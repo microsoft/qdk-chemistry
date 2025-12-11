@@ -67,6 +67,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.constants.find_constant"><code class="docutils literal notranslate"><span class="pre">find_constant()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.constants.get_constant_info"><code class="docutils literal notranslate"><span class="pre">get_constant_info()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.constants.get_constants_info"><code class="docutils literal notranslate"><span class="pre">get_constants_info()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.constants.get_current_codata_version"><code class="docutils literal notranslate"><span class="pre">get_current_codata_version()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.constants.list_constants"><code class="docutils literal notranslate"><span class="pre">list_constants()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.constants.show_constant_details"><code class="docutils literal notranslate"><span class="pre">show_constant_details()</span></code></a></li>
 </ul>
@@ -111,9 +112,9 @@
   <section id="module-qdk_chemistry.constants">
 <span id="qdk-chemistry-constants-module"></span><h1>qdk_chemistry.constants module<a class="headerlink" href="#module-qdk_chemistry.constants" title="Link to this heading"></a></h1>
 <p>QDK/Chemistry Physical Constants Module.</p>
-<p>This module provides access to physical constants from CODATA standards.
+<p>This module provides access to physical constants from CODATA standards <span id="id1">[<a class="reference internal" href="../../references.html#id28" title="Peter J. Mohr, David B. Newell, and Barry N. Taylor. CODATA recommended values of the fundamental physical constants: 2022. Reviews of Modern Physics, 97:025002, 2025. URL: https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=958143, doi:10.1103/RevModPhys.97.025002.">MNT25</a>]</span>.
 The constants are sourced from the most recent CODATA recommendations
-(currently CODATA 2018), but the underlying C++ implementation supports
+(currently CODATA 2022), but the underlying C++ implementation supports
 multiple CODATA versions for compatibility and comparison purposes.</p>
 <p>All constants are provided in their original units as specified by CODATA,
 with conversion factors available for different unit systems.</p>
@@ -122,8 +123,8 @@ and energy conversion factors commonly used in computational chemistry
 and quantum mechanics.</p>
 <dl class="simple">
 <dt>Data Source:</dt><dd><p>CODATA recommended values of the fundamental physical constants
-Currently using: CODATA 2018 (default)
-Also available: CODATA 2014 (via C++ preprocessor directives)
+Currently using: CODATA 2022 (default)
+Also available: CODATA 2018, CODATA 2014 (via C++ preprocessor directives)
 <a class="reference external" href="https://physics.nist.gov/cuu/Constants/">https://physics.nist.gov/cuu/Constants/</a></p>
 </dd>
 <dt>Constants Documentation:</dt><dd><p>Each constant includes detailed documentation about its physical meaning,
@@ -180,7 +181,7 @@ of individual constants.</p>
 <dl class="py property">
 <dt class="sig sig-object py" id="qdk_chemistry.constants.ConstantInfo.source">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">source</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.source" title="Link to this definition"></a></dt>
-<dd><p>Data source (e.g., ‘CODATA 2018’)</p>
+<dd><p>Data source (e.g., ‘CODATA 2022’)</p>
 </dd></dl>
 
 <dl class="py property">
@@ -236,6 +237,12 @@ of individual constants.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.constants.get_constants_info">
 <span class="sig-prename descclassname"><span class="pre">qdk_chemistry.constants.</span></span><span class="sig-name descname"><span class="pre">get_constants_info</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#qdk_chemistry.constants.ConstantInfo" title="qdk_chemistry.constants.ConstantInfo"><span class="pre">qdk_chemistry.constants.ConstantInfo</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.constants.get_constants_info" title="Link to this definition"></a></dt>
 <dd><p>Get documentation information for all available constants</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.constants.get_current_codata_version">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.constants.</span></span><span class="sig-name descname"><span class="pre">get_current_codata_version</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></span><a class="headerlink" href="#qdk_chemistry.constants.get_current_codata_version" title="Link to this definition"></a></dt>
+<dd><p>Get the current CODATA version being used (e.g., ‘CODATA 2022’)</p>
 </dd></dl>
 
 <dl class="py function">

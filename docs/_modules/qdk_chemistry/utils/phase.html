@@ -100,6 +100,8 @@
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
     <span class="s2">&quot;accumulated_phase_from_bits&quot;</span><span class="p">,</span>
     <span class="s2">&quot;energy_alias_candidates&quot;</span><span class="p">,</span>
@@ -123,6 +125,7 @@
 <span class="sd">        Energy estimate corresponding to ``phase_fraction``.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">angle</span> <span class="o">=</span> <span class="p">(</span><span class="n">phase_fraction</span> <span class="o">%</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">angle</span> <span class="o">&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">:</span>
         <span class="n">angle</span> <span class="o">-=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span>
@@ -154,6 +157,7 @@
 <span class="sd">        Sorted list of alias energy values covering positive and negative branches.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">period</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="n">evolution_time</span>
     <span class="c1"># Materialize the range in case a generator is provided and guarantee the zero shift.</span>
     <span class="n">shifts</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">shift_range</span><span class="p">)</span>
@@ -193,6 +197,7 @@
 <span class="sd">        Alias energy closest to ``reference_energy``.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">candidates</span> <span class="o">=</span> <span class="n">energy_alias_candidates</span><span class="p">(</span><span class="n">raw_energy</span><span class="p">,</span> <span class="n">evolution_time</span><span class="o">=</span><span class="n">evolution_time</span><span class="p">,</span> <span class="n">shift_range</span><span class="o">=</span><span class="n">shift_range</span><span class="p">)</span>
     <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">candidates</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">energy</span><span class="p">:</span> <span class="nb">abs</span><span class="p">(</span><span class="n">energy</span> <span class="o">-</span> <span class="n">reference_energy</span><span class="p">))</span></div>
 
@@ -201,7 +206,7 @@
 <div class="viewcode-block" id="iterative_phase_feedback_update">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.phase.html#qdk_chemistry.utils.phase.iterative_phase_feedback_update">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">iterative_phase_feedback_update</span><span class="p">(</span><span class="n">current_phase</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">measured_bit</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Update the feedback phase according to Kitaev&#39;s recursion.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Update the feedback phase according to Kitaev&#39;s recursion :cite:`Kitaev1995`.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        current_phase: Phase ``Φ(k+1)`` from the previous iteration.</span>
@@ -214,6 +219,7 @@
 <span class="sd">        ValueError: If ``measured_bit`` is not 0 or 1.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">measured_bit</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;measured_bit must be 0 or 1, received </span><span class="si">{</span><span class="n">measured_bit</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">current_phase</span> <span class="o">/</span> <span class="mf">2.0</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">measured_bit</span> <span class="o">/</span> <span class="mf">2.0</span></div>
@@ -232,6 +238,7 @@
 <span class="sd">        Phase fraction corresponding to ``phase_feedback``.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">phase_feedback</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span></div>
 
 
@@ -248,6 +255,7 @@
 <span class="sd">        Accumulated phase angle ``Φ(1)``.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">phase</span> <span class="o">=</span> <span class="mf">0.0</span>
     <span class="k">for</span> <span class="n">bit</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">bits_msb_first</span><span class="p">):</span>
         <span class="n">phase</span> <span class="o">=</span> <span class="n">iterative_phase_feedback_update</span><span class="p">(</span><span class="n">phase</span><span class="p">,</span> <span class="n">bit</span><span class="p">)</span>

@@ -1,0 +1,6 @@
+Namespace qdk::chemistry::constants::codata_2022
+================================================
+
+.. doxygennamespace:: qdk::chemistry::constants::codata_2022
+   :project: QDK/Chemistry
+   :members:

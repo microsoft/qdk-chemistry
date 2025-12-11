@@ -132,9 +132,11 @@
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
     <span class="s2">&quot;available&quot;</span><span class="p">,</span>
     <span class="s2">&quot;create&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;inspect_settings&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;print_settings&quot;</span><span class="p">,</span>
     <span class="s2">&quot;register&quot;</span><span class="p">,</span>
     <span class="s2">&quot;register_factory&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;show_settings&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;show_default&quot;</span><span class="p">,</span>
     <span class="s2">&quot;unregister&quot;</span><span class="p">,</span>
     <span class="s2">&quot;unregister_factory&quot;</span><span class="p">,</span>
 <span class="p">]</span>
@@ -163,7 +165,7 @@
 
 <span class="sd">            (e.g., &quot;scf_solver&quot;, &quot;active_space_selector&quot;, &quot;coupled_cluster_calculator&quot;).</span>
 
-<span class="sd">        algorithm_name (Optional[str]): The specific name of the algorithm implementation to create.</span>
+<span class="sd">        algorithm_name (str | None): The specific name of the algorithm implementation to create.</span>
 
 <span class="sd">            If None or empty string, creates the default algorithm for that type.</span>
 
@@ -171,7 +173,7 @@
 
 <span class="sd">            These configure the algorithm&#39;s settings. These are forwarded directly to the algorithm&#39;s settings</span>
 <span class="sd">            via `settings().update()`. Available settings depend on the specific algorithm</span>
-<span class="sd">            type and implementation and can be looked up with show_settings().</span>
+<span class="sd">            type and implementation and can be looked up with inspect_settings() or print_settings().</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Algorithm: The created algorithm instance.</span>
@@ -187,6 +189,10 @@
 <span class="sd">        &gt;&gt;&gt; pyscf_solver = registry.create(&quot;scf_solver&quot;, &quot;pyscf&quot;)</span>
 <span class="sd">        &gt;&gt;&gt; # Create an SCF solver with custom settings</span>
 <span class="sd">        &gt;&gt;&gt; scf = registry.create(&quot;scf_solver&quot;, &quot;pyscf&quot;, max_iterations=100, convergence_threshold=1e-8)</span>
+<span class="sd">        &gt;&gt;&gt; # Create an MP2 calculator</span>
+<span class="sd">        &gt;&gt;&gt; mp2_calc = registry.create(&quot;dynamical_correlation_calculator&quot;, &quot;qdk_mp2_calculator&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; # Create the default reference-derived calculator (MP2)</span>
+<span class="sd">        &gt;&gt;&gt; default_calc = registry.create(&quot;dynamical_correlation_calculator&quot;)</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">algorithm_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -220,14 +226,70 @@
 
 
 
-<div class="viewcode-block" id="show_settings">
-<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.registry.html#qdk_chemistry.algorithms.registry.show_settings">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">show_settings</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Show the settings schema for a specific algorithm.</span>
+<div class="viewcode-block" id="print_settings">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.registry.html#qdk_chemistry.algorithms.registry.print_settings">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">print_settings</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">characters</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">120</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Print the settings table for a specific algorithm.</span>
+
+<span class="sd">    This function retrieves and prints the settings schema for a given algorithm type and name</span>
+<span class="sd">    as a formatted table. The table displays configurable parameters including their names,</span>
+<span class="sd">    current values, allowed values/ranges, and descriptions.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        algorithm_type (str): The type of algorithm.</span>
+
+<span class="sd">            (e.g., &quot;scf_solver&quot;, &quot;active_space_selector&quot;, &quot;coupled_cluster_calculator&quot;).</span>
+
+<span class="sd">        algorithm_name (str): The specific name of the algorithm implementation.</span>
+
+<span class="sd">        characters (int): Maximum width of the table in characters (default: 120).</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        KeyError: If the specified algorithm type is not registered in the system.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; from qdk_chemistry.algorithms import registry</span>
+<span class="sd">        &gt;&gt;&gt; # Print settings table for the PySCF SCF solver</span>
+<span class="sd">        &gt;&gt;&gt; registry.print_settings(&quot;scf_solver&quot;, &quot;pyscf&quot;)</span>
+<span class="sd">        ------------------------------------------------------------------------------------------------------------------------</span>
+<span class="sd">        Key                  | Value           | Allowed              | Description</span>
+<span class="sd">        ------------------------------------------------------------------------------------------------------------------------</span>
+<span class="sd">        charge               | 0               | -                    | Total molecular charge</span>
+<span class="sd">        convergence_thresh...| 1.00e-06        | 1.00e-12 &lt;= x        | Energy convergence threshold</span>
+<span class="sd">                             |                 | x &lt;= 1.00e-02        |</span>
+<span class="sd">        force_restricted     | false           | -                    | Force restricted calculation</span>
+<span class="sd">        max_iterations       | 50              | 1 &lt;= x &lt;= 1000       | Maximum SCF iterations</span>
+<span class="sd">        method               | &quot;hf&quot;            | [&quot;hf&quot;, &quot;dft&quot;]        | SCF method to use</span>
+<span class="sd">        spin_multiplicity    | 1               | 1 &lt;= x &lt;= 10         | Spin multiplicity (2S+1)</span>
+<span class="sd">        ------------------------------------------------------------------------------------------------------------------------</span>
+<span class="sd">        &gt;&gt;&gt; # Print with custom width</span>
+<span class="sd">        &gt;&gt;&gt; registry.print_settings(&quot;scf_solver&quot;, &quot;pyscf&quot;, characters=100)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="o">==</span> <span class="n">algorithm_type</span><span class="p">:</span>
+            <span class="n">instance</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">algorithm_name</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">instance</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">as_table</span><span class="p">(</span><span class="n">characters</span><span class="p">))</span>
+            <span class="k">return</span>
+    <span class="n">available_types</span> <span class="o">=</span> <span class="p">[</span><span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">]</span>
+    <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Algorithm type &#39;</span><span class="si">{</span><span class="n">algorithm_type</span><span class="si">}</span><span class="s2">&#39; is not registered. &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;Available algorithm types: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">available_types</span><span class="p">)</span><span class="si">}</span><span class="s2">. &quot;</span>
+        <span class="s2">&quot;Available algorithm types are influenced by loaded plugins and registered custom algorithms. &quot;</span>
+        <span class="s2">&quot;Please ensure the relevant plugins are loaded or custom algorithms are registered ahead of calling create().&quot;</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="inspect_settings">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.registry.html#qdk_chemistry.algorithms.registry.inspect_settings">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">inspect_settings</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Inspect the settings schema for a specific algorithm.</span>
 
 <span class="sd">    This function retrieves the settings schema for a given algorithm type and name.</span>
 <span class="sd">    The settings schema provides information about configurable parameters for the</span>
-<span class="sd">    algorithm, including their names, expected Python types, and default values.</span>
+<span class="sd">    algorithm, including their names, expected Python types, default values, descriptions,</span>
+<span class="sd">    and allowed values/ranges.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        algorithm_type (str): The type of algorithm.</span>
@@ -237,11 +299,14 @@
 <span class="sd">        algorithm_name (str): The specific name of the algorithm implementation.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        list[tuple[str, str, Any]]: A list of tuples where each tuple contains:</span>
+<span class="sd">        list[tuple[str, str, Any, str | None, Any | None]]: A list of tuples where each tuple contains:</span>
 <span class="sd">            - Setting name (str): The name/key of the setting</span>
 <span class="sd">            - Expected Python type (str): The Python type expected for this setting</span>
 <span class="sd">              (e.g., int, float, str, bool, list[int], list[float])</span>
 <span class="sd">            - Default value (Any): The default value for this setting</span>
+<span class="sd">            - Description (str | None): Human-readable description of the setting, or None if not available</span>
+<span class="sd">            - Limits (Any | None): Allowed values or range, or None if not constrained.</span>
+<span class="sd">              For numeric types: tuple of (min, max). For strings/lists: list of allowed values.</span>
 
 <span class="sd">    Raises:</span>
 <span class="sd">        KeyError: If the specified algorithm type is not registered in the system.</span>
@@ -249,26 +314,33 @@
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; from qdk_chemistry.algorithms import registry</span>
 <span class="sd">        &gt;&gt;&gt; # Show settings for the PySCF SCF solver</span>
-<span class="sd">        &gt;&gt;&gt; settings_info = registry.show_settings(&quot;scf_solver&quot;, &quot;pyscf&quot;)</span>
-<span class="sd">        &gt;&gt;&gt; for name, python_type, default in settings_info:</span>
-<span class="sd">        ...     print(f&quot;{name}: {python_type} = {default}&quot;)</span>
-<span class="sd">        method: str = hf</span>
-<span class="sd">        basis_set: str = def2-svp</span>
-<span class="sd">        charge: int = 0</span>
-<span class="sd">        spin_multiplicity: int = 1</span>
-<span class="sd">        tolerance: float = 1e-06</span>
-<span class="sd">        max_iterations: int = 50</span>
-<span class="sd">        force_restricted: bool = False</span>
+<span class="sd">        &gt;&gt;&gt; settings_info = registry.inspect_settings(&quot;scf_solver&quot;, &quot;pyscf&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; for name, python_type, default, description, limits in settings_info:</span>
+<span class="sd">        ...     limit_str = f&quot; (allowed: {limits})&quot; if limits else &quot;&quot;</span>
+<span class="sd">        ...     desc_str = f&quot;  # {description}&quot; if description else &quot;&quot;</span>
+<span class="sd">        ...     print(f&quot;{name}: {python_type} = {default}{limit_str}{desc_str}&quot;)</span>
+<span class="sd">        method: str = hf (allowed: [&#39;hf&#39;, &#39;dft&#39;])  # SCF method to use</span>
+<span class="sd">        basis_set: str = def2-svp  # Basis set for the calculation</span>
+<span class="sd">        charge: int = 0  # Total molecular charge</span>
+<span class="sd">        spin_multiplicity: int = 1 (allowed: (1, 10))  # Spin multiplicity (2S+1)</span>
+<span class="sd">        tolerance: float = 1e-06 (allowed: (1e-12, 0.01))  # Convergence threshold</span>
+<span class="sd">        max_iterations: int = 50 (allowed: (1, 1000))  # Maximum SCF iterations</span>
+<span class="sd">        force_restricted: bool = False  # Force restricted calculation</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="o">==</span> <span class="n">algorithm_type</span><span class="p">:</span>
             <span class="n">instance</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">algorithm_name</span><span class="p">)</span>
-            <span class="n">settings</span> <span class="o">=</span> <span class="n">instance</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get_all_settings</span><span class="p">()</span>
-            <span class="k">return</span> <span class="p">[</span>
-                <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">instance</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get_expected_python_type</span><span class="p">(</span><span class="n">name</span><span class="p">),</span> <span class="n">default</span><span class="p">)</span>
-                <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">default</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
-            <span class="p">]</span>
+            <span class="n">settings</span> <span class="o">=</span> <span class="n">instance</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">default</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">python_type</span> <span class="o">=</span> <span class="n">instance</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get_expected_python_type</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+                <span class="n">description</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">instance</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get_description</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">if</span> <span class="n">instance</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">has_description</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="p">)</span>
+                <span class="n">limits</span> <span class="o">=</span> <span class="n">instance</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get_limits</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">if</span> <span class="n">instance</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">has_limits</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">name</span><span class="p">,</span> <span class="n">python_type</span><span class="p">,</span> <span class="n">default</span><span class="p">,</span> <span class="n">description</span><span class="p">,</span> <span class="n">limits</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">result</span>
     <span class="n">available_types</span> <span class="o">=</span> <span class="p">[</span><span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">]</span>
     <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
         <span class="sa">f</span><span class="s2">&quot;Algorithm type &#39;</span><span class="si">{</span><span class="n">algorithm_type</span><span class="si">}</span><span class="s2">&#39; is not registered. Available algorithm types: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">available_types</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
@@ -338,7 +410,7 @@
 <span class="sd">    type, it returns only the list of available algorithms for that type.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        algorithm_type (Optional[str]): If provided, only list algorithms of this type.</span>
+<span class="sd">        algorithm_type (str | None): If provided, only list algorithms of this type.</span>
 
 <span class="sd">            If None, list all algorithms across all types.</span>
 
@@ -356,7 +428,7 @@
 <span class="sd">        &gt;&gt;&gt; # List all available algorithms across all types</span>
 <span class="sd">        &gt;&gt;&gt; all_algorithms = registry.available()</span>
 <span class="sd">        &gt;&gt;&gt; print(all_algorithms)</span>
-<span class="sd">        {&#39;scf_solver&#39;: [&#39;pyscf&#39;, &#39;qdk&#39;], &#39;active_space_selector&#39;: [&#39;occupation&#39;, &#39;avas&#39;], ...}</span>
+<span class="sd">        {&#39;scf_solver&#39;: [&#39;pyscf&#39;, &#39;qdk&#39;], &#39;active_space_selector&#39;: [&#39;pyscf_avas&#39;, &#39;qdk_occupation&#39;, ...], ...}</span>
 <span class="sd">        &gt;&gt;&gt; # List only SCF solvers</span>
 <span class="sd">        &gt;&gt;&gt; scf_solvers = registry.available(&quot;scf_solver&quot;)</span>
 <span class="sd">        &gt;&gt;&gt; print(scf_solvers)</span>
@@ -364,7 +436,7 @@
 <span class="sd">        &gt;&gt;&gt; # Check what active space selectors are available</span>
 <span class="sd">        &gt;&gt;&gt; selectors = registry.available(&quot;active_space_selector&quot;)</span>
 <span class="sd">        &gt;&gt;&gt; print(selectors)</span>
-<span class="sd">        [&#39;occupation&#39;, &#39;avas&#39;, &#39;valence&#39;]</span>
+<span class="sd">        [&#39;pyscf_avas&#39;, &#39;qdk_occupation&#39;, &#39;qdk_autocas_eos&#39;, &#39;qdk_autocas&#39;, &#39;qdk_valence&#39;]</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">algorithm_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -376,6 +448,50 @@
         <span class="k">if</span> <span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="o">==</span> <span class="n">algorithm_type</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">factory</span><span class="o">.</span><span class="n">available</span><span class="p">()</span>
     <span class="k">return</span> <span class="p">[]</span></div>
+
+
+
+<div class="viewcode-block" id="show_default">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.registry.html#qdk_chemistry.algorithms.registry.show_default">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">show_default</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;List the default algorithm by type.</span>
+
+<span class="sd">    This function returns information about the default algorithms configured</span>
+<span class="sd">    for each algorithm type. When called without arguments, it returns a dictionary</span>
+<span class="sd">    mapping all algorithm types to their default algorithm names. When called with</span>
+<span class="sd">    a specific algorithm type, it returns only the default algorithm name for that type.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        algorithm_type (str | None): If provided, only return the default algorithm</span>
+<span class="sd">            for this type. If None, return default algorithms for all types.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict[str, str] | str: When algorithm_type is None, returns a dictionary where</span>
+<span class="sd">            keys are algorithm type names and values are the default algorithm names for</span>
+<span class="sd">            each type. When algorithm_type is specified, returns the default algorithm</span>
+<span class="sd">            name for that specific type (empty string if type not found).</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; from qdk_chemistry.algorithms import registry</span>
+<span class="sd">        &gt;&gt;&gt; # List the default algorithms across all types</span>
+<span class="sd">        &gt;&gt;&gt; default_algorithms = registry.show_default()</span>
+<span class="sd">        &gt;&gt;&gt; print(default_algorithms)</span>
+<span class="sd">        {&#39;scf_solver&#39;: &#39;qdk&#39;, &#39;active_space_selector&#39;: &#39;qdk_autocas_eos&#39;, ...}</span>
+<span class="sd">        &gt;&gt;&gt; # Get the default SCF solver</span>
+<span class="sd">        &gt;&gt;&gt; default_scf = registry.show_default(&quot;scf_solver&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; print(default_scf)</span>
+<span class="sd">        &#39;qdk&#39;</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">algorithm_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">result</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()]</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">default_algorithm_name</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">result</span>
+    <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="o">==</span> <span class="n">algorithm_type</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">factory</span><span class="o">.</span><span class="n">default_algorithm_name</span><span class="p">()</span>
+    <span class="k">return</span> <span class="s2">&quot;&quot;</span></div>
 
 
 
@@ -460,9 +576,19 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_register_cpp_factories</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Register all built-in C++ algorithm factories.</span>
+
+<span class="sd">    This internal initialization function registers all the C++-implemented</span>
+<span class="sd">    algorithm factories provided by the core library. This includes factories</span>
+<span class="sd">    for SCF solvers, active space selectors, coupled cluster calculators,</span>
+<span class="sd">    localizers, multi-configuration calculators, and other core algorithm types.</span>
+
+<span class="sd">    This function is automatically called during module import and should not</span>
+<span class="sd">    be called by users.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry._core._algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
         <span class="n">ActiveSpaceSelectorFactory</span><span class="p">,</span>
-        <span class="n">CoupledClusterCalculatorFactory</span><span class="p">,</span>
+        <span class="n">DynamicalCorrelationCalculatorFactory</span><span class="p">,</span>
         <span class="n">HamiltonianConstructorFactory</span><span class="p">,</span>
         <span class="n">LocalizerFactory</span><span class="p">,</span>
         <span class="n">MultiConfigurationCalculatorFactory</span><span class="p">,</span>
@@ -473,24 +599,35 @@
     <span class="p">)</span>
 
     <span class="n">register_factory</span><span class="p">(</span><span class="n">ActiveSpaceSelectorFactory</span><span class="p">)</span>
-    <span class="n">register_factory</span><span class="p">(</span><span class="n">CoupledClusterCalculatorFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">HamiltonianConstructorFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">LocalizerFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">MultiConfigurationCalculatorFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">MultiConfigurationScfFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">ProjectedMultiConfigurationCalculatorFactory</span><span class="p">)</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">DynamicalCorrelationCalculatorFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">ScfSolverFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">StabilityCheckerFactory</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_register_python_factories</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Register all built-in Python algorithm factories.</span>
+
+<span class="sd">    This internal initialization function registers all the Python-implemented</span>
+<span class="sd">    algorithm factories. This includes factories for energy estimators, qubit Hamiltonian solver,</span>
+<span class="sd">    qubit mappers, and state preparation algorithms that are implemented in Python.</span>
+
+<span class="sd">    This function is automatically called during module import and should not</span>
+<span class="sd">    be called by users.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.energy_estimator</span><span class="w"> </span><span class="kn">import</span> <span class="n">EnergyEstimatorFactory</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_hamiltonian_solver</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitHamiltonianSolverFactory</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitMapperFactory</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.state_preparation</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatePreparationFactory</span>  <span class="c1"># noqa: PLC0415</span>
 
     <span class="n">register_factory</span><span class="p">(</span><span class="n">EnergyEstimatorFactory</span><span class="p">())</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">StatePreparationFactory</span><span class="p">())</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">QubitMapperFactory</span><span class="p">())</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">QubitHamiltonianSolverFactory</span><span class="p">())</span>
 
 
 <span class="n">_</span> <span class="o">=</span> <span class="n">_register_cpp_factories</span><span class="p">()</span>
@@ -533,12 +670,23 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_register_python_algorithms</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Register all built-in Python algorithm instances.</span>
+
+<span class="sd">    This internal initialization function registers specific Python-implemented</span>
+<span class="sd">    algorithm instances as built-in algorithms. This includes the default QDK</span>
+<span class="sd">    energy estimator, qubit Hamiltonian solvers, and state preparation algorithms.</span>
+
+<span class="sd">    This function is automatically called during module import and should not</span>
+<span class="sd">    be called by users.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.energy_estimator</span><span class="w"> </span><span class="kn">import</span> <span class="n">QDKEnergyEstimator</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_hamiltonian_solver</span><span class="w"> </span><span class="kn">import</span> <span class="n">DenseMatrixSolver</span><span class="p">,</span> <span class="n">SparseMatrixSolver</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.state_preparation</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparseIsometryGF2XStatePreparation</span>  <span class="c1"># noqa: PLC0415</span>
 
-    <span class="c1"># Register built-in Python energy estimators</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QDKEnergyEstimator</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">SparseIsometryGF2XStatePreparation</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">DenseMatrixSolver</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">SparseMatrixSolver</span><span class="p">())</span>
 
 
 <span class="n">_register_python_algorithms</span><span class="p">()</span>

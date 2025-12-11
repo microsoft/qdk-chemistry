@@ -76,7 +76,7 @@
 <li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
 <li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
-<li class="toctree-l3"><a class="reference internal" href="reference_derived.html">Reference-derived calculations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dynamical_correlation.html">Dynamical correlation calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solving</a></li>
 <li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Self-consistent field stability checks</a></li>
 <li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State Preparation</a></li>
@@ -198,10 +198,7 @@ For a complete list of available settings with descriptions, see the <a class="r
 </div>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Set the number of states to solve for (ground state + two excited states)</span>
-<span class="n">mc_calculator</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_roots&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
-
-<span class="c1">// Set the convergence threshold for the CI iterations</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Set the convergence threshold for the CI iterations</span>
 <span class="n">mc_calculator</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;ci_residual_threshold&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0e-6</span><span class="p">);</span>
 
 <span class="c1">// Set the maximum number of Davidson iterations</span>
@@ -214,10 +211,8 @@ For a complete list of available settings with descriptions, see the <a class="r
 </div>
 <input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Configure the MC calculator</span>
-<span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_roots&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># Ground state only</span>
 <span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;ci_residual_tolerance&quot;</span><span class="p">,</span> <span class="mf">1.0e-6</span><span class="p">)</span>
-<span class="c1"># TODO: debug this setting</span>
-<span class="c1"># mc_calculator.settings().set(&quot;davidson_iterations&quot;, 200)</span>
+<span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;davidson_iterations&quot;</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
 <span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;calculate_one_rdm&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
 <span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;calculate_two_rdm&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
 
@@ -314,22 +309,17 @@ These settings are divided into base settings (common to all <a class="reference
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">num_roots</span></code></p></td>
-<td><p>int</p></td>
-<td><p>3</p></td>
-<td><p>Number of states to solve for (ground state + excited states)</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ci_residual_threshold</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ci_residual_threshold</span></code></p></td>
 <td><p>float</p></td>
 <td><p>1.0e-6</p></td>
 <td><p>Convergence threshold for <a class="reference internal" href="../../../glossary.html#term-CI"><span class="xref std std-term">CI</span></a> iterations</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">davidson_iterations</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">davidson_iterations</span></code></p></td>
 <td><p>int</p></td>
 <td><p>200</p></td>
 <td><p>Maximum number of Davidson iterations</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">calculate_one_rdm</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">calculate_one_rdm</span></code></p></td>
 <td><p>bool</p></td>
 <td><p>true</p></td>
 <td><p>Whether to calculate one-electron reduced density matrix</p></td>

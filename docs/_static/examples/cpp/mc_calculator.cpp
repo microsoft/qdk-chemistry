@@ -22,9 +22,6 @@ auto selected_ci = MultiConfigurationCalculatorFactory::create("macis_cas");
 
 // --------------------------------------------------------------------------------------------
 // start-cell-configure
-// Set the number of states to solve for (ground state + two excited states)
-mc_calculator->settings().set("num_roots", 3);
-
 // Set the convergence threshold for the CI iterations
 mc_calculator->settings().set("ci_residual_threshold", 1.0e-6);
 

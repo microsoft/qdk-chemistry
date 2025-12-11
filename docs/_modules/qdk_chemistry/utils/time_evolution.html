@@ -101,6 +101,8 @@
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Sequence</span>
 
@@ -165,6 +167,7 @@
 <span class="sd">        ValueError: If a coefficient has an imaginary part whose magnitude exceeds ``atol``.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">PauliEvolutionTerm</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">pauli</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">pauli_op</span><span class="o">.</span><span class="n">paulis</span><span class="p">,</span> <span class="n">pauli_op</span><span class="o">.</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">coeff</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">atol</span><span class="p">:</span>
@@ -203,6 +206,7 @@
 <span class="sd">        The quantum circuit with the controlled rotation appended.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">term</span><span class="o">.</span><span class="n">pauli_map</span><span class="p">:</span>
         <span class="c1"># Identity contribution results in a controlled phase on the ancilla.</span>
         <span class="n">circuit</span><span class="o">.</span><span class="n">p</span><span class="p">(</span><span class="o">-</span><span class="n">angle</span><span class="p">,</span> <span class="n">control_qubit</span><span class="p">)</span>
@@ -266,6 +270,7 @@
 <span class="sd">        ValueError: If ``power`` is less than 1.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">power</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;power must be at least 1 for controlled time evolution.&quot;</span><span class="p">)</span>
 
@@ -296,6 +301,7 @@
 <span class="sd">        List of :class:`PauliEvolutionTerm` entries representing the Hamiltonian.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="k">return</span> <span class="n">pauli_evolution_terms</span><span class="p">(</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">pauli_ops</span><span class="p">)</span></div>
 
 </pre></div>

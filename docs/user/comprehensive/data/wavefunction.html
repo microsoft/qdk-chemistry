@@ -1,0 +1,418 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wavefunction &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Wavefunction</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/user/comprehensive/data/wavefunction.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="wavefunction">
+<h1>Wavefunction<a class="headerlink" href="#wavefunction" title="Link to this heading"></a></h1>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> class in QDK/Chemistry represents quantum mechanical wavefunctions for molecular systems.
+This class provides access to wavefunction coefficients, determinants, reduced density matrices (RDMs), orbital entropies <span id="id1">[<a class="reference internal" href="../../../references.html#id5" title="Katharina Boguslawski and Paweł Tecmer. Orbital entanglement in quantum chemistry. International Journal of Quantum Chemistry, 115(19):1289-1295, 2015. doi:10.1002/qua.24832.">BT15</a>]</span>, and other quantum chemical properties.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>A wavefunction in quantum chemistry describes the quantum state of a molecular system.
+In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> class encapsulates various wavefunction types, from simple single-determinant Hartree-Fock wavefunctions to complex multi-reference wavefunctions.</p>
+<p>The class uses a container-based design where different wavefunction types (Slater determinants, configuration interaction, etc.) are implemented as specialized container classes, while the main <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> class provides a unified interface.</p>
+<section id="mathematical-representation">
+<h3>Mathematical representation<a class="headerlink" href="#mathematical-representation" title="Link to this heading"></a></h3>
+<p>Wavefunctions are represented as linear combinations of determinants:</p>
+<div class="math notranslate nohighlight">
+\[|\Psi\rangle = \sum_I c_I |\Phi_I\rangle\]</div>
+<p>where <span class="math notranslate nohighlight">\(c_I\)</span> are expansion coefficients and <span class="math notranslate nohighlight">\(|\Phi_I\rangle\)</span> are Slater determinants.</p>
+</section>
+</section>
+<section id="container-types">
+<h2>Container types<a class="headerlink" href="#container-types" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry supports different wavefunction container types for various quantum chemistry methods:</p>
+<section id="slater-determinant-container">
+<h3>Slater determinant container<a class="headerlink" href="#slater-determinant-container" title="Link to this heading"></a></h3>
+<p>Single-determinant wavefunctions (e.g., from Hartree-Fock calculations).</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Use helper function to get orbitals</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">Orbitals</span><span class="o">&gt;</span><span class="w"> </span><span class="n">orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_minimal_orbitals</span><span class="p">();</span>
+<span class="w">  </span><span class="c1">// Create a simple Slater determinant wavefunction for H2 ground state</span>
+<span class="w">  </span><span class="c1">// 2 electrons in bonding sigma orbital</span>
+<span class="w">  </span><span class="n">Configuration</span><span class="w"> </span><span class="n">det</span><span class="p">(</span><span class="s">&quot;20&quot;</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Constructor takes single determinant and orbitals as input</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">sd_container</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">SlaterDeterminantContainer</span><span class="o">&gt;</span><span class="p">(</span><span class="n">det</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">);</span>
+<span class="w">  </span><span class="n">Wavefunction</span><span class="w"> </span><span class="nf">sd_wavefunction</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">sd_container</span><span class="p">));</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use helper function to get orbitals</span>
+<span class="n">orbitals</span> <span class="o">=</span> <span class="n">make_minimal_orbitals</span><span class="p">()</span>
+
+<span class="c1"># Create a simple Slater determinant wavefunction for H2 ground state</span>
+<span class="c1"># 2 electrons in bonding sigma orbital</span>
+<span class="n">det</span> <span class="o">=</span> <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;20&quot;</span><span class="p">)</span>
+
+<span class="c1"># Constructor takes single determinant and orbitals as input</span>
+<span class="n">sd_container</span> <span class="o">=</span> <span class="n">SlaterDeterminantContainer</span><span class="p">(</span><span class="n">det</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
+<span class="n">sd_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">sd_container</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="sci-wavefunction-container">
+<h3>SCI wavefunction container<a class="headerlink" href="#sci-wavefunction-container" title="Link to this heading"></a></h3>
+<p>Sparse multi-determinant wavefunctions for Selected Configuration Interaction methods.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create an SCI wavefunction for H2</span>
+<span class="w">  </span><span class="c1">// SCI selects only the most important configurations/determinants from the</span>
+<span class="w">  </span><span class="c1">// full space</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Configuration</span><span class="o">&gt;</span><span class="w"> </span><span class="n">sci_dets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="p">(</span><span class="s">&quot;20&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Ground state</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="p">(</span><span class="s">&quot;ud&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Mixed state</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="p">(</span><span class="s">&quot;du&quot;</span><span class="p">)</span><span class="w">   </span><span class="c1">// Mixed state</span>
+<span class="w">  </span><span class="p">};</span>
+
+<span class="w">  </span><span class="c1">// Coefficients for selected determinants</span>
+<span class="w">  </span><span class="n">Eigen</span><span class="o">::</span><span class="n">VectorXd</span><span class="w"> </span><span class="nf">sci_coeffs</span><span class="p">(</span><span class="mi">3</span><span class="p">);</span>
+<span class="w">  </span><span class="n">sci_coeffs</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">0.96</span><span class="p">,</span><span class="w"> </span><span class="mf">0.15</span><span class="p">,</span><span class="w"> </span><span class="mf">0.15</span><span class="p">;</span>
+
+<span class="w">  </span><span class="c1">// Create a SCI wavefunction: requires selected coefficients and determinants,</span>
+<span class="w">  </span><span class="c1">// as well as orbitals, in constructor</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">sci_container</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">SciWavefunctionContainer</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">      </span><span class="n">sci_coeffs</span><span class="p">,</span><span class="w"> </span><span class="n">sci_dets</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">);</span>
+<span class="w">  </span><span class="n">Wavefunction</span><span class="w"> </span><span class="nf">sci_wavefunction</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">sci_container</span><span class="p">));</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create an SCI wavefunction for H2</span>
+<span class="c1"># SCI selects only the most important configurations/determinants from the full space</span>
+<span class="n">sci_dets</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;20&quot;</span><span class="p">),</span>  <span class="c1"># both electrons in bonding MO (ground state)</span>
+    <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;du&quot;</span><span class="p">),</span>  <span class="c1"># alpha in bonding, beta in antibonding</span>
+    <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;ud&quot;</span><span class="p">),</span>  <span class="c1"># beta in bonding, alpha in antibonding</span>
+<span class="p">]</span>
+
+<span class="c1"># Coefficients for selected determinants</span>
+<span class="n">sci_coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.96</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">])</span>
+
+<span class="c1"># Create a SCI wavefunction: requires selected coefficients and determinants, as well</span>
+<span class="c1"># as orbitals, in constructor</span>
+<span class="n">sci_container</span> <span class="o">=</span> <span class="n">SciWavefunctionContainer</span><span class="p">(</span><span class="n">sci_coeffs</span><span class="p">,</span> <span class="n">sci_dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
+<span class="n">sci_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">sci_container</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="cas-wavefunction-container">
+<h3>CAS wavefunction container<a class="headerlink" href="#cas-wavefunction-container" title="Link to this heading"></a></h3>
+<p>A multi-determinant wavefunction from Complete Active Space methods (CASSCF/CASCI) with comprehensive reduced density matrix support for computing electronic properties.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a CAS wavefunction for H2</span>
+<span class="w">  </span><span class="c1">// CAS(2,2) = 2 electrons in 2 MOs (bonding and antibonding)</span>
+<span class="w">  </span><span class="c1">// All possible configurations:</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Configuration</span><span class="o">&gt;</span><span class="w"> </span><span class="n">cas_dets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="p">(</span><span class="s">&quot;20&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Both electrons in bonding (ground state)</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="p">(</span><span class="s">&quot;ud&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Alpha in bonding, beta in antibonding</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="p">(</span><span class="s">&quot;du&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Beta in bonding, alpha in antibonding</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="p">(</span><span class="s">&quot;02&quot;</span><span class="p">)</span><span class="w">   </span><span class="c1">// Both electrons in antibonding</span>
+<span class="w">  </span><span class="p">};</span>
+
+<span class="w">  </span><span class="c1">// Coefficients</span>
+<span class="w">  </span><span class="n">Eigen</span><span class="o">::</span><span class="n">VectorXd</span><span class="w"> </span><span class="nf">cas_coeffs</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span>
+<span class="w">  </span><span class="n">cas_coeffs</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">0.95</span><span class="p">,</span><span class="w"> </span><span class="mf">0.15</span><span class="p">,</span><span class="w"> </span><span class="mf">0.15</span><span class="p">,</span><span class="w"> </span><span class="mf">0.05</span><span class="p">;</span><span class="w">  </span><span class="c1">// Normalized later by the container</span>
+
+<span class="w">  </span><span class="c1">// Create a CAS wavefunction : requires all coefficients and determinants, as</span>
+<span class="w">  </span><span class="c1">// well as orbitals, in constructor</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">cas_container</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">CasWavefunctionContainer</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">      </span><span class="n">cas_coeffs</span><span class="p">,</span><span class="w"> </span><span class="n">cas_dets</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">);</span>
+<span class="w">  </span><span class="n">Wavefunction</span><span class="w"> </span><span class="nf">cas_wavefunction</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">cas_container</span><span class="p">));</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a CAS wavefunction for H2</span>
+<span class="c1"># CAS(2,2) = 2 electrons in 2 MOs (bonding and antibonding)</span>
+<span class="c1"># All possible configurations:</span>
+<span class="n">cas_dets</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;20&quot;</span><span class="p">),</span>  <span class="c1"># both electrons in bonding MO (ground state)</span>
+    <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;ud&quot;</span><span class="p">),</span>  <span class="c1"># alpha in bonding, beta in antibonding</span>
+    <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;du&quot;</span><span class="p">),</span>  <span class="c1"># beta in bonding, alpha in antibonding</span>
+    <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;02&quot;</span><span class="p">),</span>  <span class="c1"># both electrons in antibonding</span>
+<span class="p">]</span>
+
+<span class="c1"># Coefficients (normalized later by container)</span>
+<span class="n">cas_coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.95</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">])</span>
+
+<span class="c1"># Create a CAS wavefunction: requires all coefficients and determinants,</span>
+<span class="c1"># as well as orbitals, in constructor</span>
+<span class="n">cas_container</span> <span class="o">=</span> <span class="n">CasWavefunctionContainer</span><span class="p">(</span><span class="n">cas_coeffs</span><span class="p">,</span> <span class="n">cas_dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
+<span class="n">cas_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">cas_container</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="properties">
+<h3>Properties<a class="headerlink" href="#properties" title="Link to this heading"></a></h3>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> class provides access to various quantum chemical properties. Availability depends on the specific container type:</p>
+<table class="docutils align-default" id="id2">
+<caption><span class="caption-text">Property availability by container type</span><a class="headerlink" href="#id2" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 40.0%" />
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Property</p></th>
+<th class="head"><p>Slater determinant</p></th>
+<th class="head"><p>CAS</p></th>
+<th class="head"><p>SCI</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>Coefficients</strong></p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Determinants</strong></p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Electron counts</strong></p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Orbital occupations</strong></p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>1-RDMs (spin-dependent)</strong></p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>1-RDMs (spin-traced)</strong></p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>2-RDMs (spin-dependent)</strong></p></td>
+<td><p>✓</p></td>
+<td><p>✓*</p></td>
+<td><p>✓*</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>2-RDMs (spin-traced)</strong></p></td>
+<td><p>✓</p></td>
+<td><p>✓*</p></td>
+<td><p>✓*</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Orbital entropies</strong></p></td>
+<td><p>✓</p></td>
+<td><p>✓*</p></td>
+<td><p>✓*</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Overlap calculations</strong></p></td>
+<td><p>✗</p></td>
+<td><p>✓</p></td>
+<td><p>✗</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Norm calculations</strong></p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+<td><p>✗</p></td>
+</tr>
+</tbody>
+</table>
+<p>Legend:
+- ✓ Available and implemented
+- ✗ Not available (method not implemented)
+- ✓* Implemented and available only if 2-RDMs were provided during construction</p>
+</section>
+</section>
+<section id="accessing-wavefunction-data">
+<h2>Accessing wavefunction data<a class="headerlink" href="#accessing-wavefunction-data" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> class provides methods to access coefficients, determinants, and derived properties:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Access coefficient(s) and determinant(s) - SD has only one</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">coeffs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_coefficients</span><span class="p">();</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">dets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_active_determinants</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Get orbital information</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">orbitals_ref</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_orbitals</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Get electron counts</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">n_alpha</span><span class="p">,</span><span class="w"> </span><span class="n">n_beta</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_total_num_electrons</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Get RDMs</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">rdm1_aa</span><span class="p">,</span><span class="w"> </span><span class="n">rdm1_bb</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_active_one_rdm_spin_dependent</span><span class="p">();</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">rdm1_total</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_active_one_rdm_spin_traced</span><span class="p">();</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">rdm2_aa</span><span class="p">,</span><span class="w"> </span><span class="n">rdm2_aabb</span><span class="p">,</span><span class="w"> </span><span class="n">rdm2_bbbb</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_active_two_rdm_spin_dependent</span><span class="p">();</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">rdm2_total</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_active_two_rdm_spin_traced</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Get single orbital entropies</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">entropies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_single_orbital_entropies</span><span class="p">();</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Access coefficient(s) and determinant(s) - SD has only one</span>
+<span class="n">coeffs</span> <span class="o">=</span> <span class="n">sd_wavefunction</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()</span>
+<span class="n">dets</span> <span class="o">=</span> <span class="n">sd_wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">()</span>
+
+<span class="c1"># Get orbital information</span>
+<span class="n">orbitals_ref</span> <span class="o">=</span> <span class="n">sd_wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+
+<span class="c1"># Get electron counts</span>
+<span class="n">n_alpha</span><span class="p">,</span> <span class="n">n_beta</span> <span class="o">=</span> <span class="n">sd_wavefunction</span><span class="o">.</span><span class="n">get_total_num_electrons</span><span class="p">()</span>
+
+<span class="c1"># Get RDMs</span>
+<span class="n">rdm1_aa</span><span class="p">,</span> <span class="n">rdm1_bb</span> <span class="o">=</span> <span class="n">sd_wavefunction</span><span class="o">.</span><span class="n">get_active_one_rdm_spin_dependent</span><span class="p">()</span>
+<span class="n">rdm1_total</span> <span class="o">=</span> <span class="n">sd_wavefunction</span><span class="o">.</span><span class="n">get_active_one_rdm_spin_traced</span><span class="p">()</span>
+<span class="n">rdm2_aaaa</span><span class="p">,</span> <span class="n">rdm2_aabb</span><span class="p">,</span> <span class="n">rdm2_bbbb</span> <span class="o">=</span> <span class="n">sd_wavefunction</span><span class="o">.</span><span class="n">get_active_two_rdm_spin_dependent</span><span class="p">()</span>
+<span class="n">rdm2_total</span> <span class="o">=</span> <span class="n">sd_wavefunction</span><span class="o">.</span><span class="n">get_active_two_rdm_spin_traced</span><span class="p">()</span>
+
+<span class="c1"># Get single orbital entropies</span>
+<span class="n">entropies</span> <span class="o">=</span> <span class="n">sd_wavefunction</span><span class="o">.</span><span class="n">get_single_orbital_entropies</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a>: Data serialization and deserialization</p></li>
+<li><p><a class="reference internal" href="../design/settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
+<li><p><a class="reference internal" href="../algorithms/active_space.html"><span class="doc">Active space methods</span></a>: Active space selection from wavefunctions</p></li>
+<li><p><a class="reference internal" href="structure.html"><span class="doc">Structure</span></a>: Molecular structure that defines the system</p></li>
+<li><p><a class="reference internal" href="orbitals.html"><span class="doc">Orbitals</span></a>: Orbital basis set for the wavefunction</p></li>
+<li><p><a class="reference internal" href="hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Electronic Hamiltonian constructed from wavefunction</p></li>
+<li><p><a class="reference internal" href="../algorithms/scf_solver.html"><span class="doc">ScfSolver</span></a>: Algorithm that produces SCF wavefunctions</p></li>
+<li><p><a class="reference internal" href="../algorithms/mc_calculator.html"><span class="doc">MCCalculator</span></a>: Algorithm for multi-configuration wavefunctions</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

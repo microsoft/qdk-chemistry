@@ -156,9 +156,8 @@ Most algorithms validate their settings only at execution time, so you can adjus
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
-
 <span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span><span class="p">,</span> <span class="n">available</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>
 
 <span class="c1"># Create an algorithm</span>
@@ -216,7 +215,7 @@ The <code class="docutils literal notranslate"><span class="pre">set</span></cod
 <span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;def2-tzvp&quot;</span><span class="p">)</span>
 
 <span class="c1"># Set a numeric value</span>
-<span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="mf">1.0e-8</span><span class="p">)</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">,</span> <span class="mf">1.0e-8</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -243,9 +242,8 @@ For cases where you want to provide a fallback value if the key doesn’t exist,
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
-
 <span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span><span class="p">,</span> <span class="n">available</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>
 
 <span class="c1"># Create an algorithm</span>
@@ -307,20 +305,20 @@ Additionally, the <code class="docutils literal notranslate"><span class="pre">t
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis set is configured: </span><span class="si">{</span><span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;basis_set&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="c1"># Check if a setting exists (Python duck typing, no type check needed)</span>
-<span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">):</span>
+<span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">):</span>
     <span class="c1"># Use the setting</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Convergence threshold: </span><span class="si">{</span><span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;tolerance&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Convergence threshold: </span><span class="si">{</span><span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;convergence_threshold&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="c1"># List the available settings</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Available settings:&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
 
 <span class="c1"># Try to get a value (Python uses get_or_default or try/except)</span>
 <span class="k">try</span><span class="p">:</span>
-    <span class="n">value</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">)</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>
     <span class="c1"># Use the value</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Got convergence threshold: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;tolerance not found&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;convergence_threshold not found&quot;</span><span class="p">)</span>
 
 <span class="c1"># Check if settings exist</span>
 <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">):</span>
@@ -343,16 +341,16 @@ Additionally, the <code class="docutils literal notranslate"><span class="pre">t
 <span class="n">settings</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span>  <span class="c1"># Re-initialize to clear</span>
 
 <span class="c1"># Validate that required settings exist</span>
-<span class="n">settings</span><span class="o">.</span><span class="n">validate_required</span><span class="p">([</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;tolerance&quot;</span><span class="p">])</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">validate_required</span><span class="p">([</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;convergence_threshold&quot;</span><span class="p">])</span>
 
 <span class="c1"># Get a setting as a string representation</span>
-<span class="n">value_str</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_as_string</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">)</span>
+<span class="n">value_str</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_as_string</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>
 
 <span class="c1"># Update an existing setting (throws if key doesn&#39;t exist)</span>
-<span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="mf">1.0e-9</span><span class="p">)</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">,</span> <span class="mf">1.0e-9</span><span class="p">)</span>
 
 <span class="c1"># Get the type name of a setting</span>
-<span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">)</span>
+<span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -402,20 +400,20 @@ present), manipulation (merging with other settings objects), and more.</p>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis set is configured: </span><span class="si">{</span><span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;basis_set&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="c1"># Check if a setting exists (Python duck typing, no type check needed)</span>
-<span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">):</span>
+<span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">):</span>
     <span class="c1"># Use the setting</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Convergence threshold: </span><span class="si">{</span><span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;tolerance&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Convergence threshold: </span><span class="si">{</span><span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;convergence_threshold&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="c1"># List the available settings</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Available settings:&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
 
 <span class="c1"># Try to get a value (Python uses get_or_default or try/except)</span>
 <span class="k">try</span><span class="p">:</span>
-    <span class="n">value</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">)</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>
     <span class="c1"># Use the value</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Got convergence threshold: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;tolerance not found&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;convergence_threshold not found&quot;</span><span class="p">)</span>
 
 <span class="c1"># Check if settings exist</span>
 <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">):</span>
@@ -438,16 +436,16 @@ present), manipulation (merging with other settings objects), and more.</p>
 <span class="n">settings</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span>  <span class="c1"># Re-initialize to clear</span>
 
 <span class="c1"># Validate that required settings exist</span>
-<span class="n">settings</span><span class="o">.</span><span class="n">validate_required</span><span class="p">([</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;tolerance&quot;</span><span class="p">])</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">validate_required</span><span class="p">([</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;convergence_threshold&quot;</span><span class="p">])</span>
 
 <span class="c1"># Get a setting as a string representation</span>
-<span class="n">value_str</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_as_string</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">)</span>
+<span class="n">value_str</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_as_string</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>
 
 <span class="c1"># Update an existing setting (throws if key doesn&#39;t exist)</span>
-<span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="mf">1.0e-9</span><span class="p">)</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">,</span> <span class="mf">1.0e-9</span><span class="p">)</span>
 
 <span class="c1"># Get the type name of a setting</span>
-<span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">)</span>
+<span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -554,7 +552,7 @@ The pattern is used throughout QDK/Chemistry, such as in the <a class="reference
 <span class="w">  </span><span class="n">MySettings</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Can only call set_default during construction</span>
 <span class="w">    </span><span class="n">set_default</span><span class="p">(</span><span class="s">&quot;max_iterations&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">);</span>
-<span class="w">    </span><span class="n">set_default</span><span class="p">(</span><span class="s">&quot;tolerance&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-6</span><span class="p">);</span>
+<span class="w">    </span><span class="n">set_default</span><span class="p">(</span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-7</span><span class="p">);</span>
 <span class="w">    </span><span class="n">set_default</span><span class="p">(</span><span class="s">&quot;method&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="p">(</span><span class="s">&quot;default&quot;</span><span class="p">));</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">};</span>
@@ -568,7 +566,7 @@ The pattern is used throughout QDK/Chemistry, such as in the <a class="reference
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="c1"># Set default values during initialization</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">set_default</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">set_default</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="mf">1e-6</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_default</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">,</span> <span class="mf">1e-6</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">set_default</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;default&quot;</span><span class="p">)</span>
 
 

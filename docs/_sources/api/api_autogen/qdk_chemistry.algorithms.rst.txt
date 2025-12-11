@@ -25,12 +25,13 @@ Submodules
 
    qdk_chemistry.algorithms.active_space_selector
    qdk_chemistry.algorithms.base
-   qdk_chemistry.algorithms.coupled_cluster_calculator
+   qdk_chemistry.algorithms.dynamical_correlation_calculator
    qdk_chemistry.algorithms.hamiltonian_constructor
    qdk_chemistry.algorithms.multi_configuration_calculator
    qdk_chemistry.algorithms.multi_configuration_scf
    qdk_chemistry.algorithms.orbital_localizer
    qdk_chemistry.algorithms.projected_multi_configuration_calculator
+   qdk_chemistry.algorithms.qubit_hamiltonian_solver
    qdk_chemistry.algorithms.registry
    qdk_chemistry.algorithms.scf_solver
    qdk_chemistry.algorithms.stability_checker

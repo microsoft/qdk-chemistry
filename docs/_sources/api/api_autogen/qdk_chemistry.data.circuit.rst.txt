@@ -1,0 +1,8 @@
+qdk\_chemistry.data.circuit module
+==================================
+
+.. automodule:: qdk_chemistry.data.circuit
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

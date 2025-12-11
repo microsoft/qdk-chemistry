@@ -14,7 +14,6 @@ Submodules
    :maxdepth: 4
 
    qdk_chemistry.utils.bitstring
-   qdk_chemistry.utils.circuit
    qdk_chemistry.utils.cubegen
    qdk_chemistry.utils.phase
    qdk_chemistry.utils.statevector

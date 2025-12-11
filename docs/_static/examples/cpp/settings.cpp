@@ -141,7 +141,7 @@ class MySettings : public Settings {
   MySettings() {
     // Can only call set_default during construction
     set_default("max_iterations", 100);
-    set_default("tolerance", 1e-6);
+    set_default("convergence_threshold", 1e-7);
     set_default("method", std::string("default"));
   }
 };

@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.qubit\_hamiltonian\_solver module
+===========================================================
+
+.. automodule:: qdk_chemistry.algorithms.qubit_hamiltonian_solver
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

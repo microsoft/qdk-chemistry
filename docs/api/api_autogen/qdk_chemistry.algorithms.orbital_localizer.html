@@ -61,7 +61,7 @@
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a><ul class="current">
 <li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.algorithms.html">qdk_chemistry.algorithms package</a><ul class="current">
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.CoupledClusterCalculator"><code class="docutils literal notranslate"><span class="pre">CoupledClusterCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.DynamicalCorrelationCalculator"><code class="docutils literal notranslate"><span class="pre">DynamicalCorrelationCalculator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator"><code class="docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HamiltonianConstructor"><code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.IterativePhaseEstimation"><code class="docutils literal notranslate"><span class="pre">IterativePhaseEstimation</span></code></a></li>
@@ -82,7 +82,9 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkOccupationActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkOccupationActiveSpaceSelector</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkPipekMezeyLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkPipekMezeyLocalizer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkScfSolver"><code class="docutils literal notranslate"><span class="pre">QdkScfSolver</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkVVHVLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkVVHVLocalizer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkValenceActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkValenceActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitHamiltonianSolver"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonianSolver</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper"><code class="docutils literal notranslate"><span class="pre">QubitMapper</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ScfSolver"><code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StabilityChecker"><code class="docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a></li>
@@ -91,8 +93,10 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.available"><code class="docutils literal notranslate"><span class="pre">available()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.create"><code class="docutils literal notranslate"><span class="pre">create()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.energy_from_phase"><code class="docutils literal notranslate"><span class="pre">energy_from_phase()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.inspect_settings"><code class="docutils literal notranslate"><span class="pre">inspect_settings()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.print_settings"><code class="docutils literal notranslate"><span class="pre">print_settings()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.register"><code class="docutils literal notranslate"><span class="pre">register()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.show_settings"><code class="docutils literal notranslate"><span class="pre">show_settings()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.show_default"><code class="docutils literal notranslate"><span class="pre">show_default()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.unregister"><code class="docutils literal notranslate"><span class="pre">unregister()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#subpackages">Subpackages</a></li>
 <li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.algorithms.html#submodules">Submodules</a></li>
@@ -331,6 +335,58 @@ maintain the occupied-virtual separation.</p>
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkPipekMezeyLocalizer" title="qdk_chemistry.algorithms.QdkPipekMezeyLocalizer"><span class="pre">qdk_chemistry.algorithms.QdkPipekMezeyLocalizer</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.orbital_localizer.QdkPipekMezeyLocalizer.__init__" title="Link to this definition"></a></dt>
 <dd><p>Default constructor.</p>
 <p>Initializes a Pipek-Mezey localizer with default settings.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.orbital_localizer.QdkVVHVLocalizer">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.orbital_localizer.</span></span><span class="sig-name descname"><span class="pre">QdkVVHVLocalizer</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.orbital_localizer.QdkVVHVLocalizer" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.OrbitalLocalizer" title="qdk_chemistry.algorithms.OrbitalLocalizer"><code class="xref py py-class docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a></p>
+<p>QDK Valence Virtual - Hard Virtual (VV-HV) orbital localizer.</p>
+<p>This class provides a concrete implementation of the orbital localizer using
+the VV-HV localization algorithm. The VV-HV algorithm partitions virtual
+orbitals into valence virtuals (VVs) and hard virtuals (HVs) based on
+projection onto a minimal basis, then localizes each space separately.</p>
+<p>The algorithm is particularly useful for post-Hartree-Fock methods where
+separate treatment of valence and Rydberg-like virtual orbitals improves
+computational efficiency and accuracy.</p>
+<dl class="simple">
+<dt>Implementation based on:</dt><dd><p>Subotnik et al. JCP 123, 114108 (2005)
+Wang et al. JCTC 21, 1163 (2025)</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This localizer requires all orbital indices to be covered in the
+localization call.</p>
+</div>
+<p>Typical usage:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">alg</span>
+
+<span class="c1"># Create a VV-HV localizer</span>
+<span class="n">localizer</span> <span class="o">=</span> <span class="n">alg</span><span class="o">.</span><span class="n">QdkVVHVLocalizer</span><span class="p">()</span>
+
+<span class="c1"># Configure settings if needed</span>
+<span class="n">localizer</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;minimal_basis&quot;</span><span class="p">,</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
+<span class="n">localizer</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;weighted_orthogonalization&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="n">localizer</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+<span class="n">localizer</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;convergence_tolerance&quot;</span><span class="p">,</span> <span class="mf">1e-8</span><span class="p">)</span>
+
+<span class="c1"># Localize orbitals (must include all orbital indices)</span>
+<span class="n">localized_wfn</span> <span class="o">=</span> <span class="n">localizer</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">,</span> <span class="n">loc_indices_a</span><span class="p">,</span> <span class="n">loc_indices_b</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p><a class="reference internal" href="#qdk_chemistry.algorithms.orbital_localizer.OrbitalLocalizer" title="qdk_chemistry.algorithms.orbital_localizer.OrbitalLocalizer"><code class="xref py py-class docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a>
+<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">qdk_chemistry.data.Wavefunction</span></code></a></p>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.orbital_localizer.QdkVVHVLocalizer.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkVVHVLocalizer" title="qdk_chemistry.algorithms.QdkVVHVLocalizer"><span class="pre">qdk_chemistry.algorithms.QdkVVHVLocalizer</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.orbital_localizer.QdkVVHVLocalizer.__init__" title="Link to this definition"></a></dt>
+<dd><p>Default constructor.</p>
+<p>Initializes a VV-HV localizer with default settings.</p>
 </dd></dl>
 
 </dd></dl>

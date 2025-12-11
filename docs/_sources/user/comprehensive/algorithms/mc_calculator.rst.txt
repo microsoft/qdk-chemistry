@@ -121,10 +121,6 @@ These settings apply to all :term:`MC` calculation methods:
      - Type
      - Default
      - Description
-   * - ``num_roots``
-     - int
-     - 3
-     - Number of states to solve for (ground state + excited states)
    * - ``ci_residual_threshold``
      - float
      - 1.0e-6

@@ -112,11 +112,12 @@
 <span id="qdk-chemistry-plugins-qiskit-energy-estimator-module"></span><h1>qdk_chemistry.plugins.qiskit.energy_estimator module<a class="headerlink" href="#module-qdk_chemistry.plugins.qiskit.energy_estimator" title="Link to this heading"></a></h1>
 <p>QDK/Chemistry energy estimator module.</p>
 <p>This module defines a custom <cite>EnergyEstimator</cite> class for evaluating expectation values of quantum circuits
-with respect to Hamiltonian. The estimator leverages Qiskit backends to execute quantum circuits and
-collect bitstring outcomes.</p>
+with respect to Hamiltonian.
+The estimator leverages Qiskit <span id="id1">[<a class="reference internal" href="../../references.html#id21" title="Ali Javadi-Abhari, Matthew Treinish, Kevin Krsulich, Christopher J. Wood, Jake Lishman, Julien Gacon, Simon Martiel, Paul D. Nation, Lev S. Bishop, Andrew W. Cross, Blake R. Johnson, and Jay M. Gambetta. Quantum computing with Qiskit. arXiv, 2024. doi:10.48550/arXiv.2405.08810.">JATK+24</a>]</span> backends to execute quantum circuits and collect
+bitstring outcomes.</p>
 <dl class="simple">
 <dt>Key Features:</dt><dd><ul class="simple">
-<li><p>Accepts a quantum circuit (as a QASM string) and observables (as a list of QubitHamiltonian).</p></li>
+<li><p>Accepts a quantum circuit (as a Circuit) and observables (as a list of QubitHamiltonian).</p></li>
 <li><p>Generates measurement circuits for each observable term.</p></li>
 <li><p>Executes measurement circuits on a simulator backend with a specified number of shots.</p></li>
 <li><p>Collects bitstring counts and computes expectation values and variances.</p></li>
@@ -126,46 +127,36 @@ collect bitstring outcomes.</p>
 </dl>
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimator">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.qiskit.energy_estimator.</span></span><span class="sig-name descname"><span class="pre">QiskitEnergyEstimator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">backend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">42</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/energy_estimator.html#QiskitEnergyEstimator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimator" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.qiskit.energy_estimator.</span></span><span class="sig-name descname"><span class="pre">QiskitEnergyEstimator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">42</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend_options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/energy_estimator.html#QiskitEnergyEstimator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimator" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator" title="qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a></p>
 <p>Custom Estimator to estimate expectation values of quantum circuits with respect to a given observable.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>backend</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.providers.BackendV2" title="(in Qiskit v2.2)"><em>qiskit.providers.backend.BackendV2</em></a><em> | </em><em>None</em>)</p></li>
 <li><p><strong>seed</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>backend_options</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>Any</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>backend</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.providers.BackendV2" title="(in Qiskit v2.2)"><em>qiskit.providers.backend.BackendV2</em></a><em> | </em><em>None</em>)</p></li>
 </ul>
 </dd>
 </dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimator.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">backend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">42</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/energy_estimator.html#QiskitEnergyEstimator.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimator.__init__" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">42</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend_options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/energy_estimator.html#QiskitEnergyEstimator.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimator.__init__" title="Link to this definition"></a></dt>
 <dd><p>Initialize the Estimator with a backend and optional transpilation settings.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>backend</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.providers.BackendV2" title="(in Qiskit v2.2)"><em>BackendV2</em></a><em> | </em><em>None</em>) – Backend simulator to run circuits. Default to use qiskit AerSimulator.</p></li>
-<li><p><strong>seed</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Seed for the simulator to ensure reproducibility. Default is 42.
-This argument takes priority over the seed specified in the Backend configuration.</p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimator.from_backend_options">
-<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_backend_options</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">42</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend_options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/energy_estimator.html#QiskitEnergyEstimator.from_backend_options"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimator.from_backend_options" title="Link to this definition"></a></dt>
-<dd><p>Create an EnergyEstimator from specified backend options for Aer simulator.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator" title="qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
 <li><p><strong>seed</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Seed for the simulator to ensure reproducibility. Default is 42.
 This argument takes priority over the seed specified in the Backend configuration/options.</p></li>
-<li><p><strong>backend_options</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>] </em><em>| </em><em>None</em>) – Backend-specific configuration dictionary. Frequently used options include
-<code class="docutils literal notranslate"><span class="pre">{&quot;seed_simulator&quot;:</span> <span class="pre">int,</span> <span class="pre">&quot;noise_model&quot;:</span> <span class="pre">NoiseModel,</span> <span class="pre">...}</span></code></p></li>
+<li><p><strong>backend_options</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>] </em><em>| </em><em>None</em>) – Backend-specific configuration dictionary for Qiskit AerSimulator.
+Frequently used options include <code class="docutils literal notranslate"><span class="pre">{&quot;seed_simulator&quot;:</span> <span class="pre">int,</span> <span class="pre">&quot;noise_model&quot;:</span> <span class="pre">NoiseModel,</span> <span class="pre">...}</span></code>.
+The backend option “seed_simulator” is overwritten by seed.
+The backend option “noise_model” is overwritten when a noise model is provided as argument in the
+<code class="docutils literal notranslate"><span class="pre">run</span></code> function.
+This keyword argument is not compatible with qdk_chemistry.algorithms.create.</p></li>
+<li><p><strong>backend</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.providers.BackendV2" title="(in Qiskit v2.2)"><em>BackendV2</em></a><em> | </em><em>None</em>) – Backend simulator to run circuits. Defaults to Qiskit AerSimulator.
+<code class="docutils literal notranslate"><span class="pre">backend</span></code> and <code class="docutils literal notranslate"><span class="pre">backend_options</span></code> are mutually exclusive; provide only one.
+This keyword argument is not compatible with qdk_chemistry.algorithms.create.</p></li>
 </ul>
 </dd>
 </dl>
@@ -181,6 +172,23 @@ This argument takes priority over the seed specified in the Backend configuratio
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
 </dd>
 </dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimatorSettings">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.qiskit.energy_estimator.</span></span><span class="sig-name descname"><span class="pre">QiskitEnergyEstimatorSettings</span></span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/energy_estimator.html#QiskitEnergyEstimatorSettings"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimatorSettings" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Settings" title="qdk_chemistry.data.Settings"><code class="xref py py-class docutils literal notranslate"><span class="pre">Settings</span></code></a></p>
+<p>Settings configuration for a QiskitEnergyEstimator.</p>
+<dl class="simple">
+<dt>QiskitEnergyEstimator-specific settings:</dt><dd><p>seed (int, default=42): Random seed for reproducibility.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimatorSettings.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/energy_estimator.html#QiskitEnergyEstimatorSettings.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimatorSettings.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize QiskitEnergyEstimatorSettings.</p>
 </dd></dl>
 
 </dd></dl>

@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.dynamical\_correlation\_calculator module
+===================================================================
+
+.. automodule:: qdk_chemistry.algorithms.dynamical_correlation_calculator
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

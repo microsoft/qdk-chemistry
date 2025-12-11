@@ -27,7 +27,7 @@
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
     <link rel="next" title="qdk_chemistry.algorithms.scf_solver module" href="qdk_chemistry.algorithms.scf_solver.html" />
-    <link rel="prev" title="qdk_chemistry.algorithms.projected_multi_configuration_calculator module" href="qdk_chemistry.algorithms.projected_multi_configuration_calculator.html" /> 
+    <link rel="prev" title="qdk_chemistry.algorithms.qubit_hamiltonian_solver module" href="qdk_chemistry.algorithms.qubit_hamiltonian_solver.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -61,7 +61,7 @@
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a><ul class="current">
 <li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.algorithms.html">qdk_chemistry.algorithms package</a><ul class="current">
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.CoupledClusterCalculator"><code class="docutils literal notranslate"><span class="pre">CoupledClusterCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.DynamicalCorrelationCalculator"><code class="docutils literal notranslate"><span class="pre">DynamicalCorrelationCalculator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator"><code class="docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HamiltonianConstructor"><code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.IterativePhaseEstimation"><code class="docutils literal notranslate"><span class="pre">IterativePhaseEstimation</span></code></a></li>
@@ -82,7 +82,9 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkOccupationActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkOccupationActiveSpaceSelector</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkPipekMezeyLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkPipekMezeyLocalizer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkScfSolver"><code class="docutils literal notranslate"><span class="pre">QdkScfSolver</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkVVHVLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkVVHVLocalizer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkValenceActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkValenceActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitHamiltonianSolver"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonianSolver</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper"><code class="docutils literal notranslate"><span class="pre">QubitMapper</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ScfSolver"><code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StabilityChecker"><code class="docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a></li>
@@ -91,8 +93,10 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.available"><code class="docutils literal notranslate"><span class="pre">available()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.create"><code class="docutils literal notranslate"><span class="pre">create()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.energy_from_phase"><code class="docutils literal notranslate"><span class="pre">energy_from_phase()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.inspect_settings"><code class="docutils literal notranslate"><span class="pre">inspect_settings()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.print_settings"><code class="docutils literal notranslate"><span class="pre">print_settings()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.register"><code class="docutils literal notranslate"><span class="pre">register()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.show_settings"><code class="docutils literal notranslate"><span class="pre">show_settings()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.show_default"><code class="docutils literal notranslate"><span class="pre">show_default()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.unregister"><code class="docutils literal notranslate"><span class="pre">unregister()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#subpackages">Subpackages</a></li>
 <li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.algorithms.html#submodules">Submodules</a></li>
@@ -176,7 +180,7 @@ type, it returns only the list of available algorithms for that type.</p>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]] | <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>algorithm_type</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – <p>If provided, only list algorithms of this type.</p>
+<dd class="field-even"><p><strong>algorithm_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>) – <p>If provided, only list algorithms of this type.</p>
 <p>If None, list all algorithms across all types.</p>
 </p>
 </dd>
@@ -200,7 +204,7 @@ algorithms are available).</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># List all available algorithms across all types</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">all_algorithms</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">all_algorithms</span><span class="p">)</span>
-<span class="go">{&#39;scf_solver&#39;: [&#39;pyscf&#39;, &#39;qdk&#39;], &#39;active_space_selector&#39;: [&#39;occupation&#39;, &#39;avas&#39;], ...}</span>
+<span class="go">{&#39;scf_solver&#39;: [&#39;pyscf&#39;, &#39;qdk&#39;], &#39;active_space_selector&#39;: [&#39;pyscf_avas&#39;, &#39;qdk_occupation&#39;, ...], ...}</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># List only SCF solvers</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">scf_solvers</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">scf_solvers</span><span class="p">)</span>
@@ -208,7 +212,7 @@ algorithms are available).</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Check what active space selectors are available</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">selectors</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;active_space_selector&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">selectors</span><span class="p">)</span>
-<span class="go">[&#39;occupation&#39;, &#39;avas&#39;, &#39;valence&#39;]</span>
+<span class="go">[&#39;pyscf_avas&#39;, &#39;qdk_occupation&#39;, &#39;qdk_autocas_eos&#39;, &#39;qdk_autocas&#39;, &#39;qdk_valence&#39;]</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -232,13 +236,13 @@ algorithms. Use <a class="reference internal" href="#qdk_chemistry.algorithms.re
 <li><p><strong>algorithm_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – <p>The type of algorithm to create.</p>
 <p>(e.g., “scf_solver”, “active_space_selector”, “coupled_cluster_calculator”).</p>
 </p></li>
-<li><p><strong>algorithm_name</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – <p>The specific name of the algorithm implementation to create.</p>
+<li><p><strong>algorithm_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>) – <p>The specific name of the algorithm implementation to create.</p>
 <p>If None or empty string, creates the default algorithm for that type.</p>
 </p></li>
 <li><p><strong>kwargs</strong> – <p>Optional keyword arguments (passed via <code class="docutils literal notranslate"><span class="pre">**kwargs</span></code>).</p>
 <p>These configure the algorithm’s settings. These are forwarded directly to the algorithm’s settings
 via <cite>settings().update()</cite>. Available settings depend on the specific algorithm
-type and implementation and can be looked up with show_settings().</p>
+type and implementation and can be looked up with inspect_settings() or print_settings().</p>
 </p></li>
 </ul>
 </dd>
@@ -260,6 +264,116 @@ type and implementation and can be looked up with show_settings().</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">pyscf_solver</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;pyscf&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Create an SCF solver with custom settings</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">scf</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;pyscf&quot;</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">convergence_threshold</span><span class="o">=</span><span class="mf">1e-8</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Create an MP2 calculator</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mp2_calc</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;dynamical_correlation_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_mp2_calculator&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Create the default reference-derived calculator (MP2)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">default_calc</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;dynamical_correlation_calculator&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.inspect_settings">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.registry.</span></span><span class="sig-name descname"><span class="pre">inspect_settings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">algorithm_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">algorithm_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/registry.html#inspect_settings"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.registry.inspect_settings" title="Link to this definition"></a></dt>
+<dd><p>Inspect the settings schema for a specific algorithm.</p>
+<p>This function retrieves the settings schema for a given algorithm type and name.
+The settings schema provides information about configurable parameters for the
+algorithm, including their names, expected Python types, default values, descriptions,
+and allowed values/ranges.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>algorithm_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – <p>The type of algorithm.</p>
+<p>(e.g., “scf_solver”, “active_space_selector”, “coupled_cluster_calculator”).</p>
+</p></li>
+<li><p><strong>algorithm_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The specific name of the algorithm implementation.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><dl class="simple">
+<dt>A list of tuples where each tuple contains:</dt><dd><ul class="simple">
+<li><p>Setting name (str): The name/key of the setting</p></li>
+<li><p>Expected Python type (str): The Python type expected for this setting
+(e.g., int, float, str, bool, list[int], list[float])</p></li>
+<li><p>Default value (Any): The default value for this setting</p></li>
+<li><p>Description (str | None): Human-readable description of the setting, or None if not available</p></li>
+<li><p>Limits (Any | None): Allowed values or range, or None if not constrained.
+For numeric types: tuple of (min, max). For strings/lists: list of allowed values.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>, Any, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a> | None, Any | None]]</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#KeyError" title="(in Python v3.14)"><strong>KeyError</strong></a> – If the specified algorithm type is not registered in the system.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Show settings for the PySCF SCF solver</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings_info</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">inspect_settings</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;pyscf&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">python_type</span><span class="p">,</span> <span class="n">default</span><span class="p">,</span> <span class="n">description</span><span class="p">,</span> <span class="n">limits</span> <span class="ow">in</span> <span class="n">settings_info</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">limit_str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot; (allowed: </span><span class="si">{</span><span class="n">limits</span><span class="si">}</span><span class="s2">)&quot;</span> <span class="k">if</span> <span class="n">limits</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+<span class="gp">... </span>    <span class="n">desc_str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;  # </span><span class="si">{</span><span class="n">description</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">description</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">python_type</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">default</span><span class="si">}{</span><span class="n">limit_str</span><span class="si">}{</span><span class="n">desc_str</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="go">method: str = hf (allowed: [&#39;hf&#39;, &#39;dft&#39;])  # SCF method to use</span>
+<span class="go">basis_set: str = def2-svp  # Basis set for the calculation</span>
+<span class="go">charge: int = 0  # Total molecular charge</span>
+<span class="go">spin_multiplicity: int = 1 (allowed: (1, 10))  # Spin multiplicity (2S+1)</span>
+<span class="go">tolerance: float = 1e-06 (allowed: (1e-12, 0.01))  # Convergence threshold</span>
+<span class="go">max_iterations: int = 50 (allowed: (1, 1000))  # Maximum SCF iterations</span>
+<span class="go">force_restricted: bool = False  # Force restricted calculation</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.print_settings">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.registry.</span></span><span class="sig-name descname"><span class="pre">print_settings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">algorithm_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">algorithm_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">characters</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">120</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/registry.html#print_settings"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.registry.print_settings" title="Link to this definition"></a></dt>
+<dd><p>Print the settings table for a specific algorithm.</p>
+<p>This function retrieves and prints the settings schema for a given algorithm type and name
+as a formatted table. The table displays configurable parameters including their names,
+current values, allowed values/ranges, and descriptions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>algorithm_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – <p>The type of algorithm.</p>
+<p>(e.g., “scf_solver”, “active_space_selector”, “coupled_cluster_calculator”).</p>
+</p></li>
+<li><p><strong>algorithm_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The specific name of the algorithm implementation.</p></li>
+<li><p><strong>characters</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Maximum width of the table in characters (default: 120).</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#KeyError" title="(in Python v3.14)"><strong>KeyError</strong></a> – If the specified algorithm type is not registered in the system.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Print settings table for the PySCF SCF solver</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">registry</span><span class="o">.</span><span class="n">print_settings</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;pyscf&quot;</span><span class="p">)</span>
+<span class="go">------------------------------------------------------------------------------------------------------------------------</span>
+<span class="go">Key                  | Value           | Allowed              | Description</span>
+<span class="go">------------------------------------------------------------------------------------------------------------------------</span>
+<span class="go">charge               | 0               | -                    | Total molecular charge</span>
+<span class="go">convergence_thresh...| 1.00e-06        | 1.00e-12 &lt;= x        | Energy convergence threshold</span>
+<span class="go">                     |                 | x &lt;= 1.00e-02        |</span>
+<span class="go">force_restricted     | false           | -                    | Force restricted calculation</span>
+<span class="go">max_iterations       | 50              | 1 &lt;= x &lt;= 1000       | Maximum SCF iterations</span>
+<span class="go">method               | &quot;hf&quot;            | [&quot;hf&quot;, &quot;dft&quot;]        | SCF method to use</span>
+<span class="go">spin_multiplicity    | 1               | 1 &lt;= x &lt;= 10         | Spin multiplicity (2S+1)</span>
+<span class="go">------------------------------------------------------------------------------------------------------------------------</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Print with custom width</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">registry</span><span class="o">.</span><span class="n">print_settings</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;pyscf&quot;</span><span class="p">,</span> <span class="n">characters</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -324,56 +438,44 @@ thus adding entire algorithm types.</p>
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.show_settings">
-<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.registry.</span></span><span class="sig-name descname"><span class="pre">show_settings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">algorithm_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">algorithm_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/registry.html#show_settings"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.registry.show_settings" title="Link to this definition"></a></dt>
-<dd><p>Show the settings schema for a specific algorithm.</p>
-<p>This function retrieves the settings schema for a given algorithm type and name.
-The settings schema provides information about configurable parameters for the
-algorithm, including their names, expected Python types, and default values.</p>
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.show_default">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.registry.</span></span><span class="sig-name descname"><span class="pre">show_default</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">algorithm_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/registry.html#show_default"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.registry.show_default" title="Link to this definition"></a></dt>
+<dd><p>List the default algorithm by type.</p>
+<p>This function returns information about the default algorithms configured
+for each algorithm type. When called without arguments, it returns a dictionary
+mapping all algorithm types to their default algorithm names. When called with
+a specific algorithm type, it returns only the default algorithm name for that type.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]]</span></p>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>] | <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>algorithm_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – <p>The type of algorithm.</p>
-<p>(e.g., “scf_solver”, “active_space_selector”, “coupled_cluster_calculator”).</p>
-</p></li>
-<li><p><strong>algorithm_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The specific name of the algorithm implementation.</p></li>
-</ul>
+<dd class="field-even"><p><strong>algorithm_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>) – If provided, only return the default algorithm
+for this type. If None, return default algorithms for all types.</p>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p><dl class="simple">
-<dt>A list of tuples where each tuple contains:</dt><dd><ul class="simple">
-<li><p>Setting name (str): The name/key of the setting</p></li>
-<li><p>Expected Python type (str): The Python type expected for this setting
-(e.g., int, float, str, bool, list[int], list[float])</p></li>
-<li><p>Default value (Any): The default value for this setting</p></li>
-</ul>
+<dt>When algorithm_type is None, returns a dictionary where</dt><dd><p>keys are algorithm type names and values are the default algorithm names for
+each type. When algorithm_type is specified, returns the default algorithm
+name for that specific type (empty string if type not found).</p>
 </dd>
 </dl>
 </p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>, Any]]</p>
-</dd>
-<dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#KeyError" title="(in Python v3.14)"><strong>KeyError</strong></a> – If the specified algorithm type is not registered in the system.</p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>] | <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Show settings for the PySCF SCF solver</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings_info</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">show_settings</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;pyscf&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">python_type</span><span class="p">,</span> <span class="n">default</span> <span class="ow">in</span> <span class="n">settings_info</span><span class="p">:</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">python_type</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">default</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="go">method: str = hf</span>
-<span class="go">basis_set: str = def2-svp</span>
-<span class="go">charge: int = 0</span>
-<span class="go">spin_multiplicity: int = 1</span>
-<span class="go">tolerance: float = 1e-06</span>
-<span class="go">max_iterations: int = 50</span>
-<span class="go">force_restricted: bool = False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># List the default algorithms across all types</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">default_algorithms</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">show_default</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">default_algorithms</span><span class="p">)</span>
+<span class="go">{&#39;scf_solver&#39;: &#39;qdk&#39;, &#39;active_space_selector&#39;: &#39;qdk_autocas_eos&#39;, ...}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Get the default SCF solver</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">default_scf</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">show_default</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">default_scf</span><span class="p">)</span>
+<span class="go">&#39;qdk&#39;</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -432,7 +534,7 @@ thus removing entire algorithm types.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="qdk_chemistry.algorithms.projected_multi_configuration_calculator.html" class="btn btn-neutral float-left" title="qdk_chemistry.algorithms.projected_multi_configuration_calculator module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.algorithms.qubit_hamiltonian_solver.html" class="btn btn-neutral float-left" title="qdk_chemistry.algorithms.qubit_hamiltonian_solver module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="qdk_chemistry.algorithms.scf_solver.html" class="btn btn-neutral float-right" title="qdk_chemistry.algorithms.scf_solver module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

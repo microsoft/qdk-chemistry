@@ -87,7 +87,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.data.qubit_hamiltonian</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry Qubit Hamiltonian Module.</span>
+<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry Qubit Hamiltonian module.</span>
 
 <span class="sd">This module provides the QubitHamiltonian dataclass for electronic structure problems. It bridges fermionic Hamiltonians</span>
 <span class="sd">and quantum circuit construction or measurement workflows.</span>
@@ -108,6 +108,7 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Wavefunction</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataClass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.statevector</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_statevector_from_wavefunction</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;filter_and_group_pauli_ops_from_wavefunction&quot;</span><span class="p">]</span>
@@ -125,6 +126,9 @@
     <span class="c1"># Class attribute for filename validation</span>
     <span class="n">_data_type_name</span> <span class="o">=</span> <span class="s2">&quot;qubit_hamiltonian&quot;</span>
 
+    <span class="c1"># Serialization version for this class</span>
+    <span class="n">_serialization_version</span> <span class="o">=</span> <span class="s2">&quot;0.1.0&quot;</span>
+
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pauli_strings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">coefficients</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize a QubitHamiltonian.</span>
 
@@ -137,6 +141,7 @@
 <span class="sd">                or if the Pauli strings or coefficients are invalid.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">coefficients</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Mismatch between number of Pauli strings and coefficients.&quot;</span><span class="p">)</span>
 
@@ -181,38 +186,27 @@
 <span class="sd">            A list of ``QubitHamiltonian`` representing the grouped Hamiltonian.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="n">sparse_pauli_ops</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pauli_ops</span><span class="o">.</span><span class="n">group_commuting</span><span class="p">(</span><span class="n">qubit_wise</span><span class="o">=</span><span class="n">qubit_wise</span><span class="p">)</span>
         <span class="k">return</span> <span class="p">[</span>
             <span class="n">QubitHamiltonian</span><span class="p">(</span><span class="n">pauli_strings</span><span class="o">=</span><span class="n">group</span><span class="o">.</span><span class="n">paulis</span><span class="o">.</span><span class="n">to_labels</span><span class="p">(),</span> <span class="n">coefficients</span><span class="o">=</span><span class="n">group</span><span class="o">.</span><span class="n">coeffs</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">sparse_pauli_ops</span>
         <span class="p">]</span>
 
-    <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">exact_energy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute the exact ground state energy via matrix diagonalization.</span>
-
-<span class="sd">        Returns:</span>
-<span class="sd">            float | None: The minimum eigenvalue if qubit count is small enough, else None.</span>
-
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">eigvalsh</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pauli_ops</span><span class="o">.</span><span class="n">to_matrix</span><span class="p">())</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
-
     <span class="c1"># DataClass interface implementation</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get a human-readable summary of the Hamiltonian.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Qubit Hamiltonian</span><span class="se">\n</span><span class="s2">&quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;  Number of qubits: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">num_qubits</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;  Number of terms: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">)</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;  Exact energy: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">exact_energy</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Qubit Hamiltonian</span><span class="se">\n</span><span class="s2">  Number of qubits: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">num_qubits</span><span class="si">}</span><span class="se">\n</span><span class="s2">  Number of terms: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">)</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert the Hamiltonian to a dictionary for JSON serialization.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="p">{</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">&quot;pauli_strings&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">,</span>
             <span class="s2">&quot;coefficients&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">coefficients</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
         <span class="p">}</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_add_json_version</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">to_hdf5</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Save the Hamiltonian to an HDF5 group.</span>
@@ -222,6 +216,7 @@
 <span class="sd">            Python users should call to_hdf5_file() directly.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_add_hdf5_version</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
         <span class="n">group</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;pauli_strings&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;S&quot;</span><span class="p">))</span>
         <span class="n">group</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;coefficients&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">coefficients</span><span class="p">)</span>
 
@@ -235,7 +230,11 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            QubitHamiltonian: New instance reconstructed from JSON data</span>
 
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If version field is missing or incompatible</span>
+
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">_validate_json_version</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_serialization_version</span><span class="p">,</span> <span class="n">json_data</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
             <span class="n">pauli_strings</span><span class="o">=</span><span class="n">json_data</span><span class="p">[</span><span class="s2">&quot;pauli_strings&quot;</span><span class="p">],</span>
             <span class="n">coefficients</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">json_data</span><span class="p">[</span><span class="s2">&quot;coefficients&quot;</span><span class="p">]),</span>
@@ -251,7 +250,11 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            QubitHamiltonian: New instance reconstructed from HDF5 data</span>
 
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If version attribute is missing or incompatible</span>
+
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">_validate_hdf5_version</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_serialization_version</span><span class="p">,</span> <span class="n">group</span><span class="p">)</span>
         <span class="n">pauli_strings</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;pauli_strings&quot;</span><span class="p">][:]]</span>
         <span class="n">coefficients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">group</span><span class="p">[</span><span class="s2">&quot;coefficients&quot;</span><span class="p">])</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">pauli_strings</span><span class="o">=</span><span class="n">pauli_strings</span><span class="p">,</span> <span class="n">coefficients</span><span class="o">=</span><span class="n">coefficients</span><span class="p">)</span>
@@ -290,6 +293,7 @@
 <span class="sd">            * A list of classical coefficients for terms that were reduced to classical contributions.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">psi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">statevector</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">complex</span><span class="p">)</span>
     <span class="n">norm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">psi</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">norm</span> <span class="o">&lt;</span> <span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span><span class="p">:</span>
@@ -393,6 +397,7 @@
 <span class="sd">            * A list of classical coefficients for terms that were reduced to classical contributions.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">psi</span> <span class="o">=</span> <span class="n">create_statevector_from_wavefunction</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">_filter_and_group_pauli_ops_from_statevector</span><span class="p">(</span>
         <span class="n">hamiltonian</span><span class="p">,</span> <span class="n">psi</span><span class="p">,</span> <span class="n">abelian_grouping</span><span class="p">,</span> <span class="n">trimming</span><span class="p">,</span> <span class="n">trimming_tolerance</span>

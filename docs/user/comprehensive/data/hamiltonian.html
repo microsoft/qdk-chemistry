@@ -147,6 +147,19 @@ While setter methods are available for construction and initialization purposes,
 <li><p><strong>Selected orbital indices</strong>: Indices defining the active space orbitals</p></li>
 <li><p><strong>Number of electrons</strong>: Count of electrons in the active space</p></li>
 </ul>
+<section id="restricted-vs-unrestricted-hamiltonians">
+<h3>Restricted vs. unrestricted Hamiltonians<a class="headerlink" href="#restricted-vs-unrestricted-hamiltonians" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">Hamiltonian</span></code> class supports both restricted and unrestricted representations:</p>
+<ul class="simple">
+<li><p><strong>Restricted</strong>: Uses the same spatial orbitals for alpha and beta electrons. Suitable for closed-shell systems where alpha and beta electrons occupy the same spatial orbitals with opposite spins.</p></li>
+<li><p><strong>Unrestricted</strong>: Allows different spatial orbitals for alpha and beta electrons.</p></li>
+</ul>
+<p>For unrestricted Hamiltonians, the one-electron and two-electron integrals are stored separately for each spin channel:</p>
+<ul class="simple">
+<li><p>One-electron integrals: <span class="math notranslate nohighlight">\(h_{\alpha\alpha}\)</span> and <span class="math notranslate nohighlight">\(h_{\beta\beta}\)</span></p></li>
+<li><p>Two-electron integrals: <span class="math notranslate nohighlight">\(h_{\alpha\alpha\alpha\alpha}\)</span>, <span class="math notranslate nohighlight">\(h_{\alpha\beta\alpha\beta}\)</span>, and <span class="math notranslate nohighlight">\(h_{\beta\beta\beta\beta}\)</span></p></li>
+</ul>
+</section>
 </section>
 <section id="usage">
 <h2>Usage<a class="headerlink" href="#usage" title="Link to this heading"></a></h2>
@@ -159,33 +172,33 @@ The <a class="reference internal" href="../algorithms/hamiltonian_constructor.ht
 Hamiltonian object should be considered constant and not modified:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create a Hamiltonian constructor</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create a structure object</span>
+<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="o">&gt;</span><span class="w"> </span><span class="n">coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{{</span><span class="mf">0.000000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">},</span>
+<span class="w">                                       </span><span class="p">{</span><span class="mf">1.43233673</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">},</span>
+<span class="w">                                       </span><span class="p">{</span><span class="mf">-0.44604614</span><span class="p">,</span><span class="w"> </span><span class="mf">1.09629126</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">}};</span>
+<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">symbols</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;O&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">};</span>
+<span class="n">Structure</span><span class="w"> </span><span class="nf">structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span><span class="w"> </span><span class="n">symbols</span><span class="p">);</span>
+
+<span class="c1">// Run initial SCF to get orbitals</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_scf</span><span class="p">,</span><span class="w"> </span><span class="n">wfn</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">wfn</span><span class="o">-&gt;</span><span class="n">get_orbitals</span><span class="p">();</span>
+
+<span class="c1">// Create a Hamiltonian constructor</span>
 <span class="c1">// Returns std::shared_ptr&lt;HamiltonianConstructor&gt;</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian_constructor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">HamiltonianConstructorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
 
-<span class="c1">// Set active orbitals if needed</span>
-<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">active_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">};</span><span class="w">  </span><span class="c1">// Example indices</span>
-<span class="n">hamiltonian_constructor</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;active_orbitals&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">active_orbitals</span><span class="p">);</span>
-
 <span class="c1">// Construct the Hamiltonian from orbitals</span>
-<span class="c1">// Returns Hamiltonian</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian_constructor</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">orbitals</span><span class="p">);</span>
-
-<span class="c1">// Alternatively, create a Hamiltonian directly</span>
-<span class="n">Hamiltonian</span><span class="w"> </span><span class="nf">direct_hamiltonian</span><span class="p">(</span><span class="n">one_body_integrals</span><span class="p">,</span><span class="w"> </span><span class="n">two_body_integrals</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">,</span>
-<span class="w">                               </span><span class="n">selected_orbital_indices</span><span class="p">,</span><span class="w"> </span><span class="n">num_electrons</span><span class="p">,</span>
-<span class="w">                               </span><span class="n">core_energy</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">Structure</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span><span class="p">,</span> <span class="n">SpinChannel</span>
 
+<span class="c1"># Create a structure object</span>
 <span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
     <span class="p">[</span>
         <span class="p">[</span><span class="mf">0.000000</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">],</span>
@@ -193,7 +206,10 @@ Hamiltonian object should be considered constant and not modified:</p>
         <span class="p">[</span><span class="o">-</span><span class="mf">0.44604614</span><span class="p">,</span> <span class="mf">1.09629126</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">],</span>
     <span class="p">]</span>
 <span class="p">)</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;O&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
+<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;O&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="p">)</span>
+
+<span class="c1"># Run intiial SCF to get orbitals</span>
 <span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
 <span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
 <span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
@@ -236,47 +252,51 @@ these symmetries can be expressed as:</p>
 When accessing specific elements with <code class="docutils literal notranslate"><span class="pre">get_two_body_element(i,</span> <span class="pre">j,</span> <span class="pre">k,</span> <span class="pre">l)</span></code>, the function handles the appropriate index mapping to retrieve the correct value based on the implementation’s storage format.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Access one-electron integrals, returns const Eigen::MatrixXd&amp;</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">h1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">get_one_body_integrals</span><span class="p">();</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Example indices for one- and two-body integral access</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="n">k</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="n">l</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">;</span>
 
-<span class="c1">// Access two-electron integrals, returns const Eigen::VectorXd&amp;</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">h2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">get_two_body_integrals</span><span class="p">();</span>
+<span class="c1">// Access one-electron integrals, returns tuple of const Eigen::MatrixXd&amp;</span>
+<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">h1_a</span><span class="p">,</span><span class="w"> </span><span class="n">h1_b</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">get_one_body_integrals</span><span class="p">();</span>
 
-<span class="c1">// Access a specific two-electron integral &lt;ij|kl&gt;</span>
-<span class="kt">double</span><span class="w"> </span><span class="n">element</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">get_two_body_element</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="n">j</span><span class="p">,</span><span class="w"> </span><span class="n">k</span><span class="p">,</span><span class="w"> </span><span class="n">l</span><span class="p">);</span>
+<span class="c1">// Access two-electron integrals, returns triple of const Eigen::VectorXd&amp;</span>
+<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">h2_aaaa</span><span class="p">,</span><span class="w"> </span><span class="n">h2_aabb</span><span class="p">,</span><span class="w"> </span><span class="n">h2_bbbb</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">get_two_body_integrals</span><span class="p">();</span>
+
+<span class="c1">// Access a specific one-electron integral &lt;ij&gt; (for aa spin channel)</span>
+<span class="kt">double</span><span class="w"> </span><span class="n">one_body_element</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">get_one_body_element</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="n">j</span><span class="p">,</span><span class="w"> </span><span class="n">SpinChannel</span><span class="o">::</span><span class="n">aa</span><span class="p">);</span>
+
+<span class="c1">// Access a specific two-electron integral &lt;ij|kl&gt; (for aaaa spin channel)</span>
+<span class="kt">double</span><span class="w"> </span><span class="n">two_body_element</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">get_two_body_element</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="n">j</span><span class="p">,</span><span class="w"> </span><span class="n">k</span><span class="p">,</span><span class="w"> </span><span class="n">l</span><span class="p">,</span><span class="w"> </span><span class="n">SpinChannel</span><span class="o">::</span><span class="n">aaaa</span><span class="p">);</span>
 
 <span class="c1">// Get core energy (nuclear repulsion + inactive orbital energy), returns double</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">core_energy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">get_core_energy</span><span class="p">();</span>
 
-<span class="c1">// Get inactive Fock matrix (if available), returns const Eigen::MatrixXd&amp;</span>
-<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">has_inactive_fock_matrix</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">inactive_fock</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">get_inactive_fock_matrix</span><span class="p">();</span>
-<span class="p">}</span>
-
 <span class="c1">// Get orbital data, returns const Orbitals&amp;</span>
-<span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">get_orbitals</span><span class="p">();</span>
-
-<span class="c1">// Get active space information, returns const std::vector&lt;size_t&gt;&amp;</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">active_indices</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">get_selected_orbital_indices</span><span class="p">();</span>
-<span class="c1">// Returns size_t</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">num_electrons</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">get_num_electrons</span><span class="p">();</span>
-<span class="c1">// Returns size_t</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">num_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">get_num_orbitals</span><span class="p">();</span>
+<span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">orbitals_access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">get_orbitals</span><span class="p">();</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example indices for two-electron integral access</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example indices for one- and two-electron integral access</span>
 <span class="n">i_int</span><span class="p">,</span> <span class="n">j_int</span><span class="p">,</span> <span class="n">k_int</span><span class="p">,</span> <span class="n">l_int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span>
 
-<span class="c1"># Access one-electron integrals</span>
-<span class="n">h1</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()</span>
+<span class="c1"># Access one-electron integrals (both spin channels)</span>
+<span class="n">h1_a</span><span class="p">,</span> <span class="n">h1_b</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()</span>
 
-<span class="c1"># Access two-electron integrals</span>
-<span class="n">h2</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_integrals</span><span class="p">()</span>
+<span class="c1"># Access two-electron integrals (both spin channels)</span>
+<span class="n">h2_aaaa</span><span class="p">,</span> <span class="n">h2_aabb</span><span class="p">,</span> <span class="n">h2_bbbb</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_integrals</span><span class="p">()</span>
 
-<span class="c1"># Access a specific two-electron integral &lt;ij|kl&gt;</span>
-<span class="n">element</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_element</span><span class="p">(</span><span class="n">i_int</span><span class="p">,</span> <span class="n">j_int</span><span class="p">,</span> <span class="n">k_int</span><span class="p">,</span> <span class="n">l_int</span><span class="p">)</span>
+<span class="c1"># Access a specific one-electron integral &lt;ij&gt; (for aa spin channel)</span>
+<span class="n">one_body_element</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_element</span><span class="p">(</span><span class="n">i_int</span><span class="p">,</span> <span class="n">j_int</span><span class="p">,</span> <span class="n">SpinChannel</span><span class="o">.</span><span class="n">aa</span><span class="p">)</span>
+
+<span class="c1"># Access a specific two-electron integral &lt;ij|kl&gt; (for aaaa spin channel)</span>
+<span class="n">two_body_element</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_element</span><span class="p">(</span>
+    <span class="n">i_int</span><span class="p">,</span> <span class="n">j_int</span><span class="p">,</span> <span class="n">k_int</span><span class="p">,</span> <span class="n">l_int</span><span class="p">,</span> <span class="n">SpinChannel</span><span class="o">.</span><span class="n">aaaa</span>
+<span class="p">)</span>
 
 <span class="c1"># Get core energy (nuclear repulsion + inactive orbital energy)</span>
 <span class="n">core_energy</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_core_energy</span><span class="p">()</span>
@@ -293,114 +313,6 @@ When accessing specific elements with <code class="docutils literal notranslate"
 <h2>Serialization<a class="headerlink" href="#serialization" title="Link to this heading"></a></h2>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a> class supports serialization to and from JSON and HDF5 formats.
 For detailed information about serialization in QDK/Chemistry, see the <a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a> documentation.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>All Hamiltonian-related files should follow a consistent naming convention, such as
-<code class="docutils literal notranslate"><span class="pre">molecule.hamiltonian.json</span></code> and <code class="docutils literal notranslate"><span class="pre">molecule.hamiltonian.h5</span></code> for JSON and HDF5 files respectively.</p>
-</div>
-<section id="file-formats">
-<h3>File formats<a class="headerlink" href="#file-formats" title="Link to this heading"></a></h3>
-<p>QDK/Chemistry supports multiple serialization formats for Hamiltonian data:</p>
-<section id="json-format">
-<h4>JSON format<a class="headerlink" href="#json-format" title="Link to this heading"></a></h4>
-<p>JSON representation of a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a> object has the following structure (showing simplified content):</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;core_energy&quot;</span><span class="p">:</span><span class="mf">0.0</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;has_one_body_integrals&quot;</span><span class="p">:</span><span class="kc">true</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;has_orbitals&quot;</span><span class="p">:</span><span class="kc">true</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;has_two_body_integrals&quot;</span><span class="p">:</span><span class="kc">true</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;num_electrons&quot;</span><span class="p">:</span><span class="mi">2</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;num_orbitals&quot;</span><span class="p">:</span><span class="mi">2</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;one_body_integrals&quot;</span><span class="p">:[[</span><span class="mf">-0.7789220366556091</span><span class="p">,</span><span class="mf">-1.1102230246251565e-16</span><span class="p">],</span>
-<span class="w">    </span><span class="p">[</span><span class="mf">-1.6653345369377348e-16</span><span class="p">,</span><span class="mf">-0.6702666733672852</span><span class="p">]],</span>
-<span class="w">  </span><span class="nt">&quot;orbitals&quot;</span><span class="p">:{</span><span class="s2">&quot;...&quot;</span><span class="p">},</span>
-<span class="w">  </span><span class="nt">&quot;selected_orbital_indices&quot;</span><span class="p">:[</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;two_body_integrals&quot;</span><span class="p">:[</span><span class="s2">&quot;...&quot;</span><span class="p">],</span>
-<span class="p">}</span>
-</pre></div>
-</div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The <code class="docutils literal notranslate"><span class="pre">orbitals</span></code> field contains a nested <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> object with its own serialization structure.
-For detailed information about the serialization format of the <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> data contained within the Hamiltonian, please refer to the <span class="xref std std-ref">Orbitals Serialization</span> section.</p>
-</div>
-</section>
-<section id="hdf5-format">
-<h4>HDF5 format<a class="headerlink" href="#hdf5-format" title="Link to this heading"></a></h4>
-<p>HDF5 representation of a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a> object has the following structure (showing groups and datasets):</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>/
-├── selected_orbital_indices  # Dataset: uint32, 1D array active space orbital indices
-├── one_body_integrals        # Dataset: float64, 1D array of one-electron integrals
-├── two_body_integrals        # Dataset: float64, 2D array of one-electron integrals
-├── metadata/                     # Group
-│   ├── core_energy           # Attribute: float64, core energy
-│   ├── has_orbitals          # Attribute: uint8, 0 if false, 1 if true
-│   ├── num_electrons         # Attribute: uint32, number of electrons (in the active space)
-│   └── num_orbitals          # Attribute: uint32, number of orbitals (in the active space)
-└── orbitals/                     # Group
-    └── json_data             # Dataset: representation of the JSON orbital data
-</pre></div>
-</div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The <code class="docutils literal notranslate"><span class="pre">orbitals/</span></code> group follows the same structure and organization as an independent <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> HDF5 file.
-For complete details on the structure and content of this group, see the <span class="xref std std-ref">Orbitals Serialization</span> section in the Orbitals documentation.</p>
-</div>
-<div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Serialize to JSON file</span>
-<span class="n">hamiltonian</span><span class="p">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s">&quot;molecule.hamiltonian.json&quot;</span><span class="p">);</span>
-
-<span class="c1">// Deserialize from JSON file</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian_from_json_file</span><span class="w"> </span><span class="o">=</span>
-<span class="w">    </span><span class="n">Hamiltonian</span><span class="o">::</span><span class="n">from_json_file</span><span class="p">(</span><span class="s">&quot;molecule.hamiltonian.json&quot;</span><span class="p">);</span>
-
-<span class="c1">// Serialize to HDF5 file</span>
-<span class="n">hamiltonian</span><span class="p">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s">&quot;molecule.hamiltonian.h5&quot;</span><span class="p">);</span>
-
-<span class="c1">// Deserialize from HDF5 file</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian_from_hdf5_file</span><span class="w"> </span><span class="o">=</span>
-<span class="w">    </span><span class="n">Hamiltonian</span><span class="o">::</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s">&quot;molecule.hamiltonian.h5&quot;</span><span class="p">);</span>
-
-<span class="c1">// Generic file I/O based on type parameter</span>
-<span class="n">hamiltonian</span><span class="p">.</span><span class="n">to_file</span><span class="p">(</span><span class="s">&quot;molecule.hamiltonian.json&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;json&quot;</span><span class="p">);</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian_from_file</span><span class="w"> </span><span class="o">=</span>
-<span class="w">    </span><span class="n">Hamiltonian</span><span class="o">::</span><span class="n">from_file</span><span class="p">(</span><span class="s">&quot;molecule.hamiltonian.h5&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;hdf5&quot;</span><span class="p">);</span>
-
-<span class="c1">// Convert to JSON object</span>
-<span class="c1">// Returns nlohmann::json</span>
-<span class="n">nlohmann</span><span class="o">::</span><span class="n">json</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">to_json</span><span class="p">();</span>
-
-<span class="c1">// Load from JSON object</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian_from_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Hamiltonian</span><span class="o">::</span><span class="n">from_json</span><span class="p">(</span><span class="n">j</span><span class="p">);</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">temp_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">gettempdir</span><span class="p">())</span>
-<span class="c1"># Serialize to JSON file</span>
-<span class="n">hamiltonian</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">temp_dir</span> <span class="o">/</span> <span class="s2">&quot;molecule.hamiltonian.json&quot;</span><span class="p">)</span>
-
-<span class="c1"># Deserialize from JSON file</span>
-<span class="n">hamiltonian_from_json_file</span> <span class="o">=</span> <span class="n">Hamiltonian</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span>
-    <span class="n">temp_dir</span> <span class="o">/</span> <span class="s2">&quot;molecule.hamiltonian.json&quot;</span>
-<span class="p">)</span>
-
-<span class="c1"># Serialize to HDF5 file</span>
-<span class="n">hamiltonian</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">&quot;molecule.hamiltonian.h5&quot;</span><span class="p">)</span>
-<span class="n">hamiltonian_from_hdf5_file</span> <span class="o">=</span> <span class="n">Hamiltonian</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">&quot;molecule.hamiltonian.h5&quot;</span><span class="p">)</span>
-
-<span class="c1"># Generic file I/O based on type parameter</span>
-<span class="n">hamiltonian</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="n">temp_dir</span> <span class="o">/</span> <span class="s2">&quot;molecule.hamiltonian.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
-<span class="n">hamiltonian_loaded</span> <span class="o">=</span> <span class="n">Hamiltonian</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span>
-    <span class="n">temp_dir</span> <span class="o">/</span> <span class="s2">&quot;molecule.hamiltonian.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span>
-<span class="p">)</span>
-</pre></div>
-</div>
-</div>
-</div>
-</section>
-</section>
 </section>
 <section id="active-space-hamiltonian">
 <h2>Active space Hamiltonian<a class="headerlink" href="#active-space-hamiltonian" title="Link to this heading"></a></h2>
@@ -412,7 +324,7 @@ The <a class="reference internal" href="../algorithms/hamiltonian_constructor.ht
 <h2>Validation methods<a class="headerlink" href="#validation-methods" title="Link to this heading"></a></h2>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a> class provides methods to check the validity and consistency of its data:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Check if the Hamiltonian data is complete and consistent</span>
 <span class="c1">// Returns bool</span>
 <span class="kt">bool</span><span class="w"> </span><span class="n">valid</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">is_valid</span><span class="p">();</span>
@@ -422,11 +334,10 @@ The <a class="reference internal" href="../algorithms/hamiltonian_constructor.ht
 <span class="kt">bool</span><span class="w"> </span><span class="n">has_one_body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">has_one_body_integrals</span><span class="p">();</span>
 <span class="kt">bool</span><span class="w"> </span><span class="n">has_two_body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">has_two_body_integrals</span><span class="p">();</span>
 <span class="kt">bool</span><span class="w"> </span><span class="n">has_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">has_orbitals</span><span class="p">();</span>
-<span class="kt">bool</span><span class="w"> </span><span class="n">has_inactive_fock</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">has_inactive_fock_matrix</span><span class="p">();</span>
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>This example shows the API pattern. For complete working examples, see the test suite.</p>

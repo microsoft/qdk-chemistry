@@ -72,7 +72,7 @@
 <li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
 <li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
-<li class="toctree-l3"><a class="reference internal" href="reference_derived.html">Reference-derived calculations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dynamical_correlation.html">Dynamical correlation calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solving</a></li>
 <li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Self-consistent field stability checks</a></li>
 <li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State Preparation</a></li>
@@ -129,7 +129,7 @@ It is designed to support multiple backend simulators.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator" title="qdk_chemistry.algorithms.EnergyEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a> evaluates the expectation value of a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a> with respect to a given quantum circuit.
-It takes a circuit in OpenQASM format with target qubit Hamiltonians, automatically generates the corresponding measurement circuits.
+It takes a Circuit object with target qubit Hamiltonians and automatically generates the corresponding measurement circuits.
 These circuits are executed on a selected backend simulator with the user-specified number of shots, and the resulting bitstring statistics are used to calculate per-term expectation values and the total energy.</p>
 </section>
 <section id="capabilities">
@@ -146,17 +146,14 @@ These circuits are executed on a selected backend simulator with the user-specif
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-
-<span class="c1"># Import noise models for QDK simulator examples</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="n">DepolarizingNoise</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">QubitHamiltonian</span>
 
 <span class="c1"># Import noise models for Qiskit Aer simulator examples</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit_aer.noise</span><span class="w"> </span><span class="kn">import</span> <span class="n">NoiseModel</span><span class="p">,</span> <span class="n">depolarizing_error</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.energy_estimator.qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="n">QDKEnergyEstimator</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitHamiltonian</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit.energy_estimator</span><span class="w"> </span><span class="kn">import</span> <span class="n">QiskitEnergyEstimator</span>
+<span class="c1"># Import noise models for QDK simulator examples</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="n">DepolarizingNoise</span>
 
 <span class="c1"># Create energy estimator using Qsharp simulator as backend</span>
 <span class="n">qdk_estimator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;energy_estimator&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_base_simulator&quot;</span><span class="p">)</span>
@@ -180,18 +177,20 @@ These circuits are executed on a selected backend simulator with the user-specif
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define a simple quantum circuit in QASM and a qubit Hamiltonian</span>
-<span class="n">circuit_qasm</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="n">circuit</span> <span class="o">=</span> <span class="n">Circuit</span><span class="p">(</span>
+    <span class="n">qasm</span><span class="o">=</span><span class="s2">&quot;&quot;&quot;</span>
 <span class="s2">    include &quot;stdgates.inc&quot;;</span>
 <span class="s2">    qubit[2] q;</span>
 <span class="s2">    rz(pi) q[0];</span>
 <span class="s2">    x q[0];</span>
 <span class="s2">    cx q[0], q[1];</span>
 <span class="s2">    &quot;&quot;&quot;</span>
+<span class="p">)</span>
 <span class="n">qubit_hamiltonians</span> <span class="o">=</span> <span class="p">[</span><span class="n">QubitHamiltonian</span><span class="p">([</span><span class="s2">&quot;ZZ&quot;</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">]))]</span>
 
 <span class="c1"># Run energy estimation using Qsharp simulator without noise</span>
 <span class="n">energy_expectation_results</span><span class="p">,</span> <span class="n">measurement_data</span> <span class="o">=</span> <span class="n">qdk_estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">circuit_qasm</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span>
+    <span class="n">circuit</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span>
 <span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span>
     <span class="s2">&quot;Energy expectation value from noiseless QDK Simulator: &quot;</span>
@@ -200,9 +199,9 @@ These circuits are executed on a selected backend simulator with the user-specif
 
 <span class="c1"># Create energy estimator using Qsharp simulator with depolarizing noise</span>
 <span class="n">noise_model</span> <span class="o">=</span> <span class="n">DepolarizingNoise</span><span class="p">(</span><span class="mf">0.01</span><span class="p">)</span>
-<span class="n">qdk_estimator</span> <span class="o">=</span> <span class="n">QDKEnergyEstimator</span><span class="p">(</span><span class="n">noise_model</span><span class="o">=</span><span class="n">noise_model</span><span class="p">)</span>
+<span class="n">qdk_estimator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;energy_estimator&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_base_simulator&quot;</span><span class="p">)</span>
 <span class="n">energy_expectation_results</span><span class="p">,</span> <span class="n">measurement_data</span> <span class="o">=</span> <span class="n">qdk_estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">circuit_qasm</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span>
+    <span class="n">circuit</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">noise_model</span><span class="o">=</span><span class="n">noise_model</span>
 <span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span>
     <span class="s2">&quot;Energy expectation value from QDK Simulator with depolarizing noise: &quot;</span>
@@ -210,9 +209,9 @@ These circuits are executed on a selected backend simulator with the user-specif
 <span class="p">)</span>
 
 <span class="c1"># Create energy estimator using Qsharp simulator with qubit loss</span>
-<span class="n">qdk_estimator</span> <span class="o">=</span> <span class="n">QDKEnergyEstimator</span><span class="p">(</span><span class="n">qubit_loss</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span>
+<span class="n">qdk_estimator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;energy_estimator&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_base_simulator&quot;</span><span class="p">,</span> <span class="n">qubit_loss</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span>
 <span class="n">energy_expectation_results</span><span class="p">,</span> <span class="n">measurement_data</span> <span class="o">=</span> <span class="n">qdk_estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">circuit_qasm</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span>
+    <span class="n">circuit</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span>
 <span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span>
     <span class="s2">&quot;Energy expectation value from QDK Simulator with qubit loss: &quot;</span>
@@ -234,7 +233,7 @@ These circuits are executed on a selected backend simulator with the user-specif
 <input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Run energy estimation using Qiskit Aer simulator without noise</span>
 <span class="n">energy_expectation_results</span><span class="p">,</span> <span class="n">measurement_data</span> <span class="o">=</span> <span class="n">qiskit_estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">circuit_qasm</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span>
+    <span class="n">circuit</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span>
 <span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span>
     <span class="sa">f</span><span class="s2">&quot;Energy expectation value from Qiskit Aer Simulator: </span><span class="si">{</span><span class="n">energy_expectation_results</span><span class="o">.</span><span class="n">energy_expectation_value</span><span class="si">}</span><span class="s2">&quot;</span>
@@ -244,13 +243,13 @@ These circuits are executed on a selected backend simulator with the user-specif
 <span class="n">noise_model</span> <span class="o">=</span> <span class="n">NoiseModel</span><span class="p">(</span><span class="n">basis_gates</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;rz&quot;</span><span class="p">,</span> <span class="s2">&quot;sx&quot;</span><span class="p">,</span> <span class="s2">&quot;cx&quot;</span><span class="p">,</span> <span class="s2">&quot;measure&quot;</span><span class="p">])</span>
 <span class="n">noise_model</span><span class="o">.</span><span class="n">add_all_qubit_quantum_error</span><span class="p">(</span><span class="n">depolarizing_error</span><span class="p">(</span><span class="mf">0.005</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">[</span><span class="s2">&quot;rz&quot;</span><span class="p">,</span> <span class="s2">&quot;sx&quot;</span><span class="p">])</span>
 <span class="n">noise_model</span><span class="o">.</span><span class="n">add_all_qubit_quantum_error</span><span class="p">(</span><span class="n">depolarizing_error</span><span class="p">(</span><span class="mf">0.007</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">[</span><span class="s2">&quot;cx&quot;</span><span class="p">])</span>
-<span class="n">backend_options</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;noise_model&quot;</span><span class="p">:</span> <span class="n">noise_model</span><span class="p">}</span>
 
-<span class="n">qiskit_estimator</span> <span class="o">=</span> <span class="n">QiskitEnergyEstimator</span><span class="o">.</span><span class="n">from_backend_options</span><span class="p">(</span>
-    <span class="n">backend_options</span><span class="o">=</span><span class="n">backend_options</span>
-<span class="p">)</span>
+<span class="n">qiskit_estimator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;energy_estimator&quot;</span><span class="p">,</span> <span class="s2">&quot;qiskit_aer_simulator&quot;</span><span class="p">)</span>
 <span class="n">energy_expectation_results</span><span class="p">,</span> <span class="n">measurement_data</span> <span class="o">=</span> <span class="n">qiskit_estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">circuit_qasm</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span>
+    <span class="n">circuit</span><span class="p">,</span>
+    <span class="n">qubit_hamiltonians</span><span class="p">,</span>
+    <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+    <span class="n">noise_model</span><span class="o">=</span><span class="n">noise_model</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span>
     <span class="s2">&quot;Energy expectation value from Qiskit Aer Simulator with noise: &quot;</span>

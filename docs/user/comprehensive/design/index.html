@@ -314,8 +314,7 @@ This design allows users to benefit from specialized capabilities of external so
 
 <span class="n">mc</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Available multi-configuration calculator settings: </span><span class="si">{</span><span class="n">mc</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="c1"># TODO: uncomment the line below when the bug is fixed</span>
-<span class="c1"># mc.settings().set(&quot;davidson_iterations&quot;, 300)</span>
+<span class="n">mc</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;davidson_iterations&quot;</span><span class="p">,</span> <span class="mi">300</span><span class="p">)</span>
 <span class="n">E_cas</span><span class="p">,</span> <span class="n">wfn_cas</span> <span class="o">=</span> <span class="n">mc</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
     <span class="n">hamiltonian</span><span class="p">,</span> <span class="n">n_active_alpha_electrons</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_active_beta_electrons</span><span class="o">=</span><span class="mi">1</span>
 <span class="p">)</span>

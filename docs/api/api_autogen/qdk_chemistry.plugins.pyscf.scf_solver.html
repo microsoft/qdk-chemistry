@@ -148,12 +148,17 @@ ElectronicStructureSettings and adding PySCF-specific customizations.</p>
 <li><p>method (str, default=”hf”): The electronic structure method (Hartree-Fock).</p></li>
 <li><p>basis_set (str, default=”def2-svp”): The basis set used for quantum chemistry calculations.
 Common options include “def2-svp”, “def2-tzvp”, “cc-pvdz”, etc.</p></li>
-<li><p>tolerance (float, default=1e-6): Convergence tolerance.</p></li>
+<li><p>convergence_threshold (float, default=1e-7): Convergence tolerance for orbital gradient norm.</p></li>
 <li><p>max_iterations (int, default=50): Maximum number of iterations.</p></li>
+<li><dl class="simple">
+<dt>scf_type (str, default=”auto”): Type of SCF calculation. Can be:</dt><dd><ul>
+<li><p>“auto”: Automatically detect based on spin (RHF for singlet, UHF for open-shell)</p></li>
+<li><p>“restricted”: Force restricted calculation (RHF/ROHF for HF, RKS/ROKS for DFT)</p></li>
+<li><p>“unrestricted”: Force unrestricted calculation (UHF for HF, UKS for DFT)</p></li>
 </ul>
-<p>PySCF-specific settings:</p>
-<ul class="simple">
-<li><p>force_restricted (bool, default=False): If True, enforce restricted orbitals, even if open shell (e.g. ROHF).</p></li>
+</dd>
+</dl>
+</li>
 </ul>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span> <span class="o">=</span> <span class="n">PyscfScfSettings</span><span class="p">()</span>
@@ -170,7 +175,7 @@ are fundamental for determining electronic structure and molecular properties.</
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSettings.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/pyscf/scf_solver.html#PyscfScfSettings.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSettings.__init__" title="Link to this definition"></a></dt>
-<dd><p>Initialize the settings with default values from ElectronicStructureSettingsplus PySCF-specific defaults.</p>
+<dd><p>Initialize the settings with default values from ElectronicStructureSettings plus PySCF-specific defaults.</p>
 </dd></dl>
 
 </dd></dl>
@@ -190,7 +195,7 @@ QDK/Chemistry-compatible format.</p>
 <li><p>DFT methods: any other method string is treated as an XC functional (e.g., “b3lyp”, “pbe”, “m06”)</p></li>
 </ul>
 <p>The solver automatically selects restricted/unrestricted variants based on spin
-and the force_restricted setting, returning electronic energy (excluding nuclear
+and the scf setting, returning electronic energy (excluding nuclear
 repulsion) along with molecular orbitals information.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">solver</span> <span class="o">=</span> <span class="n">PyscfScfSolver</span><span class="p">()</span>

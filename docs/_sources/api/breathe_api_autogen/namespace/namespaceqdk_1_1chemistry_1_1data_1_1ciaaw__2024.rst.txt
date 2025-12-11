@@ -1,0 +1,6 @@
+Namespace qdk::chemistry::data::ciaaw_2024
+==========================================
+
+.. doxygennamespace:: qdk::chemistry::data::ciaaw_2024
+   :project: QDK/Chemistry
+   :members:

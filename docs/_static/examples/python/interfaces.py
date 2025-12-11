@@ -8,7 +8,6 @@
 ################################################################################
 # start-cell-scf
 import numpy as np
-
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.data import Structure
 
@@ -52,7 +51,7 @@ scf = create("scf_solver")
 # Set general options that work across implementations
 scf.settings().set("basis_set", "sto-3g")
 scf.settings().set("max_iterations", 100)
-scf.settings().set("tolerance", 1.0e-8)
+scf.settings().set("convergence_threshold", 1e-7)
 
 # Query available settings for an algorithm
 print(f"SCF settings: {scf.settings().keys()}")

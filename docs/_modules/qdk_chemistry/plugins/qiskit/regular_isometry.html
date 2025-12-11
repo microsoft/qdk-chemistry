@@ -94,26 +94,22 @@
 <span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
-
 <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuantumCircuit</span><span class="p">,</span> <span class="n">qasm3</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.circuit.library</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatePreparation</span> <span class="k">as</span> <span class="n">QiskitStatePreparation</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.compiler</span><span class="w"> </span><span class="kn">import</span> <span class="n">transpile</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.quantum_info</span><span class="w"> </span><span class="kn">import</span> <span class="n">Statevector</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.transpiler</span><span class="w"> </span><span class="kn">import</span> <span class="n">PassManager</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">register</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.state_preparation</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatePreparation</span><span class="p">,</span> <span class="n">StatePreparationSettings</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">Wavefunction</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit._interop.transpiler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">MergeZBasisRotations</span><span class="p">,</span>
     <span class="n">RemoveZBasisOnZeroState</span><span class="p">,</span>
     <span class="n">SubstituteCliffordRz</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.bitstring</span><span class="w"> </span><span class="kn">import</span> <span class="n">separate_alpha_beta_to_binary_string</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.statevector</span><span class="w"> </span><span class="kn">import</span> <span class="n">_create_statevector_from_coeffs_and_dets_string</span>
-
-<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;RegularIsometryStatePreparation&quot;</span><span class="p">]</span>
 
@@ -124,27 +120,29 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;State preparation using a regular isometry approach.</span>
 
 <span class="sd">    This class implements the isometry-based state preparation proposed by</span>
-<span class="sd">    Matthias Christandl in `arXiv:1501.06911 &lt;https://arxiv.org/abs/1501.06911&gt;`_.</span>
+<span class="sd">    Matthias Christandl in arXiv:1501.06911 :cite:`Christandl2016`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="RegularIsometryStatePreparation.__init__">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.regular_isometry.html#qdk_chemistry.plugins.qiskit.regular_isometry.RegularIsometryStatePreparation.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the RegularIsometryStatePreparation.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">StatePreparationSettings</span><span class="p">()</span></div>
 
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wavefunction</span><span class="p">:</span> <span class="n">Wavefunction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wavefunction</span><span class="p">:</span> <span class="n">Wavefunction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a quantum circuit that prepares the state using regular isometry.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            wavefunction: Wavefunction to prepare state from</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            A QASM string representation of the quantum circuit.</span>
+<span class="sd">            A Circuit object containing a QASM string representation of the quantum circuit.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="c1"># Active Space Consistency Check</span>
         <span class="n">alpha_indices</span><span class="p">,</span> <span class="n">beta_indices</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">alpha_indices</span> <span class="o">!=</span> <span class="n">beta_indices</span><span class="p">:</span>
@@ -166,7 +164,7 @@
         <span class="k">if</span> <span class="ow">not</span> <span class="n">bitstrings</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No valid bitstrings found. The determinants list might be empty.&quot;</span><span class="p">)</span>
         <span class="n">n_qubits</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">)</span><span class="si">}</span><span class="s2"> determinants for state preparation&quot;</span><span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">)</span><span class="si">}</span><span class="s2"> determinants for state preparation&quot;</span><span class="p">)</span>
 
         <span class="c1"># Create a statevector from the filtered terms</span>
         <span class="n">statevector_data</span> <span class="o">=</span> <span class="n">_create_statevector_from_coeffs_and_dets_string</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">bitstrings</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">)</span>
@@ -193,18 +191,16 @@
             <span class="p">)</span>
             <span class="n">circuit</span> <span class="o">=</span> <span class="n">pass_manager</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">circuit</span><span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">qasm3</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">circuit</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span><span class="n">qasm</span><span class="o">=</span><span class="n">qasm3</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">circuit</span><span class="p">))</span>
 
 <div class="viewcode-block" id="RegularIsometryStatePreparation.name">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.regular_isometry.html#qdk_chemistry.plugins.qiskit.regular_isometry.RegularIsometryStatePreparation.name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name of the state preparation method.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="k">return</span> <span class="s2">&quot;regular_isometry&quot;</span></div>
 </div>
 
-
-
-<span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">RegularIsometryStatePreparation</span><span class="p">())</span>
 </pre></div>
 
            </div>

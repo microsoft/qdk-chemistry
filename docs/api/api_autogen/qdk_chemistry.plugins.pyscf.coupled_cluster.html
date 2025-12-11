@@ -113,8 +113,7 @@
 <p>PySCF-based Coupled Cluster calculator implementation for qdk_chemistry.</p>
 <p>This module provides integration between QDK/Chemistry and PySCF for performing
 Coupled Cluster (CC) calculations. It implements a CCSD (Coupled Cluster Singles and Doubles)
-calculator that can be used within the QDK/Chemistry framework for accurate electronic structure
-calculations.</p>
+calculator that can be used within the QDK/Chemistry framework.</p>
 <p>The module contains:</p>
 <ul class="simple">
 <li><p><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterSettings" title="qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterSettings"><code class="xref py py-class docutils literal notranslate"><span class="pre">PyscfCoupledClusterSettings</span></code></a>: Configuration class for CC calculation parameters</p></li>
@@ -122,21 +121,21 @@ calculations.</p>
 <li><p>Registration utilities to integrate the calculator with QDK/Chemistry’s plugin system</p></li>
 </ul>
 <p>The calculator handles automatic conversion between QDK/Chemistry Hamiltonian objects and PySCF
-format, performs the CC calculation, and returns results (energy and
-excitation amplitudes) in QDK/Chemistry-compatible format.</p>
+format, performs the CC calculation, and returns results (energy and wavefunction)
+in QDK/Chemistry-compatible format.</p>
 <p>Upon import, this module automatically registers the PySCF CC calculator with QDK/Chemistry’s
-CC calculator registry under the name “pyscf”.</p>
+CC calculator registry under the name “pyscf_coupled_cluster”.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.coupled_cluster</span><span class="w"> </span><span class="kn">import</span> <span class="n">PyscfCoupledClusterCalculator</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">cc_calculator</span> <span class="o">=</span> <span class="n">PyscfCoupledClusterCalculator</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">energy</span><span class="p">,</span> <span class="n">amplitudes</span> <span class="o">=</span> <span class="n">cc_calculator</span><span class="o">.</span><span class="n">calculate</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">energy</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">cc_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">ansatz</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>This module requires both QDK/Chemistry and PySCF to be installed.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterCalculator">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.pyscf.coupled_cluster.</span></span><span class="sig-name descname"><span class="pre">PyscfCoupledClusterCalculator</span></span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/pyscf/coupled_cluster.html#PyscfCoupledClusterCalculator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterCalculator" title="Link to this definition"></a></dt>
-<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.CoupledClusterCalculator" title="qdk_chemistry.algorithms.CoupledClusterCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">CoupledClusterCalculator</span></code></a></p>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.DynamicalCorrelationCalculator" title="qdk_chemistry.algorithms.DynamicalCorrelationCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">DynamicalCorrelationCalculator</span></code></a></p>
 <p>PySCF-based Coupled Cluster calculator for quantum chemistry calculations.</p>
 <p>This class provides an interface between QDK/Chemistry and PySCF for performing
 Coupled Cluster calculations on molecular systems. It handles the conversion
@@ -152,12 +151,7 @@ CC calculation, and returns the results in QDK/Chemistry-compatible format.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterCalculator.name">
 <span class="sig-name descname"><span class="pre">name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/pyscf/coupled_cluster.html#PyscfCoupledClusterCalculator.name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterCalculator.name" title="Link to this definition"></a></dt>
-<dd><p>Return the name of the Coupled Cluster calculator.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
-</dd>
-</dl>
+<dd><p>Return the name of this coupled cluster implementation.</p>
 </dd></dl>
 
 </dd></dl>

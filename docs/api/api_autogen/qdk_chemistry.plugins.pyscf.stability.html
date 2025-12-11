@@ -188,7 +188,9 @@ configurable options used by <a class="reference internal" href="#qdk_chemistry.
 </li>
 <li><p>with_symmetry: Whether to respect point group symmetry during stability analysis.</p></li>
 <li><p>nroots: Number of eigenvalue roots to compute in the Davidson solver.</p></li>
-<li><p>tolerance: Convergence threshold for the Davidson eigenvalue solver.</p></li>
+<li><p>davidson_tolerance: Convergence threshold for the Davidson eigenvalue solver.</p></li>
+<li><p>stability_tolerance: Threshold for determining stability from eigenvalues.</p></li>
+<li><p>method: The electronic structure method (“hf” for Hartree-Fock or a DFT functional name).</p></li>
 </ul>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span> <span class="o">=</span> <span class="n">PyscfStabilitySettings</span><span class="p">()</span>
@@ -196,6 +198,7 @@ configurable options used by <a class="reference internal" href="#qdk_chemistry.
 <span class="go">3</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;nroots&quot;</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;external&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>  <span class="c1"># Only internal stability</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;b3lyp&quot;</span><span class="p">)</span>  <span class="c1"># Use B3LYP DFT</span>
 </pre></div>
 </div>
 <dl class="py method">

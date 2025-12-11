@@ -62,20 +62,20 @@
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Orbital localization</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#localization-methods">Localization methods</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#creating-a-localizer">Creating a localizer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#usage">Usage</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#configuring-the-localizer">Configuring the localizer</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#performing-orbital-localization">Performing orbital localization</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#available-localization-methods">Available localization methods</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#available-settings">Available settings</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#implemented-interface">Implemented interface</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-topics">Related topics</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
 <li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
-<li class="toctree-l3"><a class="reference internal" href="reference_derived.html">Reference-derived calculations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dynamical_correlation.html">Dynamical correlation calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solving</a></li>
 <li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Self-consistent field stability checks</a></li>
 <li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State Preparation</a></li>
@@ -128,7 +128,8 @@
 <h1>Orbital localization<a class="headerlink" href="#orbital-localization" title="Link to this heading"></a></h1>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.OrbitalLocalizer" title="qdk_chemistry.algorithms.OrbitalLocalizer"><code class="xref py py-class docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a> algorithm in QDK/Chemistry performs various orbital transformations to create localized or otherwise transformed molecular orbitals.
 Following QDK/Chemistry’s <a class="reference internal" href="../design/index.html"><span class="doc">algorithm design principles</span></a>, it takes an <a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a> instance as input and produces a new <a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a> instance as output.
-These transformations preserve the overall electronic state but provide orbitals with different properties that are useful for chemical analysis or subsequent calculations.</p>
+For more information about this pattern, see the <a class="reference internal" href="../design/factory_pattern.html"><span class="doc">Factory Pattern</span></a> documentation.</p>
+<p>These transformations preserve the overall electronic state but provide orbitals with different properties that are useful for chemical analysis or subsequent calculations.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Canonical molecular orbitals from <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculations are often delocalized over the entire molecule, which can make chemical interpretation difficult and lead to slow convergence in post-<a class="reference internal" href="../../../glossary.html#term-HF"><span class="xref std std-term">HF</span></a> methods.
@@ -138,42 +139,37 @@ Multiple localization methods are available through a unified interface, each op
 <section id="localization-methods">
 <h2>Localization methods<a class="headerlink" href="#localization-methods" title="Link to this heading"></a></h2>
 <p>QDK/Chemistry provides several orbital transformation methods through the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.OrbitalLocalizer" title="qdk_chemistry.algorithms.OrbitalLocalizer"><code class="xref py py-class docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a> interface:</p>
-<ul class="simple">
-<li><p><strong>Pipek-Mezey Localization</strong></p></li>
-<li><p><strong>Natural Orbitals</strong></p></li>
-<li><p><strong>Second-order Møller-Plesset (MP2) Natural Orbitals</strong></p></li>
-</ul>
+<dl class="simple">
+<dt><strong>Pipek-Mezey Localization</strong></dt><dd><p>Maximizes the sum of squared Mulliken charges on each atom for each orbital, creating orbitals that are maximally localized on specific atoms or bonds <span id="id1">[<a class="reference internal" href="../../../references.html#id4" title="James W. Boughton and Peter Pulay. Comparison of the Boys and Pipek-Mezey localizations in the local correlation approach and automatic virtual basis selection. Journal of Computational Chemistry, 14(6):736-740, 1993. doi:10.1002/jcc.540140615.">BP93</a>, <a class="reference internal" href="../../../references.html#id3" title="Clyde Edmiston and Klaus Ruedenberg. Localized atomic and molecular orbitals. Reviews of Modern Physics, 35:457, 1963. doi:10.1103/RevModPhys.35.457.">ER63</a>]</span>.</p>
+</dd>
+<dt><strong>MP2 Natural Orbitals</strong></dt><dd><p>Transforms canonical orbitals into natural orbitals based on MP2 density matrices, providing orbitals that diagonalize the correlation effects.</p>
+</dd>
+<dt><strong>Valence Virtual Hard Virtual (VVHV) Orbitals</strong></dt><dd><p>Separates orbitals into valence, virtual, and hard virtual categories for more efficient treatment in correlation methods.</p>
+</dd>
+</dl>
 </section>
-<section id="creating-a-localizer">
-<h2>Creating a localizer<a class="headerlink" href="#creating-a-localizer" title="Link to this heading"></a></h2>
-<p>As an algorithm class in QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.OrbitalLocalizer" title="qdk_chemistry.algorithms.OrbitalLocalizer"><code class="xref py py-class docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a> follows the <a class="reference internal" href="../design/index.html"><span class="doc">factory pattern design principle</span></a>.
-It is created using its corresponding factory, which provides a unified interface for different localization method implementations.
-For more information about this pattern, see the <a class="reference internal" href="../design/factory_pattern.html"><span class="doc">Factory Pattern</span></a> documentation.</p>
+<section id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Link to this heading"></a></h2>
+<p>Before performing localization, you need an <a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a> instance as input.
+This is typically obtained from an <a class="reference internal" href="scf_solver.html"><span class="doc">ScfSolver</span></a> calculation, as localization is usually applied to converged <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> orbitals.</p>
+<p>The most common use case is localizing occupied orbitals after an SCF calculation:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span>
 <span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">algorithms</span><span class="p">;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
 
-<span class="c1">// Create an MP2 natural orbital localizer</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">mp2_localizer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LocalizerFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;mp2_natural_orbitals&quot;</span><span class="p">);</span>
+<span class="c1">// Create a Pipek-Mezey localizer using the factory</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">localizer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LocalizerFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;qdk_pipek_mezey&quot;</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
-
-<span class="c1"># First run an SCF calculation to get a wavefunction</span>
-<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
-<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
-<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
-<span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-
-<span class="c1"># List available orbital localizer implementations</span>
-<span class="n">available_localizers</span> <span class="o">=</span> <span class="n">available</span><span class="p">(</span><span class="s2">&quot;orbital_localizer&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Available orbital localizers: </span><span class="si">{</span><span class="n">available_localizers</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="c1"># Create a Pipek-Mezey localizer</span>
 <span class="n">localizer</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;orbital_localizer&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_pipek_mezey&quot;</span><span class="p">)</span>
@@ -187,8 +183,10 @@ For more information about this pattern, see the <a class="reference internal" h
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.OrbitalLocalizer" title="qdk_chemistry.algorithms.OrbitalLocalizer"><code class="xref py py-class docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a> can be configured using the <a class="reference internal" href="../design/settings.html"><span class="doc">Settings</span></a> object:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Set the convergence threshold</span>
-<span class="n">localizer</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;tolerance&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0e-6</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Configure settings for localizer</span>
+<span class="w">  </span><span class="n">localizer</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;tolerance&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0e-6</span><span class="p">);</span>
+<span class="w">  </span><span class="n">localizer</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;max_iterations&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">);</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">localizer</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">keys</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 </pre></div>
 </div>
 </div>
@@ -223,21 +221,27 @@ If empty vectors/lists are provided, no orbitals of that spin type will be local
 <p>Once configured, the localization can be performed on a set of orbitals:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Obtain a valid Orbitals instance</span>
-<span class="n">Orbitals</span><span class="w"> </span><span class="n">orbitals</span><span class="p">;</span>
-<span class="cm">/* orbitals = ... */</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create H2O molecule</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="o">&gt;</span><span class="w"> </span><span class="n">coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="p">{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.757</span><span class="p">,</span><span class="w"> </span><span class="mf">0.587</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">-0.757</span><span class="p">,</span><span class="w"> </span><span class="mf">0.587</span><span class="p">}};</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">symbols</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;O&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">};</span>
+<span class="w">  </span><span class="n">Structure</span><span class="w"> </span><span class="nf">structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span><span class="w"> </span><span class="n">symbols</span><span class="p">);</span>
 
-<span class="c1">// Configure electron counts in settings for methods that require them</span>
-<span class="n">localizer</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;n_alpha_electrons&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">n_alpha</span><span class="p">);</span>
-<span class="n">localizer</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;n_beta_electrons&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">n_beta</span><span class="p">);</span>
+<span class="w">  </span><span class="c1">// Obtain orbitals from SCF calculation</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+<span class="w">  </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;sto-3g&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_scf</span><span class="p">,</span><span class="w"> </span><span class="n">wavefunction</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
 
-<span class="c1">// Create indices for orbitals to localize</span>
-<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">loc_indices_a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">};</span><span class="w">  </span><span class="c1">// Alpha orbital indices</span>
-<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">loc_indices_b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">};</span><span class="w">  </span><span class="c1">// Beta orbital indices</span>
+<span class="w">  </span><span class="c1">// Specify which orbitals to localize</span>
+<span class="w">  </span><span class="c1">// For restricted calculations, alpha and beta orbitals are identical</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">loc_indices</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">};</span>
 
-<span class="c1">// Localize the specified orbitals</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">localized_orbitals</span><span class="w"> </span><span class="o">=</span>
-<span class="w">    </span><span class="n">localizer</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span><span class="w"> </span><span class="n">loc_indices_a</span><span class="p">,</span><span class="w"> </span><span class="n">loc_indices_b</span><span class="p">);</span>
+<span class="w">  </span><span class="c1">// Localize the specified orbitals</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">localized_wfn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">localizer</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">,</span><span class="w"> </span><span class="n">loc_indices</span><span class="p">,</span><span class="w"> </span><span class="n">loc_indices</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">localized_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">localized_wfn</span><span class="o">-&gt;</span><span class="n">get_orbitals</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Print summary</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">localizer</span><span class="o">-&gt;</span><span class="n">get_summary</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 </pre></div>
 </div>
 </div>
@@ -246,17 +250,23 @@ If empty vectors/lists are provided, no orbitals of that spin type will be local
 <p class="admonition-title">Note</p>
 <p>This example shows the API pattern. For complete working examples, see the test suite.</p>
 </div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create indices for orbitals to localize</span>
-<span class="c1"># For H2 with sto-3g, we have 2 molecular orbitals</span>
-<span class="n">num_mos</span> <span class="o">=</span> <span class="n">wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
-<span class="n">loc_indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">num_mos</span><span class="p">))</span>  <span class="c1"># Localize all orbitals</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create H2O molecule</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.757</span><span class="p">,</span> <span class="mf">0.587</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.757</span><span class="p">,</span> <span class="mf">0.587</span><span class="p">]])</span>
+<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;O&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="o">=</span><span class="n">symbols</span><span class="p">)</span>
+
+<span class="c1"># Obtain orbitals from SCF</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
+<span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># Create indices for orbitals to localize</span>
+<span class="n">loc_indices</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
 
 <span class="c1"># Localize the specified orbitals</span>
-<span class="c1"># For restricted orbitals, alpha and beta indices must be the same</span>
 <span class="n">localized_wfn</span> <span class="o">=</span> <span class="n">localizer</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn</span><span class="p">,</span> <span class="n">loc_indices</span><span class="p">,</span> <span class="n">loc_indices</span><span class="p">)</span>
 
 <span class="n">localized_orbitals</span> <span class="o">=</span> <span class="n">localized_wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Localized </span><span class="si">{</span><span class="n">num_mos</span><span class="si">}</span><span class="s2"> orbitals&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">localized_orbitals</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
 </pre></div>
 </div>
@@ -265,27 +275,26 @@ If empty vectors/lists are provided, no orbitals of that spin type will be local
 </section>
 <section id="available-localization-methods">
 <h2>Available localization methods<a class="headerlink" href="#available-localization-methods" title="Link to this heading"></a></h2>
-<dl class="simple">
-<dt>qdk_mp2_natural_orbitals</dt><dd><p><a class="reference internal" href="../../../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a> Natural Orbitals</p>
-</dd>
-<dt>qdk_pipek_mezey</dt><dd><p>Pipek-Mezey Localized Orbitals</p>
-</dd>
-<dt>qdk_vvhv</dt><dd><p>Valence Virtual Hard Virtual (<a class="reference internal" href="../../../glossary.html#term-VVHV"><span class="xref std std-term">VVHV</span></a>) Orbitals</p>
-</dd>
-</dl>
+<p>QDK/Chemistry’s <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.OrbitalLocalizer" title="qdk_chemistry.algorithms.OrbitalLocalizer"><code class="xref py py-class docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a> provides a unified interface for localization methods.</p>
+<section id="qdk-chemistry-implementations">
+<h3>QDK/Chemistry implementations<a class="headerlink" href="#qdk-chemistry-implementations" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>QDK/Chemistry</strong>: Native implementation of Pipek-Mezey and MP2 natural orbital localization</p></li>
+<li><p><strong>QDK/Chemistry</strong>: VVHV orbital separation method</p></li>
+</ul>
+</section>
+<section id="third-party-interfaces">
+<h3>Third-party interfaces<a class="headerlink" href="#third-party-interfaces" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>PySCF</strong>: Interface to PySCF’s orbital localization methods (Pipek-Mezey, Boys, etc.)</p></li>
+</ul>
+<p>The factory pattern allows seamless selection between these implementations.</p>
+<p>For more details on how QDK/Chemistry interfaces with external packages, see the <a class="reference internal" href="../design/interfaces.html"><span class="doc">Interfaces</span></a> documentation.</p>
+</section>
 </section>
 <section id="available-settings">
 <h2>Available settings<a class="headerlink" href="#available-settings" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.OrbitalLocalizer" title="qdk_chemistry.algorithms.OrbitalLocalizer"><code class="xref py py-class docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a> accepts a range of settings to control its behavior. These settings are divided into base settings
-(common to all localization methods) and specialized settings (specific to certain localization variants).</p>
-<section id="base-settings">
-<h3>Base settings<a class="headerlink" href="#base-settings" title="Link to this heading"></a></h3>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>TODO:  The base settings table is currently under construction.
-Please see <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/main/examples/factory_list.ipynb">online examples</a> for the most up-to-date information.</p>
-</div>
-</section>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.OrbitalLocalizer" title="qdk_chemistry.algorithms.OrbitalLocalizer"><code class="xref py py-class docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a> settings vary by implementation. Different localization algorithms have their own specific configuration parameters.</p>
 <section id="specialized-settings">
 <h3>Specialized settings<a class="headerlink" href="#specialized-settings" title="Link to this heading"></a></h3>
 <p>These settings apply only to specific variants of localization:</p>
@@ -324,19 +333,17 @@ Please see <a class="reference external" href="https://github.com/microsoft/qdk-
 <td><p>Threshold for small rotation detection</p></td>
 <td><p>Pipek-Mezey, <a class="reference internal" href="../../../glossary.html#term-VVHV"><span class="xref std std-term">VVHV</span></a></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">n_alpha_electrons</span></code></p></td>
-<td><p>int</p></td>
-<td><p>Required</p></td>
-<td><p>Number of alpha electrons.
-Orbital indices &lt; n_alpha_electrons are treated as occupied, indices &gt;= n_alpha_electrons are treated as virtual.</p></td>
-<td><p><a class="reference internal" href="../../../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a> Natural Orbitals, <a class="reference internal" href="../../../glossary.html#term-VVHV"><span class="xref std std-term">VVHV</span></a></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">minimal_basis</span></code></p></td>
+<td><p>string</p></td>
+<td><p>“sto-3g”</p></td>
+<td><p>Name of the minimal basis set used for valence virtual projection</p></td>
+<td><p><a class="reference internal" href="../../../glossary.html#term-VVHV"><span class="xref std std-term">VVHV</span></a></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">n_beta_electrons</span></code></p></td>
-<td><p>int</p></td>
-<td><p>Required</p></td>
-<td><p>Number of beta electrons.
-Orbital indices &lt; n_beta_electrons are treated as occupied, indices &gt;= n_beta_electrons are treated as virtual.</p></td>
-<td><p><a class="reference internal" href="../../../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a> Natural Orbitals, <a class="reference internal" href="../../../glossary.html#term-VVHV"><span class="xref std std-term">VVHV</span></a></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">weighted_orthogonalization</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>true</p></td>
+<td><p>Whether to use weighted orthogonalization in hard virtual construction</p></td>
+<td><p><a class="reference internal" href="../../../glossary.html#term-VVHV"><span class="xref std std-term">VVHV</span></a></p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">method</span></code></p></td>
 <td><p>string</p></td>
@@ -356,38 +363,8 @@ Orbital indices &lt; n_beta_electrons are treated as occupied, indices &gt;= n_b
 <td><p>Threshold for classifying orbitals as occupied vs virtual</p></td>
 <td><p>PySCF</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">minimal_basis</span></code></p></td>
-<td><p>string</p></td>
-<td><p>“sto-3g”</p></td>
-<td><p>Name of the minimal basis set used for valence virtual projection</p></td>
-<td><p><a class="reference internal" href="../../../glossary.html#term-VVHV"><span class="xref std std-term">VVHV</span></a></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">weighted_orthogonalization</span></code></p></td>
-<td><p>bool</p></td>
-<td><p>true</p></td>
-<td><p>Whether to use weighted orthogonalization in hard virtual construction</p></td>
-<td><p><a class="reference internal" href="../../../glossary.html#term-VVHV"><span class="xref std std-term">VVHV</span></a></p></td>
-</tr>
 </tbody>
 </table>
-</section>
-</section>
-<section id="implemented-interface">
-<h2>Implemented interface<a class="headerlink" href="#implemented-interface" title="Link to this heading"></a></h2>
-<p>QDK/Chemistry’s <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.OrbitalLocalizer" title="qdk_chemistry.algorithms.OrbitalLocalizer"><code class="xref py py-class docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a> provides a unified interface for localization methods.</p>
-<section id="qdk-chemistry-implementations">
-<h3>QDK/Chemistry implementations<a class="headerlink" href="#qdk-chemistry-implementations" title="Link to this heading"></a></h3>
-<ul class="simple">
-<li><p><strong>QDK/Chemistry</strong>: Native implementation of Pipek-Mezey, and <a class="reference internal" href="../../../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a> natural orbital localization</p></li>
-</ul>
-</section>
-<section id="third-party-interfaces">
-<h3>Third-party interfaces<a class="headerlink" href="#third-party-interfaces" title="Link to this heading"></a></h3>
-<ul class="simple">
-<li><p><strong>PySCF</strong>: Interface to PySCF’s orbital localization methods</p></li>
-</ul>
-<p>The factory pattern allows seamless selection between these implementations.</p>
-<p>For more details on how QDK/Chemistry interfaces with external packages, see the <a class="reference internal" href="../design/interfaces.html"><span class="doc">Interfaces</span></a> documentation.</p>
 </section>
 </section>
 <section id="further-reading">
@@ -396,8 +373,17 @@ Orbital indices &lt; n_beta_electrons are treated as occupied, indices &gt;= n_b
 <li><p>The above examples can be downloaded as complete <a class="reference external" href="../../../_static/examples/python/localizer.py">Python</a> or <a class="reference external" href="../../../_static/examples/cpp/localizer.cpp">C++</a> code.</p></li>
 <li><p><a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a>: Input and output orbitals</p></li>
 <li><p><a class="reference internal" href="scf_solver.html"><span class="doc">ScfSolver</span></a>: Produces initial orbitals for localization</p></li>
-<li><p><a class="reference internal" href="active_space.html"><span class="doc">ActiveSpaceSelector</span></a>: Often used with localized orbitals</p></li>
+<li><p><a class="reference internal" href="active_space.html"><span class="doc">ActiveSpaceSelector</span></a>: Often used with localized orbitals for better active space selection</p></li>
 <li><p><a class="reference internal" href="hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a>: Can build Hamiltonians using localized orbitals</p></li>
+<li><p><a class="reference internal" href="../data/wavefunction.html"><span class="doc">Wavefunction</span></a>: Container for orbitals and electronic state information</p></li>
+</ul>
+</section>
+<section id="related-topics">
+<h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../data/serialization.html"><span class="doc">Serialization</span></a>: Data serialization and deserialization</p></li>
+<li><p><a class="reference internal" href="../design/settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
+<li><p><a class="reference internal" href="../design/factory_pattern.html"><span class="doc">Factory pattern</span></a>: Creating algorithm instances</p></li>
 </ul>
 </section>
 </section>

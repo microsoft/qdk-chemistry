@@ -95,7 +95,6 @@
 <span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">Counter</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">math</span><span class="w"> </span><span class="kn">import</span> <span class="n">inf</span>
@@ -112,8 +111,7 @@
     <span class="n">TWO_QUBIT_CLIFFORD_GATES</span><span class="p">,</span>
     <span class="n">UNI_DIRECTIONAL_2Q_CLIFFORD_GATES</span><span class="p">,</span>
 <span class="p">)</span>
-
-<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;CircuitInfo&quot;</span><span class="p">,</span> <span class="s2">&quot;analyze_qubit_status&quot;</span><span class="p">,</span> <span class="s2">&quot;plot_circuit_diagram&quot;</span><span class="p">]</span>
 
@@ -139,6 +137,7 @@
 <span class="sd">        A summary of qubit roles indexed by qubit index.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">dag</span> <span class="o">=</span> <span class="n">circuit_to_dag</span><span class="p">(</span><span class="n">circuit</span><span class="p">)</span>
 
     <span class="c1"># Setup data structures to track qubit status and two-qubit gates for propagation.</span>
@@ -229,6 +228,7 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Post-initialization to compute circuit properties.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">num_qubits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">circuit</span><span class="o">.</span><span class="n">num_qubits</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">depth</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">circuit</span><span class="o">.</span><span class="n">depth</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">gate_counts</span> <span class="o">=</span> <span class="n">Counter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">circuit</span><span class="o">.</span><span class="n">count_ops</span><span class="p">())</span>
@@ -238,6 +238,7 @@
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.count_gate_category">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">count_gate_category</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">gate_list</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the number of gates in the circuit that belong to a list.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gate_counts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">gate_list</span><span class="p">)</span></div>
 
 
@@ -245,6 +246,7 @@
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.count_gate">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">count_gate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">gate_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the number of times a specific gate appears.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">gate_counts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">gate_name</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="mi">0</span><span class="p">)</span></div>
 
 
@@ -275,6 +277,7 @@
 <div class="viewcode-block" id="CircuitInfo.summary">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.summary">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">summary</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a summary of the circuit information.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">&quot;num_qubits&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_qubits</span><span class="p">,</span>
@@ -288,6 +291,7 @@
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Nicely formatted summary for printing.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="n">s</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>
         <span class="k">return</span> <span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Circuit info summary:</span><span class="se">\n</span><span class="s2">&quot;</span>
@@ -314,13 +318,14 @@
 
 <span class="sd">    Ensures measurement targets and classical registers remain consistent.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">status</span> <span class="o">=</span> <span class="n">analyze_qubit_status</span><span class="p">(</span><span class="n">circuit</span><span class="p">)</span>
     <span class="n">remove_status</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">if</span> <span class="n">remove_idle_qubits</span><span class="p">:</span>
         <span class="n">remove_status</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;idle&quot;</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">remove_classical_qubits</span><span class="p">:</span>
         <span class="n">remove_status</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;classical&quot;</span><span class="p">)</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="s2">&quot;Removing classical qubits will also remove any control operations sourced from them &quot;</span>
             <span class="s2">&quot;and measurements involving them.&quot;</span>
         <span class="p">)</span>
@@ -344,7 +349,7 @@
         <span class="n">kept_clbit_indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">circuit</span><span class="o">.</span><span class="n">clbits</span><span class="p">)))</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">kept_clbit_indices</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">circuit</span><span class="o">.</span><span class="n">clbits</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;All measurements are dropped, no classical bits remain.&quot;</span><span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;All measurements are dropped, no classical bits remain.&quot;</span><span class="p">)</span>
 
     <span class="n">new_qc</span> <span class="o">=</span> <span class="n">QuantumCircuit</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">kept_qubit_indices</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">kept_clbit_indices</span><span class="p">))</span>
     <span class="n">qubit_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">circuit</span><span class="o">.</span><span class="n">qubits</span><span class="p">[</span><span class="n">i</span><span class="p">]:</span> <span class="n">new_qc</span><span class="o">.</span><span class="n">qubits</span><span class="p">[</span><span class="n">new_i</span><span class="p">]</span> <span class="k">for</span> <span class="n">new_i</span><span class="p">,</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">kept_qubit_indices</span><span class="p">)}</span>
@@ -362,7 +367,7 @@
             <span class="n">circuit_drawer</span><span class="p">(</span><span class="n">new_qc</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;mpl&quot;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="n">output_file</span><span class="p">,</span> <span class="o">**</span><span class="n">draw_kwargs</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">except</span> <span class="ne">MemoryError</span><span class="p">:</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;MemoryError: Failed to save circuit diagram.&quot;</span><span class="p">)</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;MemoryError: Failed to save circuit diagram.&quot;</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">new_qc</span><span class="o">.</span><span class="n">draw</span><span class="p">(</span><span class="s2">&quot;mpl&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">draw_kwargs</span><span class="p">)</span></div>

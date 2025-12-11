@@ -101,7 +101,7 @@
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.html#subpackages">Subpackages</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.html">qdk_chemistry.algorithms package</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.CoupledClusterCalculator"><code class="docutils literal notranslate"><span class="pre">CoupledClusterCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.DynamicalCorrelationCalculator"><code class="docutils literal notranslate"><span class="pre">DynamicalCorrelationCalculator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator"><code class="docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HamiltonianConstructor"><code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.IterativePhaseEstimation"><code class="docutils literal notranslate"><span class="pre">IterativePhaseEstimation</span></code></a></li>
@@ -122,7 +122,9 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkOccupationActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkOccupationActiveSpaceSelector</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkPipekMezeyLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkPipekMezeyLocalizer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkScfSolver"><code class="docutils literal notranslate"><span class="pre">QdkScfSolver</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkVVHVLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkVVHVLocalizer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkValenceActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkValenceActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitHamiltonianSolver"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonianSolver</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper"><code class="docutils literal notranslate"><span class="pre">QubitMapper</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ScfSolver"><code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StabilityChecker"><code class="docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a></li>
@@ -131,8 +133,10 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.available"><code class="docutils literal notranslate"><span class="pre">available()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.create"><code class="docutils literal notranslate"><span class="pre">create()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.energy_from_phase"><code class="docutils literal notranslate"><span class="pre">energy_from_phase()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.inspect_settings"><code class="docutils literal notranslate"><span class="pre">inspect_settings()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.print_settings"><code class="docutils literal notranslate"><span class="pre">print_settings()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.register"><code class="docutils literal notranslate"><span class="pre">register()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.show_settings"><code class="docutils literal notranslate"><span class="pre">show_settings()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.show_default"><code class="docutils literal notranslate"><span class="pre">show_default()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.unregister"><code class="docutils literal notranslate"><span class="pre">unregister()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#subpackages">Subpackages</a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#submodules">Submodules</a></li>
@@ -143,14 +147,16 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Ansatz"><code class="docutils literal notranslate"><span class="pre">Ansatz</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet"><code class="docutils literal notranslate"><span class="pre">BasisSet</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.CasWavefunctionContainer"><code class="docutils literal notranslate"><span class="pre">CasWavefunctionContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Circuit"><code class="docutils literal notranslate"><span class="pre">Circuit</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration"><code class="docutils literal notranslate"><span class="pre">Configuration</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.CoupledClusterAmplitudes"><code class="docutils literal notranslate"><span class="pre">CoupledClusterAmplitudes</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.CoupledClusterContainer"><code class="docutils literal notranslate"><span class="pre">CoupledClusterContainer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.DataClass"><code class="docutils literal notranslate"><span class="pre">DataClass</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.ElectronicStructureSettings"><code class="docutils literal notranslate"><span class="pre">ElectronicStructureSettings</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Element"><code class="docutils literal notranslate"><span class="pre">Element</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.EnergyExpectationResult"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian"><code class="docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.HamiltonianType"><code class="docutils literal notranslate"><span class="pre">HamiltonianType</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.MP2Container"><code class="docutils literal notranslate"><span class="pre">MP2Container</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.MeasurementData"><code class="docutils literal notranslate"><span class="pre">MeasurementData</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.ModelOrbitals"><code class="docutils literal notranslate"><span class="pre">ModelOrbitals</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.OrbitalType"><code class="docutils literal notranslate"><span class="pre">OrbitalType</span></code></a></li>
@@ -174,6 +180,7 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction"><code class="docutils literal notranslate"><span class="pre">Wavefunction</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer"><code class="docutils literal notranslate"><span class="pre">WavefunctionContainer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionType"><code class="docutils literal notranslate"><span class="pre">WavefunctionType</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.get_current_ciaaw_version"><code class="docutils literal notranslate"><span class="pre">get_current_ciaaw_version()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#submodules">Submodules</a></li>
 </ul>
 </li>
@@ -196,6 +203,7 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.html">qdk_chemistry.utils package</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.compute_valence_space_parameters"><code class="docutils literal notranslate"><span class="pre">compute_valence_space_parameters()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.rotate_orbitals"><code class="docutils literal notranslate"><span class="pre">rotate_orbitals()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#submodules">Submodules</a></li>
 </ul>
 </li>
@@ -207,6 +215,7 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.constants.html#qdk_chemistry.constants.find_constant"><code class="docutils literal notranslate"><span class="pre">find_constant()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.constants.html#qdk_chemistry.constants.get_constant_info"><code class="docutils literal notranslate"><span class="pre">get_constant_info()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.constants.html#qdk_chemistry.constants.get_constants_info"><code class="docutils literal notranslate"><span class="pre">get_constants_info()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.constants.html#qdk_chemistry.constants.get_current_codata_version"><code class="docutils literal notranslate"><span class="pre">get_current_codata_version()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.constants.html#qdk_chemistry.constants.list_constants"><code class="docutils literal notranslate"><span class="pre">list_constants()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.constants.html#qdk_chemistry.constants.show_constant_details"><code class="docutils literal notranslate"><span class="pre">show_constant_details()</span></code></a></li>
 </ul>

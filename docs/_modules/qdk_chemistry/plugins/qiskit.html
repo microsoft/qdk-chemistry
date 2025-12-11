@@ -99,14 +99,26 @@
 <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">DeprecationWarning</span><span class="p">,</span> <span class="n">module</span><span class="o">=</span><span class="s2">&quot;qiskit.*&quot;</span><span class="p">)</span>
 <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">DeprecationWarning</span><span class="p">,</span> <span class="n">module</span><span class="o">=</span><span class="s2">&quot;qiskit_aer.*&quot;</span><span class="p">)</span>
 
+<span class="n">_loaded</span> <span class="o">=</span> <span class="kc">False</span>
+
 
 <div class="viewcode-block" id="load">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.plugins.qiskit.html#qdk_chemistry.plugins.qiskit.load">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">():</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Load the Qiskit plugin into QDK/Chemistry.&quot;&quot;&quot;</span>
-    <span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit.energy_estimator</span>  <span class="c1"># noqa: PLC0415</span>
-    <span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit.qubit_mapper</span>  <span class="c1"># noqa: PLC0415</span>
-    <span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit.regular_isometry</span>  <span class="c1"># noqa: PLC0415</span></div>
+    <span class="k">global</span> <span class="n">_loaded</span>  <span class="c1"># noqa: PLW0603</span>
+    <span class="k">if</span> <span class="n">_loaded</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="n">_loaded</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">register</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit.energy_estimator</span><span class="w"> </span><span class="kn">import</span> <span class="n">QiskitEnergyEstimator</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit.qubit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">QiskitQubitMapper</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit.regular_isometry</span><span class="w"> </span><span class="kn">import</span> <span class="n">RegularIsometryStatePreparation</span>  <span class="c1"># noqa: PLC0415</span>
+
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QiskitEnergyEstimator</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QiskitQubitMapper</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">RegularIsometryStatePreparation</span><span class="p">())</span></div>
 
 </pre></div>
 

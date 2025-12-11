@@ -453,7 +453,7 @@ The statistical nature of quantum measurements introduces variance in the energy
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Estimate energy using the optimized circuit and filtered Hamiltonian operators</span>
 <span class="n">estimator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;energy_estimator&quot;</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qdk_base_simulator&quot;</span><span class="p">)</span>
 <span class="n">energy_results</span><span class="p">,</span> <span class="n">simulation_data</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">circuit_qasm</span><span class="o">=</span><span class="n">sparse_isometry_circuit</span><span class="p">,</span>
+    <span class="n">circuit</span><span class="o">=</span><span class="n">sparse_isometry_circuit</span><span class="p">,</span>
     <span class="n">qubit_hamiltonians</span><span class="o">=</span><span class="n">filtered_hamiltonian_ops</span><span class="p">,</span>
     <span class="n">total_shots</span><span class="o">=</span><span class="mi">250000</span><span class="p">,</span>
     <span class="n">classical_coeffs</span><span class="o">=</span><span class="n">classical_coeffs</span><span class="p">,</span>

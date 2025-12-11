@@ -26,7 +26,7 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Reference-derived calculations" href="reference_derived.html" />
+    <link rel="next" title="Dynamical correlation calculations" href="dynamical_correlation.html" />
     <link rel="prev" title="Projected multi-configuration calculations" href="pmc.html" /> 
 </head>
 
@@ -73,7 +73,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="reference_derived.html">Reference-derived calculations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dynamical_correlation.html">Dynamical correlation calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solving</a></li>
 <li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Self-consistent field stability checks</a></li>
 <li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State Preparation</a></li>
@@ -133,9 +133,9 @@ The resulting qubit Hamiltonian is mathematically equivalent to the original fer
 <p>The mapper supports multiple encoding strategies:</p>
 <blockquote>
 <div><ul class="simple">
-<li><p><strong>Jordan-Wigner mapping</strong> <span id="id1">[<a class="reference internal" href="../../../references.html#id5" title="P. Jordan and E. Wigner. Über das paulische äquivalenzverbot. Zeitschrift für Physik, 47:631-651, 1928. URL: https://doi.org/10.1007/BF01331938, doi:10.1007/BF01331938.">JW28</a>]</span>: Encodes each fermionic mode in a single qubit whose state directly represents the orbital occupation.</p></li>
-<li><p><strong>Parity mapping</strong> <span id="id2">[<a class="reference internal" href="../../../references.html#id6" title="Jacob T. Seeley, Martin J. Richard, and Peter J. Love. The bravyi-kitaev transformation for quantum computation of electronic structure. The Journal of Chemical Physics, 137(22):224109, 12 2012. URL: https://doi.org/10.1063/1.4768229, arXiv:https://pubs.aip.org/aip/jcp/article-pdf/doi/10.1063/1.4768229/13999577/224109_1_online.pdf, doi:10.1063/1.4768229.">SRL12</a>]</span>: Encodes qubits with cumulative electron-number parities of the orbitals.</p></li>
-<li><p><strong>Bravyi-Kitaev mapping</strong> <span id="id3">[<a class="reference internal" href="../../../references.html#id7" title="Sergey B. Bravyi and Alexei Yu. Kitaev. Fermionic quantum computation. Annals of Physics, 298(1):210-226, 2002. URL: https://www.sciencedirect.com/science/article/pii/S0003491602962548, doi:https://doi.org/10.1006/aphy.2002.6254.">BK02</a>]</span>: Distributes both occupation and parity information across qubits using a binary-tree (Fenwick tree) structure, reducing the average Pauli-string length to logarithmic scaling.</p></li>
+<li><p><strong>Jordan-Wigner mapping</strong> <span id="id1">[<a class="reference internal" href="../../../references.html#id12" title="P. Jordan and E. Wigner. Über das paulische äquivalenzverbot. Zeitschrift für Physik, 47:631-651, 1928. doi:10.1007/BF01331938.">JW28</a>]</span>: Encodes each fermionic mode in a single qubit whose state directly represents the orbital occupation.</p></li>
+<li><p><strong>Parity mapping</strong> <span id="id2">[<a class="reference internal" href="../../../references.html#id13" title="Jacob T. Seeley, Martin J. Richard, and Peter J. Love. The Bravyi-Kitaev transformation for quantum computation of electronic structure. The Journal of Chemical Physics, 137(22):224109, 12 2012. doi:10.1063/1.4768229.">SRL12</a>]</span>: Encodes qubits with cumulative electron-number parities of the orbitals.</p></li>
+<li><p><strong>Bravyi-Kitaev mapping</strong> <span id="id3">[<a class="reference internal" href="../../../references.html#id14" title="Sergey B. Bravyi and Alexei Yu. Kitaev. Fermionic quantum computation. Annals of Physics, 298(1):210-226, 2002. doi:10.1006/aphy.2002.6254.">BK02</a>]</span>: Distributes both occupation and parity information across qubits using a binary-tree (Fenwick tree) structure, reducing the average Pauli-string length to logarithmic scaling.</p></li>
 </ul>
 </div></blockquote>
 </section>
@@ -251,7 +251,7 @@ based on the calculation requirements and available packages.</p>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="pmc.html" class="btn btn-neutral float-left" title="Projected multi-configuration calculations" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="reference_derived.html" class="btn btn-neutral float-right" title="Reference-derived calculations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="dynamical_correlation.html" class="btn btn-neutral float-right" title="Dynamical correlation calculations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

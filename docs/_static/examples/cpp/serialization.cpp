@@ -8,26 +8,63 @@
 
 // --------------------------------------------------------------------------------------------
 // start-cell-json
-// Serialize to JSON object
-auto json_data = object.to_json();
+#include <filesystem>
+#include <qdk/chemistry.hpp>
+using namespace qdk::chemistry::data;
 
-// Deserialize from JSON object
-auto object_from_json = ObjectType::from_json(json_data);
+int main() {
+  // Structure data class example
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
+  std::vector<std::string> symbols = {"H", "H"};
+  std::vector<double> custom_masses{1.001, 0.999};
+  std::vector<double> custom_charges = {0.9, 1.1};
+  Structure structure(coords, symbols, custom_masses, custom_charges);
 
-// Serialize to JSON file
-object.to_json_file("filename.ext.json");  // Extension depends on object type
+  // Serialize to JSON object
+  auto structure_data = structure.to_json();
 
-// Deserialize from JSON file
-auto object_from_json_file = ObjectType::from_json_file("filename.ext.json");
-// end-cell-json
-// --------------------------------------------------------------------------------------------
+  const char* filename =
+      "h2_example.structure.json";  // Extension depends on object type
 
-// --------------------------------------------------------------------------------------------
-// start-cell-hdf5
-// Serialize to HDF5 file
-object.to_hdf5_file("filename.ext.h5");  // Extension depends on object type
+  // Deserialize from JSON object
+  // "Structure" is the data type to de-serialize into (will throw, if it
+  // doesn't match)
+  auto structure_from_json = Structure::from_json(structure_data);
 
-// Deserialize from HDF5 file
-auto object_from_hdf5_file = ObjectType::from_hdf5_file("filename.ext.h5");
-// end-cell-hdf5
-// --------------------------------------------------------------------------------------------
+  // Write to json file
+  structure.to_json_file(filename);
+
+  // Read from json file
+  auto structure_from_json_file = Structure::from_json_file(filename);
+
+  std::filesystem::remove(filename);
+
+  // end-cell-json
+  // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-hdf5
+
+  // Hamiltonian data class example
+  // Create dummy data for Hamiltonian class
+  Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::VectorXd two_body = 2 * Eigen::VectorXd::Ones(16);
+  auto orbitals =
+      std::make_shared<ModelOrbitals>(2, true);  // 2 orbitals, restricted
+  double core_energy = 1.5;
+  Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
+
+  Hamiltonian h2_example(one_body, two_body, orbitals, core_energy,
+                         inactive_fock);
+
+  h2_example.to_hdf5_file(
+      "h2_example.hamiltonian.h5");  // Extension depends on object type
+
+  // Deserialize from HDF5 file
+  auto h2_example_from_hdf5_file =
+      Hamiltonian::from_hdf5_file("h2_example.hamiltonian.h5");
+
+  // end-cell-hdf5
+  // --------------------------------------------------------------------------------------------
+  return 0;
+}

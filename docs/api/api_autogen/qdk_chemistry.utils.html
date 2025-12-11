@@ -63,6 +63,7 @@
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#utilities">Utilities</a><ul class="current">
 <li class="toctree-l3 current"><a class="current reference internal" href="#">qdk_chemistry.utils package</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.utils.compute_valence_space_parameters"><code class="docutils literal notranslate"><span class="pre">compute_valence_space_parameters()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.utils.rotate_orbitals"><code class="docutils literal notranslate"><span class="pre">rotate_orbitals()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#submodules">Submodules</a></li>
 </ul>
 </li>
@@ -124,6 +125,61 @@ The structure is automatically extracted from the wavefunction.</p>
 <p>(active_electrons, active_orbitals) = compute_valence_space(wavefunction, charge)</p>
 </dd></dl>
 
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.rotate_orbitals">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.utils.</span></span><span class="sig-name descname"><span class="pre">rotate_orbitals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">orbitals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><span class="pre">qdk_chemistry.data.Orbitals</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">rotation_vector</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.ArrayLike</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">numpy.float64</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_alpha_occupied_orbitals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_beta_occupied_orbitals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">restricted_external</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><span class="pre">qdk_chemistry.data.Orbitals</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.rotate_orbitals" title="Link to this definition"></a></dt>
+<dd><p>Rotate molecular orbitals using a rotation vector.</p>
+<p>This function takes Orbitals and applies orbital rotations using a
+rotation vector, typically taken from stability analysis eigenvectors.</p>
+<p>The rotation is performed by:
+1. Unpacking the rotation vector into an anti-Hermitian matrix
+2. Computing the unitary rotation matrix via matrix exponential
+3. Applying the rotation to the molecular orbital coefficients</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>orbitals</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><em>qdk_chemistry.data.Orbitals</em></a>) – The Orbitals to rotate</p></li>
+<li><p><strong>rotation_vector</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – The rotation vector (typically from stability analysis,
+corresponding to the lowest eigenvalue)</p></li>
+<li><p><strong>num_alpha_occupied_orbitals</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Number of alpha occupied orbitals</p></li>
+<li><p><strong>num_beta_occupied_orbitals</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Number of beta occupied orbitals</p></li>
+<li><p><strong>restricted_external</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><a class="reference internal" href="../_py_placeholders.html#optional" title="optional"><em>optional</em></a>) – If True and orbitals are restricted, creates unrestricted orbitals with
+rotated coefficients for alpha spin and unrotated coefficients for beta spin.
+Default is False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A new Orbitals object with rotated molecular orbital coefficients</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals">qdk_chemistry.data.Orbitals</a></p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>restricted_external can break spin symmetry and solve external
+instabilities of RHF/RKS.</p></li>
+<li><p>For unrestricted calculations, the rotation vector should contain
+alpha rotations first (n_occ_alpha * n_vir_alpha elements),
+then beta rotations (n_occ_beta * n_vir_beta elements).</p></li>
+<li><p>This function assumes aufbau filling for occupation numbers.</p></li>
+<li><p>Orbital energies are invalidated by rotation and set to null.</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If rotation vector size is invalid</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># After stability analysis that finds instability</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rotation_vector</span> <span class="o">=</span> <span class="o">...</span>  <span class="c1"># eigenvector from stability analysis</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rotated_orbitals</span> <span class="o">=</span> <span class="n">rotate_orbitals</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span> <span class="n">rotation_vector</span><span class="p">,</span>
+<span class="gp">... </span>                                    <span class="n">num_alpha_occupied_orbitals</span><span class="p">,</span>
+<span class="gp">... </span>                                    <span class="n">num_beta_occupied_orbitals</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
 <section id="submodules">
 <h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
 <div class="toctree-wrapper compound">
@@ -133,10 +189,6 @@ The structure is automatically extracted from the wavefunction.</p>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.bitstring.html#qdk_chemistry.utils.bitstring.binary_to_decimal"><code class="docutils literal notranslate"><span class="pre">binary_to_decimal()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.bitstring.html#qdk_chemistry.utils.bitstring.bitstrings_to_binary_matrix"><code class="docutils literal notranslate"><span class="pre">bitstrings_to_binary_matrix()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.bitstring.html#qdk_chemistry.utils.bitstring.separate_alpha_beta_to_binary_string"><code class="docutils literal notranslate"><span class="pre">separate_alpha_beta_to_binary_string()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.utils.circuit.html">qdk_chemistry.utils.circuit module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.circuit.html#qdk_chemistry.utils.circuit.qasm_to_qdk_circuit"><code class="docutils literal notranslate"><span class="pre">qasm_to_qdk_circuit()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.utils.cubegen.html">qdk_chemistry.utils.cubegen module</a><ul>

@@ -61,13 +61,12 @@
 <li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Structure</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#units">Units</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#usage">Usage</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#creating-a-structure-object-manually">Creating a structure object manually</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#loading-from-files">Loading from files</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#creating-a-structure-object">Creating a structure object</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#accessing-structure-data">Accessing structure data</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#serialization">Serialization</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#molecular-manipulation">Molecular manipulation</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#units">Units</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file-formats">File formats</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
@@ -120,7 +119,7 @@
              
   <section id="structure">
 <h1>Structure<a class="headerlink" href="#structure" title="Link to this heading"></a></h1>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> class in QDK/Chemistry represents a molecular structure, storing information about atomic positions, elements, and related properties for chemical systems of interest.
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> class in QDK/Chemistry represents a molecular structure, which always includes 3D coordinates and element information, and optionally includes related properties like atomic masses and nuclear charges.
 As a core <a class="reference internal" href="../design/index.html"><span class="doc">data class</span></a>, it follows QDK/Chemistry’s immutable data pattern.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
@@ -131,13 +130,16 @@ It provides the foundation for all quantum chemistry calculations by defining th
 <ul class="simple">
 <li><p><strong>Coordinates</strong>: 3D Cartesian coordinates for each atom</p></li>
 <li><p><strong>Elements</strong>: Chemical elements of the atoms</p></li>
+<li><p><strong>Masses</strong>: Atomic masses of each of the atoms</p></li>
+<li><p><strong>Nuclear charges</strong>: Nuclear charges (atomic numbers) of each of the atoms</p></li>
 </ul>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>By default, the total charge of a new structure is 0 (neutral) and the spin multiplicity is set to the
-lowest possible value (singlet for even-electron systems, doublet for odd-electron systems).</p>
-</div>
 </section>
+</section>
+<section id="units">
+<h2>Units<a class="headerlink" href="#units" title="Link to this heading"></a></h2>
+<p>All internal coordinates in the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> class are in Bohr by default.
+This applies to all methods that return or accept coordinates.
+The only time Angstrom units can be found by default is in the <em>xyz</em> file format, where Angstrom is default (see below).</p>
 </section>
 <section id="usage">
 <h2>Usage<a class="headerlink" href="#usage" title="Link to this heading"></a></h2>
@@ -145,77 +147,55 @@ lowest possible value (singlet for even-electron systems, doublet for odd-electr
 It is used to define the molecular system before performing electronic structure calculations.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Coordinates are in Angstrom by default when creating or importing a Structure. See the <a class="reference internal" href="#units">Units</a> section below for more details on unit conversions.</p>
+<p>Coordinates are in Bohr by default when creating or importing a Structure. See the <a class="reference internal" href="#units">Units</a> section below for more details on unit conversions.</p>
 </div>
 </section>
-<section id="creating-a-structure-object-manually">
-<h2>Creating a structure object manually<a class="headerlink" href="#creating-a-structure-object-manually" title="Link to this heading"></a></h2>
-<p>A <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> object can be created manually by adding atoms one by one:</p>
+<section id="creating-a-structure-object">
+<h2>Creating a structure object<a class="headerlink" href="#creating-a-structure-object" title="Link to this heading"></a></h2>
+<p>A <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> object can be created manually as follows:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
 <span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
 
-<span class="c1">// Create an empty structure</span>
-<span class="n">Structure</span><span class="w"> </span><span class="n">structure</span><span class="p">;</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// Specify a structure using coordinates, and either symbols or elements</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="o">&gt;</span><span class="w"> </span><span class="n">coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">},</span>
+<span class="w">                                         </span><span class="p">{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.4</span><span class="p">}};</span><span class="w">  </span><span class="c1">// Bohr</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">symbols</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;H&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">};</span>
 
-<span class="c1">// Add atoms with their 3D coordinates and element symbols (coordinates in</span>
-<span class="c1">// Bohr/atomic units)</span>
-<span class="n">structure</span><span class="p">.</span><span class="n">add_atom</span><span class="p">(</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">),</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">);</span>
-<span class="n">structure</span><span class="p">.</span><span class="n">add_atom</span><span class="p">(</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.4</span><span class="p">),</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="n">Structure</span><span class="w"> </span><span class="n">structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span><span class="w"> </span><span class="n">symbols</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Equivalent to &#39;structure&#39;, but uses &#39;elements&#39; instead of &#39;symbols&#39;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Element</span><span class="o">&gt;</span><span class="w"> </span><span class="n">elements</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">Element</span><span class="o">::</span><span class="n">H</span><span class="p">,</span><span class="w"> </span><span class="n">Element</span><span class="o">::</span><span class="n">H</span><span class="p">};</span>
+<span class="w">  </span><span class="n">Structure</span><span class="w"> </span><span class="n">structure_alternative</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span><span class="w"> </span><span class="n">elements</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Another variation on construction: can specify custom masses and/or charges</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">custom_masses</span><span class="p">{</span><span class="mf">1.001</span><span class="p">,</span><span class="w"> </span><span class="mf">0.999</span><span class="p">};</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">custom_charges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mf">0.9</span><span class="p">,</span><span class="w"> </span><span class="mf">1.1</span><span class="p">};</span>
+<span class="w">  </span><span class="n">Structure</span><span class="w"> </span><span class="n">structure_custom</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span><span class="w"> </span><span class="n">elements</span><span class="p">,</span><span class="w"> </span><span class="n">custom_masses</span><span class="p">,</span><span class="w"> </span><span class="n">custom_charges</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span><span class="p">,</span> <span class="n">Element</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
+<span class="c1"># Specify a structure using coordinates, and either symbols or elements</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>  <span class="c1"># Bohr</span>
+<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
 
-<span class="c1"># Create a Structure manually (coordinates in Bohr/atomic units)</span>
-<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
-<span class="n">elements</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">elements</span><span class="p">)</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="o">=</span><span class="n">symbols</span><span class="p">)</span>
+<span class="c1"># Equivalent to &#39;structure&#39;, but uses &#39;elements&#39; instead of &#39;symbols&#39;</span>
+<span class="n">elements</span> <span class="o">=</span> <span class="p">[</span><span class="n">Element</span><span class="o">.</span><span class="n">H</span><span class="p">,</span> <span class="n">Element</span><span class="o">.</span><span class="n">H</span><span class="p">]</span>
+<span class="n">structure_alternative</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">elements</span><span class="p">)</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created structure with </span><span class="si">{</span><span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span><span class="si">}</span><span class="s2"> atoms&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Elements: </span><span class="si">{</span><span class="n">structure</span><span class="o">.</span><span class="n">get_elements</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-</div>
-</section>
-<section id="loading-from-files">
-<h2>Loading from files<a class="headerlink" href="#loading-from-files" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> class can load molecular structures from various file formats.
-For detailed format specifications, see the <a class="reference internal" href="#file-formats">File Formats</a> section below.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>All structure-related files require the <code class="docutils literal notranslate"><span class="pre">.structure</span></code> suffix before the file type extension, for example
-<code class="docutils literal notranslate"><span class="pre">molecule.structure.xyz</span></code> and <code class="docutils literal notranslate"><span class="pre">h2.structure.json</span></code> for XYZ and JSON files respectively.</p>
-</div>
-<div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Load from XYZ file</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">structure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Structure</span><span class="o">::</span><span class="n">from_xyz_file</span><span class="p">(</span>
-<span class="w">    </span><span class="s">&quot;../data/water.structure.xyz&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// Required .structure.xyz suffix</span>
-
-<span class="c1">// Load from JSON file</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">structure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Structure</span><span class="o">::</span><span class="n">from_json_file</span><span class="p">(</span>
-<span class="w">    </span><span class="s">&quot;../data/water.structure.json&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// Required .structure.json suffix</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>These examples show the API pattern. For complete working examples, see the test suite.</p>
-</div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Load from XYZ file</span>
-<span class="n">structure_xyz</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;../data/water.structure.xyz&quot;</span><span class="p">))</span>
-
-<span class="c1"># Load from JSON file</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;../data/water.structure.json&quot;</span><span class="p">))</span>
+<span class="c1"># Another variation on construction: can specify custom masses and/or charges</span>
+<span class="n">custom_masses</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1.001</span><span class="p">,</span> <span class="mf">0.999</span><span class="p">]</span>
+<span class="n">custom_charges</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">1.1</span><span class="p">]</span>
+<span class="n">structure_custom</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span>
+    <span class="n">coords</span><span class="p">,</span> <span class="n">elements</span><span class="o">=</span><span class="n">elements</span><span class="p">,</span> <span class="n">masses</span><span class="o">=</span><span class="n">custom_masses</span><span class="p">,</span> <span class="n">nuclear_charges</span><span class="o">=</span><span class="n">custom_charges</span>
+<span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -224,48 +204,41 @@ For detailed format specifications, see the <a class="reference internal" href="
 <section id="accessing-structure-data">
 <h2>Accessing structure data<a class="headerlink" href="#accessing-structure-data" title="Link to this heading"></a></h2>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> class provides methods to access atomic data:</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
 <p>Functions that deal with specific atoms include the word “atom” in their name (e.g., <code class="docutils literal notranslate"><span class="pre">get_atom_coordinates</span></code>), while functions that return properties for all atoms omit this word (e.g., <code class="docutils literal notranslate"><span class="pre">get_coordinates</span></code>).
 All atomic data is const and immutable once set, following QDK/Chemistry’s <a class="reference internal" href="../design/index.html"><span class="doc">immutable data pattern</span></a>.
 If you need to modify coordinates or other properties, you must create a new Structure object with the desired changes.</p>
-</div>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get coordinates of a specific atom in angstrom</span>
-<span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="w"> </span><span class="n">coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">structure</span><span class="p">.</span><span class="n">get_atom_coordinates</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">  </span><span class="c1">// First atom</span>
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Get coordinates of a specific atom in Bohr</span>
+<span class="w">  </span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="w"> </span><span class="n">atom_coords</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">structure</span><span class="p">.</span><span class="n">get_atom_coordinates</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">  </span><span class="c1">// First atom</span>
 
-<span class="c1">// Get element of a specific atom</span>
-<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">element</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">structure</span><span class="p">.</span><span class="n">get_atom_element</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">  </span><span class="c1">// First atom</span>
+<span class="w">  </span><span class="c1">// Get element of a specific atom</span>
+<span class="w">  </span><span class="n">Element</span><span class="w"> </span><span class="n">element</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">structure</span><span class="p">.</span><span class="n">get_atom_element</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">  </span><span class="c1">// First atom</span>
 
-<span class="c1">// Get all coordinates (in angstrom) as a matrix</span>
-<span class="n">Eigen</span><span class="o">::</span><span class="n">MatrixXd</span><span class="w"> </span><span class="n">all_coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">structure</span><span class="p">.</span><span class="n">get_coordinates</span><span class="p">();</span>
+<span class="w">  </span><span class="c1">// Get all coordinates (in Bohr) as a matrix</span>
+<span class="w">  </span><span class="n">Eigen</span><span class="o">::</span><span class="n">MatrixXd</span><span class="w"> </span><span class="n">all_coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">structure</span><span class="p">.</span><span class="n">get_coordinates</span><span class="p">();</span>
 
-<span class="c1">// Get all elements as a vector</span>
-<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">all_elements</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">structure</span><span class="p">.</span><span class="n">get_elements</span><span class="p">();</span>
+<span class="w">  </span><span class="c1">// Get all elements as a vector</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Element</span><span class="o">&gt;</span><span class="w"> </span><span class="n">all_elements</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">structure</span><span class="p">.</span><span class="n">get_elements</span><span class="p">();</span>
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get coordinates of a specific atom</span>
 <span class="n">atom_coords</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_atom_coordinates</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># First atom</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;First atom coordinates: </span><span class="si">{</span><span class="n">atom_coords</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="c1"># Get element of a specific atom</span>
 <span class="n">element</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_atom_element</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># First atom</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;First atom element: </span><span class="si">{</span><span class="n">element</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="c1"># Get all coordinates as a matrix</span>
 <span class="n">all_coords</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_coordinates</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;All coordinates shape: </span><span class="si">{</span><span class="n">all_coords</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="c1"># Get all elements as a list</span>
 <span class="n">all_elements</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_elements</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;All elements: </span><span class="si">{</span><span class="n">all_elements</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="c1"># Get nuclear repulsion energy</span>
 <span class="n">nuc_repulsion</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">calculate_nuclear_repulsion_energy</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Nuclear repulsion energy: </span><span class="si">{</span><span class="n">nuc_repulsion</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -280,128 +253,21 @@ For detailed information about serialization in QDK/Chemistry, see the <a class=
 <p>All structure-related files require the <code class="docutils literal notranslate"><span class="pre">.structure</span></code> suffix before the file type extension, for example <code class="docutils literal notranslate"><span class="pre">molecule.structure.xyz</span></code> and <code class="docutils literal notranslate"><span class="pre">h2.structure.json</span></code> for XYZ and JSON files respectively.
 This naming convention is enforced to maintain consistency across the QDK/Chemistry ecosystem.</p>
 </div>
-<section id="file-formats">
-<h3>File formats<a class="headerlink" href="#file-formats" title="Link to this heading"></a></h3>
-<p>QDK/Chemistry supports multiple serialization formats for molecular structures:</p>
-<section id="json-format">
-<h4>JSON format<a class="headerlink" href="#json-format" title="Link to this heading"></a></h4>
-<p>JSON representation of a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> looks like:</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;coordinates&quot;</span><span class="p">:[[</span><span class="mf">0.0</span><span class="p">,</span><span class="mf">0.0</span><span class="p">,</span><span class="mf">0.0</span><span class="p">],[</span><span class="mf">0.0</span><span class="p">,</span><span class="mf">0.0</span><span class="p">,</span><span class="mf">1.4</span><span class="p">]],</span>
-<span class="w">  </span><span class="nt">&quot;elements&quot;</span><span class="p">:[</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;masses&quot;</span><span class="p">:[</span><span class="mf">1.008</span><span class="p">,</span><span class="mf">1.008</span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;nuclear_charges&quot;</span><span class="p">:[</span><span class="mf">1.0</span><span class="p">,</span><span class="mf">1.0</span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;num_atoms&quot;</span><span class="p">:</span><span class="mi">2</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;symbols&quot;</span><span class="p">:[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span><span class="s2">&quot;H&quot;</span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;total_charge&quot;</span><span class="p">:</span><span class="mi">0</span><span class="p">,</span><span class="w">  </span><span class="c1">// TODO: Verify these field names</span>
-<span class="w">  </span><span class="nt">&quot;spin_multiplicity&quot;</span><span class="p">:</span><span class="mi">1</span><span class="w">  </span><span class="c1">// TODO: Verify these field names</span>
-<span class="p">}</span>
-</pre></div>
-</div>
 </section>
+<section id="file-formats">
+<h2>File formats<a class="headerlink" href="#file-formats" title="Link to this heading"></a></h2>
+<p>As well as the JSON and HDF5 file formats supported for all data classes of QDK/Chemistry, there is the dedicated XYZ format for structures.</p>
 <section id="xyz-format">
-<h4>XYZ format<a class="headerlink" href="#xyz-format" title="Link to this heading"></a></h4>
-<p><a class="reference external" href="https://en.wikipedia.org/wiki/XYZ_file_format">XYZ representation</a> of the same <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a>:</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>QDK/Chemistry uses the comment field (second line) of the XYZ format to store the charge and spin multiplicity information, as this data is not part of the standard XYZ specification.</p>
-</div>
+<h3>XYZ format<a class="headerlink" href="#xyz-format" title="Link to this heading"></a></h3>
+<p><a class="reference external" href="https://en.wikipedia.org/wiki/XYZ_file_format">XYZ representation</a> of a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a>:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>2
-charge = 0, spin_multiplicity = 1  (TODO)
+
 H      0.000000    0.000000    0.000000
 H      0.000000    0.000000    1.400000
 </pre></div>
 </div>
-<div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Serialize to JSON object</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">json_data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">structure</span><span class="p">.</span><span class="n">to_json</span><span class="p">();</span>
-
-<span class="c1">// Deserialize from JSON object</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">structure_from_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Structure</span><span class="o">::</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_data</span><span class="p">);</span>
-
-<span class="c1">// Serialize to JSON file</span>
-<span class="n">structure</span><span class="p">.</span><span class="n">to_json_file</span><span class="p">(</span>
-<span class="w">    </span><span class="s">&quot;molecule.structure.json&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// Required .structure.json suffix</span>
-
-<span class="c1">// Get XYZ format as string</span>
-<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">xyz_string</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">structure</span><span class="p">.</span><span class="n">to_xyz</span><span class="p">();</span>
-
-<span class="c1">// Load from XYZ string</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">structure_from_xyz</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Structure</span><span class="o">::</span><span class="n">from_xyz</span><span class="p">(</span><span class="n">xyz_string</span><span class="p">);</span>
-
-<span class="c1">// Serialize to XYZ file</span>
-<span class="n">structure</span><span class="p">.</span><span class="n">to_xyz_file</span><span class="p">(</span>
-<span class="w">    </span><span class="s">&quot;molecule.structure.xyz&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// Required .structure.xyz suffix</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use a temporary directory for file I/O examples</span>
-<span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span> <span class="k">as</span> <span class="n">tmpdir</span><span class="p">:</span>
-    <span class="n">tmpdir_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">)</span>
-    <span class="n">json_file</span> <span class="o">=</span> <span class="n">tmpdir_path</span> <span class="o">/</span> <span class="s2">&quot;molecule.structure.json&quot;</span>
-    <span class="n">xyz_file</span> <span class="o">=</span> <span class="n">tmpdir_path</span> <span class="o">/</span> <span class="s2">&quot;molecule.structure.xyz&quot;</span>
-
-    <span class="c1"># Serialize to JSON object</span>
-    <span class="n">json_data</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
-
-    <span class="c1"># Deserialize from JSON object</span>
-    <span class="n">structure_from_json</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_data</span><span class="p">)</span>
-
-    <span class="c1"># Serialize to JSON file</span>
-    <span class="n">structure</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">json_file</span><span class="p">))</span>
-
-    <span class="c1"># Deserialize from JSON file</span>
-    <span class="n">structure_from_json_file</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">json_file</span><span class="p">))</span>
-
-    <span class="c1"># Get XYZ format as string</span>
-    <span class="n">xyz_string</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">to_xyz</span><span class="p">()</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;XYZ format:</span><span class="se">\n</span><span class="si">{</span><span class="n">xyz_string</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-    <span class="c1"># Serialize to XYZ file</span>
-    <span class="n">structure</span><span class="o">.</span><span class="n">to_xyz_file</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">xyz_file</span><span class="p">))</span>
-
-    <span class="c1"># Load from XYZ file</span>
-    <span class="n">structure_from_xyz_file</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">xyz_file</span><span class="p">))</span>
-</pre></div>
-</div>
-</div>
-</div>
+<p>Note that here the coordinates are in Angstrom, since this is the standard in xyz files.</p>
 </section>
-</section>
-</section>
-<section id="molecular-manipulation">
-<h2>Molecular manipulation<a class="headerlink" href="#molecular-manipulation" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> class provides methods for basic molecular manipulations:</p>
-<div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Add an atom with coordinates and element</span>
-<span class="n">structure</span><span class="p">.</span><span class="n">add_atom</span><span class="p">(</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">),</span><span class="w"> </span><span class="s">&quot;O&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// Add an oxygen atom</span>
-
-<span class="c1">// Remove an atom</span>
-<span class="n">structure</span><span class="p">.</span><span class="n">remove_atom</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span><span class="w">  </span><span class="c1">// Remove the third atom</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This example shows the API pattern. For complete working examples, see the test suite.</p>
-</div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Structure is immutable - create a new structure to modify</span>
-<span class="n">new_coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">structure</span><span class="o">.</span><span class="n">get_coordinates</span><span class="p">(),</span> <span class="p">[[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]]])</span>
-<span class="n">new_elements</span> <span class="o">=</span> <span class="p">[</span><span class="n">elem</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_elements</span><span class="p">()]</span> <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;O&quot;</span><span class="p">]</span>
-<span class="n">modified_structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">new_coords</span><span class="p">,</span> <span class="n">new_elements</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-</div>
-</section>
-<section id="units">
-<h2>Units<a class="headerlink" href="#units" title="Link to this heading"></a></h2>
-<p>All internal coordinates in the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> class are in Bohr by default.
-This applies to all methods that return or accept coordinates.</p>
 </section>
 <section id="related-classes">
 <h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>

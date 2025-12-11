@@ -108,9 +108,9 @@
     <span class="n">ParityMapper</span><span class="p">,</span>
 <span class="p">)</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">register</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitMapper</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">QubitHamiltonian</span><span class="p">,</span> <span class="n">Settings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;QiskitQubitMapper&quot;</span><span class="p">,</span> <span class="s2">&quot;QiskitQubitMapperSettings&quot;</span><span class="p">]</span>
 
@@ -123,14 +123,23 @@
 <span class="sd">    QiskitQubitMapper-specific settings:</span>
 <span class="sd">        encoding (string, default=&quot;jordan-wigner&quot;): Qubit mapping strategy to use.</span>
 
+<span class="sd">            Valid options: &quot;jordan-wigner&quot;, &quot;bravyi-kitaev&quot;, &quot;parity&quot;</span>
+
 <span class="sd">    &quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="QiskitQubitMapperSettings.__init__">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.QiskitQubitMapperSettings.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize QiskitQubitMapperSettings.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;encoding&quot;</span><span class="p">,</span> <span class="s2">&quot;string&quot;</span><span class="p">,</span> <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;encoding&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;string&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Qubit mapping strategy to use&quot;</span><span class="p">,</span>
+            <span class="p">[</span><span class="s2">&quot;jordan-wigner&quot;</span><span class="p">,</span> <span class="s2">&quot;bravyi-kitaev&quot;</span><span class="p">,</span> <span class="s2">&quot;parity&quot;</span><span class="p">],</span>
+        <span class="p">)</span></div>
 </div>
 
 
@@ -156,6 +165,7 @@
 <span class="sd">                Default: &quot;jordan-wigner&quot;.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">QiskitQubitMapperSettings</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;encoding&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="p">)</span></div>
@@ -171,6 +181,7 @@
 <span class="sd">            QubitHamiltonian: An instance of the QubitHamiltonian.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="n">encoding</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;encoding&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">encoding</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">QubitMappers</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -178,8 +189,8 @@
                 <span class="sa">f</span><span class="s2">&quot;Please use one of the following options: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">QubitMappers</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
             <span class="p">)</span>
 
-        <span class="n">h1_a</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()</span>
-        <span class="n">h2_aa</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_integrals</span><span class="p">()</span>
+        <span class="p">(</span><span class="n">h1_a</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()</span>
+        <span class="p">(</span><span class="n">h2_aa</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_integrals</span><span class="p">()</span>
         <span class="n">num_orbs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
         <span class="n">electronic_hamiltonian</span> <span class="o">=</span> <span class="n">ElectronicEnergy</span><span class="o">.</span><span class="n">from_raw_integrals</span><span class="p">(</span>
             <span class="n">h1_a</span><span class="o">=</span><span class="n">h1_a</span><span class="p">,</span> <span class="n">h2_aa</span><span class="o">=</span><span class="n">h2_aa</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">)</span>
@@ -193,12 +204,10 @@
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.QiskitQubitMapper.name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the algorithm name ``qiskit``.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="k">return</span> <span class="s2">&quot;qiskit&quot;</span></div>
 </div>
 
-
-
-<span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QiskitQubitMapper</span><span class="p">())</span>
 </pre></div>
 
            </div>

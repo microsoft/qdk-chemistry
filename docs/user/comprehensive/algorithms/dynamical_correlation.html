@@ -1,0 +1,267 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dynamical correlation calculations &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Self-consistent field solving" href="scf_solver.html" />
+    <link rel="prev" title="Qubit mapping" href="qubit_mapper.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data management</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Available algorithms</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="energy_estimator.html">Energy estimation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Classical Hamiltonian construction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected multi-configuration calculations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Dynamical correlation calculations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#available-calculators">Available calculators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mp2-calculator">MP2 Calculator</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-topics">Related topics</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solving</a></li>
+<li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Self-consistent field stability checks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State Preparation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Available algorithms</a></li>
+      <li class="breadcrumb-item active">Dynamical correlation calculations</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/user/comprehensive/algorithms/dynamical_correlation.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="dynamical-correlation-calculations">
+<h1>Dynamical correlation calculations<a class="headerlink" href="#dynamical-correlation-calculations" title="Link to this heading"></a></h1>
+<p>Dynamic correlation calculations in QDK/Chemistry are post-Hartree-Fock methods that build upon the wavefunction with one or several reference
+determinants to account for electron correlation effects. These methods include Møller-Plesset perturbation theory (MP2) and Coupled Cluster (CC) theory.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Dynamical-correlation calculators inherit from the <code class="docutils literal notranslate"><span class="pre">DynamicalCorrelationCalculator</span></code> base class and operate on an
+<a class="reference internal" href="../data/ansatz.html"><span class="doc">Ansatz</span></a> object that contains the reference wavefunction and a <a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a>.
+These methods systematically improve upon the mean-field approximation by including electron-electron correlation effects.</p>
+</section>
+<section id="available-calculators">
+<h2>Available calculators<a class="headerlink" href="#available-calculators" title="Link to this heading"></a></h2>
+<p>Currently, the following implementations are available:</p>
+<ul class="simple">
+<li><p><strong>MP2 Calculator</strong> (<code class="docutils literal notranslate"><span class="pre">qdk_mp2_calculator</span></code>): Second-order Møller-Plesset perturbation theory</p></li>
+<li><p><strong>PySCF Coupled Cluster</strong> (<code class="docutils literal notranslate"><span class="pre">pyscf_coupled_cluster</span></code>): Coupled cluster implementations via PySCF integration</p></li>
+</ul>
+</section>
+<section id="mp2-calculator">
+<h2>MP2 Calculator<a class="headerlink" href="#mp2-calculator" title="Link to this heading"></a></h2>
+<p>The MP2 (second-order Møller-Plesset perturbation theory) calculator computes the lowest-order correlation energy
+correction beyond Hartree-Fock theory.</p>
+<p>Here’s a complete example showing how to calculate MP2 corrections to a HF wavefunction:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
+
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">algorithms</span><span class="p">;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
+
+<span class="c1">// Create a simple structure</span>
+<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="o">&gt;</span><span class="w"> </span><span class="n">coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="mf">1.4</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">}};</span>
+<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">symbols</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;H&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">};</span>
+<span class="n">Structure</span><span class="w"> </span><span class="nf">structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span><span class="w"> </span><span class="n">symbols</span><span class="p">);</span>
+
+<span class="c1">// Run initial SCF</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_HF</span><span class="p">,</span><span class="w"> </span><span class="n">wfn_HF</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+
+<span class="c1">// Create a Hamiltonian constructor</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian_constructor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">HamiltonianConstructorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+
+<span class="c1">// Construct the Hamiltonian from orbitals</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian_constructor</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_HF</span><span class="o">-&gt;</span><span class="n">get_orbitals</span><span class="p">());</span>
+
+<span class="c1">// Create ansatz for MP2 calculation</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">ansatz</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span><span class="n">Ansatz</span><span class="o">&gt;</span><span class="p">(</span><span class="o">*</span><span class="n">hamiltonian</span><span class="p">,</span><span class="w"> </span><span class="o">*</span><span class="n">wfn_HF</span><span class="p">);</span>
+
+<span class="c1">// Run MP2</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">mp2_calculator</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">DynamicalCorrelationCalculatorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;qdk_mp2_calculator&quot;</span><span class="p">);</span>
+
+<span class="c1">// Get energies</span>
+<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">mp2_total_energy</span><span class="p">,</span><span class="w"> </span><span class="n">final_wavefunction</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mp2_calculator</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">ansatz</span><span class="p">);</span>
+
+<span class="c1">// If desired, we can extract only the correlation energy</span>
+<span class="kt">double</span><span class="w"> </span><span class="n">mp2_corr_energy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mp2_total_energy</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">E_HF</span><span class="p">;</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span><span class="p">,</span> <span class="n">Ansatz</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="c1"># Create a simple structure</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.4</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]])</span>
+<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="o">=</span><span class="n">symbols</span><span class="p">)</span>
+
+<span class="c1"># Run initial SCF</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">E_hf</span><span class="p">,</span> <span class="n">wfn_hf</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># Create hamiltonian constructor</span>
+<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
+
+<span class="c1"># Construct Hamiltonian from orbitals</span>
+<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_hf</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">())</span>
+
+<span class="c1"># Create ansatz for Mp2 calculation</span>
+<span class="n">ansatz</span> <span class="o">=</span> <span class="n">Ansatz</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">wfn_hf</span><span class="p">)</span>
+
+<span class="c1"># Run MP2</span>
+<span class="n">mp2_calculator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;dynamical_correlation_calculator&quot;</span><span class="p">)</span>
+
+<span class="c1"># Get energies</span>
+<span class="n">mp2_total_energy</span><span class="p">,</span> <span class="n">final_wavefunction</span> <span class="o">=</span> <span class="n">mp2_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">ansatz</span><span class="p">)</span>
+
+<span class="c1"># If desired we can extract only the correlation energy</span>
+<span class="n">mp2_corr_energy</span> <span class="o">=</span> <span class="n">mp2_total_energy</span> <span class="o">-</span> <span class="n">E_hf</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="related-topics">
+<h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="scf_solver.html"><span class="doc">SCF Solver</span></a>: Generate reference wavefunctions</p></li>
+<li><p><a class="reference internal" href="hamiltonian_constructor.html"><span class="doc">Hamiltonian Constructor</span></a>: Build Hamiltonians from orbitals</p></li>
+<li><p><a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Hamiltonian data structure, including unrestricted Hamiltonians</p></li>
+<li><p><a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a>: Orbital data structure, including unrestricted orbitals</p></li>
+<li><p><a class="reference internal" href="../data/ansatz.html"><span class="doc">Ansatz</span></a>: Ansatz combining reference wavefunction and Hamiltonian</p></li>
+<li><p><a class="reference internal" href="../data/wavefunction.html"><span class="doc">Wavefunction</span></a>: Wavefunction container for correlation methods</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For additional examples and validation tests, refer to the test suite in <code class="docutils literal notranslate"><span class="pre">python/tests/test_mp2.py</span></code>
+and <code class="docutils literal notranslate"><span class="pre">python/tests/test_pyscf_plugin.py</span></code>.</p>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qubit_mapper.html" class="btn btn-neutral float-left" title="Qubit mapping" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="scf_solver.html" class="btn btn-neutral float-right" title="Self-consistent field solving" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -91,11 +91,12 @@
 <span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry energy estimator module.</span>
 
 <span class="sd">This module defines a custom `EnergyEstimator` class for evaluating expectation values of quantum circuits</span>
-<span class="sd">with respect to Hamiltonian. The estimator leverages Qiskit backends to execute quantum circuits and</span>
-<span class="sd">collect bitstring outcomes.</span>
+<span class="sd">with respect to Hamiltonian.</span>
+<span class="sd">The estimator leverages Qiskit :cite:`Javadi-Abhari2024` backends to execute quantum circuits and collect</span>
+<span class="sd">bitstring outcomes.</span>
 
 <span class="sd">Key Features:</span>
-<span class="sd">    - Accepts a quantum circuit (as a QASM string) and observables (as a list of QubitHamiltonian).</span>
+<span class="sd">    - Accepts a quantum circuit (as a Circuit) and observables (as a list of QubitHamiltonian).</span>
 <span class="sd">    - Generates measurement circuits for each observable term.</span>
 <span class="sd">    - Executes measurement circuits on a simulator backend with a specified number of shots.</span>
 <span class="sd">    - Collects bitstring counts and computes expectation values and variances.</span>
@@ -109,7 +110,6 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="n">qasm3</span><span class="p">,</span> <span class="n">transpile</span>
@@ -120,15 +120,34 @@
     <span class="kn">import</span><span class="w"> </span><span class="nn">qiskit</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuantumCircuit</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">register</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.energy_estimator</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">EnergyEstimator</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">EnergyExpectationResult</span><span class="p">,</span> <span class="n">MeasurementData</span><span class="p">,</span> <span class="n">QubitHamiltonian</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">EnergyExpectationResult</span><span class="p">,</span> <span class="n">MeasurementData</span><span class="p">,</span> <span class="n">QubitHamiltonian</span><span class="p">,</span> <span class="n">Settings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
-<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;QiskitEnergyEstimator&quot;</span><span class="p">,</span> <span class="s2">&quot;QiskitEnergyEstimatorSettings&quot;</span><span class="p">]</span>
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;QiskitEnergyEstimator&quot;</span><span class="p">]</span>
+
+<div class="viewcode-block" id="QiskitEnergyEstimatorSettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.energy_estimator.html#qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimatorSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">QiskitEnergyEstimatorSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings configuration for a QiskitEnergyEstimator.</span>
+
+<span class="sd">    QiskitEnergyEstimator-specific settings:</span>
+<span class="sd">        seed (int, default=42): Random seed for reproducibility.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="QiskitEnergyEstimatorSettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.energy_estimator.html#qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimatorSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize QiskitEnergyEstimatorSettings.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;seed&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">42</span><span class="p">)</span></div>
+</div>
+
 
 
 <div class="viewcode-block" id="QiskitEnergyEstimator">
@@ -138,44 +157,47 @@
 
 <div class="viewcode-block" id="QiskitEnergyEstimator.__init__">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.energy_estimator.html#qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimator.__init__">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">backend</span><span class="p">:</span> <span class="n">qiskit</span><span class="o">.</span><span class="n">providers</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">BackendV2</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span><span class="p">,</span>
+        <span class="n">backend_options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">backend</span><span class="p">:</span> <span class="n">qiskit</span><span class="o">.</span><span class="n">providers</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">BackendV2</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the Estimator with a backend and optional transpilation settings.</span>
-
-<span class="sd">        Args:</span>
-<span class="sd">            backend: Backend simulator to run circuits. Default to use qiskit AerSimulator.</span>
-<span class="sd">            seed: Seed for the simulator to ensure reproducibility. Default is 42.</span>
-<span class="sd">                This argument takes priority over the seed specified in the Backend configuration.</span>
-
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">backend</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">backend</span> <span class="o">=</span> <span class="n">AerSimulator</span><span class="p">(</span><span class="n">seed_simulator</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">backend</span> <span class="o">=</span> <span class="n">backend</span>
-            <span class="c1"># Reset the seed in the backend if applicable</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="p">,</span> <span class="n">AerSimulator</span><span class="p">):</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">set_options</span><span class="p">(</span><span class="n">seed_simulator</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span></div>
-
-
-<div class="viewcode-block" id="QiskitEnergyEstimator.from_backend_options">
-<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.energy_estimator.html#qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimator.from_backend_options">[docs]</a>
-    <span class="nd">@classmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">from_backend_options</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span><span class="p">,</span> <span class="n">backend_options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EnergyEstimator</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create an EnergyEstimator from specified backend options for Aer simulator.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            seed: Seed for the simulator to ensure reproducibility. Default is 42.</span>
 <span class="sd">                This argument takes priority over the seed specified in the Backend configuration/options.</span>
-<span class="sd">            backend_options: Backend-specific configuration dictionary. Frequently used options include</span>
-<span class="sd">                ``{&quot;seed_simulator&quot;: int, &quot;noise_model&quot;: NoiseModel, ...}``</span>
+<span class="sd">            backend_options: Backend-specific configuration dictionary for Qiskit AerSimulator.</span>
+<span class="sd">                Frequently used options include ``{&quot;seed_simulator&quot;: int, &quot;noise_model&quot;: NoiseModel, ...}``.</span>
+<span class="sd">                The backend option &quot;seed_simulator&quot; is overwritten by seed.</span>
+<span class="sd">                The backend option &quot;noise_model&quot; is overwritten when a noise model is provided as argument in the</span>
+<span class="sd">                ``run`` function.</span>
+<span class="sd">                This keyword argument is not compatible with qdk_chemistry.algorithms.create.</span>
+<span class="sd">            backend: Backend simulator to run circuits. Defaults to Qiskit AerSimulator.</span>
+<span class="sd">                ``backend`` and ``backend_options`` are mutually exclusive; provide only one.</span>
+<span class="sd">                This keyword argument is not compatible with qdk_chemistry.algorithms.create.</span>
 
 <span class="sd">        References: `Qiskit Aer Simulator &lt;https://github.com/Qiskit/qiskit-aer/blob/main/qiskit_aer/backends/aer_simulator.py&gt;`_.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">backend_options</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">backend_options</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="n">backend</span> <span class="o">=</span> <span class="n">AerSimulator</span><span class="p">(</span><span class="o">**</span><span class="n">backend_options</span><span class="p">)</span>
-        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span></div>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">QiskitEnergyEstimatorSettings</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;seed&quot;</span><span class="p">,</span> <span class="n">seed</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">backend</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">backend_options</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">backend_options</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">backend_options</span><span class="p">[</span><span class="s2">&quot;seed_simulator&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">seed</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">backend</span> <span class="o">=</span> <span class="n">AerSimulator</span><span class="p">(</span><span class="o">**</span><span class="n">backend_options</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">backend_options</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;backend and backend_options are mutually exclusive; provide only one.&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">backend</span> <span class="o">=</span> <span class="n">backend</span>
+            <span class="c1"># Reset the seed in the backend if applicable</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="p">,</span> <span class="n">AerSimulator</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">set_options</span><span class="p">(</span><span class="n">seed_simulator</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">seed</span><span class="p">)</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_run_measurement_circuits_and_get_bitstring_counts</span><span class="p">(</span>
@@ -192,10 +214,11 @@
 <span class="sd">            A list of dictionaries containing the bitstring counts for each measurement circuit.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="n">bitstring_counts</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">meas_circuit</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">measurement_circuits</span><span class="p">):</span>
             <span class="n">shots</span> <span class="o">=</span> <span class="n">shots_list</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running backend with circuit </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">shots</span><span class="si">}</span><span class="s2"> shots&quot;</span><span class="p">)</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running backend with circuit </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">shots</span><span class="si">}</span><span class="s2"> shots&quot;</span><span class="p">)</span>
             <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">meas_circuit</span><span class="p">,</span> <span class="n">shots</span><span class="o">=</span><span class="n">shots</span><span class="p">)</span><span class="o">.</span><span class="n">result</span><span class="p">()</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">counts</span>
             <span class="n">bitstring_counts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">bitstring_counts</span>
@@ -217,22 +240,26 @@
 <span class="sd">            ``MeasurementData`` containing the measurement counts and observable data.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="n">counts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_measurement_circuits_and_get_bitstring_counts</span><span class="p">(</span><span class="n">measurement_circuits</span><span class="p">,</span> <span class="n">shots_list</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">MeasurementData</span><span class="p">(</span><span class="n">bitstring_counts</span><span class="o">=</span><span class="n">counts</span><span class="p">,</span> <span class="n">hamiltonians</span><span class="o">=</span><span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">shots_list</span><span class="o">=</span><span class="n">shots_list</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">circuit_qasm</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">circuit</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span>
         <span class="n">qubit_hamiltonians</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">QubitHamiltonian</span><span class="p">],</span>
         <span class="n">total_shots</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">noise_model</span><span class="p">:</span> <span class="n">NoiseModel</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">classical_coeffs</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">EnergyExpectationResult</span><span class="p">,</span> <span class="n">MeasurementData</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Estimate the expectation value and variance of Hamiltonians.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            circuit_qasm: OpenQASM3 string of the quantum circuit to be evaluated.</span>
+<span class="sd">            circuit: Circuit that provides an OpenQASM3 string of the quantum circuit to be evaluated.</span>
 <span class="sd">            qubit_hamiltonians: A list of ``QubitHamiltonian`` to estimate.</span>
 <span class="sd">            total_shots: Total number of shots to allocate across Hamiltonian terms.</span>
+<span class="sd">            noise_model: NoiseModel to be used in simulation, and the circuit will be transpiled into the basis gates</span>
+<span class="sd">                defined by the noise model.</span>
 <span class="sd">            classical_coeffs: Optional list of coefficients for classical Pauli terms to calculate energy offset.</span>
 
 <span class="sd">        Returns:</span>
@@ -247,6 +274,13 @@
 <span class="sd">                and the circuit will be transpiled into the basis gates defined by the noise model.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">noise_model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="p">,</span> <span class="n">AerSimulator</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">set_options</span><span class="p">(</span><span class="n">noise_model</span><span class="o">=</span><span class="n">noise_model</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;A noise model can only be set for an AerSimulator.&quot;</span><span class="p">)</span>
+
         <span class="n">num_observables</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">qubit_hamiltonians</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">total_shots</span> <span class="o">&lt;</span> <span class="n">num_observables</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -256,7 +290,7 @@
 
         <span class="c1"># Evenly distribute shots across all observables</span>
         <span class="n">shots_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">total_shots</span> <span class="o">//</span> <span class="n">num_observables</span><span class="p">]</span> <span class="o">*</span> <span class="n">num_observables</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Shots allocated: </span><span class="si">{</span><span class="n">shots_list</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Shots allocated: </span><span class="si">{</span><span class="n">shots_list</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
         <span class="n">energy_offset</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">classical_coeffs</span><span class="p">)</span> <span class="k">if</span> <span class="n">classical_coeffs</span> <span class="k">else</span> <span class="mf">0.0</span>
 
@@ -270,21 +304,21 @@
             <span class="n">basis_gates</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">noise_model</span><span class="o">.</span><span class="n">basis_gates</span>
 
         <span class="c1"># Create measurement circuits</span>
-        <span class="n">measurement_circuits_qasm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_measurement_circuits</span><span class="p">(</span>
-            <span class="n">circuit_qasm</span><span class="o">=</span><span class="n">circuit_qasm</span><span class="p">,</span>
+        <span class="n">measurement_circuits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_measurement_circuits</span><span class="p">(</span>
+            <span class="n">circuit</span><span class="o">=</span><span class="n">circuit</span><span class="p">,</span>
             <span class="n">grouped_hamiltonians</span><span class="o">=</span><span class="n">qubit_hamiltonians</span><span class="p">,</span>
         <span class="p">)</span>
 
         <span class="c1"># Load and optionally transpile circuits into basis gates defined by noise model</span>
-        <span class="n">measurement_circuits</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">qasm</span> <span class="ow">in</span> <span class="n">measurement_circuits_qasm</span><span class="p">:</span>
-            <span class="n">circuit</span> <span class="o">=</span> <span class="n">qasm3</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">qasm</span><span class="p">)</span>
+        <span class="n">measurement_circuits_qiskit</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">measurement_circuit</span> <span class="ow">in</span> <span class="n">measurement_circuits</span><span class="p">:</span>
+            <span class="n">circuit</span> <span class="o">=</span> <span class="n">qasm3</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">measurement_circuit</span><span class="o">.</span><span class="n">get_qasm</span><span class="p">())</span>
             <span class="k">if</span> <span class="n">basis_gates</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">circuit</span> <span class="o">=</span> <span class="n">transpile</span><span class="p">(</span><span class="n">circuit</span><span class="p">,</span> <span class="n">basis_gates</span><span class="o">=</span><span class="n">basis_gates</span><span class="p">)</span>
-            <span class="n">measurement_circuits</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">circuit</span><span class="p">)</span>
+            <span class="n">measurement_circuits_qiskit</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">circuit</span><span class="p">)</span>
 
         <span class="n">measurement_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_measurement_data</span><span class="p">(</span>
-            <span class="n">measurement_circuits</span><span class="o">=</span><span class="n">measurement_circuits</span><span class="p">,</span>
+            <span class="n">measurement_circuits</span><span class="o">=</span><span class="n">measurement_circuits_qiskit</span><span class="p">,</span>
             <span class="n">qubit_hamiltonians</span><span class="o">=</span><span class="n">qubit_hamiltonians</span><span class="p">,</span>
             <span class="n">shots_list</span><span class="o">=</span><span class="n">shots_list</span><span class="p">,</span>
         <span class="p">)</span>
@@ -297,12 +331,10 @@
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.energy_estimator.html#qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimator.name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the name of the estimator backend.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="k">return</span> <span class="s2">&quot;qiskit_aer_simulator&quot;</span></div>
 </div>
 
-
-
-<span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QiskitEnergyEstimator</span><span class="p">())</span>
 </pre></div>
 
            </div>

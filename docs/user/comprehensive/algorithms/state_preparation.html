@@ -64,7 +64,7 @@
 <li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
 <li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
-<li class="toctree-l3"><a class="reference internal" href="reference_derived.html">Reference-derived calculations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dynamical_correlation.html">Dynamical correlation calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solving</a></li>
 <li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Self-consistent field stability checks</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">State Preparation</a><ul>
@@ -130,7 +130,7 @@
 <p>State preparation is a critical step in quantum algorithms, where a quantum state is initialized to represent a specific wavefunction.
 The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation" title="qdk_chemistry.algorithms.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">StatePreparation</span></code></a> module provides two complementary approaches for constructing circuits:</p>
 <ul class="simple">
-<li><p><strong>Regular Isometry</strong>: Isometry-based state preparation proposed by Matthias Christandl <span id="id1">[<a class="reference internal" href="../../../references.html#id8" title="Raban Iten, Roger Colbeck, Ivan Kukuljan, Jonathan Home, and Matthias Christandl. Quantum circuits for isometries. Phys. Rev. A, 93:032318, Mar 2016. URL: https://link.aps.org/doi/10.1103/PhysRevA.93.032318, doi:10.1103/PhysRevA.93.032318.">ICK+16</a>]</span>, with circuit synthesis integrated through the Qiskit plugin</p></li>
+<li><p><strong>Regular Isometry</strong>: Isometry-based state preparation proposed by Matthias Christandl <span id="id1">[<a class="reference internal" href="../../../references.html#id15" title="Raban Iten, Roger Colbeck, Ivan Kukuljan, Jonathan Home, and Matthias Christandl. Quantum circuits for isometries. Phys. Rev. A, 93:032318, Mar 2016. doi:10.1103/PhysRevA.93.032318.">ICK+16</a>]</span>, with circuit synthesis integrated through the Qiskit plugin</p></li>
 <li><p><strong>Sparse Isometry</strong>: An optimized approach that leverages sparsity in the target wavefunction. This method applies GF(2) Gaussian elimination to the binary matrix representation of the state, while removing duplicate rows, all-ones rows, and reducing the rank of the diagonal matrix. These reductions correspond to implementing CNOT and X gates that simplify the preparation basis. By performing this GF(2)+X elimination, the algorithm constructs circuits that prepare only the non-zero amplitudes, substantially reducing circuit depth and gate count compared with dense isometry methods.</p></li>
 </ul>
 </section>
@@ -173,7 +173,7 @@ The resulting <a class="reference internal" href="../../../api/api_autogen/qdk_c
 <section id="preparing-a-quantum-state">
 <h2>Preparing a quantum state<a class="headerlink" href="#preparing-a-quantum-state" title="Link to this heading"></a></h2>
 <p>Once configured, the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation" title="qdk_chemistry.algorithms.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">StatePreparation</span></code></a> can be used to generate
-a quantum circuit in OpenQASM format from a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>.</p>
+a quantum circuit from a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a basis set</span>
@@ -196,10 +196,10 @@ a quantum circuit in OpenQASM format from a <a class="reference internal" href="
 <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">container</span><span class="p">)</span>
 
 <span class="c1"># Construct the circuit</span>
-<span class="n">regular_qasm</span> <span class="o">=</span> <span class="n">regular_prep</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">)</span>
-<span class="n">sparse_qasm</span> <span class="o">=</span> <span class="n">sparse_prep</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Regular isometry QASM:</span><span class="se">\n</span><span class="si">{</span><span class="n">regular_qasm</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sparse isometry QASM:</span><span class="se">\n</span><span class="si">{</span><span class="n">sparse_qasm</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">regular_circuit</span> <span class="o">=</span> <span class="n">regular_prep</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">)</span>
+<span class="n">sparse_circuit</span> <span class="o">=</span> <span class="n">sparse_prep</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Regular isometry QASM:</span><span class="se">\n</span><span class="si">{</span><span class="n">regular_circuit</span><span class="o">.</span><span class="n">get_qasm</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sparse isometry QASM:</span><span class="se">\n</span><span class="si">{</span><span class="n">sparse_circuit</span><span class="o">.</span><span class="n">get_qasm</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>

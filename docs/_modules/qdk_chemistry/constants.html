@@ -89,9 +89,9 @@
   <h1>Source code for qdk_chemistry.constants</h1><div class="highlight"><pre>
 <span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry Physical Constants Module.</span>
 
-<span class="sd">This module provides access to physical constants from CODATA standards.</span>
+<span class="sd">This module provides access to physical constants from CODATA standards :cite:`Mohr2025`.</span>
 <span class="sd">The constants are sourced from the most recent CODATA recommendations</span>
-<span class="sd">(currently CODATA 2018), but the underlying C++ implementation supports</span>
+<span class="sd">(currently CODATA 2022), but the underlying C++ implementation supports</span>
 <span class="sd">multiple CODATA versions for compatibility and comparison purposes.</span>
 
 <span class="sd">All constants are provided in their original units as specified by CODATA,</span>
@@ -103,8 +103,8 @@
 
 <span class="sd">Data Source:</span>
 <span class="sd">    CODATA recommended values of the fundamental physical constants</span>
-<span class="sd">    Currently using: CODATA 2018 (default)</span>
-<span class="sd">    Also available: CODATA 2014 (via C++ preprocessor directives)</span>
+<span class="sd">    Currently using: CODATA 2022 (default)</span>
+<span class="sd">    Also available: CODATA 2018, CODATA 2014 (via C++ preprocessor directives)</span>
 <span class="sd">    https://physics.nist.gov/cuu/Constants/</span>
 
 <span class="sd">Constants Documentation:</span>
@@ -165,7 +165,9 @@
     <span class="n">ConstantInfo</span><span class="p">,</span>
     <span class="n">get_constant_info</span><span class="p">,</span>
     <span class="n">get_constants_info</span><span class="p">,</span>
+    <span class="n">get_current_codata_version</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
 
 <div class="viewcode-block" id="list_constants">
@@ -182,12 +184,12 @@
 <span class="sd">        &gt;&gt;&gt; list_constants(show_values=False)  # Just names and descriptions</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+    <span class="n">codata_version</span> <span class="o">=</span> <span class="n">get_current_codata_version</span><span class="p">()</span>
     <span class="n">constants_info</span> <span class="o">=</span> <span class="n">get_constants_info</span><span class="p">()</span>
 
-    <span class="c1"># TODO (NAB):  change output to logger rather than print() here and elsewhere</span>
-    <span class="c1"># or just return strings workitem 41417</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;QDK/Chemistry Physical Constants (CODATA 2018)&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">50</span><span class="p">)</span>
+    <span class="n">constants_info_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">QDK/Chemistry Physical Constants (</span><span class="si">{</span><span class="n">codata_version</span><span class="si">}</span><span class="s2">)</span><span class="se">\n</span><span class="s2">&quot;</span>
+    <span class="n">constants_info_string</span> <span class="o">+=</span> <span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">50</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
 
     <span class="c1"># Group constants by category</span>
     <span class="n">categories</span> <span class="o">=</span> <span class="p">{</span>
@@ -212,8 +214,8 @@
     <span class="p">}</span>
 
     <span class="k">for</span> <span class="n">category</span><span class="p">,</span> <span class="n">constant_names</span> <span class="ow">in</span> <span class="n">categories</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="n">category</span><span class="si">}</span><span class="s2">:&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">category</span><span class="p">))</span>
+        <span class="n">constants_info_string</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="n">category</span><span class="si">}</span><span class="s2">:</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="n">constants_info_string</span> <span class="o">+=</span> <span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">category</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
 
         <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">constant_names</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">constants_info</span><span class="p">:</span>
@@ -228,7 +230,8 @@
                 <span class="k">if</span> <span class="n">show_units</span> <span class="ow">and</span> <span class="n">info</span><span class="o">.</span><span class="n">units</span><span class="p">:</span>
                     <span class="n">line</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot; </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">units</span><span class="si">}</span><span class="s2">&quot;</span>
 
-                <span class="nb">print</span><span class="p">(</span><span class="n">line</span><span class="p">)</span></div>
+                <span class="n">constants_info_string</span> <span class="o">+=</span> <span class="n">line</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">constants_info_string</span><span class="p">)</span></div>
 
 
 
@@ -249,6 +252,7 @@
 <span class="sd">        &gt;&gt;&gt; find_constant(&quot;energy&quot;)</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">constants_info</span> <span class="o">=</span> <span class="n">get_constants_info</span><span class="p">()</span>
     <span class="n">matches</span> <span class="o">=</span> <span class="p">{}</span>
 
@@ -279,17 +283,20 @@
 <span class="sd">        &gt;&gt;&gt; show_constant_details(&#39;fine_structure_constant&#39;)</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">info</span> <span class="o">=</span> <span class="n">get_constant_info</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Constant: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">constant_details_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Constant: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
         <span class="k">if</span> <span class="n">info</span><span class="o">.</span><span class="n">symbol</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Symbol: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">symbol</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Value: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">units</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Description: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Source: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">source</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">constant_details_string</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;Symbol: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">symbol</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="n">constant_details_string</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;Value: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">units</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="n">constant_details_string</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;Description: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="n">constant_details_string</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;Source: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">source</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">constant_details_string</span><span class="p">)</span>
     <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown constant: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Use list_constants() to see all available constants.&quot;</span><span class="p">)</span></div>
+        <span class="n">error_msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Unknown constant: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="n">error_msg</span> <span class="o">+=</span> <span class="s2">&quot;Use list_constants() to see all available constants.</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">error_msg</span><span class="p">)</span></div>
 
 
 
@@ -318,6 +325,7 @@
     <span class="s2">&quot;find_constant&quot;</span><span class="p">,</span>
     <span class="s2">&quot;get_constant_info&quot;</span><span class="p">,</span>
     <span class="s2">&quot;get_constants_info&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;get_current_codata_version&quot;</span><span class="p">,</span>
     <span class="s2">&quot;list_constants&quot;</span><span class="p">,</span>
     <span class="s2">&quot;show_constant_details&quot;</span><span class="p">,</span>
 <span class="p">]</span>

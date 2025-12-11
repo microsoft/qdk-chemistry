@@ -100,8 +100,6 @@
 <span class="sd">state. It also includes functions to create custom pass managers based on preset configurations and custom passes.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
-
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">ParameterExpression</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.circuit.library</span><span class="w"> </span><span class="kn">import</span> <span class="n">IGate</span><span class="p">,</span> <span class="n">SdgGate</span><span class="p">,</span> <span class="n">SGate</span><span class="p">,</span> <span class="n">ZGate</span>
@@ -111,8 +109,7 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.definitions</span><span class="w"> </span><span class="kn">import</span> <span class="n">DIAGONAL_Z_1Q_GATES</span>
-
-<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
     <span class="s2">&quot;MergeZBasisRotations&quot;</span><span class="p">,</span>
@@ -161,6 +158,7 @@
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.MergeZBasisRotations.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Use Optimize1qGatesDecomposition to handle gate optimization to merge Z basis rotations.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_optimize1q_decomposition</span> <span class="o">=</span> <span class="n">Optimize1qGatesDecomposition</span><span class="p">(</span><span class="n">basis</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;rz&quot;</span><span class="p">,</span> <span class="s2">&quot;rx&quot;</span><span class="p">])</span></div>
 
@@ -177,7 +175,8 @@
 <span class="sd">            The transformed ``DAGCircuit`` with merged Z-basis rotations.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Running MergeZBasisRotations pass.&quot;</span><span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Running MergeZBasisRotations pass.&quot;</span><span class="p">)</span>
         <span class="n">new_dag</span> <span class="o">=</span> <span class="n">DAGCircuit</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">qreg</span> <span class="ow">in</span> <span class="n">dag</span><span class="o">.</span><span class="n">qregs</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
             <span class="n">new_dag</span><span class="o">.</span><span class="n">add_qreg</span><span class="p">(</span><span class="n">qreg</span><span class="p">)</span>
@@ -233,15 +232,16 @@
 
 <span class="sd">    SubstituteCliffordRz-specific settings:</span>
 <span class="sd">        equivalent_gate_set (vector&lt;string&gt;, default=[&quot;id&quot;, &quot;s&quot;, &quot;sdg&quot;, &quot;z&quot;]): Equivalent gate set to use.</span>
-<span class="sd">        tolerance (float, default=float(np.finfo(np.float64).eps)): Float comparison tolerance to use.</span>
+<span class="sd">        tolerance (double, default=float(np.finfo(np.float64).eps)): Float comparison tolerance to use.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize SubstituteCliffordRzSettings.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">,</span> <span class="s2">&quot;vector&lt;string&gt;&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;s&quot;</span><span class="p">,</span> <span class="s2">&quot;sdg&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">])</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="s2">&quot;float&quot;</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Override set to ensure &#39;id&#39; is always in equivalent_gate_set and duplicates are removed.</span>
@@ -254,6 +254,7 @@
         <span class="c1"># Ensure &#39;id&#39; is present in equivalent_gate_set and remove duplicates</span>
         <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;equivalent_gate_set&quot;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
             <span class="n">value</span> <span class="o">=</span> <span class="nb">list</span><span class="p">({</span><span class="o">*</span><span class="n">value</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">})</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">settings_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
@@ -269,6 +270,7 @@
                 <span class="o">**</span><span class="n">settings_dict</span><span class="p">,</span>
                 <span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">:</span> <span class="nb">list</span><span class="p">({</span><span class="o">*</span><span class="n">settings_dict</span><span class="p">[</span><span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">],</span> <span class="s2">&quot;id&quot;</span><span class="p">}),</span>
             <span class="p">}</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">)</span>
 
 
@@ -321,6 +323,7 @@
 <span class="sd">            tolerance (float): Angle comparison tolerance. Default is np.finfo(np.float64).eps.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">SubstituteCliffordRzSettings</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">equivalent_gate_set</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -342,6 +345,7 @@
 <span class="sd">            The transformed ``DAGCircuit`` with Rz substitutions.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="n">equivalent_gate_set</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">)</span>
         <span class="n">tolerance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">)</span>
 
@@ -350,7 +354,7 @@
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">equivalent_gate_set</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">equivalent_gate_set</span><span class="p">)):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Gates in equivalent_gate_set (</span><span class="si">{</span><span class="n">equivalent_gate_set</span><span class="si">}</span><span class="s2">) are not unique.&quot;</span><span class="p">)</span>
 
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;SubstituteCliffordRz pass: simplification logic needs careful review.&quot;</span><span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;SubstituteCliffordRz pass: simplification logic needs careful review.&quot;</span><span class="p">)</span>
 
         <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">dag</span><span class="o">.</span><span class="n">op_nodes</span><span class="p">():</span>
             <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;rz&quot;</span><span class="p">:</span>
@@ -358,31 +362,31 @@
 
                 <span class="c1"># Skip parameterized rotations</span>
                 <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">angle</span><span class="p">,</span> <span class="n">ParameterExpression</span><span class="p">):</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Skipping parameterized Rz.&quot;</span><span class="p">)</span>
+                    <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Skipping parameterized Rz.&quot;</span><span class="p">)</span>
                     <span class="k">continue</span>
 
                 <span class="n">factor</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">angle</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span>
                 <span class="n">mod4_factor</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mod</span><span class="p">(</span><span class="n">factor</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Rz(</span><span class="si">{</span><span class="n">angle</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">) = </span><span class="si">{</span><span class="n">factor</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> * π/2 (mod 4 = </span><span class="si">{</span><span class="n">mod4_factor</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+                <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Rz(</span><span class="si">{</span><span class="n">angle</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">) = </span><span class="si">{</span><span class="n">factor</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> * π/2 (mod 4 = </span><span class="si">{</span><span class="n">mod4_factor</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
 
                 <span class="n">replacement_gate</span> <span class="o">=</span> <span class="kc">None</span>
                 <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">mod4_factor</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="n">tolerance</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;id&quot;</span> <span class="ow">in</span> <span class="n">equivalent_gate_set</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Substituting Rz(</span><span class="si">{</span><span class="n">angle</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">) with Id.&quot;</span><span class="p">)</span>
+                    <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Substituting Rz(</span><span class="si">{</span><span class="n">angle</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">) with Id.&quot;</span><span class="p">)</span>
                     <span class="n">replacement_gate</span> <span class="o">=</span> <span class="n">IGate</span><span class="p">()</span>
                 <span class="k">elif</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">mod4_factor</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="n">tolerance</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;s&quot;</span> <span class="ow">in</span> <span class="n">equivalent_gate_set</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Substituting Rz(</span><span class="si">{</span><span class="n">angle</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">) with S.&quot;</span><span class="p">)</span>
+                    <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Substituting Rz(</span><span class="si">{</span><span class="n">angle</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">) with S.&quot;</span><span class="p">)</span>
                     <span class="n">replacement_gate</span> <span class="o">=</span> <span class="n">SGate</span><span class="p">()</span>
                 <span class="k">elif</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">mod4_factor</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="n">tolerance</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;z&quot;</span> <span class="ow">in</span> <span class="n">equivalent_gate_set</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Substituting Rz(</span><span class="si">{</span><span class="n">angle</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">) with Z.&quot;</span><span class="p">)</span>
+                    <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Substituting Rz(</span><span class="si">{</span><span class="n">angle</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">) with Z.&quot;</span><span class="p">)</span>
                     <span class="n">replacement_gate</span> <span class="o">=</span> <span class="n">ZGate</span><span class="p">()</span>
                 <span class="k">elif</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">mod4_factor</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="n">tolerance</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;sdg&quot;</span> <span class="ow">in</span> <span class="n">equivalent_gate_set</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Substituting Rz(</span><span class="si">{</span><span class="n">angle</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">) with Sdg.&quot;</span><span class="p">)</span>
+                    <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Substituting Rz(</span><span class="si">{</span><span class="n">angle</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">) with Sdg.&quot;</span><span class="p">)</span>
                     <span class="n">replacement_gate</span> <span class="o">=</span> <span class="n">SdgGate</span><span class="p">()</span>
 
                 <span class="k">if</span> <span class="n">replacement_gate</span><span class="p">:</span>
                     <span class="n">dag</span><span class="o">.</span><span class="n">substitute_node</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">replacement_gate</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Keeping original Rz(</span><span class="si">{</span><span class="n">angle</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">).&quot;</span><span class="p">)</span>
+                    <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Keeping original Rz(</span><span class="si">{</span><span class="n">angle</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">).&quot;</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">dag</span></div>
 
@@ -396,6 +400,7 @@
 <span class="sd">            The settings object associated with SubstituteCliffordRz.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span></div>
 </div>
 
@@ -426,6 +431,7 @@
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.RemoveZBasisOnZeroState.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the ``RemoveZBasisOnZeroState`` transformation pass.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_z_basis_gates</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;rz&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">,</span> <span class="s2">&quot;s&quot;</span><span class="p">,</span> <span class="s2">&quot;sdg&quot;</span><span class="p">}</span></div>
 
@@ -442,7 +448,8 @@
 <span class="sd">            The transformed ``DAGCircuit`` with Z-basis gates removed.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Running RemoveZBasisOnZeroState pass.&quot;</span><span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Running RemoveZBasisOnZeroState pass.&quot;</span><span class="p">)</span>
 
         <span class="c1"># Track qubits still in |0⟩ (True means untouched)</span>
         <span class="n">zero_state_qubits</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">dag</span><span class="o">.</span><span class="n">qubits</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
@@ -456,7 +463,7 @@
             <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z_basis_gates</span><span class="p">:</span>
                 <span class="n">remove_gate</span> <span class="o">=</span> <span class="nb">all</span><span class="p">(</span><span class="n">zero_state_qubits</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">qubits</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">remove_gate</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Removing </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> on qubit </span><span class="si">{</span><span class="n">qubits</span><span class="si">}</span><span class="s2"> (still |0⟩)&quot;</span><span class="p">)</span>
+                    <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Removing </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> on qubit </span><span class="si">{</span><span class="n">qubits</span><span class="si">}</span><span class="s2"> (still |0⟩)&quot;</span><span class="p">)</span>
                     <span class="n">dag</span><span class="o">.</span><span class="n">remove_op_node</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
                     <span class="k">continue</span>  <span class="c1"># Skip to next node</span>
 
@@ -481,6 +488,7 @@
 <span class="sd">            The gate classification logic depends on the ``DIAGONAL_Z_1Q_GATES`` defined in ``definitions.py``.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">gate_name</span> <span class="ow">in</span> <span class="n">DIAGONAL_Z_1Q_GATES</span></div>
 
 </pre></div>

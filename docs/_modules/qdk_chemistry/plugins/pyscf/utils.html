@@ -123,11 +123,13 @@
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">Counter</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">StrEnum</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pyscf</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AOType</span><span class="p">,</span> <span class="n">BasisSet</span><span class="p">,</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">Orbitals</span><span class="p">,</span> <span class="n">Shell</span><span class="p">,</span> <span class="n">Structure</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
     <span class="s2">&quot;basis_to_pyscf_mol&quot;</span><span class="p">,</span>
@@ -135,6 +137,21 @@
     <span class="s2">&quot;pyscf_mol_to_qdk_basis&quot;</span><span class="p">,</span>
     <span class="s2">&quot;structure_to_pyscf_atom_labels&quot;</span><span class="p">,</span>
 <span class="p">]</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SCFType</span><span class="p">(</span><span class="n">StrEnum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enum to specify the type of SCF calculation out of auto/restricted/unrestricted.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        AUTO: Auto-detect based on restricted character of orbitals/hamiltonian</span>
+<span class="sd">        RESTRICTED: Force restricted calculation</span>
+<span class="sd">        UNRESTRICTED: Force unrestricted calculation</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">AUTO</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span>
+    <span class="n">RESTRICTED</span> <span class="o">=</span> <span class="s2">&quot;restricted&quot;</span>
+    <span class="n">UNRESTRICTED</span> <span class="o">=</span> <span class="s2">&quot;unrestricted&quot;</span>
 
 
 <div class="viewcode-block" id="structure_to_pyscf_atom_labels">
@@ -172,6 +189,7 @@
 <span class="sd">        &#39;H1 0.000000000000 0.757000000000 0.587000000000&#39;</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="c1"># Extract Structure</span>
     <span class="n">elements</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_atomic_symbols</span><span class="p">()</span>
     <span class="n">coordinates</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_coordinates</span><span class="p">()</span>
@@ -217,6 +235,7 @@
 <span class="sd">        &gt;&gt;&gt; print(pyscf_mol.atom)</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">atoms</span><span class="p">,</span> <span class="n">pyscf_symbols</span><span class="p">,</span> <span class="n">elements</span> <span class="o">=</span> <span class="n">structure_to_pyscf_atom_labels</span><span class="p">(</span><span class="n">basis</span><span class="o">.</span><span class="n">get_structure</span><span class="p">())</span>
     <span class="n">natoms</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">atoms</span><span class="p">)</span>
     <span class="c1"># Copy the basis set from QDK/Chemistry to PySCF</span>
@@ -333,6 +352,7 @@
 <span class="sd">        primitives creates a separate ECP shell.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="c1"># Determine the basis set name if not provided</span>
     <span class="k">if</span> <span class="n">basis_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="c1"># Try to extract basis set name from stored QDK/Chemistry basis name (for round-trip conversion)</span>
@@ -481,7 +501,8 @@
     <span class="n">orbitals</span><span class="p">:</span> <span class="n">Orbitals</span><span class="p">,</span>
     <span class="n">occ_alpha</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">occ_beta</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
-    <span class="n">force_restricted</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">scf_type</span><span class="p">:</span> <span class="n">SCFType</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">SCFType</span><span class="o">.</span><span class="n">AUTO</span><span class="p">,</span>
+    <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;hf&quot;</span><span class="p">,</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert an Orbitals object to a PySCF SCF object.</span>
 
@@ -495,9 +516,13 @@
 
 <span class="sd">        occ_alpha: Occupation numbers for alpha (spin-up) electrons.</span>
 <span class="sd">        occ_beta: Occupation numbers for beta (spin-down) electrons.</span>
-<span class="sd">        force_restricted: If True, forces the creation of a restricted SCF object (RHF or ROHF).</span>
+<span class="sd">        scf_type: Type of SCF calculation to create. Can be:</span>
+<span class="sd">            * ``&quot;auto&quot;`` or ``SCFType.AUTO`` (default): Automatically detect based on ``orbitals.is_restricted()``</span>
+<span class="sd">            * ``&quot;restricted&quot;`` or ``SCFType.RESTRICTED``: Force restricted calculation (RHF or ROHF)</span>
+<span class="sd">            * ``&quot;unrestricted&quot;`` or ``SCFType.UNRESTRICTED``: Force unrestricted calculation (UHF)</span>
 
-<span class="sd">            Applies even if the input orbitals are unrestricted. Default is False.</span>
+<span class="sd">        method: The electronic structure method to use. Default is &quot;hf&quot; (Hartree-Fock).</span>
+<span class="sd">            Any other value is treated as a DFT exchange-correlation functional (e.g., &quot;b3lyp&quot;, &quot;pbe&quot;).</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        A PySCF SCF object (RHF, ROHF, or UHF) populated with the molecular orbital data from the input ``Orbitals``</span>
@@ -512,6 +537,10 @@
 <span class="sd">        the orbitals are restricted/unrestricted and closed-shell/open-shell.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">scf_type</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">scf_type</span> <span class="o">=</span> <span class="n">SCFType</span><span class="p">(</span><span class="n">scf_type</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
+
     <span class="n">mol</span> <span class="o">=</span> <span class="n">basis_to_pyscf_mol</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">())</span>
     <span class="n">charge</span> <span class="o">=</span> <span class="n">mol</span><span class="o">.</span><span class="n">charge</span>
 
@@ -529,7 +558,6 @@
     <span class="n">mol</span><span class="o">.</span><span class="n">spin</span> <span class="o">=</span> <span class="n">spin</span>
     <span class="n">mol</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
 
-    <span class="n">energy_a</span><span class="p">,</span> <span class="n">energy_b</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_energies</span><span class="p">()</span>
     <span class="n">coeff_a</span><span class="p">,</span> <span class="n">coeff_b</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()</span>
     <span class="c1"># Get energies if available, otherwise use zero arrays as placeholders</span>
     <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_energies</span><span class="p">():</span>
@@ -540,22 +568,37 @@
         <span class="n">energy_a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_molecular_orbitals</span><span class="p">)</span>
         <span class="n">energy_b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_molecular_orbitals</span><span class="p">)</span>
 
-    <span class="k">if</span> <span class="n">force_restricted</span> <span class="ow">or</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">is_restricted</span><span class="p">():</span>
+    <span class="k">if</span> <span class="n">scf_type</span> <span class="o">==</span> <span class="n">SCFType</span><span class="o">.</span><span class="n">RESTRICTED</span> <span class="ow">or</span> <span class="p">(</span><span class="n">scf_type</span> <span class="o">==</span> <span class="n">SCFType</span><span class="o">.</span><span class="n">AUTO</span> <span class="ow">and</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">is_restricted</span><span class="p">()):</span>
         <span class="c1"># For restricted Orbitals, internal occupations are per-spin (each 0 or 1 for closed shell),</span>
         <span class="c1"># so total occupancy per MO is occ_a + occ_b</span>
         <span class="n">total_occ</span> <span class="o">=</span> <span class="n">occ_alpha</span> <span class="o">+</span> <span class="n">occ_beta</span>
         <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">occ_alpha</span> <span class="o">!=</span> <span class="n">occ_beta</span><span class="p">):</span>
-            <span class="n">mf</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">ROHF</span><span class="p">(</span><span class="n">mol</span><span class="p">)</span>
+            <span class="c1"># Restricted open-shell</span>
+            <span class="k">if</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;hf&quot;</span><span class="p">:</span>
+                <span class="n">mf</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">ROHF</span><span class="p">(</span><span class="n">mol</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">mf</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">ROKS</span><span class="p">(</span><span class="n">mol</span><span class="p">)</span>
+                <span class="n">mf</span><span class="o">.</span><span class="n">xc</span> <span class="o">=</span> <span class="n">method</span>
             <span class="n">mf</span><span class="o">.</span><span class="n">mo_coeff</span> <span class="o">=</span> <span class="n">coeff_a</span>
             <span class="n">mf</span><span class="o">.</span><span class="n">mo_energy</span> <span class="o">=</span> <span class="n">energy_a</span>
             <span class="n">mf</span><span class="o">.</span><span class="n">mo_occ</span> <span class="o">=</span> <span class="n">total_occ</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">mf</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">RHF</span><span class="p">(</span><span class="n">mol</span><span class="p">)</span>
+            <span class="c1"># Restricted closed-shell</span>
+            <span class="k">if</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;hf&quot;</span><span class="p">:</span>
+                <span class="n">mf</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">RHF</span><span class="p">(</span><span class="n">mol</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">mf</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">RKS</span><span class="p">(</span><span class="n">mol</span><span class="p">)</span>
+                <span class="n">mf</span><span class="o">.</span><span class="n">xc</span> <span class="o">=</span> <span class="n">method</span>
             <span class="n">mf</span><span class="o">.</span><span class="n">mo_coeff</span> <span class="o">=</span> <span class="n">coeff_a</span>
             <span class="n">mf</span><span class="o">.</span><span class="n">mo_energy</span> <span class="o">=</span> <span class="n">energy_a</span>
             <span class="n">mf</span><span class="o">.</span><span class="n">mo_occ</span> <span class="o">=</span> <span class="n">total_occ</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="n">mf</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">UHF</span><span class="p">(</span><span class="n">mol</span><span class="p">)</span>
+        <span class="c1"># Unrestricted</span>
+        <span class="k">if</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;hf&quot;</span><span class="p">:</span>
+            <span class="n">mf</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">UHF</span><span class="p">(</span><span class="n">mol</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">mf</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">UKS</span><span class="p">(</span><span class="n">mol</span><span class="p">)</span>
+            <span class="n">mf</span><span class="o">.</span><span class="n">xc</span> <span class="o">=</span> <span class="n">method</span>
         <span class="n">mf</span><span class="o">.</span><span class="n">mo_coeff</span> <span class="o">=</span> <span class="p">(</span><span class="n">coeff_a</span><span class="p">,</span> <span class="n">coeff_b</span><span class="p">)</span>
         <span class="n">mf</span><span class="o">.</span><span class="n">mo_energy</span> <span class="o">=</span> <span class="p">(</span><span class="n">energy_a</span><span class="p">,</span> <span class="n">energy_b</span><span class="p">)</span>
         <span class="n">mf</span><span class="o">.</span><span class="n">mo_occ</span> <span class="o">=</span> <span class="p">(</span><span class="n">occ_alpha</span><span class="p">,</span> <span class="n">occ_beta</span><span class="p">)</span>
@@ -567,7 +610,8 @@
     <span class="n">orbitals</span><span class="p">:</span> <span class="n">Orbitals</span><span class="p">,</span>
     <span class="n">n_electrons</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="n">multiplicity</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="n">force_restricted</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">scf_type</span><span class="p">:</span> <span class="n">SCFType</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">SCFType</span><span class="o">.</span><span class="n">AUTO</span><span class="p">,</span>
+    <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;hf&quot;</span><span class="p">,</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert an Orbitals object to a PySCF SCF object.</span>
 
@@ -581,9 +625,13 @@
 
 <span class="sd">        n_electrons: Total number of electrons in the system.</span>
 <span class="sd">        multiplicity: Spin multiplicity (2S + 1), where S is the total spin. Default is 1 (singlet).</span>
-<span class="sd">        force_restricted: If True, forces the creation of a restricted SCF object (RHF or ROHF).</span>
+<span class="sd">        scf_type: Type of SCF calculation to create. Can be:</span>
+<span class="sd">            * ``&quot;auto&quot;`` or ``SCFType.AUTO`` (default): Automatically detect based on ``orbitals.is_restricted()``</span>
+<span class="sd">            * ``&quot;restricted&quot;`` or ``SCFType.RESTRICTED``: Force restricted calculation (RHF or ROHF)</span>
+<span class="sd">            * ``&quot;unrestricted&quot;`` or ``SCFType.UNRESTRICTED``: Force unrestricted calculation (UHF)</span>
 
-<span class="sd">            Applies even if the input orbitals are unrestricted. Default is False.</span>
+<span class="sd">        method: The electronic structure method to use. Default is &quot;hf&quot; (Hartree-Fock).</span>
+<span class="sd">            Any other value is treated as a DFT exchange-correlation functional (e.g., &quot;b3lyp&quot;, &quot;pbe&quot;).</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        A PySCF SCF object (RHF, ROHF, or UHF) populated with the molecular orbital data from the input ``Orbitals``</span>
@@ -601,10 +649,11 @@
 <span class="sd">        the orbitals are restricted/unrestricted and closed-shell/open-shell.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">n_orbitals</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
     <span class="n">alpha_occ</span><span class="p">,</span> <span class="n">beta_occ</span> <span class="o">=</span> <span class="n">occupations_from_n_electrons_and_multiplicity</span><span class="p">(</span><span class="n">n_orbitals</span><span class="p">,</span> <span class="n">n_electrons</span><span class="p">,</span> <span class="n">multiplicity</span><span class="p">)</span>
 
-    <span class="k">return</span> <span class="n">orbitals_to_scf</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span> <span class="n">alpha_occ</span><span class="p">,</span> <span class="n">beta_occ</span><span class="p">,</span> <span class="n">force_restricted</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">orbitals_to_scf</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span> <span class="n">alpha_occ</span><span class="p">,</span> <span class="n">beta_occ</span><span class="p">,</span> <span class="n">scf_type</span><span class="p">,</span> <span class="n">method</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="hamiltonian_to_scf">
@@ -631,13 +680,13 @@
 <span class="sd">        object that provides the necessary interfaces for post-HF methods without having performed an SCF calculation.</span>
 
 <span class="sd">    Raises:</span>
-<span class="sd">        ValueError: If the Hamiltonian uses unsupported features.</span>
-
-<span class="sd">            Examples are: unrestricted orbitals, open-shell systems, or active spaces.</span>
+<span class="sd">        ValueError: If the Hamiltonian uses unsupported features like model Hamiltonian with unrestricted orbitals,</span>
+<span class="sd">            open-shell systems, or active spaces.</span>
 
 <span class="sd">    Note:</span>
-<span class="sd">        * Currently only supports restricted, closed-shell calculations without active spaces.</span>
-<span class="sd">        * Future versions may add support for unrestricted and open-shell calculations.</span>
+<span class="sd">        * This function is intended for (restricted) model hamiltonian usage, since the orbitals are not used directly.</span>
+<span class="sd">        * If a non-model Hamiltonian is passed, this function automatically re-routes to orbitals_to_scf.</span>
+<span class="sd">        * Active spaces are not supported.</span>
 <span class="sd">        * The function creates a &quot;fake&quot; SCF object with the necessary interfaces for post-HF methods without actually</span>
 <span class="sd">          performing an SCF calculation.</span>
 <span class="sd">        * The returned SCF object contains dummy molecular orbitals and occupations suitable for post-HF method</span>
@@ -662,13 +711,19 @@
 <span class="sd">        &gt;&gt;&gt; cc_calc.kernel()</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="c1"># Convenience aliases</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">orbitals</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">orbitals</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()</span>
+        <span class="c1"># is not a model hamiltonian - reroute to orbitals_to_scf</span>
+        <span class="k">return</span> <span class="n">orbitals_to_scf</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span> <span class="n">occ_alpha</span><span class="o">=</span><span class="n">alpha_occ</span><span class="p">,</span> <span class="n">occ_beta</span><span class="o">=</span><span class="n">beta_occ</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">is_unrestricted</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;You cannot pass an unrestricted model Hamiltonian here.&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+
     <span class="n">norb</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
 
     <span class="c1"># Consistency checks</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">is_restricted</span><span class="p">():</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unrestricted is not supported.&quot;</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">alpha_occ</span> <span class="o">!=</span> <span class="n">beta_occ</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Open-shell is not supported.&quot;</span><span class="p">)</span>
     <span class="k">if</span> <span class="p">(</span>
@@ -681,18 +736,17 @@
     <span class="n">mol</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">gto</span><span class="o">.</span><span class="n">M</span><span class="p">()</span>
 
     <span class="c1"># Calculate electron numbers from occupation arrays</span>
-    <span class="n">nalpha</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">alpha_occ</span><span class="p">))</span>
-    <span class="n">nbeta</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">beta_occ</span><span class="p">))</span>
+    <span class="n">num_alpha</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">alpha_occ</span><span class="p">))</span>
+    <span class="n">num_beta</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">beta_occ</span><span class="p">))</span>
 
     <span class="c1"># Create a fake SCF object</span>
-    <span class="c1"># TODO: Handle unrestricted / open-shell</span>
     <span class="n">fake_scf</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">RHF</span><span class="p">(</span><span class="n">mol</span><span class="p">)</span>
-    <span class="n">fake_scf</span><span class="o">.</span><span class="n">mol</span><span class="o">.</span><span class="n">nelectron</span> <span class="o">=</span> <span class="n">nalpha</span> <span class="o">+</span> <span class="n">nbeta</span>
+    <span class="n">fake_scf</span><span class="o">.</span><span class="n">mol</span><span class="o">.</span><span class="n">nelectron</span> <span class="o">=</span> <span class="n">num_alpha</span> <span class="o">+</span> <span class="n">num_beta</span>
 
     <span class="c1"># Store integrals in the SCF object</span>
-    <span class="n">eri</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_integrals</span><span class="p">()</span>
+    <span class="p">(</span><span class="n">eri</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_integrals</span><span class="p">()</span>
     <span class="n">eri</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">eri</span><span class="p">,</span> <span class="p">(</span><span class="n">norb</span><span class="p">,</span> <span class="n">norb</span><span class="p">,</span> <span class="n">norb</span><span class="p">,</span> <span class="n">norb</span><span class="p">))</span>
-    <span class="n">h1e</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()</span>
+    <span class="p">(</span><span class="n">h1e</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()</span>
     <span class="c1"># Use _eri directly as it&#39;s the established way to access this in PySCF</span>
     <span class="c1"># even though it&#39;s technically a private member</span>
     <span class="n">fake_scf</span><span class="o">.</span><span class="n">_eri</span> <span class="o">=</span> <span class="n">eri</span>  <span class="c1"># noqa: SLF001</span>
@@ -746,6 +800,7 @@
 <span class="sd">        &gt;&gt;&gt; cc_calc.kernel()</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">n_orbitals</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
     <span class="n">alpha_occ</span><span class="p">,</span> <span class="n">beta_occ</span> <span class="o">=</span> <span class="n">occupations_from_n_electrons_and_multiplicity</span><span class="p">(</span><span class="n">n_orbitals</span><span class="p">,</span> <span class="n">n_electrons</span><span class="p">,</span> <span class="n">multiplicity</span><span class="p">)</span>
 
@@ -770,6 +825,7 @@
 <span class="sd">        ValueError: If the total number of electrons or multiplicity is invalid.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="c1"># Validate inputs</span>
     <span class="k">if</span> <span class="n">n_electrons</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;The number of electrons must be non-negative, got </span><span class="si">{</span><span class="n">n_electrons</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>

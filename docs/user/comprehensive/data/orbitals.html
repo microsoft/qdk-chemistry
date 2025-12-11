@@ -60,13 +60,9 @@
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Orbitals</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#properties">Properties</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#usage">Usage</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#creating-an-orbitals-object">Creating an Orbitals object</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#accessing-orbital-data">Accessing Orbital Data</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#serialization">Serialization</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#orbital-transformations-and-applications">Orbital transformations and applications</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
@@ -136,74 +132,167 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 <p>For restricted calculations, the alpha and beta components are identical. The class maintains separate alpha and beta
 data internally, but they reference the same underlying data for restricted cases.</p>
 </section>
+<section id="model-orbitals">
+<h3>Model Orbitals<a class="headerlink" href="#model-orbitals" title="Link to this heading"></a></h3>
+<p>ModelOrbitals are a simpler class in QDK/Chemistry, for model systems without any basis set information.
+This class allows to fully specify model Hamiltonians and Wavefunctions.
+Several properties present for the Orbitals subclass are missing for ModelOrbitals: coefficients, energies, etc. These are summarized in the properties table below.</p>
 </section>
 <section id="properties">
-<h2>Properties<a class="headerlink" href="#properties" title="Link to this heading"></a></h2>
-<ul class="simple">
-<li><p><strong>Coefficients</strong>: Matrix of orbital coefficients [<a class="reference internal" href="../../../glossary.html#term-AO"><span class="xref std std-term">AO</span></a> × <a class="reference internal" href="../../../glossary.html#term-MO"><span class="xref std std-term">MO</span></a>] for alpha and beta spin channels</p></li>
-<li><p><strong>Energies</strong>: Vector of orbital energies for alpha and beta spin channels</p></li>
-<li><p><strong>Occupations</strong>: Vector of occupation numbers for alpha and beta spin channels</p></li>
-<li><p><strong>AO Overlap</strong>: Atomic orbital overlap matrix [<a class="reference internal" href="../../../glossary.html#term-AO"><span class="xref std std-term">AO</span></a> × <a class="reference internal" href="../../../glossary.html#term-AO"><span class="xref std std-term">AO</span></a>]</p></li>
-<li><p><strong>Basis Set</strong>: Comprehensive basis set information</p></li>
-</ul>
+<h3>Properties<a class="headerlink" href="#properties" title="Link to this heading"></a></h3>
+<p>The following table summarizes the properties available for the different orbital types:</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">Orbital Properties Availability</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 40.0%" />
+<col style="width: 15.0%" />
+<col style="width: 20.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Property</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Orbitals</p></th>
+<th class="head"><p>ModelOrbitals</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>Coefficients</strong></p></td>
+<td><p>Matrix of orbital coefficients [AO × MO] for alpha and beta spin channels</p></td>
+<td><p>✓</p></td>
+<td><p>✗</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Energies</strong></p></td>
+<td><p>Vector of orbital energies for alpha and beta spin channels</p></td>
+<td><p>✓</p></td>
+<td><p>✗</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Active space indices</strong></p></td>
+<td><p>Active space indices for alpha and beta spin channels</p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Inactive space indices</strong></p></td>
+<td><p>Inactive space indices for alpha and beta spin channels</p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Virtual space indices</strong></p></td>
+<td><p>Virtual space indices for alpha and beta spin channels</p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>MO overlap</strong></p></td>
+<td><p>Overlap matrices between molecular orbitals, for both spin channels</p></td>
+<td><p>✓</p></td>
+<td><p>✓*</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Basis Set</strong></p></td>
+<td><p>Comprehensive basis set information</p></td>
+<td><p>✓</p></td>
+<td><p>✗</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>AO overlap</strong></p></td>
+<td><p>Overlap matrices between atomic orbitals, for both spin channels</p></td>
+<td><p>✓</p></td>
+<td><p>✗</p></td>
+</tr>
+</tbody>
+</table>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>For detailed information about basis sets in QDK/Chemistry, including available basis sets, creation, manipulation, and serialization, refer to the <a class="reference internal" href="basis_set.html"><span class="doc">Basis Set documentation</span></a>.
-The basis set defines the atomic orbitals used to construct molecular orbitals and is a critical component for accurate quantum chemistry calculations.</p>
+<p>* For ModelOrbitals, MO overlap matrices return identity matrices since model systems assume orthonormal orbitals.</p>
 </div>
+<p>For detailed information about basis sets in QDK/Chemistry, including available basis sets, creation, manipulation, and serialization, refer to the <a class="reference internal" href="basis_set.html"><span class="doc">Basis Set documentation</span></a>.</p>
+</section>
 </section>
 <section id="usage">
 <h2>Usage<a class="headerlink" href="#usage" title="Link to this heading"></a></h2>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> class is typically created as the output of an <a class="reference internal" href="../algorithms/scf_solver.html"><span class="doc">SCF calculation</span></a> or <a class="reference internal" href="../algorithms/localizer.html"><span class="doc">orbital transformation</span></a>.
 It serves as input to various post-<a class="reference internal" href="../../../glossary.html#term-HF"><span class="xref std std-term">HF</span></a> methods such as <a class="reference internal" href="../algorithms/active_space.html"><span class="doc">active space selection</span></a> and <a class="reference internal" href="../algorithms/hamiltonian_constructor.html"><span class="doc">Hamiltonian construction</span></a>.</p>
-</section>
-<section id="creating-an-orbitals-object">
-<h2>Creating an Orbitals object<a class="headerlink" href="#creating-an-orbitals-object" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> object is typically created by algorithms rather than manually.
-However, for advanced use cases, you can create and populate orbitals directly:</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The class provides overloaded setter methods for coefficients, energies, and occupations.
-The single-argument versions (restricted setters) set the same values for both alpha and beta channels, while the two-argument versions (unrestricted setters) allow setting different values for alpha and beta channels.</p>
-</div>
+<ul class="simple">
+<li><p><strong>Orbital Localization</strong>: Transform delocalized <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> orbitals into localized representations for better chemical interpretation and more efficient correlation methods.
+See <a class="reference internal" href="../algorithms/localizer.html"><span class="doc">Localizer</span></a> for details.</p></li>
+<li><p><strong>Active Space Selection</strong>: Automatically identify important orbitals for multi-reference calculations based on
+various criteria.
+See <a class="reference internal" href="../algorithms/active_space.html"><span class="doc">ActiveSpaceSelector</span></a> for details.</p></li>
+<li><p><strong>Hamiltonian Construction</strong>: Build electronic Hamiltonians for post-HF methods using the orbital information.
+See <a class="reference internal" href="../algorithms/hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a> for details.</p></li>
+</ul>
+<p>The below example illustrates the typical access to Orbitals (via an SCF):</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Obtain orbitals from an SCF calculation</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
-<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_scf</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">solve</span><span class="p">(</span><span class="n">structure</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">algorithms</span><span class="p">;</span>
 
-<span class="c1">// set coefficients manually example (restricted)</span>
-<span class="n">Orbitals</span><span class="w"> </span><span class="n">orbs_manual</span><span class="p">;</span>
-<span class="n">Eigen</span><span class="o">::</span><span class="n">MatrixXd</span><span class="w"> </span><span class="n">coeffs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="cm">/* coefficient matrix */</span><span class="p">;</span>
-<span class="n">orbs_manual</span><span class="p">.</span><span class="n">set_coefficients</span><span class="p">(</span><span class="n">coeffs</span><span class="p">);</span><span class="w">  </span><span class="c1">// Same for alpha and beta</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// Obtain orbitals from an SCF calculation</span>
+<span class="w">  </span><span class="c1">// Create H2 molecule</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="o">&gt;</span><span class="w"> </span><span class="n">coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.4</span><span class="p">}};</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">symbols</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;H&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">};</span>
+<span class="w">  </span><span class="n">Structure</span><span class="w"> </span><span class="n">structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span><span class="w"> </span><span class="n">symbols</span><span class="p">);</span>
 
-<span class="c1">// set coefficients manually example (unrestricted)</span>
-<span class="n">Orbitals</span><span class="w"> </span><span class="n">orbs_unrestricted</span><span class="p">;</span>
-<span class="n">Eigen</span><span class="o">::</span><span class="n">MatrixXd</span><span class="w"> </span><span class="n">coeffs_alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="cm">/* alpha coefficients */</span><span class="p">;</span>
-<span class="n">Eigen</span><span class="o">::</span><span class="n">MatrixXd</span><span class="w"> </span><span class="n">coeffs_beta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="cm">/* beta coefficients */</span><span class="p">;</span>
-<span class="n">orbs_unrestricted</span><span class="p">.</span><span class="n">set_coefficients</span><span class="p">(</span><span class="n">coeffs_alpha</span><span class="p">,</span><span class="w"> </span><span class="n">coeffs_beta</span><span class="p">);</span>
+<span class="w">  </span><span class="c1">// Obtain orbitals from an SCF calculation</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+<span class="w">  </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;sto-3g&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_scf</span><span class="p">,</span><span class="w"> </span><span class="n">wfn</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">Orbitals</span><span class="o">&gt;</span><span class="w"> </span><span class="n">orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">wfn</span><span class="p">.</span><span class="n">get_orbitals</span><span class="p">();</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Orbitals</span><span class="p">,</span> <span class="n">Structure</span>
-
-<span class="c1"># Create H2 molecule</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create H2 molecule</span>
 <span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
+<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="o">=</span><span class="n">symbols</span><span class="p">)</span>
 
 <span class="c1"># Obtain orbitals from an SCF calculation</span>
 <span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
 <span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
 <span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 <span class="n">orbitals</span> <span class="o">=</span> <span class="n">wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>Similar patterns are described below for ModelOrbitals.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Set basis set size</span>
+<span class="w">  </span><span class="kt">size_t</span><span class="w"> </span><span class="n">basis_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">6</span><span class="p">;</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SCF Energy: </span><span class="si">{</span><span class="n">E_scf</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="c1">// Set active orbitals</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">alpha_active</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">};</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">beta_active</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">};</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">alpha_inactive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">};</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">beta_inactive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">};</span>
+
+<span class="w">  </span><span class="n">ModelOrbitals</span><span class="w"> </span><span class="nf">model_orbitals</span><span class="p">(</span>
+<span class="w">      </span><span class="n">basis_size</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_tuple</span><span class="p">(</span><span class="n">alpha_active</span><span class="p">,</span><span class="w"> </span><span class="n">beta_active</span><span class="p">,</span><span class="w"> </span><span class="n">alpha_inactive</span><span class="p">,</span>
+<span class="w">                                  </span><span class="n">beta_inactive</span><span class="p">));</span>
+
+<span class="w">  </span><span class="c1">// We can then pass this object to a custom Hamiltonian constructor</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Set basis set size</span>
+<span class="n">basis_size</span> <span class="o">=</span> <span class="mi">6</span>
+
+<span class="c1"># Set active orbitals</span>
+<span class="n">alpha_active</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+<span class="n">beta_active</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span>
+<span class="n">alpha_inactive</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">]</span>
+<span class="n">beta_inactive</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">]</span>
+
+<span class="n">model_orbitals</span> <span class="o">=</span> <span class="n">ModelOrbitals</span><span class="p">(</span>
+    <span class="n">basis_size</span><span class="p">,</span> <span class="p">(</span><span class="n">alpha_active</span><span class="p">,</span> <span class="n">beta_active</span><span class="p">,</span> <span class="n">alpha_inactive</span><span class="p">,</span> <span class="n">beta_inactive</span><span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># We can then pass this object to a custom Hamiltonian constructor</span>
 </pre></div>
 </div>
 </div>
@@ -215,193 +304,65 @@ The single-argument versions (restricted setters) set the same values for both a
 Following the <a class="reference internal" href="../design/index.html"><span class="doc">immutable design principle</span></a> used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
 For spin-dependent properties, methods return pairs of (alpha, beta) data.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Access orbital coefficients (returns std::pair&lt;const Eigen::MatrixXd&amp;, const</span>
-<span class="c1">// Eigen::MatrixXd&amp;&gt;)</span>
-<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">coeffs_alpha</span><span class="p">,</span><span class="w"> </span><span class="n">coeffs_beta</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="p">.</span><span class="n">get_coefficients</span><span class="p">();</span>
-
-<span class="c1">// Access orbital energies (returns std::pair&lt;const Eigen::VectorXd&amp;, const</span>
-<span class="c1">// Eigen::VectorXd&amp;&gt;)</span>
-<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">energies_alpha</span><span class="p">,</span><span class="w"> </span><span class="n">energies_beta</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="p">.</span><span class="n">get_energies</span><span class="p">();</span>
-
-<span class="c1">// Access orbital occupations (returns std::pair&lt;const Eigen::VectorXd&amp;, const</span>
-<span class="c1">// Eigen::VectorXd&amp;&gt;)</span>
-<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">occs_alpha</span><span class="p">,</span><span class="w"> </span><span class="n">occs_beta</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="p">.</span><span class="n">get_occupations</span><span class="p">();</span>
-
-<span class="c1">// Access atomic orbital overlap matrix (returns const Eigen::MatrixXd&amp;)</span>
-<span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">ao_overlap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="p">.</span><span class="n">get_overlap_matrix</span><span class="p">();</span>
-
-<span class="c1">// Access basis set information (returns const BasisSet&amp;)</span>
-<span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">basis_set</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="p">.</span><span class="n">get_basis_set</span><span class="p">();</span>
-
-<span class="c1">// Check calculation type</span>
-<span class="kt">bool</span><span class="w"> </span><span class="n">is_restricted</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="p">.</span><span class="n">is_restricted</span><span class="p">();</span>
-<span class="kt">bool</span><span class="w"> </span><span class="n">is_open_shell</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="p">.</span><span class="n">is_open_shell</span><span class="p">();</span>
-
-<span class="c1">// Get size information</span>
-<span class="kt">size_t</span><span class="w"> </span><span class="n">num_molecular_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="p">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">();</span>
-<span class="kt">size_t</span><span class="w"> </span><span class="n">num_atomic_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="p">.</span><span class="n">get_num_atomic_orbitals</span><span class="p">();</span>
-<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">n_electrons_alpha</span><span class="p">,</span><span class="w"> </span><span class="n">n_electrons_beta</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
-<span class="w">    </span><span class="n">orbitals</span><span class="p">.</span><span class="n">get_num_electrons</span><span class="p">();</span><span class="w">  </span><span class="c1">// returns std::pair&lt;double, double&gt;</span>
-
-<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">summary</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="p">.</span><span class="n">get_summary</span><span class="p">();</span>
-<span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">summary</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Access orbital coefficients (returns tuple of alpha/beta matrices)</span>
-<span class="n">coeffs_alpha</span><span class="p">,</span> <span class="n">coeffs_beta</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Orbital coefficients shape: </span><span class="si">{</span><span class="n">coeffs_alpha</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-<span class="c1"># Access orbital energies (returns tuple of alpha/beta vectors)</span>
-<span class="n">energies_alpha</span><span class="p">,</span> <span class="n">energies_beta</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_energies</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Orbital energies: </span><span class="si">{</span><span class="n">energies_alpha</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-<span class="c1"># Access atomic orbital overlap matrix</span>
-<span class="n">ao_overlap</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_overlap_matrix</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;AO overlap matrix shape: </span><span class="si">{</span><span class="n">ao_overlap</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-<span class="c1"># Access basis set information</span>
-<span class="n">basis_set</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis set: </span><span class="si">{</span><span class="n">basis_set</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-<span class="c1"># Check calculation type</span>
-<span class="n">is_restricted</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">is_restricted</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Is restricted: </span><span class="si">{</span><span class="n">is_restricted</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-<span class="c1"># Get size information</span>
-<span class="n">num_mos</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
-<span class="n">num_aos</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_atomic_orbitals</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;MOs: </span><span class="si">{</span><span class="n">num_mos</span><span class="si">}</span><span class="s2">, AOs: </span><span class="si">{</span><span class="n">num_aos</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-<span class="c1"># Get summary</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
-</pre></div>
-</div>
-</div>
-</div>
-</section>
-<section id="serialization">
-<h2>Serialization<a class="headerlink" href="#serialization" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> class supports serialization to and from JSON and HDF5 formats.
-For detailed information about serialization in QDK/Chemistry, see the <a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a> documentation.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>All orbitals-related files require the <code class="docutils literal notranslate"><span class="pre">.orbitals</span></code> suffix before the file type extension, for example <code class="docutils literal notranslate"><span class="pre">molecule.orbitals.json</span></code> and <code class="docutils literal notranslate"><span class="pre">h2.orbitals.h5</span></code> for JSON and HDF5 files respectively.
-This naming convention is enforced to maintain consistency across the QDK/Chemistry ecosystem.</p>
-</div>
-<section id="file-formats">
-<h3>File formats<a class="headerlink" href="#file-formats" title="Link to this heading"></a></h3>
-<p>QDK/Chemistry supports multiple serialization formats for orbital data, as described below.</p>
-<section id="json-format">
-<h4>JSON format<a class="headerlink" href="#json-format" title="Link to this heading"></a></h4>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The <code class="docutils literal notranslate"><span class="pre">basis_set</span></code> field in the JSON representation contains a complete serialization of the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a> object.
-For details on how basis sets are serialized, see the <span class="xref std std-ref">JSON Format section in the Basis Set documentation</span>.</p>
-</div>
-<p>JSON representation of an <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> object has the following structure (showing simplified content):</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;ao_overlap&quot;</span><span class="p">:[[</span><span class="mf">1.0</span><span class="p">,</span><span class="mf">0.11921652588876666</span><span class="p">],[</span><span class="mf">0.11921652588876666</span><span class="p">,</span><span class="mf">1.0</span><span class="p">]],</span>
-<span class="w">  </span><span class="nt">&quot;basis_set&quot;</span><span class="p">:{</span><span class="s2">&quot;...&quot;</span><span class="p">},</span>
-<span class="w">  </span><span class="nt">&quot;coefficients&quot;</span><span class="p">:{</span>
-<span class="w">    </span><span class="nt">&quot;alpha&quot;</span><span class="p">:[[</span><span class="mf">0.6683869241842456</span><span class="p">,</span><span class="mf">0.7534430365674294</span><span class="p">],</span>
-<span class="w">      </span><span class="p">[</span><span class="mf">0.6683869241842458</span><span class="p">,</span><span class="mf">-0.7534430365674292</span><span class="p">]],</span>
-<span class="w">    </span><span class="nt">&quot;beta&quot;</span><span class="p">:[[</span><span class="mf">0.6683869241842456</span><span class="p">,</span><span class="mf">0.7534430365674294</span><span class="p">],</span>
-<span class="w">      </span><span class="p">[</span><span class="mf">0.6683869241842458</span><span class="p">,</span><span class="mf">-0.7534430365674292</span><span class="p">]]</span>
-<span class="w">    </span><span class="p">},</span>
-<span class="w">  </span><span class="nt">&quot;energies&quot;</span><span class="p">:{</span>
-<span class="w">    </span><span class="nt">&quot;alpha&quot;</span><span class="p">:[</span><span class="mf">-0.26945922362180524</span><span class="p">,</span><span class="mf">0.10899736829389452</span><span class="p">],</span>
-<span class="w">    </span><span class="nt">&quot;beta&quot;</span><span class="p">:[</span><span class="mf">-0.26945922362180524</span><span class="p">,</span><span class="mf">0.10899736829389452</span><span class="p">]</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="nt">&quot;has_overlap_matrix&quot;</span><span class="p">:</span><span class="kc">true</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;is_open_shell&quot;</span><span class="p">:</span><span class="kc">false</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;is_restricted&quot;</span><span class="p">:</span><span class="kc">true</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;num_atomic_orbitals&quot;</span><span class="p">:</span><span class="mi">2</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;num_electrons&quot;</span><span class="p">:{</span><span class="nt">&quot;alpha&quot;</span><span class="p">:</span><span class="mf">1.0</span><span class="p">,</span><span class="nt">&quot;beta&quot;</span><span class="p">:</span><span class="mf">1.0</span><span class="p">},</span>
-<span class="w">  </span><span class="nt">&quot;num_molecular_orbitals&quot;</span><span class="p">:</span><span class="mi">2</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;occupations&quot;</span><span class="p">:{</span><span class="nt">&quot;alpha&quot;</span><span class="p">:[</span><span class="mf">1.0</span><span class="p">,</span><span class="mf">0.0</span><span class="p">],</span><span class="nt">&quot;beta&quot;</span><span class="p">:[</span><span class="mf">1.0</span><span class="p">,</span><span class="mf">0.0</span><span class="p">]}</span>
-<span class="p">}</span>
-</pre></div>
-</div>
-</section>
-<section id="hdf5-format">
-<h4>HDF5 format<a class="headerlink" href="#hdf5-format" title="Link to this heading"></a></h4>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The <code class="docutils literal notranslate"><span class="pre">basis_set/</span></code> group in the HDF5 representation contains a complete serialization of the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a> object.
-For details on the HDF5 structure of basis sets, see the <span class="xref std std-ref">HDF5 Format section in the Basis Set documentation</span>.</p>
-</div>
-<p>HDF5 representation of an <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> object has the following structure (showing groups and datasets):</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>/
-├── ao_overlap          # Dataset: 2D array of AO overlap matrix
-├── basis_set/          # 🔧 **TODO**: Group: Contains basis set information
-├── coefficients_alpha  # Dataset: 2D array of orbital coefficients (alpha)
-├── coefficients_beta   # Dataset: 2D array of orbital coefficients (beta)
-├── energies_alpha      # Dataset: 2D array of orbital energies (alpha)
-├── energies_beta       # Dataset: 2D array of orbital energies (beta)
-├── occupations_alpha   # Dataset: 2D array of orbital occupations (alpha)
-├── occupations_beta    # Dataset: 2D array of orbital occupations (beta)
-└── metadata/           # Group
-    ├── has_overlap_matrix       # Dataset: uint8, 0 if false, 1 if true
-    ├── has_basis_set        # Dataset: uint8, 0 if false, 1 if true
-    ├── is_open_shell        # Dataset: uint8, 0 if false, 1 if true
-    ├── is_restricted        # Dataset: uint8, 0 if false, 1 if true
-    ├── num_atomic_orbitals              # Dataset: uint32, number of atomic orbitals
-    ├── num_electrons_alpha  # Dataset: uint32, number of alpha electrons
-    ├── num_electrons_beta   # Dataset: uint32, number of beta electrons
-    └── num_molecular_orbitals              # Dataset: uint32, number of molecular orbital coefficients
-</pre></div>
-</div>
-<div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Generic serialization with format specification</span>
-<span class="n">orbitals</span><span class="p">.</span><span class="n">to_file</span><span class="p">(</span><span class="s">&quot;molecule.orbitals.json&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;json&quot;</span><span class="p">);</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">orbitals_from_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Orbitals</span><span class="o">::</span><span class="n">from_file</span><span class="p">(</span><span class="s">&quot;molecule.orbitals.json&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;json&quot;</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Access orbital coefficients (returns std::pair&lt;const Eigen::MatrixXd&amp;,</span>
+<span class="w">  </span><span class="c1">// const Eigen::MatrixXd&amp;&gt;)</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">coeffs_alpha</span><span class="p">,</span><span class="w"> </span><span class="n">coeffs_beta</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="o">-&gt;</span><span class="n">get_coefficients</span><span class="p">();</span>
 
-<span class="c1">// JSON serialization</span>
-<span class="n">orbitals</span><span class="p">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s">&quot;molecule.orbitals.json&quot;</span><span class="p">);</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">orbitals_from_json_file</span><span class="w"> </span><span class="o">=</span>
-<span class="w">    </span><span class="n">Orbitals</span><span class="o">::</span><span class="n">from_json_file</span><span class="p">(</span><span class="s">&quot;molecule.orbitals.json&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="c1">// Access orbital energies (returns std::pair&lt;const Eigen::VectorXd&amp;, const</span>
+<span class="w">  </span><span class="c1">// Eigen::VectorXd&amp;&gt;)</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">energies_alpha</span><span class="p">,</span><span class="w"> </span><span class="n">energies_beta</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="o">-&gt;</span><span class="n">get_energies</span><span class="p">();</span>
 
-<span class="c1">// Direct JSON conversion</span>
-<span class="n">nlohmann</span><span class="o">::</span><span class="n">json</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="p">.</span><span class="n">to_json</span><span class="p">();</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">orbitals_from_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Orbitals</span><span class="o">::</span><span class="n">from_json</span><span class="p">(</span><span class="n">j</span><span class="p">);</span>
+<span class="w">  </span><span class="c1">// Get active space indices</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">active_indices_alpha</span><span class="p">,</span><span class="w"> </span><span class="n">active_indices_beta</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">orbitals</span><span class="o">-&gt;</span><span class="n">get_active_space_indices</span><span class="p">();</span>
 
-<span class="c1">// HDF5 serialization</span>
-<span class="n">orbitals</span><span class="p">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s">&quot;molecule.orbitals.h5&quot;</span><span class="p">);</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">orbitals_from_hdf5_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Orbitals</span><span class="o">::</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s">&quot;molecule.orbitals.h5&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="c1">// Access atomic orbital overlap matrix (returns const Eigen::MatrixXd&amp;)</span>
+<span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">ao_overlap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="o">-&gt;</span><span class="n">get_overlap_matrix</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Access basis set information (returns const BasisSet&amp;)</span>
+<span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">basis_set</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="o">-&gt;</span><span class="n">get_basis_set</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Check calculation type</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">is_restricted</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="o">-&gt;</span><span class="n">is_restricted</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Get size information</span>
+<span class="w">  </span><span class="kt">size_t</span><span class="w"> </span><span class="n">num_molecular_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="o">-&gt;</span><span class="n">get_num_molecular_orbitals</span><span class="p">();</span>
+<span class="w">  </span><span class="kt">size_t</span><span class="w"> </span><span class="n">num_atomic_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="o">-&gt;</span><span class="n">get_num_atomic_orbitals</span><span class="p">();</span>
+
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">summary</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">orbitals</span><span class="o">-&gt;</span><span class="n">get_summary</span><span class="p">();</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">summary</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use a temporary directory for file I/O</span>
-<span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span> <span class="k">as</span> <span class="n">tmpdir</span><span class="p">:</span>
-    <span class="n">tmpdir_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">)</span>
-    <span class="n">orbitals_file</span> <span class="o">=</span> <span class="n">tmpdir_path</span> <span class="o">/</span> <span class="s2">&quot;molecule.orbitals.json&quot;</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Access orbital coefficients (alpha, beta)</span>
+<span class="n">coeffs_alpha</span><span class="p">,</span> <span class="n">coeffs_beta</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()</span>
 
-    <span class="c1"># Generic serialization with format specification</span>
-    <span class="n">orbitals</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">orbitals_file</span><span class="p">),</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
-    <span class="n">orbitals_from_file</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">orbitals_file</span><span class="p">),</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
+<span class="c1"># Access orbital energies</span>
+<span class="n">energies_alpha</span><span class="p">,</span> <span class="n">energies_beta</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_energies</span><span class="p">()</span>
+<span class="c1"># Get active space indices</span>
+<span class="n">active_indices_alpha</span><span class="p">,</span> <span class="n">active_indices_beta</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()</span>
 
-    <span class="c1"># JSON serialization</span>
-    <span class="n">orbitals</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">orbitals_file</span><span class="p">))</span>
-    <span class="n">orbitals_from_json_file</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">orbitals_file</span><span class="p">))</span>
+<span class="c1"># Access atomic orbital overlap matrix</span>
+<span class="n">ao_overlap</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_overlap_matrix</span><span class="p">()</span>
 
-    <span class="c1"># Direct JSON conversion</span>
-    <span class="n">j</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
-    <span class="n">orbitals_from_json</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">j</span><span class="p">)</span>
+<span class="c1"># Access basis set information</span>
+<span class="n">basis_set</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">()</span>
 
-    <span class="c1"># HDF5 serialization (if available)</span>
-    <span class="c1"># orbitals.to_hdf5_file(str(tmpdir_path / &quot;molecule.orbitals.h5&quot;))</span>
-    <span class="c1"># orbitals_from_hdf5 = Orbitals.from_hdf5_file(str(tmpdir_path / &quot;molecule.orbitals.h5&quot;))</span>
+<span class="c1"># Check calculation type</span>
+<span class="n">is_restricted</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">is_restricted</span><span class="p">()</span>
+
+<span class="c1"># Get size information</span>
+<span class="n">num_molecular_orbitals</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
+<span class="n">num_atomic_orbitals</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_atomic_orbitals</span><span class="p">()</span>
+
+<span class="n">summary</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_summary</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">summary</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 </div>
-</section>
-</section>
 </section>
 <section id="orbital-transformations-and-applications">
 <h2>Orbital transformations and applications<a class="headerlink" href="#orbital-transformations-and-applications" title="Link to this heading"></a></h2>
@@ -413,18 +374,8 @@ See <a class="reference internal" href="../algorithms/localizer.html"><span clas
 various criteria.
 See <a class="reference internal" href="../algorithms/active_space.html"><span class="doc">ActiveSpaceSelector</span></a> for details.</p></li>
 <li><p><strong>Hamiltonian Construction</strong>: Build electronic Hamiltonians for post-HF methods using the orbital information.
-See <a class="reference internal" href="../algorithms/hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a> for details.</p></li>
-</ul>
-</section>
-<section id="related-classes">
-<h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
-<ul class="simple">
-<li><p><a class="reference internal" href="structure.html"><span class="doc">Structure</span></a>: Molecular structure representation</p></li>
-<li><p><a class="reference internal" href="hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Electronic Hamiltonian constructed from orbitals</p></li>
-<li><p><a class="reference internal" href="../algorithms/hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a>: Algorithm that builds Hamiltonians from orbitals</p></li>
-<li><p><a class="reference internal" href="../algorithms/active_space.html"><span class="doc">ActiveSpaceSelector</span></a>: Algorithm for selecting active spaces from orbitals</p></li>
-<li><p><a class="reference internal" href="../algorithms/scf_solver.html"><span class="doc">ScfSolver</span></a>: Algorithm that produces orbitals</p></li>
-<li><p><a class="reference internal" href="../algorithms/localizer.html"><span class="doc">Localizer</span></a>: Algorithms for orbital transformations</p></li>
+Both restricted and unrestricted Hamiltonians are automatically constructed based on the matching orbital type (restricted or unrestricted).
+See <a class="reference internal" href="../algorithms/hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a> and <a class="reference internal" href="hamiltonian.html"><span class="doc">Hamiltonian</span></a> (including the <span class="xref std std-ref">Unrestricted Hamiltonians</span> section) for details.</p></li>
 </ul>
 </section>
 <section id="further-reading">
@@ -433,6 +384,12 @@ See <a class="reference internal" href="../algorithms/hamiltonian_constructor.ht
 <li><p>The above examples can be downloaded as complete <a class="reference external" href="../../../_static/examples/cpp/orbitals.cpp">C++</a> and <a class="reference external" href="../../../_static/examples/python/orbitals.py">Python</a> scripts.</p></li>
 <li><p><a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a>: Data serialization and deserialization</p></li>
 <li><p><a class="reference internal" href="../design/settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
+<li><p><a class="reference internal" href="structure.html"><span class="doc">Structure</span></a>: Molecular structure representation</p></li>
+<li><p><a class="reference internal" href="hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Electronic Hamiltonian constructed from orbitals</p></li>
+<li><p><a class="reference internal" href="../algorithms/hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a>: Algorithm that builds Hamiltonians from orbitals</p></li>
+<li><p><a class="reference internal" href="../algorithms/active_space.html"><span class="doc">ActiveSpaceSelector</span></a>: Algorithm for selecting active spaces from orbitals</p></li>
+<li><p><a class="reference internal" href="../algorithms/scf_solver.html"><span class="doc">ScfSolver</span></a>: Algorithm that produces orbitals</p></li>
+<li><p><a class="reference internal" href="../algorithms/localizer.html"><span class="doc">Localizer</span></a>: Algorithms for orbital transformations</p></li>
 </ul>
 </section>
 </section>
