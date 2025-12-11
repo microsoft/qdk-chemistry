@@ -10,7 +10,6 @@
 
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
-#include <qdk/chemistry/data/hamiltonian_container.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_4_center.hpp>
 
 #include "path_utils.hpp"

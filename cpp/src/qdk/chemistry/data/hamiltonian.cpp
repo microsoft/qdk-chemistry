@@ -7,7 +7,6 @@
 #include <iostream>
 #include <macis/util/fcidump.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
-#include <qdk/chemistry/data/hamiltonian_container.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_4_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
