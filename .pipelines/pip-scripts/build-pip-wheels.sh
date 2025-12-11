@@ -116,7 +116,8 @@ python3 -m build --wheel \
     -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
     -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
     -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
-    -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
+    -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
+    -C cmake.define.CMAKE_BUILD_PARALLEL_LEVEL=${nproc}
 
 echo "Checking shared dependencies..."
 ldd build/cp*/_core.*.so
