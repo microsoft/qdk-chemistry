@@ -294,16 +294,15 @@ void save_matrix_variant_to_group(bool is_complex, MatrixVariant matrix_variant,
                                   H5::Group group, std::string storage_name);
 
 /**
- * @brief Save two rdm to hdf5
- * @param is_two_rdm_complex Whether or not rdm is complex (affects how it is
- * stored)
- * @param two_rdm_spin_dependent_chl The two rdm to store
- * @param rdm_group Which rdm group to save to
- * @param storage_name How to save in the dedicated rdm group
+ * @brief Save vector variant to hdf5 group
+ * @param is_vector_variant_complex Whether or not vector variant is complex
+ * (affects how it is stored)
+ * @param vector_variant The vector variant to store
+ * @param group Which hdf5 group to save to
+ * @param storage_name How to save in the dedicated group
  */
-void save_vector_variant_to_group(bool is_two_rdm_complex,
-                                  VectorVariant two_rdm_spin_dependent_chl,
-                                  H5::Group rdm_group,
+void save_vector_variant_to_group(bool is_vector_variant_complex,
+                                  VectorVariant vector_variant, H5::Group group,
                                   std::string storage_name);
 // Template implementations
 
