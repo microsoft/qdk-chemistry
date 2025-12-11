@@ -10,6 +10,7 @@ CMAKE_VERSION=${6:-3.28.3}
 HDF5_VERSION=${7:-1.13.0}
 BLIS_VERSION=${8:-2.0}
 LIBFLAME_VERSION=${9:-5.2.0}
+PYENV_VERSION=${10:-2.6.15}
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -48,16 +49,16 @@ apt-get install -y -q \
 # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
 echo "Downloading and installing CMake ${CMAKE_VERSION}..."
 export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
-wget -q https://cmake.org/files/v3.28/cmake-3.28.3.tar.gz -O cmake-3.28.3.tar.gz
-echo "${CMAKE_CHECKSUM}  cmake-3.28.3.tar.gz" | shasum -a 256 -c || exit 1
-tar -xzf cmake-3.28.3.tar.gz
-rm cmake-3.28.3.tar.gz
-cd cmake-3.28.3
+wget -q https://cmake.org/files/v3.28/cmake-${CMAKE_VERSION}.tar.gz -O cmake-${CMAKE_VERSION}.tar.gz
+echo "${CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}.tar.gz" | shasum -a 256 -c || exit 1
+tar -xzf cmake-${CMAKE_VERSION}.tar.gz
+rm cmake-${CMAKE_VERSION}.tar.gz
+cd cmake-${CMAKE_VERSION}
 ./bootstrap --parallel=$(nproc) --prefix=/usr/local
 make --silent -j$(nproc)
 make install
 cd ..
-rm -r cmake-3.28.3
+rm -r cmake-${CMAKE_VERSION}
 cmake --version
 
 export CFLAGS="-fPIC -Os"
@@ -84,10 +85,10 @@ bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} 
 # when building with a non-system Python version.
 export PYENV_CHECKSUM=95187d6ad9bc8310662b5b805a88506e5cbbe038f88890e5aabe3021711bf3c8
 export PYENV_ROOT="/workspace/.pyenv"
-wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v2.6.15.zip -O pyenv.zip
+wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v${PYENV_VERSION}.zip -O pyenv.zip
 echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -a 256 -c || exit 1
 unzip -q pyenv.zip
-mv pyenv-2.6.15 "$PYENV_ROOT"
+mv pyenv-${PYENV_VERSION} "$PYENV_ROOT"
 rm pyenv.zip
 "$PYENV_ROOT/bin/pyenv" install ${PYTHON_VERSION}
 "$PYENV_ROOT/bin/pyenv" global ${PYTHON_VERSION}
@@ -117,7 +118,7 @@ python3 -m build --wheel \
     -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
     -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
     -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
-    -C cmake.define.CMAKE_BUILD_PARALLEL_LEVEL=${nproc}
+    -C cmake.define.CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
 
 echo "Checking shared dependencies..."
 ldd build/cp*/_core.*.so
