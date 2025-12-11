@@ -8,12 +8,13 @@
 #include <unordered_map>
 
 // Define CODATA version constants
-#define QDK_CHEMISTRY_CODATA_2014 2014
+#define QDK_CHEMISTRY_CODATA_2022 2022
 #define QDK_CHEMISTRY_CODATA_2018 2018
+#define QDK_CHEMISTRY_CODATA_2014 2014
 
 // Set default CODATA version if not specified
 #ifndef QDK_CHEMISTRY_CODATA_VERSION
-#define QDK_CHEMISTRY_CODATA_VERSION QDK_CHEMISTRY_CODATA_2018
+#define QDK_CHEMISTRY_CODATA_VERSION QDK_CHEMISTRY_CODATA_2022
 #endif
 
 /**
@@ -25,12 +26,12 @@
  * static constexpr variables rather than preprocessor defines for type safety.
  *
  * To use a specific CODATA version, either use the fully qualified namespace
- * (e.g., qdk::chemistry::constants::codata_2018::bohr_to_angstrom) or import
+ * (e.g., qdk::chemistry::constants::codata_2022::bohr_to_angstrom) or import
  * the specific namespace.
  *
  * The default namespace (qdk::chemistry::constants) uses the most recent CODATA
- * version (currently 2018) for convenience, but other versions remain
- * available for compatibility and comparison purposes.
+ * version (currently 2022) for convenience, but other versions remain available
+ * for compatibility and comparison purposes.
  *
  * To select a specific CODATA version, define QDK_CHEMISTRY_CODATA_VERSION
  */
@@ -50,11 +51,53 @@ struct ConstantInfo {
 };
 
 /**
+ * @namespace qdk::chemistry::constants::codata_2022
+ * @brief CODATA 2022 recommended values for fundamental physical constants
+ *
+ * Constants from the 2022 CODATA recommended values of the fundamental physical
+ * constants: https://physics.nist.gov/cuu/Constants/
+ */
+namespace codata_2022 {
+
+// Conversion factors
+static constexpr double bohr_to_angstrom =
+    0.529177210544;  // Bohr radius in Angstrom
+static constexpr double angstrom_to_bohr = 1.0 / bohr_to_angstrom;
+
+// Fundamental constants
+static constexpr double fine_structure_constant =
+    7.2973525643e-3;                                       // α, dimensionless
+static constexpr double electron_mass = 9.1093837139e-31;  // kg
+static constexpr double proton_mass = 1.67262192595e-27;   // kg
+static constexpr double neutron_mass = 1.67492750056e-27;  // kg
+static constexpr double atomic_mass_constant = 1.66053906892e-27;  // u in kg
+static constexpr double avogadro_constant = 6.02214076e23;         // mol^-1
+static constexpr double boltzmann_constant = 1.380649e-23;         // J/K
+static constexpr double planck_constant = 6.62607015e-34;          // J⋅s
+static constexpr double reduced_planck_constant =
+    planck_constant / (2.0 * 3.14159265358979323846);         // ħ, J⋅s
+static constexpr double speed_of_light = 299792458.0;         // m/s
+static constexpr double elementary_charge = 1.602176634e-19;  // C
+
+// Energy conversion factors
+static constexpr double hartree_to_ev =
+    27.211386245981;  // 1 Hartree in electron volts
+static constexpr double ev_to_hartree = 1.0 / hartree_to_ev;
+static constexpr double hartree_to_kj_per_mol =
+    hartree_to_ev * 1.602176634 * 6.02214076 * 10;  // 1 Hartree in kJ/mol
+static constexpr double kj_per_mol_to_hartree = 1.0 / hartree_to_kj_per_mol;
+static constexpr double hartree_to_kcal_per_mol =
+    hartree_to_kj_per_mol / 4.184;  // 1 Hartree in kcal/mol
+static constexpr double kcal_per_mol_to_hartree = 1.0 / hartree_to_kcal_per_mol;
+
+}  // namespace codata_2022
+
+/**
  * @namespace qdk::chemistry::constants::codata_2018
  * @brief CODATA 2018 recommended values for fundamental physical constants
  *
  * Constants from the 2018 CODATA recommended values of the fundamental physical
- * constants: https://physics.nist.gov/cuu/Constants/
+ * constants: https://physics.nist.gov/cuu/Constants/ :cite:`Tiesinga2021`.
  */
 namespace codata_2018 {
 
@@ -135,30 +178,42 @@ static constexpr double kj_per_mol_to_hartree = 1.0 / hartree_to_kj_per_mol;
 
 // Helper to determine current CODATA version in use
 constexpr const char* get_current_codata_version() {
-#if QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2014
-  return "CODATA 2014";
+#if QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2022
+  return "CODATA 2022";
 #elif QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2018
   return "CODATA 2018";
+#elif QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2014
+  return "CODATA 2014";
 #else
-  static_assert(false,
+  static_assert(QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2022 ||
+                    QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2018 ||
+                    QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2014,
                 "Unsupported QDK_CHEMISTRY_CODATA_VERSION. Supported versions: "
-                "QDK_CHEMISTRY_CODATA_2014, QDK_CHEMISTRY_CODATA_2018");
+                "QDK_CHEMISTRY_CODATA_2022, QDK_CHEMISTRY_CODATA_2018, "
+                "QDK_CHEMISTRY_CODATA_2014");
 #endif
 }
 
 // Use the selected CODATA version as default
+// To use CODATA 2022, define:
+//   #define QDK_CHEMISTRY_CODATA_VERSION QDK_CHEMISTRY_CODATA_2022 (default)
+// To use CODATA 2018, define:
+//   #define QDK_CHEMISTRY_CODATA_VERSION QDK_CHEMISTRY_CODATA_2018
 // To use CODATA 2014, define:
 //   #define QDK_CHEMISTRY_CODATA_VERSION QDK_CHEMISTRY_CODATA_2014
-// To use CODATA 2018, define:
-//   #define QDK_CHEMISTRY_CODATA_VERSION QDK_CHEMISTRY_CODATA_2018 (default)
-#if QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2014
-using namespace codata_2014;
+#if QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2022
+using namespace codata_2022;
 #elif QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2018
 using namespace codata_2018;
+#elif QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2014
+using namespace codata_2014;
 #else
-static_assert(false,
+static_assert(QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2022 ||
+                  QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2018 ||
+                  QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2014,
               "Unsupported QDK_CHEMISTRY_CODATA_VERSION. Supported versions: "
-              "QDK_CHEMISTRY_CODATA_2014, QDK_CHEMISTRY_CODATA_2018");
+              "QDK_CHEMISTRY_CODATA_2022, QDK_CHEMISTRY_CODATA_2018, "
+              "QDK_CHEMISTRY_CODATA_2014");
 #endif
 
 /**

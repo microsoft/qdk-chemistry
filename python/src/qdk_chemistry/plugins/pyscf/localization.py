@@ -10,10 +10,10 @@ orthogonality and physical character.
 
 Supported localization methods (selected via the settings `method`):
 
-* "pipek-mezey" (Pipek-Mezey, supports a configurable population analysis),
+* "pipek-mezey" :cite:`Boughton1993` (Pipek-Mezey, supports a configurable population analysis),
 * "foster-boys" (Foster-Boys),
 * "edmiston-ruedenberg" (Edmiston-Ruedenberg),
-* "cholseky" (Cholesky-based orthogonalization/localization).
+* "cholesky" (Cholesky-based orthogonalization/localization).
 
 This module registers a ``pyscf`` localizer with the QDK/Chemistry localizer registry at
 import time, making the functionality available via

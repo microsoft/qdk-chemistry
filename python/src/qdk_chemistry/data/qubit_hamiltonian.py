@@ -104,16 +104,6 @@ class QubitHamiltonian(DataClass):
             for group in sparse_pauli_ops
         ]
 
-    @property
-    def exact_energy(self) -> float | None:
-        """Compute the exact ground state energy via matrix diagonalization.
-
-        Returns:
-            float | None: The minimum eigenvalue if qubit count is small enough, else None.
-
-        """
-        return np.linalg.eigvalsh(self.pauli_ops.to_matrix()).min()
-
     # DataClass interface implementation
     def get_summary(self) -> str:
         """Get a human-readable summary of the qubit Hamiltonian.
@@ -123,10 +113,7 @@ class QubitHamiltonian(DataClass):
 
         """
         return (
-            f"Qubit Hamiltonian\n"
-            f"  Number of qubits: {self.num_qubits}\n"
-            f"  Number of terms: {len(self.pauli_strings)}\n"
-            f"  Exact energy: {self.exact_energy:.6f}"
+            f"Qubit Hamiltonian\n  Number of qubits: {self.num_qubits}\n  Number of terms: {len(self.pauli_strings)}\n"
         )
 
     def to_json(self) -> dict[str, Any]:

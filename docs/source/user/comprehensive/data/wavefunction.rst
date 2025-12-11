@@ -2,7 +2,7 @@ Wavefunction
 ============
 
 The :class:`~qdk_chemistry.data.Wavefunction` class in QDK/Chemistry represents quantum mechanical wavefunctions for molecular systems.
-This class provides access to wavefunction coefficients, determinants, reduced density matrices (RDMs), and other quantum chemical properties.
+This class provides access to wavefunction coefficients, determinants, reduced density matrices (RDMs), orbital entropies :cite:`Boguslawski2015`, and other quantum chemical properties.
 
 Overview
 --------
