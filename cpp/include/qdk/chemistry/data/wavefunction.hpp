@@ -285,8 +285,9 @@ class WavefunctionContainer {
 
   /**
    * @brief Calculate single orbital entropies for active orbitals only
-   * TODO(MM): add bibtex entry for https://doi.org/10.1002/qua.24832 to
-   * docstring
+   *
+   * This function uses the method of Boguslawski & Tecmer (2015),
+   * doi:10.1002/qua.24832, :cite:`Boguslawski2015`.
    * @return Vector of orbital entropies for active orbitals (always real)
    */
   virtual Eigen::VectorXd get_single_orbital_entropies() const;

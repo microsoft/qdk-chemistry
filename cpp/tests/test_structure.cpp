@@ -270,8 +270,10 @@ TEST_F(StructureBasicTest, EigenVectorProperties) {
   // Test that masses are Eigen::VectorXd
   const Eigen::VectorXd& masses = s.get_masses();
   EXPECT_EQ(masses.size(), 2);
-  EXPECT_GT(masses(0), 0.0);  // Should have positive mass
-  EXPECT_GT(masses(1), 0.0);  // Should have positive mass
+  EXPECT_NEAR(masses(0), 1.0080,
+              testing::numerical_zero_tolerance);  // Should have positive mass
+  EXPECT_NEAR(masses(1), 12.011,
+              testing::numerical_zero_tolerance);  // Should have positive mass
 
   // Test constructor with custom charges
   std::vector<double> custom_charges = {1.5, 6.5};  // Fractional charges
@@ -421,8 +423,10 @@ TEST_F(StructureBasicTest, StructureProperties) {
 
   const Eigen::VectorXd& masses = s.get_masses();
   EXPECT_EQ(masses.size(), 2);
-  EXPECT_GT(masses[0], 0.0);  // Should have positive mass
-  EXPECT_GT(masses[1], 0.0);  // Should have positive mass
+  EXPECT_NEAR(masses[0], 1.0080,
+              testing::numerical_zero_tolerance);  // Should have positive mass
+  EXPECT_NEAR(masses[1], 12.011,
+              testing::numerical_zero_tolerance);  // Should have positive mass
 
   const Eigen::VectorXd& charges = s.get_nuclear_charges();
   EXPECT_EQ(charges.size(), 2);
@@ -547,8 +551,12 @@ TEST_F(StructureBasicTest, JSONDeserializationEdgeCases) {
       {"elements", {1, 6}}};
   auto s3 = Structure::from_json(json_no_masses);
   EXPECT_EQ(s3->get_num_atoms(), 2);
-  EXPECT_GT(s3->get_atom_mass(0), 0.0);  // Should have standard H mass
-  EXPECT_GT(s3->get_atom_mass(1), 0.0);  // Should have standard C mass
+  EXPECT_NEAR(
+      s3->get_atom_mass(0), 1.0080,
+      testing::numerical_zero_tolerance);  // Should have standard H mass
+  EXPECT_NEAR(
+      s3->get_atom_mass(1), 12.011,
+      testing::numerical_zero_tolerance);  // Should have standard C mass
 
   // Test standard nuclear charges when not provided
   nlohmann::json json_no_nuclear_charges = {
@@ -683,17 +691,23 @@ TEST_F(StructureBasicTest, UtilityFunctionsAndEdgeCases) {
   EXPECT_NO_THROW(Structure::nuclear_charge_to_element(118));      // Oganesson
   EXPECT_EQ(Structure::nuclear_charge_to_element(6), Element::C);  // Carbon
 
-  // Test get_standard_atomic_mass with invalid element
+  // Test get_default_atomic_mass with invalid element
   // This is harder to test directly since Element enum only contains valid
   // elements But we can test it indirectly by using an extreme value
   Element invalid_element = static_cast<Element>(999);  // Invalid element
-  EXPECT_THROW(Structure::get_standard_atomic_mass(invalid_element),
+  EXPECT_THROW(Structure::get_default_atomic_mass(invalid_element),
                std::invalid_argument);
 
-  // Test get_standard_nuclear_charge
-  EXPECT_EQ(Structure::get_standard_nuclear_charge(Element::H), 1);
-  EXPECT_EQ(Structure::get_standard_nuclear_charge(Element::C), 6);
-  EXPECT_EQ(Structure::get_standard_nuclear_charge(Element::O), 8);
+  // Test get_default_atomic_mass with string parameters
+  EXPECT_THROW(Structure::get_default_atomic_mass("Zz120"),
+               std::invalid_argument);  // Invalid atomic symbol
+  EXPECT_THROW(Structure::get_default_atomic_mass("H999"),
+               std::invalid_argument);  // Invalid mass number
+
+  // Test get_default_nuclear_charge
+  EXPECT_EQ(Structure::get_default_nuclear_charge(Element::H), 1);
+  EXPECT_EQ(Structure::get_default_nuclear_charge(Element::C), 6);
+  EXPECT_EQ(Structure::get_default_nuclear_charge(Element::O), 8);
 
   // Test _validate_dimensions with inconsistent empty structure
   // This function is private, so we test it indirectly through constructor
@@ -1033,15 +1047,107 @@ TEST_F(StructureBasicTest, HDF5NumericalPrecision) {
 
     for (int j = 0; j < 3; ++j) {
       // Use very tight tolerance for precision test
-      EXPECT_NEAR(loaded_coords[j], orig_coords[j], 1e-14);
+      EXPECT_NEAR(loaded_coords[j], orig_coords[j],
+                  testing::numerical_zero_tolerance);
     }
 
     EXPECT_NEAR(loaded_precision->get_atom_mass(i),
-                precision_test.get_atom_mass(i), 1e-14);
+                precision_test.get_atom_mass(i),
+                testing::numerical_zero_tolerance);
     EXPECT_NEAR(loaded_precision->get_atom_nuclear_charge(i),
-                precision_test.get_atom_nuclear_charge(i), 1e-14);
+                precision_test.get_atom_nuclear_charge(i),
+                testing::numerical_zero_tolerance);
   }
 
   // Clean up
   std::filesystem::remove("test_precision.structure.h5");
+}
+
+// Test get_default_atomic_mass with Element
+TEST_F(StructureBasicTest, GetDefaultAtomicMassElement) {
+  // Test some common elements
+  double h_mass = Structure::get_default_atomic_mass(Element::H);
+  double c_mass = Structure::get_default_atomic_mass(Element::C);
+
+  EXPECT_NEAR(h_mass, 1.0080, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(c_mass, 12.011, testing::numerical_zero_tolerance);
+}
+
+// Test get_default_atomic_mass with string parameters
+TEST_F(StructureBasicTest, GetDefaultAtomicMassString) {
+  // Test standard atomic weights
+  double h_mass = Structure::get_default_atomic_mass("H");
+  double c_mass = Structure::get_default_atomic_mass("C");
+
+  EXPECT_NEAR(h_mass, 1.0080, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(c_mass, 12.011, testing::numerical_zero_tolerance);
+
+  // Test specific isotope masses
+  double h1_mass = Structure::get_default_atomic_mass("H1");
+  double h2_mass = Structure::get_default_atomic_mass("H2");
+  double h3_mass = Structure::get_default_atomic_mass("H3");
+  double c12_mass = Structure::get_default_atomic_mass("C12");
+  double c13_mass = Structure::get_default_atomic_mass("C13");
+
+  EXPECT_NEAR(h1_mass, 1.007825032, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(h2_mass, 2.014101778, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(h3_mass, 3.016049281, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(c12_mass, 12.0, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(c13_mass, 13.00335484, testing::numerical_zero_tolerance);
+
+  // Test deuterium and tritium aliases
+  double d_mass = Structure::get_default_atomic_mass("D");
+  double t_mass = Structure::get_default_atomic_mass("T");
+  EXPECT_NEAR(d_mass, h2_mass, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(t_mass, h3_mass, testing::numerical_zero_tolerance);
+}
+
+// Test Structure with isotope symbols in constructor
+TEST_F(StructureBasicTest, ConstructorWithIsotopeSymbols) {
+  // Test with isotope notation in symbols
+  std::vector<std::string> symbols = {"H1", "D", "C12", "O16"};
+  Eigen::MatrixXd coords(4, 3);
+  coords << 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 2.0, 0.0, 0.0, 3.0, 0.0, 0.0;
+
+  Structure s(coords, symbols);
+
+  EXPECT_EQ(s.get_num_atoms(), 4);
+
+  // Check that isotope-specific masses are used
+  EXPECT_NEAR(s.get_atom_mass(0), 1.007825032,
+              testing::numerical_zero_tolerance);  // H-1
+  EXPECT_NEAR(s.get_atom_mass(1), 2.014101778,
+              testing::numerical_zero_tolerance);  // D
+  EXPECT_NEAR(s.get_atom_mass(2), 12.0,
+              testing::numerical_zero_tolerance);  // C-12
+  EXPECT_NEAR(s.get_atom_mass(3), 15.99491462,
+              testing::numerical_zero_tolerance);  // O-16
+
+  // Check elements
+  EXPECT_EQ(s.get_atom_element(0), Element::H);
+  EXPECT_EQ(s.get_atom_element(1), Element::H);
+  EXPECT_EQ(s.get_atom_element(2), Element::C);
+  EXPECT_EQ(s.get_atom_element(3), Element::O);
+}
+
+// Test isotope extraction from symbols with mixed notation
+TEST_F(StructureBasicTest, MixedSymbolNotation) {
+  // Mix standard element symbols and isotope symbols
+  std::vector<std::string> symbols = {"H", "D", "C12", "O"};
+  Eigen::MatrixXd coords(4, 3);
+  coords << 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 2.0, 0.0, 0.0, 3.0, 0.0, 0.0;
+
+  Structure s(coords, symbols);
+
+  EXPECT_EQ(s.get_num_atoms(), 4);
+
+  // H should use standard atomic weight
+  EXPECT_NEAR(s.get_atom_mass(0), 1.0080, testing::numerical_zero_tolerance);
+  // D should use deuterium mass
+  EXPECT_NEAR(s.get_atom_mass(1), 2.014101778,
+              testing::numerical_zero_tolerance);
+  // C12 should use C-12 mass
+  EXPECT_NEAR(s.get_atom_mass(2), 12.0, testing::numerical_zero_tolerance);
+  // O should use standard atomic weight
+  EXPECT_NEAR(s.get_atom_mass(3), 15.999, testing::numerical_zero_tolerance);
 }

@@ -20,7 +20,6 @@ from qiskit.quantum_info import SparsePauliOp
 from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.statevector import create_statevector_from_wavefunction
 
 __all__ = ["filter_and_group_pauli_ops_from_wavefunction"]
 
@@ -104,24 +103,11 @@ class QubitHamiltonian(DataClass):
             for group in sparse_pauli_ops
         ]
 
-    @property
-    def exact_energy(self) -> float | None:
-        """Compute the exact ground state energy via matrix diagonalization.
-
-        Returns:
-            float | None: The minimum eigenvalue if qubit count is small enough, else None.
-
-        """
-        return np.linalg.eigvalsh(self.pauli_ops.to_matrix()).min()
-
     # DataClass interface implementation
     def get_summary(self) -> str:
         """Get a human-readable summary of the Hamiltonian."""
         return (
-            f"Qubit Hamiltonian\n"
-            f"  Number of qubits: {self.num_qubits}\n"
-            f"  Number of terms: {len(self.pauli_strings)}\n"
-            f"  Exact energy: {self.exact_energy:.6f}"
+            f"Qubit Hamiltonian\n  Number of qubits: {self.num_qubits}\n  Number of terms: {len(self.pauli_strings)}\n"
         )
 
     def to_json(self) -> dict[str, Any]:
@@ -319,8 +305,10 @@ def filter_and_group_pauli_ops_from_wavefunction(
             * A list of classical coefficients for terms that were reduced to classical contributions.
 
     """
+    from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction  # noqa: PLC0415
+
     Logger.trace_entering()
-    psi = create_statevector_from_wavefunction(wavefunction)
+    psi = create_statevector_from_wavefunction(wavefunction, normalize=True)
     return _filter_and_group_pauli_ops_from_statevector(
         hamiltonian, psi, abelian_grouping, trimming, trimming_tolerance
     )

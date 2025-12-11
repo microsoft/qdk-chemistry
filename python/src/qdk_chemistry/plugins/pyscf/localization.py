@@ -10,10 +10,10 @@ orthogonality and physical character.
 
 Supported localization methods (selected via the settings `method`):
 
-* "pipek-mezey" (Pipek-Mezey, supports a configurable population analysis),
+* "pipek-mezey" :cite:`Boughton1993` (Pipek-Mezey, supports a configurable population analysis),
 * "foster-boys" (Foster-Boys),
 * "edmiston-ruedenberg" (Edmiston-Ruedenberg),
-* "cholseky" (Cholesky-based orthogonalization/localization).
+* "cholesky" (Cholesky-based orthogonalization/localization).
 
 This module registers a ``pyscf`` localizer with the QDK/Chemistry localizer registry at
 import time, making the functionality available via
@@ -31,7 +31,7 @@ from pyscf import lo
 
 from qdk_chemistry.algorithms import OrbitalLocalizer
 from qdk_chemistry.data import Orbitals, SciWavefunctionContainer, Settings, SlaterDeterminantContainer, Wavefunction
-from qdk_chemistry.plugins.pyscf.utils import basis_to_pyscf_mol
+from qdk_chemistry.plugins.pyscf.conversion import basis_to_pyscf_mol
 from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfLocalizer", "PyscfLocalizerSettings"]
