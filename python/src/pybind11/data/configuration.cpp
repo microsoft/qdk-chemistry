@@ -77,6 +77,29 @@ Examples:
 
 )");
 
+  configuration.def("to_binary_strings", &Configuration::to_binary_strings,
+                    py::arg("num_orbitals"),
+                    R"(
+Convert configuration to separate alpha and beta binary strings.
+
+Parameters:
+    num_orbitals (int):
+
+        Number of spatial orbitals to use from the configuration
+
+Returns:
+    tuple[str, str]
+
+        Tuple of binary strings (alpha, beta) where '1' indicates occupied
+        and '0' indicates unoccupied for each spin channel
+
+Examples:
+    >>> config = qdk_chemistry.Configuration("2du0")
+    >>> print(config.to_binary_strings(4))
+    ("1010", "1100")
+
+)");
+
   bind_getter_as_property(configuration, "get_n_electrons",
                           &Configuration::get_n_electrons,
                           R"(
