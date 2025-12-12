@@ -20,21 +20,17 @@ class ControlledTimeEvolutionUnitary(DataClass):
     # TODO: Add serialization support in ControlledTimeEvolutionUnitary
     _serialization_version = "0.1.0"
 
-    def __init__(
-        self, time_evolution_unitary: TimeEvolutionUnitary, control_bit: int, system_qubits: list[int]
-    ) -> None:
+    def __init__(self, time_evolution_unitary: TimeEvolutionUnitary, control_index: int):
         """Initialize a ControlledTimeEvolutionUnitary.
 
         Args:
             time_evolution_unitary: The time evolution unitary to be controlled.
-            control_bit: The control bit index.
-            system_qubits: The list of system qubits indices.
+            control_index: The control bit index.
 
         """
         super().__init__()
         self.time_evolution_unitary = time_evolution_unitary
-        self.control_bit = control_bit
-        self.system_qubits = system_qubits
+        self.control_index = control_index
 
     def get_unitary_container_type(self) -> str:
         """Get the type of the time evolution unitary container.
@@ -44,3 +40,12 @@ class ControlledTimeEvolutionUnitary(DataClass):
 
         """
         return self.time_evolution_unitary.get_container_type()
+
+    def get_num_system_qubits(self) -> int:
+        """Get the number of system qubits.
+
+        Returns:
+            The number of qubits.
+
+        """
+        return self.time_evolution_unitary.get_num_qubits()

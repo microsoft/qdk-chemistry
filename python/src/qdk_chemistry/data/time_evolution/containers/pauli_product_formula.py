@@ -67,7 +67,11 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
     _data_type_name = "pauli_product_formula_container"
 
     def __init__(
-        self, step_terms: list[ExponentiatedPauliTerm], evolution_ordering: EvolutionOrdering, step_reps: int
+        self,
+        step_terms: list[ExponentiatedPauliTerm],
+        evolution_ordering: EvolutionOrdering,
+        step_reps: int,
+        num_qubits: int,
     ) -> None:
         """Initialize a PauliProductFormulaContainer.
 
@@ -75,6 +79,7 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
             step_terms: The list of exponentiated Pauli terms in a single step.
             evolution_ordering: A list of indices representing the order of evolution terms.
             step_reps: The number of repetitions of the single step.
+            num_qubits: The number of qubits the unitary acts on.
 
         """
         super().__init__()
@@ -82,6 +87,7 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
         evolution_ordering.validate_ordering(len(step_terms))
         self.evolution_ordering = evolution_ordering
         self.step_reps = step_reps
+        self._num_qubits = num_qubits
 
     @property
     def type(self) -> str:
@@ -92,6 +98,16 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
 
         """
         return "pauli_product_formula"
+
+    @property
+    def num_qubits(self) -> int:
+        """Get the number of qubits the time evolution unitary acts on.
+
+        Returns:
+            The number of qubits.
+
+        """
+        return self._num_qubits
 
     def set_ordering(self, evolution_ordering: EvolutionOrdering) -> None:
         """Set the evolution ordering.
@@ -113,11 +129,11 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
             The new state after applying the unitary.
 
         """
-        # Placeholder implementation
         new_state = state
-        for index in self.evolution_ordering.indices:
-            term = self.terms[index]
-            new_state = _apply_exponentiated_pauli_to_wavefunction(new_state, term)
+        for _ in range(self.step_reps):
+            for index in self.evolution_ordering.indices:
+                term = self.step_terms[index]
+                new_state = _apply_exponentiated_pauli_to_wavefunction(new_state, term)
         return new_state
 
 

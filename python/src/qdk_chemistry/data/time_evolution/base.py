@@ -24,6 +24,16 @@ class TimeEvolutionUnitaryContainer(ABC):
 
         """
 
+    @property
+    @abstractmethod
+    def num_qubits(self) -> int:
+        """Get the number of qubits the time evolution unitary acts on.
+
+        Returns:
+            The number of qubits.
+
+        """
+
     @abstractmethod
     def apply(self, state: Wavefunction) -> Wavefunction:
         """Apply the time evolution unitary to a given state.
@@ -78,3 +88,12 @@ class TimeEvolutionUnitary(DataClass):
 
         """
         return self._container.type
+
+    def get_num_qubits(self) -> int:
+        """Get the number of qubits the time evolution unitary acts on.
+
+        Returns:
+            The number of qubits.
+
+        """
+        return self._container.num_qubits

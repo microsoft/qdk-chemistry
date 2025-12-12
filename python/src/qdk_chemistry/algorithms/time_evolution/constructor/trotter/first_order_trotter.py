@@ -60,8 +60,13 @@ class FirstOrderTrotterConstructor(TimeEvolutionConstructor):
 
         terms, ordering = _decompose_trotter_step(qubit_hamiltonian, time=dt)
 
+        num_qubits = qubit_hamiltonian.num_qubits
+
         container = PauliProductFormulaContainer(
-            step_terms=terms, evolution_ordering=ordering, step_reps=self._settings.get("num_trotter_steps")
+            step_terms=terms,
+            evolution_ordering=ordering,
+            step_reps=self._settings.get("num_trotter_steps"),
+            num_qubits=num_qubits,
         )
 
         return TimeEvolutionUnitary(container=container)
@@ -121,8 +126,6 @@ def _decompose_trotter_step(
             )
 
         mapping = _pauli_label_to_map(pauli.to_label())
-        if not mapping:  # Identity: global phase, skipped
-            continue
 
         angle = float(coeff.real) * time
         terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))

@@ -1,0 +1,48 @@
+"""QDK/Chemistry controlled time evolution unitary circuit mapper abstractions."""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+from abc import abstractmethod
+
+from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
+from qdk_chemistry.data import Circuit
+from qdk_chemistry.data.time_evolution.controlled_time_evolution import ControlledTimeEvolutionUnitary
+
+
+class ControlledEvolutionCircuitMapper(Algorithm):
+    """Base class for controlled time evolution circuit mapper in QDK/Chemistry algorithms."""
+
+    def __init__(self):
+        """Initialize the ControlledEvolutionCircuitMapper."""
+        super().__init__()
+
+    def type_name(self) -> str:
+        """Return controlled_evolution_circuit_mapper as the algorithm type name."""
+        return "controlled_evolution_circuit_mapper"
+
+    @abstractmethod
+    def _run_impl(self, controlled_evolution: ControlledTimeEvolutionUnitary) -> Circuit:
+        """Construct a Circuit representing the controlled unitary for the given ControlledTimeEvolutionUnitary.
+
+        Args:
+            controlled_evolution (ControlledTimeEvolutionUnitary): The controlled time evolution unitary.
+
+        Returns:
+            Circuit: A Circuit representing the controlled unitary for the given ControlledTimeEvolutionUnitary.
+
+        """
+
+
+class ControlledEvolutionCircuitMapperFactory(AlgorithmFactory):
+    """Factory class for creating ControlledEvolutionCircuitMapper instances."""
+
+    def algorithm_type_name(self) -> str:
+        """Return controlled_evolution_circuit_mapper as the algorithm type name."""
+        return "controlled_evolution_circuit_mapper"
+
+    def default_algorithm_name(self) -> str:
+        """Return chain_structure as the default algorithm name."""
+        return "chain_structure"
