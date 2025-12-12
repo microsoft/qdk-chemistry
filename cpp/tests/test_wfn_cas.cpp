@@ -577,7 +577,7 @@ TEST_F(CasWavefunctionTest, SerializationRDMsUnrestricted) {
   auto ham_gen = HamiltonianConstructorFactory::create();
   auto H = ham_gen->run(wfn_default->get_orbitals());
 
-  // run ASCI with RDM calculation
+  // run CAS with RDM calculation
   auto mc = MultiConfigurationCalculatorFactory::create();
   mc->settings().set("calculate_one_rdm", true);
   mc->settings().set("calculate_two_rdm", true);
