@@ -173,8 +173,7 @@ class MeasurementData(DataClass):
 
     Attributes:
         hamiltonians (list[QubitHamiltonian]): List of QubitHamiltonian corresponding to the measurement data.
-        bitstring_counts (list[dict[str, int] | None] | None):
-            List of bitstring count dictionaries for each QubitHamiltonian.
+        bitstring_counts (list[dict[str, int] | None] | None): Bitstring count dictionaries for each QubitHamiltonian.
         shots_list (list[int] | None): List of number of shots used for each measurement.
 
     """
@@ -195,8 +194,7 @@ class MeasurementData(DataClass):
 
         Args:
             hamiltonians (list[QubitHamiltonian]): List of QubitHamiltonian objects.
-            bitstring_counts (list[dict[str, int] | None] | None):
-                List of bitstring count dictionaries for each QubitHamiltonian.
+            bitstring_counts (list[dict[str, int] | None] | None): Bitstring count dicts for each QubitHamiltonian.
             shots_list (list[int] | None): List of number of shots used for each measurement.
 
         """

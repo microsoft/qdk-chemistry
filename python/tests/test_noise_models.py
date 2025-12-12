@@ -68,7 +68,7 @@ def test_quantum_error_profile_from_yaml_file_not_found():
         QuantumErrorProfile.from_yaml_file("non_existent_file.yaml")
 
 
-def test_quantum_error_profile_from_empty_yaml_file():
+def test_quantum_error_profile_from_yaml_file_empty():
     """Test loading from empty YAML file."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write("")  # Empty file

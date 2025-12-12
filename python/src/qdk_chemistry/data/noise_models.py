@@ -162,32 +162,30 @@ class QuantumErrorProfile(DataClass):
         self,
         name: str | None = None,
         description: str | None = None,
-        errors: dict[SupportedGate | str, GateErrorDef | dict[str, Any]] | None = None,
+        errors: dict[SupportedGate, GateErrorDef] | None = None,
     ) -> None:
         """Initialize a QuantumErrorProfile.
 
         Args:
             name (str | None): Name of the quantum error profile.
             description (str | None): Description of what the error profile represents.
-            errors (dict[SupportedGate | str, GateErrorDef | dict[str, Any]] | None):
-                Dictionary mapping supported gate names to their error definitions.
+            errors (dict | None): Dictionary mapping supported gate names to their error definitions.
 
         """
-        self.name: str = "default"
-        if name is not None:
-            self.name = name
-        self.description: str = "No description provided"
-        if description is not None:
-            self.description = description
+        self.name: str = "default" if name is None else name
+        self.description: str = "No description provided" if description is None else description
         self.errors: dict[SupportedGate, GateErrorDef] = {}
         if errors is not None:
+            # Check types
             for gate_key, error_dict in errors.items():
-                gate = SupportedGate(gate_key) if isinstance(gate_key, str) else gate_key
+                gate = gate_key if isinstance(gate_key, SupportedGate) else SupportedGate(gate_key)
                 if isinstance(error_dict, dict):
-                    if isinstance(error_dict["type"], str):
-                        error_type = SupportedErrorTypes(error_dict["type"])
-                    else:
+                    if isinstance(error_dict["type"], SupportedErrorTypes):
                         error_type = error_dict["type"]
+                    else:
+                        error_type = SupportedErrorTypes(error_dict["type"])
+                    assert isinstance(error_dict["rate"], float)
+                    assert isinstance(error_dict["num_qubits"], int)
                     self.errors[gate] = GateErrorDef(
                         type=error_type,
                         rate=error_dict["rate"],
@@ -375,7 +373,21 @@ class QuantumErrorProfile(DataClass):
 
         """
         cls._validate_json_version(cls._serialization_version, json_data)
-        return cls(name=json_data.get("name"), description=json_data.get("description"), errors=json_data.get("errors"))
+
+        name = json_data.get("name")
+        description = json_data.get("description")
+        errors: dict[SupportedGate, GateErrorDef] = {}
+
+        json_errors = json_data.get("errors")
+        if json_errors is not None:
+            for gate, error_dict in json_errors.items():
+                errors[SupportedGate(gate)] = GateErrorDef(
+                    type=SupportedErrorTypes(error_dict["type"]),
+                    rate=error_dict["rate"],
+                    num_qubits=error_dict["num_qubits"],
+                )
+
+        return cls(name=name, description=description, errors=errors)
 
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> "QuantumErrorProfile":
@@ -391,7 +403,10 @@ class QuantumErrorProfile(DataClass):
             RuntimeError: If version attribute is missing or incompatible.
 
         """
-        cls._validate_hdf5_version(cls._serialization_version, group)
-        # Deserialize errors from JSON string
-        errors_dict = json.loads(group.attrs["errors"])
-        return cls(name=group.attrs["name"], description=group.attrs["description"], errors=errors_dict)
+        data = {
+            "version": group.attrs["version"],
+            "name": group.attrs["name"],
+            "description": group.attrs["description"],
+            "errors": json.loads(group.attrs["errors"]),  # Deserialize errors from JSON string
+        }
+        return cls.from_json(data)
