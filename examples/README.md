@@ -12,6 +12,22 @@ This directory contains example scripts demonstrating how to use QDK/Chemistry f
 
 ## Examples of interoperability with other quantum computing frameworks
 
-- `pennylane`: Example programs demonstrating [PennyLane](https://pennylane.ai/) interoperability with QDK/Chemistry.
-- `qiskit`: Example programs demonstrating [Qiskit](https://qiskit.org/) interoperability with QDK/Chemistry.
-- `qsharp`: Example programs demonstrating [Q#](https://github.com/microsoft/qdk) interoperability with QDK/Chemistry.
+### PennyLane
+
+The [`pennylane`](pennylane) directory contains example programs demonstrating interoperability between QDK/Chemistry and [PennyLane](https://pennylane.ai/), including:
+
+- [`qpe_no_trotter.py`](pennylane/qpe_no_trotter.py): Example of Quantum Phase Estimation (QPE) without Trotterization using PennyLane and QDK/Chemistry.
+
+### Qiskit
+
+The [`qiskit`](qiskit) directory contains example programs demonstrating interoperability between QDK/Chemistry and [Qiskit](https://qiskit.org/), including:
+
+- [`iqpe_model_hamiltonian.py`](qiskit/iqpe_model_hamiltonian.py): Example of Iterative Quantum Phase Estimation (IQPE) using a model Hamiltonian with Qiskit and QDK/Chemistry.
+- [`iqpe_no_trotter.py`](qiskit/iqpe_no_trotter.py): Example of Iterative Quantum Phase Estimation (IQPE) without Trotterization using Qiskit and QDK/Chemistry.
+- [`iqpe_trotter.py`](qiskit/iqpe_trotter.py): Example of Iterative Quantum Phase Estimation (IQPE) with Trotterization using Qiskit and QDK/Chemistry.
+
+### Q\#
+
+The [`qsharp`](qsharp) directory contains example programs demonstrating interoperability between QDK/Chemistry and [Q#](https://github.com/microsoft/qdk), including:
+
+- [`iqpe_no_trotter.qs`](qsharp/iqpe_no_trotter.qs): Example of Iterative Quantum Phase Estimation (IQPE) without Trotterization using Q#.
