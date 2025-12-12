@@ -46,32 +46,30 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   utils::microsoft::initialize_backend();
 
   // check basis_or_guess type
-  bool use_input_initial_guess = false;
-  bool use_explicit_basis_set = false;
-  bool use_basis_set_string = false;
+  enum class BasisSetType { Explicit, FromString, FromOrbitals };
+  BasisSetType basis_set_type;
+
   std::string basis_set_name;
-  if (std::holds_alternative<std::shared_ptr<data::Orbitals>>(
-          basis_or_guess)) {
-    basis_set_name =
-        std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess)
-            ->get_basis_set()
-            ->get_name();
-    use_input_initial_guess = true;
+  if (std::holds_alternative<std::shared_ptr<data::Orbitals>>(basis_or_guess)) {
+    basis_set_name = std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess)
+                         ->get_basis_set()
+                         ->get_name();
+    basis_set_type = BasisSetType::FromOrbitals;
   } else if (std::holds_alternative<std::shared_ptr<data::BasisSet>>(
                  basis_or_guess)) {
     basis_set_name =
-        std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess)
-            ->get_name();
-    use_explicit_basis_set = true;
+        std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess)->get_name();
+    basis_set_type = BasisSetType::Explicit;
   } else if (std::holds_alternative<std::string>(basis_or_guess)) {
     basis_set_name = std::get<std::string>(basis_or_guess);
+    basis_set_type = BasisSetType::FromString;
   }
   std::transform(basis_set_name.begin(), basis_set_name.end(),
                  basis_set_name.begin(), ::tolower);
 
   std::shared_ptr<data::BasisSet> qdk_raw_basis_set = nullptr;
-  if (basis_set_name == data::BasisSet::custom_name || use_explicit_basis_set) {
-    use_explicit_basis_set = true;
+  if (basis_set_name == data::BasisSet::custom_name ||
+      basis_set_type == BasisSetType::Explicit) {
     qdk_raw_basis_set =
         std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess);
   }
@@ -112,7 +110,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     unrestricted = open_shell;
   } else if (scf_type == "unrestricted") {
     unrestricted = true;
-    if (!open_shell && !use_input_initial_guess) {
+    if (!open_shell && basis_set_type != BasisSetType::FromOrbitals) {
       QDK_LOGGER().warn(
           "Unrestricted reference requested for closed-shell system. "
           "Automatic spin symmetry breaking is not supported. "
@@ -147,7 +145,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   auto ms_mol = qdk::chemistry::utils::microsoft::convert_to_molecule(
       *structure, charge, multiplicity);
   // update atomic charges for ECPs
-  if (use_explicit_basis_set) {
+  if (basis_set_type == BasisSetType::Explicit) {
     // iterate through atoms and adjust charges
     auto ecp_electrons = qdk_raw_basis_set->get_ecp_electrons();
     for (size_t i = 0; i < ms_mol->n_atoms; ++i) {
@@ -174,8 +172,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // Set density initialization method based on whether initial guess is
   // provided
   ms_scf_config->density_init_method =
-      use_input_initial_guess ? qcs::DensityInitializationMethod::UserProvided
-                              : qcs::DensityInitializationMethod::Atom;
+      basis_set_type == BasisSetType::FromOrbitals
+          ? qcs::DensityInitializationMethod::UserProvided
+          : qcs::DensityInitializationMethod::Atom;
 
   // Configure ERI method from settings
   std::string eri_method = _settings->get<std::string>("eri_method");
@@ -240,26 +239,32 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // Disable SCF logging
   Logger::set_global_level(LogLevel::off);
 
-  auto scf = (method == "hf")
-                 ? (use_explicit_basis_set)
-                       ? qcs::SCF::make_hf_solver(
-                             ms_mol, *ms_scf_config,
-                             utils::microsoft::convert_basis_set_from_qdk(
-                                 *qdk_raw_basis_set),
-                             utils::microsoft::convert_basis_set_from_qdk(
-                                 *qdk_raw_basis_set, true))
-                       : qcs::SCF::make_hf_solver(ms_mol, *ms_scf_config)
-             : (use_explicit_basis_set)
-                 ? qcs::SCF::make_ks_solver(
-                       ms_mol, *ms_scf_config,
-                       utils::microsoft::convert_basis_set_from_qdk(
-                           *qdk_raw_basis_set),
-                       utils::microsoft::convert_basis_set_from_qdk(
-                           *qdk_raw_basis_set, true))
-                 : qcs::SCF::make_ks_solver(ms_mol, *ms_scf_config);
+  // Create SCF solver based on method and basis set type
+  std::shared_ptr<qcs::SCF> scf;
+  if (method == "hf") {
+    if (basis_set_type == BasisSetType::Explicit) {
+      scf = qcs::SCF::make_hf_solver(
+          ms_mol, *ms_scf_config,
+          utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set),
+          utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set,
+                                                       false));
+    } else {
+      scf = qcs::SCF::make_hf_solver(ms_mol, *ms_scf_config);
+    }
+  } else {
+    if (basis_set_type == BasisSetType::Explicit) {
+      scf = qcs::SCF::make_ks_solver(
+          ms_mol, *ms_scf_config,
+          utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set),
+          utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set,
+                                                       false));
+    } else {
+      scf = qcs::SCF::make_ks_solver(ms_mol, *ms_scf_config);
+    }
+  }
 
   // Extract the basis set
-  if (!use_explicit_basis_set) {
+  if (basis_set_type != BasisSetType::Explicit) {
     qdk_raw_basis_set = std::make_shared<qdk::chemistry::data::BasisSet>(
         utils::microsoft::convert_basis_set_to_qdk(
             *scf->context().basis_set_raw));
@@ -294,7 +299,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
   // If initial guess is provided, compute density matrix and
   // create new SCF solver
-  if (use_input_initial_guess) {
+  if (basis_set_type == BasisSetType::FromOrbitals) {
     auto initial_guess =
         std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess);
     auto [coeff_alpha, coeff_beta] = initial_guess->get_coefficients();

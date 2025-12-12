@@ -515,8 +515,12 @@ TEST(AtomGuessTest, CompareWithFileGuess) {
       }
     }
 
+    // get default SCF conv thresh
+    auto config = SCFConfig();
+    double conv_thresh = config.scf_algorithm.density_threshold;
+
     // Compare the two matrices
-    EXPECT_TRUE(tD_generated.isApprox(tD_from_file, 1e-7))
+    EXPECT_TRUE(tD_generated.isApprox(tD_from_file, conv_thresh))
         << "Generated density matrix differs from file-based density matrix";
   }
 }

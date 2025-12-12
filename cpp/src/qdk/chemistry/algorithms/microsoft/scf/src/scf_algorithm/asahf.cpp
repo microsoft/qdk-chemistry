@@ -206,7 +206,7 @@ std::shared_ptr<Molecule> make_atomic_molecule(int atomic_number) {
  * @param mol atomic structure
  * @return Shared pointer to the created atomic BasisSet
  */
-std::shared_ptr<BasisSet> make_atom_basis_set(int index,
+std::shared_ptr<BasisSet> make_atom_basis_set(size_t index,
                                               const BasisSet& basis_set,
                                               std::shared_ptr<Molecule> mol) {
   std::vector<Shell> shells;
@@ -215,23 +215,27 @@ std::shared_ptr<BasisSet> make_atom_basis_set(int index,
   std::unordered_map<int, int> ecp_electrons;
 
   // Filter shells belonging to the specified atomic number
-  for (const auto& shell : basis_set.shells) {
-    if (shell.atom_index == index) {
-      Shell tmp_shell = shell;
-      tmp_shell.O = {0.0, 0.0, 0.0};  // reset center for single atom
-      tmp_shell.atom_index = 0;       // reset atom index for single atom
-      shells.push_back(tmp_shell);
-    }
+  std::copy_if(basis_set.shells.begin(), basis_set.shells.end(),
+               std::back_inserter(shells), [index](const Shell& shell) {
+                 return shell.atom_index == index;
+               });
+
+  // Reset center and atom index for single atom basis
+  for (auto& shell : shells) {
+    shell.O = {0.0, 0.0, 0.0};
+    shell.atom_index = 0;
   }
 
   // Filter ECP shells belonging to the specified atomic number
-  for (const auto& shell : basis_set.ecp_shells) {
-    if (shell.atom_index == index) {
-      Shell tmp_shell = shell;
-      tmp_shell.atom_index = 0;       // reset atom index for single atom
-      tmp_shell.O = {0.0, 0.0, 0.0};  // reset center for single atom
-      ecp_shells.push_back(tmp_shell);
-    }
+  std::copy_if(basis_set.ecp_shells.begin(), basis_set.ecp_shells.end(),
+               std::back_inserter(ecp_shells), [index](const Shell& shell) {
+                 return shell.atom_index == index;
+               });
+
+  // Reset center and atom index for single atom ECP basis
+  for (auto& shell : ecp_shells) {
+    shell.O = {0.0, 0.0, 0.0};
+    shell.atom_index = 0;
   }
 
   // get element from mol to get the ecp electrons from map
@@ -246,7 +250,7 @@ std::shared_ptr<BasisSet> make_atom_basis_set(int index,
   // Create a new BasisSet for the atom
   return std::shared_ptr<BasisSet>(
       new BasisSet(mol, shells, ecp_shells, ecp_electrons, total_ecp_electrons,
-                   basis_set.mode, basis_set.pure, true));
+                   BasisMode::RAW, basis_set.pure, false));
 }
 }  // namespace detail
 
@@ -261,8 +265,6 @@ void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
   SCFConfig cfg;
   cfg.mpi = qdk::chemistry::scf::mpi_default_input();
   cfg.scf_algorithm.max_iteration = 100;
-  cfg.scf_algorithm.og_threshold = 1e-6;
-  cfg.scf_algorithm.density_threshold = 1e-6;
   cfg.scf_algorithm.method = SCFAlgorithmName::ASAHF;
   cfg.density_init_method = DensityInitializationMethod::Core;
   cfg.require_gradient = false;
@@ -276,10 +278,9 @@ void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
   for (size_t i = 0, p = 0; i < mol.n_atoms; ++i) {
     auto atom_num = mol.atomic_nums[i];
     // create atomic molecule and basis set
-    std::shared_ptr<Molecule> atom_mol =
-        detail::make_atomic_molecule(static_cast<int>(atom_num));
+    std::shared_ptr<Molecule> atom_mol = detail::make_atomic_molecule(atom_num);
     std::shared_ptr<BasisSet> atom_basis_set =
-        detail::make_atom_basis_set(static_cast<int>(i), basis_set, atom_mol);
+        detail::make_atom_basis_set(i, basis_set, atom_mol);
     // Create SCF solver with basis sets
     SCFImpl scf_solver(atom_mol, cfg, atom_basis_set, atom_basis_set, false,
                        true);

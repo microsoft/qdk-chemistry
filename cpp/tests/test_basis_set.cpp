@@ -1718,3 +1718,44 @@ TEST_F(BasisSetTest, FromIndexMapInvalidBasisSet) {
   EXPECT_THROW(BasisSet::from_index_map(index_map, structure),
                std::invalid_argument);
 }
+
+// Test basis set name normalization for filesystem safety
+TEST_F(BasisSetTest, BasisSetNameNormalization) {
+  // These functions are in the detail namespace and need to be declared
+  // or we need to make them accessible for testing
+  namespace detail = qdk::chemistry::data::detail;
+
+  // Test normalization of special characters
+  EXPECT_EQ("6-31g_st_", detail::normalize_basis_set_name("6-31g*"));
+  EXPECT_EQ("6-31g_st__pl_", detail::normalize_basis_set_name("6-31g*+"));
+  EXPECT_EQ("6-31g_st__pl__pl_", detail::normalize_basis_set_name("6-31g*++"));
+  EXPECT_EQ("cc-pVTZ_sl_DK", detail::normalize_basis_set_name("cc-pVTZ/DK"));
+  EXPECT_EQ("def2-TZVP_pl_", detail::normalize_basis_set_name("def2-TZVP+"));
+
+  // Test denormalization reverses normalization
+  EXPECT_EQ("6-31g*", detail::denormalize_basis_set_name("6-31g_st_"));
+  EXPECT_EQ("6-31g*+", detail::denormalize_basis_set_name("6-31g_st__pl_"));
+  EXPECT_EQ("6-31g*++",
+            detail::denormalize_basis_set_name("6-31g_st__pl__pl_"));
+  EXPECT_EQ("cc-pVTZ/DK", detail::denormalize_basis_set_name("cc-pVTZ_sl_DK"));
+  EXPECT_EQ("def2-TZVP+", detail::denormalize_basis_set_name("def2-TZVP_pl_"));
+
+  // Test round-trip conversion
+  std::vector<std::string> test_names = {
+      "6-31g*",    "6-31g**",    "6-31g*+",    "6-31g*++",
+      "6-311+g*",  "6-311++g**", "cc-pVTZ/DK", "aug-cc-pVTZ/DK",
+      "def2-TZVP", "def2-TZVP+", "def2-TZVPP"};
+
+  for (const auto& name : test_names) {
+    std::string normalized = detail::normalize_basis_set_name(name);
+    std::string denormalized = detail::denormalize_basis_set_name(normalized);
+    EXPECT_EQ(name, denormalized)
+        << "Round-trip failed for basis set name: " << name;
+  }
+
+  // Test that normal names without special characters pass through unchanged
+  EXPECT_EQ("sto-3g", detail::normalize_basis_set_name("sto-3g"));
+  EXPECT_EQ("sto-3g", detail::denormalize_basis_set_name("sto-3g"));
+  EXPECT_EQ("def2-TZVP", detail::normalize_basis_set_name("def2-TZVP"));
+  EXPECT_EQ("def2-TZVP", detail::denormalize_basis_set_name("def2-TZVP"));
+}

@@ -12,6 +12,7 @@
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -329,13 +330,13 @@ class BasisSet : public DataClass,
   BasisSet& operator=(BasisSet&& other) noexcept = default;
 
   /** @brief Name for custom basis sets */
-  inline const static std::string custom_name = "custom_basis_set";
+  static constexpr std::string_view custom_name = "custom_basis_set";
 
   /** @brief Name for custom ecps */
-  inline const static std::string custom_ecp_name = "custom_ecp";
+  static constexpr std::string_view custom_ecp_name = "custom_ecp";
 
   /** @brief Default name for default ecp */
-  inline const static std::string default_ecp_name = "default_ecp";
+  static constexpr std::string_view default_ecp_name = "default_ecp";
 
   /**
    * @brief Get supported basis set names
@@ -362,7 +363,7 @@ class BasisSet : public DataClass,
    */
   static std::shared_ptr<BasisSet> from_basis_name(
       const std::string& basis_name, const Structure& structure,
-      const std::string& ecp_name = default_ecp_name,
+      const std::string& ecp_name = std::string(default_ecp_name),
       AOType atomic_orbital_type = AOType::Spherical);
 
   /**
@@ -376,7 +377,7 @@ class BasisSet : public DataClass,
    */
   static std::shared_ptr<BasisSet> from_basis_name(
       std::string basis_name, std::shared_ptr<Structure> structure,
-      std::string ecp_name = default_ecp_name,
+      std::string ecp_name = std::string(default_ecp_name),
       AOType atomic_orbital_type = AOType::Spherical);
 
   /**
@@ -922,5 +923,29 @@ class BasisSet : public DataClass,
 static_assert(DataClassCompliant<BasisSet>,
               "BasisSet must derive from DataClass and implement all required "
               "deserialization methods");
+
+namespace detail {
+/**
+ * @brief Normalize basis set name for filesystem usage.
+ * Replaces special characters that are problematic in filenames:
+ * - '*' -> '_st_' (star)
+ * - '/' -> '_sl_' (slash)
+ * - '+' -> '_pl_' (plus)
+ * @param name Original basis set name (e.g., "6-31g*+")
+ * @return Normalized name safe for filesystem (e.g., "6-31g_st__pl_")
+ */
+std::string normalize_basis_set_name(const std::string& name);
+
+/**
+ * @brief Denormalize basis set name from filesystem representation.
+ * Reverses the normalization:
+ * - '_st_' -> '*'
+ * - '_sl_' -> '/'
+ * - '_pl_' -> '+'
+ * @param normalized Normalized name from filesystem
+ * @return Original basis set name
+ */
+std::string denormalize_basis_set_name(const std::string& normalized);
+}  // namespace detail
 
 }  // namespace qdk::chemistry::data

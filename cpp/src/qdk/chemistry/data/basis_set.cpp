@@ -10,6 +10,7 @@
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <regex>
 #include <sstream>
 #include <stdexcept>
 
@@ -21,6 +22,20 @@ namespace qdk::chemistry::data {
 
 namespace detail {
 
+std::string normalize_basis_set_name(const std::string& name) {
+  std::string normalized = std::regex_replace(name, std::regex("\\*"), "_st_");
+  normalized = std::regex_replace(normalized, std::regex("/"), "_sl_");
+  normalized = std::regex_replace(normalized, std::regex("\\+"), "_pl_");
+  return normalized;
+}
+
+std::string denormalize_basis_set_name(const std::string& normalized) {
+  std::string name = std::regex_replace(normalized, std::regex("_st_"), "*");
+  name = std::regex_replace(name, std::regex("_sl_"), "/");
+  name = std::regex_replace(name, std::regex("_pl_"), "+");
+  return name;
+}
+
 /**
  * @brief Unpack the basis set archive and return the path to the temporary
  * directory containing the extracted files.
@@ -28,9 +43,11 @@ namespace detail {
  * @return Path to the temporary directory with extracted files.
  */
 std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
+  // Normalize the basis set name for filesystem operations
+  std::string normalized_name = normalize_basis_set_name(basis_set_name);
   std::filesystem::path file_path =
       qdk::chemistry::scf::QDKChemistryConfig::get_resources_dir() /
-      "compressed" / (basis_set_name + ".tar.gz");
+      "compressed" / (normalized_name + ".tar.gz");
 
   if (!std::filesystem::exists(file_path)) {
     throw std::invalid_argument("Basis set file does not exist: " +
@@ -64,9 +81,11 @@ std::filesystem::path get_correct_basis_set_file(std::string& basis_set_name) {
   // unpack basis set archive
   std::filesystem::path temp_dir = unpack_basis_set_archive(basis_set_name);
 
+  // Normalize the basis set name for the JSON file path
+  std::string normalized_name = normalize_basis_set_name(basis_set_name);
   // return path to the extracted JSON file
   std::filesystem::path json_file_path =
-      temp_dir / "basis" / (basis_set_name + ".json");
+      temp_dir / "basis" / (normalized_name + ".json");
   if (!std::filesystem::exists(json_file_path)) {
     throw std::invalid_argument("Basis set JSON file does not exist: " +
                                 json_file_path.string());
@@ -214,7 +233,7 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    AOType atomic_orbital_type)
     : _name(name),
       _atomic_orbital_type(atomic_orbital_type),
-      _ecp_name(BasisSet::default_ecp_name) {
+      _ecp_name(std::string(BasisSet::default_ecp_name)) {
   QDK_LOG_TRACE_ENTERING();
   // Organize shells by atom index
   for (const auto& shell : shells) {
@@ -474,9 +493,11 @@ std::vector<std::string> BasisSet::get_supported_basis_set_names() {
     if (entry.is_regular_file()) {
       auto path = entry.path();
       if (path.extension() == ".gz" && path.stem().extension() == ".tar") {
-        // extract basis set name from filename
+        // extract basis set name from filename and denormalize it
         std::string filename = path.stem().stem().string();
-        basis_set_names.push_back(filename);
+        std::string denormalized_name =
+            detail::denormalize_basis_set_name(filename);
+        basis_set_names.push_back(denormalized_name);
       }
     }
   }
@@ -749,8 +770,9 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
                            all_ecp_shells.end());
 
   return std::make_shared<BasisSet>(
-      BasisSet::custom_name, sorted_basis_shells, BasisSet::custom_ecp_name,
-      sorted_ecp_shells, all_ecp_electrons, structure, atomic_orbital_type);
+      std::string(BasisSet::custom_name), sorted_basis_shells,
+      std::string(BasisSet::custom_ecp_name), sorted_ecp_shells,
+      all_ecp_electrons, structure, atomic_orbital_type);
 }
 
 BasisSet::BasisSet(const BasisSet& other)

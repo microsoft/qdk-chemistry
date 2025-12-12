@@ -125,15 +125,16 @@ std::shared_ptr<BasisSet> BasisSet::from_database_json(
   return std::shared_ptr<BasisSet>(new BasisSet(mol, path, mode, pure, sort));
 }
 
-BasisSet::BasisSet(std::shared_ptr<Molecule> mol, std::vector<Shell> shells,
-                   std::vector<Shell> ecp_shells,
-                   std::unordered_map<int, int> element_ecp_electrons,
+BasisSet::BasisSet(std::shared_ptr<Molecule> mol,
+                   const std::vector<Shell>& input_shells,
+                   const std::vector<Shell>& input_ecp_shells,
+                   const std::unordered_map<int, int>& element_ecp_electrons,
                    int n_ecp_electrons, BasisMode mode, bool pure, bool sort)
     : mol(mol),
       mode(mode),
       pure(pure),
-      shells(shells),
-      ecp_shells(ecp_shells),
+      shells(input_shells),
+      ecp_shells(input_ecp_shells),
       element_ecp_electrons(element_ecp_electrons),
       n_ecp_electrons(n_ecp_electrons) {
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
@@ -142,18 +143,18 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, std::vector<Shell> shells,
   }
 #endif
   if (mode == BasisMode::PSI4) {
-    norm_psi4_mode(shells);
+    norm_psi4_mode(this->shells);
   }  // RAW branch doesn't normalize
 
   if (sort) {
-    std::stable_sort(shells.begin(), shells.end(),
+    std::stable_sort(this->shells.begin(), this->shells.end(),
                      [](const auto& x, const auto& y) {
                        return x.angular_momentum != y.angular_momentum
                                   ? x.angular_momentum < y.angular_momentum
                                   : x.contraction < y.contraction;
                      });
 
-    std::stable_sort(ecp_shells.begin(), ecp_shells.end(),
+    std::stable_sort(this->ecp_shells.begin(), this->ecp_shells.end(),
                      [](const auto& x, const auto& y) {
                        return x.angular_momentum != y.angular_momentum
                                   ? x.angular_momentum < y.angular_momentum
@@ -162,7 +163,8 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, std::vector<Shell> shells,
   }
 
   num_atomic_orbitals = std::accumulate(
-      shells.begin(), shells.end(), 0, [&pure](auto sum, const auto& sh) {
+      this->shells.begin(), this->shells.end(), 0,
+      [&pure](auto sum, const auto& sh) {
         int sz = 0;
         if (pure) {
           sz = 2 * sh.angular_momentum + 1;
@@ -176,24 +178,25 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, std::vector<Shell> shells,
   calc_atom2ao();
 
   if (libint2::initialized()) {
-    shell_pairs_ = OneBodyIntegral::compute_shell_pairs(shells);
+    shell_pairs_ = OneBodyIntegral::compute_shell_pairs(this->shells);
   }
 }
 
-BasisSet::BasisSet(std::shared_ptr<Molecule> mol, std::vector<Shell> shells,
-                   BasisMode mode, bool pure, bool sort)
-    : mol(mol), mode(mode), pure(pure), shells(shells) {
+BasisSet::BasisSet(std::shared_ptr<Molecule> mol,
+                   const std::vector<Shell>& input_shells, BasisMode mode,
+                   bool pure, bool sort)
+    : mol(mol), mode(mode), pure(pure), shells(input_shells) {
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
   if (mpi::get_world_size() > 1) {
     MPI_Barrier(MPI_COMM_WORLD);
   }
 #endif
   if (mode == BasisMode::PSI4) {
-    norm_psi4_mode(shells);
+    norm_psi4_mode(this->shells);
   }  // RAW branch doesn't normalize
 
   if (sort) {
-    std::stable_sort(shells.begin(), shells.end(),
+    std::stable_sort(this->shells.begin(), this->shells.end(),
                      [](const auto& x, const auto& y) {
                        return x.angular_momentum != y.angular_momentum
                                   ? x.angular_momentum < y.angular_momentum
@@ -202,7 +205,8 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, std::vector<Shell> shells,
   }
 
   num_atomic_orbitals = std::accumulate(
-      shells.begin(), shells.end(), 0, [&pure](auto sum, const auto& sh) {
+      this->shells.begin(), this->shells.end(), 0,
+      [&pure](auto sum, const auto& sh) {
         int sz = 0;
         if (pure) {
           sz = 2 * sh.angular_momentum + 1;
@@ -216,7 +220,7 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, std::vector<Shell> shells,
   calc_atom2ao();
 
   if (libint2::initialized()) {
-    shell_pairs_ = OneBodyIntegral::compute_shell_pairs(shells);
+    shell_pairs_ = OneBodyIntegral::compute_shell_pairs(this->shells);
   }
 }
 

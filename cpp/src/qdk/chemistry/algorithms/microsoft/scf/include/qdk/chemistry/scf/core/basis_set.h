@@ -172,18 +172,18 @@ class BasisSet {
    * @brief Constructor for basis set from shells
    *
    * @param mol Molecular structure
-   * @param inp_shells Input shells
+   * @param input_shells Input shells
    * @param mode Normalization convention
    * @param pure Whether to use spherical harmonics
    * @param sort Whether to sort shells
    */
   explicit BasisSet(std::shared_ptr<Molecule> mol,
-                    std::vector<Shell> inp_shells, BasisMode mode, bool pure,
-                    bool sort);
+                    const std::vector<Shell>& input_shells, BasisMode mode,
+                    bool pure, bool sort);
   /**
    * @brief Constructor for basis set from shells with ECPs
    * @param mol Molecular structure
-   * @param shells Orbital atomic orbital shells
+   * @param input_shells Orbital atomic orbital shells
    * @param ecp_shells Effective core potential shells
    * @param element_ecp_electrons Map from atomic number to ECP electron number
    * @param n_ecp_electrons Total number of core electrons replaced by ECPs
@@ -191,9 +191,10 @@ class BasisSet {
    * @param pure Whether to use spherical harmonics
    * @param sort Whether to sort shells
    */
-  explicit BasisSet(std::shared_ptr<Molecule> mol, std::vector<Shell> shells,
-                    std::vector<Shell> ecp_shells,
-                    std::unordered_map<int, int> element_ecp_electrons,
+  explicit BasisSet(std::shared_ptr<Molecule> mol,
+                    const std::vector<Shell>& input_shells,
+                    const std::vector<Shell>& ecp_shells,
+                    const std::unordered_map<int, int>& element_ecp_electrons,
                     int n_ecp_electrons, BasisMode mode, bool pure, bool sort);
 
  private:

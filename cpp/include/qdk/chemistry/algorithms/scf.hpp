@@ -41,8 +41,7 @@ class ElectronicStructureSettings : public data::Settings {
  * - A string for standard basis set name (e.g., "sto-3g")
  */
 using BasisOrGuess = std::variant<std::shared_ptr<data::Orbitals>,
-                                   std::shared_ptr<data::BasisSet>,
-                                   std::string>;
+                                  std::shared_ptr<data::BasisSet>, std::string>;
 
 /**
  * @brief Abstract base class for Self-Consistent Field (SCF) solvers
