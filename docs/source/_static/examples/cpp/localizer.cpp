@@ -33,8 +33,9 @@ int main() {
   // --------------------------------------------------------------------------------------------
   // start-cell-localize
   // Create H2O molecule
-  std::vector<Eigen::Vector3d> coords = {
-      {0.0, 0.0, 0.0}, {0.0, 0.757, 0.587}, {0.0, -0.757, 0.587}};
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0},
+                                         {0.0, 1.43052268, 1.10926924},
+                                         {0.0, -1.43052268, 1.10926924}};
   std::vector<std::string> symbols = {"O", "H", "H"};
   Structure structure(coords, symbols);
 
