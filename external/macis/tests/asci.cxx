@@ -606,8 +606,8 @@ TEST_CASE("ASCI Exponential Backoff", "[asci][backoff]") {
         ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
     // Should reach target size
-    REQUIRE(dets.size() == 1001);
-    REQUIRE(C.size() == 1001);
+    REQUIRE(dets.size() == asci_settings.ntdets_max);
+    REQUIRE(C.size() == asci_settings.ntdets_max);
     REQUIRE_THAT(
         std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
         Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
