@@ -11,8 +11,8 @@ import numpy as np
 from qdk_chemistry.data import Structure, Element
 
 # Specify a structure using coordinates, and either symbols or elements
-coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])  # Bohr
-symbols = ["H", "H"]
+coords = {{COORDS_INLINE_H2}}  # Bohr
+symbols = {{ELEMENTS_H2}}
 
 structure = Structure(coords, symbols=symbols)
 # Equivalent to 'structure', but uses 'elements' instead of 'symbols'
