@@ -29,6 +29,10 @@ from .reference_tolerances import (
     sci_energy_tolerance,
 )
 
+################################################################################
+# Set up and utility functions
+################################################################################
+
 
 def _truthy_env(name: str) -> bool:
     """Return True when ``name`` is set to a truthy value."""
@@ -110,6 +114,11 @@ def _assert_warning_constraints(lines: list[str], expected_warning: str | None, 
         assert all("[warning]" not in line for line in lines), (
             "Unexpected warning emitted by workflow.\nOutput:\n" + "\n".join(lines)
         )
+
+
+################################################################################
+# SCI workflow testing
+################################################################################
 
 
 @dataclass(frozen=True)
@@ -222,112 +231,6 @@ def test_sample_sci_workflow_scenarios(case: WorkflowCase) -> None:
     _assert_warning_constraints(lines, case.expected_warning, case.expect_no_warnings)
 
 
-def test_sample_non_commuting_qpe_outputs_expected_values():
-    """Execute the non-commuting IQPE sample and validate reported results."""
-    repo_root = Path(__file__).resolve().parents[2]
-    cmd = [sys.executable, "examples/qiskit/qpe_model_hamiltonian.py"]
-
-    result = _run_workflow(cmd, repo_root)
-    if result.returncode != 0:
-        _skip_for_mpi_failure(result)
-        pytest.fail(
-            "qpe_model_hamiltonian.py exited with "
-            f"{result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
-        )
-
-    phases = re.findall(r"Phase fraction φ \(measured\): ([0-9.+-eE]+)", result.stdout)
-    assert phases == ["0.140625", "0.988770"], f"Unexpected phase fractions: {phases}"
-
-    energies = [float(val) for val in re.findall(r"Estimated energy: ([+\-0-9.]+) Hartree", result.stdout)]
-    assert np.allclose(
-        energies, [1.12500000, -0.08984375], rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
-    )
-
-
-def test_qiskit_qpe_direct_outputs_consistency():
-    """Execute the exact-evolution IQPE sample and validate reported energies."""
-    repo_root = Path(__file__).resolve().parents[2]
-    cmd = [sys.executable, "examples/qiskit/qpe_no_trotter.py"]
-
-    result = _run_workflow(cmd, repo_root)
-    if result.returncode != 0:
-        _skip_for_mpi_failure(result)
-        pytest.fail(
-            f"qpe_no_trotter.py exited with {result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
-        )
-
-    phase_fraction = _extract_float(r"Phase fraction φ \(measured\): ([0-9.+-eE]+)", result.stdout)
-    assert 0.0 <= phase_fraction < 1.0
-
-    estimated_electronic_energy = _extract_float(
-        r"Estimated electronic energy: ([+\-0-9.eE]+) Hartree",
-        result.stdout,
-    )
-    estimated_total_energy = _extract_float(
-        r"Estimated total energy: ([+\-0-9.eE]+) Hartree",
-        result.stdout,
-    )
-    reference_total_energy = _extract_float(
-        r"Reference total energy \(CASCI\): ([+\-0-9.eE]+) Hartree",
-        result.stdout,
-    )
-    reported_difference = _extract_float(
-        r"Energy difference \(QPE - CASCI\): ([+\-0-9.eE]+) Hartree",
-        result.stdout,
-    )
-
-    assert math.isfinite(estimated_electronic_energy)
-    assert math.isfinite(estimated_total_energy)
-    assert np.isclose(
-        estimated_total_energy - reference_total_energy,
-        reported_difference,
-        rtol=float_comparison_relative_tolerance,
-        atol=estimator_energy_tolerance,
-    )
-
-
-def test_sample_e2e_qpe_trotter_outputs_consistency():
-    """Execute the Trotterized IQPE sample and validate reported energies."""
-    repo_root = Path(__file__).resolve().parents[2]
-    cmd = [sys.executable, "examples/qiskit/qpe_trotter.py"]
-
-    result = _run_workflow(cmd, repo_root)
-    if result.returncode != 0:
-        _skip_for_mpi_failure(result)
-        pytest.fail(
-            f"qpe_trotter.py exited with {result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
-        )
-
-    phase_fraction = _extract_float(r"Phase fraction φ \(measured\): ([0-9.+-eE]+)", result.stdout)
-    assert 0.0 <= phase_fraction < 1.0
-
-    estimated_electronic_energy = _extract_float(
-        r"Estimated electronic energy: ([+\-0-9.eE]+) Hartree",
-        result.stdout,
-    )
-    estimated_total_energy = _extract_float(
-        r"Estimated total energy: ([+\-0-9.eE]+) Hartree",
-        result.stdout,
-    )
-    reference_total_energy = _extract_float(
-        r"Reference total energy \(CASCI\): ([+\-0-9.eE]+) Hartree",
-        result.stdout,
-    )
-    reported_difference = _extract_float(
-        r"Energy difference \(QPE - CASCI\): ([+\-0-9.eE]+) Hartree",
-        result.stdout,
-    )
-
-    assert math.isfinite(estimated_electronic_energy)
-    assert math.isfinite(estimated_total_energy)
-    assert np.isclose(
-        estimated_total_energy - reference_total_energy,
-        reported_difference,
-        rtol=float_comparison_relative_tolerance,
-        atol=estimator_energy_tolerance,
-    )
-
-
 @pytest.mark.skipif(
     _RUNNING_IN_CI and not _RUN_MACIS_WORKFLOW,
     reason="Skipping MACIS ASCI workflow in CI pipeline; enable with QDK_CHEMISTRY_RUN_MACIS_WORKFLOW=1",
@@ -366,3 +269,169 @@ def test_sample_sci_workflow_macis_asci_autocas_with_limits():
 
     indices_line = _find_line(lambda line: "AutoCAS selected active space with indices:" in line, lines)
     assert "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]" in indices_line
+
+
+################################################################################
+# Sample RDKIT geometry workflow testing
+################################################################################
+
+
+@pytest.mark.xfail(reason="Skipping unimplemented examples/sample_rdkit_geometry.py test.")
+def test_sample_rdkit_geometry():
+    """Test the examples/sample_rdkit_geometry.py script."""
+    # TODO: Need to implement this test (see https://github.com/microsoft/qdk-chemistry/issues/198)
+    raise NotImplementedError("TODO: add sample_rdkit_geometry.py test.")
+
+
+################################################################################
+# Sample notebook testing
+################################################################################
+
+
+@pytest.mark.xfail(reason="Skipping unimplemented examples/factory_list.ipynb test.")
+def test_factory_list():
+    """Test the examples/factory_list.ipynb script."""
+    # TODO: Need to implement this test (see https://github.com/microsoft/qdk-chemistry/issues/196)
+    raise NotImplementedError("TODO: add factory_list.ipynb test.")
+
+
+@pytest.mark.xfail(reason="Skipping unimplemented examples/state_prep_energy.ipynb test.")
+def test_state_prep_energy():
+    """Test the examples/state_prep_energy.ipynb script."""
+    # TODO: Need to implement this test (see https://github.com/microsoft/qdk-chemistry/issues/196)
+    raise NotImplementedError("TODO: add state_prep_energy.ipynb test.")
+
+
+################################################################################
+# Qiskit interoperability sample testing
+################################################################################
+
+
+def test_qiskit_iqpe_model_hamiltonian():
+    """Execute the non-commuting IQPE sample and validate reported results."""
+    repo_root = Path(__file__).resolve().parents[2]
+    cmd = [sys.executable, "examples/qiskit/iqpe_model_hamiltonian.py"]
+
+    result = _run_workflow(cmd, repo_root)
+    if result.returncode != 0:
+        _skip_for_mpi_failure(result)
+        pytest.fail(
+            "qpe_model_hamiltonian.py exited with "
+            f"{result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+        )
+
+    phases = re.findall(r"Phase fraction φ \(measured\): ([0-9.+-eE]+)", result.stdout)
+    assert phases == ["0.140625", "0.988770"], f"Unexpected phase fractions: {phases}"
+
+    energies = [float(val) for val in re.findall(r"Estimated energy: ([+\-0-9.]+) Hartree", result.stdout)]
+    assert np.allclose(
+        energies, [1.12500000, -0.08984375], rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
+    )
+
+
+def test_qiskit_iqpe_no_trotter():
+    """Execute the exact-evolution IQPE sample and validate reported energies."""
+    repo_root = Path(__file__).resolve().parents[2]
+    cmd = [sys.executable, "examples/qiskit/iqpe_no_trotter.py"]
+
+    result = _run_workflow(cmd, repo_root)
+    if result.returncode != 0:
+        _skip_for_mpi_failure(result)
+        pytest.fail(
+            f"qpe_no_trotter.py exited with {result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+        )
+
+    phase_fraction = _extract_float(r"Phase fraction φ \(measured\): ([0-9.+-eE]+)", result.stdout)
+    assert 0.0 <= phase_fraction < 1.0
+
+    estimated_electronic_energy = _extract_float(
+        r"Estimated electronic energy: ([+\-0-9.eE]+) Hartree",
+        result.stdout,
+    )
+    estimated_total_energy = _extract_float(
+        r"Estimated total energy: ([+\-0-9.eE]+) Hartree",
+        result.stdout,
+    )
+    reference_total_energy = _extract_float(
+        r"Reference total energy \(CASCI\): ([+\-0-9.eE]+) Hartree",
+        result.stdout,
+    )
+    reported_difference = _extract_float(
+        r"Energy difference \(QPE - CASCI\): ([+\-0-9.eE]+) Hartree",
+        result.stdout,
+    )
+
+    assert math.isfinite(estimated_electronic_energy)
+    assert math.isfinite(estimated_total_energy)
+    assert np.isclose(
+        estimated_total_energy - reference_total_energy,
+        reported_difference,
+        rtol=float_comparison_relative_tolerance,
+        atol=estimator_energy_tolerance,
+    )
+
+
+def test_qiskit_iqpe_trotter():
+    """Execute the Trotterized IQPE sample and validate reported energies."""
+    repo_root = Path(__file__).resolve().parents[2]
+    cmd = [sys.executable, "examples/qiskit/iqpe_trotter.py"]
+
+    result = _run_workflow(cmd, repo_root)
+    if result.returncode != 0:
+        _skip_for_mpi_failure(result)
+        pytest.fail(
+            f"qpe_trotter.py exited with {result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+        )
+
+    phase_fraction = _extract_float(r"Phase fraction φ \(measured\): ([0-9.+-eE]+)", result.stdout)
+    assert 0.0 <= phase_fraction < 1.0
+
+    estimated_electronic_energy = _extract_float(
+        r"Estimated electronic energy: ([+\-0-9.eE]+) Hartree",
+        result.stdout,
+    )
+    estimated_total_energy = _extract_float(
+        r"Estimated total energy: ([+\-0-9.eE]+) Hartree",
+        result.stdout,
+    )
+    reference_total_energy = _extract_float(
+        r"Reference total energy \(CASCI\): ([+\-0-9.eE]+) Hartree",
+        result.stdout,
+    )
+    reported_difference = _extract_float(
+        r"Energy difference \(QPE - CASCI\): ([+\-0-9.eE]+) Hartree",
+        result.stdout,
+    )
+
+    assert math.isfinite(estimated_electronic_energy)
+    assert math.isfinite(estimated_total_energy)
+    assert np.isclose(
+        estimated_total_energy - reference_total_energy,
+        reported_difference,
+        rtol=float_comparison_relative_tolerance,
+        atol=estimator_energy_tolerance,
+    )
+
+
+################################################################################
+# Pennylane interoperability sample testing
+################################################################################
+
+
+@pytest.mark.xfail(reason="Skipping unimplemented examples/pennylane/qpe_no_trotter.py test.")
+def test_pennylane_qpe_no_trotter():
+    """Test the examples/pennylane/qpe_no_trotter.py script."""
+    # TODO: Need to implement this test (see https://github.com/microsoft/qdk-chemistry/issues/199)
+    raise NotImplementedError("TODO: add pennylane/qpe_no_trotter.py test.")
+
+
+################################################################################
+# Qsharp interoperability sample testing
+################################################################################
+
+
+@pytest.mark.xfail(reason="Skipping unimplemented examples/qsharp/iqpe_no_trotter.qs test.")
+def test_qsharp_iqpe_no_trotter():
+    """Test the examples/qsharp/iqpe_no_trotter.qs script."""
+    # TODO: Need to implement this test (see https://github.com/microsoft/qdk-chemistry/issues/200)
+    raise NotImplementedError("TODO: add qsharp/iqpe_no_trotter.qs test.")

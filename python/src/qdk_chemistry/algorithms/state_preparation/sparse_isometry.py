@@ -45,7 +45,6 @@ from qiskit.transpiler import PassManager
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
 from qdk_chemistry.data import Circuit, Wavefunction
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.bitstring import bitstrings_to_binary_matrix, separate_alpha_beta_to_binary_string
 
 __all__: list[str] = []
 
@@ -117,20 +116,20 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         num_orbitals = len(wavefunction.get_orbitals().get_active_space_indices()[0])
         bitstrings = []
         for det in dets:
-            alpha_str, beta_str = separate_alpha_beta_to_binary_string(det.to_string()[:num_orbitals])
+            alpha_str, beta_str = det.to_binary_strings(num_orbitals)
             bitstring = beta_str[::-1] + alpha_str[::-1]  # Qiskit uses little-endian convention
             bitstrings.append(bitstring)
 
         # Check for single determinant case after filtering
         if len(bitstrings) == 1:
             Logger.info("After filtering, only 1 determinant remains, using single reference state preparation")
-            return _prepare_single_reference_state(bitstrings[0])
+            return self._prepare_single_reference_state(bitstrings[0])
 
         n_qubits = len(bitstrings[0])
         Logger.debug(f"Using {len(bitstrings)} determinants for state preparation")
 
         # Step 1: Convert bitstrings to binary matrix
-        bitstring_matrix = bitstrings_to_binary_matrix(bitstrings)
+        bitstring_matrix = self._bitstrings_to_binary_matrix(bitstrings)
 
         # Step 2: Apply enhanced GF2+X
         # (includes duplicate removal, all-ones removal, and GF2)
@@ -238,54 +237,111 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
         return Circuit(qasm=qasm3.dumps(qc))
 
+    def _bitstrings_to_binary_matrix(self, bitstrings: list[str]) -> np.ndarray:
+        """Convert a list of bitstrings to a binary matrix.
+
+        This function converts a list of bitstrings (determinants) into a binary matrix
+        where each column represents a determinant and each row represents a qubit.
+
+        Args:
+            bitstrings (list[str]): List of bitstrings in Qiskit little endian order.
+                Each bitstring represents a determinant where the string is ordered
+                as "q[N-1]...q[0]" (most significant bit first in the string).
+
+        Returns:
+            Binary matrix M of shape (N, k) where
+
+                * N is the number of qubits (rows)
+                * k is the number of determinants (columns)
+
+            The matrix follows Qiskit circuit top-down convention with row ordering "q[0]...q[N-1]"
+            (qubit 0 at the top).
+
+        Note:
+            The input bitstrings are in Qiskit little endian order ("q[N-1]...q[0]"),
+            but the output binary matrix follows the Qiskit circuit convention with
+            row ordering "q[0]...q[N-1]". This means each bitstring is reversed
+            when converting to a column in the matrix.
+
+        Example:
+            >>> bitstrings = ["101", "010"]  # q[2]q[1]q[0] format
+            >>> matrix = _bitstrings_to_binary_matrix(bitstrings)
+            >>> print(matrix)
+            [[1 0]  # q[0]
+            [0 1]  # q[1]
+            [1 0]] # q[2]
+
+        """
+        if not bitstrings:
+            raise ValueError("Bitstrings list cannot be empty")
+
+        n_qubits = len(bitstrings[0])
+        n_dets = len(bitstrings)
+
+        # Validate all bitstrings have the same length
+        for i, bitstring in enumerate(bitstrings):
+            if len(bitstring) != n_qubits:
+                raise ValueError(
+                    f"All bitstrings must have the same length. "
+                    f"Bitstring {i} has length {len(bitstring)}, expected {n_qubits}"
+                )
+
+        # Create binary matrix with correct row ordering (reverse each bitstring)
+        bitstring_matrix = np.zeros((n_qubits, n_dets), dtype=np.int8)
+        for i, bitstring in enumerate(bitstrings):
+            # Reverse the bitstring to get correct qubit ordering
+            # Input: "q[N-1]...q[0]" -> Output: column with q[0] at top
+            reversed_bitstring = bitstring[::-1]
+            bitstring_matrix[:, i] = np.array(list(map(int, reversed_bitstring)), dtype=np.int8)
+
+        return bitstring_matrix
+
+    def _prepare_single_reference_state(self, bitstring: str) -> Circuit:
+        r"""Prepare a single reference state on a quantum circuit based on a bitstring.
+
+        Args:
+            bitstring: Binary string representing the occupation of qubits.
+
+                '1' means apply X gate, '0' means leave in |0⟩ state.
+
+        Returns:
+                A Circuit object containing an OpenQASM3 string with the prepared single reference state
+
+        Example:
+                bitstring = "1010" creates a circuit with X gates on qubits 1 and 3:
+
+                * :math:`\left| 0 \right\rangle \rightarrow I \rightarrow \left| 0 \right\rangle`
+                (qubit 0, corresponds to rightmost bit '0')
+                * :math:`\left| 0 \right\rangle \rightarrow X \rightarrow \left| 1 \right\rangle`
+                (qubit 1, corresponds to bit '1')
+                * :math:`\left| 0 \right\rangle \rightarrow I \rightarrow \left| 0 \right\rangle`
+                (qubit 2, corresponds to bit '0')
+                * :math:`\left| 0 \right\rangle \rightarrow X \rightarrow \left| 1 \right\rangle`
+                (qubit 3, corresponds to leftmost bit '1')
+
+        """
+        # Input validation
+        if not bitstring:
+            raise ValueError("Bitstring cannot be empty")
+
+        if not all(bit in "01" for bit in bitstring):
+            raise ValueError("Bitstring must contain only '0' and '1' characters")
+
+        num_qubits = len(bitstring)
+        circuit = QuantumCircuit(num_qubits, name=f"SingleRef_{bitstring}")
+
+        # Apply X gates for positions with '1'
+        # Note: bitstring is in little-endian format (rightmost bit = qubit 0)
+        for i, bit in enumerate(reversed(bitstring)):
+            if bit == "1":
+                circuit.x(i)
+
+        return Circuit(qasm=qasm3.dumps(circuit))
+
     def name(self) -> str:
         """Return the name of the state preparation method."""
         Logger.trace_entering()
         return "sparse_isometry_gf2x"
-
-
-def _prepare_single_reference_state(bitstring: str) -> Circuit:
-    r"""Prepare a single reference state on a quantum circuit based on a bitstring.
-
-    Args:
-        bitstring: Binary string representing the occupation of qubits.
-
-            '1' means apply X gate, '0' means leave in |0⟩ state.
-
-    Returns:
-        A Circuit object containing an OpenQASM3 string with the prepared single reference state
-
-    Example:
-        bitstring = "1010" creates a circuit with X gates on qubits 1 and 3:
-
-        * :math:`\left| 0 \right\rangle \rightarrow I \rightarrow \left| 0 \right\rangle`
-          (qubit 0, corresponds to rightmost bit '0')
-        * :math:`\left| 0 \right\rangle \rightarrow X \rightarrow \left| 1 \right\rangle`
-          (qubit 1, corresponds to bit '1')
-        * :math:`\left| 0 \right\rangle \rightarrow I \rightarrow \left| 0 \right\rangle`
-          (qubit 2, corresponds to bit '0')
-        * :math:`\left| 0 \right\rangle \rightarrow X \rightarrow \left| 1 \right\rangle`
-          (qubit 3, corresponds to leftmost bit '1')
-
-    """
-    Logger.trace_entering()
-    # Input validation
-    if not bitstring:
-        raise ValueError("Bitstring cannot be empty")
-
-    if not all(bit in "01" for bit in bitstring):
-        raise ValueError("Bitstring must contain only '0' and '1' characters")
-
-    num_qubits = len(bitstring)
-    circuit = QuantumCircuit(num_qubits, name=f"SingleRef_{bitstring}")
-
-    # Apply X gates for positions with '1'
-    # Note: bitstring is in little-endian format (rightmost bit = qubit 0)
-    for i, bit in enumerate(reversed(bitstring)):
-        if bit == "1":
-            circuit.x(i)
-
-    return Circuit(qasm=qasm3.dumps(circuit))
 
 
 @dataclass

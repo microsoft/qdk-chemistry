@@ -29,7 +29,7 @@ from pyscf.soscf import newton_ah
 
 from qdk_chemistry.algorithms import StabilityChecker
 from qdk_chemistry.data import Settings, StabilityResult, Wavefunction
-from qdk_chemistry.plugins.pyscf.utils import orbitals_to_scf
+from qdk_chemistry.plugins.pyscf.conversion import orbitals_to_scf
 from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfStabilityChecker", "PyscfStabilitySettings"]

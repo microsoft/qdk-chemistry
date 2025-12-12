@@ -9,9 +9,9 @@
 // --------------------------------------------------------------------------------------------
 // start-cell-hamiltonian-creation
 // Create a structure object
-std::vector<Eigen::Vector3d> coords = {{0.000000, 0.000000, 0.000000},
-                                       {1.43233673, 0.000000, 0.000000},
-                                       {-0.44604614, 1.09629126, 0.000000}};
+std::vector<Eigen::Vector3d> coords = {{0.00000000, 0.00000000, 0.00000000},
+                                       {2.70672414, 0.00000000, 0.00000000},
+                                       {-0.84290504, 2.07169023, 0.00000000}};
 std::vector<std::string> symbols = {"O", "H", "H"};
 Structure structure(coords, symbols);
 
