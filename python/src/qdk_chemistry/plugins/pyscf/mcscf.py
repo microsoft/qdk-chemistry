@@ -61,7 +61,7 @@ from qdk_chemistry.data import (
     Settings,
     Wavefunction,
 )
-from qdk_chemistry.plugins.pyscf.utils import SCFType, orbitals_to_scf
+from qdk_chemistry.plugins.pyscf.conversion import SCFType, orbitals_to_scf
 from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfMcscfCalculator", "PyscfMcscfSettings"]
