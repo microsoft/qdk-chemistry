@@ -5,8 +5,8 @@ QDK/Chemistry uses immutable data classes to represent molecular information, el
 These classes serve as the inputs and outputs for :doc:`algorithm classes <../algorithms/index>`, enabling a clean flow of data through the computational pipeline.
 All data classes support :doc:`serialization <serialization>` to JSON and HDF5 formats for persistence and interoperability.
 
-Comprehensive details on each data class can be found in the :ref:`API documentation <apidocs>`. Here, we provide
-a quick reference guide to help users understand the purpose and typical sources of commonly encountered data classes.
+Comprehensive details on each data class can be found in the :ref:`API documentation <apidocs>`.
+Here, we provide a quick reference guide to help users understand the purpose and typical sources of commonly encountered data classes.
 Each of the links below leads to a detailed description of the data class, including its attributes, methods, and usage examples.
 
 Quick reference

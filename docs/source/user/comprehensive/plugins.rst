@@ -27,10 +27,8 @@ This design supports several workflows:
 - Mixing backends (e.g., PySCF for SCF, MACIS for multi-configurational methods)
 - Adding custom implementations
 
-The implementations for each algorithm type are managed by a :doc:`factory class <algorithms/factory_pattern>`, which provides a
-consistent interface for creating instances and listing available implementations. We refer the
-reader to the :doc:`factory pattern <algorithms/factory_pattern>` and :doc:`algorithm <algorithms/index>`
-documentation pages for more details on this design pattern.
+The implementations for each algorithm type are managed by a :doc:`factory class <algorithms/factory_pattern>`, which provides a consistent interface for creating instances and listing available implementations.
+We refer the reader to the :doc:`factory pattern <algorithms/factory_pattern>` and :doc:`algorithm <algorithms/index>` documentation pages for more details on this design pattern.
 
 
 
@@ -108,8 +106,7 @@ The following sections provide comprehensive examples of each approach.
 Implementing a new algorithm backend
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This section demonstrates how to integrate an external SCF solver as a QDK/Chemistry plugin,
-enabling access through the standard API.
+This section demonstrates how to integrate an external SCF solver as a QDK/Chemistry plugin, enabling access through the standard API.
 
 **Interface requirements**
 
@@ -121,8 +118,7 @@ Each algorithm type in QDK/Chemistry defines an abstract base class specifying t
 
 **Defining custom settings**
 
-When an implementation requires configuration options beyond those provided by the base settings class,
-a derived settings class can be defined:
+When an implementation requires configuration options beyond those provided by the base settings class, a derived settings class can be defined:
 
 .. tab:: C++ API
 
@@ -271,9 +267,8 @@ Following registration, the implementation is accessible through the standard AP
 Defining a new algorithm type
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When the required functionality does not correspond to an existing algorithm category,
-a new algorithm type can be defined. This section demonstrates the complete process
-using a geometry optimizer as an example.
+When the required functionality does not correspond to an existing algorithm category, a new algorithm type can be defined.
+This section demonstrates the complete process using a geometry optimizer as an example.
 
 **Interface design**
 

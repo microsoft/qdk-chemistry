@@ -19,8 +19,8 @@ The :class:`~qdk_chemistry.data.Orbitals` class supports both restricted and unr
 - **Restricted**: Alpha and beta electrons share the same spatial orbitals (:term:`RHF`, :term:`RKS`)
 - **Unrestricted**: Alpha and beta electrons have separate spatial orbitals (:term:`UHF`, :term:`UKS`)
 
-For restricted calculations, the alpha and beta components are identical. The class maintains separate alpha and beta
-data internally, but they reference the same underlying data for restricted cases.
+For restricted calculations, the alpha and beta components are identical.
+The class maintains separate alpha and beta data internally, but they reference the same underlying data for restricted cases.
 
 Model orbitals
 ~~~~~~~~~~~~~~

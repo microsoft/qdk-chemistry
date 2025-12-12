@@ -1,12 +1,9 @@
 Available functionals and basis sets
 ====================================
 
-In the following sections, we provide lists of the basis sets
-and density functional theory (DFT) functionals that are available in
-QDK/Chemistry's built-in implementations.
+In the following sections, we provide lists of the basis sets and density functional theory (DFT) functionals that are available in QDK/Chemistry's built-in implementations.
 
-Additional features may be available through plugins; see the
-:ref:`Plugins <plugins>` documentation for more information.
+Additional features may be available through plugins; see the :ref:`Plugins <plugins>` documentation for more information.
 
 .. _available_basis_sets:
 
@@ -355,5 +352,4 @@ The following keywords are supported for the corresponding functionals:
 
 .. note::
 
-   Additional functionals and differing names may be available through plugins; see the
-   :ref:`Plugins <plugins>` documentation for more information.
+   Additional functionals and differing names may be available through plugins; see the :ref:`Plugins <plugins>` documentation for more information.

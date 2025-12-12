@@ -15,8 +15,7 @@ QDK/Chemistry follows a design pattern that strictly separates:
 1. **Data Classes**: Immutable containers that store and manage quantum chemical data
 2. **Algorithm Classes**: Processors that operate on data objects to produce new data objects
 
-This separation follows the principle of single responsibility and creates a clear flow of data through computational
-workflows.
+This separation follows the principle of single responsibility and creates a clear flow of data through computational workflows.
 
 .. graphviz:: /_static/diagrams/data_flow.dot
 
@@ -34,8 +33,7 @@ Data classes in QDK/Chemistry concretely represent intermediate quantities commo
 - :doc:`Serializable <../data/serialization>`: Can be easily saved to and loaded from files
 - **Language-agnostic**: Accessible through identical APIs in both C++ and Python
 
-See the :doc:`Data Classes <../data/index>` documentation for further details on the availability and usage of
-QDK/Chemistry's data classes.
+See the :doc:`Data Classes <../data/index>` documentation for further details on the availability and usage of QDK/Chemistry's data classes.
 
 .. _hl_algorithm_class:
 
@@ -50,9 +48,8 @@ These classes are designed to be:
 - **Conforming**: Exposing a common interface for disparate implementations to enable a unified user experience.
 - **Extensible**: Allowing new implementations to be added without modifying existing code
 
-Programatically, Algorithms are specified as abstract interfaces which can be specialized downstream through concrete implementations. This
-allows QDK/Chemistry to be expressed as a :doc:`plugin architecture <../plugins>`, for which algorithm implementations may be specified either natively within QDK/Chemistry or
-through established third-party quantum chemistry packages:
+Programatically, Algorithms are specified as abstract interfaces which can be specialized downstream through concrete implementations.
+This allows QDK/Chemistry to be expressed as a :doc:`plugin architecture <../plugins>`, for which algorithm implementations may be specified either natively within QDK/Chemistry or through established third-party quantum chemistry packages:
 
 .. graphviz:: /_static/diagrams/plugin_architecture.dot
 
@@ -61,8 +58,7 @@ through established third-party quantum chemistry packages:
 This design allows users to benefit from specialized capabilities of "best-in-breed" software while maintaining a consistent user experience.
 See the :doc:`Plugin System <../plugins>` documentation for further details on how to contribute new algorithm implementations.
 
-Further details on the availablity and usage of
-QDK/Chemistry's algorithm implementations can be found in the :doc:`Algorithms <../algorithms/index>` documentation.
+Further details on the availablity and usage of QDK/Chemistry's algorithm implementations can be found in the :doc:`Algorithms <../algorithms/index>` documentation.
 
 .. _hl_factory_pattertn:
 
@@ -97,9 +93,7 @@ Read more on QDK/Chemistry's usage of this pattern in the :doc:`Factory Pattern 
 Runtime configuration with settings
 ===================================
 
-Algorithm configuration is managed through instances of :doc:`Settings <../algorithms/settings>` objects,
-which contain a type-safe data store of configuration parameters consistent between the python and
-C++ APIs:
+Algorithm configuration is managed through instances of :doc:`Settings <../algorithms/settings>` objects, which contain a type-safe data store of configuration parameters consistent between the python and C++ APIs:
 
 .. tab:: C++ API
 

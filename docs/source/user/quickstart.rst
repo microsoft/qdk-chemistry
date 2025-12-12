@@ -47,16 +47,13 @@ Run a self-consistent field (SCF) calculation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Once a :doc:`comprehensive/data/structure` is created, an :term:`SCF` calculation can be performed to produce an initial :class:`~qdk_chemistry.data.Wavefunction` as well as an :term:`SCF` energy.
-QDK/Chemistry performs :term:`SCF` calculations via instantiations of a :doc:`comprehensive/algorithms/scf_solver` algorithm, and is the first instance
-of the separation :doc:`Data classes <./comprehensive/data/index>` and :doc:`Algorithm classes <./comprehensive/algorithms/index>` most will encounter
-in QDK/Chemistry. See the :doc:`design principles <./comprehensive/design/index>` documentation for more information on this pattern and how data flow is generally
-treated in QDK/Chemistry.
+QDK/Chemistry performs :term:`SCF` calculations via instantiations of a :doc:`comprehensive/algorithms/scf_solver` algorithm, and is the first instance of the separation :doc:`Data classes <./comprehensive/data/index>` and :doc:`Algorithm classes <./comprehensive/algorithms/index>` most will encounter in QDK/Chemistry.
+See the :doc:`design principles <./comprehensive/design/index>` documentation for more information on this pattern and how data flow is generally treated in QDK/Chemistry.
 Instantiations of the :doc:`comprehensive/algorithms/scf_solver` algorithm (and all other :doc:`Algorithm classes <./comprehensive/algorithms/index>`) are managed by a factory.
 See the :doc:`comprehensive/algorithms/factory_pattern` documentation for more information on how it is used in the code base.
 
 The inputs for an :term:`SCF` calculation are a :doc:`comprehensive/data/structure` object, the total charge and spin multiplicity of the molecular system, and information about the single-particle basis to be used.
-Optionally, :doc:`comprehensive/algorithms/settings` specific to the particular :doc:`comprehensive/algorithms/scf_solver` can be configured to control the execution of the SCF algorihm (e.g. convergence tolerances, etc)
-by accessing the ``settings()`` method.
+Optionally, :doc:`comprehensive/algorithms/settings` specific to the particular :doc:`comprehensive/algorithms/scf_solver` can be configured to control the execution of the SCF algorihm (e.g. convergence tolerances, etc) by accessing the ``settings()`` method.
 The basis for the :term:`SCF` calculation can be set via a string input (specifying one of the :ref:`available_basis_sets`), a custom :doc:`comprehensive/data/basis_set` or initial :doc:`comprehensive/data/orbitals` can also be provided.
 
 .. tab:: C++ API
@@ -83,8 +80,7 @@ For this reason, both :doc:`orbital localization <comprehensive/algorithms/local
 QDK/Chemistry offers many methods for the selection of active spaces to reduce the problem size:  accurately modeling the quantum many-body problem while avoiding the prohibitive computational scaling of full configuration interaction.
 See the :doc:`comprehensive/algorithms/active_space` documentation for a list of supported methods, along with their associated :doc:`comprehensive/algorithms/settings`, which accompany the standard QDK/Chemistry distribution.
 
-The following are language-specific examples of how to select a so-called "valence" active space containing a subset of only those orbitals surrounding the Fermi level - in this
-case 6 electrons to be distributed in 6 orbitals (6e, 6o).
+The following are language-specific examples of how to select a so-called "valence" active space containing a subset of only those orbitals surrounding the Fermi level - in this case 6 electrons to be distributed in 6 orbitals (6e, 6o).
 
 .. tab:: C++ API
 
@@ -106,8 +102,7 @@ Calculate the Hamiltonian
 
 Once an active space has been selected, the electronic Hamiltonian can be computed within that active space to describe the energetic interactions between electrons.
 QDK/Chemistry provides flexible Hamiltonian construction capabilities through the :doc:`comprehensive/algorithms/hamiltonian_constructor` algorithm.
-The Hamiltonian constructor generates the one- and two-electron integrals (or factorizations thereof) needed for subsequent quantum
-many-body calculations and quantum algorithms.
+The Hamiltonian constructor generates the one- and two-electron integrals (or factorizations thereof) needed for subsequent quantum many-body calculations and quantum algorithms.
 
 .. tab:: C++ API
 
@@ -126,23 +121,14 @@ many-body calculations and quantum algorithms.
 Compute a multi-configurational wavefunction for the active space
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-With the active space Hamiltonian constructed, quantum many-body calculations
-can be performed to obtain multi-configurational wavefunctions that go beyond the single-determinant :term:`SCF` approximation.
-QDK/Chemistry supports various Multi-Configuration (MC) methods including Complete Active Space
-Configuration Interaction (CASCI) and selected :term:`CI` approaches.
-:term:`MC` calculations are performed via instantiations of the :doc:`comprehensive/algorithms/mc_calculator` algorithm,
-which takes as input an instance of an active space :doc:`comprehensive/data/hamiltonian`, and the number of alpha and beta
-electrons, and produces as output a :class:`~qdk_chemistry.data.Wavefunction` representing the multi-configurational state
-as well as its associated energy.
+With the active space Hamiltonian constructed, quantum many-body calculations can be performed to obtain multi-configurational wavefunctions that go beyond the single-determinant :term:`SCF` approximation.
+QDK/Chemistry supports various Multi-Configuration (MC) methods including Complete Active Space Configuration Interaction (CASCI) and selected :term:`CI` approaches.
+:term:`MC` calculations are performed via instantiations of the :doc:`comprehensive/algorithms/mc_calculator` algorithm, which takes as input an instance of an active space :doc:`comprehensive/data/hamiltonian`, and the number of alpha and beta electrons, and produces as output a :class:`~qdk_chemistry.data.Wavefunction` representing the multi-configurational state as well as its associated energy.
 
-While multi-configurational methods provide more accurate energy estimates than :term:`SCF`, their primary role in the
-quantum applications workflow is to generate high-quality initial states for quantum algorithms.
-On scaled fault-tolerant quantum computers, these classically-computed wavefunctions serve as the foundation for
-state preparation circuits, enabling algorithms such as quantum phase estimation to achieve chemical accuracy
-for systems that remain intractable for purely classical methods.
+While multi-configurational methods provide more accurate energy estimates than :term:`SCF`, their primary role in the quantum applications workflow is to generate high-quality initial states for quantum algorithms.
+On scaled fault-tolerant quantum computers, these classically-computed wavefunctions serve as the foundation for state preparation circuits, enabling algorithms such as quantum phase estimation to achieve chemical accuracy for systems that remain intractable for purely classical methods.
 
-In the following example, as the aforementioned (6e, 6o) active space is relatively small, we perform a CASCI calculation to obtain
-the exact ground state wavefunction within the active space.
+In the following example, as the aforementioned (6e, 6o) active space is relatively small, we perform a CASCI calculation to obtain the exact ground state wavefunction within the active space.
 
 .. tab:: C++ API
 
@@ -162,8 +148,7 @@ Select important configurations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 For large active spaces, the multi-configuration :class:`~qdk_chemistry.data.Wavefunction` may contain thousands or millions of configurations, but often only a small subset contributes significantly to the overall state.
-By identifying and retaining only the dominant configurations (those with the largest amplitudes), we can create a sparse wavefunction that maintains high fidelity with respect to the original Wavefunction while dramatically
-reducing resource requirements for quantum state preparation.
+By identifying and retaining only the dominant configurations (those with the largest amplitudes), we can create a sparse wavefunction that maintains high fidelity with respect to the original Wavefunction while dramatically reducing resource requirements for quantum state preparation.
 This truncation is characterized by computing the overlap between the truncated state and the full wavefunction, and by recalculating the energy of the sparse wavefunction using the :doc:`comprehensive/algorithms/pmc`.
 
 .. tab:: C++ API
@@ -218,8 +203,8 @@ Generate the state preparation circuit
 
 Given the classical representation of the sparse multi-configurational :class:`~qdk_chemistry.data.Wavefunction`, a quantum circuit can be generated to prepare this state on a quantum computer.
 This can be done in many ways, including via Isometry encoding :cite:`Christandl2016`, linear combinations of unitaries [...], and tensor product methods [...].
-However, when the wavefunction is very sparse, these methods can be inefficient. In QDK/Chemistry, we provide a specialized method for generating state preparation circuits for sparse wavefunctions
-based on the construction of sparse isometries over GF(2) with X gates [...], provided as a :doc:`comprehensive/algorithms/state_preparation` algorithm.
+However, when the wavefunction is very sparse, these methods can be inefficient.
+In QDK/Chemistry, we provide a specialized method for generating state preparation circuits for sparse wavefunctions based on the construction of sparse isometries over GF(2) with X gates [...], provided as a :doc:`comprehensive/algorithms/state_preparation` algorithm.
 See :doc:`comprehensive/algorithms/state_preparation` for more details on the other algorithms provided for state preparation in QDK/Chemistry.
 
 .. tab:: C++ API

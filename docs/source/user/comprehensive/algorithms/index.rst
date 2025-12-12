@@ -28,8 +28,7 @@ Algorithm classes
    state_preparation
 
 QDK/Chemistry provides a comprehensive set of algorithm classes whixh express core methological primitives for quantum and classical chemistry calculations.
-All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowing you to create instances by name and configured
-through a unified :doc:`settings <settings>` interface.
+All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowing you to create instances by name and configured through a unified :doc:`settings <settings>` interface.
 
 Quick reference
 ---------------
