@@ -10,7 +10,27 @@
   macis_settings.param_name = qdk_settings.get_or_default<type>(          \
       #param_name, macis_settings.param_name)
 
+#define SET_MACIS_ENUM_SETTING(qdk_settings, macis_settings, param_name, \
+                               converter)                                \
+  if (qdk_settings.has(#param_name)) {                                   \
+    macis_settings.param_name =                                          \
+        converter(qdk_settings.get<std::string>(#param_name));           \
+  }
+
 namespace qdk::chemistry::algorithms::microsoft {
+
+macis::CoreSelectionStrategy string_to_core_selection_strategy(
+    const std::string& strategy) {
+  if (strategy == "fixed") {
+    return macis::CoreSelectionStrategy::Fixed;
+  } else if (strategy == "percentage") {
+    return macis::CoreSelectionStrategy::Percentage;
+  } else {
+    throw std::invalid_argument(
+        "Invalid core_selection_strategy: '" + strategy +
+        "'. Valid options are 'fixed' or 'percentage'.");
+  }
+}
 
 macis::MCSCFSettings get_mcscf_settings_(const data::Settings& settings_) {
   QDK_LOG_TRACE_ENTERING();
@@ -65,6 +85,9 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
   SET_MACIS_SETTING(settings_, asci_settings, pt2_min_constraint_level, int);
   SET_MACIS_SETTING(settings_, asci_settings, pt2_constraint_refine_force,
                     int64_t);
+  SET_MACIS_ENUM_SETTING(settings_, asci_settings, core_selection_strategy,
+                         string_to_core_selection_strategy);
+  SET_MACIS_SETTING(settings_, asci_settings, core_selection_threshold, double);
 
   // Validate grow_factor and related parameters
   if (asci_settings.grow_factor <= 1.0) {
@@ -87,6 +110,15 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
     throw std::runtime_error(
         "growth_recovery_rate must be > 1.0, got " +
         std::to_string(asci_settings.growth_recovery_rate));
+  }
+  if (asci_settings.core_selection_strategy ==
+          macis::CoreSelectionStrategy::Percentage &&
+      (asci_settings.core_selection_threshold <
+           std::numeric_limits<double>::epsilon() ||
+       asci_settings.core_selection_threshold > 1.0)) {
+    throw std::invalid_argument(
+        "core_selection_threshold must be in [epsilon, 1.0], got " +
+        std::to_string(asci_settings.core_selection_threshold));
   }
 
   return asci_settings;
