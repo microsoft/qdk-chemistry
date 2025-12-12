@@ -407,6 +407,10 @@ Canonical4CenterHamiltonian::from_json(const nlohmann::json& j) {
       int cols = rows > 0 ? matrix_vec[0].size() : 0;
       Eigen::MatrixXd matrix(rows, cols);
       for (int i = 0; i < rows; ++i) {
+        if (static_cast<int>(matrix_vec[i].size()) != cols) {
+          throw std::runtime_error(
+              "Matrix rows have inconsistent column counts");
+        }
         for (int j_idx = 0; j_idx < cols; ++j_idx) {
           matrix(i, j_idx) = matrix_vec[i][j_idx];
         }
