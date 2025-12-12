@@ -992,12 +992,60 @@ class TestWavefunctionRdmIntegraion:
         mc.settings().set("ntdets_min", 1)
         mc.settings().set("grow_factor", 2)
         mc.settings().set("max_refine_iter", 0)
-        _, wfn_cas = mc.run(hamiltonian, 6, 6)
+        _, wfn_sci = mc.run(hamiltonian, 6, 6)
+
+        assert wfn_sci.has_one_rdm_spin_dependent(), "one rdm is not available"
+
+        # Verify RDMs exist before save
+        original_1rdm_aa, _ = wfn_sci.get_active_one_rdm_spin_dependent()
+        original_2rdm_aabb, original_2rdm_aaaa, _ = wfn_sci.get_active_two_rdm_spin_dependent()
+
+        # Save and reload using tmp_path
+        h5_file = tmp_path / "test_wavefunction.h5"
+        wfn_sci.to_hdf5_file(str(h5_file))
+        wfn_loaded = Wavefunction.from_hdf5_file(str(h5_file))
+
+        # Check RDMs after load
+        assert wfn_loaded.has_one_rdm_spin_dependent(), "one rdm is not available"
+        after_1rdm_aa, _ = wfn_loaded.get_active_one_rdm_spin_dependent()
+
+        assert wfn_loaded.has_two_rdm_spin_dependent(), "two rdm is not available"
+        after_2rdm_aabb, after_2rdm_aaaa, _ = wfn_loaded.get_active_two_rdm_spin_dependent()
+
+        assert np.allclose(original_1rdm_aa, after_1rdm_aa, atol=rdm_tolerance)
+        assert np.allclose(original_2rdm_aaaa, after_2rdm_aaaa, atol=rdm_tolerance)
+        assert np.allclose(original_2rdm_aabb, after_2rdm_aabb, atol=rdm_tolerance)
+
+    def test_cas_hdf5_roundtrip(self, tmp_path):
+        symbols = ["H", "H"]
+        coords = np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [1.4, 0.0, 0.0],
+            ]
+        )
+
+        structure = Structure(coords, symbols)
+
+        # Run SCF
+        scf = algorithms.create("scf_solver")
+        _, wfn_scf = scf.run(structure, charge=0, spin_multiplicity=1)
+
+        # Build Hamiltonian
+        ham_constructor = algorithms.create("hamiltonian_constructor")
+        hamiltonian = ham_constructor.run(wfn_scf.get_orbitals())
+
+        # Run CAS with RDM calculation
+        mc = algorithms.create("multi_configuration_calculator", "macis_cas")
+        mc.settings().set("calculate_one_rdm", True)
+        mc.settings().set("calculate_two_rdm", True)
+        _, wfn_cas = mc.run(hamiltonian, 2, 2)
 
         assert wfn_cas.has_one_rdm_spin_dependent(), "one rdm is not available"
 
         # Verify RDMs exist before save
         original_1rdm_aa, _ = wfn_cas.get_active_one_rdm_spin_dependent()
+        original_2rdm_aabb, original_2rdm_aaaa, _ = wfn_cas.get_active_two_rdm_spin_dependent()
 
         # Save and reload using tmp_path
         h5_file = tmp_path / "test_wavefunction.h5"
@@ -1005,10 +1053,15 @@ class TestWavefunctionRdmIntegraion:
         wfn_loaded = Wavefunction.from_hdf5_file(str(h5_file))
 
         # Check RDMs after load
-        assert wfn_loaded.has_one_rdm_spin_dependent(), "one rdm is not avaialble"
+        assert wfn_loaded.has_one_rdm_spin_dependent(), "one rdm is not available"
         after_1rdm_aa, _ = wfn_loaded.get_active_one_rdm_spin_dependent()
 
+        assert wfn_loaded.has_two_rdm_spin_dependent(), "two rdm is not available"
+        after_2rdm_aabb, after_2rdm_aaaa, _ = wfn_loaded.get_active_two_rdm_spin_dependent()
+
         assert np.allclose(original_1rdm_aa, after_1rdm_aa, atol=rdm_tolerance)
+        assert np.allclose(original_2rdm_aaaa, after_2rdm_aaaa, atol=rdm_tolerance)
+        assert np.allclose(original_2rdm_aabb, after_2rdm_aabb, atol=rdm_tolerance)
 
     @pytest.fixture
     def basic_orbitals(self):

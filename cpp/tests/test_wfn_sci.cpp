@@ -409,7 +409,7 @@ TEST_F(SciWavefunctionTest, SerializationRDMs) {
   mc->settings().set("calculate_one_rdm", true);
   mc->settings().set("calculate_two_rdm", true);
   mc->settings().set("ntdets_max", 10);
-  mc->settings().set("ntdets_max", 1);
+  mc->settings().set("ntdets_min", 1);
   mc->settings().set("max_refine_iter", 0);
   mc->settings().set("grow_factor", 2);
 
@@ -529,7 +529,7 @@ TEST_F(SciWavefunctionTest, SerializationRDMsUnrestricted) {
   mc->settings().set("calculate_one_rdm", true);
   mc->settings().set("calculate_two_rdm", true);
   mc->settings().set("ntdets_max", 10);
-  mc->settings().set("ntdets_max", 1);
+  mc->settings().set("ntdets_min", 1);
   mc->settings().set("max_refine_iter", 0);
   mc->settings().set("grow_factor", 2);
   auto [E_sci, wfn_sci] = mc->run(H, 3, 5);  // 3 electrons in 5 orbitals
