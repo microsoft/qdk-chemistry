@@ -22,7 +22,7 @@ The :class:`~qdk_chemistry.data.Orbitals` class supports both restricted and unr
 For restricted calculations, the alpha and beta components are identical. The class maintains separate alpha and beta
 data internally, but they reference the same underlying data for restricted cases.
 
-Model Orbitals
+Model orbitals
 ~~~~~~~~~~~~~~
 
 ModelOrbitals are a simpler class in QDK/Chemistry, for model systems without any basis set information.
@@ -129,7 +129,7 @@ Similar patterns are described below for ModelOrbitals.
       :start-after: # start-cell-model-orbitals-create
       :end-before: # end-cell-model-orbitals-create
 
-Accessing Orbital Data
+Accessing Orbital data
 ----------------------
 
 The :class:`~qdk_chemistry.data.Orbitals` class provides methods to access orbital coefficients, energies, and other properties.

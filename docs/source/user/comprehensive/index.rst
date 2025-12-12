@@ -1,4 +1,4 @@
-In-Depth User Guide
+In-depth user guide
 ===================
 
 Welcome to the in-depth documentation for the Quantum Development Kit (QDK) Chemistry library.

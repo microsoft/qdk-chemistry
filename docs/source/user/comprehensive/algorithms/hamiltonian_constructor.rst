@@ -1,4 +1,4 @@
-Hamiltonian Construction
+Hamiltonian construction
 ========================
 
 The ``HamiltonianConstructor`` algorithm in QDK/Chemistry constructs electronic Hamiltonians for quantum chemistry calculations.

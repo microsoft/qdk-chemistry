@@ -211,7 +211,7 @@ For efficient energy estimation, the qubit Hamiltonian can be optimized in two w
       :start-after: # start-cell-qubit-hamiltonian
       :end-before: # end-cell-qubit-hamiltonian
 
-Generate the State Preparation Circuit
+Generate the state preparation circuit
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. TODO: Add more references to other meothds

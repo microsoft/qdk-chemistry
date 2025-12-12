@@ -1,4 +1,4 @@
-State Preparation
+State preparation
 =================
 
 The :class:`~qdk_chemistry.algorithms.StatePreparation` algorithm in QDK/Chemistry constructs quantum circuits that load target wavefunctions onto qubits.

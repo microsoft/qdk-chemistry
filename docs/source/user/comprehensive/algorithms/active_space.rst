@@ -1,4 +1,4 @@
-Active Space Selection
+Active space selection
 ======================
 
 The :class:`~qdk_chemistry.algorithms.ActiveSpaceSelector` algorithm in QDK/Chemistry performs active space selection to identify the most chemically relevant orbitals for multireference calculations.
@@ -165,7 +165,7 @@ Automatic selection based on orbital occupation numbers, identifying orbitals wi
      - ``0.1``
      - Orbitals with occupations deviating from 0 or 2 by more than this threshold are selected
 
-QDK Autocas
+QDK AutoCAS
 ~~~~~~~~~~~
 
 **Factory name:** ``"qdk_autocas"``
@@ -200,7 +200,7 @@ Uses histogram-based plateau detection.
      - ``True``
      - Whether to normalize entropy values
 
-QDK Autocas EOS
+QDK AutoCAS EOS
 ~~~~~~~~~~~~~~~
 
 **Factory name:** ``"qdk_autocas_eos"``

@@ -1,4 +1,4 @@
-Self-Consistent Field (SCF) Solver
+Self-consistent field (SCF) solver
 ==================================
 
 The :class:`~qdk_chemistry.algorithms.ScfSolver` algorithm in QDK/Chemistry performs Self-Consistent Field (SCF) calculations to optimize molecular orbitals for a given molecular structure.

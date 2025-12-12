@@ -147,7 +147,7 @@ Maximizes the sum of squared Mulliken charges on each atom for each orbital, cre
      - ``1e-12``
      - Threshold for small rotation detection
 
-QDK MP2 Natural Orbitals
+QDK MP2 natural orbitals
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Factory name:** ``"qdk_mp2_natural_orbitals"``

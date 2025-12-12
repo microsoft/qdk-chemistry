@@ -96,7 +96,7 @@ You can discover available implementations programmatically:
       print(registry.available("dynamical_correlation_calculator"))
       # ['pyscf_coupled_cluster', 'qdk_mp2_calculator']
 
-QDK MP2 Calculator
+QDK MP2 calculator
 ~~~~~~~~~~~~~~~~~~
 
 **Factory name:** ``"qdk_mp2_calculator"``

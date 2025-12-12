@@ -1,4 +1,4 @@
-Available Functionals and Basis Sets
+Available functionals and basis sets
 ====================================
 
 In the following sections, we provide lists of the basis sets
@@ -10,7 +10,7 @@ Additional features may be available through plugins; see the
 
 .. _available_basis_sets:
 
-Available Basis Sets
+Available basis sets
 --------------------
 
 The following keywords are supported for the corresponding basis sets:

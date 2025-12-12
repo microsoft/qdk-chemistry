@@ -1,4 +1,4 @@
-Qubit Mapping
+Qubit mapping
 =============
 
 The :class:`~qdk_chemistry.algorithms.QubitMapper` algorithm in QDK/Chemistry transforms electronic-structure Hamiltonians into qubit Hamiltonians suitable for quantum computation.

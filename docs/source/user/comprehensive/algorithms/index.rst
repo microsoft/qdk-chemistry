@@ -1,4 +1,4 @@
-Algorithm Classes
+Algorithm classes
 =================
 
 .. toctree::

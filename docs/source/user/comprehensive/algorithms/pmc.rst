@@ -1,4 +1,4 @@
-Projected Multi-Configuration Solver
+Projected Multi-Configuration solver
 ====================================
 
 .. note::

@@ -1,4 +1,4 @@
-Energy Estimation
+Energy estimation
 =================
 
 The :class:`~qdk_chemistry.algorithms.EnergyEstimator` algorithm in QDK/Chemistry estimates the energy of a quantum state by measuring expectation values of Pauli operators.
@@ -75,7 +75,7 @@ You can discover available implementations programmatically:
       from qdk_chemistry.algorithms import registry
       print(registry.available("energy_estimator"))  # ['qdk_base_simulator', 'qiskit_aer_simulator']
 
-QDK Base Simulator
+QDK base simulator
 ~~~~~~~~~~~~~~~~~~
 
 **Factory name:** ``"qdk_base_simulator"``

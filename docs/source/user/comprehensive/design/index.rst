@@ -1,4 +1,4 @@
-High-Level Design
+High-level design
 #################
 
 This document outlines the core architectural design principles of QDK/Chemistry, explaining the conceptual framework that guides the library's organization and implementation.
@@ -24,7 +24,7 @@ workflows.
 
 .. _hl_data_class:
 
-Data Classes
+Data classes
 ------------
 
 Data classes in QDK/Chemistry concretely represent intermediate quantities commonly encountered in quantum applications workflows. These classes are designed to be:
@@ -39,7 +39,7 @@ QDK/Chemistry's data classes.
 
 .. _hl_algorithm_class:
 
-Algorithm Classes
+Algorithm classes
 -----------------
 
 Algorithm classes represent mutations on data, such as the execution of quantum chemical methods and generation of circuit components commonly found in quantum applications workflows.
@@ -66,7 +66,7 @@ QDK/Chemistry's algorithm implementations can be found in the :doc:`Algorithms <
 
 .. _hl_factory_pattertn:
 
-Factory Pattern
+Factory pattern
 ===============
 
 QDK/Chemistry's :doc:`plugin architecture <../plugins>` leverages a :doc:`factory pattern <../algorithms/factory_pattern>` for algorithm creation:
@@ -94,8 +94,8 @@ Read more on QDK/Chemistry's usage of this pattern in the :doc:`Factory Pattern 
 
 .. _hl_settings:
 
-Runtime Configuration with Settings
-==============================================
+Runtime configuration with settings
+===================================
 
 Algorithm configuration is managed through instances of :doc:`Settings <../algorithms/settings>` objects,
 which contain a type-safe data store of configuration parameters consistent between the python and
@@ -120,7 +120,7 @@ Read more on how one can configure, discover, and extend instances of Settings o
 
 .. _hl_dataflow_example:
 
-A Complete Dataflow Example
+A complete dataflow example
 ===========================
 
 A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:

@@ -1,4 +1,4 @@
-Data Classes
+Data classes
 ============
 
 QDK/Chemistry uses immutable data classes to represent molecular information, electronic structure results, and quantum objects.
