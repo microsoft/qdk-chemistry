@@ -196,28 +196,28 @@ extends:
           - input: pipelineArtifact
             artifactName: linux-aarch64-wheels-python3.13
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.13
-          steps:
-          - script: |
-              mkdir -p $(System.DefaultWorkingDirectory)/target/wheels
-              find $(System.DefaultWorkingDirectory)/artifacts -name "*.whl" -exec cp {} $(System.DefaultWorkingDirectory)/target/wheels/ \;
-              ls $(System.DefaultWorkingDirectory)/target/wheels
-            displayName: Collect Python Artifacts for Release
+        steps:
+        - script: |
+            mkdir -p $(System.DefaultWorkingDirectory)/target/wheels
+            find $(System.DefaultWorkingDirectory)/artifacts -name "*.whl" -exec cp {} $(System.DefaultWorkingDirectory)/target/wheels/ \;
+            ls $(System.DefaultWorkingDirectory)/target/wheels
+          displayName: Collect Python Artifacts for Release
 
-          # Setting the contenttype to the wrong value will allow us to do a dry run of this task without
-          # publishing anything, according to the ESRP docs
-          - task: EsrpRelease@9
-            condition: succeeded()
-            displayName: Publish Python Packages
-            inputs:
-              connectedservicename: PME ESRP Azure Connection
-              usemanagedidentity: true
-              keyvaultname: quantum-esrp-kv
-              signcertname: ESRPCert
-              clientid: 832c049d-cd07-4c1c-bfa5-c07250d190cb
-              contenttype: NPM
-              domaintenantid: 975f013f-7f24-47e8-a7d3-abc4752bf346
-              folderlocation: $(System.DefaultWorkingDirectory)/target/wheels
-              waitforreleasecompletion: true
-              owners: davidwillia@microsoft.com, janunsleber@microsoft.com, nathanbaker@microsoft.com
-              approvers: davidwillia@microsoft.com, janunsleber@microsoft.com, nathanbaker@microsoft.com
-              mainpublisher: ESRPRELPACMAN
+        # Setting the contenttype to the wrong value will allow us to do a dry run of this task without
+        # publishing anything, according to the ESRP docs
+        - task: EsrpRelease@9
+          condition: succeeded()
+          displayName: Publish Python Packages
+          inputs:
+            connectedservicename: PME ESRP Azure Connection
+            usemanagedidentity: true
+            keyvaultname: quantum-esrp-kv
+            signcertname: ESRPCert
+            clientid: 832c049d-cd07-4c1c-bfa5-c07250d190cb
+            contenttype: NPM
+            domaintenantid: 975f013f-7f24-47e8-a7d3-abc4752bf346
+            folderlocation: $(System.DefaultWorkingDirectory)/target/wheels
+            waitforreleasecompletion: true
+            owners: davidwillia@microsoft.com, janunsleber@microsoft.com, nathanbaker@microsoft.com
+            approvers: davidwillia@microsoft.com, janunsleber@microsoft.com, nathanbaker@microsoft.com
+            mainpublisher: ESRPRELPACMAN
