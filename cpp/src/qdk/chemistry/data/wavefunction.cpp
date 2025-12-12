@@ -9,6 +9,8 @@
 #include <memory>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
@@ -831,17 +833,41 @@ std::shared_ptr<Wavefunction> Wavefunction::from_hdf5(H5::Group& group) {
     version_attr.read(string_type, version);
     validate_serialization_version(SERIALIZATION_VERSION, version);
 
-    // Load container using factory method (orbitals are loaded internally by
-    // the container)
+    // Load container type and dispatch to appropriate container implementation
     if (!group.nameExists("container")) {
       throw std::runtime_error(
           "HDF5 group missing required 'container' subgroup");
     }
+
     H5::Group container_group = group.openGroup("container");
-    auto container = WavefunctionContainer::from_hdf5(container_group);
+
+    // Read container type from the container group
+    if (!container_group.attrExists("container_type")) {
+      throw std::runtime_error(
+          "Container group missing 'container_type' attribute");
+    }
+
+    H5::Attribute type_attr = container_group.openAttribute("container_type");
+    std::string container_type;
+    type_attr.read(string_type, container_type);
+
+    // Dispatch to appropriate container implementation
+    std::unique_ptr<WavefunctionContainer> container;
+    if (container_type == "cas") {
+      container = CasWavefunctionContainer::from_hdf5(container_group);
+    } else if (container_type == "sci") {
+      container = SciWavefunctionContainer::from_hdf5(container_group);
+    } else if (container_type == "sd") {
+      container = SlaterDeterminantContainer::from_hdf5(container_group);
+    } else if (container_type == "cc") {
+      container = CoupledClusterContainer::from_hdf5(container_group);
+    } else if (container_type == "mp2") {
+      container = MP2Container::from_hdf5(container_group);
+    } else {
+      throw std::runtime_error("Unknown container type: " + container_type);
+    }
 
     return std::make_shared<Wavefunction>(std::move(container));
-
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
