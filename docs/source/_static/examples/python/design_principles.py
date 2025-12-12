@@ -33,7 +33,7 @@ structure = Structure(coords, ["H", "H"])
 scf_solver = create("scf_solver")
 print(f"Available SCF settings: {scf_solver.settings().items()}")
 scf_energy, scf_wavefunction = scf_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_information="cc-pvdz"
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
 )
 print(f"Total number of electrons: {scf_wavefunction.get_total_num_electrons()}")
 print(f"Orbital occupations: {scf_wavefunction.get_total_orbital_occupations()}")

@@ -22,7 +22,7 @@ scf_solver.settings().set("method", "hf")
 
 # Run calculation - returns (energy, wavefunction)
 energy, wavefunction = scf_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_information="cc-pvdz"
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
 )
 orbitals = wavefunction.get_orbitals()
 

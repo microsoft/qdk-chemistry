@@ -33,6 +33,18 @@ class ElectronicStructureSettings : public data::Settings {
 };
 
 /**
+ * @brief Type alias for basis set specification or initial guess
+ *
+ * Can be one of:
+ * - A shared pointer to Orbitals for initial guess
+ * - A shared pointer to BasisSet for custom basis
+ * - A string for standard basis set name (e.g., "sto-3g")
+ */
+using BasisOrGuess = std::variant<std::shared_ptr<data::Orbitals>,
+                                   std::shared_ptr<data::BasisSet>,
+                                   std::string>;
+
+/**
  * @brief Abstract base class for Self-Consistent Field (SCF) solvers
  *
  * The ScfSolver class provides a common interface for various SCF algorithms
@@ -62,9 +74,7 @@ class ElectronicStructureSettings : public data::Settings {
 class ScfSolver
     : public Algorithm<
           ScfSolver, std::pair<double, std::shared_ptr<data::Wavefunction>>,
-          std::shared_ptr<data::Structure>, int, int,
-          std::variant<std::shared_ptr<data::Orbitals>,
-                       std::shared_ptr<data::BasisSet>, std::string>> {
+          std::shared_ptr<data::Structure>, int, int, BasisOrGuess> {
  public:
   /**
    * @brief Default constructor
@@ -90,7 +100,7 @@ class ScfSolver
    *                  nuclear charges, and other structural information
    * @param charge The molecular charge
    * @param spin_multiplicity The spin multiplicity of the molecular system
-   * @param basis_information Basis set information, which can be provided as:
+   * @param basis_or_guess Basis set information, which can be provided as:
    *         - A shared pointer to a `data::BasisSet` object
    *         - A string specifying the name of a standard basis set (e.g.,
    * "sto-3g")
@@ -140,20 +150,17 @@ class ScfSolver
    * @param structure The molecular structure
    * @param charge The molecular charge
    * @param spin_multiplicity The spin multiplicity
-   * @param basis_information Basis set information, which can be provided as:
+   * @param basis_or_guess Basis set information, which can be provided as:
    *         - A shared pointer to a `data::BasisSet` object
    *         - A string specifying the name of a standard basis set (e.g.,
    * "sto-3g")
    *         - A shared pointer to a `data::Orbitals` object to be used as an
-   * initial guess
+   * initial guess (the basis set will be inferred from the orbitals)
    * @return A pair containing the energy and wavefunction
    */
   virtual std::pair<double, std::shared_ptr<data::Wavefunction>> _run_impl(
       std::shared_ptr<data::Structure> structure, int charge,
-      int spin_multiplicity,
-      std::variant<std::shared_ptr<data::Orbitals>,
-                   std::shared_ptr<data::BasisSet>, std::string>
-          basis_information) const = 0;
+      int spin_multiplicity, BasisOrGuess basis_or_guess) const = 0;
 };
 
 /**

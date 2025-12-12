@@ -37,7 +37,7 @@ class TestSCF : public ScfSolver {
       std::shared_ptr<Structure> /*structure*/, int charge, int multiplicity,
       std::variant<std::shared_ptr<Orbitals>, std::shared_ptr<BasisSet>,
                    std::string>
-      /*basis_information*/
+      /*basis_or_guess*/
   ) const override {
     // Dummy implementation for testing
     Eigen::MatrixXd coefficients = Eigen::MatrixXd::Zero(3, 3);

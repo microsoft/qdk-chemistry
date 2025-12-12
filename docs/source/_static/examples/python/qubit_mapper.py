@@ -23,7 +23,7 @@ structure = Structure.from_xyz_file(Path(".") / "../data/water.structure.xyz")
 # Perform an SCF calculation to generate initial orbitals
 scf_solver = create("scf_solver")
 _, wfn_hf = scf_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_information="cc-pvdz"
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
 )
 print(f"Orbital occupancies: {wfn_hf.get_total_orbital_occupations()}")
 

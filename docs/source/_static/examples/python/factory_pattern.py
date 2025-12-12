@@ -25,7 +25,7 @@ localizer = create("orbital_localizer", "qdk_pipek_mezey")
 
 # Configure and use the instance
 E_scf, wfn = scf_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_information="cc-pvdz"
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
 )
 # end-cell-scf-localizer
 ################################################################################

@@ -16,7 +16,7 @@ coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 structure = Structure(coords, ["H", "H"])
 scf_solver = create("scf_solver")
 E_scf, wfn = scf_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_information="sto-3g"
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
 )
 
 ham_constructor = create("hamiltonian_constructor")

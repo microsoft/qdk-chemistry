@@ -135,7 +135,7 @@ class PyscfScfSolver(ScfSolver):
         self._settings = PyscfScfSettings()
 
     def _run_impl(
-        self, structure: Structure, charge: int, spin_multiplicity: int, basis_information: Orbitals | BasisSet | str
+        self, structure: Structure, charge: int, spin_multiplicity: int, basis_or_guess: Orbitals | BasisSet | str
     ) -> tuple[float, Wavefunction]:
         """Perform a self-consistent field (SCF) calculation using PySCF.
 
@@ -155,7 +155,7 @@ class PyscfScfSolver(ScfSolver):
             spin_multiplicity: The spin multiplicity :math:`(2S+1)` of the system, where :math:`S` is the total spin.
                 Note: This parameter is not used directly; the spin_multiplicity from ``self._settings`` is used
                 instead.
-            basis_information: Basis set information, which can be provided as:
+            basis_or_guess: Basis set information, which can be provided as:
                 - A ``qdk_chemistry.data.BasisSet`` object
                 - A string specifying the name of a standard basis set (e.g., "sto-3g")
                 - A ``qdk_chemistry.data.Orbitals`` object to be used as an initial guess
@@ -176,14 +176,14 @@ class PyscfScfSolver(ScfSolver):
         # Determine basis set name and initial guess
         basis_name = None
         initial_guess = None
-        if isinstance(basis_information, Orbitals):
-            basis_name = basis_information.get_basis_set().get_name()
-            initial_guess = basis_information
-        elif isinstance(basis_information, BasisSet):
-            basis_name = basis_information.get_name()
+        if isinstance(basis_or_guess, Orbitals):
+            basis_name = basis_or_guess.get_basis_set().get_name()
+            initial_guess = basis_or_guess
+        elif isinstance(basis_or_guess, BasisSet):
+            basis_name = basis_or_guess.get_name()
             raise NotImplementedError("Custom BasisSet input not yet implemented in PyscfScfSolver.")
-        elif isinstance(basis_information, str):
-            basis_name = basis_information
+        elif isinstance(basis_or_guess, str):
+            basis_name = basis_or_guess
 
         # settings
         method = self._settings["method"].lower()

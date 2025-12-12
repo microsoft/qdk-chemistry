@@ -40,33 +40,31 @@ std::pair<int, int> calculate_electron_counts(int nuclear_charge, int charge,
 
 std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     std::shared_ptr<data::Structure> structure, int charge, int multiplicity,
-    std::variant<std::shared_ptr<data::Orbitals>,
-                 std::shared_ptr<data::BasisSet>, std::string>
-        basis_information) const {
+    BasisOrGuess basis_or_guess) const {
   QDK_LOG_TRACE_ENTERING();
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
 
-  // check basis_information type
+  // check basis_or_guess type
   bool use_input_initial_guess = false;
   bool use_explicit_basis_set = false;
   bool use_basis_set_string = false;
   std::string basis_set_name;
   if (std::holds_alternative<std::shared_ptr<data::Orbitals>>(
-          basis_information)) {
+          basis_or_guess)) {
     basis_set_name =
-        std::get<std::shared_ptr<data::Orbitals>>(basis_information)
+        std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess)
             ->get_basis_set()
             ->get_name();
     use_input_initial_guess = true;
   } else if (std::holds_alternative<std::shared_ptr<data::BasisSet>>(
-                 basis_information)) {
+                 basis_or_guess)) {
     basis_set_name =
-        std::get<std::shared_ptr<data::BasisSet>>(basis_information)
+        std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess)
             ->get_name();
     use_explicit_basis_set = true;
-  } else if (std::holds_alternative<std::string>(basis_information)) {
-    basis_set_name = std::get<std::string>(basis_information);
+  } else if (std::holds_alternative<std::string>(basis_or_guess)) {
+    basis_set_name = std::get<std::string>(basis_or_guess);
   }
   std::transform(basis_set_name.begin(), basis_set_name.end(),
                  basis_set_name.begin(), ::tolower);
@@ -75,7 +73,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   if (basis_set_name == data::BasisSet::custom_name || use_explicit_basis_set) {
     use_explicit_basis_set = true;
     qdk_raw_basis_set =
-        std::get<std::shared_ptr<data::BasisSet>>(basis_information);
+        std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess);
   }
 
   // Extract geometry from structure object
@@ -298,7 +296,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // create new SCF solver
   if (use_input_initial_guess) {
     auto initial_guess =
-        std::get<std::shared_ptr<data::Orbitals>>(basis_information);
+        std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess);
     auto [coeff_alpha, coeff_beta] = initial_guess->get_coefficients();
 
     // Calculate number of electrons

@@ -129,12 +129,12 @@ class ScfSolver : public qdk::chemistry::algorithms::ScfSolver {
    * elements
    * @param charge The molecular charge
    * @param spin_multiplicity The spin multiplicity of the molecular system
-   * @param basis_information Basis set information, which can be provided as:
+   * @param basis_or_guess Basis set information, which can be provided as:
    *         - A shared pointer to a `data::BasisSet` object
    *         - A string specifying the name of a standard basis set (e.g.,
    * "sto-3g")
    *         - A shared pointer to a `data::Orbitals` object to be used as an
-   * initial guess
+   * initial guess (the basis set will be inferred from the orbitals)
    *
    * @return A pair containing:
    *         - The final SCF total energy (double)
@@ -147,10 +147,7 @@ class ScfSolver : public qdk::chemistry::algorithms::ScfSolver {
    */
   std::pair<double, std::shared_ptr<data::Wavefunction>> _run_impl(
       std::shared_ptr<data::Structure> structure, int charge,
-      int spin_multiplicity,
-      std::variant<std::shared_ptr<data::Orbitals>,
-                   std::shared_ptr<data::BasisSet>, std::string>
-          basis_information) const override;
+      int spin_multiplicity, BasisOrGuess basis_or_guess) const override;
 };
 
 }  // namespace qdk::chemistry::algorithms::microsoft

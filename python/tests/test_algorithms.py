@@ -180,7 +180,7 @@ class MockScfSolver(ScfSolver):
         self._settings._set_default("numeric_param", "double", 0.0)
         self._settings._set_default("list_param", "vector<int>", [])
 
-    def _run_impl(self, structure, charge: int, multiplicity: int, basis_information: Orbitals | BasisSet | str):  # noqa: ARG002
+    def _run_impl(self, structure, charge: int, multiplicity: int, basis_or_guess: Orbitals | BasisSet | str):  # noqa: ARG002
         """A simple test implementation of the solve method."""
         # Simple test implementation - create valid orbitals
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])  # 2x2 identity

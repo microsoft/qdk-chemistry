@@ -34,7 +34,7 @@ structure = Structure(coords, symbols=symbols)
 
 # Run scf
 E_scf, wfn = scf_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_information="def2-tzvpp"
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="def2-tzvpp"
 )
 scf_orbitals = wfn.get_orbitals()
 

@@ -39,11 +39,9 @@ class ScfSolverBase : public ScfSolver,
  protected:
   ReturnType _run_impl(std::shared_ptr<Structure> structure, int charge,
                        int spin_multiplicity,
-                       std::variant<std::shared_ptr<Orbitals>,
-                                    std::shared_ptr<BasisSet>, std::string>
-                           basis_information) const override {
+                       BasisOrGuess basis_or_guess) const override {
     PYBIND11_OVERRIDE_PURE(ReturnType, ScfSolver, _run_impl, structure, charge,
-                           spin_multiplicity, basis_information);
+                           spin_multiplicity, basis_or_guess);
   }
 };
 
@@ -88,12 +86,8 @@ Examples:
       "run",
       [](const ScfSolver &solver,
          std::shared_ptr<qdk::chemistry::data::Structure> structure, int charge,
-         int spin_multiplicity,
-         std::variant<std::shared_ptr<Orbitals>, std::shared_ptr<BasisSet>,
-                      std::string>
-             basis_information) {
-        return solver.run(structure, charge, spin_multiplicity,
-                          basis_information);
+         int spin_multiplicity, BasisOrGuess basis_or_guess) {
+        return solver.run(structure, charge, spin_multiplicity, basis_or_guess);
       },
       R"(
 Perform SCF calculation on the given molecular structure.
@@ -104,7 +98,7 @@ Args:
     structure (qdk_chemistry.data.Structure): The molecular structure to solve
     charge (int): The molecular charge
     spin_multiplicity (int): The spin multiplicity of the molecular system
-    basis_information (Union[qdk_chemistry.data.Orbitals, qdk_chemistry.data.BasisSet, str]):
+    basis_or_guess (Union[qdk_chemistry.data.Orbitals, qdk_chemistry.data.BasisSet, str]):
         Basis set information, which can be provided as:
 
         - A ``qdk_chemistry.data.BasisSet`` object
@@ -116,7 +110,7 @@ Returns:
 
 )",
       py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"),
-      py::arg("basis_information"));
+      py::arg("basis_or_guess"));
 
   scf_solver.def("settings", &ScfSolver::settings,
                  R"(
