@@ -112,6 +112,7 @@ TEST_F(MCTest, Water_STO3G_ASCI) {
           "macis_asci");
   mc->settings().set("ntdets_max", 128);
   mc->settings().set("ntdets_min", 1);
+  mc->settings().set("core_selection_strategy", "fixed");  // Deterministic size
 
   auto [E_fci, wfn_fci] = mc->run(ham, 5, 5);
   // FCI electronic energy is -8.301534669468e+01
