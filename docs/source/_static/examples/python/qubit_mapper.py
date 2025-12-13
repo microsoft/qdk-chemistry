@@ -29,7 +29,7 @@ from qdk_chemistry.data import Structure  # noqa: E402
 # Read a molecular structure from XYZ file
 structure = Structure.from_xyz_file(Path(".") / "../data/water.structure.xyz")
 
-# Perform an SCF calculation to generate initial orbitals
+# Perform a SCF calculation to generate initial orbitals
 scf_solver = create("scf_solver", basis_set="cc-pvdz")
 _, wfn_hf = scf_solver.run(structure, charge=0, spin_multiplicity=1)
 

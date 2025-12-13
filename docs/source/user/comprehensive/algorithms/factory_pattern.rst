@@ -194,7 +194,7 @@ For comprehensive documentation on working with settings, see :doc:`settings`.
 
       using namespace qdk::chemistry::algorithms;
 
-      // Create an SCF solver and inspect its settings
+      // Create a SCF solver and inspect its settings
       auto scf = ScfSolverFactory::create("qdk");
 
       // Print settings as a formatted table
@@ -211,7 +211,7 @@ For comprehensive documentation on working with settings, see :doc:`settings`.
 
       from qdk_chemistry.algorithms import registry
 
-      # Create an SCF solver and inspect its settings
+      # Create a SCF solver and inspect its settings
       scf = registry.create("scf_solver", "qdk")
 
       # Print settings as a formatted table

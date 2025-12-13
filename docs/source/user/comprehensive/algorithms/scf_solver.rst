@@ -43,10 +43,10 @@ The orbitals from :term:`SCF` calculations typically serve as input for post-:te
 Running an :term:`SCF` calculation
 ----------------------------------
 
-This section demonstrates how to create, configure, and run an SCF calculation.
+This section demonstrates how to create, configure, and run a SCF calculation.
 The ``run`` method returns two values: a scalar representing the converged SCF energy and an :doc:`Orbitals <../data/orbitals>` object containing the optimized molecular orbitals.
 
-**Creating an SCF solver:**
+**Creating a SCF solver:**
 
 .. tab:: C++ API
 

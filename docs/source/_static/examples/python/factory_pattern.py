@@ -15,7 +15,7 @@ from qdk_chemistry.data import Structure
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 structure = Structure(coords, ["H", "H"])
 
-# Create an SCF solver using the default implementation
+# Create a SCF solver using the default implementation
 scf_solver = create("scf_solver")
 
 # Create an orbital localizer using a specific implementation

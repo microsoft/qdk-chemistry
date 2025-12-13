@@ -15,13 +15,13 @@ using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
 int main() {
-  // Obtain orbitals from an SCF calculation
+  // Obtain orbitals from a SCF calculation
   // Create H2 molecule
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
   std::vector<std::string> symbols = {"H", "H"};
   Structure structure(coords, symbols);
 
-  // Obtain orbitals from an SCF calculation
+  // Obtain orbitals from a SCF calculation
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("basis_set", "sto-3g");
   auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);

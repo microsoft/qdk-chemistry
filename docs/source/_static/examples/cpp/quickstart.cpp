@@ -103,7 +103,7 @@ int main() {
 
   // ---------------------------------------------------------------------------
   // start-cell-scf
-  // Perform an SCF calculation
+  // Perform a SCF calculation
   auto scf_solver = algorithms::ScfSolverFactory::create();
   scf_solver->settings().set("basis_set", "cc-pvdz");
 

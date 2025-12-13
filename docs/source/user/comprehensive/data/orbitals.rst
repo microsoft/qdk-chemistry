@@ -97,7 +97,7 @@ It serves as input to various post-:term:`HF` methods such as :doc:`active space
 - **Hamiltonian Construction**: Build electronic Hamiltonians for post-HF methods using the orbital information.
   See :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` for details.
 
-The below example illustrates the typical access to Orbitals (via an SCF):
+The below example illustrates the typical access to Orbitals (via a SCF):
 
 .. tab:: C++ API
 

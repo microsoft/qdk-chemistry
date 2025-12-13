@@ -44,7 +44,7 @@ print(f"Elements: {structure.get_elements()}")
 
 ################################################################################
 # start-cell-scf
-# Perform an SCF calculation, returning the energy and wavefunction
+# Perform a SCF calculation, returning the energy and wavefunction
 scf_solver = create("scf_solver", basis_set="cc-pvdz")
 E_hf, wfn_hf = scf_solver.run(structure, charge=0, spin_multiplicity=1)
 print(f"SCF energy is {E_hf:.3f} Hartree")

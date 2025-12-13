@@ -35,7 +35,7 @@ std::vector<Eigen::Vector3d> coords = {Eigen::Vector3d{0.0, 0.0, 0.0},
 std::vector<std::string> symbols = {"H", "H"};
 auto structure = std::make_shared<Structure>(coords, symbols);
 
-// Run an SCF to get orbitals
+// Run a SCF to get orbitals
 auto scf_solver = ScfSolverFactory::create();
 scf_solver->settings().set("basis_set", "sto-3g");
 auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);

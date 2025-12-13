@@ -14,7 +14,7 @@ from qdk_chemistry.data import Structure
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 structure = Structure(coords, ["H", "H"])
 
-# Create an SCF solver using the factory
+# Create a SCF solver using the factory
 scf_solver = create("scf_solver", "pyscf")
 
 # Configure it using the standard settings interface

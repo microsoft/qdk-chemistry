@@ -10,7 +10,7 @@
 // start-cell-scf
 #include <qdk/chemistry.hpp>
 
-// Create an SCF solver that uses the QDK/Chemistry library as solver
+// Create a SCF solver that uses the QDK/Chemistry library as solver
 auto scf = ScfSolverFactory::create();
 
 // Configure it using the standard settings interface
