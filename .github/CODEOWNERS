@@ -16,4 +16,4 @@
 # C++
 /cpp/ @sobolevnrm @wavefunction91 @nabbelbabbel @ConradJohnston
 # Python bindings
-python/src/pybind11/ @sobolevnrm @wavefunction91 @nabbelbabbel @ConradJohnston
+/python/src/pybind11/ @sobolevnrm @wavefunction91 @nabbelbabbel @ConradJohnston
