@@ -113,6 +113,14 @@ class MacisAsciSettings : public MultiConfigurationSettings {
                          macis_defaults.pt2_min_constraint_level);
     set_default<int64_t>("pt2_constraint_refine_force",
                          macis_defaults.pt2_constraint_refine_force);
+
+    // Core selection strategy parameter
+    set_default<std::string>("core_selection_strategy", "percentage");
+    set_default<double>("core_selection_threshold",
+                        macis_defaults.core_selection_threshold,
+                        "Cumulative weight threshold for core selection",
+                        data::BoundConstraint<double>{
+                            std::numeric_limits<double>::epsilon(), 1.0});
   }
 
   /**
