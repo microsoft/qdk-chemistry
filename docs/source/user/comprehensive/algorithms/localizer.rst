@@ -102,20 +102,17 @@ You can discover available implementations programmatically:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      auto names = LocalizerFactory::available();
-      for (const auto& name : names) {
-          std::cout << name << std::endl;
-      }
+   .. literalinclude:: ../../../_static/examples/cpp/localizer.cpp
+      :language: cpp
+      :start-after: // start-cell-list-implementations
+      :end-before: // end-cell-list-implementations
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import registry
-      print(registry.available("orbital_localizer"))
-      # ['pyscf_multi', 'qdk_vvhv', 'qdk_mp2_natural_orbitals', 'qdk_pipek_mezey']
+   .. literalinclude:: ../../../_static/examples/python/localizer.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
 
 QDK Pipek-Mezey
 ~~~~~~~~~~~~~~~
@@ -233,16 +230,10 @@ The PySCF plugin provides access to `PySCF's <https://pyscf.org/>`_ orbital loca
 
 **Example:**
 
-.. code-block:: python
-
-   from qdk_chemistry.algorithms import create
-
-   localizer = create("orbital_localizer", "pyscf_multi")
-   localizer.settings().set("method", "foster-boys")
-
-   # Localize occupied orbitals
-   occ_indices = list(range(n_occupied))
-   localized_orbs = localizer.run(orbitals, occ_indices, occ_indices)
+.. literalinclude:: ../../../_static/examples/python/localizer.py
+   :language: python
+   :start-after: # start-cell-pyscf-multi-example
+   :end-before: # end-cell-pyscf-multi-example
 
 For more details on how to extend QDK/Chemistry with additional implementations, see the :doc:`plugin system <../plugins>` documentation.
 

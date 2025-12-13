@@ -63,3 +63,12 @@ print(f"Regular isometry QASM:\n{regular_circuit.get_qasm()}")
 print(f"Sparse isometry QASM:\n{sparse_circuit.get_qasm()}")
 # end-cell-run
 ################################################################################
+
+################################################################################
+# start-cell-list-implementations
+from qdk_chemistry.algorithms import registry  # noqa: E402
+
+print(registry.available("state_prep"))
+# ['sparse_isometry_gf2x', 'regular_isometry']
+# end-cell-list-implementations
+################################################################################

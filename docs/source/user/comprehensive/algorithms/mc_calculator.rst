@@ -87,20 +87,17 @@ You can discover available implementations programmatically:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      auto names = MultiConfigurationCalculatorFactory::available();
-      for (const auto& name : names) {
-          std::cout << name << std::endl;
-      }
+   .. literalinclude:: ../../../_static/examples/cpp/mc_calculator.cpp
+      :language: cpp
+      :start-after: // start-cell-list-implementations
+      :end-before: // end-cell-list-implementations
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import registry
-      print(registry.available("multi_configuration_calculator"))
-      # ['macis_asci', 'macis_cas']
+   .. literalinclude:: ../../../_static/examples/python/mc_calculator.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
 
 MACIS CAS
 ~~~~~~~~~
@@ -206,13 +203,10 @@ The MACIS ASCI (Adaptive Sampling Configuration Interaction) provides selected C
 
 **Example:**
 
-.. code-block:: python
-
-   from qdk_chemistry.algorithms import create
-
-   mc = create("multi_configuration_calculator", "macis_asci")
-   mc.settings().set("ntdets_max", 50000)
-   mc.settings().set("calculate_one_rdm", True)
+.. literalinclude:: ../../../_static/examples/python/mc_calculator.py
+   :language: python
+   :start-after: # start-cell-asci-example
+   :end-before: # end-cell-asci-example
 
 For more details on how to extend QDK/Chemistry with additional implementations, see the :doc:`plugin system <../plugins>` documentation.
 

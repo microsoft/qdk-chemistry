@@ -61,3 +61,20 @@ print(f"Correlation energy: {E_ci - E_scf:.10f} Hartree")
 print(ci_wavefunction.get_summary())
 # end-cell-run
 ################################################################################
+
+################################################################################
+# start-cell-list-implementations
+from qdk_chemistry.algorithms import registry  # noqa: E402
+
+print(registry.available("multi_configuration_calculator"))
+# ['macis_asci', 'macis_cas']
+# end-cell-list-implementations
+################################################################################
+
+################################################################################
+# start-cell-asci-example
+mc = create("multi_configuration_calculator", "macis_asci")
+mc.settings().set("ntdets_max", 50000)
+mc.settings().set("calculate_one_rdm", True)
+# end-cell-asci-example
+################################################################################

@@ -112,71 +112,17 @@ Listing algorithm types and implementations
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      #include <iostream>
-      #include <qdk/chemistry.hpp>
-
-      using namespace qdk::chemistry::algorithms;
-
-      // List available SCF solver implementations
-      auto scf_methods = ScfSolverFactory::available();
-      std::cout << "Available SCF solvers:" << std::endl;
-      for (const auto& name : scf_methods) {
-          std::cout << "  - " << name << std::endl;
-      }
-
-      // List available localizer implementations
-      auto localizer_methods = LocalizerFactory::available();
-      std::cout << "Available localizers:" << std::endl;
-      for (const auto& name : localizer_methods) {
-          std::cout << "  - " << name << std::endl;
-      }
-
-      // List available Hamiltonian constructor implementations
-      auto ham_methods = HamiltonianConstructorFactory::available();
-      std::cout << "Available Hamiltonian constructors:" << std::endl;
-      for (const auto& name : ham_methods) {
-          std::cout << "  - " << name << std::endl;
-      }
-
-      // List available multi-configuration calculator implementations
-      auto mc_methods = MultiConfigurationCalculatorFactory::available();
-      std::cout << "Available MC calculators:" << std::endl;
-      for (const auto& name : mc_methods) {
-          std::cout << "  - " << name << std::endl;
-      }
-
-      // Show default implementation for each factory type
-      std::cout << "Default SCF solver: " << ScfSolverFactory::default_name() << std::endl;
-      std::cout << "Default localizer: " << LocalizerFactory::default_name() << std::endl;
-      std::cout << "Default Hamiltonian constructor: " << HamiltonianConstructorFactory::default_name() << std::endl;
-      std::cout << "Default MC calculator: " << MultiConfigurationCalculatorFactory::default_name() << std::endl;
+   .. literalinclude:: ../../../_static/examples/cpp/factory_pattern.cpp
+      :language: cpp
+      :start-after: // start-cell-list-algorithms
+      :end-before: // end-cell-list-algorithms
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import registry
-
-      # List all algorithm types and their implementations
-      all_algorithms = registry.available()
-      print(all_algorithms)
-      # Output: {'scf_solver': ['qdk', 'pyscf'], 'orbital_localizer': ['qdk_pipek_mezey', 'pyscf'], ...}
-
-      # List implementations for a specific algorithm type
-      scf_methods = registry.available("scf_solver")
-      print("Available SCF solvers:", scf_methods)
-      # Output: ['qdk', 'pyscf']
-
-      localizer_methods = registry.available("orbital_localizer")
-      print("Available localizers:", localizer_methods)
-      # Output: ['qdk_pipek_mezey', 'pyscf', ...]
-
-      # Show default implementations for each algorithm type
-      defaults = registry.show_default()
-      print("Defaults:", defaults)
-      # Output: {'scf_solver': 'qdk', 'orbital_localizer': 'qdk_pipek_mezey', ...}
+   .. literalinclude:: ../../../_static/examples/python/factory_pattern.py
+      :language: python
+      :start-after: # start-cell-list-algorithms
+      :end-before: # end-cell-list-algorithms
 
 Inspecting settings
 ~~~~~~~~~~~~~~~~~~~
@@ -187,39 +133,17 @@ For comprehensive documentation on working with settings, see :doc:`settings`.
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      #include <iostream>
-      #include <qdk/chemistry.hpp>
-
-      using namespace qdk::chemistry::algorithms;
-
-      // Create a SCF solver and inspect its settings
-      auto scf = ScfSolverFactory::create("qdk");
-
-      // Print settings as a formatted table
-      std::cout << scf->settings().as_table() << std::endl;
-
-      // Or iterate over individual settings
-      for (const auto& key : scf->settings().keys()) {
-          std::cout << key << ": " << scf->settings().get_as_string(key) << std::endl;
-      }
+   .. literalinclude:: ../../../_static/examples/cpp/factory_pattern.cpp
+      :language: cpp
+      :start-after: // start-cell-inspect-settings
+      :end-before: // end-cell-inspect-settings
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import registry
-
-      # Create a SCF solver and inspect its settings
-      scf = registry.create("scf_solver", "qdk")
-
-      # Print settings as a formatted table
-      registry.print_settings("scf_solver", "qdk")
-
-      # Or iterate over individual settings
-      for key in scf.settings().keys():
-          print(f"{key}: {scf.settings().get(key)}")
+   .. literalinclude:: ../../../_static/examples/python/factory_pattern.py
+      :language: python
+      :start-after: # start-cell-inspect-settings
+      :end-before: # end-cell-inspect-settings
 
 Connection to the plugin system
 -------------------------------

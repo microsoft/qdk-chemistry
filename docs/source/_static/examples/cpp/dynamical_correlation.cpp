@@ -53,3 +53,12 @@ std::cout << "MP2 Correlation Energy: " << mp2_corr_energy << " Hartree\n";
 std::cout << "MP2 Total Energy: " << mp2_total_energy << " Hartree\n";
 // end-cell-run
 // -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// start-cell-list-implementations
+auto names = DynamicalCorrelationCalculatorFactory::available();
+for (const auto& name : names) {
+  std::cout << name << std::endl;
+}
+// end-cell-list-implementations
+// -----------------------------------------------------------------------------

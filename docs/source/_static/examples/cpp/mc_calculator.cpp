@@ -70,3 +70,12 @@ std::cout << "Correlation energy: " << E_ci - E_scf << " Hartree" << std::endl;
 std::cout << ci_wavefunction->get_summary() << std::endl;
 // end-cell-run
 // --------------------------------------------------------------------------------------------
+
+// --------------------------------------------------------------------------------------------
+// start-cell-list-implementations
+auto names = MultiConfigurationCalculatorFactory::available();
+for (const auto& name : names) {
+  std::cout << name << std::endl;
+}
+// end-cell-list-implementations
+// --------------------------------------------------------------------------------------------

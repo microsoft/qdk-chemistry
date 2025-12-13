@@ -39,6 +39,21 @@ std::cout << ScfSolverFactory::get_docstring("default") << std::endl;
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
+// start-cell-discover-implementations
+#include <qdk/chemistry/algorithms/scf.hpp>
+
+// List all registered SCF solver implementations
+auto names = qdk::chemistry::algorithms::ScfSolver::available();
+for (const auto& name : names) {
+  std::cout << name << std::endl;
+}
+
+// Create a specific implementation
+auto solver = qdk::chemistry::algorithms::ScfSolver::create("pyscf");
+// end-cell-discover-implementations
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
 // start-cell-settings
 // Set general options that work across all backends
 scf->settings().set("basis_set", "cc-pvdz");

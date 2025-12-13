@@ -81,20 +81,17 @@ You can discover available implementations programmatically:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      auto names = DynamicalCorrelationCalculatorFactory::available();
-      for (const auto& name : names) {
-          std::cout << name << std::endl;
-      }
+   .. literalinclude:: ../../../_static/examples/cpp/dynamical_correlation.cpp
+      :language: cpp
+      :start-after: // start-cell-list-implementations
+      :end-before: // end-cell-list-implementations
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import registry
-      print(registry.available("dynamical_correlation_calculator"))
-      # ['pyscf_coupled_cluster', 'qdk_mp2_calculator']
+   .. literalinclude:: ../../../_static/examples/python/dynamical_correlation.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
 
 QDK MP2 calculator
 ~~~~~~~~~~~~~~~~~~

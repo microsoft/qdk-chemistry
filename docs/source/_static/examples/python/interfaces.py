@@ -44,6 +44,21 @@ for algorithm_name in available():
 ################################################################################
 
 ################################################################################
+# start-cell-discover-implementations
+from qdk_chemistry.algorithms import ScfSolver  # noqa: E402
+
+# List all registered SCF solver implementations
+print(ScfSolver.available())  # ['qdk', 'pyscf']
+
+# Create a specific implementation
+solver = ScfSolver.create("pyscf")
+
+# Inspect available settings
+solver.print_settings()
+# end-cell-discover-implementations
+################################################################################
+
+################################################################################
 # start-cell-settings
 # All algorithms use a consistent settings interface
 scf = create("scf_solver")

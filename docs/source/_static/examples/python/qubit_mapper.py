@@ -24,6 +24,7 @@ qubit_mapper.settings().set("encoding", "jordan-wigner")
 ################################################################################
 # start-cell-run
 from pathlib import Path  # noqa: E402
+
 from qdk_chemistry.data import Structure  # noqa: E402
 
 # Read a molecular structure from XYZ file
@@ -51,4 +52,13 @@ hamiltonian = hamiltonian_constructor.run(active_orbitals)
 qubit_hamiltonian = qubit_mapper.run(hamiltonian)
 print(f"Qubit Hamiltonian has {qubit_hamiltonian.num_qubits()} qubits")
 # end-cell-run
+################################################################################
+
+################################################################################
+# start-cell-list-implementations
+from qdk_chemistry.algorithms import registry  # noqa: E402
+
+print(registry.available("qubit_mapper"))
+# ['qiskit']
+# end-cell-list-implementations
 ################################################################################

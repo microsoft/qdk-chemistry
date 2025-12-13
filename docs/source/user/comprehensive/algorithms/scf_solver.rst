@@ -136,19 +136,17 @@ You can discover available implementations programmatically:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      auto names = ScfSolverFactory::available();
-      for (const auto& name : names) {
-          std::cout << name << std::endl;
-      }
+   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
+      :language: cpp
+      :start-after: // start-cell-list-implementations
+      :end-before: // end-cell-list-implementations
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import registry
-      print(registry.available("scf_solver"))  # ['pyscf', 'qdk']
+   .. literalinclude:: ../../../_static/examples/python/scf_solver.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
 
 QDK (Native)
 ~~~~~~~~~~~~
@@ -279,14 +277,10 @@ The PySCF plugin provides access to the comprehensive `PySCF <https://pyscf.org/
 
 **Example:**
 
-.. code-block:: python
-
-   from qdk_chemistry.algorithms import create
-
-   solver = create("scf_solver", "pyscf")
-   solver.settings().set("method", "b3lyp")
-   solver.settings().set("basis_set", "cc-pvdz")
-   solver.settings().set("scf_type", "restricted")
+.. literalinclude:: ../../../_static/examples/python/scf_solver.py
+   :language: python
+   :start-after: # start-cell-pyscf-example
+   :end-before: # end-cell-pyscf-example
 
 For more details on how to extend QDK/Chemistry with additional implementations, see the :doc:`plugin system <../plugins>` documentation.
 

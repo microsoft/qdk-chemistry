@@ -65,10 +65,10 @@ You can discover available implementations programmatically:
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import registry
-      print(registry.available("qubit_mapper"))  # ['qiskit']
+   .. literalinclude:: ../../../_static/examples/python/qubit_mapper.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
 
 Qiskit
 ~~~~~~

@@ -122,28 +122,17 @@ When an implementation requires configuration options beyond those provided by t
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      class CustomScfSettings : public qdk::chemistry::algorithms::ElectronicStructureSettings {
-       public:
-        CustomScfSettings() : ElectronicStructureSettings() {
-          // Define additional settings beyond the inherited defaults
-          set_default("custom_option", "default_value");
-        }
-      };
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-custom-settings
+      :end-before: // end-cell-custom-settings
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.data import ElectronicStructureSettings
-
-      class CustomScfSettings(ElectronicStructureSettings):
-          def __init__(self):
-              super().__init__()
-              # Define additional settings beyond the inherited defaults
-              self._set_default("custom_option", "string", "default_value",
-                               "Description of the custom option")
+   .. literalinclude:: ../../_static/examples/python/custom_plugin.py
+      :language: python
+      :start-after: # start-cell-custom-settings
+      :end-before: # end-cell-custom-settings
 
 **Implementation structure**
 
@@ -156,72 +145,17 @@ The ``_run_impl()`` method is responsible for:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      #include <qdk/chemistry/algorithms/scf.hpp>
-      #include "external_chemistry_package.hpp"
-
-      class CustomScfSolver : public qdk::chemistry::algorithms::ScfSolver {
-       public:
-        CustomScfSolver() {
-          _settings = std::make_unique<CustomScfSettings>();
-        }
-
-        std::string name() const override { return "custom"; }
-
-       protected:
-        std::pair<double, std::shared_ptr<qdk::chemistry::data::Wavefunction>>
-        _run_impl(std::shared_ptr<qdk::chemistry::data::Structure> structure,
-                  int charge, int spin_multiplicity,
-                  std::optional<std::shared_ptr<qdk::chemistry::data::Orbitals>> initial_guess) override {
-
-          // Convert to external format
-          auto external_mol = convert_to_external_format(structure);
-
-          // Execute external calculation
-          auto basis = _settings->get<std::string>("basis_set");
-          auto [energy, external_orbitals] = external_package::run_scf(external_mol, basis);
-
-          // Convert results to QDK format
-          auto wavefunction = convert_to_qdk_wavefunction(external_orbitals);
-
-          return {energy, wavefunction};
-        }
-      };
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-custom-scf-solver
+      :end-before: // end-cell-custom-scf-solver
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import ScfSolver
-      from qdk_chemistry.data import Structure, Wavefunction, Orbitals
-
-      class CustomScfSolver(ScfSolver):
-          def __init__(self):
-              super().__init__()
-              self._settings = CustomScfSettings()
-
-          def name(self) -> str:
-              return "custom"
-
-          def _run_impl(
-              self,
-              structure: Structure,
-              charge: int,
-              spin_multiplicity: int,
-              initial_guess: Orbitals | None = None,
-          ) -> tuple[float, Wavefunction]:
-              # Convert to external format
-              # external_mol = external_package.Molecule(structure.positions, structure.elements)
-
-              # Execute external calculation
-              basis_set = self.settings().get("basis_set")
-              # energy, external_orbs = external_package.run_scf(external_mol, basis=basis_set)
-
-              # Convert results to QDK format
-              # wavefunction = self._convert_to_wavefunction(external_orbs)
-
-              return energy, wavefunction
+   .. literalinclude:: ../../_static/examples/python/custom_plugin.py
+      :language: python
+      :start-after: # start-cell-custom-scf-solver
+      :end-before: # end-cell-custom-scf-solver
 
 **Registration**
 
@@ -230,37 +164,24 @@ Registration is typically performed during module initialization:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      #include <qdk/chemistry/algorithms/scf.hpp>
-
-      // Static registration during library initialization
-      static auto registration = qdk::chemistry::algorithms::ScfSolver::register_implementation(
-          []() { return std::make_unique<CustomScfSolver>(); }
-      );
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-registration
+      :end-before: // end-cell-registration
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms.registry import register
-
-      # Registration during module import
-      register(lambda: CustomScfSolver())
+   .. literalinclude:: ../../_static/examples/python/custom_plugin.py
+      :language: python
+      :start-after: # start-cell-registration
+      :end-before: # end-cell-registration
 
 Following registration, the implementation is accessible through the standard API:
 
-.. code-block:: python
-
-   from qdk_chemistry.algorithms import ScfSolver
-
-   # Instantiate the custom solver
-   solver = ScfSolver.create("custom")
-   solver.settings()["basis_set"] = "cc-pvdz"
-   energy, wavefunction = solver.run(molecule, charge=0, spin_multiplicity=1)
-
-   # Verify registration
-   print(ScfSolver.available())  # [..., 'custom']
+.. literalinclude:: ../../_static/examples/python/custom_plugin.py
+   :language: python
+   :start-after: # start-cell-usage-after-registration
+   :end-before: # end-cell-usage-after-registration
 
 .. _custom-algorithm-types:
 
@@ -284,34 +205,17 @@ Define a settings class containing all configuration parameters:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      class GeometryOptimizerSettings : public qdk::chemistry::data::Settings {
-       public:
-        GeometryOptimizerSettings() {
-          set_default<int64_t>("max_steps", 100, "Maximum optimization steps",
-                               qdk::chemistry::data::BoundConstraint<int64_t>{1, 10000});
-          set_default<double>("convergence_threshold", 1e-5,
-                              "Gradient convergence threshold");
-          set_default<double>("step_size", 0.1, "Initial optimization step size");
-        }
-      };
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-geometry-settings
+      :end-before: // end-cell-geometry-settings
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.data import Settings
-
-      class GeometryOptimizerSettings(Settings):
-          def __init__(self):
-              super().__init__()
-              self._set_default("max_steps", "int", 100,
-                               "Maximum optimization steps", (1, 10000))
-              self._set_default("convergence_threshold", "double", 1e-5,
-                               "Gradient convergence threshold")
-              self._set_default("step_size", "double", 0.1,
-                               "Initial optimization step size")
+   .. literalinclude:: ../../_static/examples/python/custom_plugin.py
+      :language: python
+      :start-after: # start-cell-geometry-settings
+      :end-before: # end-cell-geometry-settings
 
 **Base class definition**
 
@@ -319,29 +223,17 @@ Define an abstract base class specifying the interface for all implementations:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      class GeometryOptimizer
-          : public qdk::chemistry::algorithms::Algorithm<
-                GeometryOptimizer,
-                std::shared_ptr<qdk::chemistry::data::Structure>,  // Return type
-                std::shared_ptr<qdk::chemistry::data::Structure>>  // Input type
-      {
-       public:
-        static std::string type_name() { return "geometry_optimizer"; }
-      };
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-geometry-base-class
+      :end-before: // end-cell-geometry-base-class
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms.base import Algorithm
-
-      class GeometryOptimizer(Algorithm):
-          """Abstract base class for geometry optimization algorithms."""
-
-          def type_name(self) -> str:
-              return "geometry_optimizer"
+   .. literalinclude:: ../../_static/examples/python/custom_plugin.py
+      :language: python
+      :start-after: # start-cell-geometry-base-class
+      :end-before: # end-cell-geometry-base-class
 
 **Factory definition**
 
@@ -349,22 +241,17 @@ The factory manages implementation registration and provides instance creation:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // The Algorithm base class template provides factory functionality automatically
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-geometry-factory
+      :end-before: // end-cell-geometry-factory
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms.base import AlgorithmFactory
-
-      class GeometryOptimizerFactory(AlgorithmFactory):
-          def algorithm_type_name(self) -> str:
-              return "geometry_optimizer"
-
-          def default_algorithm_name(self) -> str:
-              return "bfgs"
+   .. literalinclude:: ../../_static/examples/python/custom_plugin.py
+      :language: python
+      :start-after: # start-cell-geometry-factory
+      :end-before: # end-cell-geometry-factory
 
 **Concrete implementations**
 
@@ -372,65 +259,24 @@ Implement the algorithm by inheriting from the base class:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      class BfgsOptimizer : public GeometryOptimizer {
-       public:
-        BfgsOptimizer() {
-          _settings = std::make_unique<GeometryOptimizerSettings>();
-        }
-
-        std::string name() const override { return "bfgs"; }
-
-       protected:
-        std::shared_ptr<qdk::chemistry::data::Structure>
-        _run_impl(std::shared_ptr<qdk::chemistry::data::Structure> structure) override {
-          auto max_steps = _settings->get<int64_t>("max_steps");
-          auto threshold = _settings->get<double>("convergence_threshold");
-
-          // BFGS optimization implementation
-          return optimized_structure;
-        }
-      };
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-geometry-implementations
+      :end-before: // end-cell-geometry-implementations
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      class BfgsOptimizer(GeometryOptimizer):
-          """BFGS quasi-Newton geometry optimizer."""
-
-          def __init__(self):
-              super().__init__()
-              self._settings = GeometryOptimizerSettings()
-
-          def name(self) -> str:
-              return "bfgs"
-
-          def _run_impl(self, structure: Structure) -> Structure:
-              max_steps = self.settings().get("max_steps")
-              threshold = self.settings().get("convergence_threshold")
-
-              # BFGS optimization implementation
-              return optimized_structure
+   .. literalinclude:: ../../_static/examples/python/custom_plugin.py
+      :language: python
+      :start-after: # start-cell-geometry-implementations
+      :end-before: # end-cell-geometry-implementations
 
 Additional implementations follow the same pattern:
 
-.. code-block:: python
-
-   class SteepestDescentOptimizer(GeometryOptimizer):
-       """Steepest descent geometry optimizer."""
-
-       def __init__(self):
-           super().__init__()
-           self._settings = GeometryOptimizerSettings()
-
-       def name(self) -> str:
-           return "steepest_descent"
-
-       def _run_impl(self, structure: Structure) -> Structure:
-           # Steepest descent implementation
-           return optimized_structure
+.. literalinclude:: ../../_static/examples/python/custom_plugin.py
+   :language: python
+   :start-after: # start-cell-steepest-descent
+   :end-before: # end-cell-steepest-descent
 
 **Registration**
 
@@ -438,45 +284,26 @@ Register the factory and all implementations:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // During library initialization
-      static auto factory_reg = register_factory<GeometryOptimizer>();
-      static auto bfgs_reg = GeometryOptimizer::register_implementation(
-          []() { return std::make_unique<BfgsOptimizer>(); }
-      );
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-geometry-registration
+      :end-before: // end-cell-geometry-registration
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import registry
-
-      # Register the factory
-      registry.register_factory(GeometryOptimizerFactory())
-
-      # Register implementations
-      registry.register(lambda: BfgsOptimizer())
-      registry.register(lambda: SteepestDescentOptimizer())
+   .. literalinclude:: ../../_static/examples/python/custom_plugin.py
+      :language: python
+      :start-after: # start-cell-geometry-registration
+      :end-before: # end-cell-geometry-registration
 
 **Usage**
 
 Following registration, the new algorithm type is accessible through the standard API:
 
-.. code-block:: python
-
-   from qdk_chemistry.algorithms import create, available
-
-   # List available implementations
-   print(available("geometry_optimizer"))  # ['bfgs', 'steepest_descent']
-
-   # Instantiate and configure
-   optimizer = create("geometry_optimizer", "bfgs")
-   optimizer.settings().set("max_steps", 200)
-   optimizer.settings().set("convergence_threshold", 1e-6)
-
-   # Execute
-   optimized_structure = optimizer.run(initial_structure)
+.. literalinclude:: ../../_static/examples/python/custom_plugin.py
+   :language: python
+   :start-after: # start-cell-geometry-usage
+   :end-before: # end-cell-geometry-usage
 
 For additional information on the factory pattern and settings system, refer to the
 :doc:`factory pattern <algorithms/factory_pattern>` and :doc:`settings <algorithms/settings>` documentation.

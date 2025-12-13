@@ -23,8 +23,8 @@ mp2_calculator = create("dynamical_correlation_calculator")
 
 ################################################################################
 # start-cell-run
-from qdk_chemistry.data import Structure, Ansatz  # noqa: E402
 import numpy as np  # noqa: E402
+from qdk_chemistry.data import Ansatz, Structure  # noqa: E402
 
 # Create a simple structure
 coords = np.array([[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]])
@@ -50,4 +50,13 @@ mp2_corr_energy = mp2_total_energy - E_hf
 print(f"MP2 Correlation Energy: {mp2_corr_energy:.10f} Hartree")
 print(f"MP2 Total Energy: {mp2_total_energy:.10f} Hartree")
 # end-cell-run
+################################################################################
+
+################################################################################
+# start-cell-list-implementations
+from qdk_chemistry.algorithms import registry  # noqa: E402
+
+print(registry.available("dynamical_correlation_calculator"))
+# ['pyscf_coupled_cluster', 'qdk_mp2_calculator']
+# end-cell-list-implementations
 ################################################################################

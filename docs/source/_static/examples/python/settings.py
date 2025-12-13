@@ -6,9 +6,33 @@
 # --------------------------------------------------------------------------------------------
 
 ################################################################################
+# start-cell-discover-settings
+from qdk_chemistry.algorithms import available, create, print_settings, inspect_settings
+
+# List all algorithm types and their implementations
+for algo_type, implementations in available().items():
+    print(f"{algo_type}: {implementations}")
+
+# Display a formatted settings table for a specific implementation
+print_settings("scf_solver", "qdk")
+
+# Inspect settings programmatically
+for name, type_name, default, description, limits in inspect_settings(
+    "scf_solver", "qdk"
+):
+    print(f"{name} ({type_name}): {default}")
+
+# Create an instance and iterate over its settings
+scf = create("scf_solver")
+for key, value in scf.settings().items():
+    print(f"  {key}: {value}")
+# end-cell-discover-settings
+################################################################################
+
+################################################################################
 # start-cell-get-settings
-from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Settings
+from qdk_chemistry.algorithms import create  # noqa: E402
+from qdk_chemistry.data import Settings  # noqa: E402
 
 # Create an algorithm
 scf_solver = create("scf_solver")
@@ -117,6 +141,22 @@ settings_from_json = Settings.from_json(json_data)
 # end-cell-serialization
 ################################################################################
 
+################################################################################
+# start-cell-settings-locked
+scf = create("scf_solver")
+scf.settings().set("basis_set", "sto-3g")
+energy, wfn = scf.run(structure, charge=0, spin_multiplicity=1)  # type: ignore[name-defined]  # noqa: F821
+
+# Settings are now locked - this raises SettingsAreLocked:
+# scf.settings().set("basis_set", "cc-pvdz")
+
+# Create a new instance for different settings
+scf2 = create("scf_solver")
+scf2.settings().set("basis_set", "cc-pvdz")
+energy2, wfn2 = scf2.run(structure, charge=0, spin_multiplicity=1)  # type: ignore[name-defined]  # noqa: F821
+# end-cell-settings-locked
+################################################################################
+
 
 ################################################################################
 # start-cell-extend-settings
@@ -144,4 +184,27 @@ except qdk_chemistry.data.SettingNotFound as e:
     # Use a fallback and continue execution
     value = settings.get_or_default("non_existent_setting", 0.0)
 # end-cell-settings-errors
+################################################################################
+
+################################################################################
+# start-cell-get-expected-type
+expected_type = settings.get_expected_python_type("convergence_threshold")
+print(expected_type)  # "float"
+
+expected_type = settings.get_expected_python_type("active_orbitals")
+print(expected_type)  # "list[int]"
+# end-cell-get-expected-type
+################################################################################
+
+################################################################################
+# start-cell-inspect-constraints
+if settings.has_limits("max_iterations"):
+    limits = settings.get_limits("max_iterations")
+    # Returns (min, max) tuple for bounds, or list for allowed values
+    print(f"Allowed range: {limits}")  # e.g., (1, 1000)
+
+if settings.has_limits("method"):
+    allowed = settings.get_limits("method")
+    print(f"Allowed values: {allowed}")  # e.g., ['hf', 'dft']
+# end-cell-inspect-constraints
 ################################################################################

@@ -61,10 +61,10 @@ You can discover available implementations programmatically:
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import registry
-      print(registry.available("state_prep"))  # ['sparse_isometry_gf2x', 'regular_isometry']
+   .. literalinclude:: ../../../_static/examples/python/state_preparation.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
 
 Sparse Isometry GF2+X
 ~~~~~~~~~~~~~~~~~~~~~

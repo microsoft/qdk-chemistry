@@ -27,3 +27,70 @@ scf_solver->settings().set("basis_set", "cc-pvdz");
 auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);
 // end-cell-scf-localizer
 // -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// start-cell-list-algorithms
+#include <iostream>
+#include <qdk/chemistry.hpp>
+
+using namespace qdk::chemistry::algorithms;
+
+// List available SCF solver implementations
+auto scf_methods = ScfSolverFactory::available();
+std::cout << "Available SCF solvers:" << std::endl;
+for (const auto& name : scf_methods) {
+  std::cout << "  - " << name << std::endl;
+}
+
+// List available localizer implementations
+auto localizer_methods = LocalizerFactory::available();
+std::cout << "Available localizers:" << std::endl;
+for (const auto& name : localizer_methods) {
+  std::cout << "  - " << name << std::endl;
+}
+
+// List available Hamiltonian constructor implementations
+auto ham_methods = HamiltonianConstructorFactory::available();
+std::cout << "Available Hamiltonian constructors:" << std::endl;
+for (const auto& name : ham_methods) {
+  std::cout << "  - " << name << std::endl;
+}
+
+// List available multi-configuration calculator implementations
+auto mc_methods = MultiConfigurationCalculatorFactory::available();
+std::cout << "Available MC calculators:" << std::endl;
+for (const auto& name : mc_methods) {
+  std::cout << "  - " << name << std::endl;
+}
+
+// Show default implementation for each factory type
+std::cout << "Default SCF solver: " << ScfSolverFactory::default_name()
+          << std::endl;
+std::cout << "Default localizer: " << LocalizerFactory::default_name()
+          << std::endl;
+std::cout << "Default Hamiltonian constructor: "
+          << HamiltonianConstructorFactory::default_name() << std::endl;
+std::cout << "Default MC calculator: "
+          << MultiConfigurationCalculatorFactory::default_name() << std::endl;
+// end-cell-list-algorithms
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// start-cell-inspect-settings
+#include <iostream>
+#include <qdk/chemistry.hpp>
+
+using namespace qdk::chemistry::algorithms;
+
+// Create a SCF solver and inspect its settings
+auto scf = ScfSolverFactory::create("qdk");
+
+// Print settings as a formatted table
+std::cout << scf->settings().as_table() << std::endl;
+
+// Or iterate over individual settings
+for (const auto& key : scf->settings().keys()) {
+  std::cout << key << ": " << scf->settings().get_as_string(key) << std::endl;
+}
+// end-cell-inspect-settings
+// -----------------------------------------------------------------------------

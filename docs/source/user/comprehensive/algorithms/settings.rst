@@ -24,43 +24,17 @@ The following example demonstrates how to discover available algorithms and insp
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      #include <qdk/chemistry/algorithms/scf.hpp>
-
-      // List available implementations for a specific algorithm type
-      auto scf_names = qdk::chemistry::algorithms::ScfSolverFactory::available();
-      for (const auto& name : scf_names) {
-          std::cout << "SCF solver: " << name << std::endl;
-      }
-
-      // Create an instance and inspect its settings
-      auto scf = qdk::chemistry::algorithms::ScfSolverFactory::create();
-      for (const auto& key : scf->settings().keys()) {
-          std::cout << "  " << key << ": " << scf->settings().get_as_string(key) << std::endl;
-      }
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
+      :language: cpp
+      :start-after: // start-cell-discover-settings
+      :end-before: // end-cell-discover-settings
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import available, create, print_settings, inspect_settings
-
-      # List all algorithm types and their implementations
-      for algo_type, implementations in available().items():
-          print(f"{algo_type}: {implementations}")
-
-      # Display a formatted settings table for a specific implementation
-      print_settings("scf_solver", "qdk")
-
-      # Inspect settings programmatically
-      for name, type_name, default, description, limits in inspect_settings("scf_solver", "qdk"):
-          print(f"{name} ({type_name}): {default}")
-
-      # Create an instance and iterate over its settings
-      scf = create("scf_solver")
-      for key, value in scf.settings().items():
-          print(f"  {key}: {value}")
+   .. literalinclude:: ../../../_static/examples/python/settings.py
+      :language: python
+      :start-after: # start-cell-discover-settings
+      :end-before: # end-cell-discover-settings
 
 Working with settings
 ---------------------
@@ -76,19 +50,10 @@ Settings are validated at execution time, allowing modifications at any point be
    Any subsequent attempt to modify the settings raises a ``SettingsAreLocked`` exception.
    To run the same algorithm with different parameters, create a new algorithm instance.
 
-   .. code-block:: python
-
-      scf = create("scf_solver")
-      scf.settings().set("basis_set", "sto-3g")
-      energy, wfn = scf.run(structure, charge=0, spin_multiplicity=1)
-
-      # Settings are now locked - this raises SettingsAreLocked:
-      # scf.settings().set("basis_set", "cc-pvdz")
-
-      # Create a new instance for different settings
-      scf2 = create("scf_solver")
-      scf2.settings().set("basis_set", "cc-pvdz")
-      energy2, wfn2 = scf2.run(structure, charge=0, spin_multiplicity=1)
+   .. literalinclude:: ../../../_static/examples/python/settings.py
+      :language: python
+      :start-after: # start-cell-settings-locked
+      :end-before: # end-cell-settings-locked
 
 **Accessing and modifying settings:**
 
@@ -257,13 +222,10 @@ When retrieving values, the reverse conversion occurs transparently.
 
 The ``get_expected_python_type()`` method can be used to query the expected Python type for any setting:
 
-.. code-block:: python
-
-   expected_type = settings.get_expected_python_type("convergence_threshold")
-   print(expected_type)  # "float"
-
-   expected_type = settings.get_expected_python_type("active_orbitals")
-   print(expected_type)  # "list[int]"
+.. literalinclude:: ../../../_static/examples/python/settings.py
+   :language: python
+   :start-after: # start-cell-get-expected-type
+   :end-before: # end-cell-get-expected-type
 
 This is particularly useful when building dynamic configuration interfaces or validating user input before applying it to settings.
 
@@ -292,25 +254,17 @@ Constraints can be queried using ``has_limits()`` and ``get_limits()``:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      if (settings.has_limits("max_iterations")) {
-          auto limits = settings.get_limits("max_iterations");
-          // limits is a Constraint variant (BoundConstraint or ListConstraint)
-      }
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
+      :language: cpp
+      :start-after: // start-cell-inspect-constraints
+      :end-before: // end-cell-inspect-constraints
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      if settings.has_limits("max_iterations"):
-          limits = settings.get_limits("max_iterations")
-          # Returns (min, max) tuple for bounds, or list for allowed values
-          print(f"Allowed range: {limits}")  # e.g., (1, 1000)
-
-      if settings.has_limits("method"):
-          allowed = settings.get_limits("method")
-          print(f"Allowed values: {allowed}")  # e.g., ['hf', 'dft']
+   .. literalinclude:: ../../../_static/examples/python/settings.py
+      :language: python
+      :start-after: # start-cell-inspect-constraints
+      :end-before: # end-cell-inspect-constraints
 
 The ``print_settings()`` and ``inspect_settings()`` functions include constraint information in their output, making it easy to understand the valid configuration options for any algorithm.
 

@@ -59,3 +59,12 @@ std::cout << "Core energy: " << std::fixed << std::setprecision(10)
 std::cout << hamiltonian->get_summary() << std::endl;
 // end-cell-construct
 // --------------------------------------------------------------------------------------------
+
+// --------------------------------------------------------------------------------------------
+// start-cell-list-implementations
+auto names = HamiltonianConstructorFactory::available();
+for (const auto& name : names) {
+  std::cout << name << std::endl;
+}
+// end-cell-list-implementations
+// --------------------------------------------------------------------------------------------

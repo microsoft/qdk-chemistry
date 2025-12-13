@@ -87,32 +87,16 @@ Use ``available()`` to list registered implementations:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      #include <qdk/chemistry/algorithms/scf.hpp>
-
-      // List all registered SCF solver implementations
-      auto names = qdk::chemistry::algorithms::ScfSolver::available();
-      for (const auto& name : names) {
-          std::cout << name << std::endl;
-      }
-
-      // Create a specific implementation
-      auto solver = qdk::chemistry::algorithms::ScfSolver::create("pyscf");
+   .. literalinclude:: ../../../_static/examples/cpp/interfaces.cpp
+      :language: cpp
+      :start-after: // start-cell-discover-implementations
+      :end-before: // end-cell-discover-implementations
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import ScfSolver
-
-      # List all registered SCF solver implementations
-      print(ScfSolver.available())  # ['qdk', 'pyscf']
-
-      # Create a specific implementation
-      solver = ScfSolver.create("pyscf")
-
-      # Inspect available settings
-      solver.print_settings()
+   .. literalinclude:: ../../../_static/examples/python/interfaces.py
+      :language: python
+      :start-after: # start-cell-discover-implementations
+      :end-before: # end-cell-discover-implementations
 
 For details on creating, loading, and using custom algorithm implementations, see the :doc:`plugin system <../plugins>` and :doc:`factory pattern <factory_pattern>` documentation.

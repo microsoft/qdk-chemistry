@@ -86,19 +86,17 @@ You can discover available implementations programmatically:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      auto names = HamiltonianConstructorFactory::available();
-      for (const auto& name : names) {
-          std::cout << name << std::endl;
-      }
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-list-implementations
+      :end-before: // end-cell-list-implementations
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import registry
-      print(registry.available("hamiltonian_constructor"))  # ['qdk']
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
 
 QDK (Native)
 ~~~~~~~~~~~~

@@ -70,10 +70,10 @@ You can discover available implementations programmatically:
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import registry
-      print(registry.available("energy_estimator"))  # ['qdk_base_simulator', 'qiskit_aer_simulator']
+   .. literalinclude:: ../../../_static/examples/python/energy_estimator.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
 
 QDK base simulator
 ~~~~~~~~~~~~~~~~~~

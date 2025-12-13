@@ -13,6 +13,25 @@
 using namespace qdk::chemistry;
 
 // --------------------------------------------------------------------------------------------
+// start-cell-discover-settings
+#include <qdk/chemistry/algorithms/scf.hpp>
+
+// List available implementations for a specific algorithm type
+auto scf_names = qdk::chemistry::algorithms::ScfSolverFactory::available();
+for (const auto& name : scf_names) {
+  std::cout << "SCF solver: " << name << std::endl;
+}
+
+// Create an instance and inspect its settings
+auto scf = qdk::chemistry::algorithms::ScfSolverFactory::create();
+for (const auto& key : scf->settings().keys()) {
+  std::cout << "  " << key << ": " << scf->settings().get_as_string(key)
+            << std::endl;
+}
+// end-cell-discover-settings
+// --------------------------------------------------------------------------------------------
+
+// --------------------------------------------------------------------------------------------
 // start-cell-get-settings
 // Create an algorithm
 auto scf_solver = algorithms::ScfSolverFactory::create();
@@ -125,4 +144,13 @@ try {
   auto value = settings.get_or_default<double>("non_existent_setting", 0.0);
 }
 // end-cell-settings-errors
+// --------------------------------------------------------------------------------------------
+
+// --------------------------------------------------------------------------------------------
+// start-cell-inspect-constraints
+if (settings.has_limits("max_iterations")) {
+  auto limits = settings.get_limits("max_iterations");
+  // limits is a Constraint variant (BoundConstraint or ListConstraint)
+}
+// end-cell-inspect-constraints
 // --------------------------------------------------------------------------------------------

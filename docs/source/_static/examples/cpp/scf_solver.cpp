@@ -46,5 +46,14 @@ int main() {
   std::cout << "SCF Energy: " << E_scf << " Hartree" << std::endl;
   // end-cell-run
   // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-list-implementations
+  auto names = ScfSolverFactory::available();
+  for (const auto& name : names) {
+    std::cout << name << std::endl;
+  }
+  // end-cell-list-implementations
+  // --------------------------------------------------------------------------------------------
   return 0;
 }
