@@ -66,7 +66,7 @@ pip install . -C build-dir="build/{wheel_tag}"
 **Warning:** When using a persistent build directory, CMake caches configuration decisions (such as whether the C++ library was found pre-installed or built from source). If your environment changes (e.g., you add or remove a pre-installed C++ library, or C++ dependencies change), the cached state may cause subtle build failures. In this case, remove the build directory and try again:
 
 ```bash
-rm -rf python/build/
+rm -rf build/
 pip install .
 ```
 
