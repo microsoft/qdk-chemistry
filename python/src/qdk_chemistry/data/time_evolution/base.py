@@ -65,8 +65,8 @@ class TimeEvolutionUnitary(DataClass):
     # Use keyword arguments to be future-proof
     def __init__(self, container: TimeEvolutionUnitaryContainer) -> None:
         """Initialize a TimeEvolutionUnitary."""
-        super().__init__()
         self._container = container
+        super().__init__()
 
     def apply(self, state: Wavefunction) -> Wavefunction:
         """Apply the time evolution unitary to a given state.

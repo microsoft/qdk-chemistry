@@ -28,9 +28,9 @@ class ControlledTimeEvolutionUnitary(DataClass):
             control_index: The control bit index.
 
         """
-        super().__init__()
         self.time_evolution_unitary = time_evolution_unitary
         self.control_index = control_index
+        super().__init__()
 
     def get_unitary_container_type(self) -> str:
         """Get the type of the time evolution unitary container.
