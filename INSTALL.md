@@ -60,7 +60,7 @@ pytest tests/
 By default, each `pip install` uses a fresh temporary build directory to ensure reproducible builds and avoid issues with stale CMake cache state. However, for development workflows where you're making frequent changes, you can enable persistent build caching for significantly faster rebuilds:
 
 ```bash
-pip install . --config-settings=build-dir=build/{wheel_tag}
+pip install . -C build-dir="build/{wheel_tag}"
 ```
 
 **Warning:** When using a persistent build directory, CMake caches configuration decisions (such as whether the C++ library was found pre-installed or built from source). If your environment changes (e.g., you add or remove a pre-installed C++ library, or C++ dependencies change), the cached state may cause subtle build failures. In this case, remove the build directory and try again:
