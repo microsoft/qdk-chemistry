@@ -20,13 +20,13 @@ Localization methods
 QDK/Chemistry provides several orbital transformation methods through the :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` interface:
 
 **Pipek-Mezey Localization**
-   Maximizes the sum of squared Mulliken charges on each atom for each orbital, creating orbitals that are maximally localized on specific atoms or bonds :cite:`Boughton1993, Edmiston1963`.
+   Maximizes the sum of squared Mulliken charges on each atom for each orbital, creating orbitals that are maximally localized on specific atoms or bonds :cite:`Foster1960`.
 
 **MP2 Natural Orbitals**
-   Transforms canonical orbitals into natural orbitals based on MP2 density matrices, providing orbitals that diagonalize the correlation effects.
+   Transforms canonical orbitals into natural orbitals based on MP2 density matrices, providing orbitals that diagonalize the correlation effects :cite:`Lowdin1956`.
 
 **Valence Virtual Hard Virtual (VVHV) Orbitals**
-   Separates orbitals into valence, virtual, and hard virtual categories for more efficient treatment in correlation methods.
+   Separates orbitals into valence, virtual, and hard virtual categories for more numerically stable localizations and the production of orbitals which vary smoothly with molecular geometry.
 
 Running orbital localization
 ----------------------------
@@ -114,6 +114,8 @@ You can discover available implementations programmatically:
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
 
+.. _localizer-qdk-pipek-mezey:
+
 QDK Pipek-Mezey
 ~~~~~~~~~~~~~~~
 
@@ -158,7 +160,7 @@ QDK VVHV
 
 **Factory name:** ``"qdk_vvhv"``
 
-Valence Virtual Hard Virtual (VVHV) orbital separation—separates orbitals into valence, virtual, and hard virtual categories for more efficient treatment in correlation methods.
+Localization of molecular orbitals expressed in near-complete :doc:`../data/basis_set` is numerically ill-posed and challenging for most localizers. This can lead to orbitals which do not vary smoothly with molecular geometry, numerically unstable results, and reproduction difficulties on various architectures and compute environments. Do address this problem. QDK/Chemistry includes an implementation of orbitals locations withing the VVHV separation :cite:`Subotnik2005` (and subsequent improvements to the numerical procedure described in :cite:`Wang2025`), which separates orbitals into valence, virtual, and hard virtual categories for more numerically stable treatments. This can be particularly useful for selecting consistent active spaces across molecular geometries.
 
 **Settings:**
 
@@ -190,6 +192,8 @@ Valence Virtual Hard Virtual (VVHV) orbital separation—separates orbitals into
      - bool
      - ``True``
      - Use weighted orthogonalization in hard virtual construction
+
+.. _localizer-pyscf-multi:
 
 PySCF Multi
 ~~~~~~~~~~~

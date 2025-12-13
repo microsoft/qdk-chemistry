@@ -27,6 +27,7 @@ Key Features
    :caption: User Documentation
 
    user/quickstart
+   user/features
    user/comprehensive/index
 
 .. _apidocs:

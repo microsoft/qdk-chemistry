@@ -7,7 +7,7 @@
 
 ################################################################################
 # start-cell-discover-settings
-from qdk_chemistry.algorithms import available, create, print_settings, inspect_settings
+from qdk_chemistry.algorithms import available, create, inspect_settings, print_settings
 
 # List all algorithm types and their implementations
 for algo_type, implementations in available().items():
