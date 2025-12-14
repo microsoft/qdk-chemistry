@@ -7,11 +7,6 @@ This document provides an overview of QDK/Chemistry's features, supported method
    :local:
    :depth: 2
 
-Features Overview
------------------
-
-.. todo:: Add a high-level summary of QDK/Chemistry's core features and design philosophy.
-
 
 Supported Methods
 -----------------
@@ -146,36 +141,47 @@ Quantum Methods
   See :doc:`comprehensive/algorithms/energy_estimator`.
 
 
-Software Dependencies
----------------------
+Community Open Source Software Dependencies
+-------------------------------------------
 
-Required Dependencies
-^^^^^^^^^^^^^^^^^^^^^
+QDK/Chemistry builds upon a foundation of well-established open source libraries developed by the quantum chemistry community. These dependencies provide battle-tested implementations of computationally demanding kernels, allowing QDK/Chemistry to focus on higher-level algorithms and quantum computing integration. For a complete list of dependencies, see the `Installation Guide <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_.
 
-.. todo:: List the core dependencies required for QDK/Chemistry to function.
+.. note::
 
-Optional Dependencies
-^^^^^^^^^^^^^^^^^^^^^
-
-.. todo:: Document optional dependencies and the features they enable.
+   If you use QDK/Chemistry in published work, please cite the underlying libraries as described below to acknowledge the community's contributions.
 
 
-Backend Integrations
-^^^^^^^^^^^^^^^^^^^^
+Basis Sets and Effective Core Potentials
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. todo:: Describe integrations with quantum computing frameworks (Qiskit, PennyLane, Q#, etc.).
+**Basis Set Exchange (BSE)** :cite:`Pritchard2019, Feller1996, Schuchardt2007`
+   A comprehensive repository of standardized basis sets for quantum chemistry calculations. All of the basis sets and effective core potentials distributed with QDK/Chemistry are sourced from the BSE. If you publish results obtained with detault basis sets provided with QDK/Chemistry, in addition to the reference for the basis set itself, please cite the BSE. For guirance on citing specific basis sets and effective core potentials, see the `Basis Set Exchange Website <https://www.basissetexchange.org/>`_.
+
+**Libecpint** :cite:`Shaw2017,Shaw2021`
+   Provides efficient evaluation of effective core potential (ECP) integrals over Gaussian-type orbitals. QDK/Chemistry's native SCF solver relies on Libecpint for ECP integral computation. If you publish results obtained with any of the native quantum chemistry modules within QDK/Chemistry that utilize ECPs, please cite Libecpint. The `Libecpint repository <https://github.com/robashaw/libecpint>`_ includes additional guidance on citing Libecpint.
+
+Integral Evaluation
+^^^^^^^^^^^^^^^^^^^
+
+**Libint** :cite:`Libint2_290`
+   Provides efficient evaluation of molecular integrals over Gaussian-type orbitals, including one- and two-electron repulsion integrals essential for all electronic structure methods. QDK/Chemistry's native SCF solver, orbital localization, and post-SCF modules rely on Libint for integral computation. If you publish results obtained with any of the native quantum chemistry modules within QDK/Chemistry, please cite Libint. The `Libint repository <https://github.com/evaleev/libint>`_ includes additional guidance on citing Libint.
+
+**GauXC** :cite:`Petrone2018,williams20on,williams2021achieving,williams2023distributed,kovtun2024relativistic`
+   Handles numerical integration on atom-centered grids, which is required for evaluating exchange-correlation contributions in density functional theory. GauXC supports both CPU and GPU acceleration, enabling scalable :term:`DFT` calculations on modern hardware. If you publish :term:`DFT` results obtained with QDK/Chemistry, please cite GauXC. See the `GauXC repository <https://github.com/wavefunction91/gauxc>`_ for guidance on citing GauXC.
 
 
-Extensibility and Plugins
--------------------------
+Exchange-Correlation Functionals
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. todo:: Document the plugin architecture and how users can extend QDK/Chemistry.
+**Libxc** :cite:`Lehtola2013`
+   A comprehensive library providing implementations of over 600 exchange-correlation functionals spanning LDA, GGA, meta-GGA, and hybrid rungs of Jacob's ladder. GauXC depends on Libxc for functional evaluation. If you publish :term:`DFT` results obtained with QDK/Chemistry, in addition to the reference for the functional used, please cite Libxc. For guidance on citing specific functionals, see the `Libxc Website <https://tddft.org/programs/libxc/>`_.
 
 
-Platform Support
-----------------
+Multi-Configuration Solvers
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. todo:: Document supported operating systems, compilers, and Python versions.
+**MACIS** :cite:`Williams-Young2023`
+   The Many-body Adaptive Configuration Interaction Solver powers QDK/Chemistry's selected CI capabilities. MACIS implements the :term:`ASCI` algorithm with distributed-memory parallelism, enabling treatment of active spaces far beyond the reach of conventional exact diagonalization.
 
 
 See Also
