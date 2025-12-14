@@ -155,12 +155,15 @@ Transforms canonical orbitals into natural orbitals based on MP2 density matrice
 
 **Settings:** This implementation has no configurable settings.
 
+.. _localizer-qdk-vvhv:
+
 QDK VVHV
 ~~~~~~~~
 
 **Factory name:** ``"qdk_vvhv"``
 
-Localization of molecular orbitals expressed in near-complete :doc:`../data/basis_set` is numerically ill-posed and challenging for most localizers. This can lead to orbitals which do not vary smoothly with molecular geometry, numerically unstable results, and reproduction difficulties on various architectures and compute environments. Do address this problem. QDK/Chemistry includes an implementation of orbitals locations withing the VVHV separation :cite:`Subotnik2005` (and subsequent improvements to the numerical procedure described in :cite:`Wang2025`), which separates orbitals into valence, virtual, and hard virtual categories for more numerically stable treatments. This can be particularly useful for selecting consistent active spaces across molecular geometries.
+The VVHV (Valence Virtual--Hard Virtual) localizer addresses the numerical challenges of orbital localization in near-complete basis sets by partitioning the virtual space into chemically meaningful subspaces.
+See :ref:`VVHV Algorithm <vvhv-algorithm>` below for a detailed description.
 
 **Settings:**
 
@@ -192,6 +195,54 @@ Localization of molecular orbitals expressed in near-complete :doc:`../data/basi
      - bool
      - ``True``
      - Use weighted orthogonalization in hard virtual construction
+
+.. _vvhv-algorithm:
+
+VVHV Algorithm
+^^^^^^^^^^^^^^
+
+Localization of molecular orbitals expressed in near-complete :doc:`basis sets <../data/basis_set>` is numerically ill-posed and challenging for most localizers.
+This can lead to orbitals that do not vary smoothly with molecular geometry, numerically unstable results, and reproducibility difficulties across architectures and compute environments.
+The Valence Virtual--Hard Virtual (VVHV) separation :cite:`Subotnik2005` addresses these problems by partitioning the virtual orbital space into chemically meaningful subspaces before localization.
+
+**The Problem with Standard Localization**
+
+Standard orbital localization methods optimize a cost function (e.g., Pipek-Mezey, Foster-Boys) over all orbitals simultaneously.
+In large basis sets, the virtual space contains orbitals of vastly different character:
+
+- **Valence-virtual orbitals**: Low-lying virtual orbitals that are chemically relevant for describing bond breaking/formation and correlation effects
+- **Hard-virtual orbitals**: High-energy orbitals that primarily describe core-valence polarization and basis set completeness
+
+When localization is applied to the full virtual space, the optimizer may mix these distinct orbital types, leading to non-physical results that are sensitive to numerical precision and can vary discontinuously along reaction coordinates.
+
+**The VVHV Separation Procedure**
+
+The VVHV algorithm proceeds in three stages:
+
+1. **Minimal Basis Projection**: Project the canonical virtual orbitals onto a minimal basis set (e.g., STO-3G) to identify the valence-virtual subspace.
+   Given the overlap matrix :math:`\mathbf{S}_{\text{min}}` between the computational basis and minimal basis, the valence-virtual orbitals span the range of:
+
+   .. math::
+
+      \mathbf{P}_{\text{VV}} = \mathbf{S}_{\text{min}} (\mathbf{S}_{\text{min}}^T \mathbf{S}_{\text{min}})^{-1} \mathbf{S}_{\text{min}}^T
+
+2. **Orthogonalization**: Construct orthonormal valence-virtual and hard-virtual orbital sets.
+   The hard-virtual orbitals are obtained as the orthogonal complement to the valence-virtual space.
+   QDK/Chemistry implements both standard and weighted orthogonalization :cite:`Wang2025` procedures; weighted orthogonalization improves numerical stability for near-linear dependencies.
+
+3. **Subspace Localization**: Apply the chosen localization method (e.g., Pipek-Mezey) separately within each subspace.
+   This ensures that the optimization landscape is well-behaved and that orbitals vary smoothly with geometry.
+
+**Benefits for Active Space Selection**
+
+The VVHV separation is particularly valuable for multi-configuration calculations where a consistent active space must be maintained along a reaction pathway.
+By localizing only the valence-virtual orbitals, which are the chemically relevant virtual orbitals for active space construction, the VVHV procedure ensures:
+
+- Orbitals that track smoothly as bonds stretch and form
+- Reproducible results across different compute environments
+- Well-defined orbital character that aids chemical interpretation
+
+For details on using localized orbitals in active space selection, see :doc:`ActiveSpaceSelector <active_space>`.
 
 .. _localizer-pyscf-multi:
 

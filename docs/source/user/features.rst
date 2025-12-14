@@ -50,7 +50,7 @@ See :doc:`comprehensive/algorithms/localizer` for further details about availabl
 Implementation Highlights
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **Valence Virtual--Hard Virtual (VVHV) Orbital Localization**: Localization of molecular orbitals expressed in a near-complete :doc:`./comprehensive/data/basis_set` is numerically ill-posed and challenging for most localizers. This can lead to orbitals which do not vary smoothly with molecular geometry, numerically unstable results, and reproduction difficulties on various architectures and compute environments. To address this problem. QDK/Chemistry includes an implementation of orbitals localizations within the VVHV separation :cite:`Subotnik2005` (and subsequent improvements to the numerical procedure described in :cite:`Wang2025`), which separates orbitals into occupied, valence-virtual, and hard-virtual categories for more numerically stable treatments. This can be particularly useful for selecting consistent active spaces across molecular geometries.
+- **Valence Virtual--Hard Virtual (VVHV) Orbital Localization**: Localization of molecular orbitals expressed in near-complete :doc:`./comprehensive/data/basis_set` is numerically ill-posed and challenging for most localizers. QDK/Chemistry includes an implementation of the VVHV separation :cite:`Subotnik2005`, which partitions the virtual orbital space into valence-virtual and hard-virtual subspaces for more numerically stable treatments. This produces orbitals that vary smoothly with molecular geometry, which is particularly useful for selecting consistent active spaces along reaction pathways. See the :ref:`VVHV Algorithm <vvhv-algorithm>` section for further details.
 
 Active Space Selection
 """"""""""""""""""""""
