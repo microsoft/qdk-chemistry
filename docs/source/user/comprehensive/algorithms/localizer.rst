@@ -5,28 +5,28 @@ The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` algorithm in QDK/Chemist
 Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes an :doc:`Orbitals <../data/orbitals>` instance as input and produces a new :doc:`Orbitals <../data/orbitals>` instance as output.
 For more information about this pattern, see the :doc:`Factory Pattern <factory_pattern>` documentation.
 
-These transformations preserve the overall electronic state but provide orbitals with different properties that are useful for chemical analysis or subsequent calculations.
-
 Overview
 --------
 
-Canonical molecular orbitals from :term:`SCF` calculations are often delocalized over the entire molecule, which can make chemical interpretation difficult and lead to slow convergence in post-:term:`HF` methods.
+Canonical molecular orbitals from :term:`SCF` calculations are typically delocalized over the entire molecule, which can complicate chemical interpretation and slow the convergence of post-:term:`SCF` correlation methods.
 The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` algorithm applies unitary transformations to these orbitals to obtain alternative representations that may be more physically intuitive or computationally advantageous.
-Multiple localization methods are available through a unified interface, each optimizing different criteria to achieve localization.
 
-Localization methods
---------------------
+Orbital transformation techniques broadly fall into two categories:
 
-QDK/Chemistry provides several orbital transformation methods through the :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` interface:
+**Optimization-Based Methods**
+   The vast majority of localization methods define a cost function and iteratively minimize it to yield localized orbitals :cite:`Lehtola2013`.
+   Popular choices include **Pipek-Mezey** :cite:`Pipek1989`, **Foster-Boys** :cite:`Foster1960`, and **Edmiston-Ruedenberg** :cite:`Edmiston1963` localization.
+   These methods produce orbitals that are maximally localized on specific atoms or bonds.
 
-**Pipek-Mezey Localization**
-   Maximizes the sum of squared Mulliken charges on each atom for each orbital, creating orbitals that are maximally localized on specific atoms or bonds :cite:`Foster1960`.
+**Analytical Methods**
+   These methods transform orbitals in a single step through analytical techniques rather than iterative optimization.
+   **Natural orbitals** :cite:`Lowdin1956`, which diagonalize the one-particle reduced density matrix, are a prominent example and can be particularly useful for :doc:`active space selection <active_space>`.
+   **Cholesky localization** :cite:`Aquilante2006` provides efficient approximate localization via Cholesky decomposition of the density matrix.
+   The :ref:`VVHV separation <vvhv-algorithm>` also falls into this category, using projection and orthogonalization to partition virtual orbitals into valence and hard-virtual subspaces.
 
-**MP2 Natural Orbitals**
-   Transforms canonical orbitals into natural orbitals based on MP2 density matrices, providing orbitals that diagonalize the correlation effects :cite:`Lowdin1956`.
-
-**Valence Virtual Hard Virtual (VVHV) Orbitals**
-   Separates orbitals into valence, virtual, and hard virtual categories for more numerically stable localizations and the production of orbitals which vary smoothly with molecular geometry.
+The specific methods available depend on the backend implementation selected.
+QDK/Chemistry provides native implementations of key algorithms and extends these capabilities through :doc:`plugins <../plugins>` that integrate external quantum chemistry packages.
+See `Available implementations`_ below for details on each backend and its supported methods.
 
 Running orbital localization
 ----------------------------
@@ -121,7 +121,8 @@ QDK Pipek-Mezey
 
 **Factory name:** ``"qdk_pipek_mezey"`` (default)
 
-Maximizes the sum of squared Mulliken charges on each atom for each orbital, creating orbitals that are maximally localized on specific atoms or bonds.
+Native implementation of Pipek-Mezey localization :cite:`Pipek1989`, which maximizes the sum of squared Mulliken charges on each atom for each orbital.
+This produces orbitals that are maximally localized on specific atoms or bonds, making them well-suited for chemical interpretation and local correlation methods.
 
 **Settings:**
 
@@ -146,12 +147,13 @@ Maximizes the sum of squared Mulliken charges on each atom for each orbital, cre
      - ``1e-12``
      - Threshold for small rotation detection
 
-QDK MP2 natural orbitals
+QDK MP2 Natural Orbitals
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Factory name:** ``"qdk_mp2_natural_orbitals"``
 
-Transforms canonical orbitals into natural orbitals based on MP2 density matrices, providing orbitals that diagonalize the correlation effects.
+Computes natural orbitals :cite:`Lowdin1956` from the MP2 one-particle density matrix.
+These orbitals diagonalize the correlation effects and provide occupation numbers that can guide :doc:`active space selection <active_space>`.
 
 **Settings:** This implementation has no configurable settings.
 
@@ -251,14 +253,12 @@ PySCF Multi
 
 **Factory name:** ``"pyscf_multi"``
 
-The PySCF plugin provides access to `PySCF's <https://pyscf.org/>`_ orbital localization routines, supporting multiple localization algorithms.
+The PySCF :doc:`plugin <../plugins>` provides access to additional localization algorithms through `PySCF <https://pyscf.org/>`_:
 
-**Capabilities:**
-
-- Pipek-Mezey (PM) localization
-- Foster-Boys (FB) localization
-- Edmiston-Ruedenberg (ER) localization
-- Cholesky-based localization
+- **Pipek-Mezey** :cite:`Pipek1989` — Maximizes atomic charge localization
+- **Foster-Boys** :cite:`Foster1960` — Minimizes the spatial extent of orbitals
+- **Edmiston-Ruedenberg** :cite:`Edmiston1963` — Maximizes self-repulsion energy
+- **Cholesky** :cite:`Aquilante2006` — Efficient analytical localization via Cholesky decomposition
 
 **Settings:**
 

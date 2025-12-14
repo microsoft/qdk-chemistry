@@ -38,11 +38,11 @@ Implementation Highlights
 Orbital Localization
 """"""""""""""""""""
 
-The canonical orbitals produced by SCF calculations are typically delocalized over the entire molecule, which can complicate chemical interpretation and slow the convergence of post-SCF correlation methods. QDK/Chemistry provides several classes of orbital localization techniques to yield specialized representations which accelerate the convergence of correlation methods and enhance chemical insight:
+The canonical orbitals produced by SCF calculations are typically delocalized over the entire molecule, which can complicate chemical interpretation and slow the convergence of post-SCF correlation methods. QDK/Chemistry provides several classes of orbital transformation techniques to yield specialized representations which accelerate the convergence of correlation methods and enhance chemical insight:
 
-- **Optimized Based Localizations**: The vast majority of orbitals localization methods fall into this category, where a cost function is defined and minimized to yield localized orbitals. See :cite:`Lehtola2013` for a discussion of this class of methods. QDK/Chemistry supports, either through our :ref:`native implementations <localizer-qdk-pipek-mezey>` or via :ref:`integration with external libraries <localizer-pyscf-multi>`, several popular choices of cost functions, including: **Pipek-Mezey** :cite:`Pipek1989`, **Foster-Boys** :cite:`Foster1960`, and **Edmiston-Ruedenberg** :cite:`Edmiston1963`.
+- **Optimization-Based Methods**: The vast majority of orbital localization methods fall into this category, where a cost function is iteratively minimized to yield localized orbitals :cite:`Lehtola2013`. QDK/Chemistry supports, either through our :ref:`native implementations <localizer-qdk-pipek-mezey>` or via :ref:`integration with external libraries <localizer-pyscf-multi>`, several popular choices of cost functions, including: **Pipek-Mezey** :cite:`Pipek1989`, **Foster-Boys** :cite:`Foster1960`, and **Edmiston-Ruedenberg** :cite:`Edmiston1963`.
 
-- **Natural Orbital Based Methods**: The notion of locality is not limited to spatial localtion, and can be extened to notions which minimize quantities such as entanglement, as well as methods which optimize for wavefunction sparsity. Given a :doc:`multi-configurational wavefunction <comprehensive/algorithms/mc_calculator>`, QDK/Chemistry offers methods to compute **Natural Orbitals** :cite:`Lowdin1956`, which can be particularly useful for :doc:`active space selection <comprehensive/algorithms/active_space>`.
+- **Analytical Methods**: These methods transform orbitals in a single step through analytical techniques rather than iterative optimization. **Natural orbitals** :cite:`Lowdin1956`, which diagonalize the one-particle reduced density matrix, and **Cholesky localization** :cite:`Aquilante2006`, which uses Cholesky decomposition for efficient approximate localization, are prominent examples. The :ref:`VVHV separation <vvhv-algorithm>` also falls into this category.
 
 See :doc:`comprehensive/algorithms/localizer` for further details about available orbital localization methods and implementations.
 
@@ -78,7 +78,7 @@ See :doc:`comprehensive/algorithms/active_space` for further details about avail
 Implementation Highlights
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **AutoCAS with Orbital Entanglement**: QDK/Chemistry includes a native implementation of the AutoCAS algorithm :cite:`Stein2019`, which leverages quantum information concepts to identify strongly correlated orbitals. The method computes single-orbital entropies—measures of how entangled each orbital is with the rest of the system—from the one- and two-electron reduced density matrices of a multi-configuration wavefunction. Orbitals with high entropy are strongly entangled and should be treated explicitly in the active space. QDK/Chemistry's implementation includes both standard AutoCAS and an enhanced variant using entanglement of orbitals with entropy differences (AutoCAS-EOS) for improved robustness.
+- **AutoCAS Protocol**: QDK/Chemistry includes a native implementation of the AutoCAS algorithm :cite:`Stein2019`, which leverages quantum information concepts to identify strongly correlated orbitals. The method computes single-orbital entropies—measures of how entangled each orbital is with the rest of the system—from the one- and two-electron reduced density matrices of a multi-configuration wavefunction. Orbitals with high entropy are strongly entangled and should be treated explicitly in the active space. QDK/Chemistry's implementation includes both standard AutoCAS and an enhanced variant using entanglement of orbitals with entropy differences (AutoCAS-EOS) for improved robustness.
 
 
 Multi-Configuration Methods
