@@ -184,6 +184,19 @@ Multi-Configuration Solvers
    The Many-body Adaptive Configuration Interaction Solver powers QDK/Chemistry's selected CI capabilities. MACIS implements the :term:`ASCI` algorithm with distributed-memory parallelism, enabling treatment of active spaces far beyond the reach of conventional exact diagonalization.
 
 
+Plugins
+^^^^^^^
+
+QDK/Chemistry is distributed with the following officially supported plugins that extend its capabilities by integrating with external quantum chemistry and quantum computing packages. If implementations coming from these modules are used in your published work, please cite both QDK/Chemistry and the underlying package as described in the respective plugin documentation.
+
+**PySCF Plugin**
+   Integrates QDK/Chemistry with the PySCF quantum chemistry package, providing access to its extensive suite of electronic structure methods and tools.
+   See the `PySCF documentation <https://pyscf.org/about.html>`_ for guidance on citing PySCF.
+
+**Qiskit Plugin**
+   Enables interoperability between QDK/Chemistry and the Qiskit quantum computing framework
+   See the `Qiskit documentation <https://qiskit.org/documentation/getting_started.html>`_ for guidance on citing Qiskit.
+
 See Also
 --------
 
