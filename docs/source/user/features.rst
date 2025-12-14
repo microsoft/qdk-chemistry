@@ -55,37 +55,70 @@ See :doc:`comprehensive/algorithms/localizer` for further details about availabl
 Implementation Highlights
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **Valence Virtual--Hard Virtual (VVHV) Orbital Localization**: Localization of molecular orbitals expressed in near-complete :doc:`./comprehensive/data/basis_set` is numerically ill-posed and challenging for most localizers. This can lead to orbitals which do not vary smoothly with molecular geometry, numerically unstable results, and reproduction difficulties on various architectures and compute environments. Do address this problem. QDK/Chemistry includes an implementation of orbitals locations withing the VVHV separation :cite:`Subotnik2005` (and subsequent improvements to the numerical procedure described in :cite:`Wang2025`), which separates orbitals into valence, virtual, and hard virtual categories for more numerically stable treatments. This can be particularly useful for selecting consistent active spaces across molecular geometries.
+- **Valence Virtual--Hard Virtual (VVHV) Orbital Localization**: Localization of molecular orbitals expressed in near-complete :doc:`./comprehensive/data/basis_set` is numerically ill-posed and challenging for most localizers. This can lead to orbitals which do not vary smoothly with molecular geometry, numerically unstable results, and reproduction difficulties on various architectures and compute environments. To address this problem. QDK/Chemistry includes an implementation of orbitals locations withing the VVHV separation :cite:`Subotnik2005` (and subsequent improvements to the numerical procedure described in :cite:`Wang2025`), which separates orbitals into valence, virtual, and hard virtual categories for more numerically stable treatments. This can be particularly useful for selecting consistent active spaces across molecular geometries.
 
 Active Space Selection
 """"""""""""""""""""""
 
-Automatically identify strongly correlated orbitals for multi-reference calculations.
+Accurate treatment of strongly correlated systems requires identifying which molecular orbitals exhibit significant multireference character. QDK/Chemistry provides a range of automated and manual approaches to select chemically relevant orbitals for :doc:`multi-configurational calculations <comprehensive/algorithms/mc_calculator>`.
 
-**Automated approaches:**
-  - **AutoCAS** :cite:`Stein2016` — entropy-based selection using orbital entanglement analysis
-  - **Occupation-based** — select orbitals with fractional occupation numbers
-  - **AVAS** — Automated Valence Active Space for transition metal systems
+The challenge lies in balancing accuracy and computational cost: an ideal active space should include all orbitals with significant multireference character while remaining as compact as possible. QDK/Chemistry supports several strategies for making this selection:
 
-**Manual approaches:**
-  - Valence selection with user-specified active electrons and orbitals
+**Automated Approaches:**
 
-→ :doc:`comprehensive/algorithms/active_space`
+- **Entanglement-Based Methods**: Utilizing concepts from quantum information theory, these methods identify strongly correlated orbitals based on their entanglement with the rest of the system. QDK/Chemistry includes a native implementation of the AutoCAS algorithm :cite:`Stein2019`, which computes single-orbital entropies from reduced density matrices to systematically select active spaces (see below for details).
+
+- **Occupation-based Methods**: Automatic selection based on natural orbital occupation numbers. Orbitals with fractional occupations indicate strong correlation and are included in the active space.
+
+- **AVAS (Automated Valence Active Space)** :cite:`Sayfutyarova2017` — Projects molecular orbitals onto a target atomic orbital basis (e.g., metal 3d orbitals) to systematically identify valence active spaces.
+
+**Manual Approaches:**
+
+- **Valence selection** — User-specified active electrons and orbitals, typically centered around the HOMO-LUMO gap.
+
+See :doc:`comprehensive/algorithms/active_space` for further details about available methods and implementations.
+
+.. _active-space-highlights:
+
+Implementation Highlights
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- **AutoCAS with Orbital Entanglement**: QDK/Chemistry includes a native implementation of the AutoCAS algorithm :cite:`Stein2019`, which leverages quantum information concepts to identify strongly correlated orbitals. The method computes single-orbital entropies—measures of how entangled each orbital is with the rest of the system—from the one- and two-electron reduced density matrices of a multi-configuration wavefunction. Orbitals with high entropy are strongly entangled and should be treated explicitly in the active space. QDK/Chemistry's implementation includes both standard AutoCAS and an enhanced variant using entanglement of orbitals with entropy differences (AutoCAS-EOS) for improved robustness.
+
 
 Multi-Configuration Methods
 """""""""""""""""""""""""""
 
-Capture static correlation for bond-breaking, transition states, and open-shell systems using multi-determinant wavefunctions.
+Multi-configuration (:term:`MC`) methods represent the electronic wavefunction as a linear combination of many Slater determinants, enabling accurate description of static (strong) correlation effects. These methods are essential for systems where a single determinant is qualitatively incorrect, including:
+
+- **Bond breaking and formation**: Stretched bonds require multiple configurations to describe correctly
+- **Transition states**: Reaction barriers often exhibit multireference character
+- **Open-shell systems**: Radicals, diradicals, and transition metal complexes
+- **Excited states**: Many electronic states require multireference treatment
+
+QDK/Chemistry provides access to a hierarchy of :term:`MC` methods:
 
 **Configuration Interaction:**
-  - Full CI (FCI), Complete Active Space CI (CASCI)
-  - Selected CI (SCI) — iteratively identify important configurations
 
-**Orbital-optimized methods:**
-  - Multi-Configuration SCF (MCSCF)
-  - Complete Active Space SCF (CASSCF)
+- **Full CI (FCI)** — Exact solution within the :doc:`basis <comprehensive/data/basis_set>` representation. Computationally feasible only for small systems.
 
-→ :doc:`comprehensive/algorithms/mc_calculator` · :doc:`comprehensive/algorithms/mcscf`
+- **Complete Active Space CI (CASCI)** — FCI within a defined active space, with core orbitals frozen and virtual orbitals excluded.
+
+- **Selected CI (SCI)** — Iteratively identifies and includes only the most important configurations, enabling treatment of larger active spaces at the cost of approximation.
+
+**Orbital-Optimized Methods:**
+
+- **Multi-Configuration SCF (MCSCF)** — Simultaneously optimizes configuration coefficients and orbital shapes for improved accuracy.
+
+See :doc:`comprehensive/algorithms/mc_calculator` and :doc:`comprehensive/algorithms/mcscf` for further details.
+
+.. _mc-highlights:
+
+Implementation Highlights
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- **Adaptive Sampling Configuration Interaction** (:term:`ASCI`): QDK/Chemistry integrates :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :cite:`Williams-Young2023`, a high-performance, parallel implementation of the Adaptive Sampling Configuration Interaction (:term:`ASCI`) algorithm :cite:`Tubman2016,Tubman2020`. ASCI iteratively grows the determinant space by identifying configurations with the largest contributions to the wavefunction, achieving near-CASCI accuracy at a fraction of the cost. This enables treatment of active spaces that would be intractable for conventional CASCI.
+
 
 Dynamical Correlation Methods
 """""""""""""""""""""""""""""
