@@ -1,3 +1,20 @@
-@sobolevnrm
-@wavefunction91
-@nabbelbabbel
+# Code owners file
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners for more information
+
+# Global owners
+* @sobolevnrm @wavefunction91 @nabbelbabbel
+
+# Pipelines
+/.pipelines/ @wavefunction91 @nabbelbabbel @v-georgen
+
+# Samples
+/examples/ @sobolevnrm @wavefunction91 @nabbelbabbel @ConradJohnston
+
+# Tests
+/python/tests/ @sobolevnrm @wavefunction91 @nabbelbabbel @ConradJohnston
+
+# C++
+/cpp/ @sobolevnrm @wavefunction91 @nabbelbabbel @ConradJohnston
+
+# Python bindings
+/python/src/pybind11/ @sobolevnrm @wavefunction91 @nabbelbabbel @ConradJohnston
