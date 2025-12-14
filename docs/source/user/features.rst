@@ -30,7 +30,7 @@ See :doc:`comprehensive/algorithms/scf_solver` for further details about availab
 Implementation Highlights
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **Geometric Direct Minimization (GDM)**: The QDK SCF Solver implements the GDM algorithm :cite:`VanVoorhis2002` for robust and efficient SCF convergence of challenging systems. This methods is particularly helpful for open-shell and small gap systems, which are of high interest in quantum computing applications, yet challenging for many SCF solvers.
+- **Geometric Direct Minimization (GDM)**: The :ref:`QDK SCF Solver <qdk-scf-native>` implements the GDM algorithm :cite:`VanVoorhis2002` for robust and efficient SCF convergence of challenging systems. This methods is particularly helpful for open-shell and small gap systems, which are of high interest in quantum computing applications, yet challenging for many SCF solvers. See the :ref:`SCF Convergence Algorithms <scf-convergence-algorithms>` section for further details.
 
 - **Stability Analysis and Reoptimization**: Challenging SCF problems often converge to local minima that do not represent the true mean-field ground state. QDK/Chemistry includes automated :doc:`comprehensive/algorithms/stability_checker` :cite:`Schlegel1991` tools to identify, perturb and reoptimize unstable solutions, helping users obtain physically meaningful reference states for subsequent calculations.
 

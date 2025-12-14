@@ -15,35 +15,20 @@ Both methods rely on a single Slater determinant representation of the many-elec
 This single-determinant approach is a key simplification that makes these methods computationally efficient but limits their ability to capture certain correlation effects.
 The :term:`SCF` procedure iteratively refines these orbitals until self-consistency is achieved.
 
-At its core, an :term:`SCF` calculation:
-
-1. **Initializes a starting guess** for the molecular orbitals, typically using a superposition of atomic orbitals
-2. **Constructs the Fock matrix** which represents the effective one-electron Hamiltonian
-3. **Diagonalizes the matrix** to obtain a new set of molecular orbitals and their energies
-4. **Computes the electron density** from the occupied molecular orbitals
-5. **Checks for convergence** by comparing the new density with that from the previous iteration
-6. **Repeats steps 2-5** until the density and energy no longer change significantly between iterations
-
-This iterative process is called "self-consistent" because the orbitals used to construct the Fock/Kohn-Sham operator must be consistent with the orbitals obtained by solving the resulting eigenvalue equation.
-The final result provides:
-
-- Optimized molecular orbitals and their energies
-- Mean-field energy  which excludes electron correlation (for :term:`HF`), or includes some dynamical correlation (for :term:`DFT`)
-
 :term:`SCF` methods provide an excellent starting point, but they miss important electronic correlation effects:
 
 - **Static correlation**: Essential for systems with near-degenerate states or bond-breaking processes.
-  See :doc:`MCCalculator <mc_calculator>` documentation.
-- **Dynamic correlation**: Required for all molecular systems to account for instantaneous electron-electron interactions.
-  See :doc:`DynamicalCorrelationCalculator <dynamical_correlation>` documentation.
+  See the :doc:`MCCalculator <mc_calculator>` documentation for electronic structure methods targeted at capturing static correlation.
+- **Dynamical correlation**: Required for all molecular systems to account for instantaneous electron-electron interactions.
+  See the :doc:`DynamicalCorrelationCalculator <dynamical_correlation>` documentation for electronic structure methods targeting dynamical correlation.
 
-The orbitals from :term:`SCF` calculations typically serve as input for post-:term:`SCF` methods that capture these correlation effects.
-:term:`SCF` methods thus serve as the foundation for more advanced electronic structure calculations and provide essential insights into molecular properties, reactivity, and spectroscopic characteristics.
+The orbitals from :term:`SCF` calculations typically serve as input for these post-:term:`SCF` methods which capture correlation effects.
+:term:`SCF` methods thus serve as the foundation for more advanced quantum and classical electronic structure calculations and provide essential insights into molecular properties, reactivity, and spectroscopic characteristics.
 
 Running an :term:`SCF` calculation
 ----------------------------------
 
-This section demonstrates how to create, configure, and run a SCF calculation.
+This section demonstrates how to setup, configure, and run a SCF calculation.
 The ``run`` method returns two values: a scalar representing the converged SCF energy and an :doc:`Orbitals <../data/orbitals>` object containing the optimized molecular orbitals.
 
 **Creating a SCF solver:**
@@ -128,6 +113,7 @@ All implementations share a common base set of settings from ``ElectronicStructu
      - ``50``
      - Maximum number of SCF iterations (must be ≥ 1)
 
+See :doc:`Settings <settings>` for a more general treatment of settings in QDK/Chemistry.
 Available implementations
 -------------------------
 
@@ -148,6 +134,8 @@ You can discover available implementations programmatically:
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
 
+.. _qdk-scf-native:
+
 QDK (Native)
 ~~~~~~~~~~~~
 
@@ -161,7 +149,51 @@ The native QDK/Chemistry implementation provides high-performance SCF calculatio
 - Restricted Kohn-Sham (RKS) and Unrestricted Kohn-Sham (UKS) DFT
 - Extensive library of :doc:`basis sets <../basis_functionals>` including Pople, Dunning, and Karlsruhe families
 - Full range of :doc:`exchange-correlation functionals <../basis_functionals>` for DFT
-- Advanced convergence algorithms including DIIS and geometric direct minimization (GDM)
+- Advanced convergence algorithms including the direct inversion in the iterative subspace (DIIS) method :cite:`Pulay1982`, and the geometric direct minimization (GDM) method :cite:`VanVoorhis2002`
+
+.. _scf-convergence-algorithms:
+
+SCF Convergence Algorithms in QDK
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Achieving stable SCF convergence is a non-trivial problem in computational chemistry.
+QDK/Chemistry implements two complementary algorithms that can be used independently or in combination.
+
+**Direct Inversion in the Iterative Subspace (DIIS)**
+
+DIIS is an extrapolation technique that accelerates SCF convergence by constructing an optimal linear combination of previous Fock matrices :cite:`Pulay1982`.
+At each iteration, the algorithm. DIIS is highly effective for well-behaved systems, often achieving convergence in 10–20 iterations.
+However, it can fail for challenging cases such as transition metal complexes, open-shell systems, or molecules with near-degenerate orbitals, where the error surface is highly non-linear.
+
+**Geometric Direct Minimization (GDM)**
+
+When DIIS encounters difficulties, the GDM algorithm provides a robust alternative :cite:`VanVoorhis2002`.
+Rather than extrapolating Fock matrices, GDM directly minimizes the energy with respect to orbital rotation parameters using a quasi-Newton optimization approach.
+
+The key insight of GDM is to parameterize orbital changes through unitary rotations, which converts the constrained optimizxation problem of determining the energy-minimizing set of orthonormal orbitals into an unconstrained optimization over anti-Hermitian matrices.
+This allows the use of standard nonlinear optimization techniques while preserving orbital orthonormality.
+Given a set of orbital coefficients, :math:`\mathbf{C}`, new orbitals, :math:`\mathbf{C}'`, are generated via:
+
+.. math::
+
+   \mathbf{C}' = \mathbf{C} \exp(\mathbf{X})
+
+where :math:`\mathbf{X}` is an anti-Hermitian matrix containing non-zeros only in the occupied-virtual blocks. The matrix exponential :math:`\exp(\mathbf{X})`, computed by scaling and squaring within the QDK :cite:`Higham2005`, generates a unitary transformation that preserves orbital orthonormality.
+
+The GDM algorithm then proceeds via a slightly modified :cite:`VanVoorhis2002` BFGS optimization :cite:`Liu1989` which smoothly converges to a nearby energy minimum. If provided a guess close to the true minimum, GDM can converge in a similar number of iterations as DIIS, but it is more robust for difficult cases. However, if initialized further from the minimum, GDM may converge to local minima, which may require additional strategies (e.g. :doc:`Stability analysis<stability_checker>`) to ensure the global minimum is found. This may be overcome in many cases by combining GDM with DIIS in a hybrid approach.
+
+
+
+**Hybrid DIIS-GDM Strategy**
+
+By default, the native QDK implementation uses DIIS alone (``enable_gdm=False``).
+When enabled, the hybrid strategy (``enable_gdm=True``) provides enhanced robustness:
+
+1. Start with DIIS for rapid initial convergence
+2. Monitor energy changes; if the energy change exceeds ``energy_thresh_diis_switch`` (default: :math:`10^{-3}` Ha), switch to GDM
+3. Once switched, continue with GDM until convergence
+
+This hybrid approach combines the speed of DIIS for typical systems with the robustness of GDM for challenging cases.
 
 **Settings:**
 
