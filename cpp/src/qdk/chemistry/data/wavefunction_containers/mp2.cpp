@@ -564,7 +564,7 @@ void MP2Container::_generate_ci_expansion() const {
   // MP2 is a perturbation theory method, not an exponential ansatz.
   // The first-order wavefunction correction is:
   //   |Ψ^(1)⟩ = Σ_{ijab} t_{ij}^{ab} |Φ_{ij}^{ab}⟩
-  // So the CI expansion is simply: reference + doubles
+  // The complete MP2 wavefunction is |Ψ⟩ = |Φ₀⟩ + |Ψ^(1)⟩, i.e., the CI expansion includes the reference determinant and all double excitations.
 
   // Get T2 amplitudes (T1 = 0 for MP2)
   auto [t2_abab, t2_aaaa, t2_bbbb] = get_t2_amplitudes();
