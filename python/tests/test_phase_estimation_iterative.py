@@ -12,7 +12,6 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 from qiskit import ClassicalRegister, QuantumCircuit, transpile
-from qiskit.quantum_info import SparsePauliOp
 from qiskit_aer import AerSimulator
 
 from qdk_chemistry.algorithms import (
@@ -53,10 +52,7 @@ class PhaseEstimationProblem:
 @pytest.fixture
 def two_qubit_phase_problem() -> PhaseEstimationProblem:
     """Return the two-qubit phase estimation scenario used in documentation."""
-    sparse_pauli_op = SparsePauliOp.from_list([("XX", 0.25), ("ZZ", 0.5)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
     state_prep = QuantumCircuit(2, name="psi")
     state_prep.initialize([0.6, 0.0, 0.0, 0.8], [0, 1])
 
@@ -78,10 +74,7 @@ def two_qubit_phase_problem() -> PhaseEstimationProblem:
 @pytest.fixture
 def four_qubit_phase_problem() -> PhaseEstimationProblem:
     """Return the four-qubit benchmark used in documentation."""
-    sparse_pauli_op = SparsePauliOp.from_list([("XXXX", 0.25), ("ZZZZ", 4.5)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
     state_prep = QuantumCircuit(4, name="psi_4q")
     state_vector = np.zeros(2**4, dtype=complex)
     state_vector[int("1000", 2)] = 0.8
@@ -178,7 +171,8 @@ def _run_traditional(problem: PhaseEstimationProblem) -> QpeResult:
 
 
 def _run_iterative_with_parameters(
-    pauli_terms: list[tuple[str, float]],
+    pauli_strings: list[str],
+    coefficients: list[float],
     state_vector: np.ndarray,
     *,
     evolution_time: float,
@@ -190,7 +184,8 @@ def _run_iterative_with_parameters(
     """Execute iterative phase estimation for a custom Hamiltonian/state pair.
 
     Args:
-        pauli_terms: List of Pauli terms and coefficients defining the Hamiltonian.
+        pauli_strings: List of Pauli strings defining the Hamiltonian.
+        coefficients: List of coefficients defining the Hamiltonian.
         state_vector: Initial state amplitudes for the system register.
         evolution_time: Evolution time ``t`` used in ``U = exp(-i H t)``.
         num_bits: Number of iterative QPE rounds executed.
@@ -202,10 +197,9 @@ def _run_iterative_with_parameters(
         :class:`QpeResult` capturing the iterative estimation outcome.
 
     """
-    sparse_pauli_op = SparsePauliOp.from_list(pauli_terms)
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    assert len(pauli_strings) == len(coefficients)
+
+    hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients)
     num_qubits = int(np.log2(len(state_vector)))
 
     state_prep = QuantumCircuit(num_qubits, name="state")
@@ -384,11 +378,13 @@ def test_iterative_and_traditional_match_on_four_qubits(four_qubit_phase_problem
 
 def test_iterative_phase_estimation_non_commuting_xi_plus_zz() -> None:
     """Validate IQPE for H = 0.519 XI + ZZ with Hartree-Fock-like trial state."""
-    pauli_terms = [("XI", 0.519), ("ZZ", 1.0)]
+    pauli_strings = ["XI", "ZZ"]
+    coefficients = [0.519, 1.0]
     state_vector = np.array([0.97, 0.0, np.sqrt(1 - 0.97**2), 0.0], dtype=complex)
 
     result = _run_iterative_with_parameters(
-        pauli_terms,
+        pauli_strings,
+        coefficients,
         state_vector,
         evolution_time=np.pi / 4,
         num_bits=6,
@@ -409,20 +405,15 @@ def test_iterative_phase_estimation_non_commuting_xi_plus_zz() -> None:
 
 def test_iterative_phase_estimation_second_non_commuting_example() -> None:
     """Validate IQPE for H = -0.0289(X1+X2) + 0.0541(Z1+Z2) + 0.0150 XX + 0.0590 ZZ."""
-    pauli_terms = [
-        ("XI", -0.0289),
-        ("IX", -0.0289),
-        ("ZI", 0.0541),
-        ("IZ", 0.0541),
-        ("XX", 0.0150),
-        ("ZZ", 0.0590),
-    ]
+    pauli_strings = ["XI", "IX", "ZI", "IZ", "XX", "ZZ"]
+    coefficients = [-0.0289, -0.0289, 0.0541, 0.0541, 0.0150, 0.059]
 
     state_vector = np.array([0.0, 0.47, 0.47, 0.75], dtype=complex)
     state_vector /= np.linalg.norm(state_vector)
 
     result = _run_iterative_with_parameters(
-        pauli_terms,
+        pauli_strings,
+        coefficients,
         state_vector,
         evolution_time=np.pi / 4,
         num_bits=11,
@@ -460,10 +451,7 @@ def test_create_iterations_generates_correct_number_of_circuits(
 
 def test_create_iterations_with_phase_corrections() -> None:
     """Test create_iterations with custom phase corrections."""
-    sparse_pauli_op = SparsePauliOp.from_list([("ZZ", 1.0)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["ZZ"], coefficients=[1.0])
     state_prep = QuantumCircuit(2)
     state_prep.h([0, 1])
 
@@ -479,10 +467,7 @@ def test_create_iterations_with_phase_corrections() -> None:
 
 def test_create_iterations_with_custom_measurement_registers() -> None:
     """Test create_iterations with custom measurement registers."""
-    sparse_pauli_op = SparsePauliOp.from_list([("XX", 0.5)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["XX"], coefficients=[0.5])
     state_prep = QuantumCircuit(2)
     state_prep.h([0, 1])
 
@@ -498,10 +483,7 @@ def test_create_iterations_with_custom_measurement_registers() -> None:
 
 def test_create_iterations_with_iteration_names() -> None:
     """Test create_iterations with custom iteration names."""
-    sparse_pauli_op = SparsePauliOp.from_list([("ZI", 1.0)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["ZI"], coefficients=[1.0])
     state_prep = QuantumCircuit(2)
     state_prep.h(0)
 
@@ -517,10 +499,7 @@ def test_create_iterations_with_iteration_names() -> None:
 
 def test_create_iterations_invalid_num_bits() -> None:
     """Test that create_iterations raises ValueError for non-positive num_bits."""
-    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
     state_prep = QuantumCircuit(1)
 
     iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
@@ -534,10 +513,7 @@ def test_create_iterations_invalid_num_bits() -> None:
 
 def test_create_iterations_mismatched_phase_corrections_length() -> None:
     """Test that create_iterations raises ValueError when phase_corrections length doesn't match num_bits."""
-    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
     state_prep = QuantumCircuit(1)
 
     iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
@@ -548,10 +524,7 @@ def test_create_iterations_mismatched_phase_corrections_length() -> None:
 
 def test_create_iterations_mismatched_measurement_registers_length() -> None:
     """Test that create_iterations raises ValueError when measurement_registers length doesn't match num_bits."""
-    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
     state_prep = QuantumCircuit(1)
 
     iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
@@ -564,10 +537,7 @@ def test_create_iterations_mismatched_measurement_registers_length() -> None:
 
 def test_create_iterations_mismatched_iteration_names_length() -> None:
     """Test that create_iterations raises ValueError when iteration_names length doesn't match num_bits."""
-    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
     state_prep = QuantumCircuit(1)
 
     iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
@@ -654,10 +624,7 @@ def test_iteration_dataclass_frozen() -> None:
 
 def test_create_iteration_returns_correct_metadata() -> None:
     """Test that create_iteration returns correct metadata."""
-    sparse_pauli_op = SparsePauliOp.from_list([("ZZ", 1.0)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["ZZ"], coefficients=[1.0])
     state_prep = QuantumCircuit(2)
     state_prep.h([0, 1])
 
@@ -675,10 +642,7 @@ def test_create_iteration_returns_correct_metadata() -> None:
 # Tests for validation and error handling
 def test_create_iteration_circuit_invalid_iteration_negative() -> None:
     """Test that create_iteration_circuit raises ValueError for negative iteration."""
-    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
     state_prep = QuantumCircuit(1)
 
     iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
@@ -689,10 +653,7 @@ def test_create_iteration_circuit_invalid_iteration_negative() -> None:
 
 def test_create_iteration_circuit_invalid_iteration_too_large() -> None:
     """Test that create_iteration_circuit raises ValueError for iteration >= total_iterations."""
-    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
     state_prep = QuantumCircuit(1)
 
     iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
@@ -703,10 +664,7 @@ def test_create_iteration_circuit_invalid_iteration_too_large() -> None:
 
 def test_create_iteration_circuit_invalid_total_iterations_zero() -> None:
     """Test that create_iteration_circuit raises ValueError for total_iterations <= 0."""
-    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
     state_prep = QuantumCircuit(1)
 
     iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
@@ -717,10 +675,7 @@ def test_create_iteration_circuit_invalid_total_iterations_zero() -> None:
 
 def test_create_iteration_circuit_invalid_total_iterations_negative() -> None:
     """Test that create_iteration_circuit raises ValueError for negative total_iterations."""
-    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
     state_prep = QuantumCircuit(1)
 
     iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
@@ -731,10 +686,7 @@ def test_create_iteration_circuit_invalid_total_iterations_negative() -> None:
 
 def test_create_iteration_circuit_power_calculation() -> None:
     """Test that the power calculation is correct for different iterations."""
-    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
     state_prep = QuantumCircuit(1)
 
     iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
@@ -748,10 +700,7 @@ def test_create_iteration_circuit_power_calculation() -> None:
 
 def test_create_iteration_circuit_with_none_measurement_register() -> None:
     """Test create_iteration_circuit with None measurement register creates default."""
-    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
     state_prep = QuantumCircuit(1)
 
     iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
@@ -765,10 +714,7 @@ def test_create_iteration_circuit_with_none_measurement_register() -> None:
 
 def test_iterative_qpe_initialization() -> None:
     """Test IterativePhaseEstimation initialization."""
-    sparse_pauli_op = SparsePauliOp.from_list([("XX", 0.5), ("ZZ", 1.0)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.5, 1.0])
     evolution_time = 2.5
 
     iqpe = IterativePhaseEstimation(hamiltonian, evolution_time)
