@@ -290,8 +290,9 @@ bool group_exists_in_group(H5::Group& group, const std::string& group_name);
  * @param group Which hdf5 group to save to
  * @param storage_name How to save in the dedicated group
  */
-void save_matrix_variant_to_group(bool is_complex, MatrixVariant matrix_variant,
-                                  H5::Group group, std::string storage_name);
+void save_matrix_variant_to_group(
+    bool is_complex, const std::shared_ptr<MatrixVariant>& matrix_variant,
+    H5::Group& group, const std::string& storage_name);
 
 /**
  * @brief Save vector variant to hdf5 group
@@ -301,9 +302,10 @@ void save_matrix_variant_to_group(bool is_complex, MatrixVariant matrix_variant,
  * @param group Which hdf5 group to save to
  * @param storage_name How to save in the dedicated group
  */
-void save_vector_variant_to_group(bool is_vector_variant_complex,
-                                  VectorVariant vector_variant, H5::Group group,
-                                  std::string storage_name);
+void save_vector_variant_to_group(
+    bool is_vector_variant_complex,
+    const std::shared_ptr<VectorVariant>& vector_variant, H5::Group& group,
+    const std::string& storage_name);
 // Template implementations
 
 // Save STL vector to HDF5 file

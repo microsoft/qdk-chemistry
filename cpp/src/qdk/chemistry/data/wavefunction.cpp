@@ -951,6 +951,8 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
     bool is_restricted = get_orbitals()->is_restricted();
     H5::Attribute restricted_attr = group.createAttribute(
         "is_restricted", H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
+    hbool_t is_restricted_flag = is_restricted ? 1 : 0;
+    restricted_attr.write(H5::PredType::NATIVE_HBOOL, &is_restricted_flag);
 
     // Store complexity flag for coefficients
     // Check if coefficients exist before accessing
@@ -1004,7 +1006,7 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
         // restricted only
         if (get_orbitals()->is_restricted()) {
           std::string storage_name = "one_rdm_aa";
-          H5::Attribute one_rdm_aa_complex_attr = group.createAttribute(
+          H5::Attribute one_rdm_aa_complex_attr = rdm_group.createAttribute(
               "is_one_rdm_aa_complex", H5::PredType::NATIVE_HBOOL,
               H5::DataSpace(H5S_SCALAR));
 
@@ -1013,7 +1015,7 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
             bool is_one_rdm_complex =
                 detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
             save_matrix_variant_to_group(is_one_rdm_complex,
-                                         *_one_rdm_spin_dependent_aa, rdm_group,
+                                         _one_rdm_spin_dependent_aa, rdm_group,
                                          storage_name);
 
             // store complexity flag
@@ -1028,7 +1030,7 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
             bool is_one_rdm_complex =
                 detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
             save_matrix_variant_to_group(is_one_rdm_complex,
-                                         *_one_rdm_spin_dependent_bb, rdm_group,
+                                         _one_rdm_spin_dependent_bb, rdm_group,
                                          storage_name);
 
             // store complexity flag
@@ -1038,14 +1040,14 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
           } else if (_one_rdm_spin_traced != nullptr &&
                      get_orbitals()->is_restricted()) {
             // only spin traced
-            _one_rdm_spin_dependent_aa =
+            auto derived_one_rdm_spin_dependent_aa =
                 detail::multiply_matrix_variant(*_one_rdm_spin_traced, 0.5);
             // check if real or complex
-            bool is_one_rdm_complex =
-                detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
+            bool is_one_rdm_complex = detail::is_matrix_variant_complex(
+                *derived_one_rdm_spin_dependent_aa);
             save_matrix_variant_to_group(is_one_rdm_complex,
-                                         *_one_rdm_spin_dependent_aa, rdm_group,
-                                         storage_name);
+                                         derived_one_rdm_spin_dependent_aa,
+                                         rdm_group, storage_name);
 
             // store complexity flag
             hbool_t is_one_rdm_aa_complex_flag = is_one_rdm_complex ? 1 : 0;
@@ -1061,23 +1063,23 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
         } else {
           // unrestricted - want to store both
           std::string storage_name_aa = "one_rdm_aa";
-          H5::Attribute one_rdm_aa_complex_attr = group.createAttribute(
+          H5::Attribute one_rdm_aa_complex_attr = rdm_group.createAttribute(
               "is_one_rdm_aa_complex", H5::PredType::NATIVE_HBOOL,
               H5::DataSpace(H5S_SCALAR));
-          H5::Attribute one_rdm_bb_complex_attr = group.createAttribute(
+          H5::Attribute one_rdm_bb_complex_attr = rdm_group.createAttribute(
               "is_one_rdm_bb_complex", H5::PredType::NATIVE_HBOOL,
               H5::DataSpace(H5S_SCALAR));
 
           bool is_aa_rdm_complex =
               detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
           save_matrix_variant_to_group(is_aa_rdm_complex,
-                                       *_one_rdm_spin_dependent_aa, rdm_group,
+                                       _one_rdm_spin_dependent_aa, rdm_group,
                                        storage_name_aa);
           std::string storage_name_bb = "one_rdm_bb";
           bool is_bb_rdm_complex =
               detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
           save_matrix_variant_to_group(is_bb_rdm_complex,
-                                       *_one_rdm_spin_dependent_bb, rdm_group,
+                                       _one_rdm_spin_dependent_bb, rdm_group,
                                        storage_name_bb);
 
           // store complexity flags
@@ -1093,22 +1095,22 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
       if (has_two_rdm_spin_dependent()) {
         std::string storage_name_aabb = "two_rdm_aabb";
         std::string storage_name_aaaa = "two_rdm_aaaa";
-        H5::Attribute two_rdm_aabb_complex_attr = group.createAttribute(
+        H5::Attribute two_rdm_aabb_complex_attr = rdm_group.createAttribute(
             "is_two_rdm_aabb_complex", H5::PredType::NATIVE_HBOOL,
             H5::DataSpace(H5S_SCALAR));
-        H5::Attribute two_rdm_aaaa_complex_attr = group.createAttribute(
+        H5::Attribute two_rdm_aaaa_complex_attr = rdm_group.createAttribute(
             "is_two_rdm_aaaa_complex", H5::PredType::NATIVE_HBOOL,
             H5::DataSpace(H5S_SCALAR));
         // we need aabb and aaaa for both restricted and unrestricted
         bool is_aabb_rdm_complex =
             detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aabb);
         save_vector_variant_to_group(is_aabb_rdm_complex,
-                                     *_two_rdm_spin_dependent_aabb, rdm_group,
+                                     _two_rdm_spin_dependent_aabb, rdm_group,
                                      storage_name_aabb);
         bool is_aaaa_rdm_complex =
             detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aaaa);
         save_vector_variant_to_group(is_aaaa_rdm_complex,
-                                     *_two_rdm_spin_dependent_aaaa, rdm_group,
+                                     _two_rdm_spin_dependent_aaaa, rdm_group,
                                      storage_name_aaaa);
 
         // store complexity flags
@@ -1121,13 +1123,13 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
         if (get_orbitals()->is_unrestricted()) {
           // also save bbbb
           std::string storage_name_bbbb = "two_rdm_bbbb";
-          H5::Attribute two_rdm_bbbb_complex_attr = group.createAttribute(
+          H5::Attribute two_rdm_bbbb_complex_attr = rdm_group.createAttribute(
               "is_two_rdm_bbbb_complex", H5::PredType::NATIVE_HBOOL,
               H5::DataSpace(H5S_SCALAR));
           bool is_bbbb_rdm_complex =
               detail::is_vector_variant_complex(*_two_rdm_spin_dependent_bbbb);
           save_vector_variant_to_group(is_bbbb_rdm_complex,
-                                       *_two_rdm_spin_dependent_bbbb, rdm_group,
+                                       _two_rdm_spin_dependent_bbbb, rdm_group,
                                        storage_name_bbbb);
           hbool_t is_two_rdm_bbbb_complex_flag = is_bbbb_rdm_complex ? 1 : 0;
           two_rdm_bbbb_complex_attr.write(H5::PredType::NATIVE_HBOOL,
@@ -1167,7 +1169,6 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
     // Load wavefunction type
     WavefunctionType type = WavefunctionType::SelfDual;
     if (group.attrExists("wavefunction_type")) {
-      H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
       H5::Attribute wf_type_attr = group.openAttribute("wavefunction_type");
       std::string type_str;
       wf_type_attr.read(string_type, type_str);
@@ -1256,9 +1257,9 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
       if (rdm_group.nameExists("one_rdm_aa")) {
         // check complexity
         bool is_one_rdm_aa_complex = false;
-        if (group.attrExists("is_one_rdm_aa_complex")) {
+        if (rdm_group.attrExists("is_one_rdm_aa_complex")) {
           H5::Attribute complex_attr =
-              group.openAttribute("is_one_rdm_aa_complex");
+              rdm_group.openAttribute("is_one_rdm_aa_complex");
           hbool_t is_complex_flag;
           complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
           is_one_rdm_aa_complex = (is_complex_flag != 0);
@@ -1266,8 +1267,19 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
         one_rdm_aa = load_matrix_variant_from_group(rdm_group, "one_rdm_aa",
                                                     is_one_rdm_aa_complex);
       } else {
-        throw std::runtime_error(
-            "One rdms should be available but none were found in hdf5.");
+        // Only throw if metadata says one RDMs are expected
+        bool has_one_rdm_spin_dependent = false;
+        if (group.attrExists("has_one_rdm_spin_dependent")) {
+          H5::Attribute attr =
+              group.openAttribute("has_one_rdm_spin_dependent");
+          hbool_t flag;
+          attr.read(H5::PredType::NATIVE_HBOOL, &flag);
+          has_one_rdm_spin_dependent = (flag != 0);
+        }
+        if (has_one_rdm_spin_dependent) {
+          throw std::runtime_error(
+              "One rdms should be available but none were found in hdf5.");
+        }
       }
 
       // check if any two rdms were saved
@@ -1275,17 +1287,17 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
           rdm_group.nameExists("two_rdm_aaaa")) {
         // check complexity
         bool is_two_rdm_aabb_complex = false;
-        if (group.attrExists("is_two_rdm_aabb_complex")) {
+        if (rdm_group.attrExists("is_two_rdm_aabb_complex")) {
           H5::Attribute complex_attr =
-              group.openAttribute("is_two_rdm_aabb_complex");
+              rdm_group.openAttribute("is_two_rdm_aabb_complex");
           hbool_t is_complex_flag;
           complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
           is_two_rdm_aabb_complex = (is_complex_flag != 0);
         }
         bool is_two_rdm_aaaa_complex = false;
-        if (group.attrExists("is_two_rdm_aaaa_complex")) {
+        if (rdm_group.attrExists("is_two_rdm_aaaa_complex")) {
           H5::Attribute complex_attr =
-              group.openAttribute("is_two_rdm_aaaa_complex");
+              rdm_group.openAttribute("is_two_rdm_aaaa_complex");
           hbool_t is_complex_flag;
           complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
           is_two_rdm_aaaa_complex = (is_complex_flag != 0);
@@ -1366,9 +1378,9 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
         if (rdm_group.nameExists("one_rdm_bb")) {
           // check complexity
           bool is_one_rdm_bb_complex = false;
-          if (group.attrExists("is_one_rdm_bb_complex")) {
+          if (rdm_group.attrExists("is_one_rdm_bb_complex")) {
             H5::Attribute complex_attr =
-                group.openAttribute("is_one_rdm_bb_complex");
+                rdm_group.openAttribute("is_one_rdm_bb_complex");
             hbool_t is_complex_flag;
             complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
             is_one_rdm_bb_complex = (is_complex_flag != 0);
@@ -1388,9 +1400,9 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
         // also get two rdms bbbb
         if (rdm_group.nameExists("two_rdm_bbbb")) {
           bool is_two_rdm_bbbb_complex = false;
-          if (group.attrExists("is_two_rdm_bbbb_complex")) {
+          if (rdm_group.attrExists("is_two_rdm_bbbb_complex")) {
             H5::Attribute complex_attr =
-                group.openAttribute("is_two_rdm_bbbb_complex");
+                rdm_group.openAttribute("is_two_rdm_bbbb_complex");
             hbool_t is_complex_flag;
             complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
             is_two_rdm_bbbb_complex = (is_complex_flag != 0);

@@ -269,11 +269,12 @@ void write_vector_to_hdf5(H5::Group& grp, const std::string& name,
   }
 }
 
-void save_matrix_variant_to_group(bool is_complex, MatrixVariant matrix_variant,
-                                  H5::Group group, std::string storage_name) {
+void save_matrix_variant_to_group(
+    bool is_complex, const std::shared_ptr<MatrixVariant>& matrix_variant,
+    H5::Group& group, const std::string& storage_name) {
   // complex
   if (is_complex) {
-    const auto& matrix_complex = std::get<Eigen::MatrixXcd>(matrix_variant);
+    const auto& matrix_complex = std::get<Eigen::MatrixXcd>(*matrix_variant);
     hsize_t matrix_dims[2] = {matrix_complex.rows(), matrix_complex.cols()};
     H5::DataSpace matrix_space(2, matrix_dims);
 
@@ -288,7 +289,7 @@ void save_matrix_variant_to_group(bool is_complex, MatrixVariant matrix_variant,
   }
   // real
   else {
-    const auto& matrix_real = std::get<Eigen::MatrixXd>(matrix_variant);
+    const auto& matrix_real = std::get<Eigen::MatrixXd>(*matrix_variant);
     hsize_t matrix_dims[2] = {matrix_real.rows(), matrix_real.cols()};
     H5::DataSpace matrix_space(2, matrix_dims);
     H5::DataSet real_dataset = group.createDataSet(
@@ -298,11 +299,12 @@ void save_matrix_variant_to_group(bool is_complex, MatrixVariant matrix_variant,
   }
 }
 
-void save_vector_variant_to_group(bool is_complex, VectorVariant vector_variant,
-                                  H5::Group group, std::string storage_name) {
+void save_vector_variant_to_group(
+    bool is_complex, const std::shared_ptr<VectorVariant>& vector_variant,
+    H5::Group& group, const std::string& storage_name) {
   // complex
   if (is_complex) {
-    const auto& vector_complex = std::get<Eigen::VectorXcd>(vector_variant);
+    const auto& vector_complex = std::get<Eigen::VectorXcd>(*vector_variant);
     hsize_t vector_dims = vector_complex.size();
     H5::DataSpace vector_space(1, &vector_dims);
 
@@ -317,7 +319,7 @@ void save_vector_variant_to_group(bool is_complex, VectorVariant vector_variant,
   }
   // real
   else {
-    const auto& vector_real = std::get<Eigen::VectorXd>(vector_variant);
+    const auto& vector_real = std::get<Eigen::VectorXd>(*vector_variant);
     hsize_t vector_dims = vector_real.size();
     H5::DataSpace vector_space(1, &vector_dims);
     H5::DataSet real_dataset = group.createDataSet(
