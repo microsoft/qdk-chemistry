@@ -4,8 +4,9 @@
 
 #include "asahf.h"
 
-#include <qdk/chemistry/constants.hpp>
 #include <qdk/chemistry/scf/config.h>
+
+#include <qdk/chemistry/constants.hpp>
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
@@ -325,10 +326,8 @@ void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
   }
 }
 
-void AtomicSphericallyAveragedHartreeFock::
-    compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
-                                             RowMajorMatrix* ret,
-                                             size_t n_atom_orbs) {
+void AtomicSphericallyAveragedHartreeFock::compute_orthogonalization_matrix_(
+    const RowMajorMatrix& S_, RowMajorMatrix* ret, size_t n_atom_orbs) {
   RowMajorMatrix U_t(n_atom_orbs, n_atom_orbs);
   RowMajorMatrix s(n_atom_orbs, 1);
   std::memcpy(U_t.data(), S_.data(),

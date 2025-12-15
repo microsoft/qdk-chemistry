@@ -26,8 +26,8 @@ namespace qdk::chemistry::scf {
  *     "Starting scf calculations by superposition of atomic densities"
  *     J. Comput. Chem.
  *     10.1002/jcc.20393
- * 
- * See also: 
+ *
+ * See also:
  *     qdk::chemistry::constants::ATOMIC_CONFIGURATION for the atomic electron
  *     configurations used in this method.
  */
