@@ -110,6 +110,7 @@ export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
 export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
 
 python3 -m build --wheel \
+    -C build-dir="build/{wheel_tag}" \
     -C cmake.define.QDK_UARCH=${MARCH} \
     -C cmake.define.BUILD_SHARED_LIBS=OFF \
     -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \

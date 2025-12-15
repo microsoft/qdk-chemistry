@@ -23,7 +23,6 @@ pip install ipykernel ipywidgets pandas
 cd "$REPO_ROOT/python"
 export CMAKE_BUILD_PARALLEL_LEVEL=4
 QDK_UARCH=native pip install -v .[all]
-rm -fr build
 
 # Install QDK Widgets
 git clone --branch billti/widg https://github.com/microsoft/qdk /tmp/qdk

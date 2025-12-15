@@ -171,7 +171,8 @@ jobs:
       run: |
         # Remove CMake files to build Python package without picking the installed library
         rm -r ${{ github.workspace }}/install/lib/cmake/qdk
-        python -m pip install --prefix=${{ github.workspace }}/install .[all]
+        # Use persistent build directory for coverage analysis
+        python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[all]
         python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
 
     - name: Run Python tests
