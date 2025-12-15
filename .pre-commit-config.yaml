@@ -127,3 +127,12 @@ repos:
         cpp/CMakeLists\.txt|
         docs/source/conf\.py
       )$
+
+  - id: check-pyi-stubs
+    name: Check .pyi Stub Files
+    description: Verify required .pyi type stub files exist
+    entry: python3 .github/scripts/check_pyi_stubs.py
+    language: system
+    pass_filenames: false
+    require_serial: true
+    always_run: true
