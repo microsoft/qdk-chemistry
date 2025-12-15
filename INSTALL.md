@@ -55,6 +55,21 @@ pytest tests/
 
 **NOTE:** Building this Python package may require significant memory, since the C++ library build uses all available threads by default and some compilations can consume around 3 GB of RAM. To avoid running out of memory, set `CMAKE_BUILD_PARALLEL_LEVEL` to a reasonably small value. For example, use: `CMAKE_BUILD_PARALLEL_LEVEL=1 pip install .` to perform a single-threaded C++ library build.
 
+#### Accelerating Rebuilds with Build Caching
+
+By default, each `pip install` uses a fresh temporary build directory to ensure reproducible builds and avoid issues with stale CMake cache state. However, for development workflows where you're making frequent changes, you can enable persistent build caching for significantly faster rebuilds:
+
+```bash
+pip install . -C build-dir="build/{wheel_tag}"
+```
+
+**Warning:** When using a persistent build directory, CMake caches configuration decisions (such as whether the C++ library was found pre-installed or built from source). If your environment changes (e.g., you add or remove a pre-installed C++ library, or C++ dependencies change), the cached state may cause subtle build failures. In this case, remove the build directory and try again:
+
+```bash
+rm -rf build/
+pip install .
+```
+
 #### Environment Variables for the Python Build
 
 To control the settings of the internal C++ build in the python package installation, the following environment variables can be set.

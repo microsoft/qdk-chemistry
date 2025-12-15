@@ -1,11 +1,8 @@
-// Active space selection example.
-
-// --------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
-// --------------------------------------------------------------------------------------------
 
+// Active space selection example.
 #include <iostream>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/scf_solver.hpp>

@@ -4,6 +4,15 @@
 trigger: none
 pr: none
 
+resources:
+  repositories:
+  - repository: 1ESPipelineTemplates
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+  - repository: self
+    path: qdk-chemistry
+
 parameters:
 - name: matrix
   type: object
@@ -17,150 +26,198 @@ parameters:
     os: linux
     arch: aarch64
     march: armv8-a
-    imageName: qd-azurelinux3-pt-arm
-- name: pcmsolverRef
-  displayName: pcmsolver Reference
-  default: msft_develop
-  type: string
-- name: exchCXXRef
-  displayName: ExchCXX Reference
-  default: msft_develop
-  type: string
-- name: gauXCRef
-  displayName: GauXC Reference
-  default: msft_develop
-  type: string
-- name: forceArtifactUpload
-  displayName: Force Artifact Upload
-  type: boolean
-  default: false
-
-resources:
-  repositories:
-  - repository: self
-    path: qdk-chemistry
-  - repository: pcmsolver
-    type: git
-    name: AzureQuantum/pcmsolver
-    ref: ${{ parameters.pcmsolverRef }}
-  - repository: ExchCXX
-    type: git
-    name: AzureQuantum/madft-exchcxx
-    ref: ${{ parameters.exchCXXRef }}
-  - repository: GauXC
-    type: git
-    name: AzureQuantum/GauXC
-    ref: ${{ parameters.gauXCRef }}
+    imageName: 1es-pt-azurelinux3-arm
 
 variables:
 - group: QdkChemistry
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
+  parameters:
+    sdl:
+      autobaseline:
+        enableForGitHub: true
+      codeql:
+        compiled:
+          enabled: true
+        sourceLanguages: python
+        binaryLanguages: cpp
+      psscriptanalyzer:
+        enabled: false
+        justificationForDisabling: Powershell is not used in this repository.
+        break: false
+      armory:
+        enabled: false
+        justificationForDisabling: ARM templates are not used in this repository.
+        break: false
+      eslint:
+        enabled: false
+        justificationForDisabling: JavaScript is not used in this repository.
+        exitOnFatalError: true
+      sourceAnalysisPool:
+        name: Azure-Pipelines-DevTools-EO
+        image: windows-2022
+        os: windows
+    stages:
+    - stage: Build
+      displayName: Build C++ Deps and Python Wheels
+      jobs:
+      - ${{ each target in parameters.matrix }}:
+        - job: Build_${{ target.name }}
+          ${{ if eq(target.arch, 'aarch64') }}:
+            pool:
+              name: $(CPU_POOL_ARM)
+              demands:
+              - ImageOverride -equals ${{ target.imageName }}
+              os: ${{ target.os }}
+              hostArchitecture: Arm64
+          ${{ if eq(target.arch, 'x86_64') }}:
+            pool:
+              name: $(CPU_POOL_X86)
+              demands:
+              - ImageOverride -equals ${{ target.imageName }}
+              os: ${{ target.os }}
+          timeoutInMinutes: 480
+          displayName: Build ${{ target.march }} wheels
+          variables:
+            LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
+          strategy:
+            matrix:
+              Python3.11:
+                pythonVersion: '3.11'
+                buildMarch: ${{ target.march }}
+              Python3.12:
+                pythonVersion: '3.12'
+                buildMarch: ${{ target.march }}
+              Python3.13:
+                pythonVersion: '3.13'
+                buildMarch: ${{ target.march }}
+            maxParallel: 3
+          templateContext:
+            outputs:
+            - output: pipelineArtifact
+              displayName: Upload Linux Python $(pythonVersion) Wheels for ${{ target.march }}
+              targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
+              artifactName: linux-${{ target.arch }}-wheels-python$(pythonVersion)
+          steps:
+          # Build - x86_64
+          - ${{ if eq(target.arch, 'x86_64') }}:
+            - template: .pipelines/templates/docker-pip-wheel.yml@self
+              parameters:
+                march: $(buildMarch)
+                buildTesting: OFF
+                enableCoverage: OFF
+                agentBuildDirectory: $(Agent.BuildDirectory)
+                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
+                imageTag: linux/amd64
+                pythonVersion: $(pythonVersion)
 
-stages:
-- stage: Build
-  displayName: Build C++ Deps and Python Wheels
-  jobs:
-  - ${{ each target in parameters.matrix }}:
-    - job: Build_${{ target.name }}
-      ${{ if eq(target.arch, 'aarch64') }}:
+          # Test - x86_64
+          - ${{ if eq(target.arch, 'x86_64') }}:
+            - template: .pipelines/templates/docker-test-wheel.yml@self
+              parameters:
+                agentBuildDirectory: $(Agent.BuildDirectory)
+                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
+                imageTag: linux/amd64
+                pythonVersion: $(pythonVersion)
+
+          # Build - ARM64
+          - ${{ if eq(target.arch, 'aarch64') }}:
+            - template: .pipelines/templates/docker-pip-wheel.yml@self
+              parameters:
+                march: $(buildMarch)
+                buildTesting: OFF
+                enableCoverage: OFF
+                agentBuildDirectory: $(Agent.BuildDirectory)
+                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
+                imageTag: linux/arm64/v8
+                pythonVersion: $(pythonVersion)
+
+          # Test - ARM64
+          - ${{ if eq(target.arch, 'aarch64') }}:
+            - template: .pipelines/templates/docker-test-wheel.yml@self
+              parameters:
+                agentBuildDirectory: $(Agent.BuildDirectory)
+                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
+                imageTag: linux/arm64/v8
+                pythonVersion: $(pythonVersion)
+
+          # ARM builds require that we transfer ownership of the wheel directory
+          # back to the original base image user
+          - ${{ if eq(target.arch, 'aarch64') }}:
+            - script: |
+                sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
+              displayName: Fix wheel directory ownership
+
+    - stage: Approval
+      displayName: Approval
+      dependsOn: Build
+      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'))
+      jobs:
+      - job: Approval
+        pool: server
+        timeoutInMinutes: 1440     # job times out in 1 day
+        steps:
+        - task: ManualValidation@0
+          timeoutInMinutes: 1440       # task times out in 1 day
+          inputs:
+            notifyUsers: ''
+            instructions: Please verify artifacts and approve the release
+            onTimeout: reject
+
+    - stage: Release
+      displayName: Release
+      dependsOn: Approval
+      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'))
+      jobs:
+      - job: Publish_Python_Packages
         pool:
-          name: $(CPU_POOL_ARM)
-          demands:
-          - ImageOverride -equals ${{ target.imageName }}
-          os: ${{ target.os }}
-          hostArchitecture: Arm64
-      ${{ if eq(target.arch, 'x86_64') }}:
-        pool:
-          name: $(CPU_POOL_X86)
-          demands:
-          - ImageOverride -equals ${{ target.imageName }}
-          os: ${{ target.os }}
-      timeoutInMinutes: 480
-      displayName: Build ${{ target.march }} wheels
-      variables:
-        LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
-        targetOs: ${{ target.os }}
-        targetArch: ${{ target.arch }}
-      strategy:
-        matrix:
-          Python3.11:
-            pythonVersion: '3.11'
-            buildMarch: ${{ target.march }}
-          Python3.12:
-            pythonVersion: '3.12'
-            buildMarch: ${{ target.march }}
-          Python3.13:
-            pythonVersion: '3.13'
-            buildMarch: ${{ target.march }}
-        maxParallel: 1
+          name: Azure-Pipelines-DevTools-EO
+          image: ubuntu-latest
+          os: linux
+        templateContext:
+          type: releaseJob
+          isProduction: true
+          inputs:     # Declare all build artifacts to be consumed in the release job
+          - input: pipelineArtifact
+            artifactName: linux-x86_64-wheels-python3.11
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.11
+          - input: pipelineArtifact
+            artifactName: linux-x86_64-wheels-python3.12
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.12
+          - input: pipelineArtifact
+            artifactName: linux-x86_64-wheels-python3.13
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.13
+          - input: pipelineArtifact
+            artifactName: linux-aarch64-wheels-python3.11
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.11
+          - input: pipelineArtifact
+            artifactName: linux-aarch64-wheels-python3.12
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.12
+          - input: pipelineArtifact
+            artifactName: linux-aarch64-wheels-python3.13
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.13
+        steps:
+        - script: |
+            mkdir -p $(System.DefaultWorkingDirectory)/target/wheels
+            find $(System.DefaultWorkingDirectory)/artifacts -name "*.whl" -exec cp {} $(System.DefaultWorkingDirectory)/target/wheels/ \;
+            ls $(System.DefaultWorkingDirectory)/target/wheels
+          displayName: Collect Python Artifacts for Release
 
-      steps:
-      # Build - x86_64
-      - ${{ if eq(target.arch, 'x86_64') }}:
-        - template: templates/docker-pip-wheel.yml
-          parameters:
-            march: $(buildMarch)
-            buildTesting: OFF
-            enableCoverage: OFF
-            agentBuildDirectory: $(Agent.BuildDirectory)
-            dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
-            imageTag: linux/amd64
-            pythonVersion: $(pythonVersion)
-
-      # Test - x86_64
-      - ${{ if eq(target.arch, 'x86_64') }}:
-        - template: templates/docker-test-wheel.yml
-          parameters:
-            agentBuildDirectory: $(Agent.BuildDirectory)
-            dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
-            imageTag: linux/amd64
-            pythonVersion: $(pythonVersion)
-
-      # Build - ARM64
-      - ${{ if eq(target.arch, 'aarch64') }}:
-        - template: templates/docker-pip-wheel.yml
-          parameters:
-            march: $(buildMarch)
-            buildTesting: OFF
-            enableCoverage: OFF
-            agentBuildDirectory: $(Agent.BuildDirectory)
-            dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
-            imageTag: linux/arm64/v8
-            pythonVersion: $(pythonVersion)
-
-      # Test - ARM64
-      - ${{ if eq(target.arch, 'aarch64') }}:
-        - template: templates/docker-test-wheel.yml
-          parameters:
-            agentBuildDirectory: $(Agent.BuildDirectory)
-            dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
-            imageTag: linux/arm64/v8
-            pythonVersion: $(pythonVersion)
-
-      # Deploy: only from main branch and not for PRs
-      - task: TwineAuthenticate@1
-        displayName: Twine Authenticate for wheel upload
-        inputs:
-          $(DEPENDENCIES_ARTIFACT_FEED): $(DEPENDENCIES_ARTIFACT_PROJECT)/$(DEPENDENCIES_ARTIFACT_FEED)
-        condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
-
-      - script: |
-          cd $(Agent.BuildDirectory)/qdk-chemistry/python
-          pip install --user twine
-          python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
-        displayName: Upload wheel with twine
-        condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
-
-      # Optional Publish Build Artifacts for debugging
-      - task: TwineAuthenticate@1
-        displayName: Twine Authenticate for wheel upload
-        inputs:
-          $(DEPENDENCIES_ARTIFACT_FEED): $(DEPENDENCIES_ARTIFACT_PROJECT)/$(DEPENDENCIES_ARTIFACT_FEED)
-        condition: and(succeeded(), eq(${{ parameters.forceArtifactUpload }}, true))
-
-      - script: |
-          echo "WARNING: Forcing artifact upload. This is intended for debugging purposes only."
-          cd $(Agent.BuildDirectory)/qdk-chemistry/python
-          pip install --user twine
-          python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
-        displayName: Upload wheel with twine
-        condition: and(succeeded(), eq(${{ parameters.forceArtifactUpload }}, true))
+        # Setting the contenttype to the wrong value will allow us to do a dry run of this task without
+        # publishing anything, according to the ESRP docs
+        - task: EsrpRelease@9
+          condition: succeeded()
+          displayName: Publish Python Packages
+          inputs:
+            connectedservicename: PME ESRP Azure Connection
+            usemanagedidentity: true
+            keyvaultname: quantum-esrp-kv
+            signcertname: ESRPCert
+            clientid: 832c049d-cd07-4c1c-bfa5-c07250d190cb
+            contenttype: NPM
+            domaintenantid: 975f013f-7f24-47e8-a7d3-abc4752bf346
+            folderlocation: $(System.DefaultWorkingDirectory)/target/wheels
+            waitforreleasecompletion: true
+            owners: davidwillia@microsoft.com, janunsleber@microsoft.com, nathanbaker@microsoft.com
+            approvers: davidwillia@microsoft.com, janunsleber@microsoft.com, nathanbaker@microsoft.com
+            mainpublisher: ESRPRELPACMAN

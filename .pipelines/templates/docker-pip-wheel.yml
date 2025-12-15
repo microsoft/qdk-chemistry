@@ -35,6 +35,9 @@ parameters:
 - name: libflameVersion
   type: string
   default: 5.2.0
+- name: pyenvVersion
+  type: string
+  default: 2.6.15
 - name: artifactProject
   type: string
   default: 37e07de7-e7fd-4be8-8379-dc164a4401f3
@@ -55,9 +58,9 @@ steps:
     echo "Running pip wheel build..."
     docker run --rm \
       --platform ${{ parameters.imageTag }} \
-      -v ${{ parameters.agentBuildDirectory }}:/workspace \
+      -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
       -e QDK_UARCH=${{ parameters.march }} \
       -w /workspace/qdk-chemistry \
       ${{ parameters.dockerImage }} \
-    bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} ${{ parameters.pythonVersion }} ${{ parameters.buildType }} ${{ parameters.buildTesting }} ${{ parameters.enableCoverage }} ${{ parameters.cmakeVersion }} ${{ parameters.hdf5Version }} ${{ parameters.blisVersion }} ${{ parameters.libflameVersion }}
+    bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} ${{ parameters.pythonVersion }} ${{ parameters.buildType }} ${{ parameters.buildTesting }} ${{ parameters.enableCoverage }} ${{ parameters.cmakeVersion }} ${{ parameters.hdf5Version }} ${{ parameters.blisVersion }} ${{ parameters.libflameVersion }} ${{ parameters.pyenvVersion }}
   displayName: Build wheel in container
