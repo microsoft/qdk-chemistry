@@ -63,8 +63,8 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/gabime/spdlog",
-          "commitHash": "7e635fca68d014934b4af8a1cf874f63989352b7",
-          "tag": "v1.10.0"
+          "commitHash": "6fa36017cfd5731d617e1a934f0e5ea9c4445b13",
+          "tag": "v1.15.3"
         }
       },
       "developmentDependency": false

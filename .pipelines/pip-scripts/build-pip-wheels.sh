@@ -10,12 +10,21 @@ CMAKE_VERSION=${6:-3.28.3}
 HDF5_VERSION=${7:-1.13.0}
 BLIS_VERSION=${8:-2.0}
 LIBFLAME_VERSION=${9:-5.2.0}
+PYENV_VERSION=${10:-2.6.15}
 
 export DEBIAN_FRONTEND=noninteractive
 
+# Try to prevent stochastic segfault from libc-bin
+echo "Reinstalling libc-bin..."
+rm /var/lib/dpkg/info/libc-bin.*
+apt-get clean
+apt-get update -q
+apt install -q libc-bin
+
 # Update and install dependencies
-apt-get update
-apt-get install -y \
+echo "Installing apt dependencies..."
+apt-get update -q
+apt-get install -y -q \
     python3 python3-pip python3-dev \
     libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev \
     libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
@@ -38,17 +47,18 @@ apt-get install -y \
     libpugixml-dev
 
 # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
-if [[ ${MARCH} == 'armv8-a' ]]; then
-    wget -q https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-aarch64.sh
-    chmod +x cmake-${CMAKE_VERSION}-linux-aarch64.sh
-    /bin/sh cmake-${CMAKE_VERSION}-linux-aarch64.sh --skip-license --prefix=/usr/local
-    rm cmake-${CMAKE_VERSION}-linux-aarch64.sh
-elif [[ ${MARCH} == 'x86-64-v3' ]]; then
-    wget -q https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.sh
-    chmod +x cmake-${CMAKE_VERSION}-linux-x86_64.sh
-    /bin/sh cmake-${CMAKE_VERSION}-linux-x86_64.sh --skip-license --prefix=/usr/local
-    rm cmake-${CMAKE_VERSION}-linux-x86_64.sh
-fi
+echo "Downloading and installing CMake ${CMAKE_VERSION}..."
+export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
+wget -q https://cmake.org/files/v3.28/cmake-${CMAKE_VERSION}.tar.gz -O cmake-${CMAKE_VERSION}.tar.gz
+echo "${CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}.tar.gz" | shasum -a 256 -c || exit 1
+tar -xzf cmake-${CMAKE_VERSION}.tar.gz
+rm cmake-${CMAKE_VERSION}.tar.gz
+cd cmake-${CMAKE_VERSION}
+./bootstrap --parallel=$(nproc) --prefix=/usr/local
+make --silent -j$(nproc)
+make install
+cd ..
+rm -r cmake-${CMAKE_VERSION}
 cmake --version
 
 export CFLAGS="-fPIC -Os"
@@ -59,7 +69,9 @@ echo "Downloading and installing libflame..."
 bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} ${CFLAGS}
 
 echo "Downloading HDF5 $HDF5_VERSION..."
+export HDF5_CHECKSUM=1826e198df8dac679f0d3dc703aba02af4c614fd6b7ec936cf4a55e6aa0646ec
 wget -q -nc --no-check-certificate https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-${HDF5_VERSION}/src/hdf5-${HDF5_VERSION}.tar.bz2
+echo "${HDF5_CHECKSUM}  hdf5-${HDF5_VERSION}.tar.bz2" | shasum -a 256 -c || exit 1
 tar -xjf hdf5-${HDF5_VERSION}.tar.bz2
 rm hdf5-${HDF5_VERSION}.tar.bz2
 mv hdf5-${HDF5_VERSION} hdf5
@@ -69,13 +81,17 @@ echo "Installing HDF5..."
 bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} ${CFLAGS}
 
 # Install pyenv to use non-system python3 versions
-export PYENV_ROOT="/workspace/.pyenv" && \
-wget -q https://github.com/pyenv/pyenv/archive/refs/heads/master.zip -O pyenv.zip && \
-unzip -q pyenv.zip && \
-mv pyenv-master "$PYENV_ROOT" && \
-rm pyenv.zip && \
-"$PYENV_ROOT/bin/pyenv" install ${PYTHON_VERSION} && \
-"$PYENV_ROOT/bin/pyenv" global ${PYTHON_VERSION} && \
+# pyenv is used in place of a venv to prevent any collisions with the system Python
+# when building with a non-system Python version.
+export PYENV_CHECKSUM=95187d6ad9bc8310662b5b805a88506e5cbbe038f88890e5aabe3021711bf3c8
+export PYENV_ROOT="/workspace/.pyenv"
+wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v${PYENV_VERSION}.zip -O pyenv.zip
+echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -a 256 -c || exit 1
+unzip -q pyenv.zip
+mv pyenv-${PYENV_VERSION} "$PYENV_ROOT"
+rm pyenv.zip
+"$PYENV_ROOT/bin/pyenv" install ${PYTHON_VERSION}
+"$PYENV_ROOT/bin/pyenv" global ${PYTHON_VERSION}
 export PATH="$PYENV_ROOT/versions/${PYTHON_VERSION}/bin:$PATH"
 export PATH="$PYENV_ROOT/shims:$PATH"
 
@@ -84,6 +100,7 @@ python3 --version
 # Update pip and install build tools
 python3 -m pip install --upgrade pip
 python3 -m pip install auditwheel build
+python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
 
 # Install Python package
 cd python
@@ -100,16 +117,14 @@ python3 -m build --wheel \
     -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
     -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
     -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
-    -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
+    -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
+    -C cmake.define.CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
 
 echo "Checking shared dependencies..."
 ldd build/cp*/_core.*.so
 
 # Repair wheel
-auditwheel repair dist/qdk_chemistry-*.whl -w repaired_wheelhouse/ \
-    --exclude libopen-rte.so.40 \
-    --exclude libopen-pal.so.40 \
-    --exclude libmpi.so.40
+auditwheel repair dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
 
 # Fix RPATH
 WHEEL_FILE=$(ls repaired_wheelhouse/qdk_chemistry-*.whl)

@@ -3,8 +3,6 @@ build-backend = "scikit_build_core.build"
 requires = [
   "scikit-build-core>=0.10.0",
   "pybind11>=2.13.6",
-  "cmake>=3.15",
-  "ninja; platform_system!='Windows'",
   "numpy>=1.20.0",
 ]
 
