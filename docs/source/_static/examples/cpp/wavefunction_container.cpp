@@ -1,11 +1,8 @@
-// Wavefunction container examples
-
-// --------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
-// --------------------------------------------------------------------------------------------
 
+// Wavefunction container examples
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::data;
 
