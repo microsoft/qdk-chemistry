@@ -12,7 +12,7 @@ from pathlib import Path
 from pyscf.tools import cubegen
 
 from qdk_chemistry.data import Orbitals
-from qdk_chemistry.plugins.pyscf.utils import basis_to_pyscf_mol
+from qdk_chemistry.plugins.pyscf.conversion import basis_to_pyscf_mol
 from qdk_chemistry.utils import Logger
 
 __all__ = [

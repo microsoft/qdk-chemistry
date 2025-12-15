@@ -30,8 +30,8 @@
  * the specific namespace.
  *
  * The default namespace (qdk::chemistry::constants) uses the most recent CODATA
- * version (currently 2022) for convenience, but other versions remain available
- * for compatibility and comparison purposes.
+ * version (currently 2022 :cite:`Mohr2025`) for convenience, but other versions
+ * remain available for compatibility and comparison purposes.
  *
  * To select a specific CODATA version, define QDK_CHEMISTRY_CODATA_VERSION
  */
@@ -55,7 +55,7 @@ struct ConstantInfo {
  * @brief CODATA 2022 recommended values for fundamental physical constants
  *
  * Constants from the 2022 CODATA recommended values of the fundamental physical
- * constants: https://physics.nist.gov/cuu/Constants/
+ * constants: https://physics.nist.gov/cuu/Constants/. :cite:`Mohr2025`
  */
 namespace codata_2022 {
 
@@ -97,7 +97,7 @@ static constexpr double kcal_per_mol_to_hartree = 1.0 / hartree_to_kcal_per_mol;
  * @brief CODATA 2018 recommended values for fundamental physical constants
  *
  * Constants from the 2018 CODATA recommended values of the fundamental physical
- * constants: https://physics.nist.gov/cuu/Constants/ :cite:`Tiesinga2021`.
+ * constants: https://physics.nist.gov/cuu/Constants/. :cite:`Tiesinga2021`
  */
 namespace codata_2018 {
 
@@ -139,7 +139,7 @@ static constexpr double kj_per_mol_to_hartree = 1.0 / hartree_to_kj_per_mol;
  * @brief CODATA 2014 recommended values for fundamental physical constants
  *
  * Constants from the 2014 CODATA recommended values of the fundamental physical
- * constants: https://physics.nist.gov/cuu/Constants/
+ * constants: https://physics.nist.gov/cuu/Constants/. :cite:`Mohr2016`
  */
 namespace codata_2014 {
 

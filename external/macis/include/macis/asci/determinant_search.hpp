@@ -29,6 +29,36 @@
 namespace macis {
 
 /**
+ * @brief Strategy for selecting core determinants in ASCI calculations
+ *
+ * Determines how the number of core determinants is chosen from the
+ * trial determinant set during ASCI refinement iterations.
+ */
+enum class CoreSelectionStrategy {
+  /// @brief Use a fixed number of core determinants
+  Fixed,
+  /// @brief Select core determinants to capture a target percentage of
+  /// wavefunction weight
+  Percentage
+};
+
+/**
+ * @brief Convert CoreSelectionStrategy enum to string representation
+ * @param strategy The core selection strategy to convert
+ * @return String representation ("fixed" or "percentage")
+ */
+inline std::string core_selection_strategy_to_string(
+    CoreSelectionStrategy strategy) {
+  switch (strategy) {
+    case CoreSelectionStrategy::Fixed:
+      return "fixed";
+    case CoreSelectionStrategy::Percentage:
+      return "percentage";
+  }
+  throw std::invalid_argument("Invalid CoreSelectionStrategy value");
+}
+
+/**
  * @brief Comparator for selecting top-k ASCI contributions
  *
  * This comparator orders ASCI contributions by their absolute ratio value (rv)
@@ -66,6 +96,12 @@ struct ASCISettings {
   size_t ntdets_max = 1e5;
   /// @brief Minimum number of trial determinants required
   size_t ntdets_min = 100;
+  /// @brief Strategy for selecting the number of core determinants
+  CoreSelectionStrategy core_selection_strategy =
+      CoreSelectionStrategy::Percentage;
+  /// @brief Threshold for percentage-based core selection (fraction of
+  /// wavefunction weight to retain, 0.0-1.0)
+  double core_selection_threshold = 0.95;
   /// @brief Maximum number of core determinants
   size_t ncdets_max = 100;
   /// @brief Threshold for Hamiltonian matrix element magnitude

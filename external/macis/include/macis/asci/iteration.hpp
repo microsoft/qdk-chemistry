@@ -51,8 +51,47 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   // Sort wfn on coefficient weights
   if (wfn.size() > 1) reorder_ci_on_coeff(wfn, X);
 
-  // Sanity check on search determinants
-  size_t nkeep = std::min(asci_settings.ncdets_max, wfn.size());
+  auto logger = spdlog::get("asci_search");
+
+  size_t nkeep = 0;
+  switch (asci_settings.core_selection_strategy) {
+    case CoreSelectionStrategy::Fixed:
+      // Use fixed number of determinants
+      nkeep = std::min(asci_settings.ncdets_max, wfn.size());
+      if (logger) {
+        logger->trace("  * Core selection: nkeep={}", nkeep);
+      }
+      break;
+    case CoreSelectionStrategy::Percentage: {
+      // Validate core_selection_threshold only when using Percentage strategy
+      if (asci_settings.core_selection_threshold <
+              std::numeric_limits<double>::epsilon() ||
+          asci_settings.core_selection_threshold > 1.0) {
+        throw std::invalid_argument(
+            "core_selection_threshold must be in [epsilon, 1.0], got " +
+            std::to_string(asci_settings.core_selection_threshold));
+      }
+      // Use percentage-based selection - keep determinants until cumulative
+      // weight reaches threshold (not capped by ncdets_max).
+      // Note: If the threshold is never reached (e.g., very small
+      // coefficients), all determinants will be kept (nkeep == wfn.size()).
+      double core_weight = 0.0;
+      for (size_t i = 0; i < wfn.size(); ++i) {
+        core_weight += X[i] * X[i];
+        nkeep++;
+        if (core_weight >= asci_settings.core_selection_threshold) {
+          break;
+        }
+      }
+      if (logger) {
+        logger->trace("  * Core selection: nkeep={}, weight={:.6f}", nkeep,
+                      core_weight);
+      }
+      break;
+    }
+    default:
+      throw std::runtime_error("Unknown CoreSelectionStrategy");
+  }
 
   // Sort kept dets on alpha string
   if (wfn.size() > 1)
