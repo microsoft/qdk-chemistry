@@ -21,11 +21,11 @@ import pytest
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     GF2XEliminationResult,
+    SparseIsometryGF2XStatePreparation,
     _eliminate_column,
     _find_pivot_row,
     _is_diagonal_matrix,
     _perform_gaussian_elimination,
-    _prepare_single_reference_state,
     _reduce_diagonal_matrix,
     _remove_all_ones_rows_with_x,
     _remove_duplicate_rows_with_cnot,
@@ -98,13 +98,180 @@ def test_sparse_isometry_gf2x_single_reference_state():
     assert single_ref_qasm.count("x q[") == 2
 
 
-def test_single_reference_state_error_cases():
+def test_gf2x_bitstrings_to_binary_matrix():
+    """Test functionality of _bitstrings_to_binary_matrix helper."""
+    testclass = SparseIsometryGF2XStatePreparation()
+    # Simple 3-qubit, 2-determinant example
+    bitstrings = ["101", "010"]  # q[2]q[1]q[0] format (Little Endian)
+    result = testclass._bitstrings_to_binary_matrix(bitstrings)
+
+    # Expected: matrix should be (3, 2) with rows q[0], q[1], q[2]
+    # "101" -> reversed to [1,0,1] for column 0
+    # "010" -> reversed to [0,1,0] for column 1
+    expected = np.array(
+        [
+            [1, 0],  # q[0]
+            [0, 1],  # q[1]
+            [1, 0],  # q[2]
+        ],
+        dtype=np.int8,
+    )
+
+    assert result.shape == (3, 2)
+    assert np.array_equal(result, expected)
+
+    # Single bitstring
+    bitstrings = ["1100"]
+    result = testclass._bitstrings_to_binary_matrix(bitstrings)
+
+    # "1100" -> reversed to [0,0,1,1] for single column
+    expected = np.array(
+        [
+            [0],  # q[0]
+            [0],  # q[1]
+            [1],  # q[2]
+            [1],  # q[3]
+        ],
+        dtype=np.int8,
+    )
+
+    assert result.shape == (4, 1)
+    assert np.array_equal(result, expected)
+
+    # Multiple determinants with same length
+    bitstrings = ["00", "01", "10", "11"]
+    result = testclass._bitstrings_to_binary_matrix(bitstrings)
+
+    # Expected matrix (2, 4):
+    # "00" -> [0,0], "01" -> [1,0], "10" -> [0,1], "11" -> [1,1]
+    expected = np.array(
+        [
+            [0, 1, 0, 1],  # q[0]
+            [0, 0, 1, 1],  # q[1]
+        ],
+        dtype=np.int8,
+    )
+
+    assert result.shape == (2, 4)
+    assert np.array_equal(result, expected)
+
+    # All zeros and all ones
+    bitstrings = ["000", "111"]
+    result = testclass._bitstrings_to_binary_matrix(bitstrings)
+
+    expected = np.array(
+        [
+            [0, 1],  # q[0]
+            [0, 1],  # q[1]
+            [0, 1],  # q[2]
+        ],
+        dtype=np.int8,
+    )
+
+    assert result.shape == (3, 2)
+    assert np.array_equal(result, expected)
+
+    # Verify matrix properties
+    bitstrings = ["1010", "0101"]
+    result = testclass._bitstrings_to_binary_matrix(bitstrings)
+
+    # Check dtype and shape
+    assert result.dtype == np.int8
+    assert result.shape == (4, 2)
+
+    # Check that all values are 0 or 1
+    assert np.all((result == 0) | (result == 1))
+
+
+def test_gf2x_bitstrings_to_binary_matrix_edge_cases():
+    """Test edge cases and error conditions for bitstring-to-matrix conversion."""
+    testclass = SparseIsometryGF2XStatePreparation()
+
+    # Empty bitstrings list
+    with pytest.raises(ValueError, match="Bitstrings list cannot be empty"):
+        testclass._bitstrings_to_binary_matrix([])
+
+    # Inconsistent bitstring lengths
+    bitstrings = ["10", "101"]  # Different lengths
+    with pytest.raises(ValueError, match="All bitstrings must have the same length"):
+        testclass._bitstrings_to_binary_matrix(bitstrings)
+
+    # Single character bitstrings
+    bitstrings = ["0", "1"]
+    result = testclass._bitstrings_to_binary_matrix(bitstrings)
+
+    expected = np.array([[0, 1]], dtype=np.int8)  # Single row for q[0]
+    assert result.shape == (1, 2)
+    assert np.array_equal(result, expected)
+
+    # Large number of determinants
+    bitstrings = ["01", "10", "00", "11", "01"]  # 5 determinants
+    result = testclass._bitstrings_to_binary_matrix(bitstrings)
+
+    expected = np.array(
+        [
+            [1, 0, 0, 1, 1],  # q[0]
+            [0, 1, 0, 1, 0],  # q[1]
+        ],
+        dtype=np.int8,
+    )
+
+    assert result.shape == (2, 5)
+    assert np.array_equal(result, expected)
+
+
+def test_gf2x_bitstrings_to_binary_matrix_qiskit_convention():
+    """Test that the function correctly handles Qiskit Little Endian convention."""
+    testclass = SparseIsometryGF2XStatePreparation()
+
+    # Test specific example
+    bitstrings = ["101", "010"]  # q[2]q[1]q[0] format
+    result = testclass._bitstrings_to_binary_matrix(bitstrings)
+
+    # Verify the transformation:
+    # Input "101" means q[2]=1, q[1]=0, q[0]=1
+    # Input "010" means q[2]=0, q[1]=1, q[0]=0
+    # Output matrix should have q[0] in first row, q[1] in second row, q[2] in third row
+
+    # Column 0 from "101": q[0]=1, q[1]=0, q[2]=1
+    assert result[0, 0] == 1  # q[0] from "101"
+    assert result[1, 0] == 0  # q[1] from "101"
+    assert result[2, 0] == 1  # q[2] from "101"
+
+    # Column 1 from "010": q[0]=0, q[1]=1, q[2]=0
+    assert result[0, 1] == 0  # q[0] from "010"
+    assert result[1, 1] == 1  # q[1] from "010"
+    assert result[2, 1] == 0  # q[2] from "010"
+
+    # Test another example to ensure consistency
+    bitstrings = ["1001"]  # q[3]q[2]q[1]q[0] = 1001
+    result = testclass._bitstrings_to_binary_matrix(bitstrings)
+
+    # This should give us q[0]=1, q[1]=0, q[2]=0, q[3]=1
+    expected = np.array([[1], [0], [0], [1]], dtype=np.int8)
+    assert np.array_equal(result, expected)
+
+
+def test_gf2x_bitstrings_to_binary_matrix_additional_validation():
+    """Test additional validation scenarios for bitstrings_to_binary_matrix."""
+    testclass = SparseIsometryGF2XStatePreparation()
+
+    # Test with large valid bitstring
+    large_bitstring = ["0" * 50, "1" * 50]
+    result = testclass._bitstrings_to_binary_matrix(large_bitstring)
+    assert result.shape == (50, 2)
+    assert np.all(result[:, 0] == 0)  # First column all zeros (reversed "0"*50)
+    assert np.all(result[:, 1] == 1)  # Second column all ones (reversed "1"*50)
+
+
+def test_prepare_single_reference_state_error_cases():
     """Test error handling for invalid inputs."""
+    test_cls = SparseIsometryGF2XStatePreparation()
     with pytest.raises(ValueError, match="Bitstring cannot be empty"):
-        _prepare_single_reference_state("")
+        test_cls._prepare_single_reference_state("")
 
     with pytest.raises(ValueError, match="Bitstring must contain only '0' and '1' characters"):
-        _prepare_single_reference_state("1012")
+        test_cls._prepare_single_reference_state("1012")
 
 
 def test_asymmetric_active_space_error():
@@ -131,6 +298,14 @@ def test_asymmetric_active_space_error():
         def get_coefficient(self, _):
             """Return mock coefficient."""
             return 1.0
+
+        def get_coefficients(self):
+            """Return coefficients for all determinants."""
+            return [1.0, 0.5]  # Two coefficients for the two determinants
+
+        def size(self):
+            """Return the number of determinants."""
+            return len(self.get_active_determinants())
 
     mock_wfn = MockWavefunction()
     for sp_key in available("state_prep"):
@@ -591,7 +766,7 @@ def test_is_diagonal_matrix():
     pseudo_diagonal_matrices = [
         # Example: 3x4 matrix (3 rows = odd, 3x3 square part is diagonal, remaining column all 1s)
         np.array([[1, 0, 0, 1], [0, 1, 0, 1], [0, 0, 1, 1]], dtype=np.int8),  # VALID: odd rows + all-1s remaining
-        # 3x5 matrix with multiple remaining columns (all must be all 1s)
+        # 3x5 matrix with multiple remaining columns (all must be all-1s)
         np.array([[1, 0, 0, 1, 1], [0, 1, 0, 1, 1], [0, 0, 1, 1, 1]], dtype=np.int8),
     ]
 

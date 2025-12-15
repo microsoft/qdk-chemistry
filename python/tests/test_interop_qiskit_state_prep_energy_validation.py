@@ -14,7 +14,9 @@ from qiskit_aer import AerSimulator
 from qiskit_aer.primitives import EstimatorV2 as AerEstimator
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.state_preparation.sparse_isometry import _prepare_single_reference_state
+from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
+    SparseIsometryGF2XStatePreparation,
+)
 from qdk_chemistry.data import Circuit
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
@@ -152,6 +154,7 @@ def get_bitstring(circuit: Circuit) -> str:
 @pytest.mark.parametrize("bitstring", ["1010", "0000", "1111", "101001", "1", "0"])
 def test_single_reference_state_basic(bitstring):
     """Test basic single reference state preparation with various bitstrings."""
-    circuit = _prepare_single_reference_state(bitstring)
+    test_cls = SparseIsometryGF2XStatePreparation()
+    circuit = test_cls._prepare_single_reference_state(bitstring)
     result_bitstring = get_bitstring(circuit)
     assert result_bitstring == bitstring, f"Expected {bitstring}, got {result_bitstring}"

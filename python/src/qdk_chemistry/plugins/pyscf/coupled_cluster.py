@@ -36,7 +36,7 @@ from pyscf import cc
 
 from qdk_chemistry.algorithms import DynamicalCorrelationCalculator
 from qdk_chemistry.data import CoupledClusterContainer, Settings, Wavefunction
-from qdk_chemistry.plugins.pyscf.utils import hamiltonian_to_scf
+from qdk_chemistry.plugins.pyscf.conversion import hamiltonian_to_scf
 from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfCoupledClusterCalculator", "PyscfCoupledClusterSettings"]

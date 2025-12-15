@@ -181,28 +181,37 @@ extern std::unordered_map<std::string, unsigned> SYMBOL_TO_CHARGE;
  * Standard atomic weights in AMU (atomic mass units) for all elements 1-118.
  * IUPAC (International Union of Pure and Applied Chemistry) Commission on
  * Isotopic Abundances and Atomic Weights (CIAAW), 2024.
+ *
  * T. Prohaska et al., Standard atomic weights of the elements 2021 (IUPAC
- * Technical Report), Pure and Applied Chemistry 2022, 94, 573-600.
- * DOI: 10.1515/pac-2019-0603.
+ * Technical Report), Pure and Applied Chemistry 2022, 94, 573-600
+ * (DOI: 10.1515/pac-2019-0603). :cite:`Prohaska2022`
+ *
  * Standard atomic masses of gadolinium, lutetium, and zirconium have been
  * revised by IUPAC CIAAW in 2024 and these revisions are included here.
- * For radioactive elements the mass number of the most stable isotope is used.
- * F. G. Kondev et al., The NUBASE2020 evaluation of nuclear physics properties
- * Chinese Physics C 2021, 45, 030001.
- * DOI: 10.1088/1674-1137/abddae.
+ *
+ * For radioactive elements the mass number of the most stable isotope is used
+ * as standard atomic weight.
+ *
+ * F. G. Kondev et al., The NUBASE2020 evaluation of nuclear physics properties,
+ * Chinese Physics C 2021, 45, 030001 (DOI: 10.1088/1674-1137/abddae).
+ * :cite:`Kondev2021`
+ *
  *
  * Isotope masses in AMU (atomic mass units) for all elements 1-118.
  * IUPAC (International Union of Pure and Applied Chemistry) Commission
  * on Isotopic Abundances and Atomic Weights (CIAAW), 2021.
+ *
  * W. J. Huang et al., The AME 2020 atomic mass evaluation (I). Evaluation of
- * input data, and adjustment procedures, Chinese Phys. C 2021, 45, 030002.
- * DOI: 10.1088/1674-1137/abddb0.
+ * input data, and adjustment procedures, Chinese Physics C 2021, 45, 030002
+ * (DOI: 10.1088/1674-1137/abddb0). :cite:`Huang2021`
+ *
  * M. Wang et al., The AME 2020 atomic mass evaluation (II). Tables, graphs and
- * references, Chinese Phys. C 2021, 45, 030003.
- * DOI: 10.1088/1674-1137/abddaf.
- * F. G. Kondev et al., The NUBASE2020 evaluation of nuclear physics properties
- * Chinese Physics C 2021, 45, 030001.
- * DOI: 10.1088/1674-1137/abddae.
+ * references, Chinese Physics C 2021, 45, 030003
+ * (DOI: 10.1088/1674-1137/abddaf). :cite:`Wang2021`
+ *
+ * F. G. Kondev et al., The NUBASE2020 evaluation of nuclear physics properties,
+ * Chinese Physics C 2021, 45, 030001 (DOI: 10.1088/1674-1137/abddae).
+ * :cite:`Kondev2021`
  */
 namespace ciaaw_2024 {
 
