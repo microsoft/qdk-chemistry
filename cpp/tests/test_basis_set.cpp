@@ -1456,6 +1456,50 @@ TEST_F(BasisSetTest, SameBasisSetCheck) {
           {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}},
       std::vector<std::string>{"H", "H", "O"});
 
+  // generate basis set from shells
+  std::string manual_name = std::string(BasisSet::custom_name);
+  std::vector<Shell> shells = {
+      // H atom 0
+      Shell(0, OrbitalType::S,
+            // exponents
+            std::vector<double>{0.3425250914E+01, 0.6239137298E+00,
+                                0.1688554040E+00},
+            // coefficients
+            std::vector<double>{0.1543289673E+00, 0.5353281423E+00,
+                                0.4446345422E+00}),
+      // H atom 1
+      Shell(1, OrbitalType::S,
+            // exponents
+            std::vector<double>{0.3425250914E+01, 0.6239137298E+00,
+                                0.1688554040E+00},
+            // coefficients
+            std::vector<double>{0.1543289673E+00, 0.5353281423E+00,
+                                0.4446345422E+00}),
+      // O atom 2
+      Shell(2, OrbitalType::S,
+            // exponents
+            std::vector<double>{0.1307093214E+03, 0.2380886605E+02,
+                                0.6443608313E+01},
+            // coefficients
+            std::vector<double>{0.1543289673E+00, 0.5353281423E+00,
+                                0.4446345422E+00}),
+      Shell(2, OrbitalType::S,
+            // exponents
+            std::vector<double>{0.5033151319E+01, 0.1169596125E+01,
+                                0.3803889600E+00},
+            // coefficients
+            std::vector<double>{-0.9996722919E-01, 0.3995128261E+00,
+                                0.7001154689E+00}),
+      Shell(2, OrbitalType::P,
+            // exponents
+            std::vector<double>{0.5033151319E+01, 0.1169596125E+01,
+                                0.3803889600E+00},
+            // coefficients
+            std::vector<double>{0.1559162750E+00, 0.6076837186E+00,
+                                0.3919573931E+00})};
+  std::shared_ptr<BasisSet> manual_basis =
+      std::make_shared<BasisSet>(manual_name, shells, structure);
+
   // create custom basis set object
   std::shared_ptr<BasisSet> basis =
       BasisSet::from_basis_name(basis_set, structure);
@@ -1465,8 +1509,12 @@ TEST_F(BasisSetTest, SameBasisSetCheck) {
   auto [e_scf_default, hf_det_default] =
       scf_solver->run(structure, 0, 1, basis_set);
   auto [e_scf_custom, hf_det_custom] = scf_solver->run(structure, 0, 1, basis);
+  auto [e_scf_manual, hf_det_manual] =
+      scf_solver->run(structure, 0, 1, manual_basis);
 
   EXPECT_NEAR(e_scf_custom, e_scf_default, testing::scf_energy_tolerance);
+  EXPECT_NEAR(e_scf_manual, e_scf_default, testing::scf_energy_tolerance);
+  EXPECT_NEAR(e_scf_custom, e_scf_manual, testing::scf_energy_tolerance);
 }
 
 TEST_F(BasisSetTest, SameBasisSetCheckWithEcp) {

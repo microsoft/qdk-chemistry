@@ -15,10 +15,31 @@ namespace qdk::chemistry::scf {
  * @param basis_set Basis set for the molecule
  * @param mol Molecular structure
  * @param tD Output density matrix
+ *
+ * References:
+ *     Almlöf, J.; Faegri Jr., K.; Korsell., K. (1982). "Principles for a direct
+ *     SCF approach to LICAO–MO ab-initio calculations"
+ *     J. Comput. Chem.
+ *     10.1002/jcc.540030314.
+ *
+ *     Van Lenthe, J. H.; Zwaans, R.;  Van Dam, H. J. J.; Guest, M. F. (2006).
+ *     "Starting scf calculations by superposition of atomic densities"
+ *     J. Comput. Chem.
+ *     10.1002/jcc.20393
+ * 
+ * See also: 
+ *     qdk::chemistry::constants::ATOMIC_CONFIGURATION for the atomic electron
+ *     configurations used in this method.
  */
 void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
                     RowMajorMatrix& tD);
 
+/**
+ * @brief Atomic Spherically Averaged Hartree-Fock (ASAHF) SCF solver
+ *
+ * This class implements an algorithm for spin-restricted atomic SCF
+ * calculations using spherically averaged Fock matrices.
+ */
 class AtomicSphericallyAveragedHartreeFock : public DIIS {
  public:
   /**
@@ -67,10 +88,9 @@ class AtomicSphericallyAveragedHartreeFock : public DIIS {
    * @param n_atom_orbs Number of atomic orbitals
    * @param n_mol_orbs Number of molecular orbitals
    */
-  void custom_compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
-                                                RowMajorMatrix* ret,
-                                                size_t n_atom_orbs,
-                                                size_t n_mol_orbs);
+  void compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
+                                         RowMajorMatrix* ret,
+                                         size_t n_atom_orbs);
 };
 
 }  // namespace qdk::chemistry::scf
