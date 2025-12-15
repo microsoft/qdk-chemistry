@@ -5,10 +5,9 @@
 
 r"""Iterative QPE demo that swaps Trotterization for exact matrix exponentials.
 
-This script walks through the QDK/Chemistry's SCF → CASCI → IQPE pipeline, in IQPE, it uses
-Qiskit's ``PauliEvolutionGate`` with a ``MatrixExponential`` synthesizer so each
-controlled time evolution is exact. The resulting phase estimate is therefore
-free of Trotter error, making it a reference point for benchmarking the
+This script walks through the QDK/Chemistry's SCF → CASCI → IQPE pipeline, in IQPE, it uses Qiskit's
+``PauliEvolutionGate`` with a ``MatrixExponential`` synthesizer so each controlled time evolution is exact.
+The resulting phase estimate is therefore free of Trotter error, making it a reference point for benchmarking the
 Trotterized workflow.
 """
 

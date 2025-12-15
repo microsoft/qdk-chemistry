@@ -111,6 +111,7 @@ TEST_F(MCTest, Water_STO3G_ASCI) {
           "macis_asci");
   mc->settings().set("ntdets_max", 128);
   mc->settings().set("ntdets_min", 1);
+  mc->settings().set("core_selection_strategy", "fixed");  // Deterministic size
 
   auto [E_fci, wfn_fci] = mc->run(ham, 5, 5);
   // FCI electronic energy is -8.301534669468e+01
@@ -164,7 +165,7 @@ TEST_F(MCTest, Water_DEF2SVP_CASCI) {
       std::vector<size_t>{0, 1});
   // Print number of electrons before and after selection
   auto ham = hamiltonian_constructor->run(orbitals_with_active_space);
-  EXPECT_NEAR(ham->get_core_energy(), -6.3499129701956562e+01,
+  EXPECT_NEAR(ham->get_core_energy(), -6.349912970471e+01,
               testing::numerical_zero_tolerance * 10);
 
   // Run CASCI

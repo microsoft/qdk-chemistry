@@ -49,6 +49,37 @@ TEST_F(ConfigurationTest, ToStringConversion) {
   EXPECT_EQ(complex_config.to_string().substr(0, 10), "22dduudd00");
 }
 
+// Test conversion to alpha, beta strings
+TEST_F(ConfigurationTest, ToBinaryStrings) {
+  Configuration basic_config("2du0");
+
+  auto [alpha_string, beta_string] = basic_config.to_binary_strings(4);
+
+  EXPECT_EQ(alpha_string, "1010");
+  EXPECT_EQ(beta_string, "1100");
+
+  // Active space - check only the first two orbitals
+  auto [alpha_string_red, beta_string_red] = basic_config.to_binary_strings(2);
+
+  EXPECT_EQ(alpha_string_red, "10");
+  EXPECT_EQ(beta_string_red, "11");
+
+  // Throw if we ask for too many orbitals
+  EXPECT_THROW(basic_config.to_binary_strings(5), std::runtime_error);
+}
+
+// Test conversion from alpha, beta binary strings
+TEST_F(ConfigurationTest, FromBinaryStrings) {
+  std::string alpha_string = "1010";
+  std::string beta_string = "1100";
+
+  Configuration basic_config =
+      Configuration::from_binary_strings(alpha_string, beta_string);
+
+  // should be 2du0
+  EXPECT_EQ(basic_config.to_string(), "2du0");
+}
+
 // Test construction from bitset and conversion to bitset
 TEST_F(ConfigurationTest, BitsetConversion) {
   // Test with a 8-bit bitset (4 spatial orbitals)

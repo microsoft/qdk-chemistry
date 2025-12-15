@@ -233,12 +233,9 @@ TEST_F(ScfTest, WaterDftPbe) {
 
   auto [E_pbe, wfn_pbe] = scf_solver->run(water, 0, 1, "def2-svp");
 
-  // PBE should give a reasonable energy (different from B3LYP)
+  // PBE should give a different energy than B3LYP
+  EXPECT_NEAR(E_pbe, -76.251126664739658, testing::scf_energy_tolerance);
   EXPECT_TRUE(wfn_pbe->get_orbitals()->is_restricted());
-
-  // Energy should be reasonable (negative and close to other DFT results)
-  EXPECT_LT(E_pbe, -75.0);  // Should be reasonable for water
-  EXPECT_GT(E_pbe, -77.0);
 }
 
 TEST_F(ScfTest, LithiumDftB3lypUks) {
@@ -252,7 +249,7 @@ TEST_F(ScfTest, LithiumDftB3lypUks) {
   auto [energy_b3lyp, wfn_b3lyp] = scf_solver->run(lithium, 0, 2, "def2-svp");
   auto orbitals_b3lyp = wfn_b3lyp->get_orbitals();
 
-  // Check that we get reasonable DFT results
+  // Check that we get the expected energy
   EXPECT_NEAR(energy_b3lyp, -7.484980651804635, testing::scf_energy_tolerance);
   EXPECT_FALSE(
       orbitals_b3lyp->is_restricted());  // Should be UKS (unrestricted)
@@ -297,9 +294,8 @@ TEST_F(ScfTest, LithiumDftPbeUks) {
   EXPECT_NEAR(total_alpha_electrons, 2.0, testing::numerical_zero_tolerance);
   EXPECT_NEAR(total_beta_electrons, 1.0, testing::numerical_zero_tolerance);
 
-  // Energy should be reasonable for lithium
-  EXPECT_LT(energy_pbe, -7.0);  // Should be reasonable for lithium
-  EXPECT_GT(energy_pbe, -8.0);
+  // Check energy
+  EXPECT_NEAR(energy_pbe, -7.4539012980211972, testing::scf_energy_tolerance);
 }
 
 TEST_F(ScfTest, OxygenTripletDftB3lypUks) {
@@ -313,13 +309,10 @@ TEST_F(ScfTest, OxygenTripletDftB3lypUks) {
       scf_solver->run(oxygen_molecule, 0, 3, "def2-svp");
   auto orbitals_b3lyp = wfn_b3lyp->get_orbitals();
 
-  // Check that we get reasonable DFT results
+  // Check that we get the expected energy
+  EXPECT_NEAR(energy_b3lyp, -150.20469858420449, testing::scf_energy_tolerance);
   EXPECT_FALSE(
       orbitals_b3lyp->is_restricted());  // Should be UKS (unrestricted)
-
-  // Energy should be reasonable for O2
-  EXPECT_LT(energy_b3lyp, -149.0);
-  EXPECT_GT(energy_b3lyp, -151.0);
 
   // Check that basis set is populated
   EXPECT_TRUE(orbitals_b3lyp->has_basis_set());
@@ -361,9 +354,8 @@ TEST_F(ScfTest, OxygenTripletDftPbeUks) {
   EXPECT_NEAR(total_alpha_electrons, 9.0, testing::numerical_zero_tolerance);
   EXPECT_NEAR(total_beta_electrons, 7.0, testing::numerical_zero_tolerance);
 
-  // Energy should be reasonable for O2
-  EXPECT_LT(energy_pbe, -149.0);  // Should be reasonable for O2
-  EXPECT_GT(energy_pbe, -151.0);
+  // Check energy
+  EXPECT_NEAR(energy_pbe, -150.06573508243739, testing::scf_energy_tolerance);
 }
 
 TEST_F(ScfTest, DftMethodCaseInsensitive) {
@@ -547,7 +539,7 @@ TEST_F(ScfTest, AgHDef2SvpWithEcp) {
   // Verify the electronic energy matches expected value
   double nuclear_repulsion = agh->calculate_nuclear_repulsion_energy();
   double electronic_energy = energy - nuclear_repulsion;
-  EXPECT_NEAR(electronic_energy, -162.0054639416,
+  EXPECT_NEAR(electronic_energy, -162.0054639312,
               testing::scf_energy_tolerance);
 
   // Check electron count - with ECP, should have 20 valence electrons

@@ -158,6 +158,8 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
   settings.set("max_refine_iter", macis_params::refine_off);
   // Smaller growth factor
   settings.set("grow_factor", macis_params::grow_factor);
+  // Use fixed core selection strategy for deterministic growth
+  settings.set("core_selection_strategy", "fixed");
 
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
 
@@ -173,6 +175,36 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
             macis_params::ntdets_max_large);  // Should respect ntdets_max
 
   // Energy should be reasonable (above HF but below exact)
+  EXPECT_NEAR(energy, -75.945264400409414,
+              macis_params::energy_tol);  // Should be negative for bound system
+}
+
+// Test percentage-based core selection strategy
+TEST_F(MacisAsciTest, PercentageCoreSelectionStrategy) {
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+  ASSERT_NE(calculator, nullptr);
+
+  auto& settings = calculator->settings();
+  // Use a small ntdets_max that the system can actually reach
+  // The test molecule can only generate ~34 determinants from HF
+  settings.set("ntdets_max", static_cast<size_t>(30));
+  settings.set("ntdets_min", static_cast<size_t>(1));
+  settings.set("max_refine_iter", macis_params::refine_off);
+  // Use percentage-based core selection (the default)
+  settings.set("core_selection_strategy", "percentage");
+  // Use a high threshold to include most core determinants
+  settings.set("core_selection_threshold", 0.99);
+  settings.set("ncdets_max", static_cast<size_t>(200));
+
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+
+  // Execute ASCI calculation with percentage strategy
+  auto [energy, wavefunction_ptr] = calculator->run(hamiltonian, 3, 3);
+  const Wavefunction& wavefunction = *wavefunction_ptr;
+
+  // Verify basic properties
+  EXPECT_TRUE(std::isfinite(energy));
+  EXPECT_GT(wavefunction.size(), 0);
   EXPECT_LT(energy, 0.0);  // Should be negative for bound system
 }
 
@@ -191,6 +223,7 @@ TEST_F(MacisAsciTest, ASCISettingsConfiguration) {
   EXPECT_NO_THROW(settings.set("rv_prune_tol", macis_params::rv_prune_tol));
   EXPECT_NO_THROW(settings.set("grow_factor", macis_params::grow_factor));
   EXPECT_NO_THROW(settings.set("max_refine_iter", macis_params::refine_off));
+  EXPECT_NO_THROW(settings.set("core_selection_strategy", "fixed"));
 
   // Test that settings with these values can be used in a calculation
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
@@ -205,6 +238,7 @@ TEST_F(MacisAsciTest, DispatchByNorbDifferentSizes) {
   auto& settings = calculator->settings();
   settings.set("ntdets_max", macis_params::ntdets_max_small);
   settings.set("max_refine_iter", macis_params::refine_off);
+  settings.set("core_selection_strategy", "fixed");
 
   // Test small active space (< 32 orbitals) - should use wfn_t<64>
   auto water = testing::create_water_structure();
@@ -247,6 +281,7 @@ TEST_F(MacisAsciTest, RDMCalculationSimplified) {
   auto& settings = calculator->settings();
   settings.set("ntdets_max", macis_params::ntdets_max_small);
   settings.set("max_refine_iter", macis_params::refine_off);
+  settings.set("core_selection_strategy", "fixed");
 
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
 
@@ -265,6 +300,7 @@ TEST_F(MacisAsciTest, RDMCalculationSimplified) {
   auto& settings2 = calculator->settings();
   settings2.set("ntdets_max", macis_params::ntdets_max_small);
   settings2.set("max_refine_iter", macis_params::refine_off);
+  settings2.set("core_selection_strategy", "fixed");
   settings2.set("calculate_one_rdm", false);
   settings2.set("calculate_two_rdm", false);
 
@@ -280,6 +316,7 @@ TEST_F(MacisAsciTest, MultiConfigurationScfSettingsConversion) {
   auto& settings = calculator->settings();
   settings.set("ntdets_max", macis_params::ntdets_max_small);
   settings.set("max_refine_iter", macis_params::refine_off);
+  settings.set("core_selection_strategy", "fixed");
 
   // Test QDK-style MultiConfigurationScf settings names
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
@@ -295,6 +332,7 @@ TEST_F(MacisAsciTest, MultiConfigurationScfSettingsConversion) {
   auto& settings2 = calculator2->settings();
   settings2.set("ntdets_max", macis_params::ntdets_max_small);
   settings2.set("max_refine_iter", macis_params::refine_off);
+  settings2.set("core_selection_strategy", "fixed");
   settings2.set("ci_residual_tolerance", testing::ci_energy_tolerance);
   settings2.set("davidson_iterations", macis_params::davidson_iterations);
 
@@ -318,6 +356,7 @@ TEST_F(MacisAsciTest, DifferentActiveSpaceConfigurations) {
   // Use standard ASCI parameter name
   settings1.set("ntdets_max", macis_params::ntdets_max_small);
   settings1.set("max_refine_iter", macis_params::refine_off);
+  settings1.set("core_selection_strategy", "fixed");
 
   auto ham_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian1 =
@@ -346,6 +385,7 @@ TEST_F(MacisAsciTest, DifferentActiveSpaceConfigurations) {
   // Use standard ASCI parameter name
   settings2.set("ntdets_max", macis_params::ntdets_max_small);
   settings2.set("max_refine_iter", macis_params::refine_off);
+  settings2.set("core_selection_strategy", "fixed");
 
   // This exercises get_active_indices with different indices
   try {
@@ -383,6 +423,7 @@ TEST_F(MacisAsciTest, DifferentActiveElectronConfigurations) {
   auto& settings = calculator->settings();
   settings.set("ntdets_max", macis_params::ntdets_max_small);
   settings.set("max_refine_iter", macis_params::refine_off);
+  settings.set("core_selection_strategy", "fixed");
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian = hamiltonian_constructor->run(
@@ -429,6 +470,7 @@ TEST_F(MacisAsciTest, MixedAlphaBetaActiveSpaces) {
   auto& settings = calculator->settings();
   settings.set("ntdets_max", macis_params::ntdets_max_small);
   settings.set("max_refine_iter", macis_params::refine_off);
+  settings.set("core_selection_strategy", "fixed");
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   EXPECT_ANY_THROW(auto hamiltonian = hamiltonian_constructor->run(
@@ -455,6 +497,7 @@ TEST_F(MacisAsciTest, MultiConfigurationScfSettingsWithMACISNames) {
   // Use standard ASCI parameter name
   settings.set("ntdets_max", macis_params::ntdets_max_small);
   settings.set("max_refine_iter", macis_params::refine_off);
+  settings.set("core_selection_strategy", "fixed");
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian = hamiltonian_constructor->run(orbitals_);
@@ -513,6 +556,7 @@ TEST_F(MacisAsciTest, ASCISettingsConversion) {
   // Nxtval settings
   settings.set("nxtval_bcount_thresh", macis_params::nxtval_bcount_thresh);
   settings.set("nxtval_bcount_inc", macis_params::nxtval_bcount_inc);
+  settings.set("core_selection_strategy", "fixed");
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian = hamiltonian_constructor->run(orbitals_);
@@ -537,6 +581,7 @@ TEST_F(MacisAsciTest, ASCISettingsWithDefaults) {
   // Use standard ASCI parameter name
   settings.set("ntdets_max", macis_params::ntdets_max_small);
   settings.set("max_refine_iter", macis_params::refine_off);
+  settings.set("core_selection_strategy", "fixed");
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian = hamiltonian_constructor->run(orbitals_);
@@ -1260,6 +1305,7 @@ TEST_F(MacisAsciBackoffTest, NormalSettingsNoBackoff) {
   calculator->settings().set("ncdets_max",
                              static_cast<size_t>(100));  // Plenty of room
   calculator->settings().set("max_refine_iter", static_cast<size_t>(0));
+  calculator->settings().set("core_selection_strategy", std::string("fixed"));
 
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
   auto [energy, wavefunction] = calculator->run(hamiltonian, 5, 5);

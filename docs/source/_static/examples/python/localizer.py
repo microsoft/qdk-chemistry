@@ -30,7 +30,9 @@ print(f"Localizer settings: {localizer.settings().keys()}")
 ################################################################################
 # start-cell-localize
 # Create H2O molecule
-coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.757, 0.587], [0.0, -0.757, 0.587]])
+coords = np.array(
+    [[0.0, 0.0, 0.0], [0.0, 1.43052268, 1.10926924], [0.0, -1.43052268, 1.10926924]]
+)
 symbols = ["O", "H", "H"]
 structure = Structure(coords, symbols=symbols)
 
