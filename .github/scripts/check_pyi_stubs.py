@@ -29,7 +29,13 @@ STUB_PLACEHOLDER = "# This file is a placeholder and will be replaced with gener
 def find_repo_root() -> Path:
     """Find the repository root by looking for .git directory."""
     script = Path(__file__).resolve()
-    return next(p for p in script.parents if (p / ".git").exists())
+    try:
+        return next(p for p in script.parents if (p / ".git").exists())
+    except StopIteration:
+        raise RuntimeError(
+            "Could not find the repository root (.git directory not found in any parent directory). "
+            "Please run this script from within a git repository."
+        )
 
 
 def main() -> int:
