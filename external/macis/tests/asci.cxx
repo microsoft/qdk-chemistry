@@ -412,7 +412,9 @@ TEST_CASE("ASCI") {
   std::vector<double> C = {1.0};
   double E0 = ham_gen.matrix_element(dets[0], dets[0]);
 
-  // ASCI Grow
+  // ASCI Grow - use Fixed strategy for this test (Percentage with 1 det HF
+  // start would limit growth)
+  asci_settings.core_selection_strategy = macis::CoreSelectionStrategy::Fixed;
   asci_settings.ntdets_max = 10000;
   std::tie(E0, dets, C) = macis::asci_grow(
       asci_settings, mcscf_settings, E0, std::move(dets), std::move(C), ham_gen,
@@ -494,14 +496,19 @@ TEST_CASE("ASCI Exponential Backoff", "[asci][backoff]") {
     asci_settings.grow_factor = 2.5;
     asci_settings.ntdets_max = 100;
     asci_settings.ntdets_min = 10;
+    // Use Fixed strategy to ensure deterministic behavior for this backoff test
+    asci_settings.core_selection_strategy = macis::CoreSelectionStrategy::Fixed;
 
     std::tie(E0, dets, C) = macis::asci_grow(
         asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
         ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
     // Should reach target size or close to it
+    // Note: The algorithm may return slightly more than ntdets_max when
+    // multiple determinants have the same predicted weight at the cutoff.
     REQUIRE(dets.size() >= 50);  // Should grow with factor 2.5
-    REQUIRE(dets.size() <= 100);
+    REQUIRE(dets.size() <=
+            100);  // Should not exceed ntdets_max with Fixed strategy
     REQUIRE(C.size() == dets.size());
     REQUIRE_THAT(
         std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
@@ -586,6 +593,8 @@ TEST_CASE("ASCI Exponential Backoff", "[asci][backoff]") {
     asci_settings.ntdets_max = 1000;
     asci_settings.ntdets_min = 100;
     asci_settings.ncdets_max = 1000;  // Plenty of room
+    // Use Fixed strategy to ensure deterministic behavior for this backoff test
+    asci_settings.core_selection_strategy = macis::CoreSelectionStrategy::Fixed;
 
     // Reset to HF
     dets = {wfn_traits::canonical_hf_determinant(nalpha, nbeta)};
@@ -597,12 +606,221 @@ TEST_CASE("ASCI Exponential Backoff", "[asci][backoff]") {
         ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
     // Should reach target size
-    REQUIRE(dets.size() == 1000);
-    REQUIRE(C.size() == 1000);
+    REQUIRE(dets.size() == asci_settings.ntdets_max);
+    REQUIRE(C.size() == asci_settings.ntdets_max);
     REQUIRE_THAT(
         std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
         Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
   }
 
+  spdlog::drop_all();
+}
+
+TEST_CASE("CoreSelectionStrategy") {
+  MACIS_MPI_CODE(MPI_Barrier(MPI_COMM_WORLD);)
+
+  // Read Water FCIDUMP
+  const size_t norb = macis::read_fcidump_norb(water_ccpvdz_fcidump);
+  const size_t norb2 = norb * norb;
+  const size_t norb4 = norb2 * norb2;
+
+  std::vector<double> T(norb2), V(norb4);
+  auto E_core = macis::read_fcidump_core(water_ccpvdz_fcidump);
+  macis::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
+  macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
+
+  using wfn_type = macis::wfn_t<64>;
+  using wfn_traits = macis::wavefunction_traits<wfn_type>;
+  using generator_t = macis::DoubleLoopHamiltonianGenerator<wfn_type>;
+  generator_t ham_gen(
+      macis::matrix_span<double>(T.data(), norb, norb),
+      macis::rank4_span<double>(V.data(), norb, norb, norb, norb));
+
+  uint32_t nalpha(5), nbeta(5);
+
+  SECTION("Fixed Strategy") {
+    macis::ASCISettings asci_settings;
+    macis::MCSCFSettings mcscf_settings;
+
+    asci_settings.core_selection_strategy = macis::CoreSelectionStrategy::Fixed;
+    asci_settings.ntdets_max = 5000;
+    asci_settings.ncdets_max = 100;
+
+    std::vector<wfn_type> dets = {
+        wfn_traits::canonical_hf_determinant(nalpha, nbeta)};
+    std::vector<double> C = {1.0};
+    double E0 = ham_gen.matrix_element(dets[0], dets[0]);
+
+    std::tie(E0, dets, C) = macis::asci_grow(
+        asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
+        ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
+
+    REQUIRE(dets.size() == 5000);
+    REQUIRE(C.size() == 5000);
+    REQUIRE_THAT(
+        std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
+  }
+
+  SECTION("Percentage Strategy") {
+    // This test verifies percentage-based core selection works without
+    // throwing exceptions. With percentage strategy, the number of core
+    // determinants selected depends on the wavefunction concentration,
+    // not ncdets_max. When the wavefunction is highly concentrated
+    // (most weight in few determinants), very few core determinants may
+    // be selected, which naturally limits growth.
+    //
+    // We verify that a few ASCI iterations complete successfully.
+    macis::ASCISettings asci_settings;
+    macis::MCSCFSettings mcscf_settings;
+
+    asci_settings.core_selection_strategy =
+        macis::CoreSelectionStrategy::Percentage;
+    asci_settings.core_selection_threshold = 0.95;
+    asci_settings.ntdets_max = 5000;
+    asci_settings.ncdets_max = 100;
+
+    std::vector<wfn_type> dets = {
+        wfn_traits::canonical_hf_determinant(nalpha, nbeta)};
+    std::vector<double> C = {1.0};
+    double E0 = ham_gen.matrix_element(dets[0], dets[0]);
+
+    // Do just a few ASCI iterations
+    for (int iter = 0; iter < 3; ++iter) {
+      size_t ndets_new = std::min<size_t>(
+          asci_settings.ntdets_max, std::max<size_t>(100, 8 * dets.size()));
+      std::tie(E0, dets, C) = macis::asci_iter<64, int32_t>(
+          asci_settings, mcscf_settings, ndets_new, E0, std::move(dets),
+          std::move(C), ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
+    }
+
+    // Verify we got some determinants and the wavefunction is normalized
+    REQUIRE(dets.size() > 1);
+    REQUIRE(C.size() == dets.size());
+    REQUIRE_THAT(
+        std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
+  }
+
+  SECTION("String Conversion") {
+    REQUIRE(macis::core_selection_strategy_to_string(
+                macis::CoreSelectionStrategy::Fixed) == "fixed");
+    REQUIRE(macis::core_selection_strategy_to_string(
+                macis::CoreSelectionStrategy::Percentage) == "percentage");
+  }
+
+  SECTION("Settings Defaults") {
+    macis::ASCISettings settings;
+    REQUIRE(settings.core_selection_strategy ==
+            macis::CoreSelectionStrategy::Percentage);
+    REQUIRE(settings.core_selection_threshold == 0.95);
+  }
+
+  SECTION("Percentage Threshold Values") {
+    // Test that different threshold values result in different core set sizes
+    // First grow a wavefunction to a reasonable size, then test core selection
+
+    macis::ASCISettings grow_settings;
+    grow_settings.ntdets_max = 1000;
+    grow_settings.ncdets_max = 100;
+    macis::MCSCFSettings mcscf_settings;
+
+    // Grow a wavefunction first
+    std::vector<wfn_type> dets_base = {
+        wfn_traits::canonical_hf_determinant(nalpha, nbeta)};
+    std::vector<double> C_base = {1.0};
+    double E0_base = ham_gen.matrix_element(dets_base[0], dets_base[0]);
+    const double E_HF = E0_base;  // Store HF energy for later comparison
+
+    std::tie(E0_base, dets_base, C_base) = macis::asci_grow(
+        grow_settings, mcscf_settings, E0_base, std::move(dets_base),
+        std::move(C_base), ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
+
+    // Now test percentage-based core selection on this wavefunction
+    macis::ASCISettings asci_settings_low;
+    asci_settings_low.core_selection_strategy =
+        macis::CoreSelectionStrategy::Percentage;
+    asci_settings_low.core_selection_threshold = 0.7;  // Keep 70% weight
+    asci_settings_low.ntdets_max = 10000;  // High enough to not limit
+    asci_settings_low.ncdets_max = 10000;
+
+    macis::ASCISettings asci_settings_high;
+    asci_settings_high.core_selection_strategy =
+        macis::CoreSelectionStrategy::Percentage;
+    asci_settings_high.core_selection_threshold = 0.99;  // Keep 99% weight
+    asci_settings_high.ntdets_max = 10000;
+    asci_settings_high.ncdets_max = 10000;
+
+    // Run one iteration with low threshold (70%)
+    auto [E0_low, dets_low, C_low] = macis::asci_iter<64, int32_t>(
+        asci_settings_low, mcscf_settings, asci_settings_low.ntdets_max,
+        E0_base, dets_base, C_base, ham_gen,
+        norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
+
+    // Run one iteration with high threshold (99%)
+    auto [E0_high, dets_high, C_high] = macis::asci_iter<64, int32_t>(
+        asci_settings_high, mcscf_settings, asci_settings_high.ntdets_max,
+        E0_base, dets_base, C_base, ham_gen,
+        norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
+
+    // Higher threshold should result in MORE determinants being kept in core
+    // and thus potentially finding more new determinants
+    // Since both start from same wavefunction, the difference comes from
+    // how many core determinants were used in the search
+    REQUIRE(dets_low.size() <= dets_high.size());
+
+    // Verify both produced valid results
+    REQUIRE(std::isfinite(E0_low));
+    REQUIRE(std::isfinite(E0_high));
+    REQUIRE(E0_low < E_HF);  // Both should improve over HF
+    REQUIRE(E0_high < E_HF);
+
+    // Higher threshold should give better (lower) energy since it keeps more
+    // important determinants in the core
+    REQUIRE(E0_high <= E0_low);
+
+    // Verify normalization
+    REQUIRE_THAT(
+        std::inner_product(C_low.begin(), C_low.end(), C_low.begin(), 0.0),
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
+    REQUIRE_THAT(
+        std::inner_product(C_high.begin(), C_high.end(), C_high.begin(), 0.0),
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
+
+    // Additionally verify the core weight captures the expected fraction
+    // Sort indices based on C_base coefficients by absolute value (descending)
+    std::vector<size_t> indices_base(C_base.size());
+    std::iota(indices_base.begin(), indices_base.end(), 0);
+    std::sort(indices_base.begin(), indices_base.end(),
+              [&](size_t i, size_t j) {
+                return std::abs(C_base[i]) > std::abs(C_base[j]);
+              });
+
+    // Compute cumulative weight for verification
+    double cumulative_sum_low = 0.0;
+    size_t core_size_low = 0;
+    for (size_t i = 0; i < C_base.size(); ++i) {
+      cumulative_sum_low += C_base[indices_base[i]] * C_base[indices_base[i]];
+      if (cumulative_sum_low >= 0.7) {
+        core_size_low = i + 1;
+        break;
+      }
+    }
+
+    double cumulative_sum_high = 0.0;
+    size_t core_size_high = 0;
+    for (size_t i = 0; i < C_base.size(); ++i) {
+      cumulative_sum_high += C_base[indices_base[i]] * C_base[indices_base[i]];
+      if (cumulative_sum_high >= 0.99) {
+        core_size_high = i + 1;
+        break;
+      }
+    }
+
+    // Core size to capture 99% weight should be larger than for 70% weight
+    REQUIRE(core_size_high > core_size_low);
+  }
+
+  MACIS_MPI_CODE(MPI_Barrier(MPI_COMM_WORLD);)
   spdlog::drop_all();
 }

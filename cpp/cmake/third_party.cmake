@@ -73,7 +73,7 @@ set(GAUXC_ENABLE_OPENMP ${QDK_ENABLE_OPENMP} CACHE BOOL "Enable gauxc OpenMP Sup
 
 handle_dependency(gauxc
   GIT_REPOSITORY https://github.com/wavefunction91/gauxc.git
-  GIT_TAG v1.1
+  GIT_TAG 62fea07c9306dbd83dd18b6957358827ac9b3da0
   BUILD_TARGET gauxc::gauxc
   INSTALL_TARGET gauxc::gauxc
   ${DEPENDENCY_BUILD_FLAGS}

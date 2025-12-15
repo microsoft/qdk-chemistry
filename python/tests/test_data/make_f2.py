@@ -47,6 +47,8 @@ if __name__ == "__main__":
     pmc_energy, pmc_wfn = pmc.run(
         active_space_h, [Configuration("222220"), Configuration("220222"), Configuration("222202")]
     )
+    Logger.info(f"SCI energy: {sci_energy}")
+    Logger.info(f"SCI correction: {sci_energy - active_space_h.get_core_energy()}")
     Logger.info(f"PMC energy: {pmc_energy}")
     Logger.info(f"PMC correction: {pmc_energy - active_space_h.get_core_energy()}")
     Logger.info("Leading configurations and coefficients:")

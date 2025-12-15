@@ -1,8 +1,9 @@
 """QDK/Chemistry energy estimator module.
 
 This module defines a custom `EnergyEstimator` class for evaluating expectation values of quantum circuits
-with respect to Hamiltonian. The estimator leverages Qiskit backends to execute quantum circuits and
-collect bitstring outcomes.
+with respect to Hamiltonian.
+The estimator leverages Qiskit :cite:`Javadi-Abhari2024` backends to execute quantum circuits and collect
+bitstring outcomes.
 
 Key Features:
     - Accepts a quantum circuit (as a Circuit) and observables (as a list of QubitHamiltonian).
