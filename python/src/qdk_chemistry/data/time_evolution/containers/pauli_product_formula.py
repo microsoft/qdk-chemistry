@@ -6,9 +6,13 @@
 # --------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass
+from typing import Any
 
-from qdk_chemistry.data import Wavefunction
-from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitaryContainer
+import h5py
+
+from .base import TimeEvolutionUnitaryContainer
+
+__all__ = ["EvolutionOrdering", "ExponentiatedPauliTerm", "PauliProductFormulaContainer"]
 
 
 @dataclass(frozen=True)
@@ -82,12 +86,12 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
             num_qubits: The number of qubits the unitary acts on.
 
         """
-        super().__init__()
         self.step_terms = step_terms
         evolution_ordering.validate_ordering(len(step_terms))
         self.evolution_ordering = evolution_ordering
         self.step_reps = step_reps
         self._num_qubits = num_qubits
+        super().__init__()
 
     @property
     def type(self) -> str:
@@ -119,35 +123,117 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
         evolution_ordering.validate_ordering(len(self.step_terms))
         self.evolution_ordering = evolution_ordering
 
-    def apply(self, state: Wavefunction) -> Wavefunction:
-        """Apply the time evolution unitary to a given state.
-
-        Args:
-            state: The state to which the unitary is applied.
+    def to_json(self) -> dict[str, Any]:
+        """Convert the TimeEvolutionUnitary to a dictionary for JSON serialization.
 
         Returns:
-            The new state after applying the unitary.
+            dict: Dictionary representation of the TimeEvolutionUnitary
 
         """
-        new_state = state
-        for _ in range(self.step_reps):
-            for index in self.evolution_ordering.indices:
-                term = self.step_terms[index]
-                new_state = _apply_exponentiated_pauli_to_wavefunction(new_state, term)
-        return new_state
+        data: dict[str, Any] = {
+            "container_type": self.type,
+            "step_terms": [{"pauli_term": term.pauli_term, "angle": term.angle} for term in self.step_terms],
+            "evolution_ordering": self.evolution_ordering.indices,
+            "step_reps": self.step_reps,
+            "num_qubits": self.num_qubits,
+        }
+        return data
 
+    def to_hdf5(self, group: h5py.Group) -> None:
+        """Save the TimeEvolutionUnitary to an HDF5 group.
 
-def _apply_exponentiated_pauli_to_wavefunction(
-    wavefunction: Wavefunction, term: ExponentiatedPauliTerm
-) -> Wavefunction:
-    """Apply an exponentiated Pauli term to a wavefunction.
+        Args:
+            group: HDF5 group or file to write data to
 
-    Args:
-        wavefunction: The input wavefunction.
-        term: The exponentiated Pauli term to apply.
+        """
+        group.attrs["container_type"] = self.type
+        group.attrs["step_reps"] = self.step_reps
+        group.attrs["num_qubits"] = self.num_qubits
 
-    Returns:
-        The new wavefunction after applying the term.
+        step_terms_group = group.create_group("step_terms")
+        for i, term in enumerate(self.step_terms):
+            term_group = step_terms_group.create_group(f"term_{i}")
+            term_group.attrs["angle"] = term.angle
+            pauli_term_group = term_group.create_group("pauli_term")
+            for qubit_index, pauli_operator in term.pauli_term.items():
+                pauli_term_group.attrs[str(qubit_index)] = pauli_operator
 
-    """
-    # TODO: Implement when bistring and statevector refacotring is done
+        group.attrs["evolution_ordering"] = self.evolution_ordering.indices
+
+    @classmethod
+    def from_json(cls, json_data: dict[str, Any]) -> "TimeEvolutionUnitaryContainer":
+        """Create TimeEvolutionUnitary from a JSON dictionary.
+
+        Args:
+            json_data: Dictionary containing the serialized data
+
+        Returns:
+            TimeEvolutionUnitaryContainer
+
+        """
+        step_terms = [
+            ExponentiatedPauliTerm(
+                pauli_term=term_data["pauli_term"],
+                angle=term_data["angle"],
+            )
+            for term_data in json_data["step_terms"]
+        ]
+        evolution_ordering = EvolutionOrdering(indices=json_data["evolution_ordering"])
+        step_reps = json_data["step_reps"]
+        num_qubits = json_data["num_qubits"]
+        return cls(
+            step_terms=step_terms,
+            evolution_ordering=evolution_ordering,
+            step_reps=step_reps,
+            num_qubits=num_qubits,
+        )
+
+    @classmethod
+    def from_hdf5(cls, group: h5py.Group) -> "TimeEvolutionUnitaryContainer":
+        """Load an instance from an HDF5 group.
+
+        Args:
+            group: HDF5 group or file to read data from
+
+        Returns:
+            TimeEvolutionUnitaryContainer
+
+        """
+        step_reps = group.attrs["step_reps"]
+        num_qubits = group.attrs["num_qubits"]
+
+        step_terms: list[ExponentiatedPauliTerm] = []
+        step_terms_group = group["step_terms"]
+        for term_name in step_terms_group:
+            term_group = step_terms_group[term_name]
+            angle = term_group.attrs["angle"]
+            pauli_term: dict[int, str] = {}
+            pauli_term_group = term_group["pauli_term"]
+            for qubit_index_str in pauli_term_group.attrs:
+                qubit_index = int(qubit_index_str)
+                pauli_operator = pauli_term_group.attrs[qubit_index_str]
+                pauli_term[qubit_index] = pauli_operator
+            step_terms.append(ExponentiatedPauliTerm(pauli_term=pauli_term, angle=angle))
+
+        evolution_ordering_indices = list(group.attrs["evolution_ordering"])
+        evolution_ordering = EvolutionOrdering(indices=evolution_ordering_indices)
+
+        return cls(
+            step_terms=step_terms,
+            evolution_ordering=evolution_ordering,
+            step_reps=step_reps,
+            num_qubits=num_qubits,
+        )
+
+    def get_summary(self) -> str:
+        """Get summary of time evolution unitary.
+
+        Returns:
+            str: Summary string describing the TimeEvolutionUnitary's contents and properties
+
+        """
+        lines = ["Pauli Product Formula Container"]
+        lines.append(f"  Number of qubits: {self.num_qubits}")
+        lines.append(f"  Number of step terms: {len(self.step_terms)}")
+        lines.append(f"  Step repetitions: {self.step_reps}")
+        return "\n".join(lines)

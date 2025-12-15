@@ -5,46 +5,16 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from abc import ABC, abstractmethod
+from typing import Any
 
-from qdk_chemistry.data import Wavefunction
+import h5py
+
 from qdk_chemistry.data.base import DataClass
 
+from .containers.base import TimeEvolutionUnitaryContainer
+from .containers.pauli_product_formula import PauliProductFormulaContainer
 
-class TimeEvolutionUnitaryContainer(ABC):
-    """Abstract class for a time evolution unitary container."""
-
-    @property
-    @abstractmethod
-    def type(self) -> str:
-        """Get the type of the time evolution unitary container.
-
-        Returns:
-            The type of the time evolution unitary container.
-
-        """
-
-    @property
-    @abstractmethod
-    def num_qubits(self) -> int:
-        """Get the number of qubits the time evolution unitary acts on.
-
-        Returns:
-            The number of qubits.
-
-        """
-
-    @abstractmethod
-    def apply(self, state: Wavefunction) -> Wavefunction:
-        """Apply the time evolution unitary to a given state.
-
-        Args:
-            state: The state to which the unitary is applied.
-
-        Returns:
-            The new state after applying the unitary.
-
-        """
+__all__: list[str] = []
 
 
 class TimeEvolutionUnitary(DataClass):
@@ -59,26 +29,12 @@ class TimeEvolutionUnitary(DataClass):
     _data_type_name = "time_evolution_unitary"
 
     # Serialization version for this class
-    # TODO: Add serialization support in TimeEvolutionUnitaryContainer
     _serialization_version = "0.1.0"
 
-    # Use keyword arguments to be future-proof
     def __init__(self, container: TimeEvolutionUnitaryContainer) -> None:
         """Initialize a TimeEvolutionUnitary."""
         self._container = container
         super().__init__()
-
-    def apply(self, state: Wavefunction) -> Wavefunction:
-        """Apply the time evolution unitary to a given state.
-
-        Args:
-            state: The quantum state to which the unitary is applied.
-
-        Returns:
-            The new quantum state after applying the unitary.
-
-        """
-        return self._container.apply(state)
 
     def get_container_type(self) -> str:
         """Get the type of the time evolution unitary container.
@@ -97,3 +53,72 @@ class TimeEvolutionUnitary(DataClass):
 
         """
         return self._container.num_qubits
+
+    def to_json(self) -> dict[str, Any]:
+        """Convert the TimeEvolutionUnitary to a dictionary for JSON serialization.
+
+        Returns:
+            dict: Dictionary representation of the TimeEvolutionUnitary
+
+        """
+        return self._container.to_json()
+
+    def to_hdf5(self, group: h5py.Group) -> None:
+        """Save the TimeEvolutionUnitary to an HDF5 group.
+
+        Args:
+            group: HDF5 group or file to write data to
+
+        """
+        self._add_hdf5_version(group)
+        self._container.to_hdf5(group)
+
+    def get_summary(self) -> str:
+        """Get summary of time evolution unitary.
+
+        Returns:
+            str: Summary string describing the TimeEvolutionUnitary's contents and properties
+
+        """
+        return self._container.get_summary()
+
+    @classmethod
+    def from_json(cls, json_data: dict[str, Any]) -> "TimeEvolutionUnitary":
+        """Create TimeEvolutionUnitary from a JSON dictionary.
+
+        Args:
+            json_data: Dictionary containing the serialized data
+
+        Returns:
+            TimeEvolutionUnitary
+
+        """
+        if "container_type" not in json_data:
+            raise ValueError("JSON data must contain 'container_type' field.")
+        container_type = json_data["container_type"]
+
+        if container_type == "pauli_product_formula":
+            container = PauliProductFormulaContainer.from_json(json_data)
+        else:
+            raise ValueError(f"Unsupported container type: {container_type}")
+
+        return cls(container=container)
+
+    @classmethod
+    def from_hdf5(cls, group: h5py.Group) -> "TimeEvolutionUnitary":
+        """Load an instance from an HDF5 group.
+
+        Args:
+            group: HDF5 group or file to read data from
+
+        Returns:
+            TimeEvolutionUnitary
+
+        """
+        cls._validate_hdf5_version(cls._serialization_version, group)
+        container_type = group.attrs.get("container_type")
+        if container_type == "pauli_product_formula":
+            container = PauliProductFormulaContainer.from_hdf5(group)
+        else:
+            raise ValueError(f"Unsupported container type: {container_type}")
+        return cls(container=container)

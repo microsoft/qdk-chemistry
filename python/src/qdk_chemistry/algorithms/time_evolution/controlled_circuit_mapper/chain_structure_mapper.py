@@ -21,6 +21,8 @@ from qdk_chemistry.utils import Logger
 
 from .base import ControlledEvolutionCircuitMapper
 
+__all__: list[str] = []
+
 
 class ChainStructureMapperSettings(Settings):
     """Settings for ChainStructureMapper.
@@ -45,6 +47,10 @@ class ChainStructureMapper(ControlledEvolutionCircuitMapper):
         self._settings = ChainStructureMapperSettings()
         self._settings.set("power", power)
 
+    def name(self) -> str:
+        """Return the algorithm name."""
+        return "chain_structure"
+
     def _run_impl(
         self, controlled_evolution: ControlledTimeEvolutionUnitary, system_indices: Sequence[int] | None = None
     ) -> Circuit:
@@ -66,7 +72,7 @@ class ChainStructureMapper(ControlledEvolutionCircuitMapper):
             )
 
         num_system_qubits = controlled_evolution.get_num_system_qubits()
-        total_qubits = num_system_qubits + len(controlled_evolution.control_index)
+        total_qubits = num_system_qubits + len([controlled_evolution.control_index])
 
         if system_indices is None:
             system_indices = [i for i in range(total_qubits) if i != controlled_evolution.control_index]
@@ -167,7 +173,7 @@ def append_controlled_time_evolution(
     if power < 1:
         raise ValueError("power must be at least 1 for controlled time evolution.")
 
-    control_qubit = controlled_evolution.control_bits
+    control_qubit = controlled_evolution.control_index
 
     for _ in range(power):
         for _ in range(controlled_evolution.time_evolution_unitary._container.step_reps):  # noqa: SLF001

@@ -14,13 +14,15 @@ from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     PauliProductFormulaContainer,
 )
 
+__all__: list[str] = []
+
 
 class FirstOrderTrotterConstructorSettings(Settings):
     """Settings for first-order Trotterization unitary constructor.
 
     Attributes:
         num_trotter_steps (int): The number of Trotter steps to use in the construction.
-        power (int): The power of the unitary to be constructed.
+        tolerence (float): The absolute tolerance for filtering small coefficients.
 
     """
 
@@ -28,21 +30,24 @@ class FirstOrderTrotterConstructorSettings(Settings):
         """Initialize FirstOrderTrotterConstructorSettings with default values."""
         super().__init__()
         self._set_default("num_trotter_steps", "int", 1)
+        self._set_default("tolerence", "float", 1e-12)
 
 
 class FirstOrderTrotterConstructor(TimeEvolutionConstructor):
     """First-order Trotterization unitary constructor."""
 
-    def __init__(self, num_trotter_steps: int = 1):
+    def __init__(self, num_trotter_steps: int = 1, tolerence: float = 1e-12):
         """Initialize FirstOrderTrotterConstructor with given settings.
 
         Args:
             num_trotter_steps (int): The number of Trotter steps to use in the construction.
+            tolerence (float): The absolute tolerance for filtering small coefficients.
 
         """
         super().__init__()
         self._settings = FirstOrderTrotterConstructorSettings()
         self._settings.set("num_trotter_steps", num_trotter_steps)
+        self._settings.set("tolerence", tolerence)
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
         """Construct the control unitary circuit using first-order Trotterization.
@@ -57,8 +62,9 @@ class FirstOrderTrotterConstructor(TimeEvolutionConstructor):
         """
         # Calculate evolution time per Trotter step
         dt = time / self._settings.get("num_trotter_steps")
+        tolerence = self._settings.get("tolerence")
 
-        terms, ordering = _decompose_trotter_step(qubit_hamiltonian, time=dt)
+        terms, ordering = _decompose_trotter_step(qubit_hamiltonian, time=dt, atol=tolerence)
 
         num_qubits = qubit_hamiltonian.num_qubits
 
