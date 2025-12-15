@@ -19,7 +19,7 @@ from qiskit.quantum_info import SparsePauliOp
 
 from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.base import DataClass
-from qdk_chemistry.utils.statevector import create_statevector_from_wavefunction
+from qdk_chemistry.utils import Logger
 
 __all__ = ["filter_and_group_pauli_ops_from_wavefunction"]
 
@@ -51,6 +51,7 @@ class QubitHamiltonian(DataClass):
                 or if the Pauli strings or coefficients are invalid.
 
         """
+        Logger.trace_entering()
         if len(pauli_strings) != len(coefficients):
             raise ValueError("Mismatch between number of Pauli strings and coefficients.")
 
@@ -95,30 +96,18 @@ class QubitHamiltonian(DataClass):
             A list of ``QubitHamiltonian`` representing the grouped Hamiltonian.
 
         """
+        Logger.trace_entering()
         sparse_pauli_ops = self.pauli_ops.group_commuting(qubit_wise=qubit_wise)
         return [
             QubitHamiltonian(pauli_strings=group.paulis.to_labels(), coefficients=group.coeffs)
             for group in sparse_pauli_ops
         ]
 
-    @property
-    def exact_energy(self) -> float | None:
-        """Compute the exact ground state energy via matrix diagonalization.
-
-        Returns:
-            float | None: The minimum eigenvalue if qubit count is small enough, else None.
-
-        """
-        return np.linalg.eigvalsh(self.pauli_ops.to_matrix()).min()
-
     # DataClass interface implementation
     def get_summary(self) -> str:
         """Get a human-readable summary of the Hamiltonian."""
         return (
-            f"Qubit Hamiltonian\n"
-            f"  Number of qubits: {self.num_qubits}\n"
-            f"  Number of terms: {len(self.pauli_strings)}\n"
-            f"  Exact energy: {self.exact_energy:.6f}"
+            f"Qubit Hamiltonian\n  Number of qubits: {self.num_qubits}\n  Number of terms: {len(self.pauli_strings)}\n"
         )
 
     def to_json(self) -> dict[str, Any]:
@@ -214,6 +203,7 @@ def _filter_and_group_pauli_ops_from_statevector(
             * A list of classical coefficients for terms that were reduced to classical contributions.
 
     """
+    Logger.trace_entering()
     psi = np.asarray(statevector, dtype=complex)
     norm = np.linalg.norm(psi)
     if norm < np.finfo(np.float64).eps:
@@ -315,7 +305,10 @@ def filter_and_group_pauli_ops_from_wavefunction(
             * A list of classical coefficients for terms that were reduced to classical contributions.
 
     """
-    psi = create_statevector_from_wavefunction(wavefunction)
+    from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction  # noqa: PLC0415
+
+    Logger.trace_entering()
+    psi = create_statevector_from_wavefunction(wavefunction, normalize=True)
     return _filter_and_group_pauli_ops_from_statevector(
         hamiltonian, psi, abelian_grouping, trimming, trimming_tolerance
     )

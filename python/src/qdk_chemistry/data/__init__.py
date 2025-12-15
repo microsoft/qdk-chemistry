@@ -79,6 +79,7 @@ from qdk_chemistry._core.data import (
     Wavefunction,
     WavefunctionContainer,
     WavefunctionType,
+    get_current_ciaaw_version,
 )
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.circuit import Circuit
@@ -130,4 +131,5 @@ __all__ = [
     "Wavefunction",
     "WavefunctionContainer",
     "WavefunctionType",
+    "get_current_ciaaw_version",
 ]

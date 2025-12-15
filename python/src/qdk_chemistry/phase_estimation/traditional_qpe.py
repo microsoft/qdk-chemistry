@@ -5,8 +5,7 @@ Quantum Fourier Transform (QFT), which measures all phase bits in parallel using
 multiple ancilla qubits.
 
 References:
-    Nielsen, M. A., & Chuang, I. L. (2010). "Quantum Computation and Quantum
-    Information" (10th Anniversary Edition), Ch. 5.2.
+    Nielsen, M. A., & Chuang, I. L. (2010). :cite:`Nielsen-Chuang2010-QPE`
 
 """
 
@@ -17,7 +16,6 @@ References:
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
@@ -26,13 +24,12 @@ from qiskit.synthesis.qft.qft_decompose_full import synth_qft_full
 if TYPE_CHECKING:
     from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.phase_estimation.base import PhaseEstimation, PhaseEstimationAlgorithm
+from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.time_evolution import (
     PauliEvolutionTerm,
     append_controlled_time_evolution,
     extract_terms_from_hamiltonian,
 )
-
-_LOGGER = logging.getLogger(__name__)
 
 __all__: list[str] = []
 
@@ -54,15 +51,13 @@ class TraditionalPhaseEstimation(PhaseEstimation):
                 ordered from most-significant to least-significant bit.
 
         """
+        Logger.trace_entering()
         super().__init__(hamiltonian, evolution_time)
         self._terms: list[PauliEvolutionTerm] = extract_terms_from_hamiltonian(hamiltonian)
         self._qft_do_swaps = qft_do_swaps
-        _LOGGER.debug(
-            "Initialized %s with %d evolution terms, evolution time %.6f, qft_do_swaps=%s.",
-            self.__class__.__name__,
-            len(self._terms),
-            evolution_time,
-            qft_do_swaps,
+        Logger.debug(
+            f"Initialized {self.__class__.__name__} with {len(self._terms)} evolution terms, "
+            f"evolution time {evolution_time:.6f}, qft_do_swaps={qft_do_swaps}."
         )
 
     def create_circuit(
@@ -74,6 +69,7 @@ class TraditionalPhaseEstimation(PhaseEstimation):
         include_measurement: bool = True,
     ) -> QuantumCircuit:
         """Build the traditional QPE circuit."""
+        Logger.trace_entering()
         if num_bits <= 0:
             raise ValueError("num_bits must be a positive integer.")
 
@@ -91,10 +87,8 @@ class TraditionalPhaseEstimation(PhaseEstimation):
             if measurement_register is not None:
                 qc.add_register(measurement_register)
 
-        _LOGGER.debug(
-            "Creating traditional QPE circuit with %d ancilla qubits and measurement=%s.",
-            num_bits,
-            include_measurement,
+        Logger.debug(
+            f"Creating traditional QPE circuit with {num_bits} ancilla qubits and measurement={include_measurement}."
         )
 
         qc.compose(state_prep, qubits=system, inplace=True)
@@ -122,10 +116,8 @@ class TraditionalPhaseEstimation(PhaseEstimation):
             qc.barrier(label="iqft")
             qc.measure(ancilla, classical)
 
-        _LOGGER.debug(
-            "Completed traditional QPE circuit with %d qubits, include_measurement=%s.",
-            qc.num_qubits,
-            include_measurement,
+        Logger.debug(
+            f"Completed traditional QPE circuit with {qc.num_qubits} qubits, include_measurement={include_measurement}."
         )
 
         return qc

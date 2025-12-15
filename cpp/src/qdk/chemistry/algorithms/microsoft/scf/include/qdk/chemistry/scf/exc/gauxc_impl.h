@@ -14,7 +14,7 @@ namespace qdk::chemistry::scf::impl {
 /**
  * @brief GauXC backend implementation for XC and sn-K evaluation
  *
- * @see https://github.com/wavefunction/GauXC for GauXC documentation
+ * @see https://github.com/wavefunction91/GauXC for GauXC documentation
  */
 class GAUXC {
  public:

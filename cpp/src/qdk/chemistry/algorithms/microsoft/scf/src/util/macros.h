@@ -4,9 +4,8 @@
 
 #pragma once
 
-#include <spdlog/spdlog.h>
-
 #include <exception>
+#include <qdk/chemistry/utils/logger.hpp>
 
 #include "util/timer.h"
 
@@ -25,11 +24,11 @@
  * @brief Verify an expression and abort if false
  * @param expr Expression to verify
  */
-#define VERIFY(expr)                                                      \
-  if (!static_cast<bool>(expr)) {                                         \
-    spdlog::critical("{}:{}: Verifying '{}' failed.", __FILE__, __LINE__, \
-                     #expr);                                              \
-    std::abort();                                                         \
+#define VERIFY(expr)                                                           \
+  if (!static_cast<bool>(expr)) {                                              \
+    QDK_LOGGER().critical("{}:{}: Verifying '{}' failed.", __FILE__, __LINE__, \
+                          #expr);                                              \
+    std::abort();                                                              \
   }
 
 /**

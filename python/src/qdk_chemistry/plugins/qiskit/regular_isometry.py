@@ -4,8 +4,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import logging
-
 from qiskit import QuantumCircuit, qasm3
 from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 from qiskit.compiler import transpile
@@ -19,10 +17,8 @@ from qdk_chemistry.plugins.qiskit._interop.transpiler import (
     RemoveZBasisOnZeroState,
     SubstituteCliffordRz,
 )
-from qdk_chemistry.utils.bitstring import separate_alpha_beta_to_binary_string
-from qdk_chemistry.utils.statevector import _create_statevector_from_coeffs_and_dets_string
-
-_LOGGER = logging.getLogger(__name__)
+from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction
+from qdk_chemistry.utils import Logger
 
 __all__ = ["RegularIsometryStatePreparation"]
 
@@ -31,11 +27,12 @@ class RegularIsometryStatePreparation(StatePreparation):
     """State preparation using a regular isometry approach.
 
     This class implements the isometry-based state preparation proposed by
-    Matthias Christandl in `arXiv:1501.06911 <https://arxiv.org/abs/1501.06911>`_.
+    Matthias Christandl in arXiv:1501.06911 :cite:`Christandl2016`.
     """
 
     def __init__(self):
         """Initialize the RegularIsometryStatePreparation."""
+        Logger.trace_entering()
         super().__init__()
         self._settings = StatePreparationSettings()
 
@@ -49,6 +46,7 @@ class RegularIsometryStatePreparation(StatePreparation):
             A Circuit object containing a QASM string representation of the quantum circuit.
 
         """
+        Logger.trace_entering()
         # Active Space Consistency Check
         alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()
         if alpha_indices != beta_indices:
@@ -58,25 +56,16 @@ class RegularIsometryStatePreparation(StatePreparation):
                 "alpha and beta orbitals are not supported for state preparation."
             )
 
-        coeffs = wavefunction.get_coefficients()
-        dets = wavefunction.get_active_determinants()
-        num_orbitals = len(wavefunction.get_orbitals().get_active_space_indices()[0])
-        bitstrings = []
-        for det in dets:
-            alpha_str, beta_str = separate_alpha_beta_to_binary_string(det.to_string()[:num_orbitals])
-            bitstring = beta_str[::-1] + alpha_str[::-1]  # Qiskit uses little-endian convention
-            bitstrings.append(bitstring)
+        num_orbitals = len(alpha_indices)
+        n_qubits = num_orbitals * 2
+        num_dets = wavefunction.size()
+        Logger.debug(f"Using {num_dets} determinants for state preparation")
 
-        if not bitstrings:
-            raise ValueError("No valid bitstrings found. The determinants list might be empty.")
-        n_qubits = len(bitstrings[0])
-        _LOGGER.debug(f"Using {len(bitstrings)} determinants for state preparation")
-
-        # Create a statevector from the filtered terms
-        statevector_data = _create_statevector_from_coeffs_and_dets_string(coeffs, bitstrings, n_qubits)
+        # Create statevector using Python conversion function
+        statevector_data = create_statevector_from_wavefunction(wavefunction, normalize=True)
 
         # Create the circuit
-        circuit = QuantumCircuit(n_qubits, name=f"regular_isometry_{len(bitstrings)}_det")
+        circuit = QuantumCircuit(n_qubits, name=f"regular_isometry_{num_dets}_det")
 
         # Use the StatePreparation class which implements efficient decomposition
         state_prep = QiskitStatePreparation(Statevector(statevector_data), normalize=True)
@@ -101,4 +90,5 @@ class RegularIsometryStatePreparation(StatePreparation):
 
     def name(self) -> str:
         """Return the name of the state preparation method."""
+        Logger.trace_entering()
         return "regular_isometry"

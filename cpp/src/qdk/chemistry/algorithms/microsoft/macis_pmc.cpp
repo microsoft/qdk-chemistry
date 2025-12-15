@@ -12,6 +12,7 @@
 #include <macis/util/mpi.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -35,6 +36,7 @@ struct pmc_helper {
       const data::Hamiltonian& hamiltonian,
       const std::vector<data::Configuration>& configurations,
       const data::Settings& settings_) {
+    QDK_LOG_TRACE_ENTERING();
     // Create MacisPmcSettings instance for accessing PMC-specific settings
     MacisPmcSettings macis_pmc_settings;
     double h_el_tol = macis_pmc_settings.get<double>("h_el_tol");
@@ -179,6 +181,8 @@ struct pmc_helper {
 std::pair<double, std::shared_ptr<data::Wavefunction>> MacisPmc::_run_impl(
     std::shared_ptr<data::Hamiltonian> hamiltonian,
     const std::vector<data::Configuration>& configurations) const {
+  QDK_LOG_TRACE_ENTERING();
+
   const auto& orbitals = hamiltonian->get_orbitals();
   std::vector<size_t> active_indices =
       orbitals->get_active_space_indices().first;

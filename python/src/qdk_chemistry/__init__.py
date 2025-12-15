@@ -16,6 +16,7 @@ import warnings
 from pathlib import Path
 
 # Import some tools for convenience
+import qdk_chemistry.constants
 from qdk_chemistry._core import QDKChemistryConfig
 from qdk_chemistry.utils import telemetry_events
 from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED

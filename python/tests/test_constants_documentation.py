@@ -165,7 +165,7 @@ class TestConstantInfo:
 
         version = next(iter(versions))
         assert "CODATA" in version
-        assert ("2014" in version) or ("2018" in version)
+        assert ("2022" in version) or ("2018" in version) or ("2014" in version)
 
 
 class TestDocumentationFunctions:
@@ -212,27 +212,27 @@ class TestDocumentationFunctions:
         all_info = get_constants_info()
         assert len(results) == len(all_info)
 
-    def test_show_constant_details_output(self, capsys: pytest.CaptureFixture[str]):
+    def test_show_constant_details_output(self, capfd: pytest.CaptureFixture[str]):
         """Test that show_constant_details produces output."""
         show_constant_details("bohr_to_angstrom")
 
-        captured = capsys.readouterr()
+        captured = capfd.readouterr()
         assert "bohr_to_angstrom" in captured.out
         assert "Bohr radius" in captured.out
         assert "CODATA" in captured.out
 
-    def test_show_constant_details_unknown(self, capsys: pytest.CaptureFixture[str]):
+    def test_show_constant_details_unknown(self, capfd: pytest.CaptureFixture[str]):
         """Test error handling in show_constant_details."""
         show_constant_details("nonexistent_constant")
 
-        captured = capsys.readouterr()
+        captured = capfd.readouterr()
         assert "Unknown constant" in captured.out
 
-    def test_list_constants_output(self, capsys: pytest.CaptureFixture[str]):
+    def test_list_constants_output(self, capfd: pytest.CaptureFixture[str]):
         """Test that list_constants produces categorized output."""
         list_constants(show_values=False)
 
-        captured = capsys.readouterr()
+        captured = capfd.readouterr()
         output = captured.out
 
         # Check for expected categories
@@ -245,11 +245,11 @@ class TestDocumentationFunctions:
         assert "bohr_to_angstrom" in output
         assert "fine_structure_constant" in output
 
-    def test_list_constants_with_values(self, capsys: pytest.CaptureFixture[str]):
+    def test_list_constants_with_values(self, capfd: pytest.CaptureFixture[str]):
         """Test list_constants with values shown."""
         list_constants(show_values=True, show_units=True)
 
-        captured = capsys.readouterr()
+        captured = capfd.readouterr()
         output = captured.out
 
         # Should contain numerical values
@@ -265,14 +265,22 @@ class TestVersionAwareness:
         info = get_constant_info("bohr_to_angstrom")
 
         assert "CODATA" in info.source
-        # Should be either 2014 or 2018
-        assert ("2014" in info.source) or ("2018" in info.source)
+        # Should be either 2022, 2018, or 2014
+        assert any(year in info.source for year in ["2022", "2018", "2014"])
 
-    def test_expected_values_codata_2018(self):
-        """Test expected values if using CODATA 2018."""
+    def test_expected_values_codata_version(self):
+        """Test expected values based on CODATA version."""
         info = get_constant_info("bohr_to_angstrom")
 
-        if "2018" in info.source:
+        if "2022" in info.source:
+            # CODATA 2022 value
+            assert np.isclose(
+                BOHR_TO_ANGSTROM,
+                0.529177210544,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+        elif "2018" in info.source:
             # CODATA 2018 value
             assert np.isclose(
                 BOHR_TO_ANGSTROM,
@@ -302,7 +310,9 @@ class TestVersionAwareness:
         # Check that the reported version matches the actual values
         bohr_info = all_info["bohr_to_angstrom"]
 
-        if "2018" in version:
+        if "2022" in version:
+            expected_bohr = 0.529177210544
+        elif "2018" in version:
             expected_bohr = 0.529177210903
         elif "2014" in version:
             expected_bohr = 0.52917721067

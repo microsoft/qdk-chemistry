@@ -7,6 +7,8 @@
 #include <qdk/chemistry/scf/core/types.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
+#include <qdk/chemistry/utils/logger.hpp>
+
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -35,6 +37,8 @@ const auto max_engine_precision = std::numeric_limits<double>::epsilon() / 1e10;
  */
 RowMajorMatrix compute_shellblock_norm(const ::libint2::BasisSet& obs,
                                        const double* A, size_t LDA) {
+  QDK_LOG_TRACE_ENTERING();
+
   auto shell2bf = obs.shell2bf();
   const size_t nsh = obs.size();
   RowMajorMatrix shnrms(nsh, nsh);
@@ -73,6 +77,8 @@ using shellpair_data_t = std::vector<
  */
 std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(
     const ::libint2::BasisSet& obs, double threshold = 1e-12) {
+  QDK_LOG_TRACE_ENTERING();
+
   const auto ln_max_engine_precision = std::log(max_engine_precision);
   const size_t nsh = obs.size();
 #ifdef _OPENMP
@@ -156,6 +162,8 @@ std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(
  */
 RowMajorMatrix compute_schwarz_ints(const ::libint2::BasisSet& obs,
                                     bool use_2norm) {
+  QDK_LOG_TRACE_ENTERING();
+
   const size_t nsh = obs.size();
 
   // Setup the engine
@@ -248,6 +256,8 @@ class ERI {
       : unrestricted_(unr),
         use_thread_local_buffers_(!use_atomics),
         obs_(libint2_util::convert_to_libint_basisset(basis_set)) {
+    QDK_LOG_TRACE_ENTERING();
+
     shell2bf_ = obs_.shell2bf();
 
     // Compute Shell Pairs
@@ -287,6 +297,8 @@ class ERI {
    */
   void build_JK(const double* P, double* J, double* K, double alpha,
                 double beta, double omega) {
+    QDK_LOG_TRACE_ENTERING();
+
     AutoTimer t("ERI::build_JK");
     const size_t num_atomic_orbitals = obs_.nbf();
     const size_t nsh = obs_.size();
@@ -637,6 +649,8 @@ class ERI {
    */
   void get_gradients(const double* P, double* dJ, double* dK, double alpha,
                      double beta, double omega) {
+    QDK_LOG_TRACE_ENTERING();
+
     throw std::runtime_error("LIBINT2_DIRECT + Gradients Not Yet Implemented");
   }
 
@@ -662,6 +676,8 @@ class ERI {
    * @note Result includes proper symmetrization for shell permutations
    */
   void quarter_trans(size_t nt, const double* C, double* out) {
+    QDK_LOG_TRACE_ENTERING();
+
     AutoTimer t("ERI::quarter_trans");
     const size_t num_atomic_orbitals = obs_.nbf();
     const size_t nsh = obs_.size();
@@ -902,6 +918,8 @@ class ERI {
    */
   template <typename... Args>
   static std::unique_ptr<ERI> make_libint2_direct_eri(Args&&... args) {
+    QDK_LOG_TRACE_ENTERING();
+
     return std::make_unique<ERI>(std::forward<Args>(args)...);
   }
 };
@@ -913,6 +931,7 @@ LIBINT2_DIRECT::LIBINT2_DIRECT(bool unr, BasisSet& basis_set,
     : ERI(unr, 0.0, basis_set, _mpi),
       eri_impl_(libint2::direct::ERI::make_libint2_direct_eri(unr, basis_set,
                                                               use_atomics)) {
+  QDK_LOG_TRACE_ENTERING();
   if (_mpi.world_size > 1) throw std::runtime_error("LIBINT2_DIRECT + MPI NYI");
 }
 
@@ -921,6 +940,7 @@ LIBINT2_DIRECT::~LIBINT2_DIRECT() noexcept = default;
 // Public interface implementation - delegates to internal ERI implementation
 void LIBINT2_DIRECT::build_JK(const double* P, double* J, double* K,
                               double alpha, double beta, double omega) {
+  QDK_LOG_TRACE_ENTERING();
   if (!eri_impl_) throw std::runtime_error("LIBINT2_DIRECT NOT INITIALIZED");
   eri_impl_->build_JK(P, J, K, alpha, beta, omega);
 }
@@ -928,6 +948,7 @@ void LIBINT2_DIRECT::build_JK(const double* P, double* J, double* K,
 // Override implementation for ERI base class
 void LIBINT2_DIRECT::build_JK_impl_(const double* P, double* J, double* K,
                                     double alpha, double beta, double omega) {
+  QDK_LOG_TRACE_ENTERING();
   if (!eri_impl_) throw std::runtime_error("LIBINT2_DIRECT NOT INITIALIZED");
   eri_impl_->build_JK(P, J, K, alpha, beta, omega);
 }
@@ -935,6 +956,7 @@ void LIBINT2_DIRECT::build_JK_impl_(const double* P, double* J, double* K,
 // Gradient computation interface
 void LIBINT2_DIRECT::get_gradients(const double* P, double* dJ, double* dK,
                                    double alpha, double beta, double omega) {
+  QDK_LOG_TRACE_ENTERING();
   if (!eri_impl_) throw std::runtime_error("LIBINT2_DIRECT NOT INITIALIZED");
   eri_impl_->get_gradients(P, dJ, dK, alpha, beta, omega);
 }
@@ -942,6 +964,7 @@ void LIBINT2_DIRECT::get_gradients(const double* P, double* dJ, double* dK,
 // Quarter transformation interface
 void LIBINT2_DIRECT::quarter_trans_impl(size_t nt, const double* C,
                                         double* out) {
+  QDK_LOG_TRACE_ENTERING();
   if (!eri_impl_) throw std::runtime_error("LIBINT2_DIRECT NOT INITIALIZED");
   eri_impl_->quarter_trans(nt, C, out);
 };

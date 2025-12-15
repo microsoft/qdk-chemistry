@@ -12,7 +12,8 @@ from pathlib import Path
 from pyscf.tools import cubegen
 
 from qdk_chemistry.data import Orbitals
-from qdk_chemistry.plugins.pyscf.utils import basis_to_pyscf_mol
+from qdk_chemistry.plugins.pyscf.conversion import basis_to_pyscf_mol
+from qdk_chemistry.utils import Logger
 
 __all__ = [
     "generate_cubefiles_from_orbitals",
@@ -49,6 +50,7 @@ def generate_cubefiles_from_orbitals(
         list[str] | dict[str, str]: Paths or contents of the generated cube files.
 
     """
+    Logger.trace_entering()
     if output_folder is not None:
         output_folder = Path(output_folder)
         output_folder.mkdir(parents=True, exist_ok=True)

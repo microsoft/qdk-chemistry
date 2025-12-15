@@ -5,11 +5,11 @@
 #include "diis.h"
 
 #include <qdk/chemistry/scf/config.h>
-#include <spdlog/spdlog.h>
 
 #include <cmath>
 #include <deque>
 #include <limits>
+#include <qdk/chemistry/utils/logger.hpp>
 
 #include "../scf/scf_impl.h"
 
@@ -62,6 +62,7 @@ class DIIS {
    * @return Reference to the extrapolated Fock matrix
    */
   const RowMajorMatrix& get_extrapolated_fock() const {
+    QDK_LOG_TRACE_ENTERING();
     return F_extrapolated_;
   }
   /**
@@ -69,7 +70,10 @@ class DIIS {
    *
    * @return Current DIIS error
    */
-  double get_diis_error() const { return diis_error_; }
+  double get_diis_error() const {
+    QDK_LOG_TRACE_ENTERING();
+    return diis_error_;
+  }
 
  private:
   /**
@@ -127,6 +131,7 @@ class DIIS {
 
 DIIS::DIIS(const SCFContext& ctx, const size_t subspace_size)
     : ctx_(ctx), subspace_size_(subspace_size) {
+  QDK_LOG_TRACE_ENTERING();
   if (subspace_size <= 0) {
     throw std::invalid_argument("subspace_size must be greater than 0");
   }
@@ -134,6 +139,7 @@ DIIS::DIIS(const SCFContext& ctx, const size_t subspace_size)
 
 void DIIS::iterate(const RowMajorMatrix& P, const RowMajorMatrix& F,
                    const RowMajorMatrix& S) {
+  QDK_LOG_TRACE_ENTERING();
   const auto* cfg = ctx_.cfg;
   auto& res = ctx_.result;
 
@@ -164,6 +170,7 @@ void DIIS::iterate(const RowMajorMatrix& P, const RowMajorMatrix& F,
 
 void DIIS::extrapolate_(const RowMajorMatrix& x, const RowMajorMatrix& error,
                         RowMajorMatrix& x_diis) {
+  QDK_LOG_TRACE_ENTERING();
   x_diis = x;
   if (hist_.size() == subspace_size_) delete_oldest_();
   hist_.push_back(x);
@@ -217,6 +224,7 @@ void DIIS::extrapolate_(const RowMajorMatrix& x, const RowMajorMatrix& error,
 }
 
 void DIIS::delete_oldest_() {
+  QDK_LOG_TRACE_ENTERING();
   hist_.pop_front();
   errors_.pop_front();
   size_t sz = B_.rows();
@@ -227,6 +235,7 @@ void DIIS::delete_oldest_() {
 void DIIS::apply_level_shift_(const RowMajorMatrix& F, const RowMajorMatrix& P,
                               const RowMajorMatrix& S, RowMajorMatrix& F_ls,
                               const double mu) const {
+  QDK_LOG_TRACE_ENTERING();
   const auto* cfg = ctx_.cfg;
   int num_atomic_orbitals = static_cast<int>(S.cols());
   int num_density_matrices = cfg->unrestricted ? 2 : 1;
@@ -267,11 +276,14 @@ void DIIS::apply_level_shift_(const RowMajorMatrix& F, const RowMajorMatrix& P,
 // Constructor for SCFAlgorithm interface
 DIIS::DIIS(const SCFContext& ctx, const size_t subspace_size)
     : SCFAlgorithm(ctx),
-      diis_impl_(std::make_unique<impl::DIIS>(ctx, subspace_size)) {}
+      diis_impl_(std::make_unique<impl::DIIS>(ctx, subspace_size)) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 DIIS::~DIIS() noexcept = default;
 
 void DIIS::iterate(SCFImpl& scf_impl) {
+  QDK_LOG_TRACE_ENTERING();
   const auto* cfg = ctx_.cfg;
 
   // Get references to matrices from SCFImpl

@@ -94,146 +94,6 @@ std::shared_ptr<Structure> structure_from_hdf5_wrapper(
 void bind_structure(py::module &m) {
   using qdk::chemistry::python::utils::bind_getter_as_property;
 
-  // Bind Element enum
-  py::enum_<Element>(m, "Element", R"(
-Chemical elements enumeration.
-
-This enum represents all chemical elements from hydrogen (1) to oganesson (118).
-Each element is represented by its atomic number.
-
-Examples:
-    >>> from qdk_chemistry.data import Element
-    >>> Element.H  # Hydrogen
-    >>> Element.C  # Carbon
-    >>> Element.O  # Oxygen
-
-)")
-      // Period 1
-      .value("H", Element::H, "Hydrogen")
-      .value("He", Element::He, "Helium")
-      // Period 2
-      .value("Li", Element::Li, "Lithium")
-      .value("Be", Element::Be, "Beryllium")
-      .value("B", Element::B, "Boron")
-      .value("C", Element::C, "Carbon")
-      .value("N", Element::N, "Nitrogen")
-      .value("O", Element::O, "Oxygen")
-      .value("F", Element::F, "Fluorine")
-      .value("Ne", Element::Ne, "Neon")
-      // Period 3
-      .value("Na", Element::Na, "Sodium")
-      .value("Mg", Element::Mg, "Magnesium")
-      .value("Al", Element::Al, "Aluminum")
-      .value("Si", Element::Si, "Silicon")
-      .value("P", Element::P, "Phosphorus")
-      .value("S", Element::S, "Sulfur")
-      .value("Cl", Element::Cl, "Chlorine")
-      .value("Ar", Element::Ar, "Argon")
-      // Period 4
-      .value("K", Element::K, "Potassium")
-      .value("Ca", Element::Ca, "Calcium")
-      .value("Sc", Element::Sc, "Scandium")
-      .value("Ti", Element::Ti, "Titanium")
-      .value("V", Element::V, "Vanadium")
-      .value("Cr", Element::Cr, "Chromium")
-      .value("Mn", Element::Mn, "Manganese")
-      .value("Fe", Element::Fe, "Iron")
-      .value("Co", Element::Co, "Cobalt")
-      .value("Ni", Element::Ni, "Nickel")
-      .value("Cu", Element::Cu, "Copper")
-      .value("Zn", Element::Zn, "Zinc")
-      .value("Ga", Element::Ga, "Gallium")
-      .value("Ge", Element::Ge, "Germanium")
-      .value("As", Element::As, "Arsenic")
-      .value("Se", Element::Se, "Selenium")
-      .value("Br", Element::Br, "Bromine")
-      .value("Kr", Element::Kr, "Krypton")
-      // Period 5
-      .value("Rb", Element::Rb, "Rubidium")
-      .value("Sr", Element::Sr, "Strontium")
-      .value("Y", Element::Y, "Yttrium")
-      .value("Zr", Element::Zr, "Zirconium")
-      .value("Nb", Element::Nb, "Niobium")
-      .value("Mo", Element::Mo, "Molybdenum")
-      .value("Tc", Element::Tc, "Technetium")
-      .value("Ru", Element::Ru, "Ruthenium")
-      .value("Rh", Element::Rh, "Rhodium")
-      .value("Pd", Element::Pd, "Palladium")
-      .value("Ag", Element::Ag, "Silver")
-      .value("Cd", Element::Cd, "Cadmium")
-      .value("In", Element::In, "Indium")
-      .value("Sn", Element::Sn, "Tin")
-      .value("Sb", Element::Sb, "Antimony")
-      .value("Te", Element::Te, "Tellurium")
-      .value("I", Element::I, "Iodine")
-      .value("Xe", Element::Xe, "Xenon")
-      // Period 6
-      .value("Cs", Element::Cs, "Cesium")
-      .value("Ba", Element::Ba, "Barium")
-      .value("La", Element::La, "Lanthanum")
-      .value("Ce", Element::Ce, "Cerium")
-      .value("Pr", Element::Pr, "Praseodymium")
-      .value("Nd", Element::Nd, "Neodymium")
-      .value("Pm", Element::Pm, "Promethium")
-      .value("Sm", Element::Sm, "Samarium")
-      .value("Eu", Element::Eu, "Europium")
-      .value("Gd", Element::Gd, "Gadolinium")
-      .value("Tb", Element::Tb, "Terbium")
-      .value("Dy", Element::Dy, "Dysprosium")
-      .value("Ho", Element::Ho, "Holmium")
-      .value("Er", Element::Er, "Erbium")
-      .value("Tm", Element::Tm, "Thulium")
-      .value("Yb", Element::Yb, "Ytterbium")
-      .value("Lu", Element::Lu, "Lutetium")
-      .value("Hf", Element::Hf, "Hafnium")
-      .value("Ta", Element::Ta, "Tantalum")
-      .value("W", Element::W, "Tungsten")
-      .value("Re", Element::Re, "Rhenium")
-      .value("Os", Element::Os, "Osmium")
-      .value("Ir", Element::Ir, "Iridium")
-      .value("Pt", Element::Pt, "Platinum")
-      .value("Au", Element::Au, "Gold")
-      .value("Hg", Element::Hg, "Mercury")
-      .value("Tl", Element::Tl, "Thallium")
-      .value("Pb", Element::Pb, "Lead")
-      .value("Bi", Element::Bi, "Bismuth")
-      .value("Po", Element::Po, "Polonium")
-      .value("At", Element::At, "Astatine")
-      .value("Rn", Element::Rn, "Radon")
-      // Period 7
-      .value("Fr", Element::Fr, "Francium")
-      .value("Ra", Element::Ra, "Radium")
-      .value("Ac", Element::Ac, "Actinium")
-      .value("Th", Element::Th, "Thorium")
-      .value("Pa", Element::Pa, "Protactinium")
-      .value("U", Element::U, "Uranium")
-      .value("Np", Element::Np, "Neptunium")
-      .value("Pu", Element::Pu, "Plutonium")
-      .value("Am", Element::Am, "Americium")
-      .value("Cm", Element::Cm, "Curium")
-      .value("Bk", Element::Bk, "Berkelium")
-      .value("Cf", Element::Cf, "Californium")
-      .value("Es", Element::Es, "Einsteinium")
-      .value("Fm", Element::Fm, "Fermium")
-      .value("Md", Element::Md, "Mendelevium")
-      .value("No", Element::No, "Nobelium")
-      .value("Lr", Element::Lr, "Lawrencium")
-      .value("Rf", Element::Rf, "Rutherfordium")
-      .value("Db", Element::Db, "Dubnium")
-      .value("Sg", Element::Sg, "Seaborgium")
-      .value("Bh", Element::Bh, "Bohrium")
-      .value("Hs", Element::Hs, "Hassium")
-      .value("Mt", Element::Mt, "Meitnerium")
-      .value("Ds", Element::Ds, "Darmstadtium")
-      .value("Rg", Element::Rg, "Roentgenium")
-      .value("Cn", Element::Cn, "Copernicium")
-      .value("Nh", Element::Nh, "Nihonium")
-      .value("Fl", Element::Fl, "Flerovium")
-      .value("Mc", Element::Mc, "Moscovium")
-      .value("Lv", Element::Lv, "Livermorium")
-      .value("Ts", Element::Ts, "Tennessine")
-      .value("Og", Element::Og, "Oganesson")
-      .export_values();
   py::class_<Structure, DataClass, py::smart_holder> structure(m, "Structure",
                                                                R"(
 Represents a molecular structure with atomic coordinates, elements, masses, and nuclear charges.
@@ -1041,28 +901,54 @@ Examples:
 )",
                        py::arg("nuclear_charge"));
 
-  structure.def_static("get_standard_atomic_mass",
-                       &Structure::get_standard_atomic_mass,
-                       R"(
-Get standard atomic mass for an element.
+  structure.def_static(
+      "get_default_atomic_mass",
+      py::overload_cast<Element>(&Structure::get_default_atomic_mass),
+      R"(
+Get default atomic mass for an element.
 
 Args:
     element (Element): Element enum value
 
 Returns:
-    float: Standard atomic mass in AMU
+    float: Default atomic mass in AMU
 
 Examples:
-    >>> mass = Structure.get_standard_atomic_mass(Element.C)
+    >>> mass = Structure.get_default_atomic_mass(Element.C)
     >>> print(f"Carbon mass: {mass} AMU")
 
 )",
-                       py::arg("element"));
+      py::arg("element"));
 
-  structure.def_static("get_standard_nuclear_charge",
-                       &Structure::get_standard_nuclear_charge,
+  structure.def_static(
+      "get_default_atomic_mass",
+      py::overload_cast<std::string>(&Structure::get_default_atomic_mass),
+      R"(
+Get default atomic mass for an element symbol string.
+
+Args:
+    symbol (str): Element symbol (e.g., "H", "H2", "C", "C12", "C13").
+        Using an element symbol string without a mass number returns the standard atomic weight.
+        "D" (deuterium) can be used as alias for "H2".
+        "T" (tritium) can be used as alias for "H3".
+
+Returns:
+    float: Atomic mass in AMU
+
+Examples:
+    >>> mass = Structure.get_default_atomic_mass("C")  # Standard carbon mass
+    >>> print(f"Carbon mass: {mass} AMU")
+    >>> mass = Structure.get_default_atomic_mass("C13")  # Carbon-13
+    >>> print(f"Carbon-13 mass: {mass} AMU")
+    >>> mass = Structure.get_default_atomic_mass("D")  # Deuterium
+    >>> print(f"Deuterium mass: {mass} AMU")
+)",
+      py::arg("symbol"));
+
+  structure.def_static("get_default_nuclear_charge",
+                       &Structure::get_default_nuclear_charge,
                        R"(
-Get standard nuclear charge for an element.
+Get default nuclear charge for an element.
 
 Args:
     element (Element): Element enum value
@@ -1071,7 +957,7 @@ Returns:
     int: Nuclear charge (atomic number)
 
 Examples:
-    >>> charge = Structure.get_standard_nuclear_charge(Element.C)
+    >>> charge = Structure.get_default_nuclear_charge(Element.C)
     >>> assert charge == 6
 
 )",

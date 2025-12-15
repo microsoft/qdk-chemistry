@@ -5,7 +5,8 @@
 #include <qdk/chemistry/scf/config.h>
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
-#include <spdlog/spdlog.h>
+
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::scf::cuda {
 
@@ -19,15 +20,17 @@ namespace qdk::chemistry::scf::cuda {
 constexpr int MAX_NUM_DEVICE = 32;
 
 int get_current_device() {
+  QDK_LOG_TRACE_ENTERING();
   int device;
   CUDA_CHECK(cudaGetDevice(&device));
   return device;
 }
 
 void init_memory_pool(int device) {
+  QDK_LOG_TRACE_ENTERING();
   static bool initialized[MAX_NUM_DEVICE] = {false};
   if (!initialized[device]) {
-    spdlog::trace("Configure memory pool for device {}", device);
+    QDK_LOGGER().trace("Configure memory pool for device {}", device);
     cudaMemPool_t mempool;
     cudaDeviceGetDefaultMemPool(&mempool, device);
     uint64_t threshold = UINT64_MAX;
@@ -38,13 +41,16 @@ void init_memory_pool(int device) {
 }
 
 void trim_memory_pool(size_t bytes, int device) {
-  spdlog::trace("Trim memory pool to {} bytes for device {}", bytes, device);
+  QDK_LOG_TRACE_ENTERING();
+  QDK_LOGGER().trace("Trim memory pool to {} bytes for device {}", bytes,
+                     device);
   cudaMemPool_t mempool;
   cudaDeviceGetDefaultMemPool(&mempool, device);
   CUDA_CHECK(cudaMemPoolTrimTo(mempool, bytes));
 }
 
 void show_memory_pool_info(int device) {
+  QDK_LOG_TRACE_ENTERING();
   cudaMemPool_t mempool;
   cudaDeviceGetDefaultMemPool(&mempool, device);
   auto print_attr = [&](cudaMemPoolAttr attr, const char* attr_name) {

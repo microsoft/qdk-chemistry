@@ -44,6 +44,7 @@ from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     ProjectedMultiConfigurationCalculator,
     QdkMacisPmc,
 )
+from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolver
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper
 from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, ScfSolver
 from qdk_chemistry.algorithms.stability_checker import StabilityChecker
@@ -85,6 +86,7 @@ __all__ = [
     "QdkScfSolver",
     "QdkVVHVLocalizer",
     "QdkValenceActiveSpaceSelector",
+    "QubitHamiltonianSolver",
     "QubitMapper",
     "ScfSolver",
     "StabilityChecker",

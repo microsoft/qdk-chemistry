@@ -19,7 +19,7 @@ Note:
     and the helper routines assume atomic numbers do not exceed 200.
 
 Examples:
-    >>> from qdk_chemistry.plugins.pyscf.utils import structure_to_pyscf_atom_labels, basis_to_pyscf_mol
+    >>> from qdk_chemistry.plugins.pyscf.conversion import structure_to_pyscf_atom_labels, basis_to_pyscf_mol
     >>> # Convert structure to PySCF format
     >>> atoms, pyscf_symbols, elements = structure_to_pyscf_atom_labels(structure)
     >>> # Convert basis set to PySCF Mole object
@@ -39,6 +39,7 @@ import numpy as np
 import pyscf
 
 from qdk_chemistry.data import AOType, BasisSet, Hamiltonian, Orbitals, Shell, Structure
+from qdk_chemistry.utils import Logger
 
 __all__ = [
     "basis_to_pyscf_mol",
@@ -96,6 +97,7 @@ def structure_to_pyscf_atom_labels(structure: Structure) -> tuple:
         'H1 0.000000000000 0.757000000000 0.587000000000'
 
     """
+    Logger.trace_entering()
     # Extract Structure
     elements = structure.get_atomic_symbols()
     coordinates = structure.get_coordinates()
@@ -138,6 +140,7 @@ def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) 
         >>> print(pyscf_mol.atom)
 
     """
+    Logger.trace_entering()
     atoms, pyscf_symbols, elements = structure_to_pyscf_atom_labels(basis.get_structure())
     natoms = len(atoms)
     # Copy the basis set from QDK/Chemistry to PySCF
@@ -251,6 +254,7 @@ def pyscf_mol_to_qdk_basis(
         primitives creates a separate ECP shell.
 
     """
+    Logger.trace_entering()
     # Determine the basis set name if not provided
     if basis_name is None:
         # Try to extract basis set name from stored QDK/Chemistry basis name (for round-trip conversion)
@@ -434,6 +438,7 @@ def orbitals_to_scf(
         the orbitals are restricted/unrestricted and closed-shell/open-shell.
 
     """
+    Logger.trace_entering()
     if isinstance(scf_type, str):
         scf_type = SCFType(scf_type.lower())
 
@@ -545,6 +550,7 @@ def orbitals_to_scf_from_n_electrons_and_multiplicity(
         the orbitals are restricted/unrestricted and closed-shell/open-shell.
 
     """
+    Logger.trace_entering()
     n_orbitals = orbitals.get_num_molecular_orbitals()
     alpha_occ, beta_occ = occupations_from_n_electrons_and_multiplicity(n_orbitals, n_electrons, multiplicity)
 
@@ -589,7 +595,7 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
 
     Examples:
         >>> import numpy as np
-        >>> from qdk_chemistry.plugins.pyscf.utils import hamiltonian_to_scf
+        >>> from qdk_chemistry.plugins.pyscf.conversion import hamiltonian_to_scf
         >>> # Convert a QDK/Chemistry Hamiltonian to a PySCF SCF object
         >>> # Example for 10-electron system with 5 doubly occupied orbitals
         >>> norb = hamiltonian.get_orbitals().get_num_molecular_orbitals()
@@ -604,6 +610,7 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         >>> cc_calc.kernel()
 
     """
+    Logger.trace_entering()
     orbitals = hamiltonian.get_orbitals()
     try:
         orbitals.get_coefficients()
@@ -679,7 +686,7 @@ def hamiltonian_to_scf_from_n_electrons_and_multiplicity(
         ValueError: If the electron count or multiplicity is invalid.
 
     Examples:
-        >>> from qdk_chemistry.plugins.pyscf.utils import hamiltonian_to_scf_from_n_electrons_and_multiplicity
+        >>> from qdk_chemistry.plugins.pyscf.conversion import hamiltonian_to_scf_from_n_electrons_and_multiplicity
         >>> # Convert a QDK/Chemistry Hamiltonian to a PySCF SCF object
         >>> # Example for a 10-electron singlet system
         >>> pyscf_scf = hamiltonian_to_scf_from_n_electrons_and_multiplicity(
@@ -691,6 +698,7 @@ def hamiltonian_to_scf_from_n_electrons_and_multiplicity(
         >>> cc_calc.kernel()
 
     """
+    Logger.trace_entering()
     n_orbitals = hamiltonian.get_orbitals().get_num_molecular_orbitals()
     alpha_occ, beta_occ = occupations_from_n_electrons_and_multiplicity(n_orbitals, n_electrons, multiplicity)
 
@@ -715,6 +723,7 @@ def occupations_from_n_electrons_and_multiplicity(
         ValueError: If the total number of electrons or multiplicity is invalid.
 
     """
+    Logger.trace_entering()
     # Validate inputs
     if n_electrons < 0:
         raise ValueError(f"The number of electrons must be non-negative, got {n_electrons}.")
