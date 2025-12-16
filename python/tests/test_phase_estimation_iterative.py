@@ -18,9 +18,10 @@ from qdk_chemistry.algorithms import (
     IterativePhaseEstimation,
     TraditionalPhaseEstimation,
 )
-from qdk_chemistry.data import QpeResult, QubitHamiltonian
+from qdk_chemistry.data import QpeResult, QuantumErrorProfile, QubitHamiltonian
 from qdk_chemistry.phase_estimation.base import PhaseEstimationAlgorithm
 from qdk_chemistry.phase_estimation.iterative_qpe import IterativePhaseEstimationIteration
+from qdk_chemistry.plugins.qiskit._interop.noise_model import get_noise_model_from_profile
 from qdk_chemistry.utils.phase import accumulated_phase_from_bits
 
 from .reference_tolerances import (
@@ -431,6 +432,99 @@ def test_iterative_phase_estimation_second_non_commuting_example() -> None:
     )
     assert np.isclose(
         result.resolved_energy, -0.08984375, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
+    )
+
+
+def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
+    """Integration test showing NoiseModel impact on iterative phase estimation accuracy."""
+    # Run noiseless QPE
+    noiseless_result = _run_iterative(two_qubit_phase_problem)
+
+    # Verify noiseless case matches expected values
+    assert noiseless_result.bits_msb_first is not None
+    assert list(noiseless_result.bits_msb_first) == two_qubit_phase_problem.expected_bits
+    assert np.isclose(
+        noiseless_result.phase_fraction,
+        two_qubit_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
+    )
+    assert np.isclose(
+        noiseless_result.resolved_energy,
+        two_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
+
+    # Create noise model with depolarizing error on cx gates
+    error_rate = 0.2
+    error_profile = QuantumErrorProfile(
+        name="qpe_noise_test",
+        description="Depolarizing noise for QPE integration test",
+        errors={
+            "cx": {"type": "depolarizing_error", "rate": error_rate, "num_qubits": 2},
+        },
+    )
+    noise_model = get_noise_model_from_profile(error_profile)
+
+    # Run noisy QPE with depolarizing noise on two-qubit gates
+    iqpe = IterativePhaseEstimation(two_qubit_phase_problem.hamiltonian, two_qubit_phase_problem.evolution_time)
+    simulator = AerSimulator(seed_simulator=_SEED, noise_model=noise_model)
+    phase_feedback = 0.0
+    bits: list[int] = []
+
+    for iteration in range(two_qubit_phase_problem.num_bits):
+        iteration_data = iqpe.create_iteration(
+            two_qubit_phase_problem.state_prep,
+            iteration=iteration,
+            total_iterations=two_qubit_phase_problem.num_bits,
+            phase_correction=phase_feedback,
+        )
+        # Run noisy simulation with more shots to see noise impact despite statistics
+        result = simulator.run(iteration_data.circuit, shots=100).result()
+        counts = result.get_counts()
+        measured_bit = 0 if counts.get("0", 0) >= counts.get("1", 0) else 1
+
+        bits.append(measured_bit)
+        phase_feedback = iqpe.update_phase_feedback(phase_feedback, measured_bit)
+
+    phase_fraction = iqpe.phase_fraction_from_feedback(phase_feedback)
+    noisy_result = QpeResult.from_phase_fraction(
+        method=IterativePhaseEstimation.algorithm,
+        phase_fraction=phase_fraction,
+        evolution_time=two_qubit_phase_problem.evolution_time,
+        bits_msb_first=bits,
+        reference_energy=two_qubit_phase_problem.expected_energy,
+        metadata={"label": two_qubit_phase_problem.label, "noise_model": "depolarizing", "error_rate": error_rate},
+    )
+
+    # Verify that noisy results deviate from expected values
+    expected_noisy_phase = 0.0625
+    expected_noisy_energy = 0.25
+    assert noisy_result.bits_msb_first is not None
+    assert np.isclose(
+        noisy_result.phase_fraction,
+        expected_noisy_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
+    )
+    assert not np.isclose(
+        expected_noisy_phase,
+        two_qubit_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
+    )
+    assert np.isclose(
+        noisy_result.resolved_energy,
+        expected_noisy_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
+    assert not np.isclose(
+        expected_noisy_energy,
+        two_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
     )
 
 
