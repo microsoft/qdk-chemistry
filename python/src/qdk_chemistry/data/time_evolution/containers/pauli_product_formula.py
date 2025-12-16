@@ -12,7 +12,7 @@ import h5py
 
 from .base import TimeEvolutionUnitaryContainer
 
-__all__ = ["EvolutionOrdering", "ExponentiatedPauliTerm", "PauliProductFormulaContainer"]
+__all__ = ["EvolutionOrdering", "ExponentiatedPauliTerm"]
 
 
 @dataclass(frozen=True)
@@ -69,6 +69,9 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
 
     # Class attribute for filename validation
     _data_type_name = "pauli_product_formula_container"
+
+    # Serialization version for this class
+    _serialization_version = "0.1.0"
 
     def __init__(
         self,
