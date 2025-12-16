@@ -5,12 +5,11 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from .base import ControlledEvolutionCircuitMapper, ControlledEvolutionCircuitMapperFactory
+from .base import ControlledEvolutionCircuitMapperFactory
 from .chain_structure_mapper import ChainStructureMapper, ChainStructureMapperSettings
 
 __all__ = [
     "ChainStructureMapper",
     "ChainStructureMapperSettings",
-    "ControlledEvolutionCircuitMapper",
     "ControlledEvolutionCircuitMapperFactory",
 ]

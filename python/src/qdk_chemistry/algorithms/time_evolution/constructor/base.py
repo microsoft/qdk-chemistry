@@ -8,8 +8,7 @@
 from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import QubitHamiltonian
-from qdk_chemistry.data.time_evolution import TimeEvolutionUnitary
+from qdk_chemistry.data import QubitHamiltonian, TimeEvolutionUnitary
 
 __all__: list[str] = []
 

@@ -6,8 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry.algorithms.time_evolution.constructor.base import TimeEvolutionConstructor
-from qdk_chemistry.data import QubitHamiltonian, Settings
-from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary
+from qdk_chemistry.data import QubitHamiltonian, Settings, TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     EvolutionOrdering,
     ExponentiatedPauliTerm,
@@ -79,7 +78,7 @@ class FirstOrderTrotterConstructor(TimeEvolutionConstructor):
 
     def name(self) -> str:
         """Return the name of the controlled unitary constructor."""
-        return "first_order_trotterization"
+        return "first_order_trotter"
 
 
 def _pauli_label_to_map(label: str) -> dict[int, str]:

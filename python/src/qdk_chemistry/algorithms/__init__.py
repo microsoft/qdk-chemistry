@@ -48,6 +48,8 @@ from qdk_chemistry.algorithms.qubit_mapper import QubitMapper
 from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, ScfSolver
 from qdk_chemistry.algorithms.stability_checker import StabilityChecker
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
+from qdk_chemistry.algorithms.time_evolution.constructor.base import TimeEvolutionConstructor
+from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
 from qdk_chemistry.phase_estimation import (
     IterativePhaseEstimation,
     IterativePhaseEstimationIteration,
@@ -60,6 +62,7 @@ from qdk_chemistry.phase_estimation import (
 __all__ = [
     # Classes
     "ActiveSpaceSelector",
+    "ControlledEvolutionCircuitMapper",
     "DynamicalCorrelationCalculator",
     "EnergyEstimator",
     "HamiltonianConstructor",
@@ -88,6 +91,7 @@ __all__ = [
     "ScfSolver",
     "StabilityChecker",
     "StatePreparation",
+    "TimeEvolutionConstructor",
     "TraditionalPhaseEstimation",
     # Factory functions
     "available",

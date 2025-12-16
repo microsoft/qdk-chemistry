@@ -17,35 +17,21 @@ __all__ = ["EvolutionOrdering", "ExponentiatedPauliTerm"]
 
 @dataclass(frozen=True)
 class ExponentiatedPauliTerm:
-    """Dataclass for an exponentiated Pauli term.
-
-    Attributes:
-        pauli_term: A dictionary mapping qubit indices to Pauli operators ('X', 'Y', 'Z').
-        angle: The rotation angle for the exponentiation.
-
-    Example:
-        >>> term = ExponentiatedPauliTerm(pauli_term={0: 'X', 2: 'Z'}, angle=1.5708)
-
-    """
+    """Dataclass for an exponentiated Pauli term."""
 
     pauli_term: dict[int, str]
+    """A dictionary mapping qubit indices to Pauli operators ('X', 'Y', 'Z')."""
+
     angle: float
+    """The rotation angle for the exponentiation."""
 
 
 @dataclass(frozen=True)
 class EvolutionOrdering:
-    """Data class for evolution ordering.
-
-    Attributes:
-        indices: List of indices representing the order of evolution.
-
-    Example:
-        >>> # Apply the third term first, then the first, and the second lastly
-        >>> ordering = EvolutionOrdering(indices=[2, 0, 1])
-
-    """
+    """Data class for evolution ordering."""
 
     indices: list[int]
+    """List of indices representing the order of evolution."""
 
     def validate_ordering(self, num_terms: int) -> None:
         """Validate the evolution ordering.
@@ -116,15 +102,24 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
         """
         return self._num_qubits
 
-    def set_ordering(self, evolution_ordering: EvolutionOrdering) -> None:
-        """Set the evolution ordering.
+    def update_ordering(self, evolution_ordering: EvolutionOrdering) -> "PauliProductFormulaContainer":
+        """Update the evolution ordering.
 
         Args:
             evolution_ordering: A list of indices representing the order of evolution terms.
 
+        Returns:
+            PauliProductFormulaContainer: A new container with the updated ordering.
+
         """
         evolution_ordering.validate_ordering(len(self.step_terms))
-        self.evolution_ordering = evolution_ordering
+
+        return PauliProductFormulaContainer(
+            step_terms=self.step_terms,
+            evolution_ordering=evolution_ordering,
+            step_reps=self.step_reps,
+            num_qubits=self._num_qubits,
+        )
 
     def to_json(self) -> dict[str, Any]:
         """Convert the TimeEvolutionUnitary to a dictionary for JSON serialization.

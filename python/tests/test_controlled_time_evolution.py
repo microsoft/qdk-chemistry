@@ -9,8 +9,7 @@ from typing import Any
 
 import h5py
 
-from qdk_chemistry.data.time_evolution import ControlledTimeEvolutionUnitary, TimeEvolutionUnitary
-from qdk_chemistry.data.time_evolution.containers import TimeEvolutionUnitaryContainer
+from qdk_chemistry.data import ControlledTimeEvolutionUnitary, TimeEvolutionUnitary, TimeEvolutionUnitaryContainer
 
 
 class MockTimeEvolutionUnitaryContainer(TimeEvolutionUnitaryContainer):

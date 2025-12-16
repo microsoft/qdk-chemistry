@@ -60,7 +60,7 @@ class TestExponentiatedPauliTerm:
     def test_frozen(self):
         """Test that ExponentiatedPauliTerm is immutable."""
         term = ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.1)
-        with pytest.raises(Exception, match="cannot be assigned to"):
+        with pytest.raises(Exception, match="cannot assign to field 'angle'"):
             term.angle = 0.2
 
 
@@ -96,18 +96,18 @@ class TestPauliProductFormulaContainer:
         assert len(container.step_terms) == 3
         assert container.evolution_ordering.indices == [2, 0, 1]
 
-    def test_set_ordering(self, container):
+    def test_update_ordering(self, container):
         """Test setting a new valid evolution ordering."""
         new_ordering = EvolutionOrdering(indices=[1, 2, 0])
-        container.set_ordering(new_ordering)
+        updated_container = container.update_ordering(new_ordering)
 
-        assert container.evolution_ordering.indices == [1, 2, 0]
+        assert updated_container.evolution_ordering.indices == [1, 2, 0]
 
-    def test_set_ordering_invalid(self, container):
+    def test_update_ordering_invalid(self, container):
         """Test setting an invalid evolution ordering."""
         bad_ordering = EvolutionOrdering(indices=[0, 1])
         with pytest.raises(ValueError, match="length must match"):
-            container.set_ordering(bad_ordering)
+            container.update_ordering(bad_ordering)
 
     def test_to_json_roundtrip(self, container):
         """Test JSON serialization and deserialization roundtrip."""

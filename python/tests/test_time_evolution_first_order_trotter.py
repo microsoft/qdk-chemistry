@@ -13,8 +13,7 @@ from qdk_chemistry.algorithms.time_evolution.constructor.trotter.first_order_tro
     _decompose_trotter_step,
     _pauli_label_to_map,
 )
-from qdk_chemistry.data import QubitHamiltonian
-from qdk_chemistry.data.time_evolution import TimeEvolutionUnitary
+from qdk_chemistry.data import QubitHamiltonian, TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
