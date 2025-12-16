@@ -21,10 +21,10 @@ class EnergyExpectationResult(DataClass):
     """Expectation value and variance for a Hamiltonian energy estimate.
 
     Attributes:
-        energy_expectation_value: Expectation value of the energy.
-        energy_variance: Variance of the energy.
-        expvals_each_term: Expectation values for each term in the Hamiltonian.
-        variances_each_term: Variances for each term in the Hamiltonian.
+        energy_expectation_value (float): Expectation value of the energy.
+        energy_variance (float): Variance of the energy.
+        expvals_each_term (list[numpy.ndarray]): Expectation values for each term in the Hamiltonian.
+        variances_each_term (list[numpy.ndarray]): Variances for each term in the Hamiltonian.
 
     """
 
@@ -40,14 +40,14 @@ class EnergyExpectationResult(DataClass):
         energy_variance: float,
         expvals_each_term: list[np.ndarray],
         variances_each_term: list[np.ndarray],
-    ):
+    ) -> None:
         """Initialize an energy expectation result.
 
         Args:
-            energy_expectation_value: Expectation value of the energy.
-            energy_variance: Variance of the energy.
-            expvals_each_term: Expectation values for each term in the Hamiltonian.
-            variances_each_term: Variances for each term in the Hamiltonian.
+            energy_expectation_value (float): Expectation value of the energy.
+            energy_variance (float): Variance of the energy.
+            expvals_each_term (list[numpy.ndarray]): Expectation values for each term in the Hamiltonian.
+            variances_each_term (list[numpy.ndarray]): Variances for each term in the Hamiltonian.
 
         """
         Logger.trace_entering()
@@ -58,7 +58,12 @@ class EnergyExpectationResult(DataClass):
         super().__init__()
 
     def get_summary(self) -> str:
-        """Get a human-readable summary of the energy expectation result."""
+        """Get a human-readable summary of the energy expectation result.
+
+        Returns:
+            str: Summary string describing the energy expectation result.
+
+        """
         return (
             f"Energy Expectation Result\n"
             f"  Energy: {self.energy_expectation_value:.6f} ± {np.sqrt(self.energy_variance):.6f}\n"
@@ -67,7 +72,12 @@ class EnergyExpectationResult(DataClass):
         )
 
     def to_json(self) -> dict[str, Any]:
-        """Convert result to a dictionary for JSON serialization."""
+        """Convert energy expectation result to a dictionary for JSON serialization.
+
+        Returns:
+            dict[str, Any]: Dictionary representation of the energy expectation result.
+
+        """
         data = {
             "energy_expectation_value": float(self.energy_expectation_value),
             "energy_variance": float(self.energy_variance),
@@ -79,9 +89,8 @@ class EnergyExpectationResult(DataClass):
     def to_hdf5(self, group: h5py.Group) -> None:
         """Save the energy expectation result to an HDF5 group.
 
-        Note:
-            This method is used internally when saving to HDF5 files.
-            Python users should call to_hdf5_file() directly.
+        Args:
+            group (h5py.Group): HDF5 group or file to write the energy expectation result to.
 
         """
         self._add_hdf5_version(group)
@@ -100,13 +109,13 @@ class EnergyExpectationResult(DataClass):
         """Create an energy expectation result from a JSON dictionary.
 
         Args:
-            json_data: Dictionary containing the serialized data
+            json_data (dict[str, Any]): Dictionary containing the serialized data.
 
         Returns:
-            EnergyExpectationResult: New instance reconstructed from JSON data
+            EnergyExpectationResult: New instance reconstructed from JSON data.
 
         Raises:
-            RuntimeError: If version field is missing or incompatible
+            RuntimeError: If version field is missing or incompatible.
 
         """
         cls._validate_json_version(cls._serialization_version, json_data)
@@ -123,13 +132,13 @@ class EnergyExpectationResult(DataClass):
         """Load an energy expectation result from an HDF5 group.
 
         Args:
-            group: HDF5 group or file containing the data
+            group (h5py.Group): HDF5 group or file containing the data.
 
         Returns:
-            EnergyExpectationResult: New instance reconstructed from HDF5 data
+            EnergyExpectationResult: New instance reconstructed from HDF5 data.
 
         Raises:
-            RuntimeError: If version attribute is missing or incompatible
+            RuntimeError: If version attribute is missing or incompatible.
 
         """
         cls._validate_hdf5_version(cls._serialization_version, group)
@@ -163,9 +172,9 @@ class MeasurementData(DataClass):
     """Measurement bitstring data and metadata for a ``QubitHamiltonian``.
 
     Attributes:
-        hamiltonians: List of QubitHamiltonian corresponding to the measurement data.
-        bitstring_counts: List of bitstring count dictionaries for each QubitHamiltonian.
-        shots_list: List of number of shots used for each measurement.
+        hamiltonians (list[QubitHamiltonian]): List of QubitHamiltonian corresponding to the measurement data.
+        bitstring_counts (list[dict[str, int] | None] | None): Bitstring count dictionaries for each QubitHamiltonian.
+        shots_list (list[int] | None): List of number of shots used for each measurement.
 
     """
 
@@ -180,13 +189,13 @@ class MeasurementData(DataClass):
         hamiltonians: list[QubitHamiltonian],
         bitstring_counts: list[dict[str, int] | None] | None = None,
         shots_list: list[int] | None = None,
-    ):
+    ) -> None:
         """Initialize measurement data.
 
         Args:
-            hamiltonians: List of QubitHamiltonian objects.
-            bitstring_counts: List of bitstring count dictionaries for each QubitHamiltonian.
-            shots_list: List of number of shots used for each measurement.
+            hamiltonians (list[QubitHamiltonian]): List of QubitHamiltonian objects.
+            bitstring_counts (list[dict[str, int] | None] | None): Bitstring count dicts for each QubitHamiltonian.
+            shots_list (list[int] | None): List of number of shots used for each measurement.
 
         """
         Logger.trace_entering()
@@ -196,7 +205,12 @@ class MeasurementData(DataClass):
         super().__init__()
 
     def get_summary(self) -> str:
-        """Get a human-readable summary of the measurement data."""
+        """Get a human-readable summary of the measurement data.
+
+        Returns:
+            str: Summary string describing the measurement data.
+
+        """
         total_shots = sum(self.shots_list) if self.shots_list else 0
         return (
             f"Measurement Data\n"
@@ -206,7 +220,12 @@ class MeasurementData(DataClass):
         )
 
     def to_json(self) -> dict[str, Any]:
-        """Convert to dictionary for JSON serialization (DataClass interface)."""
+        """Convert measurement data to a dictionary for JSON serialization.
+
+        Returns:
+            dict[str, Any]: Dictionary representation of the measurement data.
+
+        """
         data = {
             str(i): {
                 "hamiltonian": {
@@ -223,9 +242,8 @@ class MeasurementData(DataClass):
     def to_hdf5(self, group: h5py.Group) -> None:
         """Save the measurement data to an HDF5 group.
 
-        Note:
-            This method is used internally when saving to HDF5 files.
-            Python users should call to_hdf5_file() directly.
+        Args:
+            group (h5py.Group): HDF5 group or file to write the measurement data to.
 
         """
         self._add_hdf5_version(group)
@@ -257,13 +275,13 @@ class MeasurementData(DataClass):
         """Create measurement data from a JSON dictionary.
 
         Args:
-            json_data: Dictionary containing the serialized data
+            json_data (dict[str, Any]): Dictionary containing the serialized data.
 
         Returns:
-            MeasurementData: New instance reconstructed from JSON data
+            MeasurementData: New instance reconstructed from JSON data.
 
         Raises:
-            RuntimeError: If version field is missing or incompatible
+            RuntimeError: If version field is missing or incompatible.
 
         """
         cls._validate_json_version(cls._serialization_version, json_data)
@@ -301,13 +319,13 @@ class MeasurementData(DataClass):
         """Load measurement data from an HDF5 group.
 
         Args:
-            group: HDF5 group or file containing the data
+            group (h5py.Group): HDF5 group or file containing the data.
 
         Returns:
-            MeasurementData: New instance reconstructed from HDF5 data
+            MeasurementData: New instance reconstructed from HDF5 data.
 
         Raises:
-            RuntimeError: If version attribute is missing or incompatible
+            RuntimeError: If version attribute is missing or incompatible.
 
         """
         cls._validate_hdf5_version(cls._serialization_version, group)

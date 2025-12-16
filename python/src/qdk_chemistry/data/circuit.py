@@ -8,6 +8,8 @@ Includes utilities for visualizing circuits with QDK widgets.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import Any
+
 import h5py
 import qsharp._native
 import qsharp.openqasm
@@ -73,11 +75,11 @@ class Circuit(DataClass):
         """Parse a Circuit object into a qsharp Circuit object with trimming options.
 
         Args:
-            remove_idle_qubits: If True, remove qubits that are idle (no gates applied).
-            remove_classical_qubits: If True, remove qubits with gates but bitstring outputs are deterministic (0 or 1).
+            remove_idle_qubits (bool): If True, remove qubits that are idle (no gates applied).
+            remove_classical_qubits (bool): If True, remove qubits with gates but deterministic bitstring outputs (0|1).
 
         Returns:
-            A qsharp Circuit object representing the trimmed circuit.
+            qsharp._native.Circuit: A qsharp Circuit object representing the trimmed circuit.
 
         """
         Logger.trace_entering()
@@ -89,11 +91,11 @@ class Circuit(DataClass):
         """Trim the quantum circuit by removing idle and classical qubits.
 
         Args:
-            remove_idle_qubits: If True, remove qubits that are idle (no gates applied).
-            remove_classical_qubits: If True, remove qubits with gates but bitstring outputs are deterministic (0 or 1).
+            remove_idle_qubits (bool): If True, remove qubits that are idle (no gates applied).
+            remove_classical_qubits (bool): If True, remove qubits with gates but deterministic bitstring outputs (0|1).
 
         Returns:
-            A trimmed circuit in QASM format.
+            str: A trimmed circuit in QASM format.
 
         """
         Logger.trace_entering()
@@ -164,14 +166,14 @@ class Circuit(DataClass):
             lines.append(f"  QASM string: {self.qasm}")
         return "\n".join(lines)
 
-    def to_json(self) -> dict:
+    def to_json(self) -> dict[str, Any]:
         """Convert the Circuit to a dictionary for JSON serialization.
 
         Returns:
-            dict: Dictionary representation of the quantum circuit.
+            dict[str, Any]: Dictionary representation of the quantum circuit.
 
         """
-        data: dict = {}
+        data: dict[str, Any] = {}
         if self.qasm is not None:
             data["qasm"] = self.qasm
         return self._add_json_version(data)
@@ -180,7 +182,7 @@ class Circuit(DataClass):
         """Save the Circuit to an HDF5 group.
 
         Args:
-            group: HDF5 group or file to write the quantum circuit to
+            group (h5py.Group): HDF5 group or file to write the quantum circuit to.
 
         """
         self._add_hdf5_version(group)
@@ -188,17 +190,17 @@ class Circuit(DataClass):
             group.attrs["qasm"] = self.qasm
 
     @classmethod
-    def from_json(cls, json_data: dict) -> "Circuit":
+    def from_json(cls, json_data: dict[str, Any]) -> "Circuit":
         """Create a Circuit from a JSON dictionary.
 
         Args:
-            json_data: Dictionary containing the serialized data
+            json_data (dict[str, Any]): Dictionary containing the serialized data.
 
         Returns:
-            Circuit: New instance of the Circuit
+            Circuit: New instance of the Circuit.
 
         Raises:
-            RuntimeError: If version field is missing or incompatible
+            RuntimeError: If version field is missing or incompatible.
 
         """
         cls._validate_json_version(cls._serialization_version, json_data)
@@ -211,13 +213,13 @@ class Circuit(DataClass):
         """Load a Circuit from an HDF5 group.
 
         Args:
-            group: HDF5 group or file to read data from
+            group (h5py.Group): HDF5 group or file to read data from.
 
         Returns:
-            Circuit: New instance of the Circuit
+            Circuit: New instance of the Circuit.
 
         Raises:
-            RuntimeError: If version attribute is missing or incompatible
+            RuntimeError: If version attribute is missing or incompatible.
 
         """
         cls._validate_hdf5_version(cls._serialization_version, group)

@@ -160,6 +160,8 @@ nitpick_ignore_regex = [
     (r"cpp:identifier", r"nlohmann.*"),
     (r"cpp:identifier", r"qcs.*"),
     (r"cpp:identifier", r".*::value"),
+    (r"cpp:identifier", r"fmt::format_string.*"),
+    (r"cpp:identifier", r"spdlog.*"),
     # C++20 concepts - Sphinx/Breathe doesn't fully support concept references yet
     (r"cpp:identifier", r"NonBoolIntegral<.*>"),
     (r"cpp:identifier", r"NonBoolIntegralVector<.*>"),
@@ -167,13 +169,15 @@ nitpick_ignore_regex = [
     (r"cpp:identifier", r"VariantMember<.*>"),
     (r"cpp:identifier", r"Vector<.*>"),
     (r"cpp:identifier", r"SupportedSettingType<.*>"),
-    (r"py:class", r"qsharp._qsharp.*"),
     (r"py:class", r"h5py.*"),
     (r"py:class", r"numpy.*"),
-    (r"py:class", r"qiskit_aer.*"),
-    (r"py:class", r"Circuit"),
+    (r"py:class", r"pathlib.*"),
     (r"py:class", r"pyscf.*"),
+    (r"py:class", r"qiskit.*"),
+    (r"py:class", r"qiskit_aer.*"),
     (r"py:class", r"qdk_chemistry._core.data.DataClass"),
+    (r"py:class", r"qsharp._native.*"),
+    (r"py:class", r"qsharp._qsharp.*"),
 ]
 
 # Configure output for to-dos

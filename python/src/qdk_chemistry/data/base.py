@@ -25,9 +25,9 @@ def _validate_filename_suffix(filename: str | Path, data_type: str, operation: s
     """Validate that filename has the correct data type suffix.
 
     Args:
-        filename: Filename to validate (e.g., "example.structure.json")
-        data_type: Expected data structure type (e.g., "structure")
-        operation: Operation type ("read" or "write") for error messages
+        filename (str | pathlib.Path): Filename to validate (e.g., "example.structure.json")
+        data_type (str): Expected data structure type (e.g., "structure")
+        operation (str): Operation type ("read" or "write") for error messages
 
     Returns:
         str: The original filename as string if valid
@@ -90,7 +90,7 @@ class DataClass(_CoreDataClass):
     2. _serialization_version class attribute (e.g., "0.1.0")
     3. get_summary() -> str
         Return a human-readable summary string of the object
-    4. to_json() -> dict
+    4. to_json() -> dict[str, Any]
         Return a dictionary representation suitable for JSON serialization
         Use _add_json_version() to include version information
     5. to_hdf5(group: h5py.Group) -> None
@@ -139,7 +139,7 @@ class DataClass(_CoreDataClass):
         """Provide dynamic access to 'get_' prefixed methods as properties.
 
         Args:
-            name: Attribute name
+            name (str): Attribute name
 
         Returns:
             Any: Value returned by the corresponding 'get_' method
@@ -157,8 +157,8 @@ class DataClass(_CoreDataClass):
         """Prevent attribute modification after initialization.
 
         Args:
-            name: Attribute name
-            value: Attribute value
+            name (str): Attribute name
+            value (Any): Attribute value
 
         Raises:
             AttributeError: If attempting to modify after initialization
@@ -172,7 +172,7 @@ class DataClass(_CoreDataClass):
         """Prevent attribute deletion.
 
         Args:
-            name: Attribute name
+            name (str): Attribute name
 
         Raises:
             AttributeError: Always, as deletion is not allowed
@@ -199,10 +199,10 @@ class DataClass(_CoreDataClass):
         """Add version field to JSON data.
 
         Args:
-            data: Dictionary to add version to
+            data (dict[str, Any]): Dictionary to add version to
 
         Returns:
-            dict: The same dictionary with version added
+            dict[str, Any]: The same dictionary with version added
 
         """
         if self._serialization_version is None:
@@ -215,7 +215,7 @@ class DataClass(_CoreDataClass):
         """Add version attribute to HDF5 group if class defines a version.
 
         Args:
-            group: HDF5 group or file to add version to
+            group (h5py.Group): HDF5 group or file to add version to
 
         """
         if self._serialization_version is None:
@@ -228,8 +228,8 @@ class DataClass(_CoreDataClass):
         """Validate serialization version in JSON data.
 
         Args:
-            expected_version: The expected version string
-            json_data: Dictionary containing the serialized data
+            expected_version (str): The expected version string
+            json_data (dict[str, Any]): Dictionary containing the serialized data
 
         Raises:
             RuntimeError: If version field is missing or incompatible
@@ -244,8 +244,8 @@ class DataClass(_CoreDataClass):
         """Validate serialization version in HDF5 group.
 
         Args:
-            expected_version: The expected version string
-            group: HDF5 group containing the serialized data
+            expected_version (str): The expected version string
+            group (h5py.Group): HDF5 group containing the serialized data
 
         Raises:
             RuntimeError: If version attribute is missing or incompatible
@@ -259,7 +259,7 @@ class DataClass(_CoreDataClass):
         """Convert the object to a dictionary.
 
         Returns:
-            dict: Dictionary representation of the object
+            dict[str, Any]: Dictionary representation of the object
 
         """
         return self.to_json()
@@ -268,7 +268,7 @@ class DataClass(_CoreDataClass):
         """Convert the object to a dictionary for JSON serialization.
 
         Returns:
-            dict: Dictionary representation of the object
+            dict[str, Any]: Dictionary representation of the object
 
         Note:
             This method must be implemented by derived classes.
@@ -285,7 +285,7 @@ class DataClass(_CoreDataClass):
         """Save the object to an HDF5 group.
 
         Args:
-            group: HDF5 group or file to write data to
+            group (h5py.Group): HDF5 group or file to write data to
 
         Note:
             This method must be implemented by derived classes.
@@ -302,7 +302,7 @@ class DataClass(_CoreDataClass):
         """Save the object to a JSON file.
 
         Args:
-            filename: Path to the output JSON file
+            filename (str | pathlib.Path): Path to the output JSON file
 
                 Must match pattern: <name>.<data_type>.json
 
@@ -319,7 +319,7 @@ class DataClass(_CoreDataClass):
         """Save the object to an HDF5 file.
 
         Args:
-            filename: Path to the output HDF5 file
+            filename (str | pathlib.Path): Path to the output HDF5 file
 
                 Must match pattern: <name>.<data_type>.h5 or <name>.<data_type>.hdf5
 
@@ -336,11 +336,11 @@ class DataClass(_CoreDataClass):
         """Save the object to a file with the specified format.
 
         Args:
-            filename: Path to the output file
+            filename (str | pathlib.Path): Path to the output file
 
                 Must match pattern: <name>.<data_type>.<extension>
 
-            format_type: Format type ("json", "hdf5", or "h5")
+            format_type (str): Format type ("json", "hdf5", or "h5")
 
         Raises:
             ValueError: If format_type is not supported or filename doesn't match required pattern
@@ -360,7 +360,7 @@ class DataClass(_CoreDataClass):
         """Create an instance from a dictionary.
 
         Args:
-            dict_data: Dictionary containing the serialized data
+            dict_data (dict[str, Any]): Dictionary containing the serialized data
 
         Returns:
             DataClass: New instance of the derived class
@@ -373,7 +373,7 @@ class DataClass(_CoreDataClass):
         """Create an instance from a JSON dictionary.
 
         Args:
-            json_data: Dictionary containing the serialized data
+            json_data (dict[str, Any]): Dictionary containing the serialized data
 
         Returns:
             DataClass: New instance of the derived class
@@ -390,7 +390,7 @@ class DataClass(_CoreDataClass):
         """Load an instance from a JSON file.
 
         Args:
-            filename: Path to the input JSON file
+            filename (str | pathlib.Path): Path to the input JSON file
 
                 Must match pattern: <name>.<data_type>.json
 
@@ -412,7 +412,7 @@ class DataClass(_CoreDataClass):
         """Load an instance from an HDF5 group.
 
         Args:
-            group: HDF5 group or file to read data from
+            group (h5py.Group): HDF5 group or file to read data from
 
         Returns:
             DataClass: New instance of the derived class
@@ -431,7 +431,7 @@ class DataClass(_CoreDataClass):
         """Load an instance from an HDF5 file.
 
         Args:
-            filename: Path to the input HDF5 file
+            filename (str | pathlib.Path): Path to the input HDF5 file
 
                 Must match pattern: <name>.<data_type>.h5 or <name>.<data_type>.hdf5
 
@@ -452,11 +452,11 @@ class DataClass(_CoreDataClass):
         """Load an instance from a file with the specified format.
 
         Args:
-            filename: Path to the input file
+            filename (str | pathlib.Path): Path to the input file
 
                 Must match pattern: <name>.<data_type>.<extension>
 
-            format_type: Format type ("json", "hdf5", or "h5")
+            format_type (str): Format type ("json", "hdf5", or "h5")
 
         Returns:
             DataClass: New instance of the derived class
