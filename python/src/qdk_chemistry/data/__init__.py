@@ -18,6 +18,7 @@ Exposed classes are:
 - :class:`Element`: Represents a chemical element with its properties.
 - :class:`EnergyExpectationResult`: Result for Hamiltonian energy expectation value and variance.
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
+- :class:`HamiltonianContainer`: Abstract base class for Hamiltonian container implementations.
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitHamiltonian objects.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
 - :class:`MP2Container`: Container for MP2 wavefunction with Hamiltonian reference and optional amplitudes.
@@ -55,12 +56,14 @@ from qdk_chemistry._core.data import (
     Ansatz,
     AOType,
     BasisSet,
+    Canonical4CenterHamiltonian,
     CasWavefunctionContainer,
     Configuration,
     CoupledClusterContainer,
     ElectronicStructureSettings,
     Element,
     Hamiltonian,
+    HamiltonianContainer,
     HamiltonianType,
     ModelOrbitals,
     MP2Container,
@@ -99,6 +102,7 @@ __all__ = [
     "AOType",
     "Ansatz",
     "BasisSet",
+    "Canonical4CenterHamiltonian",
     "CasWavefunctionContainer",
     "Circuit",
     "Configuration",
@@ -108,6 +112,7 @@ __all__ = [
     "Element",
     "EnergyExpectationResult",
     "Hamiltonian",
+    "HamiltonianContainer",
     "HamiltonianType",
     "MP2Container",
     "MeasurementData",

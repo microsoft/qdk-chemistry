@@ -7,8 +7,8 @@
 #include <iostream>
 #include <macis/util/fcidump.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/canonical_4_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
-#include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
@@ -20,29 +20,12 @@
 
 namespace qdk::chemistry::data {
 
-Hamiltonian::Hamiltonian(const Hamiltonian& other)
-    : _one_body_integrals(other._one_body_integrals),
-      _two_body_integrals(other._two_body_integrals),
-      _inactive_fock_matrix(other._inactive_fock_matrix),
-      _orbitals(other._orbitals),
-      _core_energy(other._core_energy),
-      _type(other._type) {
-  QDK_LOG_TRACE_ENTERING();
-  if (!_is_valid()) {
-    throw std::invalid_argument(
-        "Tried to generate invalid Hamiltonian object.");
-  }
-}
-
-Hamiltonian::Hamiltonian(const Eigen::MatrixXd& one_body_integrals,
-                         const Eigen::VectorXd& two_body_integrals,
-                         std::shared_ptr<Orbitals> orbitals, double core_energy,
-                         const Eigen::MatrixXd& inactive_fock_matrix,
-                         HamiltonianType type)
+HamiltonianContainer::HamiltonianContainer(
+    const Eigen::MatrixXd& one_body_integrals,
+    std::shared_ptr<Orbitals> orbitals, double core_energy,
+    const Eigen::MatrixXd& inactive_fock_matrix, HamiltonianType type)
     : _one_body_integrals(
           make_restricted_one_body_integrals(one_body_integrals)),
-      _two_body_integrals(
-          make_restricted_two_body_integrals(two_body_integrals)),
       _inactive_fock_matrix(
           make_restricted_inactive_fock_matrix(inactive_fock_matrix)),
       _orbitals(orbitals),
@@ -53,37 +36,22 @@ Hamiltonian::Hamiltonian(const Eigen::MatrixXd& one_body_integrals,
     throw std::invalid_argument("Orbitals pointer cannot be nullptr");
   }
 
-  validate_integral_dimensions();
-  validate_restrictedness_consistency();
-  validate_active_space_dimensions();
-
   // Validate that orbitals have the necessary data
   if (!orbitals->has_active_space()) {
     throw std::runtime_error(
-        "Orbitals must have an active space set for Hamiltonian");
-  }
-  if (!_is_valid()) {
-    throw std::invalid_argument(
-        "Tried to generate invalid Hamiltonian object.");
+        "Orbitals must have an active space set for HamiltonianContainer");
   }
 }
 
-Hamiltonian::Hamiltonian(const Eigen::MatrixXd& one_body_integrals_alpha,
-                         const Eigen::MatrixXd& one_body_integrals_beta,
-                         const Eigen::VectorXd& two_body_integrals_aaaa,
-                         const Eigen::VectorXd& two_body_integrals_aabb,
-                         const Eigen::VectorXd& two_body_integrals_bbbb,
-                         std::shared_ptr<Orbitals> orbitals, double core_energy,
-                         const Eigen::MatrixXd& inactive_fock_matrix_alpha,
-                         const Eigen::MatrixXd& inactive_fock_matrix_beta,
-                         HamiltonianType type)
+HamiltonianContainer::HamiltonianContainer(
+    const Eigen::MatrixXd& one_body_integrals_alpha,
+    const Eigen::MatrixXd& one_body_integrals_beta,
+    std::shared_ptr<Orbitals> orbitals, double core_energy,
+    const Eigen::MatrixXd& inactive_fock_matrix_alpha,
+    const Eigen::MatrixXd& inactive_fock_matrix_beta, HamiltonianType type)
     : _one_body_integrals(
           std::make_unique<Eigen::MatrixXd>(one_body_integrals_alpha),
           std::make_unique<Eigen::MatrixXd>(one_body_integrals_beta)),
-      _two_body_integrals(
-          std::make_unique<Eigen::VectorXd>(two_body_integrals_aaaa),
-          std::make_unique<Eigen::VectorXd>(two_body_integrals_aabb),
-          std::make_unique<Eigen::VectorXd>(two_body_integrals_bbbb)),
       _inactive_fock_matrix(
           std::make_unique<Eigen::MatrixXd>(inactive_fock_matrix_alpha),
           std::make_unique<Eigen::MatrixXd>(inactive_fock_matrix_beta)),
@@ -95,50 +63,32 @@ Hamiltonian::Hamiltonian(const Eigen::MatrixXd& one_body_integrals_alpha,
     throw std::invalid_argument("Orbitals pointer cannot be nullptr");
   }
 
-  validate_integral_dimensions();
-  validate_restrictedness_consistency();
-  validate_active_space_dimensions();
-
   // Validate that orbitals have the necessary data
   if (!orbitals->has_active_space()) {
     throw std::runtime_error(
-        "Orbitals must have an active space set for Hamiltonian");
+        "Orbitals must have an active space set for HamiltonianContainer");
   }
-  if (!_is_valid()) {
-    throw std::invalid_argument(
-        "Tried to generate invalid Hamiltonian object.");
-  }
-}
-
-Hamiltonian& Hamiltonian::operator=(const Hamiltonian& other) {
-  QDK_LOG_TRACE_ENTERING();
-  if (this != &other) {
-    // Since all members are const, we need to use placement new
-    this->~Hamiltonian();
-    new (this) Hamiltonian(other);
-  }
-  return *this;
 }
 
 std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
-Hamiltonian::get_one_body_integrals() const {
+HamiltonianContainer::get_one_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_one_body_integrals()) {
     throw std::runtime_error("One-body integrals are not set");
   }
-  return std::make_tuple(std::cref(*std::get<0>(_one_body_integrals)),
-                         std::cref(*std::get<1>(_one_body_integrals)));
+  return std::make_tuple(std::cref(*_one_body_integrals.first),
+                         std::cref(*_one_body_integrals.second));
 }
 
-bool Hamiltonian::has_one_body_integrals() const {
+bool HamiltonianContainer::has_one_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   return _one_body_integrals.first != nullptr &&
          _one_body_integrals.first->rows() > 0 &&
          _one_body_integrals.first->cols() > 0;
 }
 
-double Hamiltonian::get_one_body_element(unsigned i, unsigned j,
-                                         SpinChannel channel) const {
+double HamiltonianContainer::get_one_body_element(unsigned i, unsigned j,
+                                                  SpinChannel channel) const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_one_body_integrals()) {
     throw std::runtime_error("One-body integrals are not set");
@@ -161,19 +111,7 @@ double Hamiltonian::get_one_body_element(unsigned i, unsigned j,
   }
 }
 
-std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
-           const Eigen::VectorXd&>
-Hamiltonian::get_two_body_integrals() const {
-  QDK_LOG_TRACE_ENTERING();
-  if (!has_two_body_integrals()) {
-    throw std::runtime_error("Two-body integrals are not set");
-  }
-  return std::make_tuple(std::cref(*std::get<0>(_two_body_integrals)),
-                         std::cref(*std::get<1>(_two_body_integrals)),
-                         std::cref(*std::get<2>(_two_body_integrals)));
-}
-
-bool Hamiltonian::has_inactive_fock_matrix() const {
+bool HamiltonianContainer::has_inactive_fock_matrix() const {
   QDK_LOG_TRACE_ENTERING();
   bool has_alpha = _inactive_fock_matrix.first != nullptr &&
                    _inactive_fock_matrix.first->size() > 0;
@@ -182,42 +120,8 @@ bool Hamiltonian::has_inactive_fock_matrix() const {
   return has_alpha && has_beta;
 }
 
-double Hamiltonian::get_two_body_element(unsigned i, unsigned j, unsigned k,
-                                         unsigned l,
-                                         SpinChannel channel) const {
-  QDK_LOG_TRACE_ENTERING();
-  if (!has_two_body_integrals()) {
-    throw std::runtime_error("Two-body integrals are not set");
-  }
-
-  size_t norb = _orbitals->get_active_space_indices().first.size();
-  if (i >= norb || j >= norb || k >= norb || l >= norb) {
-    throw std::out_of_range("Orbital index out of range");
-  }
-
-  size_t index = get_two_body_index(i, j, k, l);
-
-  // Select the appropriate integral based on spin channel
-  switch (channel) {
-    case SpinChannel::aaaa:
-      return (*std::get<0>(_two_body_integrals))[index];
-    case SpinChannel::aabb:
-      return (*std::get<1>(_two_body_integrals))[index];
-    case SpinChannel::bbbb:
-      return (*std::get<2>(_two_body_integrals))[index];
-    default:
-      throw std::invalid_argument("Invalid spin channel");
-  }
-}
-
-bool Hamiltonian::has_two_body_integrals() const {
-  QDK_LOG_TRACE_ENTERING();
-  return std::get<0>(_two_body_integrals) != nullptr &&
-         std::get<0>(_two_body_integrals)->size() > 0;
-}
-
 std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
-Hamiltonian::get_inactive_fock_matrix() const {
+HamiltonianContainer::get_inactive_fock_matrix() const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_inactive_fock_matrix()) {
     throw std::runtime_error("Inactive Fock matrix is not set");
@@ -225,7 +129,7 @@ Hamiltonian::get_inactive_fock_matrix() const {
   return {*_inactive_fock_matrix.first, *_inactive_fock_matrix.second};
 }
 
-const std::shared_ptr<Orbitals> Hamiltonian::get_orbitals() const {
+const std::shared_ptr<Orbitals> HamiltonianContainer::get_orbitals() const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_orbitals()) {
     throw std::runtime_error("Orbitals are not set");
@@ -233,64 +137,37 @@ const std::shared_ptr<Orbitals> Hamiltonian::get_orbitals() const {
   return _orbitals;
 }
 
-bool Hamiltonian::has_orbitals() const {
+bool HamiltonianContainer::has_orbitals() const {
   QDK_LOG_TRACE_ENTERING();
   return _orbitals != nullptr;
 }
 
-double Hamiltonian::get_core_energy() const {
+double HamiltonianContainer::get_core_energy() const {
   QDK_LOG_TRACE_ENTERING();
   return _core_energy;
 }
 
-HamiltonianType Hamiltonian::get_type() const {
+HamiltonianType HamiltonianContainer::get_type() const {
   QDK_LOG_TRACE_ENTERING();
   return _type;
 }
 
-bool Hamiltonian::is_hermitian() const {
+bool HamiltonianContainer::is_hermitian() const {
   QDK_LOG_TRACE_ENTERING();
   return _type == HamiltonianType::Hermitian;
 }
 
-bool Hamiltonian::is_restricted() const {
-  QDK_LOG_TRACE_ENTERING();
-  // Hamiltonian is restricted if alpha and beta components point to the same
-  // data
-  return (_one_body_integrals.first == _one_body_integrals.second) &&
-         (std::get<0>(_two_body_integrals) ==
-          std::get<1>(_two_body_integrals)) &&
-         (std::get<0>(_two_body_integrals) ==
-          std::get<2>(_two_body_integrals)) &&
-         (_inactive_fock_matrix.first == _inactive_fock_matrix.second ||
-          (!_inactive_fock_matrix.first && !_inactive_fock_matrix.second));
-}
-
-bool Hamiltonian::is_unrestricted() const {
+bool HamiltonianContainer::is_unrestricted() const {
   QDK_LOG_TRACE_ENTERING();
   return !is_restricted();
 }
 
-bool Hamiltonian::_is_valid() const {
+void HamiltonianContainer::validate_integral_dimensions() const {
+  // assume the container base has one-body integrals only, expect derived
+  // classes to work on the two-body integrals
+
   QDK_LOG_TRACE_ENTERING();
-  // Check if essential data is present
-  if (!has_one_body_integrals() || !has_two_body_integrals()) {
-    return false;
-  }
-
-  // Check dimension consistency
-  try {
-    validate_integral_dimensions();
-  } catch (const std::exception&) {
-    return false;
-  }
-
-  return true;
-}
-
-void Hamiltonian::validate_integral_dimensions() const {
-  QDK_LOG_TRACE_ENTERING();
-  if (!has_one_body_integrals() || !has_two_body_integrals()) {
+  if (!has_one_body_integrals()) {
     return;
   }
 
@@ -318,39 +195,9 @@ void Hamiltonian::validate_integral_dimensions() const {
           "Alpha and beta one-body integrals must have same dimensions");
     }
   }
-
-  // Check two-body integrals dimensions
-  unsigned expected_size = norb_alpha * norb_alpha * norb_alpha * norb_alpha;
-
-  // Check alpha-alpha integrals
-  if (static_cast<unsigned>(std::get<0>(_two_body_integrals)->size()) !=
-      expected_size) {
-    throw std::invalid_argument(
-        "Alpha-alpha two-body integrals size (" +
-        std::to_string(std::get<0>(_two_body_integrals)->size()) +
-        ") does not match expected size (" + std::to_string(expected_size) +
-        ") for " + std::to_string(norb_alpha) + " orbitals");
-  }
-
-  // Check alpha-beta integrals (if different from alpha-alpha)
-  if (std::get<1>(_two_body_integrals) != std::get<0>(_two_body_integrals)) {
-    if (static_cast<unsigned>(std::get<1>(_two_body_integrals)->size()) !=
-        expected_size) {
-      throw std::invalid_argument(
-          "Alpha-beta two-body integrals size mismatch");
-    }
-  }
-
-  // Check beta-beta integrals (if different from alpha-alpha)
-  if (std::get<2>(_two_body_integrals) != std::get<0>(_two_body_integrals)) {
-    if (static_cast<unsigned>(std::get<2>(_two_body_integrals)->size()) !=
-        expected_size) {
-      throw std::invalid_argument("Beta-beta two-body integrals size mismatch");
-    }
-  }
 }
 
-void Hamiltonian::validate_restrictedness_consistency() const {
+void HamiltonianContainer::validate_restrictedness_consistency() const {
   QDK_LOG_TRACE_ENTERING();
   if (!_orbitals) return;
 
@@ -366,7 +213,7 @@ void Hamiltonian::validate_restrictedness_consistency() const {
   }
 }
 
-void Hamiltonian::validate_active_space_dimensions() const {
+void HamiltonianContainer::validate_active_space_dimensions() const {
   QDK_LOG_TRACE_ENTERING();
   if (!_orbitals || !_orbitals->has_active_space()) return;
 
@@ -400,15 +247,8 @@ void Hamiltonian::validate_active_space_dimensions() const {
   }
 }
 
-size_t Hamiltonian::get_two_body_index(size_t i, size_t j, size_t k,
-                                       size_t l) const {
-  QDK_LOG_TRACE_ENTERING();
-  size_t norb = _orbitals->get_active_space_indices().first.size();
-  return i * norb * norb * norb + j * norb * norb + k * norb + l;
-}
-
 std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
-Hamiltonian::make_restricted_one_body_integrals(
+HamiltonianContainer::make_restricted_one_body_integrals(
     const Eigen::MatrixXd& integrals) {
   QDK_LOG_TRACE_ENTERING();
   auto shared_integrals = std::make_shared<Eigen::MatrixXd>(integrals);
@@ -417,19 +257,8 @@ Hamiltonian::make_restricted_one_body_integrals(
       shared_integrals);  // Both alpha and beta point to same data
 }
 
-std::tuple<std::shared_ptr<Eigen::VectorXd>, std::shared_ptr<Eigen::VectorXd>,
-           std::shared_ptr<Eigen::VectorXd>>
-Hamiltonian::make_restricted_two_body_integrals(
-    const Eigen::VectorXd& integrals) {
-  QDK_LOG_TRACE_ENTERING();
-  auto shared_integrals = std::make_shared<Eigen::VectorXd>(integrals);
-  return std::make_tuple(
-      shared_integrals, shared_integrals,
-      shared_integrals);  // aaaa, aabb, bbbb all point to same data
-}
-
 std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
-Hamiltonian::make_restricted_inactive_fock_matrix(
+HamiltonianContainer::make_restricted_inactive_fock_matrix(
     const Eigen::MatrixXd& matrix) {
   QDK_LOG_TRACE_ENTERING();
   auto shared_matrix = std::make_shared<Eigen::MatrixXd>(matrix);
@@ -440,8 +269,8 @@ Hamiltonian::make_restricted_inactive_fock_matrix(
 std::string Hamiltonian::get_summary() const {
   QDK_LOG_TRACE_ENTERING();
   std::string summary = "Hamiltonian Summary:\n";
-  size_t num_molecular_orbitals = _orbitals->get_num_molecular_orbitals();
-  size_t norb = _orbitals->get_active_space_indices().first.size();
+  size_t num_molecular_orbitals = get_orbitals()->get_num_molecular_orbitals();
+  size_t norb = get_orbitals()->get_active_space_indices().first.size();
   summary += "  Type: ";
   summary += (is_hermitian() ? "Hermitian" : "NonHermitian");
   summary += "\n";
@@ -518,6 +347,50 @@ std::string Hamiltonian::get_summary() const {
   return summary;
 }
 
+std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_json(
+    const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
+  if (!j.contains("container_type")) {
+    throw std::runtime_error("JSON missing required 'container_type' field");
+  }
+
+  std::string container_type = j["container_type"];
+
+  // Forward to appropriate container implementation
+  if (container_type == "canonical_4_center") {
+    return Canonical4CenterHamiltonian::from_json(j);
+  } else {
+    throw std::runtime_error("Unknown container type: " + container_type);
+  }
+}
+
+std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_hdf5(
+    H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
+  try {
+    // Read container type identifier
+    if (!group.attrExists("container_type")) {
+      throw std::runtime_error(
+          "HDF5 group missing required 'container_type' attribute");
+    }
+
+    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
+    H5::Attribute type_attr = group.openAttribute("container_type");
+    std::string container_type;
+    type_attr.read(string_type, container_type);
+
+    // Forward to appropriate container implementation
+    if (container_type == "canonical_4_center") {
+      return Canonical4CenterHamiltonian::from_hdf5(group);
+    } else {
+      throw std::runtime_error("Unknown container type: " + container_type);
+    }
+
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
+}
+
 void Hamiltonian::to_file(const std::string& filename,
                           const std::string& type) const {
   QDK_LOG_TRACE_ENTERING();
@@ -589,7 +462,7 @@ void Hamiltonian::to_fcidump_file(const std::string& filename, size_t nalpha,
   std::string validated_filename =
       DataTypeFilename::validate_write_suffix(filename, "hamiltonian");
 
-  _to_fcidump_file(validated_filename, nalpha, nbeta);
+  _container->to_fcidump_file(validated_filename, nalpha, nbeta);
 }
 
 void Hamiltonian::_to_json_file(const std::string& filename) const {
@@ -634,119 +507,14 @@ nlohmann::json Hamiltonian::to_json() const {
   // Store version first
   j["version"] = SERIALIZATION_VERSION;
 
-  // Store metadata
-  j["core_energy"] = _core_energy;
+  j["container_type"] = _container->get_container_type();
+
   j["type"] =
-      (_type == HamiltonianType::Hermitian) ? "Hermitian" : "NonHermitian";
+      (get_type() == HamiltonianType::Hermitian) ? "Hermitian" : "NonHermitian";
 
-  // Store restrictedness information
-  j["is_restricted"] = is_restricted();
-
-  // Store one-body integrals
-  if (has_one_body_integrals()) {
-    j["has_one_body_integrals"] = true;
-
-    // Store alpha one-body integrals
-    std::vector<std::vector<double>> one_body_alpha_vec;
-    for (int i = 0; i < _one_body_integrals.first->rows(); ++i) {
-      std::vector<double> row;
-      for (int j_idx = 0; j_idx < _one_body_integrals.first->cols(); ++j_idx) {
-        row.push_back((*_one_body_integrals.first)(i, j_idx));
-      }
-      one_body_alpha_vec.push_back(row);
-    }
-    j["one_body_integrals_alpha"] = one_body_alpha_vec;
-
-    // Store beta one-body integrals (only if unrestricted)
-    if (is_unrestricted()) {
-      std::vector<std::vector<double>> one_body_beta_vec;
-      for (int i = 0; i < _one_body_integrals.second->rows(); ++i) {
-        std::vector<double> row;
-        for (int j_idx = 0; j_idx < _one_body_integrals.second->cols();
-             ++j_idx) {
-          row.push_back((*_one_body_integrals.second)(i, j_idx));
-        }
-        one_body_beta_vec.push_back(row);
-      }
-      j["one_body_integrals_beta"] = one_body_beta_vec;
-    }
-  } else {
-    j["has_one_body_integrals"] = false;
-  }
-
-  // Store two-body integrals
-  if (has_two_body_integrals()) {
-    j["has_two_body_integrals"] = true;
-
-    // Store as object {"aaaa": [...], "aabb": [...], "bbbb": [...]}
-    nlohmann::json two_body_obj;
-
-    // Store aaaa
-    std::vector<double> two_body_aaaa_vec;
-    for (int i = 0; i < std::get<0>(_two_body_integrals)->size(); ++i) {
-      two_body_aaaa_vec.push_back((*std::get<0>(_two_body_integrals))(i));
-    }
-    two_body_obj["aaaa"] = two_body_aaaa_vec;
-
-    // Store aabb
-    std::vector<double> two_body_aabb_vec;
-    for (int i = 0; i < std::get<1>(_two_body_integrals)->size(); ++i) {
-      two_body_aabb_vec.push_back((*std::get<1>(_two_body_integrals))(i));
-    }
-    two_body_obj["aabb"] = two_body_aabb_vec;
-
-    // Store bbbb
-    std::vector<double> two_body_bbbb_vec;
-    for (int i = 0; i < std::get<2>(_two_body_integrals)->size(); ++i) {
-      two_body_bbbb_vec.push_back((*std::get<2>(_two_body_integrals))(i));
-    }
-    two_body_obj["bbbb"] = two_body_bbbb_vec;
-
-    j["two_body_integrals"] = two_body_obj;
-  } else {
-    j["has_two_body_integrals"] = false;
-  }
-
-  // Store inactive Fock matrix
-  if (has_inactive_fock_matrix()) {
-    j["has_inactive_fock_matrix"] = true;
-
-    // Store alpha inactive Fock matrix
-    std::vector<std::vector<double>> inactive_fock_alpha_vec;
-    for (int i = 0; i < _inactive_fock_matrix.first->rows(); ++i) {
-      std::vector<double> row;
-      for (int j_idx = 0; j_idx < _inactive_fock_matrix.first->cols();
-           ++j_idx) {
-        row.push_back((*_inactive_fock_matrix.first)(i, j_idx));
-      }
-      inactive_fock_alpha_vec.push_back(row);
-    }
-    j["inactive_fock_matrix_alpha"] = inactive_fock_alpha_vec;
-
-    // Store beta inactive Fock matrix (only if unrestricted)
-    if (is_unrestricted()) {
-      std::vector<std::vector<double>> inactive_fock_beta_vec;
-      for (int i = 0; i < _inactive_fock_matrix.second->rows(); ++i) {
-        std::vector<double> row;
-        for (int j_idx = 0; j_idx < _inactive_fock_matrix.second->cols();
-             ++j_idx) {
-          row.push_back((*_inactive_fock_matrix.second)(i, j_idx));
-        }
-        inactive_fock_beta_vec.push_back(row);
-      }
-      j["inactive_fock_matrix_beta"] = inactive_fock_beta_vec;
-    }
-  } else {
-    j["has_inactive_fock_matrix"] = false;
-  }
-
-  // Store orbital data
-  if (has_orbitals()) {
-    j["has_orbitals"] = true;
-    j["orbitals"] = _orbitals->to_json();
-  } else {
-    j["has_orbitals"] = false;
-  }
+  // Delegate to container serialization (orbitals are included within the
+  // container)
+  j["container"] = _container->to_json();
 
   return j;
 }
@@ -760,147 +528,14 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_json(const nlohmann::json& j) {
     }
     validate_serialization_version(SERIALIZATION_VERSION, j["version"]);
 
-    // Load metadata
-    double core_energy = j.value("core_energy", 0.0);
-
-    // Load Hamiltonian type
-    HamiltonianType type = HamiltonianType::Hermitian;
-    if (j.contains("type")) {
-      std::string type_str = j["type"].get<std::string>();
-      if (type_str == "NonHermitian") {
-        type = HamiltonianType::NonHermitian;
-      }
+    // Load container using factory method (orbitals are loaded internally by
+    // the container)
+    if (!j.contains("container")) {
+      throw std::runtime_error("JSON missing required 'container' field");
     }
 
-    // Determine if the saved Hamiltonian was restricted or unrestricted
-    bool is_restricted_data = j.value("is_restricted", true);
-
-    // Helper function to load matrix from JSON
-    auto load_matrix =
-        [](const nlohmann::json& matrix_json) -> Eigen::MatrixXd {
-      auto matrix_vec = matrix_json.get<std::vector<std::vector<double>>>();
-      int rows = matrix_vec.size();
-      int cols = rows > 0 ? matrix_vec[0].size() : 0;
-      Eigen::MatrixXd matrix(rows, cols);
-      for (int i = 0; i < rows; ++i) {
-        for (int j_idx = 0; j_idx < cols; ++j_idx) {
-          matrix(i, j_idx) = matrix_vec[i][j_idx];
-        }
-      }
-      return matrix;
-    };
-
-    // Helper function to load vector from JSON
-    auto load_vector =
-        [](const nlohmann::json& vector_json) -> Eigen::VectorXd {
-      auto vector_vec = vector_json.get<std::vector<double>>();
-      Eigen::VectorXd vector(vector_vec.size());
-      for (size_t i = 0; i < vector_vec.size(); ++i) {
-        vector(i) = vector_vec[i];
-      }
-      return vector;
-    };
-
-    // Load one-body integrals
-    Eigen::MatrixXd one_body_alpha, one_body_beta;
-    if (j.value("has_one_body_integrals", false)) {
-      if (j.contains("one_body_integrals_alpha")) {
-        one_body_alpha = load_matrix(j["one_body_integrals_alpha"]);
-      }
-
-      if (is_restricted_data) {
-        one_body_beta = one_body_alpha;
-      } else if (j.contains("one_body_integrals_beta")) {
-        one_body_beta = load_matrix(j["one_body_integrals_beta"]);
-      } else {
-        throw std::runtime_error("Should have beta integrals, if unrestricted");
-      }
-    }
-
-    // Load two-body integrals
-    Eigen::VectorXd two_body_aaaa, two_body_aabb, two_body_bbbb;
-    bool has_two_body = j.value("has_two_body_integrals", false);
-    if (has_two_body) {
-      if (!j.contains("two_body_integrals")) {
-        throw std::runtime_error("Two-body integrals data not found in JSON");
-      }
-
-      auto two_body_obj = j["two_body_integrals"];
-      if (!two_body_obj.is_object()) {
-        throw std::runtime_error(
-            "two_body_integrals must be an object with aaaa, aabb, bbbb keys");
-      }
-
-      if (!two_body_obj.contains("aaaa") || !two_body_obj.contains("aabb") ||
-          !two_body_obj.contains("bbbb")) {
-        throw std::runtime_error(
-            "two_body_integrals must contain aaaa, aabb, and bbbb keys");
-      }
-
-      two_body_aaaa = load_vector(two_body_obj["aaaa"]);
-      two_body_aabb = load_vector(two_body_obj["aabb"]);
-      two_body_bbbb = load_vector(two_body_obj["bbbb"]);
-    }
-
-    // Load inactive Fock matrix
-    Eigen::MatrixXd inactive_fock_alpha, inactive_fock_beta;
-    bool has_inactive_fock = j.value("has_inactive_fock_matrix", false);
-    if (has_inactive_fock) {
-      if (j.contains("inactive_fock_matrix_alpha")) {
-        inactive_fock_alpha = load_matrix(j["inactive_fock_matrix_alpha"]);
-      }
-
-      if (is_restricted_data) {
-        inactive_fock_beta = inactive_fock_alpha;
-      } else if (j.contains("inactive_fock_matrix_beta")) {
-        inactive_fock_beta = load_matrix(j["inactive_fock_matrix_beta"]);
-      }
-    }
-
-    // Load orbital data
-    if (!j.value("has_orbitals", false)) {
-      throw std::runtime_error("Hamiltonian JSON must include orbitals data");
-    }
-    auto orbitals = Orbitals::from_json(j["orbitals"]);
-
-    // Validate consistency: if orbitals have inactive indices,
-    // then inactive fock matrix must be present
-    if (orbitals->has_inactive_space()) {
-      if (!has_inactive_fock) {
-        auto inactive_indices = orbitals->get_inactive_space_indices();
-        size_t total_inactive =
-            inactive_indices.first.size() + inactive_indices.second.size();
-        throw std::runtime_error(
-            "Hamiltonian JSON: orbitals have " +
-            std::to_string(total_inactive) +
-            " inactive indices but no inactive Fock matrix is provided");
-      }
-      // Core energy should be explicitly set when there are inactive orbitals
-      if (!j.contains("core_energy")) {
-        auto inactive_indices = orbitals->get_inactive_space_indices();
-        size_t total_inactive =
-            inactive_indices.first.size() + inactive_indices.second.size();
-        throw std::runtime_error(
-            "Hamiltonian JSON: orbitals have " +
-            std::to_string(total_inactive) +
-            " inactive indices but no core energy is provided");
-      }
-    }
-
-    // Create and return appropriate Hamiltonian using the correct constructor
-    if (is_restricted_data) {
-      // Use restricted constructor - it will create shared pointers internally
-      // so alpha and beta point to the same data
-      return std::make_shared<Hamiltonian>(one_body_alpha, two_body_aaaa,
-                                           orbitals, core_energy,
-                                           inactive_fock_alpha, type);
-    } else {
-      // Use unrestricted constructor with separate alpha and beta data
-      return std::make_shared<Hamiltonian>(
-          one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
-          two_body_bbbb, orbitals, core_energy, inactive_fock_alpha,
-          inactive_fock_beta, type);
-    }
+    auto container = HamiltonianContainer::from_json(j["container"]);
+    return std::make_shared<Hamiltonian>(std::move(container));
 
   } catch (const std::exception& e) {
     throw std::runtime_error("Failed to parse Hamiltonian from JSON: " +
@@ -910,7 +545,7 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_json(const nlohmann::json& j) {
 
 void Hamiltonian::_to_hdf5_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
-  if (!_is_valid()) {
+  if (!_container->is_valid()) {
     throw std::runtime_error("Cannot save invalid Hamiltonian data to HDF5");
   }
 
@@ -929,73 +564,45 @@ void Hamiltonian::_to_hdf5_file(const std::string& filename) const {
 void Hamiltonian::to_hdf5(H5::Group& group) const {
   QDK_LOG_TRACE_ENTERING();
   try {
-    // Save version first
-    H5::DataSpace scalar_space(H5S_SCALAR);
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
 
-    H5::Attribute version_attr =
-        group.createAttribute("version", string_type, scalar_space);
-    std::string version_str = SERIALIZATION_VERSION;
+    // Add version attribute
+    H5::Attribute version_attr = group.createAttribute(
+        "version", string_type, H5::DataSpace(H5S_SCALAR));
+    std::string version_str(SERIALIZATION_VERSION);
     version_attr.write(string_type, version_str);
+    version_attr.close();
 
-    // Save metadata
-    H5::Group metadata_group = group.createGroup("metadata");
+    // Delegate to container serialization (orbitals are included within the
+    // container)
+    H5::Group container_group = group.createGroup("container");
+    _container->to_hdf5(container_group);
 
-    // Save core energy
-    H5::Attribute core_energy_attr = metadata_group.createAttribute(
-        "core_energy", H5::PredType::NATIVE_DOUBLE, scalar_space);
-    core_energy_attr.write(H5::PredType::NATIVE_DOUBLE, &_core_energy);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
+}
 
-    // Save Hamiltonian type
-    std::string type_str =
-        (_type == HamiltonianType::Hermitian) ? "Hermitian" : "NonHermitian";
-    H5::StrType type_string_type(H5::PredType::C_S1, type_str.length() + 1);
-    H5::Attribute type_attr =
-        metadata_group.createAttribute("type", type_string_type, scalar_space);
-    type_attr.write(type_string_type, type_str.c_str());
+std::shared_ptr<Hamiltonian> Hamiltonian::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
+  try {
+    // Check version first
+    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
+    H5::Attribute version_attr = group.openAttribute("version");
+    std::string version;
+    version_attr.read(string_type, version);
+    validate_serialization_version(SERIALIZATION_VERSION, version);
 
-    // Save restrictedness information
-    hbool_t is_restricted_flag = is_restricted() ? 1 : 0;
-    H5::Attribute restricted_attr = metadata_group.createAttribute(
-        "is_restricted", H5::PredType::NATIVE_HBOOL, scalar_space);
-    restricted_attr.write(H5::PredType::NATIVE_HBOOL, &is_restricted_flag);
-
-    // Save integrals data
-    if (has_one_body_integrals()) {
-      save_matrix_to_group(group, "one_body_integrals_alpha",
-                           *_one_body_integrals.first);
-      if (is_unrestricted()) {
-        save_matrix_to_group(group, "one_body_integrals_beta",
-                             *_one_body_integrals.second);
-      }
+    // Load container using factory method (orbitals are loaded internally by
+    // the container)
+    if (!group.nameExists("container")) {
+      throw std::runtime_error(
+          "HDF5 group missing required 'container' subgroup");
     }
+    H5::Group container_group = group.openGroup("container");
+    auto container = HamiltonianContainer::from_hdf5(container_group);
 
-    if (has_two_body_integrals()) {
-      save_vector_to_group(group, "two_body_integrals_aaaa",
-                           *std::get<0>(_two_body_integrals));
-      if (is_unrestricted()) {
-        save_vector_to_group(group, "two_body_integrals_aabb",
-                             *std::get<1>(_two_body_integrals));
-        save_vector_to_group(group, "two_body_integrals_bbbb",
-                             *std::get<2>(_two_body_integrals));
-      }
-    }
-
-    // Save inactive Fock matrix
-    if (has_inactive_fock_matrix()) {
-      save_matrix_to_group(group, "inactive_fock_matrix_alpha",
-                           *_inactive_fock_matrix.first);
-      if (is_unrestricted()) {
-        save_matrix_to_group(group, "inactive_fock_matrix_beta",
-                             *_inactive_fock_matrix.second);
-      }
-    }
-
-    // Save nested orbitals data using HDF5 group
-    if (_orbitals) {
-      H5::Group orbitals_group = group.createGroup("orbitals");
-      _orbitals->to_hdf5(orbitals_group);
-    }
+    return std::make_shared<Hamiltonian>(std::move(container));
 
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
@@ -1031,239 +638,111 @@ std::shared_ptr<Hamiltonian> Hamiltonian::_from_hdf5_file(
   }
 }
 
-std::shared_ptr<Hamiltonian> Hamiltonian::from_hdf5(H5::Group& group) {
+Hamiltonian::Hamiltonian(std::unique_ptr<HamiltonianContainer> container)
+    : _container(std::move(container)) {
   QDK_LOG_TRACE_ENTERING();
-  try {
-    // Validate version first
-    if (!group.attrExists("version")) {
-      throw std::runtime_error(
-          "HDF5 group missing required 'version' attribute");
-    }
-
-    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
-    H5::Attribute version_attr = group.openAttribute("version");
-    std::string version_str;
-    version_attr.read(string_type, version_str);
-    validate_serialization_version(SERIALIZATION_VERSION, version_str);
-
-    // Load metadata
-    H5::Group metadata_group = group.openGroup("metadata");
-
-    // Load core energy
-    double core_energy;
-    H5::Attribute core_energy_attr =
-        metadata_group.openAttribute("core_energy");
-    core_energy_attr.read(H5::PredType::NATIVE_DOUBLE, &core_energy);
-
-    // Load Hamiltonian type
-    HamiltonianType type = HamiltonianType::Hermitian;
-    if (metadata_group.attrExists("type")) {
-      H5::Attribute type_attr = metadata_group.openAttribute("type");
-      H5::StrType string_type = type_attr.getStrType();
-      std::string type_str;
-      type_attr.read(string_type, type_str);
-      if (type_str == "NonHermitian") {
-        type = HamiltonianType::NonHermitian;
-      }
-    }
-
-    // Load restrictedness information
-    bool is_restricted_data = true;  // default to restricted
-    if (metadata_group.attrExists("is_restricted")) {
-      H5::Attribute restricted_attr =
-          metadata_group.openAttribute("is_restricted");
-      hbool_t is_restricted_flag;
-      restricted_attr.read(H5::PredType::NATIVE_HBOOL, &is_restricted_flag);
-      is_restricted_data = (is_restricted_flag != 0);
-    }
-
-    // Load orbitals data from nested group
-    std::shared_ptr<Orbitals> orbitals;
-    if (group.nameExists("orbitals")) {
-      H5::Group orbitals_group = group.openGroup("orbitals");
-      orbitals = Orbitals::from_hdf5(orbitals_group);
-    }
-
-    if (!orbitals) {
-      throw std::runtime_error("Hamiltonian HDF5 must include orbitals data");
-    }
-
-    // Load integral data based on restrictedness
-    Eigen::MatrixXd one_body_alpha, one_body_beta;
-    Eigen::VectorXd two_body_aaaa, two_body_aabb, two_body_bbbb;
-    Eigen::MatrixXd inactive_fock_alpha, inactive_fock_beta;
-
-    // Load one-body integrals
-    if (dataset_exists_in_group(group, "one_body_integrals_alpha")) {
-      one_body_alpha =
-          load_matrix_from_group(group, "one_body_integrals_alpha");
-    }
-
-    // For unrestricted, load beta separately
-    if (!is_restricted_data &&
-        dataset_exists_in_group(group, "one_body_integrals_beta")) {
-      one_body_beta = load_matrix_from_group(group, "one_body_integrals_beta");
-    }
-
-    // Load two-body integrals
-    if (dataset_exists_in_group(group, "two_body_integrals_aaaa")) {
-      two_body_aaaa = load_vector_from_group(group, "two_body_integrals_aaaa");
-    }
-
-    // For unrestricted, load aabb and bbbb separately
-    if (!is_restricted_data) {
-      if (dataset_exists_in_group(group, "two_body_integrals_aabb")) {
-        two_body_aabb =
-            load_vector_from_group(group, "two_body_integrals_aabb");
-      }
-      if (dataset_exists_in_group(group, "two_body_integrals_bbbb")) {
-        two_body_bbbb =
-            load_vector_from_group(group, "two_body_integrals_bbbb");
-      }
-    }
-
-    // Load inactive Fock matrix
-    if (dataset_exists_in_group(group, "inactive_fock_matrix_alpha")) {
-      inactive_fock_alpha =
-          load_matrix_from_group(group, "inactive_fock_matrix_alpha");
-    }
-
-    // For unrestricted, load beta separately
-    if (!is_restricted_data &&
-        dataset_exists_in_group(group, "inactive_fock_matrix_beta")) {
-      inactive_fock_beta =
-          load_matrix_from_group(group, "inactive_fock_matrix_beta");
-    }
-
-    // Create and return appropriate Hamiltonian using the correct constructor
-    if (is_restricted_data) {
-      // Use restricted constructor - it will create shared pointers internally
-      return std::make_shared<Hamiltonian>(one_body_alpha, two_body_aaaa,
-                                           orbitals, core_energy,
-                                           inactive_fock_alpha, type);
-    } else {
-      // Use unrestricted constructor with separate alpha and beta data
-      return std::make_shared<Hamiltonian>(
-          one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
-          two_body_bbbb, orbitals, core_energy, inactive_fock_alpha,
-          inactive_fock_beta, type);
-    }
-
-  } catch (const H5::Exception& e) {
-    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
-  }
 }
 
-void Hamiltonian::_to_fcidump_file(const std::string& filename, size_t nalpha,
-                                   size_t nbeta) const {
+// Copy constructor
+Hamiltonian::Hamiltonian(const Hamiltonian& other)
+    : _container(other._container->clone()) {
   QDK_LOG_TRACE_ENTERING();
-  // Check if this is an unrestricted Hamiltonian and throw error
-  if (is_unrestricted()) {
-    throw std::runtime_error(
-        "FCIDUMP format is not supported for unrestricted Hamiltonians.");
+}
+
+// Copy assignment operator
+Hamiltonian& Hamiltonian::operator=(const Hamiltonian& other) {
+  QDK_LOG_TRACE_ENTERING();
+  if (this != &other) {
+    _container = other._container->clone();
   }
+  return *this;
+}
 
-  std::ofstream file(filename);
-  if (!file.is_open()) {
-    throw std::runtime_error("Cannot open file for writing: " + filename);
-  }
+std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
+Hamiltonian::get_one_body_integrals() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->get_one_body_integrals();
+}
 
-  size_t num_molecular_orbitals;
-  if (has_orbitals()) {
-    if (_orbitals->has_active_space()) {
-      auto active_indices = _orbitals->get_active_space_indices();
-      size_t n_active_alpha = active_indices.first.size();
-      size_t n_active_beta = active_indices.second.size();
+double Hamiltonian::get_one_body_element(unsigned i, unsigned j,
+                                         SpinChannel channel) const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->get_one_body_element(i, j, channel);
+}
 
-      // For restricted case, alpha and beta should be the same
-      if (n_active_alpha != n_active_beta) {
-        throw std::invalid_argument(
-            "For restricted Hamiltonian, alpha and beta active spaces must "
-            "have "
-            "same size");
-      }
-      num_molecular_orbitals =
-          n_active_alpha;  // Can use either alpha or beta since they're equal
-    } else {
-      num_molecular_orbitals = _orbitals->get_num_molecular_orbitals();
-    }
-  } else {
-    throw std::runtime_error("Orbitals are not set");
-  }
+bool Hamiltonian::has_one_body_integrals() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->has_one_body_integrals();
+}
 
-  const size_t nelec = nalpha + nbeta;
-  const size_t num_molecular_orbitals2 =
-      num_molecular_orbitals * num_molecular_orbitals;
-  const size_t num_molecular_orbitals3 =
-      num_molecular_orbitals2 * num_molecular_orbitals;
-  const double print_thresh =
-      std::numeric_limits<double>::epsilon();  // TODO: Make configurable?
+std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
+           const Eigen::VectorXd&>
+Hamiltonian::get_two_body_integrals() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->get_two_body_integrals();
+}
 
-  // We don't use symmetry, so populate with C1 data
-  std::string orb_string;
-  for (auto i = 0ul; i < num_molecular_orbitals - 1; ++i) {
-    orb_string += "1,";
-  }
-  orb_string += "1";
+double Hamiltonian::get_two_body_element(unsigned i, unsigned j, unsigned k,
+                                         unsigned l,
+                                         SpinChannel channel) const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->get_two_body_element(i, j, k, l, channel);
+}
 
-  // Write the header of the FCIDUMP file
-  file << "&FCI ";
-  file << "NORB=" << num_molecular_orbitals << ", ";
-  file << "NELEC=" << nelec << ", ";
-  file << "MS2=" << (nalpha - nbeta) << ",\n";
-  file << "ORBSYM=" << orb_string << ",\n";
-  file << "ISYM=1,\n";
-  file << "&END\n";
+bool Hamiltonian::has_two_body_integrals() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->has_two_body_integrals();
+}
 
-  auto formatted_line = [&](size_t i, size_t j, size_t k, size_t l,
-                            double val) {
-    if (std::abs(val) < print_thresh) return;
+std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
+Hamiltonian::get_inactive_fock_matrix() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->get_inactive_fock_matrix();
+}
 
-    file << std::setw(28) << std::scientific << std::setprecision(16)
-         << std::right << val << " ";
-    file << std::setw(4) << i << " ";
-    file << std::setw(4) << j << " ";
-    file << std::setw(4) << k << " ";
-    file << std::setw(4) << l;
-  };
+bool Hamiltonian::has_inactive_fock_matrix() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->has_inactive_fock_matrix();
+}
 
-  auto write_eri = [&](size_t i, size_t j, size_t k, size_t l) {
-    auto eri = (*std::get<0>(_two_body_integrals))(
-        i * num_molecular_orbitals3 + j * num_molecular_orbitals2 +
-        k * num_molecular_orbitals + l);
+const std::shared_ptr<Orbitals> Hamiltonian::get_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->get_orbitals();
+}
 
-    formatted_line(i + 1, j + 1, k + 1, l + 1, eri);
-    file << "\n";
-  };
+bool Hamiltonian::has_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->has_orbitals();
+}
 
-  auto write_1body = [&](size_t i, size_t j) {
-    auto hel = (*_one_body_integrals.first)(i, j);
+double Hamiltonian::get_core_energy() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->get_core_energy();
+}
 
-    formatted_line(i + 1, j + 1, 0, 0, hel);
-    file << "\n";
-  };
+HamiltonianType Hamiltonian::get_type() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->get_type();
+}
 
-  // Write permutationally unique MO ERIs
-  // TODO: This is only valid for integrals with 8 fold symmetry
-  // TODO (NAB):  will this TODO be resolved before the release?
-  for (size_t i = 0, ij = 0; i < num_molecular_orbitals; ++i)
-    for (size_t j = i; j < num_molecular_orbitals; ++j, ij++) {
-      for (size_t k = 0, kl = 0; k < num_molecular_orbitals; ++k)
-        for (size_t l = k; l < num_molecular_orbitals; ++l, kl++) {
-          if (ij <= kl) {
-            write_eri(i, j, k, l);
-          }
-        }  // kl loop
-    }  // ij loop
+std::string Hamiltonian::get_container_type() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->get_container_type();
+}
 
-  // Write permutationally unique MO 1-body integrals
-  for (size_t i = 0; i < num_molecular_orbitals; ++i)
-    for (size_t j = 0; j <= i; ++j) {
-      write_1body(i, j);
-    }
+bool Hamiltonian::is_hermitian() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->is_hermitian();
+}
 
-  // Write core energy
-  formatted_line(0, 0, 0, 0, _core_energy);
+bool Hamiltonian::is_restricted() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->is_restricted();
+}
+
+bool Hamiltonian::is_unrestricted() const {
+  QDK_LOG_TRACE_ENTERING();
+  return !_container->is_restricted();
 }
 
 }  // namespace qdk::chemistry::data

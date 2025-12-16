@@ -14,6 +14,7 @@
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/canonical_4_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
@@ -119,14 +120,16 @@ class TestHamiltonianConstructor : public HamiltonianConstructor {
     Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(3, 3);
     Eigen::VectorXd two_body = Eigen::VectorXd::Random(81);
     Eigen::MatrixXd f_inact = Eigen::MatrixXd::Identity(0, 0);
-    return std::make_shared<Hamiltonian>(one_body, two_body, orbitals, 0.0,
-                                         f_inact);
+    return std::make_shared<Hamiltonian>(
+        std::make_unique<Canonical4CenterHamiltonian>(one_body, two_body,
+                                                      orbitals, 0.0, f_inact));
   }
 };
 
 TEST_F(HamiltonianTest, Constructor) {
   // Test the constructor with all required data
-  Hamiltonian h(one_body, two_body, orbitals, core_energy, inactive_fock);
+  Hamiltonian h(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
 
   EXPECT_TRUE(h.has_one_body_integrals());
   EXPECT_TRUE(h.has_two_body_integrals());
@@ -146,8 +149,9 @@ TEST_F(HamiltonianTest, ConstructorWithInactiveFock) {
 
   // Create a non-empty inactive Fock matrix
   Eigen::MatrixXd non_empty_inactive_fock = Eigen::MatrixXd::Identity(2, 2);
-  Hamiltonian h(one_body, two_body, orbitals_with_inactive, core_energy,
-                non_empty_inactive_fock);
+  Hamiltonian h(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body, two_body, orbitals_with_inactive, core_energy,
+      non_empty_inactive_fock));
 
   EXPECT_TRUE(h.has_one_body_integrals());
   EXPECT_TRUE(h.has_two_body_integrals());
@@ -158,7 +162,8 @@ TEST_F(HamiltonianTest, ConstructorWithInactiveFock) {
 }
 
 TEST_F(HamiltonianTest, MoveConstructor) {
-  Hamiltonian h1(one_body, two_body, orbitals, core_energy, inactive_fock);
+  Hamiltonian h1(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
   Hamiltonian h2(std::move(h1));
 
   EXPECT_TRUE(h2.has_one_body_integrals());
@@ -171,7 +176,8 @@ TEST_F(HamiltonianTest, MoveConstructor) {
 TEST_F(HamiltonianTest, CopyConstructorAndAssignment) {
   // Create source Hamiltonian with full data
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Random(2, 2);
-  Hamiltonian h1(one_body, two_body, orbitals, core_energy, inactive_fock);
+  Hamiltonian h1(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
 
   // Test copy constructor
   Hamiltonian h2(h1);
@@ -200,7 +206,8 @@ TEST_F(HamiltonianTest, CopyConstructorAndAssignment) {
       h2.get_inactive_fock_matrix().first));
 
   // Test copy assignment
-  Hamiltonian h3(one_body, two_body, orbitals, core_energy, inactive_fock);
+  Hamiltonian h3(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
   h3 = h1;
 
   // Verify assignment worked correctly
@@ -212,7 +219,8 @@ TEST_F(HamiltonianTest, CopyConstructorAndAssignment) {
   EXPECT_EQ(h3.get_core_energy(), 1.5);
 
   // Test self-assignment (should be no-op)
-  Hamiltonian h4(one_body, two_body, orbitals, core_energy, inactive_fock);
+  Hamiltonian h4(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
   Hamiltonian* h4_ptr = &h4;
   h4 = *h4_ptr;  // Self-assignment
 
@@ -238,8 +246,8 @@ TEST_F(HamiltonianTest, TwoBodyElementAccess) {
   test_two_body[10] = 5.0;  // (1,0,1,0) -> index 1*8 + 0*4 + 1*2 + 0 = 10
   test_two_body[7] = 6.0;   // (0,1,1,1) -> index 0*8 + 1*4 + 1*2 + 1 = 7
 
-  Hamiltonian h(test_one_body, test_two_body, orbitals, core_energy,
-                inactive_fock);
+  Hamiltonian h(std::make_unique<Canonical4CenterHamiltonian>(
+      test_one_body, test_two_body, orbitals, core_energy, inactive_fock));
 
   // Test accessing specific elements to verify get_two_body_index calculations
   EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0), 1.0);
@@ -275,23 +283,24 @@ TEST_F(HamiltonianTest, TwoBodyElementAccess) {
   auto large_orbitals =
       std::make_shared<ModelOrbitals>(3, true);  // 3 orbitals, restricted
 
-  Hamiltonian h_large(large_one_body, large_two_body, large_orbitals, 0.0,
-                      large_inact_f);
+  Hamiltonian h_large(std::make_unique<Canonical4CenterHamiltonian>(
+      large_one_body, large_two_body, large_orbitals, 0.0, large_inact_f));
 
   EXPECT_DOUBLE_EQ(h_large.get_two_body_element(2, 1, 0, 2), 7.0);
   EXPECT_DOUBLE_EQ(h_large.get_two_body_element(1, 2, 2, 1), 8.0);
 }
 
 TEST_F(HamiltonianTest, JSONSerialization) {
-  Hamiltonian h(one_body, two_body, orbitals, core_energy, inactive_fock);
+  Hamiltonian h(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
 
   // Test JSON conversion
   nlohmann::json j = h.to_json();
 
-  EXPECT_EQ(j["core_energy"], 1.5);
-  EXPECT_TRUE(j["has_one_body_integrals"]);
-  EXPECT_TRUE(j["has_two_body_integrals"]);
-  EXPECT_TRUE(j["has_orbitals"]);
+  EXPECT_EQ(j["container"]["core_energy"], 1.5);
+  EXPECT_TRUE(j["container"]["has_one_body_integrals"]);
+  EXPECT_TRUE(j["container"]["has_two_body_integrals"]);
+  EXPECT_TRUE(j["container"]["has_orbitals"]);
 
   // Test round-trip conversion
   auto h2 = Hamiltonian::from_json(j);
@@ -322,7 +331,8 @@ TEST_F(HamiltonianTest, JSONSerialization) {
 }
 
 TEST_F(HamiltonianTest, JSONFileIO) {
-  Hamiltonian h(one_body, two_body, orbitals, core_energy, inactive_fock);
+  Hamiltonian h(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
 
   // Test file I/O
   std::string filename = "test.hamiltonian.json";
@@ -357,7 +367,8 @@ TEST_F(HamiltonianTest, JSONFileIO) {
 }
 
 TEST_F(HamiltonianTest, HDF5FileIO) {
-  Hamiltonian h(one_body, two_body, orbitals, core_energy, inactive_fock);
+  Hamiltonian h(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
 
   // Test file I/O
   std::string filename = "test.hamiltonian.h5";
@@ -388,7 +399,8 @@ TEST_F(HamiltonianTest, HDF5FileIO) {
 }
 
 TEST_F(HamiltonianTest, GenericFileIO) {
-  Hamiltonian h(one_body, two_body, orbitals, core_energy, inactive_fock);
+  Hamiltonian h(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
 
   // Test JSON via generic interface
   std::string json_filename = "test.hamiltonian.json";
@@ -416,7 +428,8 @@ TEST_F(HamiltonianTest, GenericFileIO) {
 
 TEST_F(HamiltonianTest, InvalidFileType) {
   // Create a Hamiltonian for testing
-  Hamiltonian h(one_body, two_body, orbitals, core_energy, inactive_fock);
+  Hamiltonian h(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
 
   EXPECT_THROW(h.to_file("test.txt", "txt"), std::runtime_error);
   EXPECT_THROW(Hamiltonian::from_file("test.txt", "txt"), std::runtime_error);
@@ -436,25 +449,28 @@ TEST_F(HamiltonianTest, ValidationTests) {
   Eigen::VectorXd bad_two_body =
       Eigen::VectorXd::Random(16);  // Should be 81 for 3x3
 
-  EXPECT_THROW(Hamiltonian(bad_one_body, bad_two_body, orbitals, core_energy,
-                           inactive_fock),
-               std::invalid_argument);
+  EXPECT_THROW(
+      Hamiltonian(std::make_unique<Canonical4CenterHamiltonian>(
+          bad_one_body, bad_two_body, orbitals, core_energy, inactive_fock)),
+      std::invalid_argument);
 
   // Test validation with non-square one-body matrix
   Eigen::MatrixXd non_square_one_body(2, 3);  // 2x3 non-square matrix
   non_square_one_body.setRandom();
   Eigen::VectorXd any_two_body = Eigen::VectorXd::Random(36);
 
-  EXPECT_THROW(Hamiltonian(non_square_one_body, any_two_body, orbitals,
-                           core_energy, inactive_fock),
+  EXPECT_THROW(Hamiltonian(std::make_unique<Canonical4CenterHamiltonian>(
+                   non_square_one_body, any_two_body, orbitals, core_energy,
+                   inactive_fock)),
                std::invalid_argument);
 
   // Test validation passes with correct dimensions
   Eigen::MatrixXd correct_one_body = Eigen::MatrixXd::Identity(2, 2);
   Eigen::VectorXd correct_two_body = Eigen::VectorXd::Random(16);  // 2^4 = 16
 
-  EXPECT_NO_THROW(Hamiltonian(correct_one_body, correct_two_body, orbitals,
-                              core_energy, inactive_fock));
+  EXPECT_NO_THROW(Hamiltonian(std::make_unique<Canonical4CenterHamiltonian>(
+      correct_one_body, correct_two_body, orbitals, core_energy,
+      inactive_fock)));
 }
 
 TEST_F(HamiltonianTest, ValidationEdgeCases) {
@@ -467,8 +483,9 @@ TEST_F(HamiltonianTest, ValidationEdgeCases) {
       std::make_shared<ModelOrbitals>(1, true);  // 1 orbital, restricted
   Eigen::MatrixXd tiny_inactive_fock = Eigen::MatrixXd::Zero(1, 1);
 
-  EXPECT_NO_THROW(Hamiltonian(tiny_one_body, tiny_two_body, tiny_orbitals,
-                              core_energy, tiny_inactive_fock));
+  EXPECT_NO_THROW(Hamiltonian(std::make_unique<Canonical4CenterHamiltonian>(
+      tiny_one_body, tiny_two_body, tiny_orbitals, core_energy,
+      tiny_inactive_fock)));
 
   // Test with large matrices (stress test)
   Eigen::MatrixXd large_one_body = Eigen::MatrixXd::Identity(10, 10);
@@ -484,17 +501,19 @@ TEST_F(HamiltonianTest, ValidationEdgeCases) {
   // Create a larger inactive_fock matrix for this test
   Eigen::MatrixXd large_inactive_fock = Eigen::MatrixXd::Zero(0, 0);
 
-  EXPECT_NO_THROW(Hamiltonian(large_one_body, large_two_body, large_orbitals,
-                              core_energy, large_inactive_fock));
+  EXPECT_NO_THROW(Hamiltonian(std::make_unique<Canonical4CenterHamiltonian>(
+      large_one_body, large_two_body, large_orbitals, core_energy,
+      large_inactive_fock)));
 
   // Test wrong size by one element
   Eigen::MatrixXd three_by_three = Eigen::MatrixXd::Identity(3, 3);
   Eigen::VectorXd off_by_one =
       Eigen::VectorXd::Random(80);  // Should be 81 for 3x3
 
-  EXPECT_THROW(Hamiltonian(three_by_three, off_by_one, orbitals, core_energy,
-                           inactive_fock),
-               std::invalid_argument);
+  EXPECT_THROW(
+      Hamiltonian(std::make_unique<Canonical4CenterHamiltonian>(
+          three_by_three, off_by_one, orbitals, core_energy, inactive_fock)),
+      std::invalid_argument);
 }
 
 TEST_F(HamiltonianConstructorTest, Factory) {
@@ -822,11 +841,10 @@ TEST_F(HamiltonianTest, UnrestrictedConstructor) {
   Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Random(2, 2);
   Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Random(2, 2);
 
-  // Create unrestricted Hamiltonian
-  Hamiltonian h_unrestricted(one_body_alpha, one_body_beta, two_body_aaaa,
-                             two_body_aabb, two_body_bbbb,
-                             unrestricted_orbitals, core_energy,
-                             inactive_fock_alpha, inactive_fock_beta);
+  Hamiltonian h_unrestricted(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+      two_body_bbbb, unrestricted_orbitals, core_energy, inactive_fock_alpha,
+      inactive_fock_beta));
 
   // Verify the unrestricted Hamiltonian was created successfully
   EXPECT_TRUE(h_unrestricted.has_one_body_integrals());
@@ -853,9 +871,10 @@ TEST_F(HamiltonianTest, UnrestrictedAccessorMethods) {
   Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Constant(2, 2, 4.0);
   Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Constant(2, 2, 5.0);
 
-  Hamiltonian h(one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
-                two_body_bbbb, unrestricted_orbitals, core_energy,
-                inactive_fock_alpha, inactive_fock_beta);
+  Hamiltonian h(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+      two_body_bbbb, unrestricted_orbitals, core_energy, inactive_fock_alpha,
+      inactive_fock_beta));
 
   // Test alpha/beta one-body integral access
   auto [h_one_alpha, h_one_beta] = h.get_one_body_integrals();
@@ -875,8 +894,8 @@ TEST_F(HamiltonianTest, UnrestrictedAccessorMethods) {
 
 TEST_F(HamiltonianTest, RestrictedVsUnrestrictedDetection) {
   // Create restricted Hamiltonian using the first constructor
-  Hamiltonian h_restricted(one_body, two_body, orbitals, core_energy,
-                           inactive_fock);
+  Hamiltonian h_restricted(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
 
   // Create unrestricted orbitals for the unrestricted test
   auto unrestricted_orbitals = std::make_shared<ModelOrbitals>(2, false);
@@ -890,10 +909,10 @@ TEST_F(HamiltonianTest, RestrictedVsUnrestrictedDetection) {
   Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Identity(2, 2);
   Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Ones(2, 2);
 
-  Hamiltonian h_unrestricted(one_body_alpha, one_body_beta, two_body_aaaa,
-                             two_body_aabb, two_body_bbbb,
-                             unrestricted_orbitals, core_energy,
-                             inactive_fock_alpha, inactive_fock_beta);
+  Hamiltonian h_unrestricted(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+      two_body_bbbb, unrestricted_orbitals, core_energy, inactive_fock_alpha,
+      inactive_fock_beta));
 
   // Test restricted detection
   EXPECT_TRUE(h_restricted.is_restricted());
@@ -923,9 +942,10 @@ TEST_F(HamiltonianTest, UnrestrictedSpinChannelAccess) {
 
   Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
 
-  Hamiltonian h(one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
-                two_body_bbbb, unrestricted_orbitals, core_energy, empty_fock,
-                empty_fock);
+  Hamiltonian h(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+      two_body_bbbb, unrestricted_orbitals, core_energy, empty_fock,
+      empty_fock));
 
   // Test accessing elements through different spin channels
   EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::aaaa), 1.0);
@@ -950,9 +970,10 @@ TEST_F(HamiltonianTest, UnrestrictedJSONSerialization) {
   Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Random(2, 2);
   Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Random(2, 2);
 
-  Hamiltonian h_orig(one_body_alpha, one_body_beta, two_body_aaaa,
-                     two_body_aabb, two_body_bbbb, unrestricted_orbitals,
-                     core_energy, inactive_fock_alpha, inactive_fock_beta);
+  Hamiltonian h_orig(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+      two_body_bbbb, unrestricted_orbitals, core_energy, inactive_fock_alpha,
+      inactive_fock_beta));
 
   // Test JSON serialization round-trip
   nlohmann::json j = h_orig.to_json();
@@ -995,9 +1016,10 @@ TEST_F(HamiltonianTest, UnrestrictedHDF5Serialization) {
   Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Random(2, 2);
   Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Random(2, 2);
 
-  Hamiltonian h_orig(one_body_alpha, one_body_beta, two_body_aaaa,
-                     two_body_aabb, two_body_bbbb, unrestricted_orbitals,
-                     core_energy, inactive_fock_alpha, inactive_fock_beta);
+  Hamiltonian h_orig(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+      two_body_bbbb, unrestricted_orbitals, core_energy, inactive_fock_alpha,
+      inactive_fock_beta));
 
   // Test HDF5 serialization round-trip
   std::string filename = "test_unrestricted.hamiltonian.h5";
@@ -1030,7 +1052,8 @@ TEST_F(HamiltonianTest, UnrestrictedHDF5Serialization) {
 }
 
 TEST_F(HamiltonianTest, FCIDUMPSerialization) {
-  Hamiltonian h(one_body, two_body, orbitals, core_energy, inactive_fock);
+  Hamiltonian h(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
 
   // Test FCIDUMP serialization
   h.to_fcidump_file("test.hamiltonian.fcidump", 1, 1);
@@ -1077,10 +1100,10 @@ TEST_F(HamiltonianTest, FCIDUMPSerializationUnrestrictedThrowsError) {
   Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
 
   // Create unrestricted Hamiltonian
-  Hamiltonian h_unrestricted(one_body_alpha, one_body_beta, two_body_aaaa,
-                             two_body_aabb, two_body_bbbb,
-                             unrestricted_orbitals, core_energy, empty_fock,
-                             empty_fock);
+  Hamiltonian h_unrestricted(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+      two_body_bbbb, unrestricted_orbitals, core_energy, empty_fock,
+      empty_fock));
 
   // Verify it's actually unrestricted
   EXPECT_TRUE(h_unrestricted.is_unrestricted());
@@ -1113,9 +1136,9 @@ TEST_F(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {
   // Create appropriate inactive Fock matrix for the inactive space
   Eigen::MatrixXd inactive_fock_2x2 = Eigen::MatrixXd::Zero(2, 2);
 
-  Hamiltonian h_active_space(one_body_2x2, two_body_2x2,
-                             orbitals_with_active_space, core_energy,
-                             inactive_fock_2x2);
+  Hamiltonian h_active_space(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body_2x2, two_body_2x2, orbitals_with_active_space, core_energy,
+      inactive_fock_2x2));
 
   // Should successfully write FCIDUMP using active space dimensions
   EXPECT_NO_THROW({
@@ -1180,10 +1203,10 @@ TEST_F(HamiltonianTest, ErrorHandlingUnrestrictedMismatchedActiveSpace) {
   // This should throw during construction due to dimension mismatch
   EXPECT_THROW(
       {
-        Hamiltonian h_mismatched(one_body_alpha, one_body_beta, two_body_aaaa,
-                                 two_body_aabb, two_body_bbbb,
-                                 unrestricted_orbitals, core_energy, empty_fock,
-                                 empty_fock);
+        Hamiltonian h_mismatched(std::make_unique<Canonical4CenterHamiltonian>(
+            one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+            two_body_bbbb, unrestricted_orbitals, core_energy, empty_fock,
+            empty_fock));
       },
       std::invalid_argument);
 }
@@ -1555,25 +1578,27 @@ TEST_F(HamiltonianTest, O2DeterministicBehaviorRestrictedUnrestricted) {
 
 TEST_F(HamiltonianTest, IsValidComprehensive) {
   // Valid Hamiltonian with all required data
-  Hamiltonian h(one_body, two_body, orbitals, core_energy, inactive_fock);
+  Hamiltonian h(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
 
   // Valid Hamiltonian with inactive Fock matrix
   Eigen::MatrixXd inactive_fock_matrix = Eigen::MatrixXd::Random(2, 2);
-  Hamiltonian h2(one_body, two_body, orbitals, core_energy,
-                 inactive_fock_matrix);
+  Hamiltonian h2(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body, two_body, orbitals, core_energy, inactive_fock_matrix));
 
   // Construction with mismatched dimensions should fail
   Eigen::MatrixXd wrong_one_body = Eigen::MatrixXd::Identity(3, 3);  // 3x3
   Eigen::VectorXd wrong_two_body = Eigen::VectorXd::Random(16);      // 2^4
 
-  EXPECT_THROW(Hamiltonian(wrong_one_body, wrong_two_body, orbitals,
-                           core_energy, inactive_fock),
+  EXPECT_THROW(Hamiltonian(std::make_unique<Canonical4CenterHamiltonian>(
+                   wrong_one_body, wrong_two_body, orbitals, core_energy,
+                   inactive_fock)),
                std::invalid_argument);
 
   // Non-square one-body matrix should fail during construction
   Eigen::MatrixXd non_square(2, 3);  // 2x3 matrix
   non_square.setRandom();
-  EXPECT_THROW(
-      Hamiltonian(non_square, two_body, orbitals, core_energy, inactive_fock),
-      std::invalid_argument);
+  EXPECT_THROW(Hamiltonian(std::make_unique<Canonical4CenterHamiltonian>(
+                   non_square, two_body, orbitals, core_energy, inactive_fock)),
+               std::invalid_argument);
 }

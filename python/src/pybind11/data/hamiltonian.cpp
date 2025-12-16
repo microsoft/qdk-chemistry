@@ -10,6 +10,7 @@
 
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/canonical_4_center.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -96,74 +97,226 @@ Values:
       .value("aabb", SpinChannel::aabb)
       .value("bbbb", SpinChannel::bbbb);
 
-  // Hamiltonian class
-  py::class_<Hamiltonian, DataClass, py::smart_holder> hamiltonian(
-      data, "Hamiltonian", R"(
-Represents a molecular Hamiltonian in the molecular orbital basis.
+  // ============================================================================
+  // HamiltonianContainer - Abstract base class (not directly constructible)
+  // ============================================================================
+  py::class_<HamiltonianContainer, py::smart_holder> hamiltonian_container(
+      data, "HamiltonianContainer", R"(
+Abstract base class for Hamiltonian container implementations.
 
-This class stores and manipulates molecular Hamiltonian data for quantum chemistry
-calculations, specifically designed for active space methods. It contains:
+This class defines the interface for storing molecular Hamiltonian data
+for quantum chemistry calculations. It contains:
+
+* One-electron integrals (kinetic + nuclear attraction) in MO representation
+* Molecular orbital information for the active space
+* Core energy contributions from inactive orbitals and nuclear repulsion
+
+Derived classes implement specific storage formats for two-electron integrals
+(e.g., canonical 4-center, density-fitted, tensor hypercontraction).
+
+Note:
+    This class cannot be instantiated directly. Use a derived class like
+    Canonical4CenterHamiltonian instead.
+)");
+
+  // HamiltonianContainer methods (read-only accessors)
+  bind_getter_as_property(hamiltonian_container, "get_one_body_integrals",
+                          &HamiltonianContainer::get_one_body_integrals,
+                          R"(
+Get tuple of one-electron integrals (alpha, beta) in molecular orbital basis.
+
+Returns:
+    tuple[numpy.ndarray, numpy.ndarray]: One-electron integral matrices [norb x norb]
+    for alpha and beta spin channels.
+)",
+                          py::return_value_policy::reference_internal);
+
+  hamiltonian_container.def("has_one_body_integrals",
+                            &HamiltonianContainer::has_one_body_integrals,
+                            R"(
+Check if one-body integrals are available.
+
+Returns:
+    bool: True if one-body integrals have been set
+)");
+
+  hamiltonian_container.def(
+      "get_one_body_element", &HamiltonianContainer::get_one_body_element,
+      R"(
+Get specific one-electron integral element <ij>.
+
+Args:
+    i (int): First orbital index
+    j (int): Second orbital index
+    channel (SpinChannel): Spin channel (aa or bb), defaults to aa
+
+Returns:
+    float: Value of the one-electron integral <ij>
+)",
+      py::arg("i"), py::arg("j"), py::arg("channel") = SpinChannel::aa);
+
+  bind_getter_as_property(hamiltonian_container, "get_inactive_fock_matrix",
+                          &HamiltonianContainer::get_inactive_fock_matrix,
+                          R"(
+Get tuple of inactive Fock matrices (alpha, beta).
+
+Returns:
+    tuple[numpy.ndarray, numpy.ndarray]: Inactive Fock matrices for the active space
+)");
+
+  hamiltonian_container.def("has_inactive_fock_matrix",
+                            &HamiltonianContainer::has_inactive_fock_matrix,
+                            R"(
+Check if inactive Fock matrix is available.
+
+Returns:
+    bool: True if inactive Fock matrix has been set
+)");
+
+  bind_getter_as_property(hamiltonian_container, "get_orbitals",
+                          &HamiltonianContainer::get_orbitals,
+                          R"(
+Get molecular orbital data.
+
+Returns:
+    Orbitals: The orbital data associated with this container
+)",
+                          py::return_value_policy::reference_internal);
+
+  hamiltonian_container.def("has_orbitals", &HamiltonianContainer::has_orbitals,
+                            R"(
+Check if orbital data is available.
+
+Returns:
+    bool: True if orbital data has been set
+)");
+
+  bind_getter_as_property(hamiltonian_container, "get_core_energy",
+                          &HamiltonianContainer::get_core_energy,
+                          R"(
+Get core energy in atomic units.
+
+Returns:
+    float: Core energy contribution in Hartree
+)");
+
+  bind_getter_as_property(hamiltonian_container, "get_type",
+                          &HamiltonianContainer::get_type,
+                          R"(
+Get the type of Hamiltonian (Hermitian or NonHermitian).
+
+Returns:
+    HamiltonianType: The Hamiltonian type
+)");
+
+  hamiltonian_container.def("is_hermitian", &HamiltonianContainer::is_hermitian,
+                            R"(
+Check if the Hamiltonian is Hermitian.
+
+Returns:
+    bool: True if the Hamiltonian type is Hermitian
+)");
+
+  hamiltonian_container.def("is_unrestricted",
+                            &HamiltonianContainer::is_unrestricted,
+                            R"(
+Check if Hamiltonian is unrestricted.
+
+Returns:
+    bool: True if alpha and beta integrals are different
+)");
+
+  hamiltonian_container.def("get_container_type",
+                            &HamiltonianContainer::get_container_type,
+                            R"(
+Get the type of this container as a string.
+
+Returns:
+    str: Container type identifier (e.g., "canonical_4_center")
+)");
+
+  // ============================================================================
+  // Canonical4CenterHamiltonian - Concrete implementation
+  // ============================================================================
+  py::class_<Canonical4CenterHamiltonian, HamiltonianContainer,
+             py::smart_holder>
+      canonical_4_center(data, "Canonical4CenterHamiltonian", R"(
+Represents a molecular Hamiltonian with canonical 4-center two-electron integrals.
+
+This class stores molecular Hamiltonian data for quantum chemistry calculations,
+specifically designed for active space methods. It contains:
 
 * One-electron integrals (kinetic + nuclear attraction) in MO representation
 * Two-electron integrals (electron-electron repulsion) in MO representation
 * Molecular orbital information for the active space
-* Indices of selected orbitals defining the active space
-* Number of electrons in the selected MO space
 * Core energy contributions from inactive orbitals and nuclear repulsion
+
+This is the standard full integral storage format where two-electron integrals
+are stored as a flattened [norb^4] vector.
+
+Examples:
+    >>> import numpy as np
+    >>> # Create restricted Hamiltonian
+    >>> one_body = np.random.rand(4, 4)  # 4 orbitals
+    >>> two_body = np.random.rand(256)   # 4^4 elements
+    >>> fock_matrix = np.random.rand(4, 4)
+    >>> container = Canonical4CenterHamiltonian(
+    ...     one_body, two_body, orbitals, 10.5, fock_matrix
+    ... )
+    >>> # Wrap in Hamiltonian interface
+    >>> hamiltonian = Hamiltonian(container)
 )");
 
-  // Constructors
-  hamiltonian.def(
+  // Restricted constructor
+  canonical_4_center.def(
       py::init<const Eigen::MatrixXd&, const Eigen::VectorXd&,
-               std::shared_ptr<qdk::chemistry::data::Orbitals>, double,
-               const Eigen::MatrixXd&, qdk::chemistry::data::HamiltonianType>(),
+               std::shared_ptr<Orbitals>, double, const Eigen::MatrixXd&,
+               HamiltonianType>(),
       R"(
-Constructor for restricted active space Hamiltonian.
-
-``norb`` denotes the number of orbitals in the active space.
+Constructor for restricted active space Hamiltonian with 4-center integrals.
 
 Args:
     one_body_integrals (numpy.ndarray): One-electron integrals matrix [norb x norb]
     two_body_integrals (numpy.ndarray): Two-electron integrals vector [norb^4]
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
-    inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix for the selected active space
+    inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [norb x norb]
     type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
 
 Examples:
     >>> import numpy as np
-    >>> one_body = np.random.rand(4, 4)  # 4 orbitals
-    >>> two_body = np.random.rand(256)   # 4^4 elements
+    >>> one_body = np.random.rand(4, 4)
+    >>> two_body = np.random.rand(256)
     >>> fock_matrix = np.random.rand(4, 4)
-    >>> hamiltonian = Hamiltonian(one_body, two_body, orbitals, 10.5, fock_matrix)
+    >>> container = Canonical4CenterHamiltonian(
+    ...     one_body, two_body, orbitals, 10.5, fock_matrix
+    ... )
 )",
       py::arg("one_body_integrals"), py::arg("two_body_integrals"),
       py::arg("orbitals"), py::arg("core_energy"),
       py::arg("inactive_fock_matrix"),
-      py::arg("type") = qdk::chemistry::data::HamiltonianType::Hermitian);
+      py::arg("type") = HamiltonianType::Hermitian);
 
-  hamiltonian.def(
+  // Unrestricted constructor
+  canonical_4_center.def(
       py::init<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
                const Eigen::VectorXd&, const Eigen::VectorXd&,
-               const Eigen::VectorXd&,
-               std::shared_ptr<qdk::chemistry::data::Orbitals>, double,
+               const Eigen::VectorXd&, std::shared_ptr<Orbitals>, double,
                const Eigen::MatrixXd&, const Eigen::MatrixXd&,
-               qdk::chemistry::data::HamiltonianType>(),
+               HamiltonianType>(),
       R"(
-Constructor for unrestricted active space Hamiltonian.
-
-``norb`` denotes the number of orbitals in the active space.
+Constructor for unrestricted active space Hamiltonian with 4-center integrals.
 
 Args:
-    one_body_integrals_alpha (numpy.ndarray): Alpha one-electron integrals matrix [norb x norb]
-    one_body_integrals_beta (numpy.ndarray): Beta one-electron integrals matrix [norb x norb]
-    two_body_integrals_aaaa (numpy.ndarray): Alpha-alpha-alpha-alpha two-electron integrals vector
-    two_body_integrals_aabb (numpy.ndarray): Alpha/beta/alpha/beta two-electron integrals vector
-    two_body_integrals_bbbb (numpy.ndarray): Beta-beta-beta-beta two-electron integrals vector
+    one_body_integrals_alpha (numpy.ndarray): Alpha one-electron integrals [norb x norb]
+    one_body_integrals_beta (numpy.ndarray): Beta one-electron integrals [norb x norb]
+    two_body_integrals_aaaa (numpy.ndarray): Alpha-alpha-alpha-alpha integrals [norb^4]
+    two_body_integrals_aabb (numpy.ndarray): Alpha-beta-alpha-beta integrals [norb^4]
+    two_body_integrals_bbbb (numpy.ndarray): Beta-beta-beta-beta integrals [norb^4]
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
-    inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix for the selected active space
-    inactive_fock_matrix_beta (numpy.ndarray): Beta inactive Fock matrix for the selected active space
+    inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix [norb x norb]
+    inactive_fock_matrix_beta (numpy.ndarray): Beta inactive Fock matrix [norb x norb]
     type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
 
 Examples:
@@ -175,14 +328,144 @@ Examples:
     >>> two_body_bbbb = np.random.rand(256)
     >>> fock_a = np.random.rand(4, 4)
     >>> fock_b = np.random.rand(4, 4)
-    >>> hamiltonian = Hamiltonian(one_body_a, one_body_b, two_body_aaaa, two_body_aabb, two_body_bbbb, orbitals, 10.5, fock_a, fock_b)
+    >>> container = Canonical4CenterHamiltonian(
+    ...     one_body_a, one_body_b,
+    ...     two_body_aaaa, two_body_aabb, two_body_bbbb,
+    ...     orbitals, 10.5, fock_a, fock_b
+    ... )
 )",
       py::arg("one_body_integrals_alpha"), py::arg("one_body_integrals_beta"),
       py::arg("two_body_integrals_aaaa"), py::arg("two_body_integrals_aabb"),
       py::arg("two_body_integrals_bbbb"), py::arg("orbitals"),
       py::arg("core_energy"), py::arg("inactive_fock_matrix_alpha"),
       py::arg("inactive_fock_matrix_beta"),
-      py::arg("type") = qdk::chemistry::data::HamiltonianType::Hermitian);
+      py::arg("type") = HamiltonianType::Hermitian);
+
+  // Two-body integral access (specific to Canonical4CenterHamiltonian)
+  bind_getter_as_property(canonical_4_center, "get_two_body_integrals",
+                          &Canonical4CenterHamiltonian::get_two_body_integrals,
+                          R"(
+Get two-electron integrals in molecular orbital basis.
+
+Returns:
+    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
+    integral vectors [norb^4] for aaaa, aabb, and bbbb spin channels.
+
+Notes:
+    Integrals are stored as flattened vectors in chemist notation <ij|kl>
+    where indices are ordered as i + j*norb + k*norb^2 + l*norb^3
+)",
+                          py::return_value_policy::reference_internal);
+
+  canonical_4_center.def("get_two_body_element",
+                         &Canonical4CenterHamiltonian::get_two_body_element,
+                         R"(
+Get specific two-electron integral element <ij|kl>.
+
+Args:
+    i, j, k, l (int): Orbital indices
+    channel (SpinChannel): Spin channel (aaaa, aabb, or bbbb), defaults to aaaa
+
+Returns:
+    float: Value of the two-electron integral <ij|kl>
+)",
+                         py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
+                         py::arg("channel") = SpinChannel::aaaa);
+
+  canonical_4_center.def("has_two_body_integrals",
+                         &Canonical4CenterHamiltonian::has_two_body_integrals,
+                         R"(
+Check if two-body integrals are available.
+
+Returns:
+    bool: True if two-body integrals have been set
+)");
+
+  canonical_4_center.def("is_restricted",
+                         &Canonical4CenterHamiltonian::is_restricted,
+                         R"(
+Check if Hamiltonian is restricted (alpha == beta).
+
+Returns:
+    bool: True if alpha and beta integrals are identical
+)");
+
+  canonical_4_center.def("is_valid", &Canonical4CenterHamiltonian::is_valid,
+                         R"(
+Check if the Hamiltonian data is complete and consistent.
+
+Returns:
+    bool: True if all required data is set and dimensions are consistent
+)");
+
+  canonical_4_center.def(
+      "to_json",
+      [](const Canonical4CenterHamiltonian& self) -> std::string {
+        return self.to_json().dump();
+      },
+      R"(
+Convert container to JSON string.
+
+Returns:
+    str: JSON representation of the container
+)");
+
+  canonical_4_center.def(
+      "to_fcidump_file", &Canonical4CenterHamiltonian::to_fcidump_file,
+      R"(
+Save Hamiltonian to FCIDUMP file.
+
+Args:
+    filename (str): Path to FCIDUMP file to create/overwrite
+    nalpha (int): Number of alpha electrons
+    nbeta (int): Number of beta electrons
+)",
+      py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
+
+  // ============================================================================
+  // Hamiltonian - Interface class
+  // ============================================================================
+  py::class_<Hamiltonian, DataClass, py::smart_holder> hamiltonian(
+      data, "Hamiltonian", R"(
+Interface class for molecular Hamiltonians in the molecular orbital basis.
+
+This class provides a unified interface to molecular Hamiltonian data by
+wrapping a HamiltonianContainer implementation. It supports:
+
+* One-electron integrals (kinetic + nuclear attraction) in MO representation
+* Two-electron integrals (electron-electron repulsion) in MO representation
+* Molecular orbital information for the active space
+* Core energy contributions from inactive orbitals and nuclear repulsion
+
+The actual integral storage is handled by the underlying container, which
+can use different representations (canonical 4-center, density-fitted, etc.).
+
+Examples:
+    >>> # Create a Hamiltonian from a Canonical4CenterHamiltonian container
+    >>> container = Canonical4CenterHamiltonian(h1, h2, orbitals, e_core, fock)
+    >>> hamiltonian = Hamiltonian(container)
+    >>>
+    >>> # Access integrals through the interface
+    >>> h1_alpha, h1_beta = hamiltonian.get_one_body_integrals
+    >>> core_energy = hamiltonian.get_core_energy
+)");
+
+  // Constructor from container
+  hamiltonian.def(py::init([](std::unique_ptr<HamiltonianContainer> container) {
+                    return std::make_shared<Hamiltonian>(std::move(container));
+                  }),
+                  R"(
+Construct a Hamiltonian from a HamiltonianContainer.
+
+Args:
+    container (HamiltonianContainer): The container holding the Hamiltonian data.
+        Ownership is transferred to the Hamiltonian.
+
+Examples:
+    >>> container = Canonical4CenterHamiltonian(h1, h2, orbitals, e_core, fock)
+    >>> hamiltonian = Hamiltonian(container)
+)",
+                  py::arg("container"));
 
   // One-body integral access
   bind_getter_as_property(hamiltonian, "get_one_body_integrals",
@@ -191,18 +474,16 @@ Examples:
 Get tuple of one-electron integrals (alpha, beta) in molecular orbital basis.
 
 Returns:
-    [numpy.ndarray, numpy.ndarray]: One-electron integral matrix [norb x norb]
-    of alpha and beta respectively, containing kinetic energy and nuclear
-    attraction integrals.
+    tuple[numpy.ndarray, numpy.ndarray]: One-electron integral matrices [norb x norb]
+    for alpha and beta spin channels.
 
 Raises:
     RuntimeError: If one-body integrals have not been set
 
 Examples:
-    >>> h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
+    >>> h1_alpha, h1_beta = hamiltonian.get_one_body_integrals
     >>> print(f"One-body matrix shape: {h1_alpha.shape}")
-    >>> print(f"Diagonal element h1_alpha[0,0] = {h1_alpha[0,0]}")
-    )",
+)",
                           py::return_value_policy::reference_internal);
 
   hamiltonian.def("has_one_body_integrals",
@@ -211,13 +492,7 @@ Examples:
 Check if one-body integrals are available.
 
 Returns:
-    bool: True if one-body integrals have been set, False otherwise
-
-Examples:
-    >>> if hamiltonian.has_one_body_integrals():
-    ...     h1 = hamiltonian.get_one_body_integrals()
-    ... else:
-    ...     print("One-body integrals not available")
+    bool: True if one-body integrals have been set
 )");
 
   hamiltonian.def("get_one_body_element", &Hamiltonian::get_one_body_element,
@@ -225,15 +500,12 @@ Examples:
 Get specific one-electron integral element <ij>.
 
 Args:
-    i, j (int): Orbital indices for the one-electron integral
-    channel (SpinChannel): spin channel to check (aa or bb, default is aa)
+    i (int): First orbital index
+    j (int): Second orbital index
+    channel (SpinChannel): Spin channel (aa or bb), defaults to aa
 
 Returns:
     float: Value of the one-electron integral <ij>
-
-Examples:
-    >>> integral = hamiltonian.get_one_body_element(0, 1)
-    >>> print(f"<01> = {integral}")
 )",
                   py::arg("i"), py::arg("j"),
                   py::arg("channel") = SpinChannel::aa);
@@ -246,22 +518,14 @@ Get two-electron integrals in molecular orbital basis.
 
 Returns:
     tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
-    integral vectors [norb^4] containing electron-electron repulsion integrals
-    aaaa, aabb and bbbb
+    integral vectors [norb^4] for aaaa, aabb, and bbbb spin channels.
 
 Raises:
     RuntimeError: If two-body integrals have not been set
 
 Notes:
-    Each of the integrals are stored as a flattened vector in chemist notation
-    <ij|kl> where the indices are ordered as i + j*norb + k*norb^2 + l*norb^3
-
-Examples:
-    >>> (h2, _, _) = hamiltonian.get_two_body_integrals()
-    >>> print(f"Two-body vector length: {len(h2)}")
-    >>> norb = hamiltonian.get_num_orbitals()
-    >>> print(f"Expected length: {norb**4}")
-        )",
+    Integrals are stored as flattened vectors in chemist notation <ij|kl>
+)",
                           py::return_value_policy::reference_internal);
 
   hamiltonian.def("get_two_body_element", &Hamiltonian::get_two_body_element,
@@ -269,18 +533,11 @@ Examples:
 Get specific two-electron integral element <ij|kl>.
 
 Args:
-    i, j, k, l (int): Orbital indices for the two-electron integral
-
-    channel (SpinChannel) : Which spin channel to check, aaaa, aabb, bbbb
-        (default is aaaa)
+    i, j, k, l (int): Orbital indices
+    channel (SpinChannel): Spin channel (aaaa, aabb, or bbbb), defaults to aaaa
 
 Returns:
     float: Value of the two-electron integral <ij|kl>
-
-Examples:
-    >>> integral = hamiltonian.get_two_body_element(0, 1, 2, 3)
-    >>> print(f"<01|23> = {integral}")
-
 )",
                   py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
                   py::arg("channel") = SpinChannel::aaaa);
@@ -291,14 +548,8 @@ Examples:
 Check if two-body integrals are available.
 
 Returns:
-    bool: True if two-body integrals have been set, False otherwise
-
-Examples:
-    >>> if hamiltonian.has_two_body_integrals():
-    ...     integrals_tuple = hamiltonian.get_two_body_integrals()
-    ... else:
-    ...     print("Two-body integrals not available")
-    )");
+    bool: True if two-body integrals have been set
+)");
 
   // Orbital information
   bind_getter_as_property(hamiltonian, "get_orbitals",
@@ -311,10 +562,6 @@ Returns:
 
 Raises:
     RuntimeError: If orbital data has not been set
-
-Examples:
-    >>> orbitals = hamiltonian.get_orbitals()
-    >>> print(f"Number of MOs: {orbitals.get_num_molecular_orbitals()}")
 )",
                           py::return_value_policy::reference_internal);
 
@@ -323,15 +570,10 @@ Examples:
 Check if orbital data is available.
 
 Returns:
-    bool: True if orbital data has been set, False otherwise
-
-Examples:
-    >>> if hamiltonian.has_orbitals():
-    ...     orbitals = hamiltonian.get_orbitals()
-    ... else:
-    ...     print("Orbital data not available")
+    bool: True if orbital data has been set
 )");
 
+  // Core energy and Fock matrix
   bind_getter_as_property(hamiltonian, "get_core_energy",
                           &Hamiltonian::get_core_energy,
                           R"(
@@ -339,76 +581,75 @@ Get core energy in atomic units.
 
 Returns:
     float: Core energy contribution in Hartree
-
-Examples:
-    >>> e_core = hamiltonian.get_core_energy()
-    >>> print(f"Core energy: {e_core} hartree")
 )");
 
   hamiltonian.def("has_inactive_fock_matrix",
                   &Hamiltonian::has_inactive_fock_matrix,
                   R"(
-Check if inactive fock matrix is available.
+Check if inactive Fock matrix is available.
 
 Returns:
-    bool: True if fock matrix is available.
-
-Examples:
-    >>> if hamiltonian.has_inactive_fock_matrix():
-    ...    alpha_fock, beta_fock = get_inactive_fock_matrix()
-    ... else:
-    ...     print("Inactive fock matrix is not available")
+    bool: True if inactive Fock matrix has been set
 )");
 
   bind_getter_as_property(hamiltonian, "get_inactive_fock_matrix",
                           &Hamiltonian::get_inactive_fock_matrix,
                           R"(
-Get tuple of alpha, beta inactive fock matrices
+Get tuple of inactive Fock matrices (alpha, beta).
 
 Returns:
-    [np.ndarray, np.ndarray] alpha, beta fock matrices
+    tuple[numpy.ndarray, numpy.ndarray]: Inactive Fock matrices for the active space
+)");
 
-Examples:
-    >>> alpha_inactive_fock, beta_inactive_fock = hamiltonian.get_inactive_fock_matrix()
+  // Type and restriction checks
+  bind_getter_as_property(hamiltonian, "get_type", &Hamiltonian::get_type,
+                          R"(
+Get the type of Hamiltonian (Hermitian or NonHermitian).
+
+Returns:
+    HamiltonianType: The Hamiltonian type
+)");
+
+  hamiltonian.def("is_hermitian", &Hamiltonian::is_hermitian,
+                  R"(
+Check if the Hamiltonian is Hermitian.
+
+Returns:
+    bool: True if the Hamiltonian type is Hermitian
 )");
 
   hamiltonian.def("is_restricted", &Hamiltonian::is_restricted,
                   R"(
-Check if Hamiltonian is restricted by checking if alpha
-and beta components are the same.
+Check if Hamiltonian is restricted (alpha == beta).
 
 Returns:
-    bool: Whether or not the hamiltonian is restricted
-
-Examples:
-    >>> restricted = hamiltonian.is_restricted()
-    >>> print(f"Hamiltonian is restricted: {restricted}")
+    bool: True if alpha and beta integrals are identical
 )");
 
   hamiltonian.def("is_unrestricted", &Hamiltonian::is_unrestricted,
                   R"(
-Check if Hamiltonian is unrestricted by checking if alpha
-and beta components are different.
+Check if Hamiltonian is unrestricted (alpha != beta).
 
 Returns:
-    bool: Whether or not the hamiltonian is unrestricted
-
-Examples:
-    >>> unrestricted = hamiltonian.is_unrestricted()
-    >>> print(f"Hamiltonian is unrestricted: {unrestricted}")
+    bool: True if alpha and beta integrals are different
 )");
 
+  // Container access
+  hamiltonian.def("get_container_type", &Hamiltonian::get_container_type,
+                  R"(
+Get the type of the underlying container.
+
+Returns:
+    str: Container type identifier (e.g., "canonical_4_center")
+)");
+
+  // Summary
   hamiltonian.def("get_summary", &Hamiltonian::get_summary,
                   R"(
 Get a human-readable summary of the Hamiltonian data.
 
 Returns:
-    str: Multi-line string describing the Hamiltonian properties including number of orbitals, electrons, core energy, etc.
-
-Examples:
-    >>> summary = hamiltonian.get_summary()
-    >>> print(summary)
-    # Output shows dimensions, energies, and validity status
+    str: Multi-line string describing the Hamiltonian properties
 )");
 
   // Generic file I/O
@@ -426,13 +667,11 @@ Raises:
 Examples:
     >>> hamiltonian.to_file("water.hamiltonian.json", "json")
     >>> hamiltonian.to_file("molecule.hamiltonian.h5", "hdf5")
-    >>> from pathlib import Path
-    >>> hamiltonian.to_file(Path("water.hamiltonian.json"), "json")
 )",
                   py::arg("filename"), py::arg("type"));
 
   hamiltonian.def_static("from_file", hamiltonian_from_file_wrapper, R"(
-Load Hamiltonian from file based on type parameter (static method).
+Load Hamiltonian from file based on type parameter.
 
 Args:
     filename (str or pathlib.Path): Path to file to read
@@ -442,14 +681,12 @@ Returns:
     Hamiltonian: New Hamiltonian loaded from file
 
 Raises:
-    ValueError: If format_type is not supported or filename doesn't follow naming convention
+    ValueError: If format_type is not supported
     RuntimeError: If file doesn't exist or I/O error occurs
 
 Examples:
     >>> hamiltonian = Hamiltonian.from_file("water.hamiltonian.json", "json")
     >>> hamiltonian = Hamiltonian.from_file("molecule.hamiltonian.h5", "hdf5")
-    >>> from pathlib import Path
-    >>> hamiltonian = Hamiltonian.from_file(Path("water.hamiltonian.json"), "json")
 )",
                          py::arg("filename"), py::arg("type"));
 
@@ -458,49 +695,35 @@ Examples:
 Save Hamiltonian to JSON file (with validation).
 
 Args:
-    filename (str or pathlib.Path): Path to JSON file to create or overwrite.
-
-        Must have ``.hamiltonian`` before the file extension
-        (e.g., ``water.hamiltonian.json``, ``molecule.hamiltonian.json``)
+    filename (str or pathlib.Path): Path to JSON file to create/overwrite.
+        Must have ``.hamiltonian`` before the file extension.
 
 Raises:
     ValueError: If filename doesn't follow the required naming convention
-
     RuntimeError: If an I/O error occurs
 
 Examples:
     >>> hamiltonian.to_json_file("water.hamiltonian.json")
-    >>> hamiltonian.to_json_file("molecule.hamiltonian.json")
-    >>> from pathlib import Path
-    >>> hamiltonian.to_json_file(Path("water.hamiltonian.json"))
-
 )",
                   py::arg("filename"));
 
   hamiltonian.def_static("from_json_file", hamiltonian_from_json_file_wrapper,
                          R"(
-Load Hamiltonian from JSON file (static method with validation).
+Load Hamiltonian from JSON file.
 
 Args:
     filename (str or pathlib.Path): Path to JSON file to read.
-
-        Must have ``.hamiltonian`` before the file extension
-        (e.g., ``water.hamiltonian.json``, ``molecule.hamiltonian.json``)
+        Must have ``.hamiltonian`` before the file extension.
 
 Returns:
     Hamiltonian: New Hamiltonian loaded from file
 
 Raises:
     ValueError: If filename doesn't follow the required naming convention
-
     RuntimeError: If file doesn't exist or I/O error occurs
 
 Examples:
     >>> hamiltonian = Hamiltonian.from_json_file("water.hamiltonian.json")
-    >>> hamiltonian = Hamiltonian.from_json_file("molecule.hamiltonian.json")
-    >>> from pathlib import Path
-    >>> hamiltonian = Hamiltonian.from_json_file(Path("water.hamiltonian.json"))
-
 )",
                          py::arg("filename"));
 
@@ -510,48 +733,34 @@ Save Hamiltonian to HDF5 file (with validation).
 
 Args:
     filename (str or pathlib.Path): Path to HDF5 file to create/overwrite.
-
-        Must have ``.hamiltonian`` before the file extension
-        (e.g., ``water.hamiltonian.h5``, ``molecule.hamiltonian.hdf5``)
+        Must have ``.hamiltonian`` before the file extension.
 
 Raises:
     ValueError: If filename doesn't follow the required naming convention
-
     RuntimeError: If I/O error occurs
 
 Examples:
     >>> hamiltonian.to_hdf5_file("water.hamiltonian.h5")
-    >>> hamiltonian.to_hdf5_file("molecule.hamiltonian.hdf5")
-    >>> from pathlib import Path
-    >>> hamiltonian.to_hdf5_file(Path("water.hamiltonian.h5"))
-
 )",
                   py::arg("filename"));
 
   hamiltonian.def_static("from_hdf5_file", hamiltonian_from_hdf5_file_wrapper,
                          R"(
-Load Hamiltonian from HDF5 file (static method with validation).
+Load Hamiltonian from HDF5 file.
 
 Args:
     filename (str or pathlib.Path): Path to HDF5 file to read.
-
-        Must have ``.hamiltonian`` before the file extension
-        (e.g., ``water.hamiltonian.h5``, ``molecule.hamiltonian.hdf5``)
+        Must have ``.hamiltonian`` before the file extension.
 
 Returns:
     Hamiltonian: New Hamiltonian loaded from file
 
 Raises:
     ValueError: If filename doesn't follow the required naming convention
-
     RuntimeError: If file doesn't exist or I/O error occurs
 
 Examples:
     >>> hamiltonian = Hamiltonian.from_hdf5_file("water.hamiltonian.h5")
-    >>> hamiltonian = Hamiltonian.from_hdf5_file("molecule.hamiltonian.hdf5")
-    >>> from pathlib import Path
-    >>> hamiltonian = Hamiltonian.from_hdf5_file(Path("water.hamiltonian.h5"))
-
 )",
                          py::arg("filename"));
 
@@ -561,11 +770,7 @@ Examples:
 Save Hamiltonian to FCIDUMP file.
 
 Args:
-    filename (str or pathlib.Path): Path to FCIDUMP file to create/overwrite.
-
-        Typically uses ``.fcidump`` extension
-        (e.g., ``water.fcidump``, ``molecule.fcidump``)
-
+    filename (str or pathlib.Path): Path to FCIDUMP file to create/overwrite
     nalpha (int): Number of alpha electrons
     nbeta (int): Number of beta electrons
 
@@ -574,14 +779,10 @@ Raises:
 
 Examples:
     >>> hamiltonian.to_fcidump_file("water.fcidump", 5, 5)
-    >>> hamiltonian.to_fcidump_file("molecule.fcidump", 7, 5)
-    >>> from pathlib import Path
-    >>> hamiltonian.to_fcidump_file(Path("water.fcidump"), 5, 5)
 
 Notes:
     FCIDUMP format is a standard quantum chemistry format for storing
     molecular integrals and is widely supported by quantum chemistry codes.
-
 )",
                   py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
@@ -592,11 +793,10 @@ Notes:
         return self.to_json().dump();
       },
       R"(
-Convert Hamiltonian to JSON object.
+Convert Hamiltonian to JSON string.
 
 Returns:
-    str: JSON-serializable string containing Hamiltonian data
-
+    str: JSON representation of the Hamiltonian
 )");
 
   hamiltonian.def_static(
@@ -605,7 +805,7 @@ Returns:
         return *Hamiltonian::from_json(nlohmann::json::parse(json_str));
       },
       R"(
-Load Hamiltonian from JSON string (static method).
+Load Hamiltonian from JSON string.
 
 Args:
     json_data (str): JSON string containing Hamiltonian data
@@ -614,12 +814,11 @@ Returns:
     Hamiltonian: New Hamiltonian loaded from JSON
 
 Raises:
-    RuntimeError: If JSON is malformed or contains invalid Hamiltonian data
+    RuntimeError: If JSON is malformed or contains invalid data
 
 Examples:
-    >>> json_str = '{"num_orbitals": 2, "num_electrons": 2, ...}'
-    >>> hamiltonian = Hamiltonian.from_json(json_str)
-
+    >>> json_str = hamiltonian.to_json()
+    >>> loaded = Hamiltonian.from_json(json_str)
 )",
       py::arg("json_data"));
 
