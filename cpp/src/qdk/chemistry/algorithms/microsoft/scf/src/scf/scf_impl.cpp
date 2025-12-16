@@ -25,6 +25,7 @@
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+#include <iomanip>
 #include <sstream>
 #include <thread>
 
@@ -965,6 +966,80 @@ void SCFImpl::write_gradients_(const std::vector<double>& gradients,
   } else {
     QDK_LOGGER().info("Point Charge gradients:\n{}", oss.str());
   }
+}
+
+std::pair<double, RowMajorMatrix>
+SCFImpl::evaluate_trial_density_energy_and_fock(
+    const RowMajorMatrix& P_matrix) const {
+  QDK_LOG_TRACE_ENTERING();
+  QDK_LOGGER().debug(
+      "Computing energy and Fock matrix by trial density matrix");
+#ifdef ENABLE_NVTX3
+  NVTX3_FUNC_RANGE();
+#endif
+  AutoTimer timer("SCFImpl::evaluate_trial_density_energy_and_fock");
+
+  RowMajorMatrix H_matrix = H_.eval();
+  RowMajorMatrix F_matrix = H_matrix;
+  auto [alpha, beta, omega] = get_hyb_coeff_();
+  RowMajorMatrix J_matrix = RowMajorMatrix::Zero(
+      num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
+  RowMajorMatrix K_matrix = RowMajorMatrix::Zero(
+      num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
+  eri_->build_JK(P_matrix.data(), J_matrix.data(), K_matrix.data(), alpha, beta,
+                 omega);
+#ifdef QDK_CHEMISTRY_ENABLE_PCM
+  double scf_pcm_energy = 0.0;
+  RowMajorMatrix Vpcm_matrix = RowMajorMatrix::Zero(
+      num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
+  if (pcm_ != nullptr) {
+    pcm_->build_pcm_potential(P_matrix.data(), Vpcm_matrix.data());
+    TIMEIT(pcm_->compute_PCM_terms(P_matrix.data(), Vpcm_matrix.data(),
+                                   &scf_pcm_energy),
+           "PCM::compute_PCM_terms");
+    if (ctx_.cfg->mpi.world_rank == 0) {
+      F_matrix += Vpcm_matrix;
+    }
+  }
+#endif
+
+  if (ctx_.cfg->mpi.world_rank == 0) {
+    if (ctx_.cfg->unrestricted) {
+      F_matrix +=
+          (J_matrix.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_) +
+           J_matrix.block(num_atomic_orbitals_, 0, num_atomic_orbitals_,
+                          num_atomic_orbitals_))
+              .replicate(2, 1) -
+          K_matrix;
+    } else {
+      F_matrix += J_matrix - 0.5 * K_matrix;
+    }
+  }
+
+  double scf_one_electron_energy = P_matrix.cwiseProduct(H_matrix).sum();
+  double scf_two_electron_energy =
+      0.5 * P_matrix.cwiseProduct(F_matrix - H_matrix).sum();
+#ifdef QDK_CHEMISTRY_ENABLE_PCM
+  double scf_two_electron_energy -=
+      0.5 * P_matrix.cwiseProduct(Vpcm_matrix).sum();
+#endif
+
+  double total_energy = ctx_.result.nuclear_repulsion_energy +
+                        scf_one_electron_energy + scf_two_electron_energy;
+#ifdef QDK_CHEMISTRY_ENABLE_PCM
+  total_energy += scf_pcm_energy;
+#endif
+#ifdef QDK_CHEMISTRY_ENABLE_DFTD3
+  const double scf_dispersion_correction_energy =
+      ctx_.result.scf_dispersion_correction_energy;
+  total_energy += scf_dispersion_correction_energy;
+#endif
+  QDK_LOGGER().debug(
+      "ctx_.cfg->mpi.world_rank: {}, nuclear_repulsion_energy: {:.10e}, "
+      "one_electron_energy: {:.10e}, two_electron_energy: {:.10e}",
+      ctx_.cfg->mpi.world_rank, ctx_.result.nuclear_repulsion_energy,
+      scf_one_electron_energy, scf_two_electron_energy);
+  return {total_energy, F_matrix};
 }
 
 }  // namespace qdk::chemistry::scf

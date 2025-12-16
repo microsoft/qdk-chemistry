@@ -119,6 +119,24 @@ double KSImpl::total_energy_() {
   return _total;
 }
 
+std::pair<double, RowMajorMatrix>
+KSImpl::evaluate_trial_density_energy_and_fock(
+    const RowMajorMatrix& P_matrix) const {
+  QDK_LOG_TRACE_ENTERING();
+  // Fock matrix generated below does not include XC contributions
+  auto [total_energy, F_matrix] =
+      SCFImpl::evaluate_trial_density_energy_and_fock(P_matrix);
+  double scf_xc_energy = 0.0;  // do not update XC_ here
+  RowMajorMatrix XC_matrix = RowMajorMatrix::Zero(
+      (num_density_matrices_ * num_atomic_orbitals_), num_atomic_orbitals_);
+  exc_->build_XC(P_matrix.data(), XC_matrix.data(), &scf_xc_energy);
+  total_energy += scf_xc_energy;
+  if (ctx_.cfg->mpi.world_rank == 0) {
+    F_matrix += XC_matrix;
+  }
+  return {total_energy, F_matrix};
+}
+
 std::tuple<double, double, double> KSImpl::get_hyb_coeff_() const {
   QDK_LOG_TRACE_ENTERING();
   return exc_->get_hyb();

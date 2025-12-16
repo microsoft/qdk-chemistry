@@ -64,6 +64,16 @@ class KSImpl : public SCFImpl {
   double total_energy_() override;
 
   /**
+   * @brief Evaluate total energy for a trial density matrix
+   *
+   * @param P_matrix Trial density matrix
+   * @return Pair of (total energy including XC in Hartree, Fock matrix in AO
+   * basis)
+   */
+  std::pair<double, RowMajorMatrix> evaluate_trial_density_energy_and_fock(
+      const RowMajorMatrix& P_matrix) const override;
+
+  /**
    * @brief Get hybridization coefficients for range-separated functionals
    *
    * @returns A tuple containing the coefficients

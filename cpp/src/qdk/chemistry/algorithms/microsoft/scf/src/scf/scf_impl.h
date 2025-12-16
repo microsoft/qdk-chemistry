@@ -166,6 +166,15 @@ class SCFImpl {
    */
   RowMajorMatrix& eigenvalues() { return eigenvalues_; }
 
+  /**
+   * @brief Evaluate total energy and Fock matrix for a trial density matrix
+   *
+   * @param P_matrix Trial density matrix
+   * @return Pair of (total energy in Hartree, Fock matrix in AO basis)
+   */
+  virtual std::pair<double, RowMajorMatrix>
+  evaluate_trial_density_energy_and_fock(const RowMajorMatrix& P_matrix) const;
+
  protected:
   /**
    * @brief Build one-electron integrals (overlap, kinetic, nuclear attraction)

@@ -14,6 +14,7 @@
 #include <qdk/chemistry/utils/logger.hpp>
 #include <vector>
 
+#include "../../../../../../../../../external/macis/src/macis/bfgs/line_search.hpp"
 #include "../scf/scf_impl.h"
 #include "qdk/chemistry/scf/core/scf.h"
 #include "qdk/chemistry/scf/core/types.h"
@@ -26,235 +27,24 @@
 namespace qdk::chemistry::scf {
 
 namespace impl {
+
 /**
- * @brief Implementation class for Geometric Direct Minimization (GDM)
+ * @brief Apply orbital rotation using kappa vector
+ * @param[in,out] C Molecular orbital coefficient matrix
+ * @param[in] spin_index Spin index (0 for alpha, 1 for beta)
+ * @param[in] kappa_vector The kappa vector to apply for rotation
+ * @param[in] num_occupied_orbitals Number of occupied orbitals for this spin
+ * @param[in] num_molecular_orbitals Number of molecular orbitals
+ *
+ * @details
+ * This function constructs the antisymmetric kappa matrix and applies the
+ * orbital rotation C = C * exp(kappa).
  */
-class GDM {
- public:
-  /**
-   * @brief Constructor for the GDM (Geometric Direct Minimization) class
-   * @param[in] ctx Reference to SCFContext
-   * @param[in] history_size_limit Maximum history size limit for BFGS in GDM
-   *
-   */
-  explicit GDM(const SCFContext& ctx, const int history_size_limit);
-
-  /**
-   * @brief Perform one GDM SCF iteration for all spin components
-   *
-   * This method drives the GDM algorithm by performing orbital optimization
-   * for each spin component (alpha and beta for unrestricted calculations).
-   *
-   * @param[in] F Current Fock matrix
-   * @param[in,out] P Density matrix
-   * @param[in,out] C Molecular orbital coefficients
-   * @param[in] energy Current SCF energy
-   */
-  void iterate(const RowMajorMatrix& F, RowMajorMatrix& P, RowMajorMatrix& C,
-               const double energy);
-
-  /**
-   * @brief Set the energy change from last two DIIS cycles for GDM algorithm
-   *
-   * @param[in] delta_energy_diis Energy change from DIIS algorithm
-   */
-  void set_delta_energy_diis(const double delta_energy_diis) {
-    QDK_LOG_TRACE_ENTERING();
-    delta_energy_ = delta_energy_diis;
-  }
-
- private:
-  /**
-   * @brief Apply orbital rotation using kappa vector
-   * @param[in,out] C Molecular orbital coefficient matrix
-   * @param[in] spin_index Spin index (0 for alpha, 1 for beta)
-   * @param[in] kappa_vector The kappa vector to apply for rotation (can be
-   * positive or negative)
-   *
-   * @details
-   * This function constructs the antisymmetric kappa matrix and applies the
-   * orbital rotation C = C * exp(kappa). For restoration, pass
-   * -kappa_[spin_index]; for normal rotation, pass kappa_[spin_index].
-   */
-  void apply_orbital_rotation_(RowMajorMatrix& C, const int spin_index,
-                               const Eigen::VectorXd& kappa_vector);
-
-  /**
-   * @brief Transform history matrices (either history_dgrad or history_kappa)
-   * using current rotation matrices Uoo and Uvv to transform into the
-   * pseudo-canonical orbital basis
-   * @param[in,out] history History matrix to be transformed (either
-   * history_dgrad or history_kappa)
-   * @param[in] history_size Number of history entries
-   * @param[in] num_occupied_orbitals Number of electrons for current spin
-   * @param[in] num_molecular_orbitals Number of molecular orbitals
-   *
-   * @details
-   * For each history entry, applies the transformation:
-   * K_new = Uoo^T * K_old * Uvv
-   * where K can be either kappa rotation vectors or gradient difference
-   * vectors.
-   */
-  void transform_history_(RowMajorMatrix& history, const int history_size,
-                          const int num_occupied_orbitals,
-                          const int num_molecular_orbitals);
-
-  /**
-   * @brief Execute a complete GDM iteration step combining all GDM operations
-   * @param[in] F Fock matrix in AO basis
-   * @param[in,out] C Molecular orbital coefficient matrix
-   * @param[in,out] P Density matrix
-   * @param[in] spin_index Spin index (0 for alpha, 1 for beta)
-   * @param[in] scf_total_energy Current SCF total energy
-   * @param[in] occupation_factor Occupation factor for density matrix
-   * construction
-   *
-   *
-   * This is the main driver function that combines all GDM algorithmic
-   * components into a single iteration step.
-   */
-  void gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
-                           RowMajorMatrix& P, const int spin_index,
-                           const double scf_total_energy,
-                           const double occupation_factor);
-  /// Reference to SCFContext
-  const SCFContext& ctx_;  ///< Reference to SCFContext
-  /// Energy change from the last step
-  double delta_energy_ = std::numeric_limits<double>::infinity();
-
-  /// Energy increase threshold for GDM step size rescaling
-  const double rescale_kappa_denergy_threshold_ = 5e-4;
-
-  /// Number of electrons for alpha (0) and beta (1) spins
-  std::vector<int> num_electrons_;
-
-  /// History of kappa rotation vectors for each spin component
-  std::vector<RowMajorMatrix> history_kappa_;
-  /// History of gradient difference vectors for each spin component
-  std::vector<RowMajorMatrix> history_dgrad_;
-  /// Number of vectors saved in history
-  std::vector<int> history_size_;
-  /// Maximum number of vectors saved in history_kappa_ and history_dgrad_
-  int history_size_limit_;
-
-  /// Gradient vectors from the last iteration step for spin alpha and beta
-  std::vector<Eigen::VectorXd> previous_gradient_;
-  /// Gradient vectors from the current iteration step for spin alpha and beta
-  std::vector<Eigen::VectorXd> current_gradient_;
-
-  /// Eigenvalues of pseudo-canonical orbitals, used for building Hessian
-  Eigen::VectorXd pseudo_canonical_eigenvalues_;
-
-  /// Horizontal rotation matrix of occupied orbitals
-  RowMajorMatrix Uoo_;
-  /// Horizontal rotation matrix of virtual orbitals
-  RowMajorMatrix Uvv_;
-
-  std::vector<Eigen::VectorXd> kappa_;  // vertical rotation matrix of this step
-  /// Energy of the last accepted step, used to decide if we rescale the kappa
-  /// vector in this step
-  double last_accepted_energy_;
-  /// The scale factor applied to kappa in the current step if energy increased
-  /// too much compared to last accepted energy
-  double kappa_scale_factor_;
-  int gdm_step_count_;        // GDM iteration counter
-  int num_density_matrices_;  // Number of density matrices (1 for restricted, 2
-                              // for unrestricted)
-};
-
-GDM::GDM(const SCFContext& ctx, int history_size_limit)
-    : ctx_(ctx),
-      history_size_limit_(history_size_limit),
-      last_accepted_energy_(std::numeric_limits<double>::infinity()),
-      kappa_scale_factor_(0.0),
-      gdm_step_count_(0) {
+static void apply_orbital_rotation(RowMajorMatrix& C, const int spin_index,
+                                   const Eigen::VectorXd& kappa_vector,
+                                   const int num_occupied_orbitals,
+                                   const int num_molecular_orbitals) {
   QDK_LOG_TRACE_ENTERING();
-  // Calculate values from SCFContext
-  const auto& cfg = *ctx.cfg;
-  const auto& mol = *ctx.mol;
-
-  const int num_molecular_orbitals =
-      static_cast<int>(ctx.num_molecular_orbitals);
-  const bool unrestricted = cfg.unrestricted;
-
-  auto n_ecp_electrons = ctx.basis_set->n_ecp_electrons;
-  auto spin = mol.multiplicity - 1;
-  auto num_alpha_electrons =
-      static_cast<int>((mol.n_electrons - n_ecp_electrons + spin) / 2);
-  auto num_beta_electrons =
-      static_cast<int>(mol.n_electrons - n_ecp_electrons - num_alpha_electrons);
-
-  // Initialize member variables
-  num_electrons_ = {num_alpha_electrons, num_beta_electrons};
-  history_size_ = std::vector<int>(unrestricted ? 2 : 1, 0);
-  pseudo_canonical_eigenvalues_ = Eigen::VectorXd::Zero(num_molecular_orbitals);
-  if (history_size_limit < 1) {
-    throw std::invalid_argument(
-        "GDM history size limit must be at least 1, got: " +
-        std::to_string(history_size_limit));
-  }
-
-  QDK_LOGGER().debug("GDM initialized with history_size_limit = {}",
-                     history_size_limit_);
-  num_density_matrices_ = unrestricted ? 2 : 1;
-
-  // Initialize vectors with proper size
-  history_kappa_.resize(num_density_matrices_);
-  history_dgrad_.resize(num_density_matrices_);
-  previous_gradient_.resize(num_density_matrices_);
-  current_gradient_.resize(num_density_matrices_);
-  kappa_.resize(num_density_matrices_);
-
-  for (int spin_index = 0; spin_index < num_density_matrices_; spin_index++) {
-    history_size_[spin_index] = 0;
-    const int num_occupied_orbitals = num_electrons_[spin_index];
-    const int num_virtual_orbitals =
-        num_molecular_orbitals - num_occupied_orbitals;
-    const int rotation_size = num_occupied_orbitals * num_virtual_orbitals;
-    history_kappa_[spin_index] =
-        RowMajorMatrix::Zero(history_size_limit_, rotation_size);
-    history_dgrad_[spin_index] =
-        RowMajorMatrix::Zero(history_size_limit_, rotation_size);
-    previous_gradient_[spin_index] = Eigen::VectorXd::Zero(rotation_size);
-    current_gradient_[spin_index] = Eigen::VectorXd::Zero(rotation_size);
-    kappa_[spin_index] = Eigen::VectorXd::Zero(rotation_size);
-  }
-}
-
-void GDM::transform_history_(RowMajorMatrix& history, const int history_size,
-                             const int num_occupied_orbitals,
-                             const int num_molecular_orbitals) {
-  QDK_LOG_TRACE_ENTERING();
-  const int num_virtual_orbitals =
-      num_molecular_orbitals - num_occupied_orbitals;
-  RowMajorMatrix temp =
-      RowMajorMatrix::Zero(num_occupied_orbitals, num_virtual_orbitals);
-  for (int line = 0; line < history_size; line++) {
-    // K_ov (new) = Uoo^T * K_ov * Uvv
-    // Note: BLAS expects column-major matrices, but our matrices are row-major
-    double* history_line_ptr = history.row(line).data();
-
-    // First step: temp = K_ov * Uvv (in row-major view)
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-               num_virtual_orbitals, num_occupied_orbitals,
-               num_virtual_orbitals, 1.0, Uvv_.data(), num_virtual_orbitals,
-               history_line_ptr, num_virtual_orbitals, 0.0, temp.data(),
-               num_virtual_orbitals);
-
-    // Second step: result = Uoo^T * temp (in row-major view)
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-               num_virtual_orbitals, num_occupied_orbitals,
-               num_occupied_orbitals, 1.0, temp.data(), num_virtual_orbitals,
-               Uoo_.data(), num_occupied_orbitals, 0.0, history_line_ptr,
-               num_virtual_orbitals);
-  }
-}
-
-void GDM::apply_orbital_rotation_(RowMajorMatrix& C, const int spin_index,
-                                  const Eigen::VectorXd& kappa_vector) {
-  QDK_LOG_TRACE_ENTERING();
-  const int num_molecular_orbitals = C.cols();
-  int num_occupied_orbitals = num_electrons_[spin_index];
   const int num_virtual_orbitals =
       num_molecular_orbitals - num_occupied_orbitals;
 
@@ -288,19 +78,427 @@ void GDM::apply_orbital_rotation_(RowMajorMatrix& C, const int spin_index,
              num_molecular_orbitals);
 }
 
-void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
-                              RowMajorMatrix& P, const int spin_index,
-                              const double scf_total_energy,
-                              const double occupation_factor) {
+/**
+ * @brief Functor for evaluating GDM line search objective
+ *
+ * Evaluates energy and gradient at trial step along direction kappa_direction.
+ * Caches results to avoid redundant computation when eval() and grad() are
+ * called at the same relative_step_length.
+ */
+class GDMLineFunctor {
+ public:
+  // Type definitions required by MACIS line search interface
+  using argument_type = Eigen::VectorXd;
+  using return_type = double;
+
+  GDMLineFunctor(const SCFImpl& scf_impl,
+                 const RowMajorMatrix& C_pseudo_canonical,
+                 const std::vector<int>& num_electrons,
+                 const std::vector<int>& rotation_offset,
+                 const std::vector<int>& rotation_size,
+                 int num_density_matrices, int num_molecular_orbitals,
+                 bool unrestricted)
+      : scf_impl_(scf_impl),
+        C_pseudo_canonical_(C_pseudo_canonical),
+        num_electrons_(num_electrons),
+        rotation_offset_(rotation_offset),
+        rotation_size_(rotation_size),
+        num_density_matrices_(num_density_matrices),
+        num_molecular_orbitals_(num_molecular_orbitals),
+        unrestricted_(unrestricted),
+        cached_kappa_(Eigen::VectorXd()) {}
+
+  /**
+   * @brief Evaluate energy at given kappa vector
+   * @param x Kappa vector (orbital rotation parameters)
+   * @return Total energy at trial point
+   *
+   * @note Uses cached result if ||x - cached_kappa|| < 1e-14
+   */
+  double eval(const Eigen::VectorXd& x);
+
+  /**
+   * @brief Evaluate gradient at given kappa vector
+   * @param x Kappa vector (orbital rotation parameters)
+   * @return Gradient vector at trial point
+   *
+   * @note Reuses Fock matrix from eval() if called at same kappa
+   */
+  Eigen::VectorXd grad(const Eigen::VectorXd& x);
+
+  /**
+   * @brief Static utility: compute dot product of two vectors
+   * @param v1 First vector
+   * @param v2 Second vector
+   * @return Dot product v1 · v2
+   */
+  static double dot(const Eigen::VectorXd& v1, const Eigen::VectorXd& v2) {
+    return v1.dot(v2);
+  }
+
+  /**
+   * @brief Static utility: perform BLAS-style axpy operation
+   * @param alpha Scalar multiplier
+   * @param x Vector to scale and add
+   * @param y Vector to add to (modified in-place)
+   * @note Performs: y = y + alpha * x
+   */
+  static void axpy(double alpha, const Eigen::VectorXd& x, Eigen::VectorXd& y) {
+    y.noalias() += alpha * x;
+  }
+
+  /**
+   * @brief Get cached orbital coefficient matrix from last eval() call
+   */
+  const RowMajorMatrix& get_cached_C() const { return cached_C_; }
+
+  /**
+   * @brief Get cached density matrix from last eval() call
+   */
+  const RowMajorMatrix& get_cached_P() const { return cached_P_; }
+
+ private:
+  // Const references to external data
+  const SCFImpl& scf_impl_;
+  const RowMajorMatrix& C_pseudo_canonical_;
+  const std::vector<int>& num_electrons_;
+  const std::vector<int>& rotation_offset_;
+  const std::vector<int>& rotation_size_;
+
+  // Value parameters
+  const int num_density_matrices_;
+  const int num_molecular_orbitals_;
+  const bool unrestricted_;
+
+  // Cache for avoiding redundant computation
+  // When eval(x) then grad(x) called, Fock only computed once
+  Eigen::VectorXd cached_kappa_;  // Cached kappa vector
+  double cached_energy_;
+  RowMajorMatrix cached_F_;  // Needed for gradient computation
+  RowMajorMatrix cached_C_;  // For writing back to scf_impl
+  RowMajorMatrix cached_P_;  // For writing back to scf_impl
+};
+
+double GDMLineFunctor::eval(const Eigen::VectorXd& x) {
+  // Check if we've already computed this kappa vector
+  // Use smart caching: if ||x - cached_kappa|| < 1e-14, reuse cached result
+  if (cached_kappa_.size() == x.size() && (cached_kappa_ - x).norm() < 1e-14) {
+    return cached_energy_;
+  }
+
+  // Use input x directly as trial kappa
+  const Eigen::VectorXd& kappa_trial = x;
+
+  // Restore C to pseudo-canonical state (all spins)
+  cached_C_ = C_pseudo_canonical_;
+
+  // Apply rotation for all spins with kappa_trial
+  for (int i = 0; i < num_density_matrices_; i++) {
+    auto kappa_spin =
+        kappa_trial.segment(rotation_offset_[i], rotation_size_[i]);
+    apply_orbital_rotation(cached_C_, i, kappa_spin, num_electrons_[i],
+                           num_molecular_orbitals_);
+  }
+
+  // Compute P_trial from rotated C (for all spins)
+  cached_P_ = RowMajorMatrix::Zero(
+      num_density_matrices_ * num_molecular_orbitals_, num_molecular_orbitals_);
+
+  for (int i = 0; i < num_density_matrices_; i++) {
+    const int num_occupied_orbitals = num_electrons_[i];
+    const double occupation_factor = unrestricted_ ? 1.0 : 2.0;
+
+    cached_P_.block(num_molecular_orbitals_ * i, 0, num_molecular_orbitals_,
+                    num_molecular_orbitals_) =
+        occupation_factor *
+        cached_C_.block(num_molecular_orbitals_ * i, 0, num_molecular_orbitals_,
+                        num_occupied_orbitals) *
+        cached_C_
+            .block(num_molecular_orbitals_ * i, 0, num_molecular_orbitals_,
+                   num_occupied_orbitals)
+            .transpose();
+  }
+
+  // Evaluate energy and Fock matrix using trial density matrix
+  auto [energy, F_trial] =
+      scf_impl_.evaluate_trial_density_energy_and_fock(cached_P_);
+
+  // Cache all results for potential grad() call at same kappa
+  cached_energy_ = energy;
+  cached_F_ = F_trial;
+  cached_kappa_ = x;
+
+  return cached_energy_;
+}
+
+Eigen::VectorXd GDMLineFunctor::grad(const Eigen::VectorXd& x) {
+  // Ensure we have the Fock matrix at this kappa
+  // If not cached, call eval() to compute it
+  if (cached_kappa_.size() != x.size() || (cached_kappa_ - x).norm() >= 1e-14) {
+    eval(x);
+  }
+
+  // Initialize the full gradient vector (concatenated for all spins)
+  int total_rotation_size = 0;
+  for (int i = 0; i < num_density_matrices_; i++) {
+    total_rotation_size += rotation_size_[i];
+  }
+  Eigen::VectorXd gradient = Eigen::VectorXd::Zero(total_rotation_size);
+
+  // Compute gradient for each spin component
+  for (int i = 0; i < num_density_matrices_; i++) {
+    const int num_occupied_orbitals = num_electrons_[i];
+    const int num_virtual_orbitals =
+        num_molecular_orbitals_ - num_occupied_orbitals;
+
+    // Transform Fock matrix to MO basis: F_MO = C^T * F * C
+    RowMajorMatrix F_MO =
+        cached_C_
+            .block(num_molecular_orbitals_ * i, 0, num_molecular_orbitals_,
+                   num_molecular_orbitals_)
+            .transpose() *
+        cached_F_.block(num_molecular_orbitals_ * i, 0, num_molecular_orbitals_,
+                        num_molecular_orbitals_) *
+        cached_C_.block(num_molecular_orbitals_ * i, 0, num_molecular_orbitals_,
+                        num_molecular_orbitals_);
+
+    // Extract occupied-virtual block and compute gradient
+    RowMajorMatrix gradient_matrix =
+        -(4.0 / num_density_matrices_) * F_MO.block(0, num_occupied_orbitals,
+                                                    num_occupied_orbitals,
+                                                    num_virtual_orbitals);
+
+    // Flatten matrix to vector and store in appropriate segment
+    gradient.segment(rotation_offset_[i], rotation_size_[i]) =
+        Eigen::Map<const Eigen::VectorXd>(gradient_matrix.data(),
+                                          rotation_size_[i]);
+  }
+
+  return gradient;
+}
+
+/**
+ * @brief Implementation class for Geometric Direct Minimization (GDM)
+ */
+class GDM {
+ public:
+  /**
+   * @brief Constructor for the GDM (Geometric Direct Minimization) class
+   * @param[in] ctx Reference to SCFContext
+   * @param[in] history_size_limit Maximum history size limit for BFGS in GDM
+   *
+   */
+  explicit GDM(const SCFContext& ctx, const int history_size_limit);
+
+  /**
+   * @brief Perform one GDM SCF iteration for all spin components
+   *
+   * This method drives the GDM algorithm by performing orbital optimization
+   * for each spin component (alpha and beta for unrestricted calculations).
+   *
+   * @param[in,out] scf_impl Reference to SCFImpl containing matrices and energy
+   */
+  void iterate(SCFImpl& scf_impl);
+
+  /**
+   * @brief Set the energy change from last two DIIS cycles for GDM algorithm
+   *
+   * @param[in] delta_energy_diis Energy change from DIIS algorithm
+   */
+  void set_delta_energy_diis(const double delta_energy_diis) {
+    QDK_LOG_TRACE_ENTERING();
+    delta_energy_ = delta_energy_diis;
+  }
+
+ private:
+  /**
+   * @brief Transform history matrices (either history_dgrad or history_kappa)
+   * using current rotation matrices Uoo and Uvv to transform into the
+   * pseudo-canonical orbital basis
+   * @param[in,out] history History matrix to be transformed (either
+   * history_dgrad or history_kappa)
+   * @param[in] history_size Number of history entries
+   * @param[in] num_occupied_orbitals Number of electrons for current spin
+   * @param[in] num_molecular_orbitals Number of molecular orbitals
+   *
+   * @details
+   * For each history entry, applies the transformation:
+   * K_new = Uoo^T * K_old * Uvv
+   * where K can be either kappa rotation vectors or gradient difference
+   * vectors.
+   */
+  void transform_history_(RowMajorMatrix& history, const int history_size,
+                          const int num_occupied_orbitals,
+                          const int num_molecular_orbitals);
+
+  /**
+   * @brief Generate pseudo-canonical orbitals and apply transformations
+   * @param[in] F Fock matrix in AO basis
+   * @param[in,out] C Molecular orbital coefficient matrix
+   * @param[in] spin_index Spin index (0 for alpha, 1 for beta)
+   * @param[in,out] history_kappa_spin Block reference to history kappa for this
+   * spin
+   * @param[in,out] history_dgrad_spin Block reference to history dgrad for this
+   * spin
+   * @param[in,out] current_gradient_spin Segment reference to current gradient
+   * for this spin
+   *
+   * This function performs pseudo-canonical transformation on orbitals,
+   * gradients, and history.
+   */
+  void generate_pseudo_canonical_orbital_(
+      const RowMajorMatrix& F, RowMajorMatrix& C, const int spin_index,
+      Eigen::Block<RowMajorMatrix> history_kappa_spin,
+      Eigen::Block<RowMajorMatrix> history_dgrad_spin,
+      Eigen::VectorBlock<Eigen::VectorXd> current_gradient_spin);
+  /// Reference to SCFContext
+  const SCFContext& ctx_;  ///< Reference to SCFContext
+  /// Energy change from the last step
+  double delta_energy_ = std::numeric_limits<double>::infinity();
+
+  /// Energy increase threshold for GDM step size rescaling
+  const double rescale_kappa_denergy_threshold_ = 5e-4;
+
+  /// Number of electrons for alpha (0) and beta (1) spins
+  std::vector<int> num_electrons_;
+
+  /// History of kappa rotation vectors for each spin component
+  RowMajorMatrix history_kappa_;
+  /// History of gradient difference vectors for each spin component
+  RowMajorMatrix history_dgrad_;
+  /// Number of vectors saved in history
+  int history_size_;
+  /// Maximum number of vectors saved in history_kappa_ and history_dgrad_
+  int history_size_limit_;
+  /// Rotation size for each spin (n_occ * n_virt for alpha and beta)
+  std::vector<int> rotation_size_;
+  /// Offset for each spin in concatenated vectors
+  std::vector<int> rotation_offset_;
+  /// Total rotation size (sum of rotation_size_)
+  int total_rotation_size_;
+
+  /// Gradient vectors from the last iteration step for spin alpha and beta
+  Eigen::VectorXd previous_gradient_;
+  /// Gradient vectors from the current iteration step for spin alpha and beta
+  Eigen::VectorXd current_gradient_;
+
+  /// Eigenvalues of pseudo-canonical orbitals, used for building Hessian
+  Eigen::VectorXd pseudo_canonical_eigenvalues_;
+
+  /// Horizontal rotation matrix of occupied orbitals
+  RowMajorMatrix Uoo_;
+  /// Horizontal rotation matrix of virtual orbitals
+  RowMajorMatrix Uvv_;
+
+  Eigen::VectorXd kappa_;  // vertical rotation matrix of this step
+  /// Energy of the last accepted step, used to decide if we rescale the kappa
+  /// vector in this step
+  double last_accepted_energy_;
+  int gdm_step_count_;        // GDM iteration counter
+  int num_density_matrices_;  // Number of density matrices (1 for restricted, 2
+                              // for unrestricted)
+};
+
+GDM::GDM(const SCFContext& ctx, int history_size_limit)
+    : ctx_(ctx),
+      history_size_limit_(history_size_limit),
+      last_accepted_energy_(std::numeric_limits<double>::infinity()),
+      gdm_step_count_(0) {
   QDK_LOG_TRACE_ENTERING();
-  // Numerical tolerance for avoiding division by zero
-  static constexpr double denominator_min_limit = 1.0e-14;
-  // Compute gradient vector
+  // Calculate values from SCFContext
+  const auto& cfg = *ctx.cfg;
+  const auto& mol = *ctx.mol;
+
+  const int num_molecular_orbitals =
+      static_cast<int>(ctx.num_molecular_orbitals);
+  const bool unrestricted = cfg.unrestricted;
+
+  auto n_ecp_electrons = ctx.basis_set->n_ecp_electrons;
+  auto spin = mol.multiplicity - 1;
+  auto num_alpha_electrons =
+      static_cast<int>((mol.n_electrons - n_ecp_electrons + spin) / 2);
+  auto num_beta_electrons =
+      static_cast<int>(mol.n_electrons - n_ecp_electrons - num_alpha_electrons);
+
+  // Initialize member variables
+  num_electrons_ = {num_alpha_electrons, num_beta_electrons};
+  history_size_ = 0;
+  pseudo_canonical_eigenvalues_ = Eigen::VectorXd::Zero(num_molecular_orbitals);
+  if (history_size_limit < 1) {
+    throw std::invalid_argument(
+        "GDM history size limit must be at least 1, got: " +
+        std::to_string(history_size_limit));
+  }
+
+  QDK_LOGGER().debug("GDM initialized with history_size_limit = {}",
+                     history_size_limit_);
+  num_density_matrices_ = unrestricted ? 2 : 1;
+
+  // Calculate rotation sizes for each spin
+  rotation_size_.resize(num_density_matrices_);
+  rotation_offset_.resize(num_density_matrices_);
+  kappa_.resize(num_density_matrices_);
+
+  total_rotation_size_ = 0;
+  for (int spin_index = 0; spin_index < num_density_matrices_; spin_index++) {
+    const int num_occupied_orbitals = num_electrons_[spin_index];
+    const int num_virtual_orbitals =
+        num_molecular_orbitals - num_occupied_orbitals;
+    rotation_size_[spin_index] = num_occupied_orbitals * num_virtual_orbitals;
+    rotation_offset_[spin_index] = total_rotation_size_;
+    total_rotation_size_ += rotation_size_[spin_index];
+  }
+
+  // Initialize concatenated matrices and vectors
+  history_kappa_ =
+      RowMajorMatrix::Zero(history_size_limit_, total_rotation_size_);
+  history_dgrad_ =
+      RowMajorMatrix::Zero(history_size_limit_, total_rotation_size_);
+  previous_gradient_ = Eigen::VectorXd::Zero(total_rotation_size_);
+  current_gradient_ = Eigen::VectorXd::Zero(total_rotation_size_);
+  kappa_ = Eigen::VectorXd::Zero(total_rotation_size_);
+}
+
+void GDM::transform_history_(RowMajorMatrix& history, const int history_size,
+                             const int num_occupied_orbitals,
+                             const int num_molecular_orbitals) {
+  QDK_LOG_TRACE_ENTERING();
+  const int num_virtual_orbitals =
+      num_molecular_orbitals - num_occupied_orbitals;
+  RowMajorMatrix temp =
+      RowMajorMatrix::Zero(num_occupied_orbitals, num_virtual_orbitals);
+  for (int line = 0; line < history_size; line++) {
+    // K_ov (new) = Uoo^T * K_ov * Uvv
+    // Note: BLAS expects column-major matrices, but our matrices are row-major
+    double* history_line_ptr = history.row(line).data();
+
+    // First step: temp = K_ov * Uvv (in row-major view)
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_virtual_orbitals, num_occupied_orbitals,
+               num_virtual_orbitals, 1.0, Uvv_.data(), num_virtual_orbitals,
+               history_line_ptr, num_virtual_orbitals, 0.0, temp.data(),
+               num_virtual_orbitals);
+
+    // Second step: result = Uoo^T * temp (in row-major view)
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+               num_virtual_orbitals, num_occupied_orbitals,
+               num_occupied_orbitals, 1.0, temp.data(), num_virtual_orbitals,
+               Uoo_.data(), num_occupied_orbitals, 0.0, history_line_ptr,
+               num_virtual_orbitals);
+  }
+}
+
+void GDM::generate_pseudo_canonical_orbital_(
+    const RowMajorMatrix& F, RowMajorMatrix& C, const int spin_index,
+    Eigen::Block<RowMajorMatrix> history_kappa_spin,
+    Eigen::Block<RowMajorMatrix> history_dgrad_spin,
+    Eigen::VectorBlock<Eigen::VectorXd> current_gradient_spin) {
   const int num_molecular_orbitals = C.cols();
   const int num_occupied_orbitals = num_electrons_[spin_index];
   const int num_virtual_orbitals =
       num_molecular_orbitals - num_occupied_orbitals;
   const int rotation_size = num_occupied_orbitals * num_virtual_orbitals;
+
   RowMajorMatrix F_MO =
       C.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
               num_molecular_orbitals)
@@ -309,282 +507,355 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
               num_molecular_orbitals) *
       C.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
               num_molecular_orbitals);
-  RowMajorMatrix current_gradient_matrix =
-      -4.0 * F_MO.block(0, num_occupied_orbitals, num_occupied_orbitals,
-                        num_virtual_orbitals);
-  current_gradient_[spin_index] = Eigen::Map<const Eigen::VectorXd>(
-      current_gradient_matrix.data(), rotation_size);
 
-  if (gdm_step_count_ != 0) {
-    delta_energy_ = scf_total_energy - last_accepted_energy_;
+  // Perform pseudo-canonical transformation and BFGS
+  // Obtain pseudo-canonical orbitals
+  // Occupied-occupied block. Foo is symmetric
+  Uoo_ = F_MO.block(0, 0, num_occupied_orbitals, num_occupied_orbitals);
+  // Virtual-virtual block. Fvv is also symmetric
+  Uvv_ = F_MO.block(num_occupied_orbitals, num_occupied_orbitals,
+                    num_virtual_orbitals, num_virtual_orbitals);
 
-    // Check if history is full and remove oldest vector if needed
-    if (history_size_[spin_index] == history_size_limit_ - 1) {
-      QDK_LOGGER().info(
-          "GDM history size reached limit {}, removing oldest history vectors",
-          history_size_limit_);
-      // Remove oldest history vectors by shifting all vectors forward
-      const int num_rows_to_shift = history_size_limit_ - 1;
-      history_kappa_[spin_index].topRows(num_rows_to_shift) =
-          history_kappa_[spin_index].middleRows(1, num_rows_to_shift);
-      history_dgrad_[spin_index].topRows(num_rows_to_shift - 1) =
-          history_dgrad_[spin_index].middleRows(1, num_rows_to_shift - 1);
-      history_size_[spin_index]--;
-    }
+  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_occupied_orbitals,
+               Uoo_.data(), num_occupied_orbitals,
+               pseudo_canonical_eigenvalues_.data());
 
-    // Add new gradient difference to history
-    history_dgrad_[spin_index].row(history_size_[spin_index]) =
-        current_gradient_[spin_index] - previous_gradient_[spin_index];
-    history_size_[spin_index]++;
-  }
+  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_virtual_orbitals,
+               Uvv_.data(), num_virtual_orbitals,
+               pseudo_canonical_eigenvalues_.data() + num_occupied_orbitals);
 
-  // Judge whether to use shortened kappa step based on energy change
-  if ((scf_total_energy - last_accepted_energy_ >
-       rescale_kappa_denergy_threshold_) &&
-      gdm_step_count_ != 0) {
-    // energy increases too much, shorten kappa in the next step and
-    // retain last_accepted_energy_
-    QDK_LOGGER().info(
-        "Energy increased too much (increase: {:.6e}, record_good_energy: "
-        "{:.6e}, "
-        "tolerance: {:.6e}), will restore orbitals and shorten kappa in "
-        "next step",
-        scf_total_energy - last_accepted_energy_, last_accepted_energy_,
-        rescale_kappa_denergy_threshold_);
+  // Transpose to convert column-major eigenvectors to row-major format
+  Uoo_.transposeInPlace();
+  Uvv_.transposeInPlace();
 
-    // if energy increase is too large, shorten kappa more; scale factor is
-    // inverse of energy increase
-    kappa_scale_factor_ =
-        1.0 / std::max(scf_total_energy - last_accepted_energy_, 2.0);
+  RowMajorMatrix C_occ = C.block(num_molecular_orbitals * spin_index, 0,
+                                 num_molecular_orbitals, num_occupied_orbitals);
+  RowMajorMatrix C_occ_pseudo_canonical =
+      RowMajorMatrix::Zero(num_molecular_orbitals, num_occupied_orbitals);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_occupied_orbitals, num_molecular_orbitals,
+             num_occupied_orbitals, 1.0, Uoo_.data(), num_occupied_orbitals,
+             C_occ.data(), num_occupied_orbitals, 0.0,
+             C_occ_pseudo_canonical.data(), num_occupied_orbitals);
 
-    // Restore orbitals
-    history_size_[spin_index]--;
-    // At present history_kappa_ has history_size_[spin_index] + 1 rows, one
-    // more than history_dgrad_
-    kappa_[spin_index] =
-        history_kappa_[spin_index].row(history_size_[spin_index]);
-    const Eigen::VectorXd negative_kappa = -kappa_[spin_index];
-    apply_orbital_rotation_(C, spin_index, negative_kappa);
-
-    // Scale kappa for this step
-    kappa_[spin_index] *= kappa_scale_factor_;
-    history_kappa_[spin_index].row(history_size_[spin_index]) =
-        kappa_[spin_index];  // update the history_kappa_
-    QDK_LOGGER().info(
-        "Restored orbitals to previous step and scaled kappa by factor of {}",
-        kappa_scale_factor_);
-  } else {
-    // else do real work this step
-    last_accepted_energy_ = scf_total_energy;  // update the record
-    kappa_scale_factor_ = 0.0;
-
-    {  // Obtain pseudo-canonical orbitals
-      // Occupied-occupied block. Foo is symmetric
-      Uoo_ = F_MO.block(0, 0, num_occupied_orbitals, num_occupied_orbitals);
-      // Virtual-virtual block. Fvv is also symmetric
-      Uvv_ = F_MO.block(num_occupied_orbitals, num_occupied_orbitals,
-                        num_virtual_orbitals, num_virtual_orbitals);
-
-      lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_occupied_orbitals,
-                   Uoo_.data(), num_occupied_orbitals,
-                   pseudo_canonical_eigenvalues_.data());
-
-      lapack::syev(
-          lapack::Job::Vec, lapack::Uplo::Lower, num_virtual_orbitals,
-          Uvv_.data(), num_virtual_orbitals,
-          pseudo_canonical_eigenvalues_.data() + num_occupied_orbitals);
-
-      // Transpose to convert column-major eigenvectors to row-major format
-      Uoo_.transposeInPlace();
-      Uvv_.transposeInPlace();
-
-      RowMajorMatrix C_occ =
-          C.block(num_molecular_orbitals * spin_index, 0,
-                  num_molecular_orbitals, num_occupied_orbitals);
-      RowMajorMatrix C_occ_pseudo_canonical =
-          RowMajorMatrix::Zero(num_molecular_orbitals, num_occupied_orbitals);
-      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-                 num_occupied_orbitals, num_molecular_orbitals,
-                 num_occupied_orbitals, 1.0, Uoo_.data(), num_occupied_orbitals,
-                 C_occ.data(), num_occupied_orbitals, 0.0,
-                 C_occ_pseudo_canonical.data(), num_occupied_orbitals);
-
-      RowMajorMatrix C_virt =
-          C.block(num_molecular_orbitals * spin_index, num_occupied_orbitals,
-                  num_molecular_orbitals, num_virtual_orbitals);
-      RowMajorMatrix C_virt_pseudo_canonical =
-          RowMajorMatrix::Zero(num_molecular_orbitals, num_virtual_orbitals);
-      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-                 num_virtual_orbitals, num_molecular_orbitals,
-                 num_virtual_orbitals, 1.0, Uvv_.data(), num_virtual_orbitals,
-                 C_virt.data(), num_virtual_orbitals, 0.0,
-                 C_virt_pseudo_canonical.data(), num_virtual_orbitals);
-
-      C.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
-              num_occupied_orbitals) = C_occ_pseudo_canonical;
+  RowMajorMatrix C_virt =
       C.block(num_molecular_orbitals * spin_index, num_occupied_orbitals,
-              num_molecular_orbitals, num_virtual_orbitals) =
-          C_virt_pseudo_canonical;
+              num_molecular_orbitals, num_virtual_orbitals);
+  RowMajorMatrix C_virt_pseudo_canonical =
+      RowMajorMatrix::Zero(num_molecular_orbitals, num_virtual_orbitals);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_virtual_orbitals, num_molecular_orbitals, num_virtual_orbitals,
+             1.0, Uvv_.data(), num_virtual_orbitals, C_virt.data(),
+             num_virtual_orbitals, 0.0, C_virt_pseudo_canonical.data(),
+             num_virtual_orbitals);
 
-      // Transform the vectors in history_kappa and history_dgrad to
-      // accommodate current pseudo-canonical orbitals
-      transform_history_(history_kappa_[spin_index], history_size_[spin_index],
-                         num_occupied_orbitals, num_molecular_orbitals);
-      transform_history_(history_dgrad_[spin_index], history_size_[spin_index],
-                         num_occupied_orbitals, num_molecular_orbitals);
+  C.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
+          num_occupied_orbitals) = C_occ_pseudo_canonical;
+  C.block(num_molecular_orbitals * spin_index, num_occupied_orbitals,
+          num_molecular_orbitals, num_virtual_orbitals) =
+      C_virt_pseudo_canonical;
 
-      // Transform the gradient to accommodate current pseudo-canonical orbitals
-      RowMajorMatrix current_gradient_matrix = Eigen::Map<RowMajorMatrix>(
-          current_gradient_[spin_index].data(), num_occupied_orbitals,
-          num_virtual_orbitals);
-      RowMajorMatrix current_gradient_transformed_matrix =
-          Uoo_.transpose() * current_gradient_matrix * Uvv_;
-      Eigen::VectorXd current_gradient_transformed =
-          Eigen::Map<Eigen::VectorXd>(
-              current_gradient_transformed_matrix.data(), rotation_size);
-      current_gradient_[spin_index] = current_gradient_transformed;  // rotate
-    }
+  // Transform the vectors in history_kappa and history_dgrad to
+  // accommodate current pseudo-canonical orbitals
+  // Note: Need to extract blocks as separate matrices since
+  // transform_history_ modifies in place
+  RowMajorMatrix history_kappa_block = history_kappa_spin;
+  transform_history_(history_kappa_block, history_size_, num_occupied_orbitals,
+                     num_molecular_orbitals);
+  history_kappa_spin = history_kappa_block;
 
-    {  // Solve kappa vectors by BFGS two-loop recursion
-      // Build diagonal initial Hessian matrix Hinit by energy difference of
-      // occupied and virtual pseudo-canonical orbitals
-      Eigen::VectorXd sqrt_initial_hessian =
-          Eigen::VectorXd::Zero(rotation_size);
-      for (int i = 0; i < num_occupied_orbitals; i++) {
-        // Hessian index is iv = i * (num_molecular_orbitals -
-        // num_occupied_orbitals) + v
-        for (int v = 0; v < num_virtual_orbitals; v++) {
-          double pseudo_canonical_energy_diff = std::max(
-              pseudo_canonical_eigenvalues_(num_occupied_orbitals + v) -
-                  pseudo_canonical_eigenvalues_(i),
-              0.0);
-          double sqrt_initial_hessian_diag_entry = sqrt(
-              2.0 * (std::abs(delta_energy_) + pseudo_canonical_energy_diff));
-          sqrt_initial_hessian(i * num_virtual_orbitals + v) =
-              std::max(sqrt_initial_hessian_diag_entry, denominator_min_limit);
-        }
-      }
+  RowMajorMatrix history_dgrad_block = history_dgrad_spin;
+  transform_history_(history_dgrad_block, history_size_, num_occupied_orbitals,
+                     num_molecular_orbitals);
+  history_dgrad_spin = history_dgrad_block;
 
-      // Scale history and gradient vectors
-      RowMajorMatrix scaled_history_kappa =
-          RowMajorMatrix::Zero(history_size_[spin_index], rotation_size);
-      RowMajorMatrix scaled_history_dgrad =
-          RowMajorMatrix::Zero(history_size_[spin_index], rotation_size);
-      Eigen::VectorXd scaled_gradient_vector =
-          Eigen::VectorXd::Zero(rotation_size);
-
-      for (int hist = 0; hist < history_size_[spin_index]; hist++) {
-        for (int index = 0; index < rotation_size; index++) {
-          scaled_history_kappa(hist, index) =
-              sqrt_initial_hessian(index) *
-              history_kappa_[spin_index](hist, index);
-          scaled_history_dgrad(hist, index) =
-              history_dgrad_[spin_index](hist, index) /
-              sqrt_initial_hessian(index);
-        }
-      }
-      for (int index = 0; index < rotation_size; index++) {
-        scaled_gradient_vector(index) =
-            current_gradient_[spin_index](index) / sqrt_initial_hessian(index);
-      }
-
-      // BFGS two-loop recursion to solve scaled kappa vector
-      Eigen::VectorXd scaled_kappa_vector;
-      if (history_size_[spin_index] == 0) {
-        // No history available, return gradient (identity matrix)
-        QDK_LOGGER().info("No history available, using identity matrix");
-        scaled_kappa_vector = -scaled_gradient_vector;
-      } else {
-        QDK_LOGGER().debug(
-            "Applying BFGS two-loop recursion with {} historical records",
-            history_size_[spin_index]);
-
-        // Pre-compute valid BFGS correction pairs using indices
-        std::vector<double> rho_values;  // rho_k = 1 / (s_k^T * y_k)
-
-        // BFGS two-loop recursion algorithm
-        // First loop: compute alpha values and update q
-        Eigen::VectorXd q = scaled_gradient_vector;
-        std::vector<double> alpha_values;
-
-        for (int i = 0; i < history_size_[spin_index]; i++) {
-          const auto& s_k = scaled_history_kappa.row(i);
-          const auto& y_k = scaled_history_dgrad.row(i);
-
-          double sy_dot = s_k.dot(y_k) > denominator_min_limit
-                              ? s_k.dot(y_k)
-                              : denominator_min_limit;
-          rho_values.push_back(1.0 / sy_dot);
-        }
-
-        for (int i = history_size_[spin_index] - 1; i >= 0; i--) {
-          double rho_kappa_dot_q =
-              rho_values[i] * scaled_history_kappa.row(i).dot(q);
-          q = q - rho_kappa_dot_q * scaled_history_dgrad.row(i).transpose();
-          alpha_values.push_back(rho_kappa_dot_q);
-        }
-
-        // Apply initial Hessian approximation H_0 = I (identity)
-        Eigen::VectorXd r = q;
-
-        // Second loop: compute beta values and update r
-        for (int i = 0; i < history_size_[spin_index]; i++) {
-          double rho_dgrad_dot_r =
-              rho_values[i] * scaled_history_dgrad.row(i).dot(r);
-          r = r + scaled_history_kappa.row(i).transpose() *
-                      (alpha_values[history_size_[spin_index] - i - 1] -
-                       rho_dgrad_dot_r);
-        }
-
-        scaled_kappa_vector = -r;
-      }
-
-      // scale kappa vector back
-      for (int index = 0; index < rotation_size; index++) {
-        kappa_[spin_index](index) =
-            scaled_kappa_vector(index) / sqrt_initial_hessian(index);
-      }
-      double kappa_norm = kappa_[spin_index].norm();
-      double kappa_norm_limit = 10.0;
-      if (kappa_norm > kappa_norm_limit) {
-        QDK_LOGGER().warn("Kappa norm is too large ({}), scaling down to {}",
-                          kappa_norm, kappa_norm_limit);
-        kappa_[spin_index] = kappa_[spin_index] / kappa_norm * kappa_norm_limit;
-      }
-
-      history_kappa_[spin_index].row(history_size_[spin_index]) =
-          kappa_[spin_index];
-      // Update previous gradient
-      previous_gradient_[spin_index] = current_gradient_[spin_index];
-    }
-  }
-
-  // Vertical orbital rotation
-  apply_orbital_rotation_(C, spin_index, kappa_[spin_index]);
-
-  // Update occupation matrix
-  P.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
-          num_molecular_orbitals) =
-      occupation_factor *
-      C.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
-              num_occupied_orbitals) *
-      C.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
-              num_occupied_orbitals)
-          .transpose();
+  // Transform the gradient to accommodate current pseudo-canonical orbitals
+  RowMajorMatrix current_gradient_matrix =
+      Eigen::Map<RowMajorMatrix>(current_gradient_spin.data(),
+                                 num_occupied_orbitals, num_virtual_orbitals);
+  RowMajorMatrix current_gradient_transformed_matrix =
+      Uoo_.transpose() * current_gradient_matrix * Uvv_;
+  Eigen::VectorXd current_gradient_transformed = Eigen::Map<Eigen::VectorXd>(
+      current_gradient_transformed_matrix.data(), rotation_size);
+  current_gradient_spin = current_gradient_transformed;  // rotate
 }
 
-void GDM::iterate(const RowMajorMatrix& F, RowMajorMatrix& P, RowMajorMatrix& C,
-                  const double energy) {
+void GDM::iterate(SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
+  // Extract matrices from scf_impl
+  auto& C = scf_impl.orbitals_matrix();
+  const auto& F = scf_impl.get_fock_matrix();
+
   const auto* cfg = ctx_.cfg;
   const int num_molecular_orbitals =
       static_cast<int>(ctx_.num_molecular_orbitals);
   const int num_density_matrices = cfg->unrestricted ? 2 : 1;
 
-  // Perform GDM iteration for each spin
+  // Compute current gradient and dgrad for each spin
   for (int i = 0; i < num_density_matrices; ++i) {
-    gdm_iteration_step_(F, C, P, i, energy, cfg->unrestricted ? 1.0 : 2.0);
+    const int num_occupied_orbitals = num_electrons_[i];
+    const int num_virtual_orbitals =
+        num_molecular_orbitals - num_occupied_orbitals;
+    const int rotation_size = num_occupied_orbitals * num_virtual_orbitals;
+    RowMajorMatrix F_MO =
+        C.block(num_molecular_orbitals * i, 0, num_molecular_orbitals,
+                num_molecular_orbitals)
+            .transpose() *
+        F.block(num_molecular_orbitals * i, 0, num_molecular_orbitals,
+                num_molecular_orbitals) *
+        C.block(num_molecular_orbitals * i, 0, num_molecular_orbitals,
+                num_molecular_orbitals);
+    RowMajorMatrix current_gradient_matrix =
+        -(4.0 / num_density_matrices) * F_MO.block(0, num_occupied_orbitals,
+                                                   num_occupied_orbitals,
+                                                   num_virtual_orbitals);
+    current_gradient_.segment(rotation_offset_[i], rotation_size_[i]) =
+        Eigen::Map<const Eigen::VectorXd>(current_gradient_matrix.data(),
+                                          rotation_size);
+
+    if (gdm_step_count_ != 0) {
+      // Add new gradient difference to history for this spin
+      history_dgrad_
+          .block(0, rotation_offset_[i], history_size_limit_, rotation_size_[i])
+          .row(history_size_) =
+          current_gradient_.segment(rotation_offset_[i], rotation_size_[i]) -
+          previous_gradient_.segment(rotation_offset_[i], rotation_size_[i]);
+    }
   }
+
+  // Update history size and manage history overflow
+  if (gdm_step_count_ != 0) {
+    // Increment history size
+    history_size_++;
+
+    // Check if history is full and remove oldest vector if needed
+    if (history_size_ == history_size_limit_) {
+      QDK_LOGGER().info(
+          "GDM history size reached limit {}, removing oldest history "
+          "vectors",
+          history_size_limit_);
+      // Remove oldest history vectors by shifting all vectors forward
+      const int num_rows_to_shift = history_size_limit_ - 1;
+      history_kappa_.topRows(num_rows_to_shift) =
+          history_kappa_.middleRows(1, num_rows_to_shift);
+      history_dgrad_.topRows(num_rows_to_shift - 1) =
+          history_dgrad_.middleRows(1, num_rows_to_shift - 1);
+      history_size_--;
+    }
+  }
+
+  // Build concatenated initial Hessian for all spins
+  Eigen::VectorXd initial_hessian = Eigen::VectorXd::Zero(total_rotation_size_);
+
+  for (int i = 0; i < num_density_matrices; ++i) {
+    // Create block references for this spin
+    const int num_occupied_orbitals = num_electrons_[i];
+    const int num_virtual_orbitals =
+        num_molecular_orbitals - num_occupied_orbitals;
+
+    auto history_kappa_spin = history_kappa_.block(
+        0, rotation_offset_[i], history_size_limit_, rotation_size_[i]);
+    auto history_dgrad_spin = history_dgrad_.block(
+        0, rotation_offset_[i], history_size_limit_, rotation_size_[i]);
+    auto current_gradient_spin =
+        current_gradient_.segment(rotation_offset_[i], rotation_size_[i]);
+
+    // Generate pseudo-canonical orbitals and transform gradient and history
+    generate_pseudo_canonical_orbital_(
+        F, C, i, history_kappa_spin, history_dgrad_spin, current_gradient_spin);
+
+    // Build this spin's segment of initial Hessian immediately
+    // while pseudo_canonical_eigenvalues_ is still valid
+    for (int j = 0; j < num_occupied_orbitals; j++) {
+      for (int v = 0; v < num_virtual_orbitals; v++) {
+        int index = rotation_offset_[i] + j * num_virtual_orbitals + v;
+        double pseudo_canonical_energy_diff =
+            std::max(pseudo_canonical_eigenvalues_(num_occupied_orbitals + v) -
+                         pseudo_canonical_eigenvalues_(j),
+                     0.0);
+        initial_hessian(index) =
+            2.0 * (std::abs(delta_energy_) + pseudo_canonical_energy_diff);
+      }
+    }
+  }
+
+  // BFGS two-loop recursion on concatenated vectors (runs once for all spins)
+  if (history_size_ == 0) {
+    // No history available, use H_0^{-1} * gradient
+    QDK_LOGGER().info("No history available, using initial Hessian inverse");
+    for (int index = 0; index < total_rotation_size_; index++) {
+      kappa_(index) = -current_gradient_(index) / initial_hessian(index);
+    }
+  } else {
+    QDK_LOGGER().debug(
+        "Applying BFGS two-loop recursion with {} historical records",
+        history_size_);
+
+    // Pre-compute inverse rho values: s_k · y_k
+    std::vector<double> inverse_rho_values;
+    for (int j = 0; j < history_size_; j++) {
+      double sy_dot = history_kappa_.row(j).dot(history_dgrad_.row(j));
+      inverse_rho_values.push_back(sy_dot);
+    }
+
+    // BFGS two-loop recursion algorithm
+    // First loop: compute alpha values and update q
+    Eigen::VectorXd q = current_gradient_;
+    std::vector<double> alpha_values;
+
+    for (int j = history_size_ - 1; j >= 0; j--) {
+      double alpha = history_kappa_.row(j).dot(q) / inverse_rho_values[j];
+      q = q - alpha * history_dgrad_.row(j).transpose();
+      alpha_values.push_back(alpha);
+    }
+
+    // Apply initial Hessian approximation H_0^{-1}
+    Eigen::VectorXd r = Eigen::VectorXd::Zero(total_rotation_size_);
+    for (int index = 0; index < total_rotation_size_; index++) {
+      r(index) = q(index) / initial_hessian(index);
+    }
+
+    // Second loop: compute beta values and update r
+    for (int j = 0; j < history_size_; j++) {
+      double beta_value = history_dgrad_.row(j).dot(r) / inverse_rho_values[j];
+      r = r + history_kappa_.row(j).transpose() *
+                  (alpha_values[history_size_ - j - 1] - beta_value);
+    }
+
+    // Log BFGS debug information
+    std::string rho_str = "inverse Rho values: ";
+    for (int j = 0; j < inverse_rho_values.size(); j++) {
+      rho_str += fmt::format("{:.6e}; ", inverse_rho_values[j]);
+    }
+    QDK_LOGGER().debug(rho_str);
+
+    std::string alpha_str = "alpha values: ";
+    for (int j = 0; j < alpha_values.size(); j++) {
+      alpha_str += fmt::format("{:.6e}; ", alpha_values[j]);
+    }
+    QDK_LOGGER().debug(alpha_str);
+
+    kappa_ = -r;
+  }
+
+  // Validate BFGS search direction
+  double kappa_dot_grad = kappa_.dot(current_gradient_);
+  if (kappa_dot_grad > 0.0) {
+    // Bad direction detected - BFGS history no longer fits current landscape
+    QDK_LOGGER().warn(
+        "BFGS search direction is invalid (kappa·grad = {:.6e} > 0). "
+        "Clearing history and restarting BFGS with initial Hessian.",
+        kappa_dot_grad);
+
+    // Clear BFGS history
+    history_size_ = 0;
+
+    // Recompute kappa using initial Hessian approximation (guaranteed descent)
+    for (int index = 0; index < total_rotation_size_; index++) {
+      kappa_(index) = -current_gradient_(index) / initial_hessian(index);
+    }
+
+    QDK_LOGGER().info(
+        "BFGS history cleared and restarted with initial Hessian");
+  } else {
+    QDK_LOGGER().debug(
+        "BFGS search direction validated: kappa·grad = {:.6e} (descent "
+        "direction)",
+        kappa_dot_grad);
+  }
+
+  // Save pseudo-canonical C for restoration in the energy validation loop
+  RowMajorMatrix C_pseudo_canonical = C.eval();
+
+  // Create line search functor for energy evaluation
+  GDMLineFunctor line_functor(scf_impl, C_pseudo_canonical, num_electrons_,
+                              rotation_offset_, rotation_size_,
+                              num_density_matrices, num_molecular_orbitals,
+                              cfg->unrestricted);
+
+  // Perform line search using Nocedal-Wright algorithm
+  Eigen::VectorXd x0 = Eigen::VectorXd::Zero(kappa_.size());
+  Eigen::VectorXd p = kappa_;  // Search direction
+  double step = 1.0;           // Initial step size
+
+  // Compute initial energy and gradient for line search
+  double fx0 = line_functor.eval(x0);
+  Eigen::VectorXd gfx0 = line_functor.grad(x0);
+
+  // Initialize output variables for line search
+  // NOTE: fx_new and gfx_new serve as BOTH input and output for the line
+  // search! They must be initialized with the values at x0 before calling.
+  Eigen::VectorXd x_new(kappa_.size());
+  double fx_new = fx0;             // Initial function value at x0
+  Eigen::VectorXd gfx_new = gfx0;  // Initial gradient at x0
+
+  try {
+    // Call Nocedal-Wright line search with strong Wolfe conditions
+    bfgs::nocedal_wright_line_search(line_functor, x0, p, step, x_new, fx_new,
+                                     gfx_new);
+
+    // Line search succeeded - update with optimal step
+    scf_impl.orbitals_matrix() = line_functor.get_cached_C();
+    scf_impl.density_matrix() = line_functor.get_cached_P();
+
+    double delta_energy = fx_new - last_accepted_energy_;
+    last_accepted_energy_ = fx_new;
+    delta_energy_ = delta_energy;
+
+    QDK_LOGGER().debug("Line search converged.");
+  } catch (const std::exception& e) {
+    // BFGS line search failed - likely bad search direction
+    QDK_LOGGER().warn(
+        "BFGS line search failed: {}. Falling back to steepest descent.",
+        e.what());
+
+    // Fallback Level 1: Try line search with steepest descent direction
+    Eigen::VectorXd p_steepest = -current_gradient_;
+    double step_steepest = 1.0;
+
+    try {
+      gfx_new = gfx0;
+      // Attempt line search with guaranteed descent direction
+      bfgs::nocedal_wright_line_search(line_functor, x0, p_steepest,
+                                       step_steepest, x_new, fx_new, gfx_new);
+
+      // Steepest descent line search succeeded
+      scf_impl.orbitals_matrix() = line_functor.get_cached_C();
+      scf_impl.density_matrix() = line_functor.get_cached_P();
+
+      double delta_energy = fx_new - last_accepted_energy_;
+      last_accepted_energy_ = fx_new;
+      delta_energy_ = delta_energy;
+
+      QDK_LOGGER().debug("Steepest descent line search converged.");
+    } catch (const std::exception& e2) {
+      // Fallback Level 2: Even steepest descent line search failed
+      QDK_LOGGER().error(
+          "Steepest descent line search also failed: {}. Using minimal "
+          "gradient step.",
+          e2.what());
+
+      // Take very small step in steepest descent direction
+      x_new = -0.01 * current_gradient_;
+      fx_new = line_functor.eval(x_new);
+
+      scf_impl.orbitals_matrix() = line_functor.get_cached_C();
+      scf_impl.density_matrix() = line_functor.get_cached_P();
+
+      double delta_energy = fx_new - last_accepted_energy_;
+      last_accepted_energy_ = fx_new;
+      delta_energy_ = delta_energy;
+
+      QDK_LOGGER().warn(
+          "Minimal gradient step taken: energy = {:.12e}, delta_energy = "
+          "{:.6e}",
+          fx_new, delta_energy);
+    }
+  }
+
+  // Add optimal kappa to history and update previous gradient
+  history_kappa_.row(history_size_) = x_new;
+  previous_gradient_ = current_gradient_;
 
   // Increment GDM step counter
   gdm_step_count_++;
@@ -603,15 +874,8 @@ GDM::GDM(const SCFContext& ctx, const GDMConfig& gdm_config)
 GDM::~GDM() noexcept = default;
 
 void GDM::iterate(SCFImpl& scf_impl) {
-  QDK_LOG_TRACE_ENTERING();
-  // Extract needed parameters from SCFImpl
-  auto& P = scf_impl.density_matrix();
-  const auto& F = scf_impl.get_fock_matrix();
-  auto& C = scf_impl.orbitals_matrix();
-  auto& res = ctx_.result;
-
-  // Call impl with minimal parameters
-  gdm_impl_->iterate(F, P, C, res.scf_total_energy);
+  // Call impl with scf_impl reference
+  gdm_impl_->iterate(scf_impl);
 }
 
 void GDM::set_delta_energy_diis(const double delta_energy_diis) {
