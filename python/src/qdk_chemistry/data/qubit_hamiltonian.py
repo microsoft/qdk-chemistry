@@ -28,8 +28,8 @@ class QubitHamiltonian(DataClass):
     """Data class for representing chemical electronic Hamiltonians in qubits.
 
     Attributes:
-        pauli_strings: List of Pauli strings representing the ``QubitHamiltonian``.
-        coefficients: Array of coefficients corresponding to each Pauli string.
+        pauli_strings (list[str]): List of Pauli strings representing the ``QubitHamiltonian``.
+        coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
 
     """
 
@@ -39,12 +39,12 @@ class QubitHamiltonian(DataClass):
     # Serialization version for this class
     _serialization_version = "0.1.0"
 
-    def __init__(self, pauli_strings: list[str], coefficients: np.ndarray):
+    def __init__(self, pauli_strings: list[str], coefficients: np.ndarray) -> None:
         """Initialize a QubitHamiltonian.
 
         Args:
-            pauli_strings: List of Pauli strings.
-            coefficients: Array of coefficients corresponding to each Pauli string.
+            pauli_strings (list[str]): List of Pauli strings representing the ``QubitHamiltonian``.
+            coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
 
         Raises:
             ValueError: If the number of Pauli strings and coefficients don't match,
@@ -78,22 +78,22 @@ class QubitHamiltonian(DataClass):
 
     @cached_property
     def pauli_ops(self) -> SparsePauliOp:
-        """Get the Hamiltonian as a ``SparsePauliOp``.
+        """Get the qubit Hamiltonian as a ``SparsePauliOp``.
 
         Returns:
-            The Hamiltonian represented as a ``SparsePauliOp``.
+            qiskit.quantum_info.SparsePauliOp: The qubit Hamiltonian represented as a ``SparsePauliOp``.
 
         """
         return SparsePauliOp(self.pauli_strings, self.coefficients)
 
     def group_commuting(self, qubit_wise: bool = True) -> list["QubitHamiltonian"]:
-        """Group the Hamiltonian into commuting subsets.
+        """Group the qubit Hamiltonian into commuting subsets.
 
         Args:
-            qubit_wise: Whether to use qubit-wise commuting grouping. Default is True.
+            qubit_wise (bool): Whether to use qubit-wise commuting grouping. Default is True.
 
         Returns:
-            A list of ``QubitHamiltonian`` representing the grouped Hamiltonian.
+            list[QubitHamiltonian]: A list of ``QubitHamiltonian`` representing the grouped Hamiltonian.
 
         """
         Logger.trace_entering()
@@ -105,13 +105,23 @@ class QubitHamiltonian(DataClass):
 
     # DataClass interface implementation
     def get_summary(self) -> str:
-        """Get a human-readable summary of the Hamiltonian."""
+        """Get a human-readable summary of the qubit Hamiltonian.
+
+        Returns:
+            str: Summary string describing the qubit Hamiltonian.
+
+        """
         return (
             f"Qubit Hamiltonian\n  Number of qubits: {self.num_qubits}\n  Number of terms: {len(self.pauli_strings)}\n"
         )
 
     def to_json(self) -> dict[str, Any]:
-        """Convert the Hamiltonian to a dictionary for JSON serialization."""
+        """Convert the qubit Hamiltonian to a dictionary for JSON serialization.
+
+        Returns:
+            dict[str, Any]: Dictionary representation of the qubit Hamiltonian.
+
+        """
         data = {
             "pauli_strings": self.pauli_strings,
             "coefficients": self.coefficients.tolist(),
@@ -119,11 +129,10 @@ class QubitHamiltonian(DataClass):
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
-        """Save the Hamiltonian to an HDF5 group.
+        """Save the qubit Hamiltonian to an HDF5 group.
 
-        Note:
-            This method is used internally when saving to HDF5 files.
-            Python users should call to_hdf5_file() directly.
+        Args:
+            group (h5py.Group): HDF5 group or file to write the qubit Hamiltonian to.
 
         """
         self._add_hdf5_version(group)
@@ -135,13 +144,13 @@ class QubitHamiltonian(DataClass):
         """Create a QubitHamiltonian from a JSON dictionary.
 
         Args:
-            json_data: Dictionary containing the serialized data
+            json_data (dict[str, Any]): Dictionary containing the serialized data.
 
         Returns:
-            QubitHamiltonian: New instance reconstructed from JSON data
+            QubitHamiltonian: New instance reconstructed from JSON data.
 
         Raises:
-            RuntimeError: If version field is missing or incompatible
+            RuntimeError: If version field is missing or incompatible.
 
         """
         cls._validate_json_version(cls._serialization_version, json_data)
@@ -155,13 +164,13 @@ class QubitHamiltonian(DataClass):
         """Load a QubitHamiltonian from an HDF5 group.
 
         Args:
-            group: HDF5 group or file containing the data
+            group (h5py.Group): HDF5 group or file containing the data.
 
         Returns:
-            QubitHamiltonian: New instance reconstructed from HDF5 data
+            QubitHamiltonian: New instance reconstructed from HDF5 data.
 
         Raises:
-            RuntimeError: If version attribute is missing or incompatible
+            RuntimeError: If version attribute is missing or incompatible.
 
         """
         cls._validate_hdf5_version(cls._serialization_version, group)
@@ -191,11 +200,11 @@ def _filter_and_group_pauli_ops_from_statevector(
     * The rest of Hamiltonian is grouped into qubit wise commuting terms.
 
     Args:
-        hamiltonian: QubitHamiltonian to be filtered and grouped.
-        statevector: Statevector used to compute expectation values.
-        abelian_grouping: Whether to group into qubit-wise commuting subsets.
-        trimming: If True, discard or reduce terms with ±1 or 0 expectation value.
-        trimming_tolerance: Numerical tolerance for determining zero or ±1 expectation (Default: 1e-8).
+        hamiltonian (QubitHamiltonian): QubitHamiltonian to be filtered and grouped.
+        statevector (numpy.ndarray): Statevector used to compute expectation values.
+        abelian_grouping (bool): Whether to group into qubit-wise commuting subsets.
+        trimming (bool): If True, discard or reduce terms with ±1 or 0 expectation value.
+        trimming_tolerance (float): Numerical tolerance for determining zero or ±1 expectation (Default: 1e-8).
 
     Returns:
         A tuple of ``(list[QubitHamiltonian], list[float])``
@@ -293,11 +302,11 @@ def filter_and_group_pauli_ops_from_wavefunction(
     * The rest of Hamiltonian is grouped into qubit wise commuting terms.
 
     Args:
-        hamiltonian: QubitHamiltonian to be filtered and grouped.
-        wavefunction: Wavefunction used to compute expectation values.
-        abelian_grouping: Whether to group into qubit-wise commuting subsets.
-        trimming: If True, discard or reduce terms with ±1 or 0 expectation value.
-        trimming_tolerance: Numerical tolerance for determining zero or ±1 expectation (Default: 1e-8).
+        hamiltonian (QubitHamiltonian): QubitHamiltonian to be filtered and grouped.
+        wavefunction (Wavefunction): Wavefunction used to compute expectation values.
+        abelian_grouping (bool): Whether to group into qubit-wise commuting subsets.
+        trimming (bool): If True, discard or reduce terms with ±1 or 0 expectation value.
+        trimming_tolerance (float): Numerical tolerance for determining zero or ±1 expectation (Default: 1e-8).
 
     Returns:
         A tuple of ``(list[QubitHamiltonian], list[float])``

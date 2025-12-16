@@ -24,6 +24,7 @@ Exposed classes are:
 - :class:`Orbitals`: Molecular orbital information and properties.
 - :class:`OrbitalType`: Enumeration of orbital angular momentum types (s, p, d, f, etc.).
 - :class:`QpeResult`: Result of quantum phase estimation workflows, including phase, energy, and metadata.
+- :class:`QuantumErrorProfile`: Information about quantum gates and error properties.
 - :class:`QubitHamiltonian`: Molecular electronic Hamiltonians mapped to qubits.
 - :class:`SciWavefunctionContainer`: Selected Configuration Interaction (SCI) wavefunction with CI coefficients.
 - :class:`Settings`: Configuration settings for quantum chemistry calculations.
@@ -84,6 +85,7 @@ from qdk_chemistry._core.data import (
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
+from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 
@@ -113,6 +115,7 @@ __all__ = [
     "OrbitalType",
     "Orbitals",
     "QpeResult",
+    "QuantumErrorProfile",
     "QubitHamiltonian",
     "SciWavefunctionContainer",
     "SettingNotFound",

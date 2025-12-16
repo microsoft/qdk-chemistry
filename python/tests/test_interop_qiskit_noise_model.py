@@ -5,11 +5,11 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import warnings
-
 from qiskit_aer.noise import NoiseModel
 
-from qdk_chemistry.noise_models import QuantumErrorProfile, SupportedGate
+from qdk_chemistry.data.noise_models import (
+    QuantumErrorProfile,
+)
 from qdk_chemistry.plugins.qiskit._interop.noise_model import get_noise_model_from_profile
 
 
@@ -35,23 +35,80 @@ def test_get_noise_model_except(simple_error_profile):
             assert gate in noise_model.noise_instructions
 
 
-def test_get_noise_model_with_unsupported_error_type():
-    """Test get_noise_model_from_profile with unsupported error type (should trigger warning)."""
-    # Create a profile with a mock unsupported error type
-    profile = QuantumErrorProfile(name="test", description="test profile", errors={})
+def test_get_noise_model_with_multiple_gates():
+    """Test noise model generation with multiple gates."""
+    profile = QuantumErrorProfile(
+        name="multi_gate",
+        description="test with multiple gates",
+        errors={
+            "h": {"type": "depolarizing_error", "rate": 0.01, "num_qubits": 1},
+            "x": {"type": "depolarizing_error", "rate": 0.01, "num_qubits": 1},
+            "cx": {"type": "depolarizing_error", "rate": 0.02, "num_qubits": 2},
+            "cz": {"type": "depolarizing_error", "rate": 0.02, "num_qubits": 2},
+        },
+    )
 
-    # Manually add an error with unsupported type to trigger the warning
-    profile.errors[SupportedGate.H] = {"type": "unsupported_error_type", "rate": 0.01, "num_qubits": 1}
+    noise_model = get_noise_model_from_profile(profile)
 
-    # Reset the qubit gates since we manually modified errors
-    profile.one_qubit_gates = ["h"]
-    profile.two_qubit_gates = []
+    assert isinstance(noise_model, NoiseModel)
+    assert "h" in noise_model.noise_instructions
+    assert "x" in noise_model.noise_instructions
+    assert "cx" in noise_model.noise_instructions
+    assert "cz" in noise_model.noise_instructions
 
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        noise_model = get_noise_model_from_profile(profile)
 
-        # Should generate a warning about unsupported error type
-        assert len(w) == 1
-        assert "Unsupported error type" in str(w[0].message)
-        assert noise_model is not None
+def test_get_noise_model_excludes_multiple_gates():
+    """Test noise model generation with multiple excluded gates."""
+    profile = QuantumErrorProfile(
+        name="exclude_multiple",
+        description="test excluding multiple gates",
+        errors={
+            "h": {"type": "depolarizing_error", "rate": 0.01, "num_qubits": 1},
+            "x": {"type": "depolarizing_error", "rate": 0.01, "num_qubits": 1},
+            "cx": {"type": "depolarizing_error", "rate": 0.02, "num_qubits": 2},
+            "cz": {"type": "depolarizing_error", "rate": 0.02, "num_qubits": 2},
+        },
+    )
+
+    exclude_gates = ["x", "cz"]
+    noise_model = get_noise_model_from_profile(profile, exclude_gates)
+
+    assert isinstance(noise_model, NoiseModel)
+    assert "h" in noise_model.noise_instructions
+    assert "cx" in noise_model.noise_instructions
+    assert "x" not in noise_model.noise_instructions
+    assert "cz" not in noise_model.noise_instructions
+
+    # Excluded gates should still be in basis gates
+    for gate in exclude_gates:
+        assert gate in noise_model.basis_gates
+
+
+def test_get_noise_model_empty_profile():
+    """Test noise model generation with empty error profile."""
+    profile = QuantumErrorProfile()
+
+    noise_model = get_noise_model_from_profile(profile)
+
+    assert isinstance(noise_model, NoiseModel)
+    assert len(noise_model.noise_instructions) == 0
+
+
+def test_get_noise_model_basis_gates_match_profile():
+    """Test that noise model basis gates match the profile's basis gates."""
+    profile = QuantumErrorProfile(
+        name="basis_test",
+        description="test basis gates",
+        errors={
+            "h": {"type": "depolarizing_error", "rate": 0.01, "num_qubits": 1},
+            "s": {"type": "depolarizing_error", "rate": 0.01, "num_qubits": 1},
+            "t": {"type": "depolarizing_error", "rate": 0.01, "num_qubits": 1},
+            "cx": {"type": "depolarizing_error", "rate": 0.02, "num_qubits": 2},
+        },
+    )
+
+    noise_model = get_noise_model_from_profile(profile)
+
+    # All gates from profile should be in noise model basis gates
+    for gate in profile.basis_gates:
+        assert gate in noise_model.basis_gates

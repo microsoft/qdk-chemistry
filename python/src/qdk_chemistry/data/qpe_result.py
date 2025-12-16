@@ -7,6 +7,7 @@
 
 import json
 from collections.abc import Iterable, Sequence
+from typing import Any
 
 import h5py
 import numpy as np
@@ -28,18 +29,18 @@ class QpeResult(DataClass):
     """Structured output for quantum phase estimation workflows.
 
     Attributes:
-        method: Identifier for the algorithm or workflow that produced the result.
-        evolution_time: Evolution time ``t`` used in ``U = exp(-i H t)``.
-        phase_fraction: Raw measured phase fraction in ``[0, 1)``.
-        phase_angle: Raw measured phase angle in radians.
-        canonical_phase_fraction: Alias-resolved phase fraction consistent with the selected energy branch.
-        canonical_phase_angle: Alias-resolved phase angle in radians.
-        raw_energy: Energy computed directly from ``phase_fraction``.
-        branching: Sorted tuple of all alias energy candidates considered.
-        resolved_energy: Alias energy selected with the optional reference value, if available.
-        bits_msb_first: Tuple of measured bits ordered from MSB to LSB, when provided.
-        bitstring_msb_first: Measured bitstring representation, when provided.
-        metadata: Optional free-form metadata copied from the caller.
+        method (str): Identifier for the algorithm or workflow that produced the result.
+        evolution_time (float): Evolution time ``t`` used in ``U = exp(-i H t)``.
+        phase_fraction (float): Raw measured phase fraction in ``[0, 1)``.
+        phase_angle (float): Raw measured phase angle in radians.
+        canonical_phase_fraction (float): Alias-resolved phase fraction consistent with the selected energy branch.
+        canonical_phase_angle (float): Alias-resolved phase angle in radians.
+        raw_energy (float): Energy computed directly from ``phase_fraction``.
+        branching (tuple[float, ...]): Sorted tuple of all alias energy candidates considered.
+        resolved_energy (float | None): Alias energy selected with the optional reference value, if available.
+        bits_msb_first (tuple[int, ...] | None): Tuple of measured bits ordered from MSB to LSB, when provided.
+        bitstring_msb_first (str | None): Measured bitstring representation, when provided.
+        metadata (dict[str, object] | None): Optional free-form metadata copied from the caller.
 
     """
 
@@ -63,22 +64,22 @@ class QpeResult(DataClass):
         bits_msb_first: tuple[int, ...] | None = None,
         bitstring_msb_first: str | None = None,
         metadata: dict[str, object] | None = None,
-    ):
+    ) -> None:
         """Initialize a QPE result.
 
         Args:
-            method: Identifier for the algorithm or workflow.
-            evolution_time: Evolution time used in the simulation.
-            phase_fraction: Raw measured phase fraction.
-            phase_angle: Raw measured phase angle in radians.
-            canonical_phase_fraction: Alias-resolved phase fraction.
-            canonical_phase_angle: Alias-resolved phase angle.
-            raw_energy: Energy computed from phase_fraction.
-            branching: Tuple of alias energy candidates.
-            resolved_energy: Alias energy selected with reference.
-            bits_msb_first: Measured bits from MSB to LSB.
-            bitstring_msb_first: Bitstring representation.
-            metadata: Optional metadata dictionary.
+            method (str): Identifier for the algorithm or workflow.
+            evolution_time (float): Evolution time used in the simulation.
+            phase_fraction (float): Raw measured phase fraction.
+            phase_angle (float): Raw measured phase angle in radians.
+            canonical_phase_fraction (float): Alias-resolved phase fraction.
+            canonical_phase_angle (float): Alias-resolved phase angle.
+            raw_energy (float): Energy computed from phase_fraction.
+            branching (tuple[float, ...]): Tuple of alias energy candidates.
+            resolved_energy (float | None): Alias energy selected with reference.
+            bits_msb_first (tuple[int, ...] | None): Measured bits from MSB to LSB.
+            bitstring_msb_first (str | None): Bitstring representation.
+            metadata (dict[str, object] | None): Optional metadata dictionary.
 
         """
         Logger.trace_entering()
@@ -113,17 +114,17 @@ class QpeResult(DataClass):
         """Construct a :class:`QpeResult` from a measured phase fraction.
 
         Args:
-            method: Phase estimation algorithm or workflow label.
-            phase_fraction: Measured phase fraction in ``[0, 1)``.
-            evolution_time: Evolution time ``t`` used in ``U = exp(-i H t)``.
-            branch_shifts: Integer multiples of ``2π / t`` examined when forming alias candidates.
-            bits_msb_first: Optional measured bits ordered from MSB to LSB.
-            bitstring_msb_first: Optional string representation of the measured bits.
-            reference_energy: Optional target value used to select the canonical alias branch.
-            metadata: Optional dictionary copied into the result for caller-defined context.
+            method (PhaseEstimationAlgorithm | str): Phase estimation algorithm or workflow label.
+            phase_fraction (float): Measured phase fraction in ``[0, 1)``.
+            evolution_time (float): Evolution time ``t`` used in ``U = exp(-i H t)``.
+            branch_shifts (Iterable[int]): Integer multiples of ``2π / t`` examined when forming alias candidates.
+            bits_msb_first (Sequence[int] | None): Optional measured bits ordered from MSB to LSB.
+            bitstring_msb_first (str | None): Optional string representation of the measured bits.
+            reference_energy (float | None): Optional target value used to select the canonical alias branch.
+            metadata (dict[str, object] | None): Optional dictionary copied into the result for caller-defined context.
 
         Returns:
-            Populated :class:`QpeResult` instance reflecting the supplied data.
+            QpeResult: Populated :class:`QpeResult` instance reflecting the supplied data.
 
         """
         Logger.trace_entering()
@@ -183,7 +184,12 @@ class QpeResult(DataClass):
 
     @property
     def algorithm(self) -> PhaseEstimationAlgorithm | None:
-        """Return the enumerated algorithm, if recognized."""
+        """Return the phase estimation algorithm that produced the result if available.
+
+        Returns:
+            PhaseEstimationAlgorithm | None: Phase estimation algorithm that produced the result or None.
+
+        """
         if _PhaseEstimationAlgorithm is None:
             return None
 
@@ -194,7 +200,12 @@ class QpeResult(DataClass):
 
     # DataClass interface implementation
     def get_summary(self) -> str:
-        """Get a human-readable summary of the QPE result."""
+        """Get a human-readable summary of the QPE result.
+
+        Returns:
+            str: Summary string describing the QPE result.
+
+        """
         lines = [
             f"QPE Result ({self.method})",
             f"  Evolution time: {self.evolution_time}",
@@ -207,8 +218,13 @@ class QpeResult(DataClass):
             lines.append(f"  Bitstring: {self.bitstring_msb_first}")
         return "\n".join(lines)
 
-    def to_json(self) -> dict:
-        """Convert the QPE result to a dictionary for JSON serialization."""
+    def to_json(self) -> dict[str, Any]:
+        """Convert the QPE result to a dictionary for JSON serialization.
+
+        Returns:
+            dict[str, Any]: Dictionary representation of the QPE result.
+
+        """
         data = {
             "method": self.method,
             "evolution_time": self.evolution_time,
@@ -234,9 +250,8 @@ class QpeResult(DataClass):
     def to_hdf5(self, group: h5py.Group) -> None:
         """Save the QPE result to an HDF5 group.
 
-        Note:
-            This method is used internally when saving to HDF5 files.
-            Python users should call to_hdf5_file() directly.
+        Args:
+            group (h5py.Group): HDF5 group or file to write the QPE result to.
 
         """
         self._add_hdf5_version(group)
@@ -261,17 +276,17 @@ class QpeResult(DataClass):
             group.attrs["metadata"] = json.dumps(self.metadata)
 
     @classmethod
-    def from_json(cls, json_data: dict) -> "QpeResult":
+    def from_json(cls, json_data: dict[str, Any]) -> "QpeResult":
         """Create a QPE result from a JSON dictionary.
 
         Args:
-            json_data: Dictionary containing the serialized QPE result data
+            json_data (dict[str, Any]): Dictionary containing the serialized QPE result data.
 
         Returns:
-            QpeResult: New instance reconstructed from the JSON data
+            QpeResult: New instance reconstructed from the JSON data.
 
         Raises:
-            RuntimeError: If version field is missing or incompatible
+            RuntimeError: If version field is missing or incompatible.
 
         """
         cls._validate_json_version(cls._serialization_version, json_data)
@@ -296,13 +311,13 @@ class QpeResult(DataClass):
         """Load a QPE result from an HDF5 group.
 
         Args:
-            group: HDF5 group or file containing the QPE result data
+            group (h5py.Group): HDF5 group or file containing the QPE result data.
 
         Returns:
-            QpeResult: New instance reconstructed from the HDF5 data
+            QpeResult: New instance reconstructed from the HDF5 data.
 
         Raises:
-            RuntimeError: If version attribute is missing or incompatible
+            RuntimeError: If version attribute is missing or incompatible.
 
         """
         cls._validate_hdf5_version(cls._serialization_version, group)

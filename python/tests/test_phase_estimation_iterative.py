@@ -11,15 +11,18 @@ from dataclasses import dataclass
 
 import numpy as np
 import pytest
-from qiskit import QuantumCircuit, transpile
-from qiskit.quantum_info import SparsePauliOp
+from qiskit import ClassicalRegister, QuantumCircuit, transpile
 from qiskit_aer import AerSimulator
 
 from qdk_chemistry.algorithms import (
     IterativePhaseEstimation,
     TraditionalPhaseEstimation,
 )
-from qdk_chemistry.data import QpeResult, QubitHamiltonian
+from qdk_chemistry.data import QpeResult, QuantumErrorProfile, QubitHamiltonian
+from qdk_chemistry.phase_estimation.base import PhaseEstimationAlgorithm
+from qdk_chemistry.phase_estimation.iterative_qpe import IterativePhaseEstimationIteration
+from qdk_chemistry.plugins.qiskit._interop.noise_model import get_noise_model_from_profile
+from qdk_chemistry.utils.phase import accumulated_phase_from_bits
 
 from .reference_tolerances import (
     float_comparison_relative_tolerance,
@@ -50,10 +53,7 @@ class PhaseEstimationProblem:
 @pytest.fixture
 def two_qubit_phase_problem() -> PhaseEstimationProblem:
     """Return the two-qubit phase estimation scenario used in documentation."""
-    sparse_pauli_op = SparsePauliOp.from_list([("XX", 0.25), ("ZZ", 0.5)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
     state_prep = QuantumCircuit(2, name="psi")
     state_prep.initialize([0.6, 0.0, 0.0, 0.8], [0, 1])
 
@@ -75,10 +75,7 @@ def two_qubit_phase_problem() -> PhaseEstimationProblem:
 @pytest.fixture
 def four_qubit_phase_problem() -> PhaseEstimationProblem:
     """Return the four-qubit benchmark used in documentation."""
-    sparse_pauli_op = SparsePauliOp.from_list([("XXXX", 0.25), ("ZZZZ", 4.5)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
     state_prep = QuantumCircuit(4, name="psi_4q")
     state_vector = np.zeros(2**4, dtype=complex)
     state_vector[int("1000", 2)] = 0.8
@@ -175,7 +172,8 @@ def _run_traditional(problem: PhaseEstimationProblem) -> QpeResult:
 
 
 def _run_iterative_with_parameters(
-    pauli_terms: list[tuple[str, float]],
+    pauli_strings: list[str],
+    coefficients: list[float],
     state_vector: np.ndarray,
     *,
     evolution_time: float,
@@ -187,7 +185,8 @@ def _run_iterative_with_parameters(
     """Execute iterative phase estimation for a custom Hamiltonian/state pair.
 
     Args:
-        pauli_terms: List of Pauli terms and coefficients defining the Hamiltonian.
+        pauli_strings: List of Pauli strings defining the Hamiltonian.
+        coefficients: List of coefficients defining the Hamiltonian.
         state_vector: Initial state amplitudes for the system register.
         evolution_time: Evolution time ``t`` used in ``U = exp(-i H t)``.
         num_bits: Number of iterative QPE rounds executed.
@@ -199,10 +198,9 @@ def _run_iterative_with_parameters(
         :class:`QpeResult` capturing the iterative estimation outcome.
 
     """
-    sparse_pauli_op = SparsePauliOp.from_list(pauli_terms)
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    assert len(pauli_strings) == len(coefficients)
+
+    hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients)
     num_qubits = int(np.log2(len(state_vector)))
 
     state_prep = QuantumCircuit(num_qubits, name="state")
@@ -381,11 +379,13 @@ def test_iterative_and_traditional_match_on_four_qubits(four_qubit_phase_problem
 
 def test_iterative_phase_estimation_non_commuting_xi_plus_zz() -> None:
     """Validate IQPE for H = 0.519 XI + ZZ with Hartree-Fock-like trial state."""
-    pauli_terms = [("XI", 0.519), ("ZZ", 1.0)]
+    pauli_strings = ["XI", "ZZ"]
+    coefficients = [0.519, 1.0]
     state_vector = np.array([0.97, 0.0, np.sqrt(1 - 0.97**2), 0.0], dtype=complex)
 
     result = _run_iterative_with_parameters(
-        pauli_terms,
+        pauli_strings,
+        coefficients,
         state_vector,
         evolution_time=np.pi / 4,
         num_bits=6,
@@ -406,20 +406,15 @@ def test_iterative_phase_estimation_non_commuting_xi_plus_zz() -> None:
 
 def test_iterative_phase_estimation_second_non_commuting_example() -> None:
     """Validate IQPE for H = -0.0289(X1+X2) + 0.0541(Z1+Z2) + 0.0150 XX + 0.0590 ZZ."""
-    pauli_terms = [
-        ("XI", -0.0289),
-        ("IX", -0.0289),
-        ("ZI", 0.0541),
-        ("IZ", 0.0541),
-        ("XX", 0.0150),
-        ("ZZ", 0.0590),
-    ]
+    pauli_strings = ["XI", "IX", "ZI", "IZ", "XX", "ZZ"]
+    coefficients = [-0.0289, -0.0289, 0.0541, 0.0541, 0.0150, 0.059]
 
     state_vector = np.array([0.0, 0.47, 0.47, 0.75], dtype=complex)
     state_vector /= np.linalg.norm(state_vector)
 
     result = _run_iterative_with_parameters(
-        pauli_terms,
+        pauli_strings,
+        coefficients,
         state_vector,
         evolution_time=np.pi / 4,
         num_bits=11,
@@ -438,3 +433,386 @@ def test_iterative_phase_estimation_second_non_commuting_example() -> None:
     assert np.isclose(
         result.resolved_energy, -0.08984375, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
     )
+
+
+def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
+    """Integration test showing NoiseModel impact on iterative phase estimation accuracy."""
+    # Run noiseless QPE
+    noiseless_result = _run_iterative(two_qubit_phase_problem)
+
+    # Verify noiseless case matches expected values
+    assert noiseless_result.bits_msb_first is not None
+    assert list(noiseless_result.bits_msb_first) == two_qubit_phase_problem.expected_bits
+    assert np.isclose(
+        noiseless_result.phase_fraction,
+        two_qubit_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
+    )
+    assert np.isclose(
+        noiseless_result.resolved_energy,
+        two_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
+
+    # Create noise model with depolarizing error on cx gates
+    error_rate = 0.2
+    error_profile = QuantumErrorProfile(
+        name="qpe_noise_test",
+        description="Depolarizing noise for QPE integration test",
+        errors={
+            "cx": {"type": "depolarizing_error", "rate": error_rate, "num_qubits": 2},
+        },
+    )
+    noise_model = get_noise_model_from_profile(error_profile)
+
+    # Run noisy QPE with depolarizing noise on two-qubit gates
+    iqpe = IterativePhaseEstimation(two_qubit_phase_problem.hamiltonian, two_qubit_phase_problem.evolution_time)
+    simulator = AerSimulator(seed_simulator=_SEED, noise_model=noise_model)
+    phase_feedback = 0.0
+    bits: list[int] = []
+
+    for iteration in range(two_qubit_phase_problem.num_bits):
+        iteration_data = iqpe.create_iteration(
+            two_qubit_phase_problem.state_prep,
+            iteration=iteration,
+            total_iterations=two_qubit_phase_problem.num_bits,
+            phase_correction=phase_feedback,
+        )
+        # Run noisy simulation with more shots to see noise impact despite statistics
+        result = simulator.run(iteration_data.circuit, shots=100).result()
+        counts = result.get_counts()
+        measured_bit = 0 if counts.get("0", 0) >= counts.get("1", 0) else 1
+
+        bits.append(measured_bit)
+        phase_feedback = iqpe.update_phase_feedback(phase_feedback, measured_bit)
+
+    phase_fraction = iqpe.phase_fraction_from_feedback(phase_feedback)
+    noisy_result = QpeResult.from_phase_fraction(
+        method=IterativePhaseEstimation.algorithm,
+        phase_fraction=phase_fraction,
+        evolution_time=two_qubit_phase_problem.evolution_time,
+        bits_msb_first=bits,
+        reference_energy=two_qubit_phase_problem.expected_energy,
+        metadata={"label": two_qubit_phase_problem.label, "noise_model": "depolarizing", "error_rate": error_rate},
+    )
+
+    # Verify that noisy results deviate from expected values
+    expected_noisy_phase = 0.0625
+    expected_noisy_energy = 0.25
+    assert noisy_result.bits_msb_first is not None
+    assert np.isclose(
+        noisy_result.phase_fraction,
+        expected_noisy_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
+    )
+    assert not np.isclose(
+        expected_noisy_phase,
+        two_qubit_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
+    )
+    assert np.isclose(
+        noisy_result.resolved_energy,
+        expected_noisy_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
+    assert not np.isclose(
+        expected_noisy_energy,
+        two_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
+
+
+# Tests for create_iterations method
+def test_create_iterations_generates_correct_number_of_circuits(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+) -> None:
+    """Test that create_iterations generates the correct number of iteration circuits."""
+    iqpe = IterativePhaseEstimation(two_qubit_phase_problem.hamiltonian, two_qubit_phase_problem.evolution_time)
+
+    iterations = iqpe.create_iterations(two_qubit_phase_problem.state_prep, num_bits=5)
+
+    assert len(iterations) == 5
+    for idx, iteration in enumerate(iterations):
+        assert iteration.iteration == idx
+        assert iteration.total_iterations == 5
+
+
+def test_create_iterations_with_phase_corrections() -> None:
+    """Test create_iterations with custom phase corrections."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["ZZ"], coefficients=[1.0])
+    state_prep = QuantumCircuit(2)
+    state_prep.h([0, 1])
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    phase_corrections = [0.0, np.pi / 4, np.pi / 2, np.pi]
+    iterations = iqpe.create_iterations(state_prep, num_bits=4, phase_corrections=phase_corrections)
+
+    assert len(iterations) == 4
+    for idx, iteration in enumerate(iterations):
+        assert iteration.phase_correction == phase_corrections[idx]
+
+
+def test_create_iterations_with_custom_measurement_registers() -> None:
+    """Test create_iterations with custom measurement registers."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["XX"], coefficients=[0.5])
+    state_prep = QuantumCircuit(2)
+    state_prep.h([0, 1])
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi / 2)
+
+    custom_registers = [ClassicalRegister(1, f"custom_{i}") for i in range(3)]
+    iterations = iqpe.create_iterations(state_prep, num_bits=3, measurement_registers=custom_registers)
+
+    assert len(iterations) == 3
+    for idx, iteration in enumerate(iterations):
+        assert custom_registers[idx] in iteration.circuit.cregs
+
+
+def test_create_iterations_with_iteration_names() -> None:
+    """Test create_iterations with custom iteration names."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["ZI"], coefficients=[1.0])
+    state_prep = QuantumCircuit(2)
+    state_prep.h(0)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi / 4)
+
+    names = ["iteration_0", "iteration_1", "iteration_2"]
+    iterations = iqpe.create_iterations(state_prep, num_bits=3, iteration_names=names)
+
+    assert len(iterations) == 3
+    for idx, iteration in enumerate(iterations):
+        assert iteration.circuit.name == names[idx]
+
+
+def test_create_iterations_invalid_num_bits() -> None:
+    """Test that create_iterations raises ValueError for non-positive num_bits."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    with pytest.raises(ValueError, match="num_bits must be a positive integer"):
+        iqpe.create_iterations(state_prep, num_bits=0)
+
+    with pytest.raises(ValueError, match="num_bits must be a positive integer"):
+        iqpe.create_iterations(state_prep, num_bits=-1)
+
+
+def test_create_iterations_mismatched_phase_corrections_length() -> None:
+    """Test that create_iterations raises ValueError when phase_corrections length doesn't match num_bits."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    with pytest.raises(ValueError, match="phase_corrections must have length equal to num_bits"):
+        iqpe.create_iterations(state_prep, num_bits=3, phase_corrections=[0.0, 0.0])
+
+
+def test_create_iterations_mismatched_measurement_registers_length() -> None:
+    """Test that create_iterations raises ValueError when measurement_registers length doesn't match num_bits."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    with pytest.raises(ValueError, match="measurement_registers must have length equal to num_bits"):
+        iqpe.create_iterations(
+            state_prep, num_bits=3, measurement_registers=[ClassicalRegister(1, "c0"), ClassicalRegister(1, "c1")]
+        )
+
+
+def test_create_iterations_mismatched_iteration_names_length() -> None:
+    """Test that create_iterations raises ValueError when iteration_names length doesn't match num_bits."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    with pytest.raises(ValueError, match="iteration_names must have length equal to num_bits"):
+        iqpe.create_iterations(state_prep, num_bits=3, iteration_names=["name1", "name2"])
+
+
+# Tests for static methods
+def test_update_phase_feedback_with_bit_zero() -> None:
+    """Test phase feedback update when measured bit is 0."""
+    current_phase = np.pi / 4
+    new_phase = IterativePhaseEstimation.update_phase_feedback(current_phase, 0)
+
+    # When bit is 0, phase should be halved
+    assert np.isclose(new_phase, current_phase / 2, rtol=float_comparison_relative_tolerance)
+
+
+def test_phase_fraction_from_feedback_zero() -> None:
+    """Test phase fraction calculation from zero feedback."""
+    phase_fraction = IterativePhaseEstimation.phase_fraction_from_feedback(0.0)
+    assert np.isclose(phase_fraction, 0.0, rtol=float_comparison_relative_tolerance)
+
+
+def test_phase_fraction_from_feedback_in_valid_range() -> None:
+    """Test phase fraction calculation from feedback in valid range."""
+    feedback = np.pi / 2
+    phase_fraction = IterativePhaseEstimation.phase_fraction_from_feedback(feedback)
+
+    # Should be in range [0, 1)
+    assert 0.0 <= phase_fraction < 1.0
+
+
+def test_phase_feedback_from_bits_empty() -> None:
+    """Test phase feedback calculation from empty bit sequence."""
+    phase_feedback = IterativePhaseEstimation.phase_feedback_from_bits([])
+    assert np.isclose(phase_feedback, 0.0, rtol=float_comparison_relative_tolerance)
+
+
+def test_phase_feedback_from_bits_single_zero() -> None:
+    """Test phase feedback calculation from single zero bit."""
+    phase_feedback = IterativePhaseEstimation.phase_feedback_from_bits([0])
+    assert np.isclose(phase_feedback, 0.0, rtol=float_comparison_relative_tolerance)
+
+
+def test_phase_feedback_from_bits_multiple() -> None:
+    """Test phase feedback calculation from multiple bits."""
+    bits = [1, 0, 1, 1]
+    phase_feedback = IterativePhaseEstimation.phase_feedback_from_bits(bits)
+
+    # Verify it's equivalent to accumulated phase
+    expected = accumulated_phase_from_bits(bits)
+    assert np.isclose(phase_feedback, expected, rtol=float_comparison_relative_tolerance)
+
+
+# Tests for IterativePhaseEstimationIteration dataclass
+def test_iteration_dataclass_creation() -> None:
+    """Test creation of IterativePhaseEstimationIteration dataclass."""
+    circuit = QuantumCircuit(3, 1)
+    iteration_obj = IterativePhaseEstimationIteration(
+        circuit=circuit, iteration=0, total_iterations=4, power=8, phase_correction=0.0
+    )
+
+    assert iteration_obj.circuit == circuit
+    assert iteration_obj.iteration == 0
+    assert iteration_obj.total_iterations == 4
+    assert iteration_obj.power == 8
+    assert iteration_obj.phase_correction == 0.0
+
+
+def test_iteration_dataclass_frozen() -> None:
+    """Test that IterativePhaseEstimationIteration is frozen."""
+    circuit = QuantumCircuit(2, 1)
+    iteration_obj = IterativePhaseEstimationIteration(
+        circuit=circuit, iteration=1, total_iterations=5, power=4, phase_correction=np.pi / 4
+    )
+
+    # Should not be able to modify frozen dataclass
+    with pytest.raises(
+        (AttributeError, TypeError)
+    ):  # FrozenInstanceError in Python 3.10+, AttributeError in older versions
+        iteration_obj.iteration = 2
+
+
+def test_create_iteration_returns_correct_metadata() -> None:
+    """Test that create_iteration returns correct metadata."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["ZZ"], coefficients=[1.0])
+    state_prep = QuantumCircuit(2)
+    state_prep.h([0, 1])
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi / 2)
+
+    iteration_obj = iqpe.create_iteration(state_prep, iteration=2, total_iterations=6, phase_correction=np.pi / 8)
+
+    assert iteration_obj.iteration == 2
+    assert iteration_obj.total_iterations == 6
+    assert iteration_obj.power == 2 ** (6 - 2 - 1)  # 2^3 = 8
+    assert np.isclose(iteration_obj.phase_correction, np.pi / 8)
+    assert iteration_obj.circuit is not None
+
+
+# Tests for validation and error handling
+def test_create_iteration_circuit_invalid_iteration_negative() -> None:
+    """Test that create_iteration_circuit raises ValueError for negative iteration."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    with pytest.raises(ValueError, match="iteration index -1 is outside the valid range"):
+        iqpe.create_iteration_circuit(state_prep, iteration=-1, total_iterations=4)
+
+
+def test_create_iteration_circuit_invalid_iteration_too_large() -> None:
+    """Test that create_iteration_circuit raises ValueError for iteration >= total_iterations."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    with pytest.raises(ValueError, match="iteration index 4 is outside the valid range"):
+        iqpe.create_iteration_circuit(state_prep, iteration=4, total_iterations=4)
+
+
+def test_create_iteration_circuit_invalid_total_iterations_zero() -> None:
+    """Test that create_iteration_circuit raises ValueError for total_iterations <= 0."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    with pytest.raises(ValueError, match="total_iterations must be a positive integer"):
+        iqpe.create_iteration_circuit(state_prep, iteration=0, total_iterations=0)
+
+
+def test_create_iteration_circuit_invalid_total_iterations_negative() -> None:
+    """Test that create_iteration_circuit raises ValueError for negative total_iterations."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    with pytest.raises(ValueError, match="total_iterations must be a positive integer"):
+        iqpe.create_iteration_circuit(state_prep, iteration=0, total_iterations=-1)
+
+
+def test_create_iteration_circuit_power_calculation() -> None:
+    """Test that the power calculation is correct for different iterations."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    # For 5 iterations (num_bits=5), powers should be: 16, 8, 4, 2, 1
+    expected_powers = [16, 8, 4, 2, 1]
+    for iteration, expected_power in enumerate(expected_powers):
+        iteration_obj = iqpe.create_iteration(state_prep, iteration=iteration, total_iterations=5)
+        assert iteration_obj.power == expected_power
+
+
+def test_create_iteration_circuit_with_none_measurement_register() -> None:
+    """Test create_iteration_circuit with None measurement register creates default."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    circuit = iqpe.create_iteration_circuit(state_prep, iteration=2, total_iterations=5, measurement_register=None)
+
+    # Should have created a default classical register named "c2"
+    assert circuit.num_clbits == 1
+    assert any(creg.name == "c2" for creg in circuit.cregs)
+
+
+def test_iterative_qpe_initialization() -> None:
+    """Test IterativePhaseEstimation initialization."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.5, 1.0])
+    evolution_time = 2.5
+
+    iqpe = IterativePhaseEstimation(hamiltonian, evolution_time)
+
+    assert iqpe.hamiltonian == hamiltonian
+    assert iqpe.evolution_time == evolution_time
+    assert iqpe.algorithm == PhaseEstimationAlgorithm.ITERATIVE
