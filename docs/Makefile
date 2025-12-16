@@ -19,7 +19,7 @@ PYTHON_SRC_DIR = ../python/src
 # Format of generated documentation (can override from environment)
 SPHINX_FORMAT ?= html
 
-.PHONY: check help clean doxygen breathe sphinx-api sphinx-autosummary sphinx-docs clean-doxygen clean-breathe clean-sphinx-api clean-sphinx-autosummary clean-sphinx-docs
+.PHONY: check help clean doxygen breathe sphinx-api sphinx-autosummary sphinx-docs clean-doxygen clean-breathe clean-sphinx-api clean-sphinx-autosummary clean-sphinx-docs generate-examples
 
 default: check
 	@echo "Try running 'make clean' to clean things up or 'make all' to build everything."
@@ -123,7 +123,7 @@ SPHINX_SUMMARY_OPTIONS = -T -v -j 1 -n -w $(SPHINX_SUMMARY_WARNINGS)
 # Extra options for Sphinx command (can be specified in environment)
 SPHINX_SUMMARY_EXTRA_OPTIONS ?=
 
-sphinx-autosummary: breathe sphinx-api $(SOURCE_DIR)/conf.py $(SOURCE_DIR)/index.rst
+sphinx-autosummary: breathe sphinx-api generate-examples $(SOURCE_DIR)/conf.py $(SOURCE_DIR)/index.rst
 	@echo "** Building Sphinx autosummary documentation..."
 	sphinx-build -M $(SPHINX_FORMAT) $(SOURCE_DIR) $(BUILD_DIR) \
 	    $(SPHINX_SUMMARY_OPTIONS) $(SPHINX_SUMMARY_EXTRA_OPTIONS) > $(SPHINX_SUMMARY_DEBUG) 2>&1
@@ -184,4 +184,17 @@ clean-sphinx-docs: check
 	rm -rf $(BUILD_DIR)
 	rm -f $(SPHINX_DOCS_DEBUG)
 	rm -f $(SPHINX_DOCS_WARNINGS)
+	@echo
+
+################################################################################
+# Generate example files from templates
+################################################################################
+
+EXAMPLES_DIR = source/_static/examples
+EXAMPLES_SCRIPT = $(EXAMPLES_DIR)/generate_examples.py
+
+generate-examples:
+	@echo "** Generating example files from templates..."
+	python3 $(EXAMPLES_SCRIPT)
+	@echo "** Example files generated."
 	@echo

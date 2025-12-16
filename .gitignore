@@ -219,3 +219,9 @@ __marimo__/
 # PYIs
 python/src/qdk_chemistry/_core/*.pyi
 python/src/qdk_chemistry/algorithms/registry.pyi
+
+# Generated documentation examples (from templates)
+docs/source/_static/examples/python/quickstart.py
+docs/source/_static/examples/python/structure.py
+docs/source/_static/examples/cpp/quickstart.cpp
+docs/source/_static/examples/cpp/structure.cpp

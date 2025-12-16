@@ -1,0 +1,9 @@
+{
+    "description": "Hydrogen molecule (H2) atomic coordinates in Bohr",
+    "units": "bohr",
+    "elements": ["H", "H"],
+    "coords": [
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 1.4]
+    ]
+}

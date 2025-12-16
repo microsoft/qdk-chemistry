@@ -71,15 +71,9 @@ int main() {
   // ---------------------------------------------------------------------------
   // start-cell-structure
   // Define benzene diradical structure directly using coordinates
-  Eigen::MatrixXd coords(10, 3);
-  coords << 0.000000, 1.396000, 0.000000, 1.209077, 0.698000, 0.000000,
-      1.209077, -0.698000, 0.000000, 0.000000, -1.396000, 0.000000, -1.209077,
-      -0.698000, 0.000000, -1.209077, 0.698000, 0.000000, 2.151000, 1.242000,
-      0.000000, 2.151000, -1.242000, 0.000000, -2.151000, -1.242000, 0.000000,
-      -2.151000, 1.242000, 0.000000;
+  {{COORDS_BENZENE_DIRADICAL}}
 
-  std::vector<std::string> elements = {"C", "C", "C", "C", "C",
-                                       "C", "H", "H", "H", "H"};
+  {{ELEMENTS_BENZENE_DIRADICAL}}
 
   auto structure = std::make_shared<data::Structure>(coords, elements);
 

@@ -16,21 +16,8 @@ from qdk_chemistry.data.qubit_hamiltonian import (
 from qdk_chemistry.utils.wavefunction import get_top_determinants
 
 # Define benzene diradical structure directly using numpy arrays
-coords = np.array(
-    [
-        [0.00000000, 2.63805767, 0.00000000],
-        [2.28482439, 1.31902883, 0.00000000],
-        [2.28482439, -1.31902883, 0.00000000],
-        [0.00000000, -2.63805767, 0.00000000],
-        [-2.28482439, -1.31902883, 0.00000000],
-        [-2.28482439, 1.31902883, 0.00000000],
-        [4.06480089, 2.34703985, 0.00000000],
-        [4.06480089, -2.34703985, 0.00000000],
-        [-4.06480089, -2.34703985, 0.00000000],
-        [-4.06480089, 2.34703985, 0.00000000],
-    ]
-)
-elements = ["C", "C", "C", "C", "C", "C", "H", "H", "H", "H"]
+coords = {{COORDS_BENZENE_DIRADICAL}}
+elements = {{ELEMENTS_BENZENE_DIRADICAL}}
 structure = Structure(coords, elements)
 
 # Alternative: load from XYZ file
