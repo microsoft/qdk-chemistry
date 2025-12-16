@@ -10,7 +10,6 @@
 #include <iostream>
 #include <memory>
 #include <nlohmann/json.hpp>
-#include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <stdexcept>
 #include <string>
@@ -310,7 +309,7 @@ class HamiltonianContainer {
 
 /**
  * @class Hamiltonian
- * @brief Interfaces a molecular Hamiltonian in the molecular orbital
+ * @brief Provides an interface to a molecular Hamiltonian in the molecular orbital
  * basis by wrapping an implementation from @ref HamiltonianContainer.
  *
  * This class provides an interface to molecular Hamiltonian data for quantum

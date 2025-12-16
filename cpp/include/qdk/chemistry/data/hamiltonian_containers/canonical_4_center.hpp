@@ -20,7 +20,7 @@ namespace qdk::chemistry::data {
 
 /**
  * @class Canonical4CenterHamiltonian
- * @brief Represents an molecular Hamiltonian in the molecular orbital
+ * @brief Represents a molecular Hamiltonian in the molecular orbital
  * basis
  *
  * This class stores molecular Hamiltonian data for quantum chemistry
