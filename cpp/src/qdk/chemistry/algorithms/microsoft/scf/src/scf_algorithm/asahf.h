@@ -10,6 +10,31 @@
 #include "diis.h"
 
 namespace qdk::chemistry::scf {
+
+namespace detail {
+/**
+ * @brief Hash function for BasisSet used in this atomic guess implementation
+ */
+struct BasisHasher {
+  size_t operator()(const BasisSet& basis) const noexcept;
+};
+
+/**
+ * @brief Equality checker for BasisSet used in this atomic guess
+ * implementation
+ */
+struct BasisEqChecker {
+  bool operator()(const BasisSet& lhs, const BasisSet& rhs) const noexcept;
+};
+
+/**
+ * @brief Type alias for map from BasisSet to its corresponding atomic density
+ * matrix
+ */
+using BasisSetMap =
+    std::unordered_map<BasisSet, RowMajorMatrix, BasisHasher, BasisEqChecker>;
+}  // namespace detail
+
 /**
  * @brief Generate atomic density matrix guess using ASAHF for each atom
  * @param basis_set Basis set for the molecule

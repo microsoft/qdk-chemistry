@@ -121,61 +121,109 @@ std::shared_ptr<BasisSet> make_atom_basis_set(size_t index,
       new BasisSet(mol, shells, ecp_shells, ecp_electrons, total_ecp_electrons,
                    BasisMode::RAW, basis_set.pure, false));
 }
-}  // namespace detail
 
-/*
-struct BasisEqChecker {
-  bool operator()(const BasisSet& a, const BasisSet& b) const noexcept {
-    // mol only has one atom, check if atoms are same
-    if (a.mol->atomic_nums[0] != b.mol->atomic_nums[0]) return false;
+bool BasisEqChecker::operator()(const BasisSet& a,
+                                const BasisSet& b) const noexcept {
+  // mol only has one atom, check if atoms are same
+  if (a.mol->atomic_nums[0] != b.mol->atomic_nums[0]) return false;
 
-    // check basis set
-    if (a.n_ecp_electrons != b.n_ecp_electrons) return false;
-    if (a.pure != b.pure) return false;
-    if (a.num_atomic_orbitals != b.num_atomic_orbitals) return false;
-    if (a.shells.size() != b.shells.size()) return false;
-    if (a.ecp_shells.size() != b.ecp_shells.size()) return false;
-    if (a.element_ecp_electrons.size() != b.element_ecp_electrons.size())
-      return false;
+  // check basis set
+  if (a.n_ecp_electrons != b.n_ecp_electrons) return false;
+  if (a.pure != b.pure) return false;
+  if (a.num_atomic_orbitals != b.num_atomic_orbitals) return false;
+  if (a.shells.size() != b.shells.size()) return false;
+  if (a.ecp_shells.size() != b.ecp_shells.size()) return false;
+  if (a.element_ecp_electrons.size() != b.element_ecp_electrons.size())
+    return false;
 
-    // check shells
-    for (size_t i = 0; i < a.shells.size(); ++i) {
-      const auto& a_shell = a.shells[i];
-      // already checked for b shells size
-      // TODO: Make sure this is true: same ordering
-      const auto& b_shell = b.shells[i];
-      // atom_index and cartesian coords are always the same here so no check
-      if (a_shell.angular_momentum != b_shell.angular_momentum) return false;
-      if (a_shell.contraction != b_shell.contraction) return false;
-      for (size_t j = 0; j < a_shell.contraction; ++j) {
-        if (a_shell.exponents[j] != b_shell.exponents[j]) return false;
-        if (a_shell.coefficients[j] != b_shell.coefficients[j]) return false;
-        if (a_shell.rpowers[j] != b_shell.rpowers[j]) return false;
-      }
-    }
-
-    // check ecp shells
-    for (size_t i = 0; i < a.ecp_shells.size(); ++i) {
-      const auto& a_shell = a.ecp_shells[i];
-      // already checked for b shells size
-      // TODO: Make sure this is true: same ordering
-      const auto& b_shell = b.ecp_shells[i];
-      // atom_index and cartesian coords are always the same here so no check
-      if (a_shell.angular_momentum != b_shell.angular_momentum) return false;
-      if (a_shell.contraction != b_shell.contraction) return false;
-      for (size_t j = 0; j < a_shell.contraction; ++j) {
-        if (a_shell.exponents[j] != b_shell.exponents[j]) return false;
-        if (a_shell.coefficients[j] != b_shell.coefficients[j]) return false;
-        if (a_shell.rpowers[j] != b_shell.rpowers[j]) return false;
-      }
+  // check shells
+  for (size_t i = 0; i < a.shells.size(); ++i) {
+    const auto& a_shell = a.shells[i];
+    // already checked for b shells size
+    const auto& b_shell = b.shells[i];
+    // atom_index and cartesian coords are always the same here so no check
+    if (a_shell.angular_momentum != b_shell.angular_momentum) return false;
+    if (a_shell.contraction != b_shell.contraction) return false;
+    for (size_t j = 0; j < a_shell.contraction; ++j) {
+      if (a_shell.exponents[j] != b_shell.exponents[j]) return false;
+      if (a_shell.coefficients[j] != b_shell.coefficients[j]) return false;
+      if (a_shell.rpowers[j] != b_shell.rpowers[j]) return false;
     }
   }
-};
 
-struct BasisHasher {
-  size_t operator()(const BasisSet& basis) const noexcept {}
-};
-*/
+  // check ecp shells
+  for (size_t i = 0; i < a.ecp_shells.size(); ++i) {
+    const auto& a_shell = a.ecp_shells[i];
+    // already checked for b shells size
+    const auto& b_shell = b.ecp_shells[i];
+    // atom_index and cartesian coords are always the same here so no check
+    if (a_shell.angular_momentum != b_shell.angular_momentum) return false;
+    if (a_shell.contraction != b_shell.contraction) return false;
+    for (size_t j = 0; j < a_shell.contraction; ++j) {
+      if (a_shell.exponents[j] != b_shell.exponents[j]) return false;
+      if (a_shell.coefficients[j] != b_shell.coefficients[j]) return false;
+      if (a_shell.rpowers[j] != b_shell.rpowers[j]) return false;
+    }
+  }
+  return true;
+}
+
+size_t BasisHasher::operator()(const BasisSet& basis) const noexcept {
+  size_t hash = 0;
+  // mol only has one atom, hash atomic number
+  hash ^= std::hash<int>()(basis.mol->atomic_nums[0]) + 0x9e3779b9 +
+          (hash << 6) + (hash >> 2);
+
+  // hash basis set
+  hash ^= std::hash<int>()(basis.n_ecp_electrons) + 0x9e3779b9 + (hash << 6) +
+          (hash >> 2);
+  hash ^=
+      std::hash<bool>()(basis.pure) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+  hash ^= std::hash<size_t>()(basis.num_atomic_orbitals) + 0x9e3779b9 +
+          (hash << 6) + (hash >> 2);
+  hash ^= std::hash<size_t>()(basis.shells.size()) + 0x9e3779b9 + (hash << 6) +
+          (hash >> 2);
+  hash ^= std::hash<size_t>()(basis.ecp_shells.size()) + 0x9e3779b9 +
+          (hash << 6) + (hash >> 2);
+  hash ^= std::hash<size_t>()(basis.element_ecp_electrons.size()) + 0x9e3779b9 +
+          (hash << 6) + (hash >> 2);
+
+  // hash shells
+  for (const auto& shell : basis.shells) {
+    hash ^= std::hash<uint64_t>()(shell.angular_momentum) + 0x9e3779b9 +
+            (hash << 6) + (hash >> 2);
+    hash ^= std::hash<uint64_t>()(shell.contraction) + 0x9e3779b9 +
+            (hash << 6) + (hash >> 2);
+    for (size_t j = 0; j < shell.contraction; ++j) {
+      hash ^= std::hash<double>()(shell.exponents[j]) + 0x9e3779b9 +
+              (hash << 6) + (hash >> 2);
+      hash ^= std::hash<double>()(shell.coefficients[j]) + 0x9e3779b9 +
+              (hash << 6) + (hash >> 2);
+      hash ^= std::hash<int>()(shell.rpowers[j]) + 0x9e3779b9 + (hash << 6) +
+              (hash >> 2);
+    }
+  }
+
+  // hash ecp shells
+  for (const auto& shell : basis.ecp_shells) {
+    hash ^= std::hash<uint64_t>()(shell.angular_momentum) + 0x9e3779b9 +
+            (hash << 6) + (hash >> 2);
+    hash ^= std::hash<uint64_t>()(shell.contraction) + 0x9e3779b9 +
+            (hash << 6) + (hash >> 2);
+    for (size_t j = 0; j < shell.contraction; ++j) {
+      hash ^= std::hash<double>()(shell.exponents[j]) + 0x9e3779b9 +
+              (hash << 6) + (hash >> 2);
+      hash ^= std::hash<double>()(shell.coefficients[j]) + 0x9e3779b9 +
+              (hash << 6) + (hash >> 2);
+      hash ^= std::hash<int>()(shell.rpowers[j]) + 0x9e3779b9 + (hash << 6) +
+              (hash >> 2);
+    }
+  }
+
+  return hash;
+}
+
+}  // namespace detail
 
 void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
                     RowMajorMatrix& tD) {
@@ -199,7 +247,7 @@ void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
   cfg.grad_eri.method = ERIMethod::Libint2Direct;
 
   // map with hashed basis + element as key and dm as value
-  // std::unordered_map<BasisSet, RowMajorMatrix, BasisHasher, BasisEqChecker> basis_to_dm_map;
+  detail::BasisSetMap basis_to_dm_map;
 
   for (size_t i = 0, p = 0; i < mol.n_atoms; ++i) {
     auto atom_num = mol.atomic_nums[i];
@@ -207,12 +255,18 @@ void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
     std::shared_ptr<Molecule> atom_mol = detail::make_atomic_molecule(atom_num);
     std::shared_ptr<BasisSet> atom_basis_set =
         detail::make_atom_basis_set(i, basis_set, atom_mol);
-    // Create SCF solver with basis sets
-    SCFImpl scf_solver(atom_mol, cfg, atom_basis_set, atom_basis_set, false,
-                       true);
-    // Run SCF with ASAHF algorithm
-    const auto& asahf_ctx = scf_solver.run();
-    const auto& dm = scf_solver.get_density_matrix();
+    // check if we have already computed the dm for this basis
+    auto it = basis_to_dm_map.find(*atom_basis_set);
+    if (it == basis_to_dm_map.end()) {
+      // Create SCF solver with basis sets
+      SCFImpl scf_solver(atom_mol, cfg, atom_basis_set, atom_basis_set, false,
+                         true);
+      // Run SCF with ASAHF algorithm
+      const auto& asahf_ctx = scf_solver.run();
+      // store in map
+      basis_to_dm_map[*atom_basis_set] = scf_solver.get_density_matrix();
+    }
+    const RowMajorMatrix& dm = basis_to_dm_map[*atom_basis_set];
     // insert atomic density matrix into total density matrix
     tD.block(p, p, dm.rows(), dm.cols()) = dm;
     p += dm.rows();
