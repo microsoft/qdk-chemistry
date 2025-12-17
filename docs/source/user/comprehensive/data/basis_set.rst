@@ -1,4 +1,4 @@
-Basis set
+BasisSet
 =========
 
 The :class:`~qdk_chemistry.data.BasisSet` class in QDK/Chemistry represents a collection of basis functions used to describe the electronic structure of molecules.
@@ -264,6 +264,6 @@ Further reading
 ---------------
 
 - The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/basis_set.cpp>`_ and `Python <../../../_static/examples/python/basis_set.py>`_ scripts.
-- :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
-- :doc:`Settings <../design/settings>`: Configuration settings for algorithms
+- :doc:`Serialization <serialization>`: Data serialization and deserialization
+- :doc:`Settings <../algorithms/settings>`: Configuration settings for algorithms
 - :doc:`Supported basis sets <../basis_functionals>`: List of pre-defined basis sets available in QDK/Chemistry

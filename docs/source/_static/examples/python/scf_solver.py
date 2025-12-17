@@ -41,3 +41,22 @@ scf_orbitals = wfn.get_orbitals()
 print(f"SCF Energy: {E_scf:.10f} Hartree")
 # end-cell-run
 ################################################################################
+
+################################################################################
+# start-cell-list-implementations
+from qdk_chemistry.algorithms import registry  # noqa: E402
+
+print(registry.available("scf_solver"))  # ['pyscf', 'qdk']
+# end-cell-list-implementations
+################################################################################
+
+################################################################################
+# start-cell-pyscf-example
+from qdk_chemistry.algorithms import create  # noqa: E402
+
+solver = create("scf_solver", "pyscf")
+solver.settings().set("method", "b3lyp")
+solver.settings().set("basis_set", "cc-pvdz")
+solver.settings().set("scf_type", "restricted")
+# end-cell-pyscf-example
+################################################################################

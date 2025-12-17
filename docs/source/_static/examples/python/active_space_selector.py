@@ -53,3 +53,24 @@ print(f"Active orbitals summary:\n{active_orbitals.get_summary()}")
 
 # end-cell-run
 ################################################################################
+
+################################################################################
+# start-cell-list-implementations
+from qdk_chemistry.algorithms import registry  # noqa: E402
+
+print(registry.available("active_space_selector"))
+# ['pyscf_avas', 'qdk_occupation', 'qdk_autocas_eos', 'qdk_autocas', 'qdk_valence']
+# end-cell-list-implementations
+################################################################################
+
+################################################################################
+# start-cell-avas-example
+from qdk_chemistry.algorithms import create  # noqa: E402
+
+avas = create("active_space_selector", "pyscf_avas")
+avas.settings().set("ao_labels", ["Fe 3d", "Fe 4d"])
+avas.settings().set("canonicalize", True)
+
+active_wavefunction = avas.run(scf_wavefunction)
+# end-cell-avas-example
+################################################################################

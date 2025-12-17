@@ -267,6 +267,9 @@ For MP2 and coupled cluster wavefunctions, one can access T1 and T2 cluster ampl
 Related classes
 ---------------
 
+- :doc:`Serialization <serialization>`: Data serialization and deserialization
+- :doc:`Settings <../algorithms/settings>`: Configuration settings for algorithms
+- :doc:`Active space methods <../algorithms/active_space>`: Active space selection from wavefunctions
 - :doc:`Structure <structure>`: Molecular structure that defines the system
 - :doc:`Orbitals <orbitals>`: Orbital basis set for the wavefunction
 - :doc:`Hamiltonian <hamiltonian>`: Electronic Hamiltonian constructed from wavefunction
@@ -276,7 +279,7 @@ Related classes
 Further reading
 ---------------
 
-- :doc:`Settings <../design/settings>`: Configuration settings for algorithms
+- :doc:`Settings <../algorithms/settings>`: Configuration settings for algorithms
 - :doc:`DynamicalCorrelationCalculator <../algorithms/dynamical_correlation>`: Algorithm for dynamical correlation calculators (includes coupled cluster and MP2)
 - :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
 - :doc:`Active space methods <../algorithms/active_space>`: Active space selection from wavefunctions

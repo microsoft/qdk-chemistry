@@ -1,31 +1,41 @@
 Energy estimation
 =================
 
-The :class:`~qdk_chemistry.algorithms.EnergyEstimator` algorithm in QDK/Chemistry provides a flexible and efficient framework for computing expectation values with quantum circuit and Hamiltonians.
-The estimator evaluates energies by generating measurement circuits, executing them on a backend with a configurable number of shots, and statistically aggregating the resulting bitstring outcomes.
-It is designed to support multiple backend simulators.
-
+The :class:`~qdk_chemistry.algorithms.EnergyEstimator` algorithm in QDK/Chemistry estimates the energy of a quantum state by measuring expectation values of Pauli operators.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes an OpenQASM circuit (from :doc:`StatePreparation <state_preparation>`) and a :class:`~qdk_chemistry.data.QubitHamiltonian` (from :doc:`QubitMapper <qubit_mapper>`) as input and returns energy expectation values with statistical uncertainty.
+This algorithm forms the final stage of a quantum chemistry workflow, where a prepared wavefunction is measured to obtain the system's energy.
 
 Overview
 --------
 
-The :class:`~qdk_chemistry.algorithms.EnergyEstimator` evaluates the expectation value of a :class:`~qdk_chemistry.data.QubitHamiltonian` with respect to a given quantum circuit.
+The :class:`~qdk_chemistry.algorithms.EnergyEstimator` evaluates the expectation value of a :class:`~qdk_chemistry.data.QubitHamiltonian` with respect to a given quantum circuit that loads a wavefunction onto qubits.
 It takes a Circuit object with target qubit Hamiltonians and automatically generates the corresponding measurement circuits.
 These circuits are executed on a selected backend simulator with the user-specified number of shots, and the resulting bitstring statistics are used to calculate per-term expectation values and the total energy.
 
+The algorithm supports:
 
-Capabilities
-------------
+- **Multiple simulator backends**: QDK's native Q# simulator or Qiskit's Aer simulator
+- **Noise modeling**: Depolarizing noise, bit flip noise, Pauli noise, phase flip noise, and qubit loss simulation
+- **Grouped measurements**: Efficient measurement of commuting Pauli terms in a single circuit execution
+- **Classical coefficient handling**: Pre-computed classical contributions from Hamiltonian filtering
 
-The :class:`~qdk_chemistry.algorithms.EnergyEstimator` provides the following capabilities:
+A typical workflow connects :doc:`StatePreparation <state_preparation>` (which loads the wavefunction onto qubits) with EnergyEstimator (which measures the energy):
 
-- **Expectation Value and Variance Calculation**: Computes the energy expectation value and variance for a given quantum circuit and Hamiltonians. It supports multiple Hamiltonians for simultaneous evaluation.
-- **Backend Flexibility**: Allows users to choose between Qsharp and Qiskit backends, each with unique features and configurations, such as noise modeling.
+1. Prepare a :class:`~qdk_chemistry.data.Wavefunction` from a multi-configuration calculation
+2. Generate an OpenQASM circuit using :doc:`StatePreparation <state_preparation>`
+3. Map the Hamiltonian to qubit operators using :doc:`QubitMapper <qubit_mapper>`
+4. Estimate the energy using EnergyEstimator
 
-Creating an energy estimator
-----------------------------
+Using the EnergyEstimator
+-------------------------
 
-The :class:`~qdk_chemistry.algorithms.EnergyEstimator` is created using the :doc:`factory pattern <../design/factory_pattern>`.
+.. note::
+   This algorithm is currently available only in the Python API.
+
+This section demonstrates how to create, configure, and run an energy estimation.
+The ``run`` method returns an energy expectation value with variance and the raw measurement data.
+
+**Creating an estimator:**
 
 .. tab:: Python API
 
@@ -34,63 +44,122 @@ The :class:`~qdk_chemistry.algorithms.EnergyEstimator` is created using the :doc
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
+**Configuring settings and running:**
 
-Configuring the energy estimator
---------------------------------
+Settings vary by implementation. The QDK backend supports noise models and qubit loss, while the Qiskit backend supports custom Aer noise models.
 
-Qsharp backend
-~~~~~~~~~~~~~~
-
-The Qsharp implementation of the :class:`~qdk_chemistry.algorithms.EnergyEstimator` leverages the QDK simulator to execute quantum circuits. Key features include:
-
-- Support for depolarizing noise, bit flip noise, pauli noise, and phase flip noise.
-- Simulation with qubit loss.
-
-.. tab:: Python API
+.. tab:: Python API (QDK Backend)
 
    .. literalinclude:: ../../../_static/examples/python/energy_estimator.py
       :language: python
       :start-after: # start-cell-qdk
       :end-before: # end-cell-qdk
 
-Qiskit backend
-~~~~~~~~~~~~~~~
-
-The Qiskit implementation uses the Aer simulator to execute quantum circuits. Key features include:
-
-- Support for custom noise models.
-- Support for other configurations of Aer simulator backends.
-
-.. tab:: Python API
+.. tab:: Python API (Qiskit Backend)
 
    .. literalinclude:: ../../../_static/examples/python/energy_estimator.py
       :language: python
       :start-after: # start-cell-qiskit
       :end-before: # end-cell-qiskit
 
-Implemented interface
----------------------
+Available implementations
+-------------------------
 
-QDK/Chemistry's :class:`~qdk_chemistry.algorithms.EnergyEstimator` provides a unified interface for selecting simulator backend for energy estimation.
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.EnergyEstimator` provides a unified interface for quantum circuit simulation and energy measurement.
+You can discover available implementations programmatically:
 
-QDK/Chemistry implementations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. tab:: Python API
 
-- ``qdk_base_simulator``: Native implementation with support for Qsharp simulator backends
+   .. literalinclude:: ../../../_static/examples/python/energy_estimator.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
 
-Third-party interfaces
-~~~~~~~~~~~~~~~~~~~~~~
+QDK base simulator
+~~~~~~~~~~~~~~~~~~
 
-- ``qiskit_aer_simulator``: Qiskit Aer simulator backend with customizable noise models and configurations
+**Factory name:** ``"qdk_base_simulator"``
 
-The factory pattern allows seamless selection between these implementations, with the most appropriate option chosen
-based on the calculation requirements and available packages.
+Native QDK/Chemistry implementation using the Q# simulator. Supports various noise models for realistic quantum hardware simulation.
 
-For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
+**Constructor parameters:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``seed``
+     - int
+     - Random seed for reproducibility. Default is 42.
+   * - ``noise_model``
+     - NoiseModel | None
+     - Q# noise model (``DepolarizingNoise``, ``BitFlipNoise``, ``PauliNoise``, or ``PhaseFlipNoise``). Default is None (noiseless).
+   * - ``qubit_loss``
+     - float
+     - Probability of qubit loss per operation (0.0 to 1.0). Default is 0.0.
+
+**Run parameters:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``circuit_qasm``
+     - str
+     - OpenQASM circuit string (from StatePreparation)
+   * - ``qubit_hamiltonians``
+     - list[QubitHamiltonian]
+     - List of qubit Hamiltonians to measure
+   * - ``total_shots``
+     - int
+     - Total number of measurement shots
+   * - ``classical_coeffs``
+     - list | None
+     - Pre-computed classical coefficients from Hamiltonian filtering. Default is None.
+
+Qiskit Aer Simulator
+~~~~~~~~~~~~~~~~~~~~
+
+**Factory name:** ``"qiskit_aer_simulator"``
+
+Energy estimation using Qiskit's Aer simulator backend. Provides access to Qiskit's extensive noise modeling capabilities.
+
+**Constructor parameters:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``backend``
+     - BackendV2 | None
+     - Qiskit Aer backend instance with optional noise model. Default is None (uses default Aer simulator).
+   * - ``seed``
+     - int
+     - Random seed for reproducibility. Default is 42.
+
+For more details on how QDK/Chemistry interfaces with external packages, see the :ref:`plugin system <plugin-system>` documentation.
+
+Related classes
+---------------
+
+- :class:`~qdk_chemistry.data.QubitHamiltonian`: Input qubit Hamiltonian from QubitMapper
+- :doc:`Wavefunction <../data/wavefunction>`: Source wavefunction for state preparation
 
 Further reading
 ---------------
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/energy_estimator.py>`_ script.
-- :doc:`StatePreparation <state_preparation>`: Prepare molecule wavefunctions into quantum circuits.
-- :doc:`QubitMapper <qubit_mapper>`: Prepare qubit Hamiltonians.
+- :doc:`StatePreparation <state_preparation>`: Load wavefunctions onto qubits as quantum circuits
+- :doc:`QubitMapper <qubit_mapper>`: Map fermionic Hamiltonians to qubit operators
+- See the ``examples/state_prep_energy.ipynb`` notebook for an end-to-end workflow demonstration
+- :doc:`Settings <settings>`: Configuration settings for algorithms
+- :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation

@@ -53,5 +53,14 @@ int main() {
   std::cout << localizer->get_summary() << std::endl;
   // end-cell-localize
   // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-list-implementations
+  auto names = LocalizerFactory::available();
+  for (const auto& name : names) {
+    std::cout << name << std::endl;
+  }
+  // end-cell-list-implementations
+  // --------------------------------------------------------------------------------------------
   return 0;
 }

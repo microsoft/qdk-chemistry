@@ -14,7 +14,7 @@ from qdk_chemistry.data import Structure
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 structure = Structure(coords, ["H", "H"])
 
-# Create an SCF solver using the factory
+# Create a SCF solver using the factory
 scf_solver = create("scf_solver", "pyscf")
 
 # Configure it using the standard settings interface
@@ -41,6 +41,21 @@ for algorithm_name in available():
         for key, value in settings.items():
             print(f"    {key}: {value}")
 # end-cell-list-methods
+################################################################################
+
+################################################################################
+# start-cell-discover-implementations
+from qdk_chemistry.algorithms import ScfSolver  # noqa: E402
+
+# List all registered SCF solver implementations
+print(ScfSolver.available())  # ['qdk', 'pyscf']
+
+# Create a specific implementation
+solver = ScfSolver.create("pyscf")
+
+# Inspect available settings
+solver.print_settings()
+# end-cell-discover-implementations
 ################################################################################
 
 ################################################################################

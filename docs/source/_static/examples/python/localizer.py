@@ -51,3 +51,25 @@ localized_orbitals = localized_wfn.get_orbitals()
 print(localized_orbitals.get_summary())
 # end-cell-localize
 ################################################################################
+
+################################################################################
+# start-cell-list-implementations
+from qdk_chemistry.algorithms import registry  # noqa: E402
+
+print(registry.available("orbital_localizer"))
+# ['pyscf_multi', 'qdk_vvhv', 'qdk_mp2_natural_orbitals', 'qdk_pipek_mezey']
+# end-cell-list-implementations
+################################################################################
+
+################################################################################
+# start-cell-pyscf-multi-example
+# Using PySCF's multi-method localizer
+localizer = create("orbital_localizer", "pyscf_multi")
+localizer.settings().set("method", "foster-boys")
+
+# Localize occupied orbitals
+n_occupied = 5
+occ_indices = list(range(n_occupied))
+localized_orbs = localizer.run(wfn, occ_indices, occ_indices)
+# end-cell-pyscf-multi-example
+################################################################################

@@ -1,5 +1,5 @@
-Projected multi-configuration calculations
-==========================================
+Projected Multi-Configuration solver
+====================================
 
 .. note::
 

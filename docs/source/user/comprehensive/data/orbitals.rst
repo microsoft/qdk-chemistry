@@ -19,10 +19,10 @@ The :class:`~qdk_chemistry.data.Orbitals` class supports both restricted and unr
 - **Restricted**: Alpha and beta electrons share the same spatial orbitals (:term:`RHF`, :term:`RKS`)
 - **Unrestricted**: Alpha and beta electrons have separate spatial orbitals (:term:`UHF`, :term:`UKS`)
 
-For restricted calculations, the alpha and beta components are identical. The class maintains separate alpha and beta
-data internally, but they reference the same underlying data for restricted cases.
+For restricted calculations, the alpha and beta components are identical.
+The class maintains separate alpha and beta data internally, but they reference the same underlying data for restricted cases.
 
-Model Orbitals
+Model orbitals
 ~~~~~~~~~~~~~~
 
 ModelOrbitals are a simpler class in QDK/Chemistry, for model systems without any basis set information.
@@ -97,7 +97,7 @@ It serves as input to various post-:term:`HF` methods such as :doc:`active space
 - **Hamiltonian Construction**: Build electronic Hamiltonians for post-HF methods using the orbital information.
   See :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` for details.
 
-The below example illustrates the typical access to Orbitals (via an SCF):
+The below example illustrates the typical access to Orbitals (via a SCF):
 
 .. tab:: C++ API
 
@@ -129,7 +129,7 @@ Similar patterns are described below for ModelOrbitals.
       :start-after: # start-cell-model-orbitals-create
       :end-before: # end-cell-model-orbitals-create
 
-Accessing Orbital Data
+Accessing Orbital data
 ----------------------
 
 The :class:`~qdk_chemistry.data.Orbitals` class provides methods to access orbital coefficients, energies, and other properties.
@@ -172,8 +172,8 @@ Further reading
 ---------------
 
 - The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/orbitals.cpp>`_ and `Python <../../../_static/examples/python/orbitals.py>`_ scripts.
-- :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
-- :doc:`Settings <../design/settings>`: Configuration settings for algorithms
+- :doc:`Serialization <serialization>`: Data serialization and deserialization
+- :doc:`Settings <../algorithms/settings>`: Configuration settings for algorithms
 - :doc:`Structure <structure>`: Molecular structure representation
 - :doc:`Hamiltonian <hamiltonian>`: Electronic Hamiltonian constructed from orbitals
 - :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`: Algorithm that builds Hamiltonians from orbitals

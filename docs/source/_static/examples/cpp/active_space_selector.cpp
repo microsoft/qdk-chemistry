@@ -65,3 +65,12 @@ std::cout << "Active orbitals summary:\n"
 
 // end-cell-run
 // --------------------------------------------------------------------------------------------
+
+// --------------------------------------------------------------------------------------------
+// start-cell-list-implementations
+auto names = ActiveSpaceSelectorFactory::available();
+for (const auto& name : names) {
+  std::cout << name << std::endl;
+}
+// end-cell-list-implementations
+// --------------------------------------------------------------------------------------------

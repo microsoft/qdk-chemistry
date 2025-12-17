@@ -7,9 +7,27 @@
 
 ################################################################################
 # start-cell-create
-import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import (
+
+# Create a StatePreparation instance
+sparse_prep = create("state_prep", "sparse_isometry_gf2x")
+regular_prep = create("state_prep", "regular_isometry")
+# end-cell-create
+################################################################################
+
+################################################################################
+# start-cell-configure
+# Configure transpilation settings
+sparse_prep.settings().set("transpile", True)
+sparse_prep.settings().set("basis_gates", ["rz", "cz", "sdg", "h"])
+sparse_prep.settings().set("transpile_optimization_level", 3)
+# end-cell-configure
+################################################################################
+
+################################################################################
+# start-cell-run
+import numpy as np  # noqa: E402
+from qdk_chemistry.data import (  # noqa: E402
     BasisSet,
     CasWavefunctionContainer,
     Configuration,
@@ -19,16 +37,6 @@ from qdk_chemistry.data import (
     Wavefunction,
 )
 
-regular_prep = create("state_prep", "regular_isometry")
-sparse_prep = create("state_prep", "sparse_isometry_gf2x")
-sparse_prep.settings().set("transpile", True)
-sparse_prep.settings().set("basis_gates", ["rz", "cz", "sdg", "h"])
-sparse_prep.settings().set("transpile_optimization_level", 3)
-# end-cell-create
-################################################################################
-
-################################################################################
-# start-cell-run
 # Create a basis set
 shells = []
 for _ in range(3):
@@ -54,4 +62,13 @@ sparse_circuit = sparse_prep.run(wavefunction)
 print(f"Regular isometry QASM:\n{regular_circuit.get_qasm()}")
 print(f"Sparse isometry QASM:\n{sparse_circuit.get_qasm()}")
 # end-cell-run
+################################################################################
+
+################################################################################
+# start-cell-list-implementations
+from qdk_chemistry.algorithms import registry  # noqa: E402
+
+print(registry.available("state_prep"))
+# ['sparse_isometry_gf2x', 'regular_isometry']
+# end-cell-list-implementations
 ################################################################################
