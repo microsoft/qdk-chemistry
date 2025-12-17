@@ -37,7 +37,8 @@ BUILD_DIR="/tmp/qdk_deps_build"
 INSTALL_PREFIX="${INSTALL_PREFIX:-/usr/local}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 JOBS="${JOBS:-$(nproc)}"
-BUILD_SHARED_LIBS="${BUILD_SHARED_LIBS:-OFF}"  # Default to static libraries
+BUILD_SHARED_LIBS="${BUILD_SHARED_LIBS:-OFF}"  # Default to static
+LIBINT_JOBS=${LIBINT_JOBS:-4}  # Limit libint build jobs to 4 due to high memory usage
 
 # Helper function to extract commit hash from cgmanifest by repository URL pattern
 get_commit_hash() {
@@ -215,7 +216,7 @@ cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
          -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
 # libint's compilation is memory intensive so parallel jobs are limited to 4 to prevent OOM errors
-make -j4
+make -j"$LIBINT_JOBS"
 make install
 cd "$BUILD_DIR"
 rm -rf "$LIBINT_DIR" "$LIBINT_TARBALL"
