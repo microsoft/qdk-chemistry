@@ -214,7 +214,8 @@ cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
          -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
          -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
-make -j"$JOBS"
+# libint's compilation is memory intensive so parallel jobs are limited to 4 to prevent OOM errors
+make -j4
 make install
 cd "$BUILD_DIR"
 rm -rf "$LIBINT_DIR" "$LIBINT_TARBALL"
