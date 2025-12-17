@@ -29,16 +29,13 @@ namespace qdk::chemistry::scf {
 namespace impl {
 
 /**
- * @brief Apply orbital rotation using kappa vector
+ * @brief Apply orbital rotation using kappa vector by constructing the
+ * antisymmetric kappa matrix and appliying the rotation C = C * exp(kappa).
  * @param[in,out] C Molecular orbital coefficient matrix
  * @param[in] spin_index Spin index (0 for alpha, 1 for beta)
  * @param[in] kappa_vector The kappa vector to apply for rotation
  * @param[in] num_occupied_orbitals Number of occupied orbitals for this spin
  * @param[in] num_molecular_orbitals Number of molecular orbitals
- *
- * @details
- * This function constructs the antisymmetric kappa matrix and applies the
- * orbital rotation C = C * exp(kappa).
  */
 static void apply_orbital_rotation(RowMajorMatrix& C, const int spin_index,
                                    const Eigen::VectorXd& kappa_vector,
@@ -138,12 +135,11 @@ class GDMLineFunctor {
   }
 
   /**
-   * @brief Static utility: perform axpy operation to acommodate line search
-   * method interface
+   * @brief Static utility: perform axpy operation y = y + alpha * x to
+   * acommodate line search method interface
    * @param alpha Scalar multiplier
    * @param x Vector to scale and add
    * @param y Vector to add to (modified in-place)
-   * @note Performs: y = y + alpha * x
    */
   static void axpy(double alpha, const Eigen::VectorXd& x, Eigen::VectorXd& y) {
     y.noalias() += alpha * x;
@@ -183,9 +179,8 @@ class GDMLineFunctor {
 };
 
 double GDMLineFunctor::eval(const Eigen::VectorXd& x) {
-  // Check if we've already computed this kappa vector
-  // Use smart caching: if ||x - cached_kappa|| < compare_kappa_tol_, reuse
-  // cached result
+  // Check if we've already computed this kappa vector:
+  // if ||x - cached_kappa|| < compare_kappa_tol_, reuse cached result
   if (cached_kappa_.size() == x.size() &&
       (cached_kappa_ - x).norm() < compare_kappa_tol_) {
     return cached_energy_;
@@ -309,13 +304,20 @@ class GDM {
   void iterate(SCFImpl& scf_impl);
 
   /**
-   * @brief Set the energy change from last two DIIS cycles for GDM algorithm
+   * @brief Initialize GDM state when switching from DIIS
    *
    * @param[in] delta_energy_diis Energy change from DIIS algorithm
+   * @param[in] total_energy Current SCF total energy
    */
-  void set_delta_energy_diis(const double delta_energy_diis) {
+  void initialize_from_diis(const double delta_energy_diis,
+                            const double total_energy) {
     QDK_LOG_TRACE_ENTERING();
     delta_energy_ = delta_energy_diis;
+    last_accepted_energy_ = total_energy;
+    QDK_LOGGER().debug(
+        "GDM initialized from DIIS: delta_energy={:.6e}, "
+        "last_accepted_energy={:.12e}",
+        delta_energy_, last_accepted_energy_);
   }
 
  private:
@@ -359,6 +361,19 @@ class GDM {
       Eigen::Block<RowMajorMatrix> history_kappa_spin,
       Eigen::Block<RowMajorMatrix> history_dgrad_spin,
       Eigen::VectorBlock<Eigen::VectorXd> current_gradient_spin);
+
+  /**
+   * @brief Accept line search step and update energy tracking
+   * @param[in,out] scf_impl Reference to SCFImpl to update with new orbitals
+   * and density
+   * @param[in] line_functor Line search functor containing cached C and P
+   * matrices
+   * @param[in] fx_new New energy from line search
+   */
+  void accept_line_search_step_(SCFImpl& scf_impl,
+                                const GDMLineFunctor& line_functor,
+                                double fx_new);
+
   /// Reference to SCFContext
   const SCFContext& ctx_;  ///< Reference to SCFContext
   /// Energy change from the last step
@@ -588,6 +603,19 @@ void GDM::generate_pseudo_canonical_orbital_(
   current_gradient_spin = current_gradient_transformed;  // rotate
 }
 
+void GDM::accept_line_search_step_(SCFImpl& scf_impl,
+                                   const GDMLineFunctor& line_functor,
+                                   double fx_new) {
+  // Update scf_impl with accepted orbitals and density
+  scf_impl.orbitals_matrix() = line_functor.get_cached_C();
+  scf_impl.density_matrix() = line_functor.get_cached_P();
+
+  // Update energy tracking
+  double delta_energy = fx_new - last_accepted_energy_;
+  last_accepted_energy_ = fx_new;
+  delta_energy_ = delta_energy;
+}
+
 void GDM::iterate(SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
   // Extract matrices from scf_impl
@@ -707,6 +735,10 @@ void GDM::iterate(SCFImpl& scf_impl) {
     for (int hist_idx = 0; hist_idx < history_size_; hist_idx++) {
       double sy_dot =
           history_kappa_.row(hist_idx).dot(history_dgrad_.row(hist_idx));
+      if (sy_dot <= 1e-14) {
+        QDK_LOGGER().warn("Detected non-positive s·y = {:.6e} at hist_idx {}. ",
+                          sy_dot, hist_idx);
+      }
       inverse_rho_values.push_back(sy_dot);
     }
 
@@ -830,12 +862,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
                                      gfx_new);
 
     // Line search succeeded - update with optimal step
-    scf_impl.orbitals_matrix() = line_functor.get_cached_C();
-    scf_impl.density_matrix() = line_functor.get_cached_P();
-
-    double delta_energy = fx_new - last_accepted_energy_;
-    last_accepted_energy_ = fx_new;
-    delta_energy_ = delta_energy;
+    accept_line_search_step_(scf_impl, line_functor, fx_new);
 
     QDK_LOGGER().debug("Line search converged.");
   } catch (const std::exception& e) {
@@ -856,12 +883,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
                                        step_steepest, x_new, fx_new, gfx_new);
 
       // Steepest descent line search succeeded
-      scf_impl.orbitals_matrix() = line_functor.get_cached_C();
-      scf_impl.density_matrix() = line_functor.get_cached_P();
-
-      double delta_energy = fx_new - last_accepted_energy_;
-      last_accepted_energy_ = fx_new;
-      delta_energy_ = delta_energy;
+      accept_line_search_step_(scf_impl, line_functor, fx_new);
 
       QDK_LOGGER().debug("Steepest descent line search converged.");
     } catch (const std::exception& e2) {
@@ -872,20 +894,16 @@ void GDM::iterate(SCFImpl& scf_impl) {
           e2.what());
 
       // Take very small step in steepest descent direction
-      x_new = -0.01 * current_gradient_;
+      double small_gradient_step_length = 1e-4;
+      x_new = -small_gradient_step_length * current_gradient_;
       fx_new = line_functor.eval(x_new);
 
-      scf_impl.orbitals_matrix() = line_functor.get_cached_C();
-      scf_impl.density_matrix() = line_functor.get_cached_P();
-
-      double delta_energy = fx_new - last_accepted_energy_;
-      last_accepted_energy_ = fx_new;
-      delta_energy_ = delta_energy;
+      accept_line_search_step_(scf_impl, line_functor, fx_new);
 
       QDK_LOGGER().warn(
           "Minimal gradient step taken: energy = {:.12e}, delta_energy = "
           "{:.6e}",
-          fx_new, delta_energy);
+          fx_new, delta_energy_);
     }
   }
 
@@ -914,9 +932,10 @@ void GDM::iterate(SCFImpl& scf_impl) {
   gdm_impl_->iterate(scf_impl);
 }
 
-void GDM::set_delta_energy_diis(const double delta_energy_diis) {
+void GDM::initialize_from_diis(const double delta_energy_diis,
+                               const double total_energy) {
   QDK_LOG_TRACE_ENTERING();
-  gdm_impl_->set_delta_energy_diis(delta_energy_diis);
+  gdm_impl_->initialize_from_diis(delta_energy_diis, total_energy);
 }
 
 }  // namespace qdk::chemistry::scf
