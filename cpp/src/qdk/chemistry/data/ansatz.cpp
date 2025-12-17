@@ -537,7 +537,6 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
       new_hamiltonian = std::make_shared<Hamiltonian>(
           std::make_unique<Canonical4CenterHamiltonian>(
               h_aa, h2_aaaa, wavefunction_orbitals,
-
               original_hamiltonian->get_core_energy(), fock_matrix,
               original_hamiltonian->get_type()));
     } else {

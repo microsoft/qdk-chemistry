@@ -6,8 +6,6 @@
 #include <H5Cpp.h>
 
 #include <Eigen/Dense>
-#include <complex>
-#include <iostream>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
@@ -96,13 +94,14 @@ class Canonical4CenterHamiltonian : public HamiltonianContainer {
   /**
    * @brief Destructor
    */
-  virtual ~Canonical4CenterHamiltonian() = default;
+  ~Canonical4CenterHamiltonian() override = default;
 
   /**
    * @brief Create a deep copy of this container
    * @return Unique pointer to a cloned container
    */
   virtual std::unique_ptr<HamiltonianContainer> clone() const override;
+
   /**
    * @brief Get the type of the underlying container
    * @return String identifying the container type (e.g., "canonical_4_center",
@@ -148,12 +147,6 @@ class Canonical4CenterHamiltonian : public HamiltonianContainer {
   virtual bool is_restricted() const override;
 
   /**
-   * @brief Check if the Hamiltonian is unrestricted
-   * @return True if alpha and beta integrals are different
-   */
-  // virtual bool is_unrestricted() const;
-
-  /**
    * @brief Convert Hamiltonian to JSON
    * @return JSON object containing Hamiltonian data
    */
@@ -169,7 +162,7 @@ class Canonical4CenterHamiltonian : public HamiltonianContainer {
   /**
    * @brief Deserialize Hamiltonian data from HDF5 group
    * @param group HDF5 group to read data from
-   * @return Shared pointer to const Hamiltonian loaded from group
+   * @return Unique pointer to const Hamiltonian loaded from group
    * @throws std::runtime_error if I/O error occurs
    */
   static std::unique_ptr<Canonical4CenterHamiltonian> from_hdf5(
@@ -198,7 +191,7 @@ class Canonical4CenterHamiltonian : public HamiltonianContainer {
    * @brief Check if the Hamiltonian data is complete and consistent
    * @return True if all required data is set and dimensions are consistent
    */
-  bool is_valid() const override;
+  virtual bool is_valid() const override;
 
  private:
   /// Two-electron integrals in MO basis, stored as flattened arrays [norb^4]
@@ -228,7 +221,7 @@ class Canonical4CenterHamiltonian : public HamiltonianContainer {
   void _to_fcidump_file(const std::string& filename, size_t nalpha,
                         size_t nbeta) const;
 
-  //   /// Serialization version
+  /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 };
 

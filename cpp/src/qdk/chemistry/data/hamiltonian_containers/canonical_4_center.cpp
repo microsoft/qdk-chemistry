@@ -8,7 +8,6 @@
 #include <macis/util/fcidump.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_4_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
-#include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
@@ -29,19 +28,11 @@ Canonical4CenterHamiltonian::Canonical4CenterHamiltonian(
       _two_body_integrals(
           make_restricted_two_body_integrals(two_body_integrals)) {
   QDK_LOG_TRACE_ENTERING();
-  if (!orbitals) {
-    throw std::invalid_argument("Orbitals pointer cannot be nullptr");
-  }
 
   validate_integral_dimensions();
   validate_restrictedness_consistency();
   validate_active_space_dimensions();
 
-  // Validate that orbitals have the necessary data
-  if (!orbitals->has_active_space()) {
-    throw std::runtime_error(
-        "Orbitals must have an active space set for Hamiltonian");
-  }
   if (!is_valid()) {
     throw std::invalid_argument(
         "Tried to generate invalid Hamiltonian object.");
@@ -65,19 +56,11 @@ Canonical4CenterHamiltonian::Canonical4CenterHamiltonian(
           std::make_unique<Eigen::VectorXd>(two_body_integrals_aabb),
           std::make_unique<Eigen::VectorXd>(two_body_integrals_bbbb)) {
   QDK_LOG_TRACE_ENTERING();
-  if (!orbitals) {
-    throw std::invalid_argument("Orbitals pointer cannot be nullptr");
-  }
 
   validate_integral_dimensions();
   validate_restrictedness_consistency();
   validate_active_space_dimensions();
 
-  // Validate that orbitals have the necessary data
-  if (!orbitals->has_active_space()) {
-    throw std::runtime_error(
-        "Orbitals must have an active space set for Hamiltonian");
-  }
   if (!is_valid()) {
     throw std::invalid_argument(
         "Tried to generate invalid Hamiltonian object.");
@@ -199,7 +182,6 @@ void Canonical4CenterHamiltonian::validate_integral_dimensions() const {
 
   // Check two-body integrals dimensions
   size_t norb_alpha = _one_body_integrals.first->rows();
-  size_t norb_alpha_cols = _one_body_integrals.first->cols();
   unsigned expected_size = norb_alpha * norb_alpha * norb_alpha * norb_alpha;
 
   // Check alpha-alpha integrals
