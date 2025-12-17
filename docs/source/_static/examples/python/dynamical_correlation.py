@@ -18,7 +18,9 @@ structure = Structure(coords, symbols=symbols)
 
 # Run initial SCF
 scf_solver = create("scf_solver")
-E_hf, wfn_hf = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+E_hf, wfn_hf = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="def2-svp"
+)
 
 # Create hamiltonian constructor
 hamiltonian_constructor = create("hamiltonian_constructor")

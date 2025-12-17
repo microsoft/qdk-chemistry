@@ -119,12 +119,14 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
  * with internal algorithms.
  *
  * @param qdk_basis_set The qdk::chemistry::data::BasisSet object to convert.
+ * @param  normalize Whether to normalize the basis set after conversion.
+ * Default is true.
  * @return A std::unique_ptr<BasisSet> representing the same basis set
  * data.
  * @throws std::runtime_error If the basis set is not spherical(pure)
  */
 std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
-    const qdk::chemistry::data::BasisSet& qdk_basis_set);
+    const qdk::chemistry::data::BasisSet& qdk_basis_set, bool normalize = true);
 
 /**
  * @brief Compute a mapping between QDK and internal basis set shells
