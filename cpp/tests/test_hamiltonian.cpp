@@ -1217,7 +1217,7 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
       std::make_shared<Ansatz>(*rhf_hamiltonian, *rhf_wavefunction);
   auto mp2_calculator =
       DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
-  auto [rmp2_energy, rhf_mp2_wavefunction] = mp2_calculator->run(rhf_ansatz);
+  auto [rmp2_energy, rhf_mp2_wavefunction, _] = mp2_calculator->run(rhf_ansatz);
 
   // Create unrestricted orbitals from restricted ones
   // Get restricted coefficients and energies
@@ -1256,7 +1256,7 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
 
   auto uhf_ansatz =
       std::make_shared<Ansatz>(*uhf_hamiltonian, *uhf_wavefunction);
-  auto [ump2_total_energy, uhf_mp2_wavefunction] =
+  auto [ump2_total_energy, uhf_mp2_wavefunction, _dont_care] =
       mp2_calculator->run(uhf_ansatz);
   double ump2_correlation = ump2_total_energy - rhf_energy;
   double ump2_energy = rhf_energy + ump2_correlation;

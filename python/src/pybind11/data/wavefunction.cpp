@@ -1035,44 +1035,6 @@ Examples:
            py::arg("t2_amplitudes_abab") = std::nullopt,
            py::arg("t2_amplitudes_aaaa") = std::nullopt,
            py::arg("t2_amplitudes_bbbb") = std::nullopt)
-      .def(py::init<
-               std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
-               const std::optional<CoupledClusterContainer::VectorVariant>&,
-               const std::optional<CoupledClusterContainer::VectorVariant>&,
-               const std::optional<CoupledClusterContainer::VectorVariant>&,
-               const std::optional<CoupledClusterContainer::VectorVariant>&,
-               const std::optional<CoupledClusterContainer::VectorVariant>&,
-               const std::optional<CoupledClusterContainer::MatrixVariant>&,
-               const std::optional<CoupledClusterContainer::VectorVariant>&>(),
-           R"(
-Constructs a coupled cluster wavefunction container with amplitudes and RDMs.
-
-Args:
-    orbitals (Orbitals): Shared pointer to orbital basis set
-    wavefunction (Wavefunction): Shared pointer to wavefunction
-    t1_amplitudes_aa (numpy.ndarray, optional): Alpha T1 amplitudes
-    t1_amplitudes_bb (numpy.ndarray, optional): Beta T1 amplitudes
-    t2_amplitudes_abab (numpy.ndarray, optional): Alpha-beta T2 amplitudes
-    t2_amplitudes_aaaa (numpy.ndarray, optional): Alpha-alpha T2 amplitudes
-    t2_amplitudes_bbbb (numpy.ndarray, optional): Beta-beta T2 amplitudes
-    one_rdm_spin_traced (numpy.ndarray, optional): Spin-traced one-particle RDM
-    two_rdm_spin_traced (numpy.ndarray, optional): Spin-traced two-particle RDM
-
-Examples:
-    >>> t1_aa = np.array([...])
-    >>> t2_abab = np.array([...])
-    >>> one_rdm = np.array([...])
-    >>> container = qdk_chemistry.CoupledClusterContainer(
-    ...     orbitals, wfn, t1_aa, None, t2_abab, None, None, one_rdm, None)
-        )",
-           py::arg("orbitals"), py::arg("wavefunction"),
-           py::arg("t1_amplitudes_aa") = std::nullopt,
-           py::arg("t1_amplitudes_bb") = std::nullopt,
-           py::arg("t2_amplitudes_abab") = std::nullopt,
-           py::arg("t2_amplitudes_aaaa") = std::nullopt,
-           py::arg("t2_amplitudes_bbbb") = std::nullopt,
-           py::arg("one_rdm_spin_traced") = std::nullopt,
-           py::arg("two_rdm_spin_traced") = std::nullopt)
 
       .def("get_wavefunction", &CoupledClusterContainer::get_wavefunction,
            R"(
