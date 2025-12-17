@@ -136,6 +136,7 @@ TEST_F(HamiltonianTest, Constructor) {
   EXPECT_TRUE(h.has_orbitals());
   EXPECT_EQ(h.get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h.get_core_energy(), 1.5);
+  EXPECT_EQ(h.get_container_type(), "canonical_4_center");
 }
 
 TEST_F(HamiltonianTest, ConstructorWithInactiveFock) {
