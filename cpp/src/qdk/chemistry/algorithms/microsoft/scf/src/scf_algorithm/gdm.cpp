@@ -64,11 +64,11 @@ static void apply_orbital_rotation(RowMajorMatrix& C, const int spin_index,
   RowMajorMatrix C_before_rotate =
       C.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
               num_molecular_orbitals);
-  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+  blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
              num_molecular_orbitals, num_molecular_orbitals,
-             num_molecular_orbitals, 1.0, exp_kappa.data(),
-             num_molecular_orbitals, C_before_rotate.data(),
-             num_molecular_orbitals, 0.0,
+             num_molecular_orbitals, 1.0, C_before_rotate.data(),
+             num_molecular_orbitals, exp_kappa.data(), num_molecular_orbitals,
+             0.0,
              C.block(num_molecular_orbitals * spin_index, 0,
                      num_molecular_orbitals, num_molecular_orbitals)
                  .data(),
@@ -325,7 +325,7 @@ class GDM {
    * @brief Transform history matrices (either history_dgrad or history_kappa)
    * using current rotation matrices Uoo and Uvv to transform into the
    * pseudo-canonical orbital basis
-   * @param[in,out] history History matrix to be transformed (either
+   * @param[in,out] history History matrix block to be transformed (either
    * history_dgrad or history_kappa)
    * @param[in] history_size Number of history entries
    * @param[in] num_occupied_orbitals Number of electrons for current spin
@@ -337,7 +337,8 @@ class GDM {
    * where K can be either kappa rotation vectors or gradient difference
    * vectors.
    */
-  void transform_history_(RowMajorMatrix& history, const int history_size,
+  void transform_history_(Eigen::Block<RowMajorMatrix>& history,
+                          const int history_size,
                           const int num_occupied_orbitals,
                           const int num_molecular_orbitals);
 
@@ -482,7 +483,8 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
   kappa_ = Eigen::VectorXd::Zero(total_rotation_size_);
 }
 
-void GDM::transform_history_(RowMajorMatrix& history, const int history_size,
+void GDM::transform_history_(Eigen::Block<RowMajorMatrix>& history,
+                             const int history_size,
                              const int num_occupied_orbitals,
                              const int num_molecular_orbitals) {
   QDK_LOG_TRACE_ENTERING();
@@ -491,22 +493,17 @@ void GDM::transform_history_(RowMajorMatrix& history, const int history_size,
   RowMajorMatrix temp =
       RowMajorMatrix::Zero(num_occupied_orbitals, num_virtual_orbitals);
   for (int line = 0; line < history_size; line++) {
-    // K_ov (new) = Uoo^T * K_ov * Uvv
-    // Note: BLAS expects column-major matrices, but our matrices are row-major
     double* history_line_ptr = history.row(line).data();
-
-    // First step: temp = K_ov * Uvv (in row-major view)
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-               num_virtual_orbitals, num_occupied_orbitals,
-               num_virtual_orbitals, 1.0, Uvv_.data(), num_virtual_orbitals,
-               history_line_ptr, num_virtual_orbitals, 0.0, temp.data(),
-               num_virtual_orbitals);
-
-    // Second step: result = Uoo^T * temp (in row-major view)
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-               num_virtual_orbitals, num_occupied_orbitals,
-               num_occupied_orbitals, 1.0, temp.data(), num_virtual_orbitals,
-               Uoo_.data(), num_occupied_orbitals, 0.0, history_line_ptr,
+    // K_ov (new) = Uoo^T * K_ov * Uvv
+    blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_occupied_orbitals, num_virtual_orbitals,
+               num_virtual_orbitals, 1.0, history_line_ptr,
+               num_virtual_orbitals, Uvv_.data(), num_virtual_orbitals, 0.0,
+               temp.data(), num_virtual_orbitals);
+    blas::gemm(blas::Layout::RowMajor, blas::Op::Trans, blas::Op::NoTrans,
+               num_occupied_orbitals, num_virtual_orbitals,
+               num_occupied_orbitals, 1.0, Uoo_.data(), num_occupied_orbitals,
+               temp.data(), num_virtual_orbitals, 0.0, history_line_ptr,
                num_virtual_orbitals);
   }
 }
@@ -555,10 +552,10 @@ void GDM::generate_pseudo_canonical_orbital_(
                                  num_molecular_orbitals, num_occupied_orbitals);
   RowMajorMatrix C_occ_pseudo_canonical =
       RowMajorMatrix::Zero(num_molecular_orbitals, num_occupied_orbitals);
-  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-             num_occupied_orbitals, num_molecular_orbitals,
-             num_occupied_orbitals, 1.0, Uoo_.data(), num_occupied_orbitals,
-             C_occ.data(), num_occupied_orbitals, 0.0,
+  blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_molecular_orbitals, num_occupied_orbitals,
+             num_occupied_orbitals, 1.0, C_occ.data(), num_occupied_orbitals,
+             Uoo_.data(), num_occupied_orbitals, 0.0,
              C_occ_pseudo_canonical.data(), num_occupied_orbitals);
 
   RowMajorMatrix C_virt =
@@ -566,9 +563,9 @@ void GDM::generate_pseudo_canonical_orbital_(
               num_molecular_orbitals, num_virtual_orbitals);
   RowMajorMatrix C_virt_pseudo_canonical =
       RowMajorMatrix::Zero(num_molecular_orbitals, num_virtual_orbitals);
-  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-             num_virtual_orbitals, num_molecular_orbitals, num_virtual_orbitals,
-             1.0, Uvv_.data(), num_virtual_orbitals, C_virt.data(),
+  blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_molecular_orbitals, num_virtual_orbitals, num_virtual_orbitals,
+             1.0, C_virt.data(), num_virtual_orbitals, Uvv_.data(),
              num_virtual_orbitals, 0.0, C_virt_pseudo_canonical.data(),
              num_virtual_orbitals);
 
@@ -580,17 +577,10 @@ void GDM::generate_pseudo_canonical_orbital_(
 
   // Transform the vectors in history_kappa and history_dgrad to
   // accommodate current pseudo-canonical orbitals
-  // Note: Need to extract blocks as separate matrices since
-  // transform_history_ modifies in place
-  RowMajorMatrix history_kappa_block = history_kappa_spin;
-  transform_history_(history_kappa_block, history_size_, num_occupied_orbitals,
+  transform_history_(history_kappa_spin, history_size_, num_occupied_orbitals,
                      num_molecular_orbitals);
-  history_kappa_spin = history_kappa_block;
-
-  RowMajorMatrix history_dgrad_block = history_dgrad_spin;
-  transform_history_(history_dgrad_block, history_size_, num_occupied_orbitals,
+  transform_history_(history_dgrad_spin, history_size_, num_occupied_orbitals,
                      num_molecular_orbitals);
-  history_dgrad_spin = history_dgrad_block;
 
   // Transform the gradient to accommodate current pseudo-canonical orbitals
   RowMajorMatrix current_gradient_matrix =
