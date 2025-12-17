@@ -1207,6 +1207,14 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
                                        : WavefunctionType::NotSelfDual;
     }
 
+    // Load container type
+    if (!group.attrExists("container_type")) {
+      throw std::runtime_error("HDF5 group missing 'container_type' attribute");
+    }
+    H5::Attribute type_attr = group.openAttribute("container_type");
+    std::string container_type;
+    type_attr.read(string_type, container_type);
+
     // Load restrictedness flag
     bool is_restricted = false;
     if (group.attrExists("is_restricted")) {
@@ -1380,29 +1388,70 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
         // return based on whether stuff is available
         // only one rdms
         if (one_rdm_aa.has_value() && !two_rdm_aabb.has_value()) {
-          return std::make_unique<CasWavefunctionContainer>(
-              coefficients, determinants, orbitals, one_rdm_spin_traced,
-              one_rdm_aa,
-              one_rdm_aa,  // bb is aa
-              std::nullopt, std::nullopt, std::nullopt, std::nullopt, type);
+          if (container_type == "cas") {
+            return std::make_unique<CasWavefunctionContainer>(
+                coefficients, determinants, orbitals, one_rdm_spin_traced,
+                one_rdm_aa,
+                one_rdm_aa,  // bb is aa
+                std::nullopt, std::nullopt, std::nullopt, std::nullopt, type);
+          } else if (container_type == "sci") {
+            return std::make_unique<SciWavefunctionContainer>(
+                coefficients, determinants, orbitals, one_rdm_spin_traced,
+                one_rdm_aa,
+                one_rdm_aa,  // bb is aa
+                std::nullopt, std::nullopt, std::nullopt, std::nullopt, type);
+          } else {
+            throw std::runtime_error(
+                "Did not expect to get here for containers other than cas/sci. "
+                "Expected delegation to container-specific methods.");
+          }
         }
+
         // only two rdms
         else if (!one_rdm_aa.has_value() && two_rdm_aabb.has_value()) {
-          return std::make_unique<CasWavefunctionContainer>(
-              coefficients, determinants, orbitals, std::nullopt, std::nullopt,
-              std::nullopt, two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
-              two_rdm_aaaa,  // two_rdm_bbbb is two_rdm_aaaa
-              type);
+          if (container_type == "cas") {
+            return std::make_unique<CasWavefunctionContainer>(
+                coefficients, determinants, orbitals, std::nullopt,
+                std::nullopt, std::nullopt, two_rdm_spin_traced, two_rdm_aabb,
+                two_rdm_aaaa,
+                two_rdm_aaaa,  // two_rdm_bbbb is two_rdm_aaaa
+                type);
+          } else if (container_type == "sci") {
+            return std::make_unique<SciWavefunctionContainer>(
+                coefficients, determinants, orbitals, std::nullopt,
+                std::nullopt, std::nullopt, two_rdm_spin_traced, two_rdm_aabb,
+                two_rdm_aaaa,
+                two_rdm_aaaa,  // two_rdm_bbbb is two_rdm_aaaa
+                type);
+          } else {
+            throw std::runtime_error(
+                "Did not expect to get here for containers other than cas/sci. "
+                "Expected delegation to container-specific methods.");
+          }
         }
         // both
         else if (one_rdm_aa.has_value() && two_rdm_aabb.has_value()) {
-          return std::make_unique<CasWavefunctionContainer>(
-              coefficients, determinants, orbitals, one_rdm_spin_traced,
-              one_rdm_aa,
-              one_rdm_aa,  // bb is aa
-              two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
-              two_rdm_aaaa,  // two_rdm_bbbb is two_rdm_aaaa
-              type);
+          if (container_type == "cas") {
+            return std::make_unique<CasWavefunctionContainer>(
+                coefficients, determinants, orbitals, one_rdm_spin_traced,
+                one_rdm_aa,
+                one_rdm_aa,  // bb is aa
+                two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
+                two_rdm_aaaa,  // two_rdm_bbbb is two_rdm_aaaa
+                type);
+          } else if (container_type == "sci") {
+            return std::make_unique<SciWavefunctionContainer>(
+                coefficients, determinants, orbitals, one_rdm_spin_traced,
+                one_rdm_aa,
+                one_rdm_aa,  // bb is aa
+                two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
+                two_rdm_aaaa,  // two_rdm_bbbb is two_rdm_aaaa
+                type);
+          } else {
+            throw std::runtime_error(
+                "Did not expect to get here for containers other than cas/sci. "
+                "Expected delegation to container-specific methods.");
+          }
         } else {
           throw std::runtime_error(
               "Unexpected combination of rdms are available.");
@@ -1468,27 +1517,60 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
         // only one rdms
         if (one_rdm_aa.has_value() && one_rdm_bb.has_value() &&
             !two_rdm_aabb.has_value()) {
-          return std::make_unique<CasWavefunctionContainer>(
-              coefficients, determinants, orbitals, one_rdm_spin_traced,
-              one_rdm_aa, one_rdm_bb, std::nullopt, std::nullopt, std::nullopt,
-              std::nullopt, type);
+          if (container_type == "cas") {
+            return std::make_unique<CasWavefunctionContainer>(
+                coefficients, determinants, orbitals, one_rdm_spin_traced,
+                one_rdm_aa, one_rdm_bb, std::nullopt, std::nullopt,
+                std::nullopt, std::nullopt, type);
+          } else if (container_type == "sci") {
+            return std::make_unique<SciWavefunctionContainer>(
+                coefficients, determinants, orbitals, one_rdm_spin_traced,
+                one_rdm_aa, one_rdm_bb, std::nullopt, std::nullopt,
+                std::nullopt, std::nullopt, type);
+          } else {
+            throw std::runtime_error(
+                "Did not expect to get here for containers other than cas/sci. "
+                "Expected delegation to container-specific methods.");
+          }
         }
         // only two rdms
         else if (!one_rdm_aa.has_value() && two_rdm_aabb.has_value() &&
                  two_rdm_aaaa.has_value() && two_rdm_bbbb.has_value()) {
-          return std::make_unique<CasWavefunctionContainer>(
-              coefficients, determinants, orbitals, std::nullopt, std::nullopt,
-              std::nullopt, two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
-              two_rdm_bbbb, type);
+          if (container_type == "cas") {
+            return std::make_unique<CasWavefunctionContainer>(
+                coefficients, determinants, orbitals, std::nullopt,
+                std::nullopt, std::nullopt, two_rdm_spin_traced, two_rdm_aabb,
+                two_rdm_aaaa, two_rdm_bbbb, type);
+          } else if (container_type == "sci") {
+            return std::make_unique<SciWavefunctionContainer>(
+                coefficients, determinants, orbitals, std::nullopt,
+                std::nullopt, std::nullopt, two_rdm_spin_traced, two_rdm_aabb,
+                two_rdm_aaaa, two_rdm_bbbb, type);
+          } else {
+            throw std::runtime_error(
+                "Did not expect to get here for containers other than cas/sci. "
+                "Expected delegation to container-specific methods.");
+          }
         }
         // both
         else if (one_rdm_aa.has_value() && one_rdm_bb.has_value() &&
                  two_rdm_aabb.has_value() && two_rdm_aaaa.has_value() &&
                  two_rdm_bbbb.has_value()) {
-          return std::make_unique<CasWavefunctionContainer>(
-              coefficients, determinants, orbitals, one_rdm_spin_traced,
-              one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-              two_rdm_aaaa, two_rdm_bbbb, type);
+          if (container_type == "cas") {
+            return std::make_unique<CasWavefunctionContainer>(
+                coefficients, determinants, orbitals, one_rdm_spin_traced,
+                one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
+                two_rdm_aaaa, two_rdm_bbbb, type);
+          } else if (container_type == "sci") {
+            return std::make_unique<SciWavefunctionContainer>(
+                coefficients, determinants, orbitals, one_rdm_spin_traced,
+                one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
+                two_rdm_aaaa, two_rdm_bbbb, type);
+          } else {
+            throw std::runtime_error(
+                "Did not expect to get here for containers other than cas/sci. "
+                "Expected delegation to container-specific methods.");
+          }
         } else {
           throw std::runtime_error(
               "Unexpected combination of rdms are available.");
@@ -1496,8 +1578,17 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
       }
     }
 
-    return std::make_unique<CasWavefunctionContainer>(
-        coefficients, determinants, orbitals, type);
+    if (container_type == "cas") {
+      return std::make_unique<CasWavefunctionContainer>(
+          coefficients, determinants, orbitals, type);
+    } else if (container_type == "sci") {
+      return std::make_unique<SciWavefunctionContainer>(
+          coefficients, determinants, orbitals, type);
+    } else {
+      throw std::runtime_error(
+          "Did not expect to get here for containers other than cas/sci. "
+          "Expected delegation to container-specific methods.");
+    }
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
