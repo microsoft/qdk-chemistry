@@ -39,7 +39,7 @@ class ScfSolverBase : public ScfSolver,
  protected:
   ReturnType _run_impl(std::shared_ptr<Structure> structure, int charge,
                        int spin_multiplicity,
-                       BasisOrGuess basis_or_guess) const override {
+                       BasisOrGuessType basis_or_guess) const override {
     PYBIND11_OVERRIDE_PURE(ReturnType, ScfSolver, _run_impl, structure, charge,
                            spin_multiplicity, basis_or_guess);
   }
@@ -86,7 +86,7 @@ Examples:
       "run",
       [](const ScfSolver &solver,
          std::shared_ptr<qdk::chemistry::data::Structure> structure, int charge,
-         int spin_multiplicity, BasisOrGuess basis_or_guess) {
+         int spin_multiplicity, BasisOrGuessType basis_or_guess) {
         return solver.run(structure, charge, spin_multiplicity, basis_or_guess);
       },
       R"(
