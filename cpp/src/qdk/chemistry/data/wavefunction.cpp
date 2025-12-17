@@ -1024,8 +1024,7 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
                                           &is_one_rdm_aa_complex_flag);
 
             // if we dont have aa, save bb
-          } else if (_one_rdm_spin_dependent_bb != nullptr &&
-                     _one_rdm_spin_dependent_aa == nullptr) {
+          } else if (_one_rdm_spin_dependent_bb != nullptr) {
             // check if real or complex
             bool is_one_rdm_complex =
                 detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
@@ -1070,25 +1069,38 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
               "is_one_rdm_bb_complex", H5::PredType::NATIVE_HBOOL,
               H5::DataSpace(H5S_SCALAR));
 
-          bool is_aa_rdm_complex =
-              detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
-          save_matrix_variant_to_group(is_aa_rdm_complex,
-                                       _one_rdm_spin_dependent_aa, rdm_group,
-                                       storage_name_aa);
-          std::string storage_name_bb = "one_rdm_bb";
-          bool is_bb_rdm_complex =
-              detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
-          save_matrix_variant_to_group(is_bb_rdm_complex,
-                                       _one_rdm_spin_dependent_bb, rdm_group,
-                                       storage_name_bb);
+          if (_one_rdm_spin_dependent_aa != nullptr) {
+            bool is_aa_rdm_complex =
+                detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
+            save_matrix_variant_to_group(is_aa_rdm_complex,
+                                         _one_rdm_spin_dependent_aa, rdm_group,
+                                         storage_name_aa);
 
-          // store complexity flags
-          hbool_t is_one_rdm_aa_complex_flag = is_aa_rdm_complex ? 1 : 0;
-          one_rdm_aa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
-                                        &is_one_rdm_aa_complex_flag);
-          hbool_t is_one_rdm_bb_complex_flag = is_bb_rdm_complex ? 1 : 0;
-          one_rdm_bb_complex_attr.write(H5::PredType::NATIVE_HBOOL,
-                                        &is_one_rdm_bb_complex_flag);
+            hbool_t is_one_rdm_aa_complex_flag = is_aa_rdm_complex ? 1 : 0;
+            one_rdm_aa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                          &is_one_rdm_aa_complex_flag);
+          } else {
+            throw std::runtime_error(
+                "Expected _one_rdm_spin_dependent_aa to point to something "
+                "other than nullptr");
+          }
+
+          if (_one_rdm_spin_dependent_bb != nullptr) {
+            std::string storage_name_bb = "one_rdm_bb";
+            bool is_bb_rdm_complex =
+                detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
+            save_matrix_variant_to_group(is_bb_rdm_complex,
+                                         _one_rdm_spin_dependent_bb, rdm_group,
+                                         storage_name_bb);
+
+            hbool_t is_one_rdm_bb_complex_flag = is_bb_rdm_complex ? 1 : 0;
+            one_rdm_bb_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                          &is_one_rdm_bb_complex_flag);
+          } else {
+            throw std::runtime_error(
+                "Expected _one_rdm_spin_dependent_bb to point to something "
+                "other than nullptr");
+          }
         }
       }
 
@@ -1102,38 +1114,57 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
             "is_two_rdm_aaaa_complex", H5::PredType::NATIVE_HBOOL,
             H5::DataSpace(H5S_SCALAR));
         // we need aabb and aaaa for both restricted and unrestricted
-        bool is_aabb_rdm_complex =
-            detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aabb);
-        save_vector_variant_to_group(is_aabb_rdm_complex,
-                                     _two_rdm_spin_dependent_aabb, rdm_group,
-                                     storage_name_aabb);
-        bool is_aaaa_rdm_complex =
-            detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aaaa);
-        save_vector_variant_to_group(is_aaaa_rdm_complex,
-                                     _two_rdm_spin_dependent_aaaa, rdm_group,
-                                     storage_name_aaaa);
+        if (_two_rdm_spin_dependent_aabb != nullptr) {
+          bool is_aabb_rdm_complex =
+              detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aabb);
+          save_vector_variant_to_group(is_aabb_rdm_complex,
+                                       _two_rdm_spin_dependent_aabb, rdm_group,
+                                       storage_name_aabb);
 
-        // store complexity flags
-        hbool_t is_two_rdm_aabb_complex_flag = is_aabb_rdm_complex ? 1 : 0;
-        two_rdm_aabb_complex_attr.write(H5::PredType::NATIVE_HBOOL,
-                                        &is_two_rdm_aabb_complex_flag);
-        hbool_t is_two_rdm_aaaa_complex_flag = is_aaaa_rdm_complex ? 1 : 0;
-        two_rdm_aaaa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
-                                        &is_two_rdm_aaaa_complex_flag);
+          hbool_t is_two_rdm_aabb_complex_flag = is_aabb_rdm_complex ? 1 : 0;
+          two_rdm_aabb_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                          &is_two_rdm_aabb_complex_flag);
+        } else {
+          throw std::runtime_error(
+              "Expected _two_rdm_spin_dependent_aabb to point to something "
+              "other than nullptr");
+        }
+        if (_two_rdm_spin_dependent_aaaa != nullptr) {
+          bool is_aaaa_rdm_complex =
+              detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aaaa);
+          save_vector_variant_to_group(is_aaaa_rdm_complex,
+                                       _two_rdm_spin_dependent_aaaa, rdm_group,
+                                       storage_name_aaaa);
+
+          hbool_t is_two_rdm_aaaa_complex_flag = is_aaaa_rdm_complex ? 1 : 0;
+          two_rdm_aaaa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                          &is_two_rdm_aaaa_complex_flag);
+        } else {
+          throw std::runtime_error(
+              "Expected _two_rdm_spin_dependent_aaaa to point to something "
+              "other than nullptr");
+        }
+
         if (get_orbitals()->is_unrestricted()) {
           // also save bbbb
-          std::string storage_name_bbbb = "two_rdm_bbbb";
-          H5::Attribute two_rdm_bbbb_complex_attr = rdm_group.createAttribute(
-              "is_two_rdm_bbbb_complex", H5::PredType::NATIVE_HBOOL,
-              H5::DataSpace(H5S_SCALAR));
-          bool is_bbbb_rdm_complex =
-              detail::is_vector_variant_complex(*_two_rdm_spin_dependent_bbbb);
-          save_vector_variant_to_group(is_bbbb_rdm_complex,
-                                       _two_rdm_spin_dependent_bbbb, rdm_group,
-                                       storage_name_bbbb);
-          hbool_t is_two_rdm_bbbb_complex_flag = is_bbbb_rdm_complex ? 1 : 0;
-          two_rdm_bbbb_complex_attr.write(H5::PredType::NATIVE_HBOOL,
-                                          &is_two_rdm_bbbb_complex_flag);
+          if (_two_rdm_spin_dependent_bbbb != nullptr) {
+            std::string storage_name_bbbb = "two_rdm_bbbb";
+            H5::Attribute two_rdm_bbbb_complex_attr = rdm_group.createAttribute(
+                "is_two_rdm_bbbb_complex", H5::PredType::NATIVE_HBOOL,
+                H5::DataSpace(H5S_SCALAR));
+            bool is_bbbb_rdm_complex = detail::is_vector_variant_complex(
+                *_two_rdm_spin_dependent_bbbb);
+            save_vector_variant_to_group(is_bbbb_rdm_complex,
+                                         _two_rdm_spin_dependent_bbbb,
+                                         rdm_group, storage_name_bbbb);
+            hbool_t is_two_rdm_bbbb_complex_flag = is_bbbb_rdm_complex ? 1 : 0;
+            two_rdm_bbbb_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                            &is_two_rdm_bbbb_complex_flag);
+          } else {
+            throw std::runtime_error(
+                "Expected _two_rdm_spin_dependent_bbbb to point to something "
+                "other than nullptr");
+          }
         }
       }
     }
@@ -1308,8 +1339,12 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
                                                       is_two_rdm_aaaa_complex);
       }
 
-      // Determine if we're dealing with restricted or unrestricted orbitals
-      is_restricted = orbitals->is_restricted();
+      if (orbitals != nullptr) {
+        // Determine if we're dealing with restricted or unrestricted orbitals
+        is_restricted = orbitals->is_restricted();
+      }
+      // Otherwise we default to the value read from hdf5, if any (default is
+      // false)
 
       // return restricted object with rdms
       if (is_restricted) {
