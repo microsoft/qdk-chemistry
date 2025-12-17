@@ -123,10 +123,13 @@ std::pair<double, RowMajorMatrix>
 KSImpl::evaluate_trial_density_energy_and_fock(
     const RowMajorMatrix& P_matrix) const {
   QDK_LOG_TRACE_ENTERING();
-  // Fock matrix generated below does not include XC contributions
+  // Fock matrix from base class does not include XC contributions; XC terms are
+  // added below
   auto [total_energy, F_matrix] =
       SCFImpl::evaluate_trial_density_energy_and_fock(P_matrix);
-  double scf_xc_energy = 0.0;  // do not update XC_ here
+  // Do not update XC_ here: XC_ is a member variable and must not be modified
+  // in this const trial evaluation.
+  double scf_xc_energy = 0.0;
   RowMajorMatrix XC_matrix = RowMajorMatrix::Zero(
       (num_density_matrices_ * num_atomic_orbitals_), num_atomic_orbitals_);
   exc_->build_XC(P_matrix.data(), XC_matrix.data(), &scf_xc_energy);

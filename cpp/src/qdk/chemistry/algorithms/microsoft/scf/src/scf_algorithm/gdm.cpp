@@ -83,7 +83,7 @@ static void apply_orbital_rotation(RowMajorMatrix& C, const int spin_index,
  *
  * Evaluates energy and gradient at trial step along direction kappa_direction.
  * Caches results to avoid redundant computation when eval() and grad() are
- * called at the same relative_step_length.
+ * called with the same kappa vector x.
  */
 class GDMLineFunctor {
  public:
@@ -127,7 +127,8 @@ class GDMLineFunctor {
   Eigen::VectorXd grad(const Eigen::VectorXd& x);
 
   /**
-   * @brief Static utility: compute dot product of two vectors
+   * @brief Static utility: compute dot product of two vectors to acommodate
+   * line search method interface
    * @param v1 First vector
    * @param v2 Second vector
    * @return Dot product v1 · v2
@@ -137,7 +138,8 @@ class GDMLineFunctor {
   }
 
   /**
-   * @brief Static utility: perform BLAS-style axpy operation
+   * @brief Static utility: perform axpy operation to acommodate line search
+   * method interface
    * @param alpha Scalar multiplier
    * @param x Vector to scale and add
    * @param y Vector to add to (modified in-place)
@@ -158,6 +160,7 @@ class GDMLineFunctor {
   const RowMajorMatrix& get_cached_P() const { return cached_P_; }
 
  private:
+  const double compare_kappa_tol_ = 1e-14;
   // Const references to external data
   const SCFImpl& scf_impl_;
   const RowMajorMatrix& C_pseudo_canonical_;
@@ -181,8 +184,10 @@ class GDMLineFunctor {
 
 double GDMLineFunctor::eval(const Eigen::VectorXd& x) {
   // Check if we've already computed this kappa vector
-  // Use smart caching: if ||x - cached_kappa|| < 1e-14, reuse cached result
-  if (cached_kappa_.size() == x.size() && (cached_kappa_ - x).norm() < 1e-14) {
+  // Use smart caching: if ||x - cached_kappa|| < compare_kappa_tol_, reuse
+  // cached result
+  if (cached_kappa_.size() == x.size() &&
+      (cached_kappa_ - x).norm() < compare_kappa_tol_) {
     return cached_energy_;
   }
 
@@ -263,6 +268,9 @@ Eigen::VectorXd GDMLineFunctor::grad(const Eigen::VectorXd& x) {
                         num_molecular_orbitals_);
 
     // Extract occupied-virtual block and compute gradient
+    // The coefficient -4.0 comes from derivative of energy w.r.t. kappa
+    // Reference: Helgaker, T., Jorgensen, P., & Olsen, J. (2013). Molecular
+    // electronic-structure theory, Eq. 10.8.34
     RowMajorMatrix gradient_matrix =
         -(4.0 / num_density_matrices_) * F_MO.block(0, num_occupied_orbitals,
                                                     num_occupied_orbitals,
@@ -605,6 +613,10 @@ void GDM::iterate(SCFImpl& scf_impl) {
                 num_molecular_orbitals) *
         C.block(num_molecular_orbitals * i, 0, num_molecular_orbitals,
                 num_molecular_orbitals);
+
+    // The coefficient -4.0 comes from derivative of energy w.r.t. kappa
+    // Reference: Helgaker, T., Jorgensen, P., & Olsen, J. (2013). Molecular
+    // electronic-structure theory, Eq. 10.8.34
     RowMajorMatrix current_gradient_matrix =
         -(4.0 / num_density_matrices) * F_MO.block(0, num_occupied_orbitals,
                                                    num_occupied_orbitals,
@@ -664,8 +676,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
     generate_pseudo_canonical_orbital_(
         F, C, i, history_kappa_spin, history_dgrad_spin, current_gradient_spin);
 
-    // Build this spin's segment of initial Hessian immediately
-    // while pseudo_canonical_eigenvalues_ is still valid
+    // Build this spin's segment of initial Hessian
     for (int j = 0; j < num_occupied_orbitals; j++) {
       for (int v = 0; v < num_virtual_orbitals; v++) {
         int index = rotation_offset_[i] + j * num_virtual_orbitals + v;
@@ -693,8 +704,9 @@ void GDM::iterate(SCFImpl& scf_impl) {
 
     // Pre-compute inverse rho values: s_k · y_k
     std::vector<double> inverse_rho_values;
-    for (int j = 0; j < history_size_; j++) {
-      double sy_dot = history_kappa_.row(j).dot(history_dgrad_.row(j));
+    for (int hist_idx = 0; hist_idx < history_size_; hist_idx++) {
+      double sy_dot =
+          history_kappa_.row(hist_idx).dot(history_dgrad_.row(hist_idx));
       inverse_rho_values.push_back(sy_dot);
     }
 
@@ -703,9 +715,10 @@ void GDM::iterate(SCFImpl& scf_impl) {
     Eigen::VectorXd q = current_gradient_;
     std::vector<double> alpha_values;
 
-    for (int j = history_size_ - 1; j >= 0; j--) {
-      double alpha = history_kappa_.row(j).dot(q) / inverse_rho_values[j];
-      q = q - alpha * history_dgrad_.row(j).transpose();
+    for (int hist_idx = history_size_ - 1; hist_idx >= 0; hist_idx--) {
+      double alpha =
+          history_kappa_.row(hist_idx).dot(q) / inverse_rho_values[hist_idx];
+      q = q - alpha * history_dgrad_.row(hist_idx).transpose();
       alpha_values.push_back(alpha);
     }
 
@@ -722,15 +735,33 @@ void GDM::iterate(SCFImpl& scf_impl) {
                   (alpha_values[history_size_ - j - 1] - beta_value);
     }
 
-    // Log BFGS debug information
-    std::string rho_str = "inverse Rho values: ";
-    for (int j = 0; j < inverse_rho_values.size(); j++) {
+    // Log BFGS debug information (last 5 values only)
+    const int rho_size = static_cast<int>(inverse_rho_values.size());
+    const int rho_start = std::max(0, rho_size - 5);
+    const int rho_num_entries = rho_size - rho_start;
+
+    std::string rho_str;
+    rho_str.reserve(20 + 15 * rho_num_entries + 10);
+    rho_str = "inverse Rho values: ";
+    if (rho_start > 0) {
+      rho_str += "... ";
+    }
+    for (int j = rho_start; j < rho_size; j++) {
       rho_str += fmt::format("{:.6e}; ", inverse_rho_values[j]);
     }
     QDK_LOGGER().debug(rho_str);
 
-    std::string alpha_str = "alpha values: ";
-    for (int j = 0; j < alpha_values.size(); j++) {
+    const int alpha_size = static_cast<int>(alpha_values.size());
+    const int alpha_start = std::max(0, alpha_size - 5);
+    const int alpha_num_entries = alpha_size - alpha_start;
+
+    std::string alpha_str;
+    alpha_str.reserve(20 + 15 * alpha_num_entries + 10);
+    alpha_str = "alpha values: ";
+    if (alpha_start > 0) {
+      alpha_str += "... ";
+    }
+    for (int j = alpha_start; j < alpha_size; j++) {
       alpha_str += fmt::format("{:.6e}; ", alpha_values[j]);
     }
     QDK_LOGGER().debug(alpha_str);
@@ -765,6 +796,10 @@ void GDM::iterate(SCFImpl& scf_impl) {
   }
 
   // Save pseudo-canonical C for restoration in the energy validation loop
+  // NOTE: The call to C.eval() creates a full copy of the coefficient matrix.
+  // This is necessary because the line search functor may modify the matrix
+  // during energy evaluations, and we need to restore the original
+  // pseudo-canonical state for each iteration.
   RowMajorMatrix C_pseudo_canonical = C.eval();
 
   // Create line search functor for energy evaluation
@@ -814,6 +849,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
     double step_steepest = 1.0;
 
     try {
+      fx_new = fx0;
       gfx_new = gfx0;
       // Attempt line search with guaranteed descent direction
       bfgs::nocedal_wright_line_search(line_functor, x0, p_steepest,
@@ -831,8 +867,8 @@ void GDM::iterate(SCFImpl& scf_impl) {
     } catch (const std::exception& e2) {
       // Fallback Level 2: Even steepest descent line search failed
       QDK_LOGGER().error(
-          "Steepest descent line search also failed: {}. Using minimal "
-          "gradient step.",
+          "Steepest descent line search also failed: {}. Taking fixed 1% step "
+          "in steepest descent direction.",
           e2.what());
 
       // Take very small step in steepest descent direction

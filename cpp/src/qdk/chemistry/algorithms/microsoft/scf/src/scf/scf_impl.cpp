@@ -1020,8 +1020,7 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
   double scf_two_electron_energy =
       0.5 * P_matrix.cwiseProduct(F_matrix - H_matrix).sum();
 #ifdef QDK_CHEMISTRY_ENABLE_PCM
-  double scf_two_electron_energy -=
-      0.5 * P_matrix.cwiseProduct(Vpcm_matrix).sum();
+  scf_two_electron_energy -= 0.5 * P_matrix.cwiseProduct(Vpcm_matrix).sum();
 #endif
 
   double total_energy = ctx_.result.nuclear_repulsion_energy +
