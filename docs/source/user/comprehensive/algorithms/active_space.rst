@@ -255,6 +255,8 @@ QDK/Chemistry provides two entropy-based selection methods:
 
 Both methods sort orbitals by decreasing entropy and select the largest identified group of strongly correlated orbitals for the active space.
 
+.. _pyscf-avas-plugin:
+
 PySCF AVAS
 ~~~~~~~~~~
 

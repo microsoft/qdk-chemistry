@@ -42,7 +42,7 @@ The canonical orbitals produced by SCF calculations are typically delocalized ov
 
 - **Optimization-Based Methods**: The vast majority of orbital localization methods fall into this category, where a cost function is iteratively minimized to yield localized orbitals :cite:`Lehtola2013`. QDK/Chemistry supports, either through our :ref:`native implementations <localizer-qdk-pipek-mezey>` or via :ref:`integration with external libraries <localizer-pyscf-multi>`, several popular choices of cost functions, including: **Pipek-Mezey** :cite:`Pipek1989`, **Foster-Boys** :cite:`Foster1960`, and **Edmiston-Ruedenberg** :cite:`Edmiston1963`.
 
-- **Analytical Methods**: These methods transform orbitals in a single step through analytical techniques rather than iterative optimization. **Natural orbitals** :cite:`Lowdin1956`, which diagonalize the one-particle reduced density matrix, and **Cholesky localization** :cite:`Aquilante2006`, which uses Cholesky decomposition for efficient approximate localization, are prominent examples. The :ref:`VVHV separation <vvhv-algorithm>` also falls into this category.
+- **Analytical Methods**: These methods transform orbitals in a single step through analytical techniques rather than iterative optimization. **Natural orbitals** :cite:`Lowdin1956`, which diagonalize the one-particle reduced density matrix, and **Cholesky localization** :cite:`Aquilante2006`, which uses Cholesky decomposition of the one particle density matrix for efficient approximate localization, are prominent examples. The localization of the "hard-virtual" orbitals in the :ref:`VVHV localization <vvhv-algorithm>` also falls into this category.
 
 See :doc:`comprehensive/algorithms/localizer` for further details about available orbital localization methods and implementations.
 
@@ -50,7 +50,7 @@ See :doc:`comprehensive/algorithms/localizer` for further details about availabl
 Implementation Highlights
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **Valence Virtual--Hard Virtual (VVHV) Orbital Localization**: Localization of molecular orbitals expressed in near-complete :doc:`./comprehensive/data/basis_set` is numerically ill-posed and challenging for most localizers. QDK/Chemistry includes an implementation of the VVHV separation :cite:`Subotnik2005`, which partitions the virtual orbital space into valence-virtual and hard-virtual subspaces for more numerically stable treatments. This produces orbitals that vary smoothly with molecular geometry, which is particularly useful for selecting consistent active spaces along reaction pathways. See the :ref:`VVHV Algorithm <vvhv-algorithm>` section for further details.
+- **Valence Virtual--Hard Virtual (VVHV) Orbital Localization**: Localization of molecular orbitals expressed in a near-complete :doc:`./comprehensive/data/basis_set` is numerically ill-posed and challenging for most iterative methods. QDK/Chemistry includes an implementation of the VVHV separation :cite:`Subotnik2005`, which partitions the virtual orbital space into valence-virtual and hard-virtual subspaces for more numerically stable treatments. This produces orbitals that vary smoothly with molecular geometry, which is particularly useful for selecting consistent active spaces along reaction pathways. See the :ref:`VVHV Algorithm <vvhv-algorithm>` section for further details.
 
 Active Space Selection
 """"""""""""""""""""""
@@ -65,7 +65,7 @@ The challenge lies in balancing accuracy and computational cost: an ideal active
 
 - **Occupation-based Methods**: Automatic selection based on natural orbital occupation numbers. Orbitals with fractional occupations indicate strong correlation and are included in the active space.
 
-- **AVAS (Automated Valence Active Space)** :cite:`Sayfutyarova2017` — Projects molecular orbitals onto a target atomic orbital basis (e.g., metal 3d orbitals) to systematically identify valence active spaces.
+- **AVAS (Automated Valence Active Space)** :cite:`Sayfutyarova2017` — Projects molecular orbitals onto a target atomic orbital basis (e.g., metal 3d orbitals) to systematically identify valence active spaces. This functionality is available through the :ref:`PySCF Plugin <pyscf-avas-plugin>`.
 
 **Manual Approaches:**
 
@@ -78,26 +78,17 @@ See :doc:`comprehensive/algorithms/active_space` for further details about avail
 Implementation Highlights
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **AutoCAS Protocol**: QDK/Chemistry includes a native implementation of the AutoCAS algorithm :cite:`Stein2019`, which leverages quantum information concepts to identify strongly correlated orbitals. The method computes single-orbital entropies—measures of how entangled each orbital is with the rest of the system—from the one- and two-electron reduced density matrices of a multi-configuration wavefunction. Orbitals with high entropy are strongly entangled and should be treated explicitly in the active space. QDK/Chemistry's implementation includes both standard AutoCAS and an enhanced variant using entanglement of orbitals with entropy differences (AutoCAS-EOS) for improved robustness. See the :ref:`AutoCAS Algorithm <autocas-algorithm-details>` section for further details.
+- **AutoCAS**: QDK/Chemistry includes a native implementation of the AutoCAS algorithm :cite:`Stein2019`, which leverages quantum information concepts to identify strongly correlated orbitals. The method computes single-orbital entropies—measures of how entangled each orbital is with the rest of the system—from the one- and two-electron reduced density matrices of a multi-configuration wavefunction. Orbitals with high entropy are strongly entangled and should be treated explicitly in the active space. QDK/Chemistry's implementation includes both standard AutoCAS and an enhanced variant using entanglement of orbitals with entropy differences (AutoCAS-EOS) for improved robustness. See the :ref:`AutoCAS Algorithm <autocas-algorithm-details>` documentation for further details.
 
 
 Multi-Configuration Methods
 """""""""""""""""""""""""""
 
-Multi-configuration (:term:`MC`) methods represent the electronic wavefunction as a linear combination of many Slater determinants, enabling accurate description of static (strong) correlation effects. These methods are essential for systems where a single determinant is qualitatively incorrect, including:
-
-- **Bond breaking and formation**: Stretched bonds require multiple configurations to describe correctly
-- **Transition states**: Reaction barriers often exhibit multireference character
-- **Open-shell systems**: Radicals, diradicals, and transition metal complexes
-- **Excited states**: Many electronic states require multireference treatment
-
-QDK/Chemistry provides access to a hierarchy of :term:`MC` methods:
+Multi-configuration (:term:`MC`) methods represent the electronic wavefunction as a linear combination of many Slater determinants, enabling accurate description of static (strong) correlation effects.QDK/Chemistry provides access to a hierarchy of :term:`MC` methods:
 
 **Configuration Interaction:**
 
-- **Full CI (FCI)** — Exact solution within the :doc:`basis <comprehensive/data/basis_set>` representation. Computationally feasible only for small systems.
-
-- **Complete Active Space CI (CASCI)** — FCI within a defined active space, with core orbitals frozen and virtual orbitals excluded.
+- **Complete Active Space CI (CASCI)** — Exact solution within a defined active space, with core orbitals frozen and virtual orbitals excluded.
 
 - **Selected CI (SCI)** — Iteratively identifies and includes only the most important configurations, enabling treatment of larger active spaces at the cost of approximation.
 
@@ -144,7 +135,7 @@ Quantum Methods
 Community Open Source Software Dependencies
 -------------------------------------------
 
-QDK/Chemistry builds upon a foundation of well-established open source libraries developed by the quantum chemistry community. These dependencies provide battle-tested implementations of computationally demanding kernels, allowing QDK/Chemistry to focus on higher-level algorithms and quantum computing integration. For a complete list of dependencies, see the `Installation Guide <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_.
+QDK/Chemistry builds upon a foundation of well-established open source libraries developed by the quantum chemistry community. For a complete list of software dependencies, see the `Installation Guide <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_.
 
 .. note::
 
@@ -187,7 +178,7 @@ Multi-Configuration Solvers
 Plugins
 ^^^^^^^
 
-QDK/Chemistry is distributed with the following officially supported plugins that extend its capabilities by integrating with external quantum chemistry and quantum computing packages. If implementations coming from these modules are used in your published work, please cite both QDK/Chemistry and the underlying package as described in the respective plugin documentation.
+QDK/Chemistry is distributed with the following officially supported plugins that extend its capabilities by integrating with external quantum chemistry and quantum algorithms frameworks. If implementations of QDK/Chemistry interfaces using these plugins are used in your published work, please cite both QDK/Chemistry and the underlying package as described in the respective plugin documentation.
 
 **PySCF Plugin**
    Integrates QDK/Chemistry with the PySCF quantum chemistry package, providing access to its extensive suite of electronic structure methods and tools.
