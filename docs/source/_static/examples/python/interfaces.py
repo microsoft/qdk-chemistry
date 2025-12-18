@@ -18,11 +18,12 @@ structure = Structure(coords, ["H", "H"])
 scf_solver = create("scf_solver", "pyscf")
 
 # Configure it using the standard settings interface
-scf_solver.settings().set("basis_set", "cc-pvdz")
 scf_solver.settings().set("method", "hf")
 
 # Run calculation - returns (energy, wavefunction)
-energy, wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+energy, wavefunction = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
+)
 orbitals = wavefunction.get_orbitals()
 
 print(f"SCF Energy: {energy:.10f} Hartree")
@@ -49,7 +50,6 @@ for algorithm_name in available():
 scf = create("scf_solver")
 
 # Set general options that work across implementations
-scf.settings().set("basis_set", "sto-3g")
 scf.settings().set("max_iterations", 100)
 scf.settings().set("convergence_threshold", 1e-7)
 
