@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -82,8 +82,6 @@ RUN if getent group "$USER_GID" >/dev/null; then \
 
 # Switch to non-root user for subsequent commands
 USER $USERNAME
-
-
 
 # Setup bash prompt
 RUN echo 'export PS1="\[\033[1;34m\]\u@qdk-dev:\w$ \[\033[0m\]"' >> ~/.bashrc
