@@ -156,7 +156,7 @@ class GDMLineFunctor {
   const RowMajorMatrix& get_cached_P() const { return cached_P_; }
 
  private:
-  const double compare_kappa_tol_ = 1e-14;
+  const double compare_kappa_tol_ = std::numeric_limits<double>::epsilon();
   // Const references to external data
   const SCFImpl& scf_impl_;
   const RowMajorMatrix& C_pseudo_canonical_;
@@ -385,7 +385,7 @@ class GDM {
   double delta_energy_ = std::numeric_limits<double>::infinity();
 
   /// Energy increase threshold for GDM step size rescaling
-  const double rescale_kappa_denergy_threshold_ = 5e-4;
+  const double nonpositive_threshold_ = std::numeric_limits<double>::epsilon();
 
   /// Number of electrons for alpha (0) and beta (1) spins
   std::vector<int> num_electrons_;
@@ -707,6 +707,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
     }
   }
 
+  double latest_inverse_rho = 1.0;
   // BFGS two-loop recursion on concatenated vectors (runs once for all spins)
   if (history_size_ == 0) {
     // No history available, use H_0^{-1} * gradient
@@ -724,12 +725,9 @@ void GDM::iterate(SCFImpl& scf_impl) {
     for (int hist_idx = 0; hist_idx < history_size_; hist_idx++) {
       double sy_dot =
           history_kappa_.row(hist_idx).dot(history_dgrad_.row(hist_idx));
-      if (sy_dot <= 1e-14) {
-        QDK_LOGGER().warn("Detected non-positive s·y = {:.6e} at hist_idx {}. ",
-                          sy_dot, hist_idx);
-      }
       inverse_rho_values.push_back(sy_dot);
     }
+    latest_inverse_rho = inverse_rho_values[history_size_ - 1];
 
     // BFGS two-loop recursion algorithm
     // First loop: compute alpha values and update q
@@ -792,12 +790,13 @@ void GDM::iterate(SCFImpl& scf_impl) {
 
   // Validate BFGS search direction
   double kappa_dot_grad = kappa_.dot(current_gradient_);
-  if (kappa_dot_grad > 0.0) {
+  if ((kappa_dot_grad > 0.0) || (latest_inverse_rho < nonpositive_threshold_)) {
     // Bad direction detected - BFGS history no longer fits current landscape
     QDK_LOGGER().warn(
         "BFGS search direction is invalid (kappa·grad = {:.6e} > 0). "
+        "or history curvature condition violated (latest inverse rho {:.6e}). "
         "Clearing history and restarting BFGS with initial Hessian.",
-        kappa_dot_grad);
+        kappa_dot_grad, latest_inverse_rho);
 
     // Clear BFGS history
     history_size_ = 0;
