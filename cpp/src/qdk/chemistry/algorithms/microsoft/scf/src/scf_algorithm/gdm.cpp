@@ -30,7 +30,7 @@ namespace impl {
 
 /**
  * @brief Apply orbital rotation using kappa vector by constructing the
- * antisymmetric kappa matrix and appliying the rotation C = C * exp(kappa).
+ * antisymmetric kappa matrix and applying the rotation C = C * exp(kappa).
  * @param[in,out] C Molecular orbital coefficient matrix
  * @param[in] spin_index Spin index (0 for alpha, 1 for beta)
  * @param[in] kappa_vector The kappa vector to apply for rotation
@@ -124,7 +124,7 @@ class GDMLineFunctor {
   Eigen::VectorXd grad(const Eigen::VectorXd& x);
 
   /**
-   * @brief Static utility: compute dot product of two vectors to acommodate
+   * @brief Static utility: compute dot product of two vectors to accommodate
    * line search method interface
    * @param v1 First vector
    * @param v2 Second vector
@@ -136,7 +136,7 @@ class GDMLineFunctor {
 
   /**
    * @brief Static utility: perform axpy operation y = y + alpha * x to
-   * acommodate line search method interface
+   * accommodate line search method interface
    * @param alpha Scalar multiplier
    * @param x Vector to scale and add
    * @param y Vector to add to (modified in-place)
@@ -234,7 +234,8 @@ double GDMLineFunctor::eval(const Eigen::VectorXd& x) {
 Eigen::VectorXd GDMLineFunctor::grad(const Eigen::VectorXd& x) {
   // Ensure we have the Fock matrix at this kappa
   // If not cached, call eval() to compute it
-  if (cached_kappa_.size() != x.size() || (cached_kappa_ - x).norm() >= 1e-14) {
+  if (cached_kappa_.size() != x.size() ||
+      (cached_kappa_ - x).norm() >= compare_kappa_tol_) {
     eval(x);
   }
 
@@ -461,7 +462,6 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
   // Calculate rotation sizes for each spin
   rotation_size_.resize(num_density_matrices_);
   rotation_offset_.resize(num_density_matrices_);
-  kappa_.resize(num_density_matrices_);
 
   total_rotation_size_ = 0;
   for (int spin_index = 0; spin_index < num_density_matrices_; spin_index++) {
@@ -660,8 +660,8 @@ void GDM::iterate(SCFImpl& scf_impl) {
       const int num_rows_to_shift = history_size_limit_ - 1;
       history_kappa_.topRows(num_rows_to_shift) =
           history_kappa_.middleRows(1, num_rows_to_shift);
-      history_dgrad_.topRows(num_rows_to_shift - 1) =
-          history_dgrad_.middleRows(1, num_rows_to_shift - 1);
+      history_dgrad_.topRows(num_rows_to_shift) =
+          history_dgrad_.middleRows(1, num_rows_to_shift);
       history_size_--;
     }
   }
@@ -831,9 +831,11 @@ void GDM::iterate(SCFImpl& scf_impl) {
   double fx0 = line_functor.eval(x0);
   Eigen::VectorXd gfx0 = line_functor.grad(x0);
 
-  // Initialize output variables for line search
-  // NOTE: fx_new and gfx_new serve as BOTH input and output for the line
-  // search! They must be initialized with the values at x0 before calling.
+  // Initialize variables for line search.
+  // NOTE: fx_new and gfx_new are output parameters of the line search
+  // routine that must be pre-initialized with the function value and
+  // gradient at x0 to satisfy the routine's interface and avoid undefined
+  // behavior. They do not have additional semantic "input" meaning.
   Eigen::VectorXd x_new(kappa_.size());
   double fx_new = fx0;             // Initial function value at x0
   Eigen::VectorXd gfx_new = gfx0;  // Initial gradient at x0
@@ -871,8 +873,8 @@ void GDM::iterate(SCFImpl& scf_impl) {
     } catch (const std::exception& e2) {
       // Fallback Level 2: Even steepest descent line search failed
       QDK_LOGGER().error(
-          "Steepest descent line search also failed: {}. Taking fixed 1% step "
-          "in steepest descent direction.",
+          "Steepest descent line search also failed: {}. Taking fixed 1e-4 "
+          "step in steepest descent direction.",
           e2.what());
 
       // Take very small step in steepest descent direction
