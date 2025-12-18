@@ -46,16 +46,16 @@ class TimeEvolutionUnitaryContainer(DataClass):
 
     @abstractmethod
     def to_json(self) -> dict[str, Any]:
-        """Convert the TimeEvolutionUnitary to a dictionary for JSON serialization.
+        """Convert the TimeEvolutionUnitaryContainer to a dictionary for JSON serialization.
 
         Returns:
-            dict: Dictionary representation of the TimeEvolutionUnitary
+            dict: Dictionary representation of the TimeEvolutionUnitaryContainer
 
         """
 
     @abstractmethod
     def to_hdf5(self, group: h5py.Group) -> None:
-        """Save the TimeEvolutionUnitary to an HDF5 group.
+        """Save the TimeEvolutionUnitaryContainer to an HDF5 group.
 
         Args:
             group: HDF5 group or file to write data to
@@ -65,7 +65,7 @@ class TimeEvolutionUnitaryContainer(DataClass):
     @classmethod
     @abstractmethod
     def from_json(cls, json_data: dict[str, Any]) -> "TimeEvolutionUnitaryContainer":
-        """Create TimeEvolutionUnitary from a JSON dictionary.
+        """Create TimeEvolutionUnitaryContainer from a JSON dictionary.
 
         Args:
             json_data: Dictionary containing the serialized data
@@ -93,6 +93,6 @@ class TimeEvolutionUnitaryContainer(DataClass):
         """Get summary of time evolution unitary.
 
         Returns:
-            str: Summary string describing the TimeEvolutionUnitary's contents and properties
+            str: Summary string describing the  TimeEvolutionUnitaryContainer's contents and properties
 
         """

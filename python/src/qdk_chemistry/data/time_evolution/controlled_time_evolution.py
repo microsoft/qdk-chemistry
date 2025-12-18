@@ -59,7 +59,7 @@ class ControlledTimeEvolutionUnitary(DataClass):
         """Convert the ControlledTimeEvolutionUnitary to a dictionary for JSON serialization.
 
         Returns:
-            dict: Dictionary representation of the TimeEvolutionUnitary
+            dict: Dictionary representation of the ControlledTimeEvolutionUnitary
 
         """
         data: dict[str, Any] = {}

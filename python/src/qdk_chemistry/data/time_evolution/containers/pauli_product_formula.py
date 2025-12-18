@@ -122,10 +122,10 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
         )
 
     def to_json(self) -> dict[str, Any]:
-        """Convert the TimeEvolutionUnitary to a dictionary for JSON serialization.
+        """Convert the PauliProductFormulaContainer to a dictionary for JSON serialization.
 
         Returns:
-            dict: Dictionary representation of the TimeEvolutionUnitary
+            dict: Dictionary representation of the PauliProductFormulaContainer
 
         """
         data: dict[str, Any] = {
@@ -135,15 +135,16 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
             "step_reps": self.step_reps,
             "num_qubits": self.num_qubits,
         }
-        return data
+        return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
-        """Save the TimeEvolutionUnitary to an HDF5 group.
+        """Save the PauliProductFormulaContainer to an HDF5 group.
 
         Args:
             group: HDF5 group or file to write data to
 
         """
+        self._add_hdf5_version(group)
         group.attrs["container_type"] = self.type
         group.attrs["step_reps"] = self.step_reps
         group.attrs["num_qubits"] = self.num_qubits
@@ -159,16 +160,17 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
         group.attrs["evolution_ordering"] = self.evolution_ordering.indices
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> "TimeEvolutionUnitaryContainer":
-        """Create TimeEvolutionUnitary from a JSON dictionary.
+    def from_json(cls, json_data: dict[str, Any]) -> "PauliProductFormulaContainer":
+        """Create PauliProductFormulaContainer from a JSON dictionary.
 
         Args:
             json_data: Dictionary containing the serialized data
 
         Returns:
-            TimeEvolutionUnitaryContainer
+            PauliProductFormulaContainer
 
         """
+        cls._validate_json_version(cls._serialization_version, json_data)
         step_terms = [
             ExponentiatedPauliTerm(
                 pauli_term=term_data["pauli_term"],
@@ -187,16 +189,17 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
         )
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> "TimeEvolutionUnitaryContainer":
+    def from_hdf5(cls, group: h5py.Group) -> "PauliProductFormulaContainer":
         """Load an instance from an HDF5 group.
 
         Args:
             group: HDF5 group or file to read data from
 
         Returns:
-            TimeEvolutionUnitaryContainer
+            PauliProductFormulaContainer
 
         """
+        cls._validate_hdf5_version(cls._serialization_version, group)
         step_reps = group.attrs["step_reps"]
         num_qubits = group.attrs["num_qubits"]
 
@@ -224,10 +227,10 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
         )
 
     def get_summary(self) -> str:
-        """Get summary of time evolution unitary.
+        """Get summary of PauliProductFormulaContainer.
 
         Returns:
-            str: Summary string describing the TimeEvolutionUnitary's contents and properties
+            str: Summary string describing the PauliProductFormulaContainer's contents and properties
 
         """
         lines = ["Pauli Product Formula Container"]

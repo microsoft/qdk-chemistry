@@ -26,7 +26,7 @@ Exposed classes are:
 - :class:`Orbitals`: Molecular orbital information and properties.
 - :class:`OrbitalType`: Enumeration of orbital angular momentum types (s, p, d, f, etc.).
 - :class:`PauliOperator`: Pauli operator (I, X, Y, Z) for quantum operator expressions with arithmetic support.
-- :class:`PauliProductFormulaContainer`: Container for pauli product formula representation of time evolution unitary.
+- :class:`PauliProductFormulaContainer`: Container for Pauli product formula representation of time evolution unitary.
 - :class:`QpeResult`: Result of quantum phase estimation workflows, including phase, energy, and metadata.
 - :class:`QuantumErrorProfile`: Information about quantum gates and error properties.
 - :class:`QubitHamiltonian`: Molecular electronic Hamiltonians mapped to qubits.

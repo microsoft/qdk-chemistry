@@ -26,7 +26,7 @@ class TimeEvolutionConstructor(Algorithm):
 
     @abstractmethod
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
-        """Construct a QuantumCircuit representing the controlled unitary for the given QubitHamiltonian.
+        """Construct a TimeEvolutionUnitary representing the time evolution unitary for the given QubitHamiltonian.
 
         Args:
             qubit_hamiltonian (QubitHamiltonian): The qubit Hamiltonian.

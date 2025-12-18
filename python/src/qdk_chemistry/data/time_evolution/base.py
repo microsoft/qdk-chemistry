@@ -70,7 +70,6 @@ class TimeEvolutionUnitary(DataClass):
             group: HDF5 group or file to write data to
 
         """
-        self._add_hdf5_version(group)
         self._container.to_hdf5(group)
 
     def get_summary(self) -> str:
@@ -115,7 +114,6 @@ class TimeEvolutionUnitary(DataClass):
             TimeEvolutionUnitary
 
         """
-        cls._validate_hdf5_version(cls._serialization_version, group)
         container_type = group.attrs.get("container_type")
         if container_type == "pauli_product_formula":
             container = PauliProductFormulaContainer.from_hdf5(group)

@@ -1,4 +1,4 @@
-"""QDK/Chemistry implemantation of the first order trotter constructor."""
+"""QDK/Chemistry implementation of the first order trotter constructor."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -21,7 +21,7 @@ class FirstOrderTrotterConstructorSettings(Settings):
 
     Attributes:
         num_trotter_steps (int): The number of Trotter steps to use in the construction.
-        tolerence (float): The absolute tolerance for filtering small coefficients.
+        tolerance (float): The absolute tolerance for filtering small coefficients.
 
     """
 
@@ -29,41 +29,41 @@ class FirstOrderTrotterConstructorSettings(Settings):
         """Initialize FirstOrderTrotterConstructorSettings with default values."""
         super().__init__()
         self._set_default("num_trotter_steps", "int", 1)
-        self._set_default("tolerence", "float", 1e-12)
+        self._set_default("tolerance", "float", 1e-12)
 
 
 class FirstOrderTrotterConstructor(TimeEvolutionConstructor):
     """First-order Trotterization unitary constructor."""
 
-    def __init__(self, num_trotter_steps: int = 1, tolerence: float = 1e-12):
+    def __init__(self, num_trotter_steps: int = 1, tolerance: float = 1e-12):
         """Initialize FirstOrderTrotterConstructor with given settings.
 
         Args:
             num_trotter_steps (int): The number of Trotter steps to use in the construction.
-            tolerence (float): The absolute tolerance for filtering small coefficients.
+            tolerance (float): The absolute tolerance for filtering small coefficients.
 
         """
         super().__init__()
         self._settings = FirstOrderTrotterConstructorSettings()
         self._settings.set("num_trotter_steps", num_trotter_steps)
-        self._settings.set("tolerence", tolerence)
+        self._settings.set("tolerance", tolerance)
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
-        """Construct the control unitary circuit using first-order Trotterization.
+        """Construct the time evolution unitary using first-order Trotterization.
 
         Args:
             qubit_hamiltonian (QubitHamiltonian): The qubit Hamiltonian to be used in the construction.
             time (float): The total evolution time.
 
         Returns:
-            QuantumCircuit: The constructed control unitary circuit.
+            TimeEvolutionUnitary: The constructed time evolution unitary.
 
         """
         # Calculate evolution time per Trotter step
         dt = time / self._settings.get("num_trotter_steps")
-        tolerence = self._settings.get("tolerence")
+        tolerance = self._settings.get("tolerance")
 
-        terms, ordering = _decompose_trotter_step(qubit_hamiltonian, time=dt, atol=tolerence)
+        terms, ordering = _decompose_trotter_step(qubit_hamiltonian, time=dt, atol=tolerance)
 
         num_qubits = qubit_hamiltonian.num_qubits
 
@@ -77,7 +77,7 @@ class FirstOrderTrotterConstructor(TimeEvolutionConstructor):
         return TimeEvolutionUnitary(container=container)
 
     def name(self) -> str:
-        """Return the name of the controlled unitary constructor."""
+        """Return the name of the time evolution unitary constructor."""
         return "first_order_trotter"
 
 
