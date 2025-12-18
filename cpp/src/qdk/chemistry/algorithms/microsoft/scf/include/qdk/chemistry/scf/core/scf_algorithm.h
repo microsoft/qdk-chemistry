@@ -93,13 +93,11 @@ class SCFAlgorithm {
    * beta)
    * @param[in] unrestricted Whether calculation is unrestricted
    */
-  void solve_fock_eigenproblem(const RowMajorMatrix& F, const RowMajorMatrix& S,
-                               const RowMajorMatrix& X, RowMajorMatrix& C,
-                               RowMajorMatrix& eigenvalues, RowMajorMatrix& P,
-                               const int num_occupied_orbitals[2],
-                               int num_atomic_orbitals,
-                               int num_molecular_orbitals, int idx_spin,
-                               bool unrestricted);
+  virtual void solve_fock_eigenproblem(
+      const RowMajorMatrix& F, const RowMajorMatrix& S, const RowMajorMatrix& X,
+      RowMajorMatrix& C, RowMajorMatrix& eigenvalues, RowMajorMatrix& P,
+      const int num_occupied_orbitals[2], int num_atomic_orbitals,
+      int num_molecular_orbitals, int idx_spin, bool unrestricted);
 
   /**
    * @brief Calculate orbital gradient (OG) error for convergence checking

@@ -45,8 +45,8 @@ Examples:
     >>> from qdk_chemistry.algorithms import create
     >>> scf_solver = create("scf_solver", "pyscf")
     >>> # Configure and use like any other algorithm
-    >>> scf_solver.settings()["basis_set"] = "cc-pvdz"
-    >>> energy, orbitals = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+    >>> scf_solver.settings()["max_iterations"] = 50
+    >>> energy, orbitals = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
 
 Notes:
     Plugin modules may have additional dependencies beyond core QDK/Chemistry.
