@@ -38,7 +38,7 @@ settings = scf_solver.settings()
 settings.set("max_iterations", 100)
 
 # Set a string value
-settings.set("basis_set", "def2-tzvp")
+settings.set("method", "B3LYP")
 
 # Set a numeric value
 settings.set("convergence_threshold", 1.0e-8)
@@ -63,9 +63,9 @@ for algorithm_name in available():
 ################################################################################
 # start-cell-misc-settings
 # Check if a setting exists
-if settings.has("basis_set"):
+if settings.has("method"):
     # Use the setting
-    print(f"Basis set is configured: {settings.get('basis_set')}")
+    print(f"Method is selected: {settings.get('method')}")
 
 # Check if a setting exists (Python duck typing, no type check needed)
 if settings.has("convergence_threshold"):
@@ -104,7 +104,7 @@ is_empty = settings.empty()
 settings = scf_solver.settings()  # Re-initialize to clear
 
 # Validate that required settings exist
-settings.validate_required(["basis_set", "convergence_threshold"])
+settings.validate_required(["convergence_threshold"])
 
 # Get a setting as a string representation
 value_str = settings.get_as_string("convergence_threshold")

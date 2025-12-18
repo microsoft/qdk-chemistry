@@ -97,8 +97,7 @@ class MacisAsciTest : public ::testing::Test {
 
     // Run SCF calculation
     auto scf_solver = ScfSolverFactory::create();
-    scf_solver->settings().set("basis_set", "def2-svp");
-    auto [E_HF, wfn_HF] = scf_solver->run(structure_, 0, 1);
+    auto [E_HF, wfn_HF] = scf_solver->run(structure_, 0, 1, "def2-svp");
 
     // Store the water SCF wavefunction for reuse in tests
     water_scf_wavefunction_ = wfn_HF;
@@ -244,8 +243,7 @@ TEST_F(MacisAsciTest, DispatchByNorbDifferentSizes) {
   // Test small active space (< 32 orbitals) - should use wfn_t<64>
   auto water = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "sto-3g");  // Smaller basis
-  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1);
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
   auto orbitals_small = wfn_HF->get_orbitals();
 
   std::vector<size_t> small_indices = {3, 4, 5};  // 3 orbitals
@@ -607,8 +605,7 @@ TEST_F(MacisAsciTest, NoActiveSpaceSetup) {
   auto h2 = std::make_shared<Structure>(coords, elements);
 
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "sto-3g");
-  auto [E_HF, wfn_HF] = scf_solver->run(h2, 0, 1);
+  auto [E_HF, wfn_HF] = scf_solver->run(h2, 0, 1, "sto-3g");
   auto orbitals_no_active = wfn_HF->get_orbitals();
 
   // The orbitals object should not have active space indices set
@@ -848,9 +845,7 @@ TEST_F(MacisAsciTest, MacisCasFullActiveSpace) {
   // Create orbitals without explicit active space
   auto water = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set(
-      "basis_set", "sto-3g");  // Use minimal basis for manageable size
-  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1);
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
   auto orbitals_full = wfn_HF->get_orbitals();
 
   // Don't set active space - should use all orbitals
@@ -1017,8 +1012,7 @@ class MacisPmcTest : public ::testing::Test {
 
     // Run SCF calculation
     auto scf_solver = ScfSolverFactory::create();
-    scf_solver->settings().set("basis_set", "def2-svp");
-    auto [E_HF, wfn_HF] = scf_solver->run(structure_, 0, 1);
+    auto [E_HF, wfn_HF] = scf_solver->run(structure_, 0, 1, "def2-svp");
     E_HF_ = E_HF;
 
     // Store the water SCF wavefunction for reuse in tests
@@ -1226,9 +1220,9 @@ class MacisAsciBackoffTest : public MacisAsciTest {
 
     // Run SCF with smaller basis set for faster backoff tests
     auto scf_solver = ScfSolverFactory::create();
-    scf_solver->settings().set("basis_set", std::string("sto-3g"));
 
-    auto [scf_energy, wavefunction] = scf_solver->run(structure_, 0, 1);
+    auto [scf_energy, wavefunction] =
+        scf_solver->run(structure_, 0, 1, "sto-3g");
     hf_energy_ = scf_energy;
     water_scf_wavefunction_ = wavefunction;
     orbitals_ = wavefunction->get_orbitals();

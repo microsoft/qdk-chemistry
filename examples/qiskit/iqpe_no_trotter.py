@@ -185,8 +185,10 @@ structure = Structure(
     np.array([[0.0, 0.0, -0.72], [0.0, 0.0, 0.72]], dtype=float), ["H", "H"]
 )  # Geometry in bohr
 
-scf_solver = create("scf_solver", basis_set="sto-3g")
-scf_energy, scf_wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+scf_solver = create("scf_solver")
+scf_energy, scf_wavefunction = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
 
 
 ########################################################################################

@@ -29,7 +29,12 @@
 
 namespace qdk::chemistry::scf {
 KSImpl::KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg)
-    : SCFImpl(mol, cfg, true) {
+    : KSImpl(mol, cfg, nullptr, nullptr) {}
+
+KSImpl::KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
+               std::shared_ptr<BasisSet> basis_set,
+               std::shared_ptr<BasisSet> raw_basis_set)
+    : SCFImpl(mol, cfg, basis_set, raw_basis_set, true) {
   QDK_LOG_TRACE_ENTERING();
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
@@ -64,6 +69,7 @@ KSImpl::KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg)
                                 num_atomic_orbitals_);
   }
 }
+
 KSImpl::KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
                const RowMajorMatrix& dm)
     : KSImpl(mol, cfg) {

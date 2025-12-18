@@ -4,4 +4,5 @@ target_sources(chemistry PRIVATE
   diis.cpp
   diis_gdm.cpp
   gdm.cpp
+  asahf.cpp
 )

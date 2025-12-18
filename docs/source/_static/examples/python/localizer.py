@@ -38,8 +38,9 @@ structure = Structure(coords, symbols=symbols)
 
 # Obtain orbitals from SCF
 scf_solver = create("scf_solver")
-scf_solver.settings().set("basis_set", "sto-3g")
-E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+E_scf, wfn = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
 
 # Create indices for orbitals to localize
 loc_indices = [0, 1, 2, 3]

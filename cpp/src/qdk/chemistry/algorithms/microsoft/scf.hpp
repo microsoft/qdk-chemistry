@@ -27,7 +27,6 @@ namespace qdk::chemistry::algorithms::microsoft {
  * ```cpp
  * auto solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
  * auto& settings = solver->settings();
- * settings.set("basis_set", "6-31G*");  // Override the default basis set
  * settings.set("max_iterations", 100);   // Add additional settings
  * ```
  *
@@ -41,8 +40,7 @@ class ScfSettings
    * @brief Constructor that initializes default SCF settings
    *
    * Creates an SCF settings object with the following defaults:
-   * - Inherits from ElectronicStructureSettings: basis_set, charge,
-   * spin_multiplicity, etc.
+   * - Inherits from ElectronicStructureSettings
    * - Additional SCF-specific convergence and algorithm parameters
    *
    */
@@ -91,10 +89,10 @@ class ScfSettings
  * auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
  *
  * // Configure settings if needed
- * scf_solver->settings().set("basis_set", "sto-3g");
+ * scf_solver->settings().set("max_iterations", 50);
  *
  * // Perform SCF calculation
- * auto [energy, orbitals] = scf_solver->run(water, 0, 1);
+ * auto [energy, orbitals] = scf_solver->run(water, 0, 1, "sto-3g");
  * ```
  *
  * @see qdk::chemistry::algorithms::ScfSolver
@@ -131,8 +129,13 @@ class ScfSolver : public qdk::chemistry::algorithms::ScfSolver {
    * elements
    * @param charge The molecular charge
    * @param spin_multiplicity The spin multiplicity of the molecular system
-   * @param initial_guess Initial orbital guess for the SCF calculation
-   * (optional, defaults to a standard configurable guess)
+   * @param basis_or_guess Basis set information, which can be provided as:
+   *         - A shared pointer to a `data::BasisSet` object
+   *         - A string specifying the name of a standard basis set (e.g.,
+   * "sto-3g")
+   *         - A shared pointer to a `data::Orbitals` object to be used as an
+   * initial guess (the basis set will be inferred from the orbitals)
+   *
    * @return A pair containing:
    *         - The final SCF total energy (double)
    *         - The converged wavefunction (data::Wavefunction)
@@ -144,9 +147,7 @@ class ScfSolver : public qdk::chemistry::algorithms::ScfSolver {
    */
   std::pair<double, std::shared_ptr<data::Wavefunction>> _run_impl(
       std::shared_ptr<data::Structure> structure, int charge,
-      int spin_multiplicity,
-      std::optional<std::shared_ptr<data::Orbitals>> initial_guess)
-      const override;
+      int spin_multiplicity, BasisOrGuessType basis_or_guess) const override;
 };
 
 }  // namespace qdk::chemistry::algorithms::microsoft

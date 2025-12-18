@@ -14,7 +14,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell, Structure
+import qdk_chemistry.algorithms as alg
+from qdk_chemistry.data import AOType, BasisSet, Element, OrbitalType, Shell, Structure
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -1324,3 +1325,121 @@ def test_basis_set_ecp_shells_multi_atom():
 
     ecp_shells_h = basis.get_ecp_shells_for_atom(2)
     assert len(ecp_shells_h) == 0
+
+
+def test_basis_set_from_basis_name():
+    """Test creating basis set using from_basis_name static method."""
+    # Create water structure
+    positions = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+    elements = ["H", "O", "H"]
+    structure = Structure(elements, positions)
+
+    # Create basis set using from_basis_name
+    basis_set = "sto-3g"
+    basis = BasisSet.from_basis_name(basis_set, structure)
+
+    # Verify basis set properties
+    assert basis.get_name() == basis_set
+    assert basis.get_num_shells() == 5
+
+    # Run SCF calculation to verify the basis set works
+    scf_solver = alg.create("scf_solver")
+    energy, determinant = scf_solver.run(structure, 0, 1, basis)
+
+    # Check number of orbitals
+    num_orbitals = determinant.get_orbitals().get_num_molecular_orbitals()
+    assert num_orbitals == 7
+
+
+def test_basis_set_from_element_map():
+    """Test creating basis set using from_element_map static method."""
+    # Create water structure
+    positions = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+    elements = ["H", "O", "H"]
+    structure = Structure(elements, positions)
+
+    # Create element-to-basis map
+    element_basis_map = {"H": "cc-pvdz", "O": "sto-3g"}
+
+    # Create basis set using from_element_map
+    basis = BasisSet.from_element_map(element_basis_map, structure)
+
+    # Verify basis set properties
+    assert basis.get_name() == "custom_basis_set"
+    assert basis.get_num_shells() == 9
+
+    # Run SCF calculation to verify the basis set works
+    scf_solver = alg.create("scf_solver")
+    energy, determinant = scf_solver.run(structure, 0, 1, basis)
+
+    # Check number of orbitals
+    num_orbitals = determinant.get_orbitals().get_num_molecular_orbitals()
+    assert num_orbitals == 15
+
+
+def test_basis_set_from_index_map():
+    """Test creating basis set using from_index_map static method."""
+    # Create water structure
+    positions = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+    elements = ["H", "O", "H"]
+    structure = Structure(elements, positions)
+
+    # Create index-to-basis map with mixed basis sets
+    index_basis_map = {0: "cc-pvtz", 1: "sto-3g", 2: "def2-svp"}
+
+    # Create basis set using from_index_map
+    basis = BasisSet.from_index_map(index_basis_map, structure)
+
+    # Verify basis set properties
+    assert basis.get_name() == "custom_basis_set"
+    assert basis.get_num_shells() == 12
+
+    # Run SCF calculation to verify the basis set works
+    scf_solver = alg.create("scf_solver")
+    energy, determinant = scf_solver.run(structure, 0, 1, basis)
+
+    # Check number of orbitals
+    num_orbitals = determinant.get_orbitals().get_num_molecular_orbitals()
+    assert num_orbitals == 24
+
+
+def test_basis_set_static_constants():
+    """Test that static constant variables are accessible."""
+    # Test that the static constants exist and have expected values
+    assert BasisSet.custom_name == "custom_basis_set"
+    assert BasisSet.custom_ecp_name == "custom_ecp"
+    assert BasisSet.default_ecp_name == "default_ecp"
+
+
+def test_get_supported_basis_set_names():
+    """Test get_supported_basis_set_names static method."""
+    # Get list of supported basis sets
+    supported = BasisSet.get_supported_basis_set_names()
+
+    # Verify it returns a list
+    assert isinstance(supported, list)
+
+    # Verify it's not empty
+    assert len(supported) > 0
+
+    # Verify some common basis sets are in the list
+    assert "sto-3g" in supported
+    assert "cc-pvdz" in supported
+    assert "6-31g" in supported
+
+
+def test_get_supported_elements_for_basis_set():
+    """Test get_supported_elements_for_basis_set static method."""
+    elements = BasisSet.get_supported_elements_for_basis_set("sto-3g")
+
+    # Verify it returns a list
+    assert isinstance(elements, list)
+
+    # Verify it's not empty
+    assert len(elements) > 0
+
+    # Verify common elements are supported in STO-3G
+    assert Element.H in elements
+    assert Element.C in elements
+    assert Element.O in elements
+    assert Element.N in elements

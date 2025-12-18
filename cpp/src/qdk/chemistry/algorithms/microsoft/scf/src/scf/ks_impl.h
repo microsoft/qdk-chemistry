@@ -40,6 +40,18 @@ class KSImpl : public SCFImpl {
   KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
          const RowMajorMatrix& density_matrix);
 
+  /**
+   * @brief Construct Kohn-Sham solver with initial density matrix
+   *
+   * @param mol Molecular structure
+   * @param cfg SCF configuration
+   * @param basis_set Basis set to use
+   * @param raw_basis_set Raw (unnormalized) basis set for output
+   */
+  KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
+         std::shared_ptr<BasisSet> basis_set,
+         std::shared_ptr<BasisSet> raw_basis_set);
+
  private:
   /**
    * @brief Update Fock matrix with exchange-correlation contributions

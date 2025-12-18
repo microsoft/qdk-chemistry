@@ -6,6 +6,7 @@
 
 #include <filesystem>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
@@ -34,7 +35,10 @@ class TestSCF : public ScfSolver {
  protected:
   std::pair<double, std::shared_ptr<Wavefunction>> _run_impl(
       std::shared_ptr<Structure> /*structure*/, int charge, int multiplicity,
-      std::optional<std::shared_ptr<Orbitals>> initial_guess) const override {
+      std::variant<std::shared_ptr<Orbitals>, std::shared_ptr<BasisSet>,
+                   std::string>
+      /*basis_or_guess*/
+  ) const override {
     // Dummy implementation for testing
     Eigen::MatrixXd coefficients = Eigen::MatrixXd::Zero(3, 3);
     Eigen::VectorXd energies = Eigen::VectorXd::Zero(3);
@@ -70,16 +74,15 @@ TEST_F(ScfTest, Water) {
   auto water = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
   // Default settings
-  auto [E_default, wfn_default] = scf_solver->run(water, 0, 1);
+  auto [E_default, wfn_default] = scf_solver->run(water, 0, 1, "def2-svp");
   auto orbitals_default = wfn_default->get_orbitals();
   EXPECT_NEAR(E_default, -75.9229032345009, testing::scf_energy_tolerance);
   EXPECT_TRUE(orbitals_default->is_restricted());
 
   // Change basis set to def2-tzvp
   scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "def2-tzvp");
   std::cout << scf_solver->settings().to_json().dump(2) << std::endl;
-  auto [E_def2tzvp, wfn_def2tzvp] = scf_solver->run(water, 0, 1);
+  auto [E_def2tzvp, wfn_def2tzvp] = scf_solver->run(water, 0, 1, "def2-tzvp");
   EXPECT_NEAR(E_def2tzvp, -76.0205776517675, testing::scf_energy_tolerance);
 }
 
@@ -88,12 +91,12 @@ TEST_F(ScfTest, Lithium) {
   auto scf_solver = ScfSolverFactory::create();
 
   // Default settings
-  auto [E_default, wfn_default] = scf_solver->run(li, 0, 2);
+  auto [E_default, wfn_default] = scf_solver->run(li, 0, 2, "def2-svp");
   EXPECT_NEAR(E_default, -7.4250663561, testing::scf_energy_tolerance);
   EXPECT_FALSE(wfn_default->get_orbitals()->is_restricted());
 
   // Li +1 should be a singlet
-  auto [E_li_plus_1, wfn_li_plus_1] = scf_solver->run(li, 1, 1);
+  auto [E_li_plus_1, wfn_li_plus_1] = scf_solver->run(li, 1, 1, "def2-svp");
   EXPECT_NEAR(E_li_plus_1, -7.2328981138900552, testing::scf_energy_tolerance);
   EXPECT_TRUE(wfn_li_plus_1->get_orbitals()->is_restricted());
 }
@@ -102,14 +105,11 @@ TEST_F(ScfTest, Oxygen) {
   auto o2 = testing::create_o2_structure();
   auto scf_solver = ScfSolverFactory::create();
 
-  // STO-3G
-  scf_solver->settings().set("basis_set", "sto-3g");
-
   // Default should be a singlet
-  auto [E_singlet, wfn_singlet] = scf_solver->run(o2, 0, 1);
+  auto [E_singlet, wfn_singlet] = scf_solver->run(o2, 0, 1, "sto-3g");
 
   // Run as a triplet
-  auto [E_triplet, wfn_triplet] = scf_solver->run(o2, 0, 3);
+  auto [E_triplet, wfn_triplet] = scf_solver->run(o2, 0, 3, "sto-3g");
 
   EXPECT_NEAR(E_singlet, -147.551127403083, testing::scf_energy_tolerance);
   EXPECT_NEAR(E_triplet, -147.633969643351, testing::scf_energy_tolerance);
@@ -126,10 +126,9 @@ TEST_F(ScfTest, Oxygen_atom_gdm) {
   auto scf_solver = ScfSolverFactory::create();
   // cc-pvdz
   scf_solver->settings().set("method", "pbe");
-  scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
   // Default should be a singlet
-  auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1);
+  auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1, "cc-pvdz");
   EXPECT_NEAR(E_singlet, -74.873106298, testing::scf_energy_tolerance);
   // Check singlet orbitals
   EXPECT_TRUE(wfn_singlet->get_orbitals()->is_restricted());
@@ -140,11 +139,10 @@ TEST_F(ScfTest, Oxygen_atom_history_size_limit_gdm) {
   auto scf_solver = ScfSolverFactory::create();
   // cc-pvdz
   scf_solver->settings().set("method", "pbe");
-  scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("gdm_bfgs_history_size_limit", 20);
   // Default should be a singlet
-  auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1);
+  auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1, "cc-pvdz");
   EXPECT_NEAR(E_singlet, -74.873106298, testing::scf_energy_tolerance);
   // Check singlet orbitals
   EXPECT_TRUE(wfn_singlet->get_orbitals()->is_restricted());
@@ -155,11 +153,10 @@ TEST_F(ScfTest, Oxygen_atom_one_diis_step_gdm) {
   auto scf_solver = ScfSolverFactory::create();
   // cc-pvdz
   scf_solver->settings().set("method", "pbe");
-  scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("gdm_max_diis_iteration", 1);
 
-  auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1);
+  auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1, "cc-pvdz");
   EXPECT_NEAR(E_singlet, -74.873106298, testing::scf_energy_tolerance);
   // Check singlet orbitals
   EXPECT_TRUE(wfn_singlet->get_orbitals()->is_restricted());
@@ -171,7 +168,7 @@ TEST_F(ScfTest, Water_triplet_gdm) {
   // Default settings
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("enable_gdm", true);
-  auto [E_default, wfn_default] = scf_solver->run(water, 0, 3);
+  auto [E_default, wfn_default] = scf_solver->run(water, 0, 3, "def2-svp");
   auto orbitals_default = wfn_default->get_orbitals();
   EXPECT_NEAR(E_default, -76.0343083322644, testing::scf_energy_tolerance);
   EXPECT_FALSE(orbitals_default->is_restricted());
@@ -182,11 +179,10 @@ TEST_F(ScfTest, Oxygen_atom_charged_doublet_gdm) {
   auto scf_solver = ScfSolverFactory::create();
   // cc-pvdz
   scf_solver->settings().set("method", "pbe");
-  scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("max_iterations", 100);
 
-  auto [E_doublet, wfn_doublet] = scf_solver->run(oxygen, 1, 2);
+  auto [E_doublet, wfn_doublet] = scf_solver->run(oxygen, 1, 2, "cc-pvdz");
   EXPECT_NEAR(E_doublet, -74.416994299, testing::scf_energy_tolerance);
   // Check singlet orbitals
   EXPECT_FALSE(wfn_doublet->get_orbitals()->is_restricted());
@@ -197,11 +193,10 @@ TEST_F(ScfTest, Oxygen_atom_invalid_energy_thresh_diis_switch_gdm) {
   auto scf_solver = ScfSolverFactory::create();
   // cc-pvdz
   scf_solver->settings().set("method", "pbe");
-  scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("energy_thresh_diis_switch", -2e-4);
   // Default should be a singlet
-  EXPECT_THROW(scf_solver->run(oxygen, 0, 1),
+  EXPECT_THROW(scf_solver->run(oxygen, 0, 1, "cc-pvdz"),
                std::invalid_argument);  // open-shell dublet
 }
 
@@ -210,11 +205,10 @@ TEST_F(ScfTest, Oxygen_atom_invalid_bfgs_history_size_limit_gdm) {
   auto scf_solver = ScfSolverFactory::create();
   // cc-pvdz
   scf_solver->settings().set("method", "pbe");
-  scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("gdm_bfgs_history_size_limit", 0);
   // Default should be a singlet
-  EXPECT_THROW(scf_solver->run(oxygen, 0, 1), std::invalid_argument);
+  EXPECT_THROW(scf_solver->run(oxygen, 0, 1, "cc-pvdz"), std::invalid_argument);
 }
 
 TEST_F(ScfTest, WaterDftB3lyp) {
@@ -223,9 +217,8 @@ TEST_F(ScfTest, WaterDftB3lyp) {
 
   // Set B3LYP DFT method
   scf_solver->settings().set("method", "b3lyp");
-  scf_solver->settings().set("basis_set", "def2-svp");
 
-  auto [E_b3lyp, wfn_b3lyp] = scf_solver->run(water, 0, 1);
+  auto [E_b3lyp, wfn_b3lyp] = scf_solver->run(water, 0, 1, "def2-svp");
 
   EXPECT_NEAR(E_b3lyp, -76.3334200741567, testing::scf_energy_tolerance);
   EXPECT_TRUE(wfn_b3lyp->get_orbitals()->is_restricted());
@@ -237,9 +230,8 @@ TEST_F(ScfTest, WaterDftPbe) {
 
   // Set PBE DFT method
   scf_solver->settings().set("method", "pbe");
-  scf_solver->settings().set("basis_set", "def2-svp");
 
-  auto [E_pbe, wfn_pbe] = scf_solver->run(water, 0, 1);
+  auto [E_pbe, wfn_pbe] = scf_solver->run(water, 0, 1, "def2-svp");
 
   // PBE should give a different energy than B3LYP
   EXPECT_NEAR(E_pbe, -76.251126664739658, testing::scf_energy_tolerance);
@@ -252,10 +244,9 @@ TEST_F(ScfTest, LithiumDftB3lypUks) {
 
   // Set B3LYP DFT method with UKS for lithium
   scf_solver->settings().set("method", "b3lyp");
-  scf_solver->settings().set("basis_set", "def2-svp");
-  // Lithium should naturally be UKS due to its doublet ground state
 
-  auto [energy_b3lyp, wfn_b3lyp] = scf_solver->run(lithium, 0, 2);
+  // Lithium should naturally be UKS due to its doublet ground state
+  auto [energy_b3lyp, wfn_b3lyp] = scf_solver->run(lithium, 0, 2, "def2-svp");
   auto orbitals_b3lyp = wfn_b3lyp->get_orbitals();
 
   // Check that we get the expected energy
@@ -283,9 +274,8 @@ TEST_F(ScfTest, LithiumDftPbeUks) {
 
   // Set PBE DFT method with UKS for lithium
   scf_solver->settings().set("method", "pbe");
-  scf_solver->settings().set("basis_set", "def2-svp");
 
-  auto [energy_pbe, wfn_pbe] = scf_solver->run(lithium, 0, 2);
+  auto [energy_pbe, wfn_pbe] = scf_solver->run(lithium, 0, 2, "def2-svp");
   auto orbitals_pbe = wfn_pbe->get_orbitals();
 
   // Check that we get reasonable DFT results (don't check specific energy for
@@ -314,9 +304,9 @@ TEST_F(ScfTest, OxygenTripletDftB3lypUks) {
 
   // Set B3LYP DFT method for O2 triplet state
   scf_solver->settings().set("method", "b3lyp");
-  scf_solver->settings().set("basis_set", "def2-svp");
 
-  auto [energy_b3lyp, wfn_b3lyp] = scf_solver->run(oxygen_molecule, 0, 3);
+  auto [energy_b3lyp, wfn_b3lyp] =
+      scf_solver->run(oxygen_molecule, 0, 3, "def2-svp");
   auto orbitals_b3lyp = wfn_b3lyp->get_orbitals();
 
   // Check that we get the expected energy
@@ -343,9 +333,9 @@ TEST_F(ScfTest, OxygenTripletDftPbeUks) {
 
   // Set PBE DFT method for O2 triplet state
   scf_solver->settings().set("method", "pbe");
-  scf_solver->settings().set("basis_set", "def2-svp");
 
-  auto [energy_pbe, wfn_pbe] = scf_solver->run(oxygen_molecule, 0, 3);
+  auto [energy_pbe, wfn_pbe] =
+      scf_solver->run(oxygen_molecule, 0, 3, "def2-svp");
   auto orbitals_pbe = wfn_pbe->get_orbitals();
 
   // Check that we get reasonable DFT results (don't check specific energy for
@@ -373,16 +363,14 @@ TEST_F(ScfTest, DftMethodCaseInsensitive) {
 
   // Test uppercase
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "sto-3g");
   scf_solver->settings().set("method", "B3LYP");
-  auto [energy_upper, wfn_upper] = scf_solver->run(water, 0, 1);
+  auto [energy_upper, wfn_upper] = scf_solver->run(water, 0, 1, "sto-3g");
   auto orbitals_upper = wfn_upper->get_orbitals();
 
   // Test lowercase
   scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("method", "b3lyp");
-  scf_solver->settings().set("basis_set", "sto-3g");
-  auto [energy_lower, wfn_lower] = scf_solver->run(water, 0, 1);
+  auto [energy_lower, wfn_lower] = scf_solver->run(water, 0, 1, "sto-3g");
   auto orbitals_lower = wfn_lower->get_orbitals();
 
   // Should give the same result
@@ -397,7 +385,7 @@ TEST_F(ScfTest, Settings_EdgeCases) {
       {
         auto scf_solver = ScfSolverFactory::create();
         scf_solver->settings().set("method", "not_a_method");
-        scf_solver->run(water, 0, 1);
+        scf_solver->run(water, 0, 1, "def2-svp");
       },
       std::runtime_error);
 
@@ -405,8 +393,7 @@ TEST_F(ScfTest, Settings_EdgeCases) {
   EXPECT_THROW(
       {
         auto scf_solver = ScfSolverFactory::create();
-        scf_solver->settings().set("basis_set", "not_a_basis");
-        scf_solver->run(water, 0, 1);
+        scf_solver->run(water, 0, 1, "not_a_basis");
       },
       std::invalid_argument);
 
@@ -423,7 +410,7 @@ TEST_F(ScfTest, Settings_EdgeCases) {
       {
         auto scf_solver = ScfSolverFactory::create();
         scf_solver->settings().set("max_iterations", "not_a_number");
-        scf_solver->run(water, 0, 1);
+        scf_solver->run(water, 0, 1, "def2-svp");
       },
       qdk::chemistry::data::SettingTypeMismatch);
 }
@@ -433,18 +420,18 @@ TEST_F(ScfTest, EriMethodSetting) {
 
   // Test default eri_method (direct)
   auto scf_solver_direct = ScfSolverFactory::create();
-  scf_solver_direct->settings().set("basis_set", "sto-3g");
   EXPECT_EQ(scf_solver_direct->settings().get<std::string>("eri_method"),
             "direct");
-  auto [energy_direct, wfn_direct] = scf_solver_direct->run(water, 0, 1);
+  auto [energy_direct, wfn_direct] =
+      scf_solver_direct->run(water, 0, 1, "sto-3g");
 
   // Test eri_method = incore
   auto scf_solver_incore = ScfSolverFactory::create();
-  scf_solver_incore->settings().set("basis_set", "sto-3g");
   scf_solver_incore->settings().set("eri_method", "incore");
   EXPECT_EQ(scf_solver_incore->settings().get<std::string>("eri_method"),
             "incore");
-  auto [energy_incore, wfn_incore] = scf_solver_incore->run(water, 0, 1);
+  auto [energy_incore, wfn_incore] =
+      scf_solver_incore->run(water, 0, 1, "sto-3g");
 
   // Both methods should give the same energy
   EXPECT_NEAR(energy_direct, energy_incore, testing::scf_energy_tolerance);
@@ -462,11 +449,10 @@ TEST_F(ScfTest, InitialGuessRestart) {
   // ===== Water as restricted test =====
   auto water = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "def2-tzvp");
   scf_solver->settings().set("method", "hf");
 
   // First calculation - let it converge normally
-  auto [energy_first, wfn_first] = scf_solver->run(water, 0, 1);
+  auto [energy_first, wfn_first] = scf_solver->run(water, 0, 1, "def2-tzvp");
   auto orbitals_first = wfn_first->get_orbitals();
 
   // Verify we get the expected energy for HF/def2-tzvp
@@ -475,7 +461,6 @@ TEST_F(ScfTest, InitialGuessRestart) {
   // Now restart with the converged orbitals as initial guess
   // Create a new solver instance since settings are locked after run
   auto scf_solver2 = ScfSolverFactory::create();
-  scf_solver2->settings().set("basis_set", "def2-tzvp");
   scf_solver2->settings().set("method", "hf");
   scf_solver2->settings().set(
       "max_iterations", 2);  // 2 is minimum as need to check energy difference
@@ -491,11 +476,10 @@ TEST_F(ScfTest, InitialGuessRestart) {
 TEST_F(ScfTest, OxygenTripletInitialGuessRestart) {
   auto o2 = testing::create_o2_structure();
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "sto-3g");
   scf_solver->settings().set("method", "hf");
 
   // First calculation - let triplet converge normally
-  auto [energy_o2_first, wfn_o2_first] = scf_solver->run(o2, 0, 3);
+  auto [energy_o2_first, wfn_o2_first] = scf_solver->run(o2, 0, 3, "sto-3g");
   auto orbitals_o2_first = wfn_o2_first->get_orbitals();
 
   // Verify we get the expected energy for HF/STO-3G triplet
@@ -505,7 +489,6 @@ TEST_F(ScfTest, OxygenTripletInitialGuessRestart) {
   // Now restart with the converged orbitals as initial guess
   // Create a new solver instance since settings are locked after run
   auto scf_solver_restart = ScfSolverFactory::create();
-  scf_solver_restart->settings().set("basis_set", "sto-3g");
   scf_solver_restart->settings().set("method", "hf");
   scf_solver_restart->settings().set(
       "max_iterations", 2);  // 2 is minimum as need to check energy difference
@@ -524,12 +507,11 @@ TEST_F(ScfTest, AgHDef2SvpWithEcp) {
   auto scf_solver = ScfSolverFactory::create();
 
   // Set def2-svp basis which includes ECP for Ag
-  scf_solver->settings().set("basis_set", "def2-svp");
   scf_solver->settings().set("method", "hf");
 
   // Run SCF calculation - AgH has 48 electrons (Ag: 47, H: 1)
   // but with ECP, Ag has 19 valence electrons, so total is 20 electrons
-  auto [energy, wfn] = scf_solver->run(agh, 0, 1);
+  auto [energy, wfn] = scf_solver->run(agh, 0, 1, "def2-svp");
   auto orbitals = wfn->get_orbitals();
 
   // Verify the calculation completed successfully
@@ -602,11 +584,10 @@ TEST_F(ScfTest, AgHBasisSetRoundTripSerialization) {
   auto scf_solver = ScfSolverFactory::create();
 
   // Set def2-svp basis which includes ECP for Ag
-  scf_solver->settings().set("basis_set", "def2-svp");
   scf_solver->settings().set("method", "hf");
 
   // Run SCF calculation to get original basis set with ECP
-  auto [energy1, wfn1] = scf_solver->run(agh, 0, 1);
+  auto [energy1, wfn1] = scf_solver->run(agh, 0, 1, "def2-svp");
   auto orbitals1 = wfn1->get_orbitals();
   auto basis_set1 = orbitals1->get_basis_set();
 
@@ -687,10 +668,9 @@ TEST_F(ScfTest, AgHBasisSetEcpConversion) {
   auto agh = testing::create_agh_structure();
   auto scf_solver = ScfSolverFactory::create();
 
-  scf_solver->settings().set("basis_set", "def2-svp");
   scf_solver->settings().set("method", "hf");
 
-  auto [energy, wfn] = scf_solver->run(agh, 0, 1);
+  auto [energy, wfn] = scf_solver->run(agh, 0, 1, "def2-svp");
   auto orbitals = wfn->get_orbitals();
   auto basis_set = orbitals->get_basis_set();
 
@@ -764,10 +744,9 @@ TEST_F(ScfTest, AgHBasisSetEcpJsonMapping) {
   auto agh = testing::create_agh_structure();
   auto scf_solver = ScfSolverFactory::create();
 
-  scf_solver->settings().set("basis_set", "def2-svp");
   scf_solver->settings().set("method", "hf");
 
-  auto [energy, wfn] = scf_solver->run(agh, 0, 1);
+  auto [energy, wfn] = scf_solver->run(agh, 0, 1, "def2-svp");
   auto orbitals = wfn->get_orbitals();
   auto basis_set = orbitals->get_basis_set();
 
@@ -875,10 +854,9 @@ TEST_F(ScfTest, AgHEcpShellIndices) {
   auto agh = testing::create_agh_structure();
   auto scf_solver = ScfSolverFactory::create();
 
-  scf_solver->settings().set("basis_set", "def2-svp");
   scf_solver->settings().set("method", "hf");
 
-  auto [energy, wfn] = scf_solver->run(agh, 0, 1);
+  auto [energy, wfn] = scf_solver->run(agh, 0, 1, "def2-svp");
   auto orbitals = wfn->get_orbitals();
   auto basis_set = orbitals->get_basis_set();
 
@@ -1021,7 +999,6 @@ TEST_F(ScfTest, H2ScanDIISNumericalStability) {
   };
 
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "sto-3g");
 
   std::vector<std::string> symbols = {"H", "H"};
   for (size_t i = 0; i < test_lengths.size(); ++i) {
@@ -1030,8 +1007,68 @@ TEST_F(ScfTest, H2ScanDIISNumericalStability) {
         Eigen::Vector3d(0.0, 0.0, test_lengths[i])};
 
     auto structure = std::make_shared<Structure>(coordinates, symbols);
-    auto [energy, wavefunction] = scf_solver->run(structure, 0, 1);
+    auto [energy, wavefunction] = scf_solver->run(structure, 0, 1, "sto-3g");
 
     EXPECT_NEAR(energy, expected_energies[i], testing::scf_energy_tolerance);
+  }
+}
+
+TEST_F(ScfTest, AtomInitGuessEnergyConvergence) {
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "hf");
+  std::vector<std::string> basis_names = {"def2-tzvp"};
+  std::vector<std::string> singlet_elements = {"He", "Be", "C",
+                                               "Fe", "Sr", "Pt"};
+  std::vector<std::string> multiplet_elements = {"N",  "Na", "Y",
+                                                 "In", "Au", "Rb"};
+
+  for (const auto& basis_name : basis_names) {
+    for (const auto& element : singlet_elements) {
+      // structure
+      std::vector<std::string> symbols = {element};
+      std::vector<Eigen::Vector3d> coordinates = {
+          Eigen::Vector3d(0.0, 0.0, 0.0)};
+      auto structure = std::make_shared<Structure>(coordinates, symbols);
+
+      // standard
+      auto basis = BasisSet::from_basis_name(basis_name, structure);
+      auto [energy, wavefunction] = scf_solver->run(structure, 0, 1, basis);
+
+      // custom
+      std::map<std::string, std::string> element_basis_map = {
+          {element, basis_name}};
+      auto basis_custom =
+          BasisSet::from_element_map(element_basis_map, structure);
+      auto [energy_cust, wavefunction_cust] =
+          scf_solver->run(structure, 0, 1, basis_custom);
+
+      EXPECT_NEAR(energy, energy_cust, testing::scf_energy_tolerance)
+          << "Failed for element: " << element << " with basis: " << basis_name;
+    }
+  }
+
+  for (const auto& basis_name : basis_names) {
+    for (const auto& element : multiplet_elements) {
+      // structure
+      std::vector<std::string> symbols = {element};
+      std::vector<Eigen::Vector3d> coordinates = {
+          Eigen::Vector3d(0.0, 0.0, 0.0)};
+      auto structure = std::make_shared<Structure>(coordinates, symbols);
+
+      // standard
+      auto basis = BasisSet::from_basis_name(basis_name, structure);
+      auto [energy, wavefunction] = scf_solver->run(structure, 0, 2, basis);
+
+      // custom
+      std::map<std::string, std::string> element_basis_map = {
+          {element, basis_name}};
+      auto basis_custom =
+          BasisSet::from_element_map(element_basis_map, structure);
+      auto [energy_cust, wavefunction_cust] =
+          scf_solver->run(structure, 0, 2, basis_custom);
+
+      EXPECT_NEAR(energy, energy_cust, testing::scf_energy_tolerance)
+          << "Failed for element: " << element << " with basis: " << basis_name;
+    }
   }
 }

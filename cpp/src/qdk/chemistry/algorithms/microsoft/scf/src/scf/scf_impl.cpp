@@ -47,25 +47,40 @@
 #endif
 
 namespace qdk::chemistry::scf {
+
 SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
-                 bool delay_eri) {
+                 std::shared_ptr<BasisSet> basis_set,
+                 std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri,
+                 bool skip_verify) {
   QDK_LOG_TRACE_ENTERING();
   auto& mol = *mol_ptr;
   ctx_.mol = mol_ptr.get();
   ctx_.cfg = &cfg;
-  ctx_.basis_set =
-      BasisSet::from_database_json(mol_ptr, cfg.basis, cfg.basis_mode,
-                                   !cfg.cartesian /*pure*/, true /*sort*/);
-  if (cfg.do_dfj) {
-    ctx_.aux_basis_set =
-        BasisSet::from_database_json(mol_ptr, cfg.aux_basis, cfg.basis_mode,
+  if (basis_set == nullptr) {
+    ctx_.basis_set =
+        BasisSet::from_database_json(mol_ptr, cfg.basis, cfg.basis_mode,
                                      !cfg.cartesian /*pure*/, true /*sort*/);
+  } else {
+    ctx_.basis_set = basis_set;
+  }
+  if (cfg.do_dfj) {
+    if (basis_set == nullptr) {
+      ctx_.aux_basis_set =
+          BasisSet::from_database_json(mol_ptr, cfg.aux_basis, cfg.basis_mode,
+                                       !cfg.cartesian /*pure*/, true /*sort*/);
+    } else {
+      ctx_.aux_basis_set = basis_set;
+    }
   }
   if (cfg.output_basis_mode == BasisMode::RAW) {
     // create an unnormalized raw basis for output only
-    ctx_.basis_set_raw =
-        BasisSet::from_database_json(mol_ptr, cfg.basis, BasisMode::RAW,
-                                     !cfg.cartesian /*pure*/, true /*sort*/);
+    if (raw_basis_set == nullptr) {
+      ctx_.basis_set_raw =
+          BasisSet::from_database_json(mol_ptr, cfg.basis, BasisMode::RAW,
+                                       !cfg.cartesian /*pure*/, true /*sort*/);
+    } else {
+      ctx_.basis_set_raw = raw_basis_set;
+    }
   }
   ctx_.result = {};
 
@@ -141,10 +156,13 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
     QDK_LOGGER().info("eri_method={}, exc_method={}", to_string(cfg.eri.method),
                       to_string(cfg.exc.method));
   }
-  VERIFY_INPUT(alpha >= 0 && beta >= 0 && beta == alpha - spin,
-               "Invalid spin number or charge");
-  VERIFY_INPUT(num_density_matrices_ == 2 || alpha == beta,
-               "Restricted requires n_alpha == n_beta");
+
+  if (!skip_verify) {
+    VERIFY_INPUT(alpha >= 0 && beta >= 0 && beta == alpha - spin,
+                 "Invalid spin number or charge");
+    VERIFY_INPUT(num_density_matrices_ == 2 || alpha == beta,
+                 "Restricted requires n_alpha == n_beta");
+  }
 
   // MAX_N = 46340. Stop the calculation early if the basis set is too large
   // A single MAX_NxMAX_N matrix will have ~2^31 double floating point numbers
@@ -219,6 +237,10 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
                                   num_atomic_orbitals_);
   }
 }
+
+SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
+                 bool delay_eri)
+    : SCFImpl(mol_ptr, cfg, nullptr, nullptr, delay_eri) {}
 
 SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
                  const RowMajorMatrix& dm, bool delay_eri)

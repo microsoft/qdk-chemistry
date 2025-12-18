@@ -28,7 +28,6 @@ class ValenceActiveParametersTest : public ::testing::Test {
  protected:
   void SetUp() override {
     auto scf_solver = ScfSolverFactory::create();
-    scf_solver->settings().set("basis_set", "STO-3G");
 
     std::vector<std::string> symbols = {"O", "H", "H"};
     Eigen::MatrixXd coords(3, 3);
@@ -37,7 +36,7 @@ class ValenceActiveParametersTest : public ::testing::Test {
         -0.757000, 0.586000, 0.000000;       // H2
     std::shared_ptr<Structure> water_structure =
         std::make_shared<Structure>(coords, symbols);
-    auto [water_e, water_wf] = scf_solver->run(water_structure, 0, 1);
+    auto [water_e, water_wf] = scf_solver->run(water_structure, 0, 1, "STO-3G");
     std::shared_ptr<Orbitals> water_orbitals = water_wf->get_orbitals();
     std::shared_ptr<BasisSet> basis_set = water_orbitals->get_basis_set();
 
@@ -61,7 +60,7 @@ class ValenceActiveParametersTest : public ::testing::Test {
     he_coords << 0.000000, 0.000000, 0.000000;  // He at origin
     std::shared_ptr<Structure> he_structure =
         std::make_shared<Structure>(he_coords, he_symbols);
-    auto [he_e, he_wf] = scf_solver->run(he_structure, 0, 1);
+    auto [he_e, he_wf] = scf_solver->run(he_structure, 0, 1, "STO-3G");
     he_wavefunction = he_wf;
 
     std::vector<std::string> symbols_oh = {"O", "H"};
@@ -71,7 +70,8 @@ class ValenceActiveParametersTest : public ::testing::Test {
     std::shared_ptr<Structure> oh_structure =
         std::make_shared<Structure>(coords_oh, symbols_oh);
 
-    auto [oh_e, oh_wf] = scf_solver->run(oh_structure, 0, 2);  // doublet
+    auto [oh_e, oh_wf] =
+        scf_solver->run(oh_structure, 0, 2, "STO-3G");  // doublet
     std::shared_ptr<Orbitals> base_orbitals_oh = oh_wf->get_orbitals();
     oh_wavefunction = oh_wf;
 
@@ -200,9 +200,8 @@ class OrbitalRotationTest : public ::testing::Test {
     // Use a real molecular system - Water
     auto water = testing::create_water_structure();
     auto scf_solver = ScfSolverFactory::create();
-    scf_solver->settings().set("basis_set", "STO-3G");
 
-    auto [water_e, water_wf] = scf_solver->run(water, 0, 1);
+    auto [water_e, water_wf] = scf_solver->run(water, 0, 1, "STO-3G");
 
     test_orbitals_restricted = water_wf->get_orbitals();
 

@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <stdexcept>
@@ -1445,4 +1446,364 @@ TEST_F(BasisSetTest, HDF5Comprehensive) {
   // Clean up the temporary directory
   std::error_code ec2;
   std::filesystem::remove_all(tmp_dir, ec2);
+}
+
+TEST_F(BasisSetTest, SameBasisSetCheck) {
+  // Compare energies from standard basis set string vs custom BasisSet object
+  const std::string basis_set = "sto-3g";
+  std::shared_ptr<Structure> structure = std::make_shared<Structure>(
+      std::vector<Eigen::Vector3d>{
+          {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}},
+      std::vector<std::string>{"H", "H", "O"});
+
+  // generate basis set from shells
+  std::string manual_name = std::string(BasisSet::custom_name);
+  std::vector<Shell> shells = {
+      // H atom 0
+      Shell(0, OrbitalType::S,
+            // exponents
+            std::vector<double>{0.3425250914E+01, 0.6239137298E+00,
+                                0.1688554040E+00},
+            // coefficients
+            std::vector<double>{0.1543289673E+00, 0.5353281423E+00,
+                                0.4446345422E+00}),
+      // H atom 1
+      Shell(1, OrbitalType::S,
+            // exponents
+            std::vector<double>{0.3425250914E+01, 0.6239137298E+00,
+                                0.1688554040E+00},
+            // coefficients
+            std::vector<double>{0.1543289673E+00, 0.5353281423E+00,
+                                0.4446345422E+00}),
+      // O atom 2
+      Shell(2, OrbitalType::S,
+            // exponents
+            std::vector<double>{0.1307093214E+03, 0.2380886605E+02,
+                                0.6443608313E+01},
+            // coefficients
+            std::vector<double>{0.1543289673E+00, 0.5353281423E+00,
+                                0.4446345422E+00}),
+      Shell(2, OrbitalType::S,
+            // exponents
+            std::vector<double>{0.5033151319E+01, 0.1169596125E+01,
+                                0.3803889600E+00},
+            // coefficients
+            std::vector<double>{-0.9996722919E-01, 0.3995128261E+00,
+                                0.7001154689E+00}),
+      Shell(2, OrbitalType::P,
+            // exponents
+            std::vector<double>{0.5033151319E+01, 0.1169596125E+01,
+                                0.3803889600E+00},
+            // coefficients
+            std::vector<double>{0.1559162750E+00, 0.6076837186E+00,
+                                0.3919573931E+00})};
+  std::shared_ptr<BasisSet> manual_basis =
+      std::make_shared<BasisSet>(manual_name, shells, structure);
+
+  // create custom basis set object
+  std::shared_ptr<BasisSet> basis =
+      BasisSet::from_basis_name(basis_set, structure);
+
+  // run hartree fock with both basis sets to ensure they are valid
+  auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
+  auto [e_scf_default, hf_det_default] =
+      scf_solver->run(structure, 0, 1, basis_set);
+  auto [e_scf_custom, hf_det_custom] = scf_solver->run(structure, 0, 1, basis);
+  auto [e_scf_manual, hf_det_manual] =
+      scf_solver->run(structure, 0, 1, manual_basis);
+
+  EXPECT_NEAR(e_scf_custom, e_scf_default, testing::scf_energy_tolerance);
+  EXPECT_NEAR(e_scf_manual, e_scf_default, testing::scf_energy_tolerance);
+  EXPECT_NEAR(e_scf_custom, e_scf_manual, testing::scf_energy_tolerance);
+}
+
+TEST_F(BasisSetTest, SameBasisSetCheckWithEcp) {
+  // Compare energies from standard basis set string vs custom BasisSet object
+  const std::string basis_set = "def2-tzvp";
+  std::shared_ptr<Structure> structure = std::make_shared<Structure>(
+      std::vector<Eigen::Vector3d>{
+          {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}},
+      std::vector<std::string>{"H", "H", "Te"});
+
+  // create custom basis set object
+  std::shared_ptr<BasisSet> basis =
+      BasisSet::from_basis_name(basis_set, structure);
+
+  // run hartree fock with both basis sets to ensure they are valid
+  auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
+  auto [e_scf_default, hf_det_default] =
+      scf_solver->run(structure, 0, 1, basis_set);
+  auto [e_scf_custom, hf_det_custom] = scf_solver->run(structure, 0, 1, basis);
+
+  EXPECT_NEAR(e_scf_custom, e_scf_default, testing::scf_energy_tolerance);
+}
+
+TEST_F(BasisSetTest, CustomBasisSetPerAtomCheck) {
+  // Compare energies from standard basis set string vs custom BasisSet object
+  std::string basis_set = "def2-SVP";
+  auto structure = testing::create_water_structure();
+
+  // create map of atoms with basis sets
+  std::map<size_t, std::string> custom_basis_map;
+  custom_basis_map[0] = basis_set;
+  custom_basis_map[1] = basis_set;
+  custom_basis_map[2] = basis_set;
+  std::shared_ptr<BasisSet> basis =
+      BasisSet::from_index_map(custom_basis_map, structure);
+
+  // run hartree fock with both basis sets to ensure they are valid
+  auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
+  auto [e_scf_default, hf_det_default] =
+      scf_solver->run(structure, 0, 1, basis_set);
+  auto [e_scf_custom, hf_det_custom] = scf_solver->run(structure, 0, 1, basis);
+
+  EXPECT_NEAR(e_scf_custom, e_scf_default, testing::scf_energy_tolerance);
+}
+
+TEST_F(BasisSetTest, CustomBasisSetAndEcpPerAtomCheck) {
+  // Compare energies from standard basis set string vs custom BasisSet object
+  std::string basis_set = "def2-SVP";
+  auto structure = testing::create_agh_structure();
+
+  // create map of atoms with basis sets
+  std::map<size_t, std::string> custom_basis_map;
+  custom_basis_map[0] = basis_set;
+  custom_basis_map[1] = basis_set;
+  std::shared_ptr<BasisSet> basis =
+      BasisSet::from_index_map(custom_basis_map, structure);
+
+  // run hartree fock with both basis sets to ensure they are valid
+  auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
+  auto [e_scf_custom, hf_det_custom] =
+      scf_solver->run(structure, 0, 1, basis_set);
+  auto [e_scf_default, hf_det_default] =
+      scf_solver->run(structure, 0, 1, basis);
+
+  EXPECT_NEAR(e_scf_custom, e_scf_default, testing::scf_energy_tolerance);
+}
+
+TEST_F(BasisSetTest, CustomBasisSetPerElementCheck) {
+  // Compare energies from standard basis set string vs custom BasisSet object
+  std::string basis_set = "def2-SVP";
+  auto structure = testing::create_water_structure();
+
+  // create map of atoms with basis sets
+  std::map<std::string, std::string> custom_basis_map;
+  custom_basis_map["H"] = basis_set;
+  custom_basis_map["O"] = basis_set;
+
+  std::shared_ptr<BasisSet> basis =
+      BasisSet::from_element_map(custom_basis_map, structure);
+
+  // run hartree fock with both basis sets to ensure they are valid
+  auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
+  auto [e_scf_custom, hf_det_custom] =
+      scf_solver->run(structure, 0, 1, basis_set);
+  auto [e_scf_default, hf_det_default] =
+      scf_solver->run(structure, 0, 1, basis);
+
+  EXPECT_NEAR(e_scf_custom, e_scf_default, testing::scf_energy_tolerance);
+}
+
+TEST_F(BasisSetTest, CustomMixedBasisSetCheck) {
+  // Compare energies from standard basis set string vs custom BasisSet object
+  std::string basis_set = "sto-3g";
+  auto structure = testing::create_water_structure();
+
+  // create map of elements with basis sets
+  std::map<std::string, std::string> custom_element_basis_map;
+  custom_element_basis_map["H"] = "cc-pvdz";
+  custom_element_basis_map["O"] = "sto-3g";
+
+  // create map of atoms with basis sets
+  std::map<size_t, std::string> custom_atom_basis_map;
+  custom_atom_basis_map[0] = "cc-pvtz";
+  custom_atom_basis_map[1] = "sto-3g";
+  custom_atom_basis_map[2] = "def2-SVP";
+
+  std::shared_ptr<BasisSet> element_basis =
+      BasisSet::from_element_map(custom_element_basis_map, structure);
+  std::shared_ptr<BasisSet> atom_basis =
+      BasisSet::from_index_map(custom_atom_basis_map, structure);
+
+  // run hartree fock with both basis sets to ensure they are valid
+  auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
+
+  auto [e_scf_default, hf_det_default] =
+      scf_solver->run(structure, 0, 1, basis_set);
+  auto [e_scf_element, hf_det_element] =
+      scf_solver->run(structure, 0, 1, element_basis);
+  auto [e_scf_atom, hf_det_atom] = scf_solver->run(structure, 0, 1, atom_basis);
+
+  // all three energies should be different
+  EXPECT_FALSE(std::abs(e_scf_element - e_scf_default) <
+               testing::scf_energy_tolerance);
+  EXPECT_FALSE(std::abs(e_scf_atom - e_scf_default) <
+               testing::scf_energy_tolerance);
+  EXPECT_FALSE(std::abs(e_scf_atom - e_scf_element) <
+               testing::scf_energy_tolerance);
+
+  // check number of orbitals in determinant
+  EXPECT_EQ(hf_det_default->get_orbitals()->get_num_molecular_orbitals(), 7);
+  EXPECT_EQ(hf_det_element->get_orbitals()->get_num_molecular_orbitals(), 15);
+  EXPECT_EQ(hf_det_atom->get_orbitals()->get_num_molecular_orbitals(), 36);
+}
+
+TEST_F(BasisSetTest, SupportedBasisSets) {
+  auto supported_basis_sets = BasisSet::get_supported_basis_set_names();
+  // Check that some known basis sets are in the supported list
+  EXPECT_NE(std::find(supported_basis_sets.begin(), supported_basis_sets.end(),
+                      "sto-3g"),
+            supported_basis_sets.end());
+  EXPECT_NE(std::find(supported_basis_sets.begin(), supported_basis_sets.end(),
+                      "cc-pvdz"),
+            supported_basis_sets.end());
+  EXPECT_NE(std::find(supported_basis_sets.begin(), supported_basis_sets.end(),
+                      "def2-tzvp"),
+            supported_basis_sets.end());
+}
+
+TEST_F(BasisSetTest, SupportedElementsForBasisSet) {
+  // Verify that supported elements for a given basis set are correct
+  std::string basis_name = "aug-ano-pv5z";
+  std::vector<Element> expected_elements = {Element::H,  Element::He,
+                                            Element::Li, Element::Be,
+                                            Element::Na, Element::Mg};
+
+  auto supported_elements =
+      BasisSet::get_supported_elements_for_basis_set(basis_name);
+
+  EXPECT_EQ(expected_elements, supported_elements);
+}
+
+// Edge case tests for from_basis_name
+TEST_F(BasisSetTest, FromBasisNameNullptrStructure) {
+  std::shared_ptr<Structure> null_structure = nullptr;
+  EXPECT_THROW(BasisSet::from_basis_name("sto-3g", null_structure),
+               std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromBasisNameInvalidBasisSet) {
+  auto structure = testing::create_water_structure();
+  EXPECT_THROW(BasisSet::from_basis_name("invalid-basis-set-name", structure),
+               std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromBasisNameEmptyBasisSet) {
+  auto structure = testing::create_water_structure();
+  EXPECT_THROW(BasisSet::from_basis_name("", structure), std::invalid_argument);
+}
+
+// Edge case tests for from_element_map
+TEST_F(BasisSetTest, FromElementMapNullptrStructure) {
+  std::map<std::string, std::string> element_map;
+  element_map["H"] = "sto-3g";
+  element_map["O"] = "sto-3g";
+  std::shared_ptr<Structure> null_structure = nullptr;
+  EXPECT_THROW(BasisSet::from_element_map(element_map, null_structure),
+               std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromElementMapMissingElement) {
+  auto structure = testing::create_water_structure();
+  std::map<std::string, std::string> element_map;
+  // Only specify H, missing O
+  element_map["H"] = "sto-3g";
+  EXPECT_THROW(BasisSet::from_element_map(element_map, structure),
+               std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromElementMapEmpty) {
+  auto structure = testing::create_water_structure();
+  std::map<std::string, std::string> empty_map;
+  EXPECT_THROW(BasisSet::from_element_map(empty_map, structure),
+               std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromElementMapInvalidBasisSet) {
+  auto structure = testing::create_water_structure();
+  std::map<std::string, std::string> element_map;
+  element_map["H"] = "invalid-basis-set";
+  element_map["O"] = "sto-3g";
+  EXPECT_THROW(BasisSet::from_element_map(element_map, structure),
+               std::invalid_argument);
+}
+
+// Edge case tests for from_index_map
+TEST_F(BasisSetTest, FromIndexMapNullptrStructure) {
+  std::map<size_t, std::string> index_map;
+  index_map[0] = "sto-3g";
+  index_map[1] = "sto-3g";
+  index_map[2] = "sto-3g";
+  std::shared_ptr<Structure> null_structure = nullptr;
+  EXPECT_THROW(BasisSet::from_index_map(index_map, null_structure),
+               std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromIndexMapMissingAtomIndex) {
+  auto structure = testing::create_water_structure();  // 3 atoms
+  std::map<size_t, std::string> index_map;
+  // Only specify atoms 0 and 1, missing atom 2
+  index_map[0] = "sto-3g";
+  index_map[1] = "sto-3g";
+  EXPECT_THROW(BasisSet::from_index_map(index_map, structure),
+               std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromIndexMapEmpty) {
+  auto structure = testing::create_water_structure();
+  std::map<size_t, std::string> empty_map;
+  EXPECT_THROW(BasisSet::from_index_map(empty_map, structure),
+               std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromIndexMapInvalidBasisSet) {
+  auto structure = testing::create_water_structure();
+  std::map<size_t, std::string> index_map;
+  index_map[0] = "invalid-basis-set";
+  index_map[1] = "sto-3g";
+  index_map[2] = "sto-3g";
+  EXPECT_THROW(BasisSet::from_index_map(index_map, structure),
+               std::invalid_argument);
+}
+
+// Test basis set name normalization for filesystem safety
+TEST_F(BasisSetTest, BasisSetNameNormalization) {
+  // These functions are in the detail namespace and need to be declared
+  // or we need to make them accessible for testing
+  namespace detail = qdk::chemistry::data::detail;
+
+  // Test normalization of special characters
+  EXPECT_EQ("6-31g_st_", detail::normalize_basis_set_name("6-31g*"));
+  EXPECT_EQ("6-31g_st__pl_", detail::normalize_basis_set_name("6-31g*+"));
+  EXPECT_EQ("6-31g_st__pl__pl_", detail::normalize_basis_set_name("6-31g*++"));
+  EXPECT_EQ("cc-pVTZ_sl_DK", detail::normalize_basis_set_name("cc-pVTZ/DK"));
+  EXPECT_EQ("def2-TZVP_pl_", detail::normalize_basis_set_name("def2-TZVP+"));
+
+  // Test denormalization reverses normalization
+  EXPECT_EQ("6-31g*", detail::denormalize_basis_set_name("6-31g_st_"));
+  EXPECT_EQ("6-31g*+", detail::denormalize_basis_set_name("6-31g_st__pl_"));
+  EXPECT_EQ("6-31g*++",
+            detail::denormalize_basis_set_name("6-31g_st__pl__pl_"));
+  EXPECT_EQ("cc-pVTZ/DK", detail::denormalize_basis_set_name("cc-pVTZ_sl_DK"));
+  EXPECT_EQ("def2-TZVP+", detail::denormalize_basis_set_name("def2-TZVP_pl_"));
+
+  // Test round-trip conversion
+  std::vector<std::string> test_names = {
+      "6-31g*",    "6-31g**",    "6-31g*+",    "6-31g*++",
+      "6-311+g*",  "6-311++g**", "cc-pVTZ/DK", "aug-cc-pVTZ/DK",
+      "def2-TZVP", "def2-TZVP+", "def2-TZVPP"};
+
+  for (const auto& name : test_names) {
+    std::string normalized = detail::normalize_basis_set_name(name);
+    std::string denormalized = detail::denormalize_basis_set_name(normalized);
+    EXPECT_EQ(name, denormalized)
+        << "Round-trip failed for basis set name: " << name;
+  }
+
+  // Test that normal names without special characters pass through unchanged
+  EXPECT_EQ("sto-3g", detail::normalize_basis_set_name("sto-3g"));
+  EXPECT_EQ("sto-3g", detail::denormalize_basis_set_name("sto-3g"));
+  EXPECT_EQ("def2-TZVP", detail::normalize_basis_set_name("def2-TZVP"));
+  EXPECT_EQ("def2-TZVP", detail::denormalize_basis_set_name("def2-TZVP"));
 }

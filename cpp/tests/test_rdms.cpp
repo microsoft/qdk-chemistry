@@ -760,8 +760,7 @@ class WavefunctionRealRDMsTest : public ::testing::Test {
 TEST_F(WavefunctionRealRDMsTest, N2_Singlet) {
   auto n2 = testing::create_stretched_n2_structure();
   auto scf = ScfSolverFactory::create();
-  scf->settings().set("basis_set", "sto-3g");
-  auto [scf_energy, scf_wfn] = scf->run(n2, 0, 1);
+  auto [scf_energy, scf_wfn] = scf->run(n2, 0, 1, "sto-3g");
 
   auto cas_selector = ActiveSpaceSelectorFactory::create("qdk_valence");
   cas_selector->settings().set("num_active_electrons", 6);

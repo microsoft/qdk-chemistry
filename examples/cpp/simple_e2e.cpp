@@ -102,14 +102,12 @@ int main(int argc, char** argv) {
   // Configure the SCF solver
   // Different solvers support different settings - check documentation
   // or use ScfSolverFactory::available() to list available implementations
-  {
-    auto& settings = scf_solver->settings();
-    settings.set("basis_set", basis_set);
-
-    // Optional: You can configure additional settings here
-    // settings.set("convergence_threshold", 1e-8);
-    // settings.set("max_iterations", 100);
-  }
+  // {
+  //   Optional: You can configure additional settings here
+  //   auto& settings = scf_solver->settings();
+  //   settings.set("convergence_threshold", 1e-8);
+  //   settings.set("max_iterations", 100);
+  // }
 
   // Define the molecular system's charge and spin
   // - Charge: net electronic charge (0 = neutral)
@@ -121,7 +119,8 @@ int main(int argc, char** argv) {
   // Run the SCF optimization
   // Returns the HF energy and wavefunction (single Slater determinant)
   std::cout << "Running SCF optimization...\n";
-  auto [E_hf, wfn_hf] = scf_solver->run(structure, charge, spin_multiplicity);
+  auto [E_hf, wfn_hf] =
+      scf_solver->run(structure, charge, spin_multiplicity, basis_set);
 
   // Display SCF results
   std::cout << "\nSCF Results:\n";

@@ -15,8 +15,9 @@ structure = data.Structure(coords, ["O", "H", "H"])
 
 # First, run SCF to get molecular orbitals
 scf_solver = algorithms.create("scf_solver")
-scf_solver.settings().set("basis_set", "6-31g")
-scf_energy, scf_wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+scf_energy, scf_wavefunction = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="6-31g"
+)
 
 # Create an active space selector using the default implementation
 active_space_selector = algorithms.create("active_space_selector")

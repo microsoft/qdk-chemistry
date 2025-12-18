@@ -89,8 +89,7 @@ TEST_F(LocalizationTest, WaterPipekMezey) {
   // Get a canonical set of water orbitals
   auto water = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "def2-svp");
-  auto [E, wfn] = scf_solver->run(water, 0, 1);
+  auto [E, wfn] = scf_solver->run(water, 0, 1, "def2-svp");
   auto orbitals = wfn->get_orbitals();
   const auto& S = orbitals->get_overlap_matrix();
   const auto& [Ca_can, Cb_can] = orbitals->get_coefficients();
@@ -165,8 +164,7 @@ TEST_F(LocalizationTest, O2TripletPipekMezey) {
   // Get a canonical set of o2 orbitals
   auto o2 = testing::create_o2_structure();
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "def2-svp");
-  auto [E, wfn] = scf_solver->run(o2, 0, 3);
+  auto [E, wfn] = scf_solver->run(o2, 0, 3, "def2-svp");
   auto orbitals = wfn->get_orbitals();
   const auto& [Ca_can, Cb_can] = orbitals->get_coefficients();
   const auto& S = orbitals->get_overlap_matrix();
@@ -344,8 +342,7 @@ TEST_F(LocalizationTest, MP2) {
   // Get a canonical set of water orbitals
   auto water = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "sto-3g");
-  auto [E, wfn] = scf_solver->run(water, 0, 1);
+  auto [E, wfn] = scf_solver->run(water, 0, 1, "sto-3g");
   auto orbitals = wfn->get_orbitals();
 
   // // Use the orbitals directly for MP2 calculation
@@ -606,8 +603,7 @@ TEST_F(LocalizationTest, WaterVVHV) {
   auto water = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("method", "hf");
-  scf_solver->settings().set("basis_set", "def2-svp");
-  auto [E, wfn] = scf_solver->run(water, 0, 1);
+  auto [E, wfn] = scf_solver->run(water, 0, 1, "def2-svp");
   auto orbitals = wfn->get_orbitals();
   const auto& [Ca_can, Cb_can] = orbitals->get_coefficients();
 
@@ -650,8 +646,7 @@ TEST_F(LocalizationTest, O2TripletVVHV) {
   // Get a canonical set of o2 orbitals
   auto o2 = testing::create_o2_structure();
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "def2-svp");
-  auto [E, wfn] = scf_solver->run(o2, 0, 3);
+  auto [E, wfn] = scf_solver->run(o2, 0, 3, "def2-svp");
   auto orbitals = wfn->get_orbitals();
   const auto& [Ca_can, Cb_can] = orbitals->get_coefficients();
 

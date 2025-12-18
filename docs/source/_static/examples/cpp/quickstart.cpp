@@ -97,9 +97,7 @@ int main() {
   // start-cell-scf
   // Perform an SCF calculation
   auto scf_solver = algorithms::ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "cc-pvdz");
-
-  auto [E_hf, wfn_hf] = scf_solver->run(structure, 0, 1);
+  auto [E_hf, wfn_hf] = scf_solver->run(structure, 0, 1, "cc-pvdz");
   std::cout << "SCF energy is " << E_hf << " Hartree" << std::endl;
 
   // Display a summary of the molecular orbitals

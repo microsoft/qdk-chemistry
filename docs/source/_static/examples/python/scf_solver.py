@@ -21,8 +21,6 @@ scf_solver = create("scf_solver")
 # Configure the SCF solver using the settings interface
 # Note that the following line is optional, since hf is the default method
 scf_solver.settings().set("method", "hf")
-# Set the basis set
-scf_solver.settings().set("basis_set", "def2-tzvpp")
 
 # end-cell-configure
 ################################################################################
@@ -35,7 +33,9 @@ symbols = ["H", "H"]
 structure = Structure(coords, symbols=symbols)
 
 # Run scf
-E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+E_scf, wfn = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="def2-tzvpp"
+)
 scf_orbitals = wfn.get_orbitals()
 
 print(f"SCF Energy: {E_scf:.10f} Hartree")

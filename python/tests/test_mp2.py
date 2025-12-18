@@ -38,10 +38,9 @@ class TestMP2Validation:
 
         # QDK Chemistry HF calculation
         qdk_scf_solver = create("scf_solver")
-        qdk_scf_solver.settings().set("basis_set", "cc-pvdz")
         qdk_scf_solver.settings().set("method", "hf")
 
-        _, hf_wavefunction = qdk_scf_solver.run(o2_molecule, 0, 1)
+        _, hf_wavefunction = qdk_scf_solver.run(o2_molecule, 0, 1, "cc-pvdz")
         qdk_orbitals = hf_wavefunction.get_orbitals()
 
         # Create Hamiltonian for energy evaluation
@@ -71,10 +70,9 @@ class TestMP2Validation:
 
         # QDK Chemistry UHF calculation
         qdk_scf_solver = create("scf_solver")
-        qdk_scf_solver.settings().set("basis_set", "cc-pvdz")
         qdk_scf_solver.settings().set("method", "hf")
 
-        _, hf_wavefunction = qdk_scf_solver.run(o2_molecule, 0, 3)
+        _, hf_wavefunction = qdk_scf_solver.run(o2_molecule, 0, 3, "cc-pvdz")
         qdk_orbitals = hf_wavefunction.get_orbitals()
 
         # Create Hamiltonian for energy evaluation
