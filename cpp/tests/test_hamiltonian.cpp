@@ -1603,3 +1603,59 @@ TEST_F(HamiltonianTest, IsValidComprehensive) {
                    non_square, two_body, orbitals, core_energy, inactive_fock)),
                std::invalid_argument);
 }
+
+// Dummy container type for testing get_container bad_cast
+class DummyHamiltonianContainer : public HamiltonianContainer {
+ public:
+  DummyHamiltonianContainer(const Eigen::MatrixXd& one_body,
+                            std::shared_ptr<Orbitals> orbitals,
+                            double core_energy,
+                            const Eigen::MatrixXd& inactive_fock)
+      : HamiltonianContainer(one_body, orbitals, core_energy, inactive_fock) {}
+
+  std::unique_ptr<HamiltonianContainer> clone() const override {
+    return std::make_unique<DummyHamiltonianContainer>(*this);
+  }
+
+  std::string get_container_type() const override { return "dummy"; }
+
+  std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
+             const Eigen::VectorXd&>
+  get_two_body_integrals() const override {
+    static Eigen::VectorXd empty;
+    return {empty, empty, empty};
+  }
+
+  double get_two_body_element(unsigned, unsigned, unsigned, unsigned,
+                              SpinChannel) const override {
+    return 0.0;
+  }
+
+  bool has_two_body_integrals() const override { return false; }
+  bool is_restricted() const override { return true; }
+  nlohmann::json to_json() const override { return {}; }
+  void to_hdf5(H5::Group&) const override {}
+  void to_fcidump_file(const std::string&, size_t, size_t) const override {}
+  bool is_valid() const override { return true; }
+};
+
+TEST_F(HamiltonianTest, GetContainerTypedAccess) {
+  // Create a Hamiltonian with Canonical4CenterHamiltonian container
+  Hamiltonian h(std::make_unique<Canonical4CenterHamiltonian>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
+
+  // Test successful typed container access
+  EXPECT_NO_THROW({
+    const auto& container = h.get_container<Canonical4CenterHamiltonian>();
+    EXPECT_EQ(container.get_container_type(), "canonical_4_center");
+  });
+
+  // Verify has_container_type returns true for correct type
+  EXPECT_TRUE(h.has_container_type<Canonical4CenterHamiltonian>());
+
+  // Verify has_container_type returns false for incorrect type
+  EXPECT_FALSE(h.has_container_type<DummyHamiltonianContainer>());
+
+  // Test that accessing with incorrect container type throws std::bad_cast
+  EXPECT_THROW(h.get_container<DummyHamiltonianContainer>(), std::bad_cast);
+}

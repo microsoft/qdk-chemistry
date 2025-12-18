@@ -350,7 +350,7 @@ class Hamiltonian : public DataClass,
   /**
    * @brief Destructor
    */
-  virtual ~Hamiltonian() = default;
+  ~Hamiltonian() = default;
 
   /**
    * @brief Get tuple of alpha, beta one-electron integrals in MO basis
@@ -452,7 +452,7 @@ class Hamiltonian : public DataClass,
    * @return String identifying the container type (e.g., "canonical_4_center",
    * "density_fitted")
    */
-  virtual std::string get_container_type() const;
+  std::string get_container_type() const;
 
   /**
    * @brief Get typed reference to the underlying container
