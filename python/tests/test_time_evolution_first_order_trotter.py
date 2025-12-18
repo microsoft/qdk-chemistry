@@ -86,7 +86,7 @@ class TestFirstOrderTrotterConstructor:
     def test_name(self):
         """Test the name method of FirstOrderTrotterConstructor."""
         ctor = FirstOrderTrotterConstructor()
-        assert ctor.name() == "first_order_trotterization"
+        assert ctor.name() == "first_order_trotter"
 
     def test_single_step_construction(self):
         """Test construction of time evolution unitary with a single Trotter step."""
