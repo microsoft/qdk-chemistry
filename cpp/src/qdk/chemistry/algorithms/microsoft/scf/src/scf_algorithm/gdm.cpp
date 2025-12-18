@@ -265,7 +265,7 @@ Eigen::VectorXd GDMLineFunctor::grad(const Eigen::VectorXd& x) {
 
     // Extract occupied-virtual block and compute gradient
     // The -4.0 before F_{ia} comes from derivative of energy w.r.t. kappa
-    // Reference: Helgaker, T., Jorgensen, P., & Olsen, J. (2013). Molecular
+    // Reference: Helgaker, T., Jørgensen, P., & Olsen, J. (2013). Molecular
     // electronic-structure theory, Eq. 10.8.34
     // -4.0 is for restricted closed-shell system. For unrestricted systems, the
     // gradient is computed separately for each spin component, in that case the
@@ -629,7 +629,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
 
     // Extract occupied-virtual block and compute gradient
     // The -4.0 before F_{ia} comes from derivative of energy w.r.t. kappa
-    // Reference: Helgaker, T., Jorgensen, P., & Olsen, J. (2013). Molecular
+    // Reference: Helgaker, T., Jørgensen, P., & Olsen, J. (2013). Molecular
     // electronic-structure theory, Eq. 10.8.34
     // -4.0 is for restricted closed-shell system. For unrestricted systems, the
     // gradient is computed separately for each spin component, in that case the
@@ -816,7 +816,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
         kappa_dot_grad);
   }
 
-  // Save pseudo-canonical C for restoration in the energy validation loop
+  // Save pseudo-canonical C for trials in the line search
   // NOTE: The call to C.eval() creates a full copy of the coefficient matrix.
   // This is necessary because the line search functor may modify the matrix
   // during energy evaluations, and we need to restore the original
@@ -835,14 +835,14 @@ void GDM::iterate(SCFImpl& scf_impl) {
   double step = 1.0;           // Initial step size
 
   // Compute initial energy and gradient for line search
-  double fx0 = line_functor.eval(x0);
-  Eigen::VectorXd gfx0 = line_functor.grad(x0);
+  double fx0 = last_accepted_energy_;
+  Eigen::VectorXd gfx0 = current_gradient_;
 
   // Initialize variables for line search.
   // NOTE: fx_new and gfx_new are output parameters of the line search
   // routine that must be pre-initialized with the function value and
   // gradient at x0 to satisfy the routine's interface and avoid undefined
-  // behavior. They do not have additional semantic "input" meaning.
+  // behavior.
   Eigen::VectorXd x_new(kappa_.size());
   double fx_new = fx0;             // Initial function value at x0
   Eigen::VectorXd gfx_new = gfx0;  // Initial gradient at x0
