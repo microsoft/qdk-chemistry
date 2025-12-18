@@ -206,7 +206,6 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
         # Step 6: Apply recorded operations in reverse order to expand back to full space.
         # Note: GF2+X can have both CNOT and X operations
-        qc.barrier()  # Add barrier before applying operations in reverse order
         for operation in reversed(gf2x_operation_results.operations):
             if operation[0] == "cnot":
                 # operation[1] should be a tuple for CNOT operations

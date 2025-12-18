@@ -123,8 +123,9 @@ class IterativePhaseEstimation(PhaseEstimation):
         classical = measurement_register or ClassicalRegister(1, f"c{iteration}")
         circuit = QuantumCircuit(ancilla, system, classical, name=iteration_name)
 
-        circuit.compose(state_prep, qubits=system, inplace=True)
-        circuit.barrier(label="state_prep")
+        state_prep.name = "state_prep"
+
+        circuit.compose(state_prep.to_gate(), qubits=system, inplace=True)
 
         control = ancilla[0]
         system_qubits = list(system)
