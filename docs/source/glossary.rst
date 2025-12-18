@@ -13,6 +13,9 @@ Acronym definitions
    CAS
       Complete Active Space.
 
+   CASSCF
+      Complete Active Space Self-Consistent Field.
+
    CCSD
       Coupled Cluster with Single and Double excitations.
 
