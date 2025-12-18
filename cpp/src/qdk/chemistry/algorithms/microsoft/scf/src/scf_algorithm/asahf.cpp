@@ -168,55 +168,52 @@ bool BasisEqChecker::operator()(const BasisSet& a,
   return true;
 }
 
+/**
+ * @brief Combine the hash of a value into an existing hash seed
+ * @tparam T Type of the value to hash
+ * @param seed Existing hash seed
+ * @param v Value to hash and combine
+ * @return Combined hash value
+ */
+template <typename T>
+size_t hash_combine(size_t seed, const T& v) {
+  using value_type = std::decay_t<T>;
+  seed ^= std::hash<value_type>()(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+  return seed;
+}
+
 size_t BasisHasher::operator()(const BasisSet& basis) const noexcept {
   size_t hash = 0;
   // mol only has one atom, hash atomic number
-  hash ^= std::hash<int>()(basis.mol->atomic_nums[0]) + 0x9e3779b9 +
-          (hash << 6) + (hash >> 2);
+  hash = hash_combine(hash, basis.mol->atomic_nums[0]);
 
   // hash basis set
-  hash ^= std::hash<int>()(basis.n_ecp_electrons) + 0x9e3779b9 + (hash << 6) +
-          (hash >> 2);
-  hash ^=
-      std::hash<bool>()(basis.pure) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-  hash ^= std::hash<size_t>()(basis.num_atomic_orbitals) + 0x9e3779b9 +
-          (hash << 6) + (hash >> 2);
-  hash ^= std::hash<size_t>()(basis.shells.size()) + 0x9e3779b9 + (hash << 6) +
-          (hash >> 2);
-  hash ^= std::hash<size_t>()(basis.ecp_shells.size()) + 0x9e3779b9 +
-          (hash << 6) + (hash >> 2);
-  hash ^= std::hash<size_t>()(basis.element_ecp_electrons.size()) + 0x9e3779b9 +
-          (hash << 6) + (hash >> 2);
+  hash = hash_combine(hash, basis.n_ecp_electrons);
+  hash = hash_combine(hash, basis.pure);
+  hash = hash_combine(hash, basis.num_atomic_orbitals);
+  hash = hash_combine(hash, basis.shells.size());
+  hash = hash_combine(hash, basis.ecp_shells.size());
+  hash = hash_combine(hash, basis.element_ecp_electrons.size());
 
   // hash shells
   for (const auto& shell : basis.shells) {
-    hash ^= std::hash<uint64_t>()(shell.angular_momentum) + 0x9e3779b9 +
-            (hash << 6) + (hash >> 2);
-    hash ^= std::hash<uint64_t>()(shell.contraction) + 0x9e3779b9 +
-            (hash << 6) + (hash >> 2);
+    hash = hash_combine(hash, shell.angular_momentum);
+    hash = hash_combine(hash, shell.contraction);
     for (size_t j = 0; j < shell.contraction; ++j) {
-      hash ^= std::hash<double>()(shell.exponents[j]) + 0x9e3779b9 +
-              (hash << 6) + (hash >> 2);
-      hash ^= std::hash<double>()(shell.coefficients[j]) + 0x9e3779b9 +
-              (hash << 6) + (hash >> 2);
-      hash ^= std::hash<int>()(shell.rpowers[j]) + 0x9e3779b9 + (hash << 6) +
-              (hash >> 2);
+      hash = hash_combine(hash, shell.exponents[j]);
+      hash = hash_combine(hash, shell.coefficients[j]);
+      hash = hash_combine(hash, shell.rpowers[j]);
     }
   }
 
   // hash ecp shells
   for (const auto& shell : basis.ecp_shells) {
-    hash ^= std::hash<uint64_t>()(shell.angular_momentum) + 0x9e3779b9 +
-            (hash << 6) + (hash >> 2);
-    hash ^= std::hash<uint64_t>()(shell.contraction) + 0x9e3779b9 +
-            (hash << 6) + (hash >> 2);
+    hash = hash_combine(hash, shell.angular_momentum);
+    hash = hash_combine(hash, shell.contraction);
     for (size_t j = 0; j < shell.contraction; ++j) {
-      hash ^= std::hash<double>()(shell.exponents[j]) + 0x9e3779b9 +
-              (hash << 6) + (hash >> 2);
-      hash ^= std::hash<double>()(shell.coefficients[j]) + 0x9e3779b9 +
-              (hash << 6) + (hash >> 2);
-      hash ^= std::hash<int>()(shell.rpowers[j]) + 0x9e3779b9 + (hash << 6) +
-              (hash >> 2);
+      hash = hash_combine(hash, shell.exponents[j]);
+      hash = hash_combine(hash, shell.coefficients[j]);
+      hash = hash_combine(hash, shell.rpowers[j]);
     }
   }
 
