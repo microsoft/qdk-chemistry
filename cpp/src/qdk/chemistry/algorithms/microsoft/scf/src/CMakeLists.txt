@@ -11,6 +11,7 @@ target_link_libraries(chemistry
 target_include_directories(chemistry PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../include>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/../external/macis/src>
   $<INSTALL_INTERFACE:include>
 )
 

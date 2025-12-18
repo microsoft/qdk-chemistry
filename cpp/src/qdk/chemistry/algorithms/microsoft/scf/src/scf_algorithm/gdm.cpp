@@ -14,8 +14,8 @@
 #include <qdk/chemistry/utils/logger.hpp>
 #include <vector>
 
-#include "../../../../../../../../../external/macis/src/macis/bfgs/line_search.hpp"
 #include "../scf/scf_impl.h"
+#include "macis/bfgs/line_search.hpp"
 #include "qdk/chemistry/scf/core/scf.h"
 #include "qdk/chemistry/scf/core/types.h"
 #include "util/matrix_exp.h"
@@ -264,9 +264,12 @@ Eigen::VectorXd GDMLineFunctor::grad(const Eigen::VectorXd& x) {
                         num_molecular_orbitals_);
 
     // Extract occupied-virtual block and compute gradient
-    // The coefficient -4.0 comes from derivative of energy w.r.t. kappa
+    // The -4.0 before F_{ia} comes from derivative of energy w.r.t. kappa
     // Reference: Helgaker, T., Jorgensen, P., & Olsen, J. (2013). Molecular
     // electronic-structure theory, Eq. 10.8.34
+    // -4.0 is for restricted closed-shell system. For unrestricted systems, the
+    // gradient is computed separately for each spin component, in that case the
+    // coefficient before F_{ia, spin} is -2.0
     RowMajorMatrix gradient_matrix =
         -(4.0 / num_density_matrices_) * F_MO.block(0, num_occupied_orbitals,
                                                     num_occupied_orbitals,
@@ -582,7 +585,7 @@ void GDM::generate_pseudo_canonical_orbital_(
       Uoo_.transpose() * current_gradient_matrix * Uvv_;
   Eigen::VectorXd current_gradient_transformed = Eigen::Map<Eigen::VectorXd>(
       current_gradient_transformed_matrix.data(), rotation_size);
-  current_gradient_spin = current_gradient_transformed;  // rotate
+  current_gradient_spin = current_gradient_transformed;
 }
 
 void GDM::accept_line_search_step_(SCFImpl& scf_impl,
@@ -624,9 +627,13 @@ void GDM::iterate(SCFImpl& scf_impl) {
         C.block(num_molecular_orbitals * i, 0, num_molecular_orbitals,
                 num_molecular_orbitals);
 
-    // The coefficient -4.0 comes from derivative of energy w.r.t. kappa
+    // Extract occupied-virtual block and compute gradient
+    // The -4.0 before F_{ia} comes from derivative of energy w.r.t. kappa
     // Reference: Helgaker, T., Jorgensen, P., & Olsen, J. (2013). Molecular
     // electronic-structure theory, Eq. 10.8.34
+    // -4.0 is for restricted closed-shell system. For unrestricted systems, the
+    // gradient is computed separately for each spin component, in that case the
+    // coefficient before F_{ia, spin} is -2.0
     RowMajorMatrix current_gradient_matrix =
         -(4.0 / num_density_matrices) * F_MO.block(0, num_occupied_orbitals,
                                                    num_occupied_orbitals,
