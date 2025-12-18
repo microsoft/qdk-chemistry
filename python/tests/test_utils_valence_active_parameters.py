@@ -14,8 +14,7 @@ from qdk_chemistry.utils import compute_valence_space_parameters
 
 def solve_wavefunction(structure, charge, multiplicity):
     scf_solver = create("scf_solver")
-    scf_solver.settings().set("basis_set", "STO-3G")
-    _, wavefunction = scf_solver.run(structure, charge, multiplicity)
+    _, wavefunction = scf_solver.run(structure, charge, multiplicity, "STO-3G")
     return wavefunction
 
 

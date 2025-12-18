@@ -55,6 +55,22 @@ class SCFImpl {
           const RowMajorMatrix& density_matrix, bool delay_eri = false);
 
   /**
+   * @brief Construct SCF implementation with initial density matrix
+   *
+   * @param mol Molecular structure
+   * @param cfg SCF configuration
+   * @param basis_set Basis set to use
+   * @param raw_basis_set Raw (unnormalized) basis set for output
+   * @param delay_eri If true, delay ERI initialization to derived constructor
+   * (default: false)
+   * @param skip_verify If true, skip input verification checks (default: false)
+   */
+  SCFImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
+          std::shared_ptr<BasisSet> basis_set,
+          std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri = false,
+          bool skip_verify = false);
+
+  /**
    * @brief Virtual destructor
    */
   virtual ~SCFImpl() {}
