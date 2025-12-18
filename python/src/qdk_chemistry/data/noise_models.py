@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 import json
-from enum import StrEnum
 from pathlib import Path
 from typing import Any, ClassVar, TypedDict
 
@@ -14,20 +13,9 @@ import h5py
 from ruamel.yaml import YAML
 
 from qdk_chemistry.data.base import DataClass
+from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 
-__all__: list[str] = ["CaseInsensitiveStrEnum", "GateErrorDef", "SupportedErrorTypes", "SupportedGate"]
-
-
-class CaseInsensitiveStrEnum(StrEnum):
-    """StrEnum that allows case-insensitive lookup of values."""
-
-    @classmethod
-    def _missing_(cls, value):  # make input case-insensitive
-        if isinstance(value, str):
-            for member in cls:
-                if member.value.upper() == value.upper():
-                    return member
-        raise ValueError(f"{value} is not a valid {cls.__name__}")
+__all__: list[str] = ["GateErrorDef", "SupportedErrorTypes", "SupportedGate"]
 
 
 class SupportedGate(CaseInsensitiveStrEnum):
