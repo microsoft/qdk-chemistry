@@ -2,7 +2,7 @@ Quickstart
 ==========
 
 These quickstart instructions provide a high-level overview of the typical workflow when using the QDK/Chemistry library.
-More comprehensive documentation can be found in the :doc:`comprehensive/index`.
+More comprehensive documentation can be found in the :doc:`comprehensive/index`. A list of features can be found in the :doc:`features` document.
 
 Installation
 ------------
