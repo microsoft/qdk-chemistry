@@ -204,7 +204,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   auto saved_level = Logger::get_global_level();
 
   // Disable SCF logging
-  Logger::set_global_level(LogLevel::off);
+  Logger::set_global_level(LogLevel::info);
 
   auto scf = (method == "hf")
                  ? qcs::SCF::make_hf_solver(ms_mol, *ms_scf_config)

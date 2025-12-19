@@ -333,18 +333,6 @@ class GDM {
       Eigen::Block<RowMajorMatrix> history_dgrad_spin,
       Eigen::VectorBlock<Eigen::VectorXd> current_gradient_spin);
 
-  /**
-   * @brief Accept line search step and update energy tracking
-   * @param[in,out] scf_impl Reference to SCFImpl to update with new orbitals
-   * and density
-   * @param[in] line_functor Line search functor containing cached C and P
-   * matrices
-   * @param[in] fx_new New energy from line search
-   */
-  void accept_line_search_step_(SCFImpl& scf_impl,
-                                const GDMLineFunctor& line_functor,
-                                double fx_new);
-
   /// Reference to SCFContext
   const SCFContext& ctx_;  ///< Reference to SCFContext
   /// Energy change from the last step
@@ -553,16 +541,6 @@ void GDM::generate_pseudo_canonical_orbital_(
   current_gradient_spin = current_gradient_transformed;
 }
 
-void GDM::accept_line_search_step_(SCFImpl& scf_impl,
-                                   const GDMLineFunctor& line_functor,
-                                   double fx_new) {
-  scf_impl.orbitals_matrix() = line_functor.get_cached_C();
-  scf_impl.density_matrix() = line_functor.get_cached_P();
-
-  delta_energy_ = fx_new - last_accepted_energy_;
-  last_accepted_energy_ = fx_new;
-}
-
 void GDM::iterate(SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
   // Extract matrices from scf_impl
@@ -709,11 +687,11 @@ void GDM::iterate(SCFImpl& scf_impl) {
     }
 
     // Log BFGS debug information (last 5 values only)
+#ifndef NDEBUG
     const int rho_size = static_cast<int>(inverse_rho_values.size());
     const int rho_start = std::max(0, rho_size - 5);
     const int rho_num_entries = rho_size - rho_start;
 
-#ifndef NDEBUG
     std::string rho_str;
     rho_str.reserve(20 + 15 * rho_num_entries + 10);
     rho_str = "inverse Rho values: ";
@@ -757,7 +735,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
     // Clear BFGS history
     history_size_ = 0;
 
-    // Recompute kappa using initial Hessian approximation (guaranteed descent)
+    // Recompute kappa using initial Hessian approximation
     for (int index = 0; index < total_rotation_size_; index++) {
       kappa_(index) = -current_gradient_(index) / initial_hessian(index);
     }
@@ -784,16 +762,13 @@ void GDM::iterate(SCFImpl& scf_impl) {
                               num_density_matrices, num_molecular_orbitals,
                               cfg->unrestricted);
 
-  // Perform line search using Nocedal-Wright algorithm
   Eigen::VectorXd x0 = Eigen::VectorXd::Zero(kappa_.size());
   Eigen::VectorXd p = kappa_;  // Search direction
   double step = 1.0;           // Initial step size
 
-  // Compute initial energy and gradient for line search
+  // assign variables for line search
   double fx0 = last_accepted_energy_;
   Eigen::VectorXd gfx0 = current_gradient_;
-
-  // Initialize variables for line search
   Eigen::VectorXd x_new(kappa_.size());
   double fx_new = fx0;             // Initial function value at x0
   Eigen::VectorXd gfx_new = gfx0;  // Initial gradient at x0
@@ -802,11 +777,6 @@ void GDM::iterate(SCFImpl& scf_impl) {
     // Call Nocedal-Wright line search with strong Wolfe conditions
     bfgs::nocedal_wright_line_search(line_functor, x0, p, step, x_new, fx_new,
                                      gfx_new);
-
-    // Line search succeeded - update with optimal step
-    accept_line_search_step_(scf_impl, line_functor, fx_new);
-
-    QDK_LOGGER().debug("Line search converged.");
   } catch (const std::exception& e) {
     // BFGS line search failed - likely bad search direction
     QDK_LOGGER().warn(
@@ -820,14 +790,9 @@ void GDM::iterate(SCFImpl& scf_impl) {
     try {
       fx_new = fx0;
       gfx_new = gfx0;
-      // Attempt line search with guaranteed descent direction
+      // Attempt line search with gradient descent direction
       bfgs::nocedal_wright_line_search(line_functor, x0, p_steepest,
                                        step_steepest, x_new, fx_new, gfx_new);
-
-      // Steepest descent line search succeeded
-      accept_line_search_step_(scf_impl, line_functor, fx_new);
-
-      QDK_LOGGER().debug("Steepest descent line search converged.");
     } catch (const std::exception& e2) {
       // Fallback Level 2: Even steepest descent line search failed
       QDK_LOGGER().error(
@@ -838,22 +803,19 @@ void GDM::iterate(SCFImpl& scf_impl) {
       // Take very small step in steepest descent direction
       double small_grad_step_length = 1e-4;
       x_new = -small_grad_step_length * current_gradient_;
-      double small_grad_step_energy = line_functor.eval(x_new);
+      fx_new = line_functor.eval(x_new);
+      gfx_new = line_functor.grad(x_new);
 
-      if (small_grad_step_energy < last_accepted_energy_) {
-        // Accept small step
-        accept_line_search_step_(scf_impl, line_functor,
-                                 small_grad_step_energy);
-
+      if (fx_new < last_accepted_energy_) {
         QDK_LOGGER().warn(
             "Accepted small fixed step in steepest descent direction with "
             "energy {:.12e}.",
-            small_grad_step_energy);
+            gfx_new);
       } else {
         QDK_LOGGER().error(
             "Small fixed step in steepest descent direction did not lower "
             "energy (energy {:.12e}). SCF iteration aborted.",
-            small_grad_step_energy);
+            gfx_new);
         throw std::runtime_error(
             "GDM SCF iteration failed: unable to find acceptable step.");
       }
@@ -861,6 +823,11 @@ void GDM::iterate(SCFImpl& scf_impl) {
   }
 
   // Add optimal kappa to history and update previous gradient
+  scf_impl.orbitals_matrix() = line_functor.get_cached_C();
+  scf_impl.density_matrix() = line_functor.get_cached_P();
+
+  delta_energy_ = fx_new - last_accepted_energy_;
+  last_accepted_energy_ = fx_new;
   history_kappa_.row(history_size_) = x_new;
   previous_gradient_ = current_gradient_;
 
