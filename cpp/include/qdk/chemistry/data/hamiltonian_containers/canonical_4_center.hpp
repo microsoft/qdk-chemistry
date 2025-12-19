@@ -17,7 +17,7 @@
 namespace qdk::chemistry::data {
 
 /**
- * @class Canonical4CenterHamiltonian
+ * @class CanonicalFourCenterHamiltonian
  * @brief Represents a molecular Hamiltonian in the molecular orbital
  * basis
  *
@@ -37,7 +37,7 @@ namespace qdk::chemistry::data {
  * integrates with the broader quantum chemistry framework for active space
  * methods.
  */
-class Canonical4CenterHamiltonian : public HamiltonianContainer {
+class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
  public:
   /**
    * @brief Constructor for active space Hamiltonian with four center integrals
@@ -52,7 +52,7 @@ class Canonical4CenterHamiltonian : public HamiltonianContainer {
    * @param type Type of Hamiltonian (Hermitian by default)
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
-  Canonical4CenterHamiltonian(
+  CanonicalFourCenterHamiltonian(
       const Eigen::MatrixXd& one_body_integrals,
       const Eigen::VectorXd& two_body_integrals,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
@@ -80,7 +80,7 @@ class Canonical4CenterHamiltonian : public HamiltonianContainer {
    * @param type Type of Hamiltonian (Hermitian by default)
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
-  Canonical4CenterHamiltonian(
+  CanonicalFourCenterHamiltonian(
       const Eigen::MatrixXd& one_body_integrals_alpha,
       const Eigen::MatrixXd& one_body_integrals_beta,
       const Eigen::VectorXd& two_body_integrals_aaaa,
@@ -94,7 +94,7 @@ class Canonical4CenterHamiltonian : public HamiltonianContainer {
   /**
    * @brief Destructor
    */
-  ~Canonical4CenterHamiltonian() override = default;
+  ~CanonicalFourCenterHamiltonian() override = default;
 
   /**
    * @brief Create a deep copy of this container
@@ -165,7 +165,7 @@ class Canonical4CenterHamiltonian : public HamiltonianContainer {
    * @return Unique pointer to const Hamiltonian loaded from group
    * @throws std::runtime_error if I/O error occurs
    */
-  static std::unique_ptr<Canonical4CenterHamiltonian> from_hdf5(
+  static std::unique_ptr<CanonicalFourCenterHamiltonian> from_hdf5(
       H5::Group& group);
 
   /**
@@ -174,7 +174,7 @@ class Canonical4CenterHamiltonian : public HamiltonianContainer {
    * @return Shared pointer to const Hamiltonian loaded from JSON
    * @throws std::runtime_error if JSON is malformed
    */
-  static std::unique_ptr<Canonical4CenterHamiltonian> from_json(
+  static std::unique_ptr<CanonicalFourCenterHamiltonian> from_json(
       const nlohmann::json& j);
 
   /**

@@ -18,7 +18,7 @@
 
 namespace qdk::chemistry::data {
 
-Canonical4CenterHamiltonian::Canonical4CenterHamiltonian(
+CanonicalFourCenterHamiltonian::CanonicalFourCenterHamiltonian(
     const Eigen::MatrixXd& one_body_integrals,
     const Eigen::VectorXd& two_body_integrals,
     std::shared_ptr<Orbitals> orbitals, double core_energy,
@@ -39,7 +39,7 @@ Canonical4CenterHamiltonian::Canonical4CenterHamiltonian(
   }
 }
 
-Canonical4CenterHamiltonian::Canonical4CenterHamiltonian(
+CanonicalFourCenterHamiltonian::CanonicalFourCenterHamiltonian(
     const Eigen::MatrixXd& one_body_integrals_alpha,
     const Eigen::MatrixXd& one_body_integrals_beta,
     const Eigen::VectorXd& two_body_integrals_aaaa,
@@ -67,29 +67,29 @@ Canonical4CenterHamiltonian::Canonical4CenterHamiltonian(
   }
 }
 
-std::unique_ptr<HamiltonianContainer> Canonical4CenterHamiltonian::clone()
+std::unique_ptr<HamiltonianContainer> CanonicalFourCenterHamiltonian::clone()
     const {
   QDK_LOG_TRACE_ENTERING();
   if (is_restricted()) {
-    return std::make_unique<Canonical4CenterHamiltonian>(
+    return std::make_unique<CanonicalFourCenterHamiltonian>(
         *_one_body_integrals.first, *std::get<0>(_two_body_integrals),
         _orbitals, _core_energy, *_inactive_fock_matrix.first, _type);
   }
-  return std::make_unique<Canonical4CenterHamiltonian>(
+  return std::make_unique<CanonicalFourCenterHamiltonian>(
       *_one_body_integrals.first, *_one_body_integrals.second,
       *std::get<0>(_two_body_integrals), *std::get<1>(_two_body_integrals),
       *std::get<2>(_two_body_integrals), _orbitals, _core_energy,
       *_inactive_fock_matrix.first, *_inactive_fock_matrix.second, _type);
 }
 
-std::string Canonical4CenterHamiltonian::get_container_type() const {
+std::string CanonicalFourCenterHamiltonian::get_container_type() const {
   QDK_LOG_TRACE_ENTERING();
   return "canonical_4_center";
 }
 
 std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
            const Eigen::VectorXd&>
-Canonical4CenterHamiltonian::get_two_body_integrals() const {
+CanonicalFourCenterHamiltonian::get_two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_two_body_integrals()) {
     throw std::runtime_error("Two-body integrals are not set");
@@ -99,7 +99,7 @@ Canonical4CenterHamiltonian::get_two_body_integrals() const {
                          std::cref(*std::get<2>(_two_body_integrals)));
 }
 
-double Canonical4CenterHamiltonian::get_two_body_element(
+double CanonicalFourCenterHamiltonian::get_two_body_element(
     unsigned i, unsigned j, unsigned k, unsigned l, SpinChannel channel) const {
   QDK_LOG_TRACE_ENTERING();
 
@@ -127,21 +127,21 @@ double Canonical4CenterHamiltonian::get_two_body_element(
   }
 }
 
-size_t Canonical4CenterHamiltonian::get_two_body_index(size_t i, size_t j,
-                                                       size_t k,
-                                                       size_t l) const {
+size_t CanonicalFourCenterHamiltonian::get_two_body_index(size_t i, size_t j,
+                                                          size_t k,
+                                                          size_t l) const {
   QDK_LOG_TRACE_ENTERING();
   size_t norb = _orbitals->get_active_space_indices().first.size();
   return i * norb * norb * norb + j * norb * norb + k * norb + l;
 }
 
-bool Canonical4CenterHamiltonian::has_two_body_integrals() const {
+bool CanonicalFourCenterHamiltonian::has_two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   return std::get<0>(_two_body_integrals) != nullptr &&
          std::get<0>(_two_body_integrals)->size() > 0;
 }
 
-bool Canonical4CenterHamiltonian::is_restricted() const {
+bool CanonicalFourCenterHamiltonian::is_restricted() const {
   QDK_LOG_TRACE_ENTERING();
   // Hamiltonian is restricted if alpha and beta components point to the same
   // data
@@ -154,7 +154,7 @@ bool Canonical4CenterHamiltonian::is_restricted() const {
           (!_inactive_fock_matrix.first && !_inactive_fock_matrix.second));
 }
 
-bool Canonical4CenterHamiltonian::is_valid() const {
+bool CanonicalFourCenterHamiltonian::is_valid() const {
   QDK_LOG_TRACE_ENTERING();
   // Check if essential data is present
   if (!has_one_body_integrals() || !has_two_body_integrals()) {
@@ -171,7 +171,7 @@ bool Canonical4CenterHamiltonian::is_valid() const {
   return true;
 }
 
-void Canonical4CenterHamiltonian::validate_integral_dimensions() const {
+void CanonicalFourCenterHamiltonian::validate_integral_dimensions() const {
   QDK_LOG_TRACE_ENTERING();
   // Check alpha one-body integrals
   HamiltonianContainer::validate_integral_dimensions();
@@ -214,7 +214,7 @@ void Canonical4CenterHamiltonian::validate_integral_dimensions() const {
 
 std::tuple<std::shared_ptr<Eigen::VectorXd>, std::shared_ptr<Eigen::VectorXd>,
            std::shared_ptr<Eigen::VectorXd>>
-Canonical4CenterHamiltonian::make_restricted_two_body_integrals(
+CanonicalFourCenterHamiltonian::make_restricted_two_body_integrals(
     const Eigen::VectorXd& integrals) {
   QDK_LOG_TRACE_ENTERING();
   auto shared_integrals = std::make_shared<Eigen::VectorXd>(integrals);
@@ -223,14 +223,13 @@ Canonical4CenterHamiltonian::make_restricted_two_body_integrals(
       shared_integrals);  // aaaa, aabb, bbbb all point to same data
 }
 
-void Canonical4CenterHamiltonian::to_fcidump_file(const std::string& filename,
-                                                  size_t nalpha,
-                                                  size_t nbeta) const {
+void CanonicalFourCenterHamiltonian::to_fcidump_file(
+    const std::string& filename, size_t nalpha, size_t nbeta) const {
   QDK_LOG_TRACE_ENTERING();
   _to_fcidump_file(filename, nalpha, nbeta);
 }
 
-nlohmann::json Canonical4CenterHamiltonian::to_json() const {
+nlohmann::json CanonicalFourCenterHamiltonian::to_json() const {
   QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
 
@@ -356,8 +355,8 @@ nlohmann::json Canonical4CenterHamiltonian::to_json() const {
   return j;
 }
 
-std::unique_ptr<Canonical4CenterHamiltonian>
-Canonical4CenterHamiltonian::from_json(const nlohmann::json& j) {
+std::unique_ptr<CanonicalFourCenterHamiltonian>
+CanonicalFourCenterHamiltonian::from_json(const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version first
@@ -502,12 +501,12 @@ Canonical4CenterHamiltonian::from_json(const nlohmann::json& j) {
     if (is_restricted_data) {
       // Use restricted constructor - it will create shared pointers internally
       // so alpha and beta point to the same data
-      return std::make_unique<Canonical4CenterHamiltonian>(
+      return std::make_unique<CanonicalFourCenterHamiltonian>(
           one_body_alpha, two_body_aaaa, orbitals, core_energy,
           inactive_fock_alpha, type);
     } else {
       // Use unrestricted constructor with separate alpha and beta data
-      return std::make_unique<Canonical4CenterHamiltonian>(
+      return std::make_unique<CanonicalFourCenterHamiltonian>(
           one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
           two_body_bbbb, orbitals, core_energy, inactive_fock_alpha,
           inactive_fock_beta, type);
@@ -519,7 +518,7 @@ Canonical4CenterHamiltonian::from_json(const nlohmann::json& j) {
   }
 }
 
-void Canonical4CenterHamiltonian::to_hdf5(H5::Group& group) const {
+void CanonicalFourCenterHamiltonian::to_hdf5(H5::Group& group) const {
   QDK_LOG_TRACE_ENTERING();
   try {
     // Save version first
@@ -601,8 +600,8 @@ void Canonical4CenterHamiltonian::to_hdf5(H5::Group& group) const {
   }
 }
 
-std::unique_ptr<Canonical4CenterHamiltonian>
-Canonical4CenterHamiltonian::from_hdf5(H5::Group& group) {
+std::unique_ptr<CanonicalFourCenterHamiltonian>
+CanonicalFourCenterHamiltonian::from_hdf5(H5::Group& group) {
   QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version first
@@ -709,12 +708,12 @@ Canonical4CenterHamiltonian::from_hdf5(H5::Group& group) {
     // Create and return appropriate Hamiltonian using the correct constructor
     if (is_restricted_data) {
       // Use restricted constructor - it will create shared pointers internally
-      return std::make_unique<Canonical4CenterHamiltonian>(
+      return std::make_unique<CanonicalFourCenterHamiltonian>(
           one_body_alpha, two_body_aaaa, orbitals, core_energy,
           inactive_fock_alpha, type);
     } else {
       // Use unrestricted constructor with separate alpha and beta data
-      return std::make_unique<Canonical4CenterHamiltonian>(
+      return std::make_unique<CanonicalFourCenterHamiltonian>(
           one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
           two_body_bbbb, orbitals, core_energy, inactive_fock_alpha,
           inactive_fock_beta, type);
@@ -725,9 +724,8 @@ Canonical4CenterHamiltonian::from_hdf5(H5::Group& group) {
   }
 }
 
-void Canonical4CenterHamiltonian::_to_fcidump_file(const std::string& filename,
-                                                   size_t nalpha,
-                                                   size_t nbeta) const {
+void CanonicalFourCenterHamiltonian::_to_fcidump_file(
+    const std::string& filename, size_t nalpha, size_t nbeta) const {
   QDK_LOG_TRACE_ENTERING();
   // Check if this is an unrestricted Hamiltonian and throw error
   if (is_unrestricted()) {

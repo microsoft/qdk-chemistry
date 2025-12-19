@@ -52,7 +52,7 @@ from qdk_chemistry.algorithms import (
     MultiConfigurationScf,
 )
 from qdk_chemistry.data import (
-    Canonical4CenterHamiltonian,
+    CanonicalFourCenterHamiltonian,
     CasWavefunctionContainer,
     Hamiltonian,
     ModelOrbitals,
@@ -139,7 +139,7 @@ class _QdkMcSolverWrapper:
         inactive_fock = np.zeros((0, 0))
 
         # Create QDK Hamiltonian
-        hamiltonian = Hamiltonian(Canonical4CenterHamiltonian(h1e, eri_qdk, orbitals, ecore, inactive_fock))
+        hamiltonian = Hamiltonian(CanonicalFourCenterHamiltonian(h1e, eri_qdk, orbitals, ecore, inactive_fock))
 
         # Run the multi-configurational calculation
         result = self.mc_calculator.run(hamiltonian, n_alpha, n_beta)

@@ -535,7 +535,7 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
           original_hamiltonian->get_two_body_integrals();
       const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          std::make_unique<Canonical4CenterHamiltonian>(
+          std::make_unique<CanonicalFourCenterHamiltonian>(
               h_aa, h2_aaaa, wavefunction_orbitals,
               original_hamiltonian->get_core_energy(), fock_matrix,
               original_hamiltonian->get_type()));
@@ -556,7 +556,7 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
       const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
 
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          std::make_unique<Canonical4CenterHamiltonian>(
+          std::make_unique<CanonicalFourCenterHamiltonian>(
               h_aa, h_bb, h2_aaaa, h2_aabb, h2_bbbb, wavefunction_orbitals,
               original_hamiltonian->get_core_energy(), fock_matrix_alpha,
               fock_matrix_beta, original_hamiltonian->get_type()));
@@ -718,7 +718,7 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
       const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
           original_hamiltonian->get_two_body_integrals();
       const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
-      auto container = std::make_unique<Canonical4CenterHamiltonian>(
+      auto container = std::make_unique<CanonicalFourCenterHamiltonian>(
           h_aa, h2_aaaa, wavefunction_orbitals,
           original_hamiltonian->get_core_energy(), fock_matrix,
           original_hamiltonian->get_type());
@@ -740,7 +740,7 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
       const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
 
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          std::make_unique<Canonical4CenterHamiltonian>(
+          std::make_unique<CanonicalFourCenterHamiltonian>(
               h_aa, h_bb, h2_aaaa, h2_aabb, h2_bbbb, wavefunction_orbitals,
               original_hamiltonian->get_core_energy(), fock_matrix_alpha,
               fock_matrix_beta, original_hamiltonian->get_type()));

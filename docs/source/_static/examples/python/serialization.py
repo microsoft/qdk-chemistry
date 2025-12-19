@@ -13,7 +13,7 @@ import numpy as np
 from qdk_chemistry.data import (
     Structure,
     Hamiltonian,
-    Canonical4CenterHamiltonian,
+    CanonicalFourCenterHamiltonian,
     ModelOrbitals,
 )
 
@@ -55,7 +55,7 @@ core_energy = 1.5
 inactive_fock = np.zeros((0, 0))
 
 h2_example = Hamiltonian(
-    Canonical4CenterHamiltonian(
+    CanonicalFourCenterHamiltonian(
         one_body, two_body, orbitals, core_energy, inactive_fock
     )
 )

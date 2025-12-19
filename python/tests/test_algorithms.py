@@ -24,7 +24,7 @@ from qdk_chemistry.algorithms import (
 from qdk_chemistry.data import (
     Ansatz,
     BasisSet,
-    Canonical4CenterHamiltonian,
+    CanonicalFourCenterHamiltonian,
     CasWavefunctionContainer,
     Configuration,
     CoupledClusterContainer,
@@ -163,7 +163,7 @@ class MockHamiltonianConstructor(HamiltonianConstructor):
         fock = np.eye(0)
 
         # Create Hamiltonian with proper constructor
-        return Hamiltonian(Canonical4CenterHamiltonian(one_body, two_body, orbitals, 0.0, fock))
+        return Hamiltonian(CanonicalFourCenterHamiltonian(one_body, two_body, orbitals, 0.0, fock))
 
     def name(self) -> str:
         """Return the algorithm name."""
@@ -394,7 +394,7 @@ class TestAlgorithmClasses:
         two_body = np.zeros(num_orbitals**4)
         fock = np.eye(0)
 
-        test_hamiltonian = Hamiltonian(Canonical4CenterHamiltonian(one_body, two_body, orbitals, 0.0, fock))
+        test_hamiltonian = Hamiltonian(CanonicalFourCenterHamiltonian(one_body, two_body, orbitals, 0.0, fock))
         return Ansatz(test_hamiltonian, test_wavefunction)
 
     def test_multi_configuration_calculator_inheritance(self):

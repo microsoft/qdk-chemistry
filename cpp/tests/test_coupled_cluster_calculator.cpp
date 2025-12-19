@@ -100,7 +100,7 @@ TEST(CoupledClusterCalculatorTest, Calculate) {
   Eigen::MatrixXd empty_one_body = Eigen::MatrixXd::Zero(2, 2);
   Eigen::VectorXd empty_two_body = Eigen::VectorXd::Zero(16);
   Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
-  Hamiltonian hamiltonian(std::make_unique<Canonical4CenterHamiltonian>(
+  Hamiltonian hamiltonian(std::make_unique<CanonicalFourCenterHamiltonian>(
       empty_one_body, empty_two_body, dummy_orbitals, 0.0, empty_fock));
 
   // Perform calculation with electron counts

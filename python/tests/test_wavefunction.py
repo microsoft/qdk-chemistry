@@ -13,7 +13,7 @@ import pytest
 
 from qdk_chemistry import algorithms
 from qdk_chemistry.data import (
-    Canonical4CenterHamiltonian,
+    CanonicalFourCenterHamiltonian,
     CasWavefunctionContainer,
     Configuration,
     CoupledClusterContainer,
@@ -976,7 +976,9 @@ class TestWavefunctionRdmIntegraion:
 
         core_energy = 0.0
         inactive_fock = np.eye(0)  # Empty inactive Fock matrix
-        return Hamiltonian(Canonical4CenterHamiltonian(h1e, h2e.flatten(), basic_orbitals, core_energy, inactive_fock))
+        return Hamiltonian(
+            CanonicalFourCenterHamiltonian(h1e, h2e.flatten(), basic_orbitals, core_energy, inactive_fock)
+        )
 
 
 class TestMP2Container:
@@ -1002,7 +1004,9 @@ class TestMP2Container:
 
         core_energy = 0.0
         inactive_fock = np.eye(0)  # Empty inactive Fock matrix
-        return Hamiltonian(Canonical4CenterHamiltonian(h1e, h2e.flatten(), basic_orbitals, core_energy, inactive_fock))
+        return Hamiltonian(
+            CanonicalFourCenterHamiltonian(h1e, h2e.flatten(), basic_orbitals, core_energy, inactive_fock)
+        )
 
     @pytest.fixture
     def reference_wavefunction(self, basic_orbitals):

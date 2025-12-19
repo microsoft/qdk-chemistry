@@ -358,7 +358,7 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_json(
 
   // Forward to appropriate container implementation
   if (container_type == "canonical_4_center") {
-    return Canonical4CenterHamiltonian::from_json(j);
+    return CanonicalFourCenterHamiltonian::from_json(j);
   } else {
     throw std::runtime_error("Unknown container type: " + container_type);
   }
@@ -381,7 +381,7 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_hdf5(
 
     // Forward to appropriate container implementation
     if (container_type == "canonical_4_center") {
-      return Canonical4CenterHamiltonian::from_hdf5(group);
+      return CanonicalFourCenterHamiltonian::from_hdf5(group);
     } else {
       throw std::runtime_error("Unknown container type: " + container_type);
     }

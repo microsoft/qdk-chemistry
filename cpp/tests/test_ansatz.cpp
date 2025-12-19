@@ -56,7 +56,7 @@ class AnsatzSerializationTest : public ::testing::Test {
     Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
 
     hamiltonian = std::make_shared<Hamiltonian>(
-        std::make_unique<Canonical4CenterHamiltonian>(
+        std::make_unique<CanonicalFourCenterHamiltonian>(
             one_body, two_body, orbitals, core_energy, inactive_fock));
 
     // Create test ansatz

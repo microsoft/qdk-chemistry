@@ -220,7 +220,7 @@ TEST_F(MultiConfigurationScfTest, SolverInterface) {
       std::move(HamiltonianConstructorFactory::create()));
 
   auto dummy_ham = std::make_shared<Hamiltonian>(
-      std::make_unique<Canonical4CenterHamiltonian>(
+      std::make_unique<CanonicalFourCenterHamiltonian>(
           one_body, two_body, test_orbitals, core_energy, inactive_fock));
 
   // Create a mock MC calculator
