@@ -17,7 +17,9 @@ coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 3.4]])
 charge = 0
 structure = Structure(coords, ["N", "N"])
 scf_solver = create("scf_solver")
-E_scf, wfn = scf_solver.run(structure, charge=charge, spin_multiplicity=1, basis_or_guess="cc-pvdz")
+E_scf, wfn = scf_solver.run(
+    structure, charge=charge, spin_multiplicity=1, basis_or_guess="cc-pvdz"
+)
 
 # Create a HamiltonianConstructor
 ham_constructor = create("hamiltonian_constructor")
@@ -66,7 +68,9 @@ val_wfn = valence_selector.run(wfn)
 
 # Run mcscf
 nalpha, nbeta = val_wfn.get_active_num_electrons()
-E_mcscf, mcscf_wfn = mcscf.run(val_wfn.get_orbitals(), ham_constructor, mc_calculator, nalpha, nbeta)
+E_mcscf, mcscf_wfn = mcscf.run(
+    val_wfn.get_orbitals(), ham_constructor, mc_calculator, nalpha, nbeta
+)
 
 print(f"SCF Energy: {E_scf:.10f} Hartree")
 print(f"MCSCF Energy:  {E_mcscf:.10f} Hartree")
