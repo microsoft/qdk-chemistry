@@ -445,6 +445,50 @@ def test_pennylane_qpe_no_trotter():
 
 
 ################################################################################
+# OpenFermion interoperability sample testing
+################################################################################
+
+
+def test_openfermion_molecular_hamiltonian_jordan_wigner():
+    """Execute the OpenFermion Jordan-Wigner sample and validate reported energies."""
+    repo_root = Path(__file__).resolve().parents[2]
+    cmd = [sys.executable, "examples/openFermion/molecular_hamiltonian_jordan_wigner.py"]
+
+    result = _run_workflow(cmd, repo_root)
+    if result.returncode != 0 and "ModuleNotFoundError: No module named 'openfermion'" in result.stderr:
+        pytest.skip("Skipping: OpenFermion not installed")
+    if result.returncode != 0:
+        _skip_for_mpi_failure(result)
+        pytest.fail(
+            "molecular_hamiltonian_jordan_wigner.py exited with "
+            f"{result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+        )
+
+    lines = _collect_output_lines(result)
+
+    # Verify SCF and CASCI energies are reported
+    scf_energy = _extract_float(r"SCF total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
+    casci_energy = _extract_float(r"CASCI total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
+
+    # LiH SCF/CASCI energies should be around -7.8 Hartree
+    assert -8.0 < scf_energy < -7.5, f"SCF energy {scf_energy} outside expected range for LiH."
+    assert -8.0 < casci_energy < -7.5, f"CASCI energy {casci_energy} outside expected range for LiH."
+
+    # Verify ground state energies before and after rotation are reported and consistent
+    energy_before = _extract_float(
+        r"Ground state energy before rotation is\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr
+    )
+    energy_after = _extract_float(
+        r"Ground state energy after rotation is\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr
+    )
+
+    # Ground state energy should be invariant under basis rotation
+    assert np.isclose(
+        energy_before, energy_after, rtol=float_comparison_relative_tolerance, atol=1e-10
+    ), f"Ground state energy changed after rotation: {energy_before} vs {energy_after}"
+
+
+################################################################################
 # Qsharp interoperability sample testing
 ################################################################################
 
