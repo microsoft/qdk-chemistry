@@ -17,7 +17,7 @@ source $HOME/.cargo/env
 which rustc
 
 # Install ipykernel
-pip install ipykernel ipywidgets pandas
+pip install ipykernel ipywidgets pandas openfermion
 
 # Install QDK Chemistry package
 cd "$REPO_ROOT/python"

@@ -3,11 +3,14 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""qdk-chemistry + PennyLane quantum phase estimation example.
+"""qdk-chemistry + OpenFermion Jordan-Wigner example.
 
-This example demonstrates the use of PennyLane to implement traditional QFT-based Quantum Phase Estimation (QPE)
-using QDK/Chemistry tools for preparing the electronic structure problem.
-This example does not use Trotterization; instead, it leverages PennyLane's ability to implement the time-evolution operator `exp(−i*coeff*H)` exactly for a given qubit Hamiltonian.
+This example demonstrates the use of QDK/Chemistry tools are used preparing the electronic structure Hamiltonian, and
+OpenFermion to transform the resulting to map Fermion operators to qubit
+operators while QDK/Chemistry tools are used preparing the electronic structure Hamiltonian. OpenFermion is used to perform the Jordan-Wigner
+transformation and to obtain the ground state energy of the resulting qubit Hamiltonian.
+This example is adapted from the introduction to OpenFermion tutorial: 
+https://quantumai.google/openfermion/tutorials/intro_to_openfermion
 """
 
 import numpy as np
@@ -21,6 +24,7 @@ import scipy.linalg
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.utils import Logger
 
+# Open Fermion must be installed to run this example.
 try:
     import openfermion
     from openfermion.transforms import get_fermion_operator, jordan_wigner
