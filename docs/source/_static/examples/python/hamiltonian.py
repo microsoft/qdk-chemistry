@@ -24,8 +24,9 @@ structure = Structure(coords, symbols)
 
 # Run intiial SCF to get orbitals
 scf_solver = create("scf_solver")
-scf_solver.settings().set("basis_set", "sto-3g")
-E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+E_scf, wfn = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
 orbitals = wfn.get_orbitals()
 
 # Create a Hamiltonian constructor

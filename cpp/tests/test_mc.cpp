@@ -98,8 +98,7 @@ TEST_F(MCTest, Water_STO3G_ASCI) {
   auto scf_solver = ScfSolverFactory::create();
 
   // Run SCF
-  scf_solver->settings().set("basis_set", "sto-3g");
-  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1);
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
 
   // Construct the Hamiltonian
   auto hamiltonian_constructor =
@@ -127,8 +126,7 @@ TEST_F(MCTest, Water_STO3G_FCI) {
   auto scf_solver = ScfSolverFactory::create();
 
   // Run SCF
-  scf_solver->settings().set("basis_set", "sto-3g");
-  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1);
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
 
   // Construct the Hamiltonian
   auto hamiltonian_constructor =
@@ -155,8 +153,7 @@ TEST_F(MCTest, Water_DEF2SVP_CASCI) {
   auto scf_solver = ScfSolverFactory::create();
 
   // Run SCF
-  scf_solver->settings().set("basis_set", "def2-svp");
-  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1);
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "def2-svp");
 
   // Construct the Hamiltonian
   auto hamiltonian_constructor =
@@ -184,8 +181,7 @@ TEST_F(MCTest, StretchedN2_CCPVDZ_CASCI) {
   auto scf_solver = ScfSolverFactory::create();
 
   // Run SCF
-  scf_solver->settings().set("basis_set", "cc-pvdz");
-  auto [E_HF, wfn_HF] = scf_solver->run(n2, 0, 1);
+  auto [E_HF, wfn_HF] = scf_solver->run(n2, 0, 1, "cc-pvdz");
 
   // Construct the Hamiltonian
   auto hamiltonian_constructor =
@@ -239,8 +235,7 @@ TEST_F(MCTest, TestMultiConfigurationCalculator_ConstructorDestructor) {
     // Test the calculate method works
     auto water = testing::create_water_structure();
     auto scf_solver = ScfSolverFactory::create();
-    scf_solver->settings().set("basis_set", "sto-3g");
-    auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1);
+    auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
 
     auto hamiltonian_constructor =
         qdk::chemistry::algorithms::HamiltonianConstructorFactory::create();
