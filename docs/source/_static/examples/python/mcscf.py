@@ -17,8 +17,7 @@ coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 3.4]])
 charge = 0
 structure = Structure(coords, ["N", "N"])
 scf_solver = create("scf_solver")
-scf_solver.settings().set("basis_set", "cc-pvdz")
-E_scf, wfn = scf_solver.run(structure, charge=charge, spin_multiplicity=1)
+E_scf, wfn = scf_solver.run(structure, charge=charge, spin_multiplicity=1, basis_or_guess="cc-pvdz")
 
 # Create a Hamiltonianconstructor
 ham_constructor = create("hamiltonian_constructor")
