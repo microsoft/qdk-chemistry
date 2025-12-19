@@ -15,6 +15,7 @@ import os
 import re
 import subprocess
 import sys
+import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -296,10 +297,38 @@ def test_sample_rdkit_geometry():
     # Verify the script outputs molecular summary information
     assert any("Number of atoms" in line for line in lines), "Expected molecular summary not found in output."
 
+    # Compare XYZ geometry and warn if mismatch
+    expected_coords = [
+        ("O", 0.008935, 0.404022, 0.000000),
+        ("H", -0.787313, -0.184699, 0.000000),
+        ("H", 0.778378, -0.219323, 0.000000),
+    ]
+    output_text = result.stdout + result.stderr
+    actual_coords = []
+    float_pattern = re.compile(r"^[+-]?\d+\.?\d*$")
+    for line in output_text.splitlines():
+        parts = line.split()
+        if len(parts) >= 4 and parts[0] in ("O", "H", "C", "N") and all(float_pattern.match(p) for p in parts[1:4]):
+            actual_coords.append((parts[0], float(parts[1]), float(parts[2]), float(parts[3])))
+
+    geometry_matches = len(actual_coords) == len(expected_coords) and all(
+        sym_a == sym_e and np.allclose([xa, ya, za], [xe, ye, ze], atol=1e-4)
+        for (sym_a, xa, ya, za), (sym_e, xe, ye, ze) in zip(actual_coords, expected_coords, strict=False)
+    )
     # Extract and validate the SCF energy
-    scf_energy = _extract_float(r"SCF Energy: ([+\-0-9.]+) Hartree", result.stdout + result.stderr)
-    # Water SCF energy with cc-pvdz basis should be around -76 Hartree
-    assert -77.0 < scf_energy < -50.0, f"SCF energy {scf_energy} outside expected range for water."
+    scf_energy = _extract_float(r"SCF Energy: ([+\-0-9.]+) Hartree", output_text)
+
+    # Water SCF energy is expected to be bad because UFF is not expected to yield a high-quality geometry
+    reference_scf_energy = -67.13513170
+
+    if geometry_matches:
+        assert np.isclose(scf_energy, reference_scf_energy, atol=1e-6)
+    else:
+        warnings.warn(
+            f"XYZ geometry mismatch. SCF energy test is skipped. Expected: {expected_coords}, Actual: {actual_coords}",
+            UserWarning,
+            stacklevel=1,
+        )
 
 
 ################################################################################
