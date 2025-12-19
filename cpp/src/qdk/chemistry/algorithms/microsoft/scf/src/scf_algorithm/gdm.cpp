@@ -806,7 +806,9 @@ void GDM::iterate(SCFImpl& scf_impl) {
       fx_new = line_functor.eval(x_new);
       gfx_new = line_functor.grad(x_new);
 
-      if (fx_new < last_accepted_energy_) {
+      double grad_norm = gfx_new.norm() / num_molecular_orbitals;
+      const double og_threshold = ctx_.cfg->scf_algorithm.og_threshold;
+      if (fx_new < last_accepted_energy_ || grad_norm < og_threshold * 0.5) {
         QDK_LOGGER().warn(
             "Accepted small fixed step in steepest descent direction with "
             "energy {:.12e}.",

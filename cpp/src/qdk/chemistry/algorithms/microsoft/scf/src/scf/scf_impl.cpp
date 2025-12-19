@@ -1034,7 +1034,7 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
   total_energy += scf_dispersion_correction_energy;
 #endif
   QDK_LOGGER().debug(
-      "ctx_.cfg->mpi.world_rank: {}, nuclear_repulsion_energy: {:.10e}, "
+      "MPI world rank: {}, nuclear_repulsion_energy: {:.10e}, "
       "one_electron_energy: {:.10e}, two_electron_energy: {:.10e}",
       ctx_.cfg->mpi.world_rank, ctx_.result.nuclear_repulsion_energy,
       scf_one_electron_energy, scf_two_electron_energy);
