@@ -810,12 +810,12 @@ void GDM::iterate(SCFImpl& scf_impl) {
         QDK_LOGGER().warn(
             "Accepted small fixed step in steepest descent direction with "
             "energy {:.12e}.",
-            gfx_new);
+            fx_new);
       } else {
         QDK_LOGGER().error(
             "Small fixed step in steepest descent direction did not lower "
             "energy (energy {:.12e}). SCF iteration aborted.",
-            gfx_new);
+            fx_new);
         throw std::runtime_error(
             "GDM SCF iteration failed: unable to find acceptable step.");
       }
