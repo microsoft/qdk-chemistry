@@ -459,19 +459,19 @@ TEST_F(CasWavefunctionTest, SerializationRDMs) {
 
   // scf
   auto scf_solver = ScfSolverFactory::create();
-  auto [E_default, wfn_default] = scf_solver->run(structure, 0, 1);
+  auto [E_default, wfn_default] = scf_solver->run(structure, 0, 1, "def2-svp");
 
   // build hamiltonian
   auto ham_gen = HamiltonianConstructorFactory::create();
   auto H = ham_gen->run(wfn_default->get_orbitals());
 
-  // run ASCI with RDM calculation
+  // run CAS with RDM calculation
   auto mc = MultiConfigurationCalculatorFactory::create();
   mc->settings().set("calculate_one_rdm", true);
   mc->settings().set("calculate_two_rdm", true);
   auto [E_cas, wfn_cas] = mc->run(H, 2, 2);
 
-  auto original = wfn_cas->get_container<CasWavefunctionContainer>();
+  const auto& original = wfn_cas->get_container<CasWavefunctionContainer>();
 
   EXPECT_TRUE(original.has_one_rdm_spin_dependent());
   EXPECT_TRUE(original.has_one_rdm_spin_traced());
@@ -571,7 +571,7 @@ TEST_F(CasWavefunctionTest, SerializationRDMsUnrestricted) {
 
   // scf
   auto scf_solver = ScfSolverFactory::create();
-  auto [E_default, wfn_default] = scf_solver->run(structure, 1, 2);
+  auto [E_default, wfn_default] = scf_solver->run(structure, 1, 2, "def2-svp");
 
   // build hamiltonian
   auto ham_gen = HamiltonianConstructorFactory::create();
@@ -584,7 +584,7 @@ TEST_F(CasWavefunctionTest, SerializationRDMsUnrestricted) {
   auto [E_cas, wfn_cas] =
       mc->run(H, 1, 2);  // 1 electron in active space, 2 orbitals
 
-  auto original = wfn_cas->get_container<CasWavefunctionContainer>();
+  const auto& original = wfn_cas->get_container<CasWavefunctionContainer>();
 
   EXPECT_TRUE(original.has_one_rdm_spin_dependent());
   EXPECT_TRUE(original.has_one_rdm_spin_traced());

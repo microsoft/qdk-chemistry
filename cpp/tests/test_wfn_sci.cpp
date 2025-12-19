@@ -396,9 +396,8 @@ TEST_F(SciWavefunctionTest, SerializationRDMs) {
 
   // scf
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "sto-3g");
 
-  auto [E_default, wfn_default] = scf_solver->run(structure, 0, 1);
+  auto [E_default, wfn_default] = scf_solver->run(structure, 0, 1, "sto-3g");
 
   // build hamiltonian
   auto ham_gen = HamiltonianConstructorFactory::create();
@@ -414,7 +413,7 @@ TEST_F(SciWavefunctionTest, SerializationRDMs) {
 
   auto [E_sci, wfn_sci] = mc->run(H, 4, 4);
 
-  auto original = wfn_sci->get_container<SciWavefunctionContainer>();
+  const auto& original = wfn_sci->get_container<SciWavefunctionContainer>();
 
   EXPECT_TRUE(original.has_one_rdm_spin_dependent());
   EXPECT_TRUE(original.has_one_rdm_spin_traced());
@@ -516,8 +515,7 @@ TEST_F(SciWavefunctionTest, SerializationRDMsUnrestricted) {
 
   // scf with multiplicity = 2 (doublet state for Li)
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "sto-3g");
-  auto [E_default, wfn_default] = scf_solver->run(structure, 0, 2);
+  auto [E_default, wfn_default] = scf_solver->run(structure, 0, 2, "sto-3g");
 
   // build hamiltonian
   auto ham_gen = HamiltonianConstructorFactory::create();
@@ -532,7 +530,7 @@ TEST_F(SciWavefunctionTest, SerializationRDMsUnrestricted) {
   mc->settings().set("grow_factor", 2);
   auto [E_sci, wfn_sci] = mc->run(H, 3, 5);  // 3 electrons in 5 orbitals
 
-  auto original = wfn_sci->get_container<SciWavefunctionContainer>();
+  const auto& original = wfn_sci->get_container<SciWavefunctionContainer>();
 
   EXPECT_TRUE(original.has_one_rdm_spin_dependent());
   EXPECT_TRUE(original.has_one_rdm_spin_traced());
