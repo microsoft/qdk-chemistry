@@ -28,8 +28,9 @@ structure = Structure.from_xyz_file("molecule.xyz")
 
 # Configure and run SCF calculation
 scf_solver = create("scf_solver")
-scf_solver.settings().set("basis_set", "cc-pvdz")
-scf_energy, scf_wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+scf_energy, scf_wavefunction = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
+)
 
 # Select active space orbitals
 active_space_selector = create(

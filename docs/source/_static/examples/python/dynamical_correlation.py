@@ -33,7 +33,9 @@ structure = Structure(coords, symbols=symbols)
 
 # Run initial SCF to get reference wavefunction
 scf_solver = create("scf_solver")
-E_hf, wfn_hf = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+E_hf, wfn_hf = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="def2-svp"
+)
 
 # Create Hamiltonian from orbitals
 hamiltonian_constructor = create("hamiltonian_constructor")
