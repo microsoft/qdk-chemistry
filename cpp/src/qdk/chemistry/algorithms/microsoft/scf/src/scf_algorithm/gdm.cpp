@@ -29,8 +29,7 @@ namespace qdk::chemistry::scf {
 namespace impl {
 
 /**
- * @brief Apply orbital rotation using kappa vector by constructing the
- * antisymmetric kappa matrix and applying the rotation C = C * exp(kappa).
+ * @brief Construct the antisymmetric kappa matrix and apply C * exp(kappa)
  * @param[in,out] C Molecular orbital coefficient matrix
  * @param[in] spin_index Spin index (0 for alpha, 1 for beta)
  * @param[in] kappa_vector The kappa vector to apply for rotation
@@ -77,10 +76,6 @@ static void apply_orbital_rotation(RowMajorMatrix& C, const int spin_index,
 
 /**
  * @brief Functor for evaluating GDM line search objective
- *
- * Evaluates energy and gradient at trial step along direction kappa_direction.
- * Caches results to avoid redundant computation when eval() and grad() are
- * called with the same kappa vector x.
  */
 class GDMLineFunctor {
  public:
@@ -106,40 +101,26 @@ class GDMLineFunctor {
         cached_kappa_(Eigen::VectorXd()) {}
 
   /**
-   * @brief Evaluate energy at given kappa vector
-   * @param x Kappa vector (orbital rotation parameters)
-   * @return Total energy at trial point
-   *
-   * @note Uses cached result if ||x - cached_kappa|| < 1e-14
+   * @brief Evaluate energy at given kappa vector x
    */
   double eval(const Eigen::VectorXd& x);
 
   /**
-   * @brief Evaluate gradient at given kappa vector
-   * @param x Kappa vector (orbital rotation parameters)
-   * @return Gradient vector at trial point
-   *
-   * @note Reuses Fock matrix from eval() if called at same kappa
+   * @brief Evaluate gradient at given kappa vector x
    */
   Eigen::VectorXd grad(const Eigen::VectorXd& x);
 
   /**
-   * @brief Static utility: compute dot product of two vectors to accommodate
+   * @brief Compute dot product of two vectors to accommodate
    * line search method interface
-   * @param v1 First vector
-   * @param v2 Second vector
-   * @return Dot product v1 · v2
    */
   static double dot(const Eigen::VectorXd& v1, const Eigen::VectorXd& v2) {
     return v1.dot(v2);
   }
 
   /**
-   * @brief Static utility: perform axpy operation y = y + alpha * x to
+   * @brief Perform axpy operation y = y + alpha * x to
    * accommodate line search method interface
-   * @param alpha Scalar multiplier
-   * @param x Vector to scale and add
-   * @param y Vector to add to (modified in-place)
    */
   static void axpy(double alpha, const Eigen::VectorXd& x, Eigen::VectorXd& y) {
     y.noalias() += alpha * x;
@@ -169,8 +150,7 @@ class GDMLineFunctor {
   const int num_molecular_orbitals_;
   const bool unrestricted_;
 
-  // Cache for avoiding redundant computation
-  // When eval(x) then grad(x) called, Fock only computed once
+  // Cache for avoiding redundant Fock matrix computation
   Eigen::VectorXd cached_kappa_;  // Cached kappa vector
   double cached_energy_;
   RowMajorMatrix cached_F_;  // Needed for gradient computation
@@ -179,17 +159,14 @@ class GDMLineFunctor {
 };
 
 double GDMLineFunctor::eval(const Eigen::VectorXd& x) {
-  // Check if we've already computed this kappa vector:
-  // if ||x - cached_kappa|| < compare_kappa_tol_, reuse cached result
+  // Check if we've computed this kappa vector: if so, reuse cached result
   if (cached_kappa_.size() == x.size() &&
       (cached_kappa_ - x).norm() < compare_kappa_tol_) {
     return cached_energy_;
   }
 
-  // Use input x directly as trial kappa
   const Eigen::VectorXd& kappa_trial = x;
 
-  // Restore C to pseudo-canonical state (all spins)
   cached_C_ = C_pseudo_canonical_;
 
   // Apply rotation for all spins with kappa_trial
@@ -232,8 +209,7 @@ double GDMLineFunctor::eval(const Eigen::VectorXd& x) {
 }
 
 Eigen::VectorXd GDMLineFunctor::grad(const Eigen::VectorXd& x) {
-  // Ensure we have the Fock matrix at this kappa
-  // If not cached, call eval() to compute it
+  // Check if we've computed this kappa vector: if so, reuse cached result
   if (cached_kappa_.size() != x.size() ||
       (cached_kappa_ - x).norm() >= compare_kappa_tol_) {
     eval(x);
@@ -300,9 +276,6 @@ class GDM {
   /**
    * @brief Perform one GDM SCF iteration for all spin components
    *
-   * This method drives the GDM algorithm by performing orbital optimization
-   * for each spin component (alpha and beta for unrestricted calculations).
-   *
    * @param[in,out] scf_impl Reference to SCFImpl containing matrices and energy
    */
   void iterate(SCFImpl& scf_impl);
@@ -335,11 +308,6 @@ class GDM {
    * @param[in] num_occupied_orbitals Number of electrons for current spin
    * @param[in] num_molecular_orbitals Number of molecular orbitals
    *
-   * @details
-   * For each history entry, applies the transformation:
-   * K_new = Uoo^T * K_old * Uvv
-   * where K can be either kappa rotation vectors or gradient difference
-   * vectors.
    */
   void transform_history_(Eigen::Block<RowMajorMatrix>& history,
                           const int history_size,
@@ -358,8 +326,6 @@ class GDM {
    * @param[in,out] current_gradient_spin Segment reference to current gradient
    * for this spin
    *
-   * This function performs pseudo-canonical transformation on orbitals,
-   * gradients, and history.
    */
   void generate_pseudo_canonical_orbital_(
       const RowMajorMatrix& F, RowMajorMatrix& C, const int spin_index,
@@ -532,10 +498,9 @@ void GDM::generate_pseudo_canonical_orbital_(
               num_molecular_orbitals);
 
   // Perform pseudo-canonical transformation and BFGS
-  // Obtain pseudo-canonical orbitals
-  // Occupied-occupied block. Foo is symmetric
+  // Obtain pseudo-canonical orbitals. Foo and Fvv are symmetric matrices, but
+  // the output eigenvectors are column-major
   Uoo_ = F_MO.block(0, 0, num_occupied_orbitals, num_occupied_orbitals);
-  // Virtual-virtual block. Fvv is also symmetric
   Uvv_ = F_MO.block(num_occupied_orbitals, num_occupied_orbitals,
                     num_virtual_orbitals, num_virtual_orbitals);
 
@@ -591,14 +556,11 @@ void GDM::generate_pseudo_canonical_orbital_(
 void GDM::accept_line_search_step_(SCFImpl& scf_impl,
                                    const GDMLineFunctor& line_functor,
                                    double fx_new) {
-  // Update scf_impl with accepted orbitals and density
   scf_impl.orbitals_matrix() = line_functor.get_cached_C();
   scf_impl.density_matrix() = line_functor.get_cached_P();
 
-  // Update energy tracking
-  double delta_energy = fx_new - last_accepted_energy_;
+  delta_energy_ = fx_new - last_accepted_energy_;
   last_accepted_energy_ = fx_new;
-  delta_energy_ = delta_energy;
 }
 
 void GDM::iterate(SCFImpl& scf_impl) {
@@ -654,16 +616,13 @@ void GDM::iterate(SCFImpl& scf_impl) {
 
   // Update history size and manage history overflow
   if (gdm_step_count_ != 0) {
-    // Increment history size
     history_size_++;
 
-    // Check if history is full and remove oldest vector if needed
     if (history_size_ == history_size_limit_) {
       QDK_LOGGER().info(
           "GDM history size reached limit {}, removing oldest history "
           "vectors",
           history_size_limit_);
-      // Remove oldest history vectors by shifting all vectors forward
       const int num_rows_to_shift = history_size_limit_ - 1;
       history_kappa_.topRows(num_rows_to_shift) =
           history_kappa_.middleRows(1, num_rows_to_shift);
@@ -698,9 +657,8 @@ void GDM::iterate(SCFImpl& scf_impl) {
       for (int v = 0; v < num_virtual_orbitals; v++) {
         int index = rotation_offset_[i] + j * num_virtual_orbitals + v;
         double pseudo_canonical_energy_diff =
-            std::max(pseudo_canonical_eigenvalues_(num_occupied_orbitals + v) -
-                         pseudo_canonical_eigenvalues_(j),
-                     0.0);
+            std::abs(pseudo_canonical_eigenvalues_(num_occupied_orbitals + v) -
+                     pseudo_canonical_eigenvalues_(j));
         initial_hessian(index) =
             2.0 * (std::abs(delta_energy_) + pseudo_canonical_energy_diff);
       }
@@ -720,7 +678,6 @@ void GDM::iterate(SCFImpl& scf_impl) {
         "Applying BFGS two-loop recursion with {} historical records",
         history_size_);
 
-    // Pre-compute inverse rho values: s_k · y_k
     std::vector<double> inverse_rho_values;
     for (int hist_idx = 0; hist_idx < history_size_; hist_idx++) {
       double sy_dot =
@@ -730,7 +687,6 @@ void GDM::iterate(SCFImpl& scf_impl) {
     latest_inverse_rho = inverse_rho_values[history_size_ - 1];
 
     // BFGS two-loop recursion algorithm
-    // First loop: compute alpha values and update q
     Eigen::VectorXd q = current_gradient_;
     std::vector<double> alpha_values;
 
@@ -741,13 +697,11 @@ void GDM::iterate(SCFImpl& scf_impl) {
       alpha_values.push_back(alpha);
     }
 
-    // Apply initial Hessian approximation H_0^{-1}
     Eigen::VectorXd r = Eigen::VectorXd::Zero(total_rotation_size_);
     for (int index = 0; index < total_rotation_size_; index++) {
       r(index) = q(index) / initial_hessian(index);
     }
 
-    // Second loop: compute beta values and update r
     for (int j = 0; j < history_size_; j++) {
       double beta_value = history_dgrad_.row(j).dot(r) / inverse_rho_values[j];
       r = r + history_kappa_.row(j).transpose() *
@@ -759,6 +713,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
     const int rho_start = std::max(0, rho_size - 5);
     const int rho_num_entries = rho_size - rho_start;
 
+#ifndef NDEBUG
     std::string rho_str;
     rho_str.reserve(20 + 15 * rho_num_entries + 10);
     rho_str = "inverse Rho values: ";
@@ -784,6 +739,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
       alpha_str += fmt::format("{:.6e}; ", alpha_values[j]);
     }
     QDK_LOGGER().debug(alpha_str);
+#endif
 
     kappa_ = -r;
   }
@@ -837,11 +793,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
   double fx0 = last_accepted_energy_;
   Eigen::VectorXd gfx0 = current_gradient_;
 
-  // Initialize variables for line search.
-  // NOTE: fx_new and gfx_new are output parameters of the line search
-  // routine that must be pre-initialized with the function value and
-  // gradient at x0 to satisfy the routine's interface and avoid undefined
-  // behavior.
+  // Initialize variables for line search
   Eigen::VectorXd x_new(kappa_.size());
   double fx_new = fx0;             // Initial function value at x0
   Eigen::VectorXd gfx_new = gfx0;  // Initial gradient at x0
@@ -884,16 +836,27 @@ void GDM::iterate(SCFImpl& scf_impl) {
           e2.what());
 
       // Take very small step in steepest descent direction
-      double small_gradient_step_length = 1e-4;
-      x_new = -small_gradient_step_length * current_gradient_;
-      fx_new = line_functor.eval(x_new);
+      double small_grad_step_length = 1e-4;
+      x_new = -small_grad_step_length * current_gradient_;
+      double small_grad_step_energy = line_functor.eval(x_new);
 
-      accept_line_search_step_(scf_impl, line_functor, fx_new);
+      if (small_grad_step_energy < last_accepted_energy_) {
+        // Accept small step
+        accept_line_search_step_(scf_impl, line_functor,
+                                 small_grad_step_energy);
 
-      QDK_LOGGER().warn(
-          "Minimal gradient step taken: energy = {:.12e}, delta_energy = "
-          "{:.6e}",
-          fx_new, delta_energy_);
+        QDK_LOGGER().warn(
+            "Accepted small fixed step in steepest descent direction with "
+            "energy {:.12e}.",
+            small_grad_step_energy);
+      } else {
+        QDK_LOGGER().error(
+            "Small fixed step in steepest descent direction did not lower "
+            "energy (energy {:.12e}). SCF iteration aborted.",
+            small_grad_step_energy);
+        throw std::runtime_error(
+            "GDM SCF iteration failed: unable to find acceptable step.");
+      }
     }
   }
 
@@ -901,7 +864,6 @@ void GDM::iterate(SCFImpl& scf_impl) {
   history_kappa_.row(history_size_) = x_new;
   previous_gradient_ = current_gradient_;
 
-  // Increment GDM step counter
   gdm_step_count_++;
 }
 
@@ -917,10 +879,7 @@ GDM::GDM(const SCFContext& ctx, const GDMConfig& gdm_config)
 
 GDM::~GDM() noexcept = default;
 
-void GDM::iterate(SCFImpl& scf_impl) {
-  // Call impl with scf_impl reference
-  gdm_impl_->iterate(scf_impl);
-}
+void GDM::iterate(SCFImpl& scf_impl) { gdm_impl_->iterate(scf_impl); }
 
 void GDM::initialize_from_diis(const double delta_energy_diis,
                                const double total_energy) {
