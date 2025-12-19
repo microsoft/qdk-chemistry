@@ -752,7 +752,9 @@ class Wavefunction : public DataClass,
   void to_hdf5(H5::Group& group) const override;
 
   /**
-   * @brief Load wavefunction from HDF5 group
+   * @brief Load wavefunction from HDF5 group. Note that due to significant code
+   * duplication in the cc and sci containers, their common logic is shared in
+   * this base class, and not re-implemented in the cc and sci containers.
    * @param group HDF5 group containing wavefunction data
    * @return Shared pointer to Wavefunction object created from HDF5 group
    * @throws std::runtime_error if HDF5 data is malformed or I/O error occurs

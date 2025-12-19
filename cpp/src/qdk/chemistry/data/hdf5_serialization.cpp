@@ -74,10 +74,14 @@ VectorVariant load_vector_variant_from_group(H5::Group& grp,
             name);
       }
 
-      H5::CompType complex_type(sizeof(std::complex<double>));
+      H5::CompType complex_type(2 * sizeof(double));
       complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
       complex_type.insertMember("imag", sizeof(double),
                                 H5::PredType::NATIVE_DOUBLE);
+      // Verify size
+      if (complex_type.getSize() != 16) {
+        throw std::runtime_error("HDF5 complex type size mismatch");
+      }
 
       Eigen::VectorXcd vec_c(dim);
       dataset.read(vec_c.data(), complex_type);
@@ -116,10 +120,14 @@ MatrixVariant load_matrix_variant_from_group(H5::Group& grp,
             name);
       }
 
-      H5::CompType complex_type(sizeof(std::complex<double>));
+      H5::CompType complex_type(2 * sizeof(double));
       complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
       complex_type.insertMember("imag", sizeof(double),
                                 H5::PredType::NATIVE_DOUBLE);
+      // Verify size
+      if (complex_type.getSize() != 16) {
+        throw std::runtime_error("HDF5 complex type size mismatch");
+      }
 
       Eigen::MatrixXcd matrix_c(dims[0], dims[1]);
       dataset.read(matrix_c.data(), complex_type);
@@ -250,10 +258,14 @@ void write_vector_to_hdf5(H5::Group& grp, const std::string& name,
       hsize_t dim = data.size();
       H5::DataSpace dataspace(1, &dim);
 
-      H5::CompType complex_type(sizeof(std::complex<double>));
+      H5::CompType complex_type(2 * sizeof(double));
       complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
       complex_type.insertMember("imag", sizeof(double),
                                 H5::PredType::NATIVE_DOUBLE);
+      // Verify size
+      if (complex_type.getSize() != 16) {
+        throw std::runtime_error("HDF5 complex type size mismatch");
+      }
 
       H5::DataSet dataset = grp.createDataSet(name, complex_type, dataspace);
       dataset.write(data.data(), complex_type);
@@ -278,10 +290,15 @@ void save_matrix_variant_to_group(
     hsize_t matrix_dims[2] = {matrix_complex.rows(), matrix_complex.cols()};
     H5::DataSpace matrix_space(2, matrix_dims);
 
-    H5::CompType complex_type(sizeof(std::complex<double>));
+    H5::CompType complex_type(2 * sizeof(double));
     complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
     complex_type.insertMember("imag", sizeof(double),
                               H5::PredType::NATIVE_DOUBLE);
+    // Verify size
+    if (complex_type.getSize() != 16) {
+      throw std::runtime_error("HDF5 complex type size mismatch");
+    }
+
     H5::DataSet complex_dataset =
         group.createDataSet(storage_name, complex_type, matrix_space);
     // Write directly from Eigen's memory layout without copying
@@ -308,10 +325,15 @@ void save_vector_variant_to_group(
     hsize_t vector_dims = vector_complex.size();
     H5::DataSpace vector_space(1, &vector_dims);
 
-    H5::CompType complex_type(sizeof(std::complex<double>));
+    H5::CompType complex_type(2 * sizeof(double));
     complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
     complex_type.insertMember("imag", sizeof(double),
                               H5::PredType::NATIVE_DOUBLE);
+    // Verify size
+    if (complex_type.getSize() != 16) {
+      throw std::runtime_error("HDF5 complex type size mismatch");
+    }
+
     H5::DataSet complex_dataset =
         group.createDataSet(storage_name, complex_type, vector_space);
     // Write directly from Eigen's memory layout without copying
