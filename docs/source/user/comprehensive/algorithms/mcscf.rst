@@ -14,7 +14,7 @@ MCSCF methods extend beyond both mean-field and configuration interaction approa
 Unlike :doc:`Hartree-Fock <scf_solver>`, which optimizes orbitals for a single configuration, or :doc:`CI calculations <mc_calculator>`, which only optimize configuration coefficients with fixed orbitals,
 MCSCF performs a full variational optimization of both components.
 
-As prerequisite, an active space must be defined, typically using an :doc:`ActiveSpaceSelector <active_space>`.
+As a prerequisite, an active space must be defined, typically using an :doc:`ActiveSpaceSelector <active_space>`.
 Afterwards, the :term:`MCSCF` procedure alternates between:
 
 - **Configuration interaction**: Solving the :term:`CI` problem in the active space with fixed orbitals
@@ -51,7 +51,7 @@ the :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator`, and its own
 
 .. note::
    The examples below show commonly used settings.
-   For a complete list of available settings with descriptions, see the `Available Settings`_ section.
+   For a complete list of available settings with descriptions, see the `Available settings`_ section.
 
 .. tab:: Python API
 

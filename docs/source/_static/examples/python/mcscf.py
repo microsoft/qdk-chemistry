@@ -19,7 +19,7 @@ structure = Structure(coords, ["N", "N"])
 scf_solver = create("scf_solver")
 E_scf, wfn = scf_solver.run(structure, charge=charge, spin_multiplicity=1, basis_or_guess="cc-pvdz")
 
-# Create a Hamiltonianconstructor
+# Create a HamiltonianConstructor
 ham_constructor = create("hamiltonian_constructor")
 
 # Create a CAS (Complete Active Space) calculator
