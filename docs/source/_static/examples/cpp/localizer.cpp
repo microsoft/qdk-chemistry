@@ -38,8 +38,7 @@ int main() {
 
   // Obtain orbitals from SCF calculation
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "sto-3g");
-  auto [E_scf, wavefunction] = scf_solver->run(structure, 0, 1);
+  auto [E_scf, wavefunction] = scf_solver->run(structure, 0, 1, "sto-3g");
 
   // Specify which orbitals to localize
   // For restricted calculations, alpha and beta orbitals are identical

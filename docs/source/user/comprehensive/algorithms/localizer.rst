@@ -2,7 +2,7 @@ Orbital localization
 ====================
 
 The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` algorithm in QDK/Chemistry performs various orbital transformations to create localized or otherwise transformed molecular orbitals.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes an :doc:`Orbitals <../data/orbitals>` instance as input and produces a new :doc:`Orbitals <../data/orbitals>` instance as output.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.Wavefunction` instance with reference orbitals as input and produces a new :class:`~qdk_chemistry.data.Wavefunction` instance with localized orbitals as output.
 For more information about this pattern, see the :doc:`Factory Pattern <factory_pattern>` documentation.
 
 Overview
@@ -86,11 +86,6 @@ See `Available implementations`_ below for implementation-specific options.
 
 **Running localization:**
 
-The ``run`` method requires three parameters:
-
-1. **orbitals**: The input :doc:`Orbitals <../data/orbitals>` instance to be localized
-2. **loc_indices_a**: Vector/list of indices specifying which alpha orbitals to localize
-3. **loc_indices_b**: Vector/list of indices specifying which beta orbitals to localize
 
 .. note::
    For restricted calculations, ``loc_indices_a`` and ``loc_indices_b`` must be identical.
@@ -195,7 +190,7 @@ See :ref:`VVHV Algorithm <vvhv-algorithm>` below for a detailed description.
    * - ``tolerance``
      - float
      - ``1e-6``
-     - Convergence criterion for localization iterations
+     - Convergence criterion for iterative localization optimization
    * - ``max_iterations``
      - int
      - ``10000``
@@ -224,7 +219,7 @@ The Valence Virtual--Hard Virtual (VVHV) separation :cite:`Subotnik2005` address
 
 **The Problem with Standard Localization**
 
-Standard orbital localization methods optimize a cost function (e.g., Pipek-Mezey, Foster-Boys) over all orbitals simultaneously.
+Standard orbital localization methods optimize a cost function (e.g., Pipek-Mezey, Foster-Boys) over blocks of orbitals simultaneously (e.g. occupied, virtual, active).
 In large basis sets, the virtual space contains orbitals of vastly different character:
 
 - **Valence-virtual orbitals**: Low-lying virtual orbitals that are chemically relevant for describing bond breaking/formation and correlation effects
@@ -256,7 +251,7 @@ The VVHV separation is particularly valuable for multi-configuration calculation
 By localizing only the valence-virtual orbitals, which are the chemically relevant virtual orbitals for active space construction, the VVHV procedure ensures:
 
 - Orbitals that track smoothly as bonds stretch and form
-- Reproducible results across different compute environments
+- Numerically stable and reproducable results
 - Well-defined orbital character that aids chemical interpretation
 
 For details on using localized orbitals in active space selection, see :doc:`ActiveSpaceSelector <active_space>`.
@@ -298,20 +293,12 @@ The PySCF :doc:`plugin <../plugins>` provides access to additional localization 
      - ``1e-10``
      - Threshold for classifying orbitals as occupied vs virtual
 
-**Example:**
-
-.. literalinclude:: ../../../_static/examples/python/localizer.py
-   :language: python
-   :start-after: # start-cell-pyscf-multi-example
-   :end-before: # end-cell-pyscf-multi-example
-
-For more details on how to extend QDK/Chemistry with additional implementations, see the :doc:`plugin system <../plugins>` documentation.
 
 Related classes
 ---------------
 
-- :doc:`Orbitals <../data/orbitals>`: Input and output orbitals
-- :doc:`Wavefunction <../data/wavefunction>`: Container for orbitals and electronic state information
+- :class:`~qdk_chemistry.data.Wavefunction`: Input and output container for orbitals and electronic state information
+- :doc:`Orbitals <../data/orbitals>`: Molecular orbital data accessible via the wavefunction
 
 Further reading
 ---------------

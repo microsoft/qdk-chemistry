@@ -190,7 +190,7 @@ However, it can fail for challenging cases such as open-shell systems or molecul
 When DIIS encounters difficulties, the GDM algorithm provides a robust alternative :cite:`VanVoorhis2002`.
 Rather than extrapolating Fock matrices, GDM directly minimizes the energy with respect to orbital rotation parameters using a quasi-Newton optimization approach.
 
-The key insight of GDM is to parameterize orbital changes through unitary rotations, which converts the constrained optimization problem of determining the energy-minimizing set of orthonormal orbitals into an unconstrained optimization over anti-Hermitian matrices.
+The key insight of GDM is to parameterize orbital changes through unitary rotations, which converts the constrained optimization problem of determining the energy-minimizing set of orthonormal orbitals into an unconstrained optimization over exponentials :cite:`Higham2005` of anti-Hermitian matrices.
 This allows the use of standard nonlinear optimization techniques while preserving orbital orthonormality.
 
 
