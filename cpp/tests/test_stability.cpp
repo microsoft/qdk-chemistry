@@ -506,8 +506,7 @@ TEST_F(StabilityCheckerTest, QDK_RHF_Water_HF_Stable) {
 
   // Run SCF calculation
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "def2-svp");
-  auto [energy, wavefunction] = scf_solver->run(water, 0, 1);
+  auto [energy, wavefunction] = scf_solver->run(water, 0, 1, "def2-svp");
 
   // Create stability checker for full analysis (internal + external)
   auto stability_checker = StabilityCheckerFactory::create("qdk");
@@ -549,9 +548,8 @@ TEST_F(StabilityCheckerTest, QDK_RHF_Water_M06_2X_Stable) {
 
   // Run SCF calculation with M06-2X
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "def2-svp");
   scf_solver->settings().set("method", "m06-2x");
-  auto [energy, wavefunction] = scf_solver->run(water, 0, 1);
+  auto [energy, wavefunction] = scf_solver->run(water, 0, 1, "def2-svp");
 
   // Create stability checker for full analysis (internal + external)
   auto stability_checker = StabilityCheckerFactory::create("qdk");
@@ -592,8 +590,7 @@ TEST_F(StabilityCheckerTest, QDK_UHF_O2_HF_Stable) {
 
   // Run UHF SCF calculation (triplet state)
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "def2-svp");
-  auto [energy, wavefunction] = scf_solver->run(o2, 0, 3);
+  auto [energy, wavefunction] = scf_solver->run(o2, 0, 3, "def2-svp");
 
   // Verify we have UHF orbitals
   auto orbitals = wavefunction->get_orbitals();
@@ -631,9 +628,8 @@ TEST_F(StabilityCheckerTest, QDK_UHF_O2_M06_2X_Stable) {
 
   // Run UHF SCF calculation (triplet state) with M06-2X
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "def2-svp");
   scf_solver->settings().set("method", "m06-2x");
-  auto [energy, wavefunction] = scf_solver->run(o2, 0, 3);
+  auto [energy, wavefunction] = scf_solver->run(o2, 0, 3, "def2-svp");
 
   // Check SCF energy
   EXPECT_NEAR(energy, -150.14208965738047, testing::scf_energy_tolerance);
@@ -675,9 +671,8 @@ TEST_F(StabilityCheckerTest, QDK_UHF_O2_PBE_Stable) {
 
   // Run UHF SCF calculation (triplet state) with PBE
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "def2-svp");
   scf_solver->settings().set("method", "pbe");
-  auto [energy, wavefunction] = scf_solver->run(o2, 0, 3);
+  auto [energy, wavefunction] = scf_solver->run(o2, 0, 3, "def2-svp");
 
   // Check SCF energy
   EXPECT_NEAR(energy, -150.06573508243756, testing::scf_energy_tolerance);
@@ -720,8 +715,7 @@ TEST_F(StabilityCheckerTest, QDK_RHF_N2_Stretched_External_Instability) {
 
   // Run RHF SCF calculation
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "def2-svp");
-  auto [energy, wavefunction] = scf_solver->run(n2, 0, 1);
+  auto [energy, wavefunction] = scf_solver->run(n2, 0, 1, "def2-svp");
 
   // Create stability checker for full analysis (internal + external)
   auto stability_checker = StabilityCheckerFactory::create("qdk");
@@ -763,8 +757,7 @@ TEST_F(StabilityCheckerTest, QDK_RHF_N2_Stretched_Internal_Instability) {
 
   // Run RHF SCF calculation
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "def2-svp");
-  auto [energy, wavefunction] = scf_solver->run(n2, 0, 1);
+  auto [energy, wavefunction] = scf_solver->run(n2, 0, 1, "def2-svp");
 
   // Create stability checker for full analysis (internal + external)
   auto stability_checker = StabilityCheckerFactory::create("qdk");
@@ -807,8 +800,7 @@ TEST_F(StabilityCheckerTest, QDK_UHF_BN_Plus_Internal_Instability) {
 
   // Run UHF SCF calculation (doublet state)
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "def2-svp");
-  auto [energy, wavefunction] = scf_solver->run(bn_plus, 1, 2);
+  auto [energy, wavefunction] = scf_solver->run(bn_plus, 1, 2, "def2-svp");
 
   // Verify we have UHF orbitals
   auto orbitals = wavefunction->get_orbitals();
@@ -847,9 +839,8 @@ TEST_F(StabilityCheckerTest, QDK_RHF_N2_Stretched_PBE_Instability) {
 
   // Run RHF SCF calculation with PBE
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "def2-svp");
   scf_solver->settings().set("method", "pbe");
-  auto [energy, wavefunction] = scf_solver->run(n2, 0, 1);
+  auto [energy, wavefunction] = scf_solver->run(n2, 0, 1, "def2-svp");
 
   EXPECT_NEAR(energy, -109.09003668989645, testing::scf_energy_tolerance);
 
