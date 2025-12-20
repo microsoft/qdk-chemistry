@@ -308,12 +308,12 @@ def test_sample_rdkit_geometry():
     float_pattern = re.compile(r"^[+-]?\d+\.?\d*$")
     for line in output_text.splitlines():
         parts = line.split()
-        if len(parts) >= 4 and parts[0] in ("O", "H", "C", "N") and all(float_pattern.match(p) for p in parts[1:4]):
+        if len(parts) == 4 and parts[0] in ("O", "H", "C", "N") and all(float_pattern.match(p) for p in parts[1:4]):
             actual_coords.append((parts[0], float(parts[1]), float(parts[2]), float(parts[3])))
 
     geometry_matches = len(actual_coords) == len(expected_coords) and all(
         sym_a == sym_e and np.allclose([xa, ya, za], [xe, ye, ze], atol=1e-4)
-        for (sym_a, xa, ya, za), (sym_e, xe, ye, ze) in zip(actual_coords, expected_coords, strict=False)
+        for (sym_a, xa, ya, za), (sym_e, xe, ye, ze) in zip(actual_coords, expected_coords)
     )
     # Extract and validate the SCF energy
     scf_energy = _extract_float(r"SCF Energy: ([+\-0-9.]+) Hartree", output_text)
