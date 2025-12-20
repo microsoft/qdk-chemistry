@@ -104,6 +104,7 @@ See `Available settings`_ below for a complete list of options.
       :start-after: # start-cell-run
       :end-before: # end-cell-run
 
+
 Available settings
 ------------------
 
@@ -132,6 +133,7 @@ All implementations share a common base set of settings from ``ElectronicStructu
      - Maximum number of SCF iterations (must be ≥ 1)
 
 See :doc:`Settings <settings>` for a more general treatment of settings in QDK/Chemistry.
+
 Available implementations
 -------------------------
 
@@ -167,7 +169,7 @@ The native QDK/Chemistry implementation provides high-performance SCF calculatio
 - Restricted Kohn-Sham (RKS) and Unrestricted Kohn-Sham (UKS) DFT
 - Extensive library of :doc:`basis sets <../basis_functionals>` including Pople, Dunning, and Karlsruhe families
 - Full range of :doc:`exchange-correlation functionals <../basis_functionals>` for DFT
-- Advanced convergence algorithms including the direct inversion in the iterative subspace (DIIS) method :cite:`Pulay1982`, and the geometric direct minimization (GDM) method :cite:`VanVoorhis2002`
+- Optimization algorithms including the direct inversion in the iterative subspace (DIIS) method :cite:`Pulay1982`, and the geometric direct minimization (GDM) method :cite:`VanVoorhis2002`
 
 .. _scf-convergence-algorithms:
 
@@ -180,23 +182,17 @@ QDK/Chemistry implements two complementary algorithms that can be used independe
 **Direct Inversion in the Iterative Subspace (DIIS)**
 
 DIIS is an extrapolation technique that accelerates SCF convergence by constructing an optimal linear combination of previous Fock matrices :cite:`Pulay1982`.
-At each iteration, the algorithm. DIIS is highly effective for well-behaved systems, often achieving convergence in 10–20 iterations.
-However, it can fail for challenging cases such as transition metal complexes, open-shell systems, or molecules with near-degenerate orbitals, where the error surface is highly non-linear.
+DIIS is highly effective for well-behaved systems, often achieving convergence in low number of  iterations.
+However, it can fail for challenging cases such as open-shell systems or molecules with near-degenerate orbitals, where the error surface is highly non-linear.
 
 **Geometric Direct Minimization (GDM)**
 
 When DIIS encounters difficulties, the GDM algorithm provides a robust alternative :cite:`VanVoorhis2002`.
 Rather than extrapolating Fock matrices, GDM directly minimizes the energy with respect to orbital rotation parameters using a quasi-Newton optimization approach.
 
-The key insight of GDM is to parameterize orbital changes through unitary rotations, which converts the constrained optimizxation problem of determining the energy-minimizing set of orthonormal orbitals into an unconstrained optimization over anti-Hermitian matrices.
+The key insight of GDM is to parameterize orbital changes through unitary rotations, which converts the constrained optimization problem of determining the energy-minimizing set of orthonormal orbitals into an unconstrained optimization over anti-Hermitian matrices.
 This allows the use of standard nonlinear optimization techniques while preserving orbital orthonormality.
-Given a set of orbital coefficients, :math:`\mathbf{C}`, new orbitals, :math:`\mathbf{C}'`, are generated via:
 
-.. math::
-
-   \mathbf{C}' = \mathbf{C} \exp(\mathbf{X})
-
-where :math:`\mathbf{X}` is an anti-Hermitian matrix containing non-zeros only in the occupied-virtual blocks. The matrix exponential :math:`\exp(\mathbf{X})`, computed by scaling and squaring within the QDK :cite:`Higham2005`, generates a unitary transformation that preserves orbital orthonormality.
 
 The GDM algorithm then proceeds via a slightly modified :cite:`VanVoorhis2002` BFGS optimization :cite:`Liu1989` which smoothly converges to a nearby energy minimum. If provided a guess close to the true minimum, GDM can converge in a similar number of iterations as DIIS, but it is more robust for difficult cases. However, if initialized further from the minimum, GDM may converge to local minima, which may require additional strategies (e.g. :doc:`Stability analysis<stability_checker>`) to ensure the global minimum is found. This may be overcome in many cases by combining GDM with DIIS in a hybrid approach.
 
@@ -284,7 +280,6 @@ The PySCF plugin provides access to the comprehensive `PySCF <https://pyscf.org/
 - Full HF support: RHF, UHF, ROHF
 - Full DFT support: RKS, UKS, ROKS with extensive functional library
 - Automatic spin-restricted/unrestricted selection based on multiplicity
-- Support for custom basis sets and effective core potentials (ECPs)
 
 **Settings:**
 
