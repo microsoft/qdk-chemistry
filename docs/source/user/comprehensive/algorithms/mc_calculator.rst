@@ -153,6 +153,8 @@ The MACIS (Many-body Adaptive Configuration Interaction Solver) CAS implementati
      - ``False``
      - Calculate two-electron reduced density matrix
 
+.. _macis-asci:
+
 MACIS ASCI
 ~~~~~~~~~~
 

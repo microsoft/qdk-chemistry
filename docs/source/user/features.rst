@@ -55,21 +55,21 @@ Implementation Highlights
 Active Space Selection
 """"""""""""""""""""""
 
-Accurate treatment of strongly correlated systems requires identifying which molecular orbitals exhibit significant multireference character. QDK/Chemistry provides a range of automated and manual approaches to select chemically relevant orbitals for :doc:`multi-configurational calculations <comprehensive/algorithms/mc_calculator>`.
+Accurate treatment of strongly correlated systems requires identifying which molecular orbitals exhibit significant entanglement character. QDK/Chemistry provides a range of automated and manual approaches to select chemically relevant orbitals for :doc:`multi-configurational calculations <comprehensive/algorithms/mc_calculator>`.
 
-The challenge lies in balancing accuracy and computational cost: an ideal active space should include all orbitals with significant multireference character while remaining as compact as possible. QDK/Chemistry supports several strategies for making this selection:
+The challenge lies in balancing accuracy and computational cost: an ideal active space should include all orbitals with significant entanglement character while remaining as compact as possible. QDK/Chemistry supports several strategies for making this selection:
 
 **Automated Approaches:**
 
-- **Entanglement-Based Methods**: Utilizing concepts from quantum information theory, these methods identify strongly correlated orbitals based on their entanglement with the rest of the system. QDK/Chemistry includes a native implementation of the AutoCAS algorithm :cite:`Stein2019`, which computes single-orbital entropies from reduced density matrices to systematically select active spaces (see below for details).
+- **Entanglement-Based Methods**: Utilizing concepts from quantum information theory, these methods identify strongly correlated orbitals based on their entanglement with the rest of the system. QDK/Chemistry includes a native implementation of the AutoCAS algorithm :cite:`Stein2019`, which leverages single-orbital entropies computed from reduced density matrices to systematically select active spaces (see below for details).
 
-- **Occupation-based Methods**: Automatic selection based on natural orbital occupation numbers. Orbitals with fractional occupations indicate strong correlation and are included in the active space.
+- **Occupation-based Methods**: Automatic selection based on natural orbital occupation numbers. Orbitals with fractional occupations indicate entanglement and are included in the active space.
 
 - **AVAS (Automated Valence Active Space)** :cite:`Sayfutyarova2017` — Projects molecular orbitals onto a target atomic orbital basis (e.g., metal 3d orbitals) to systematically identify valence active spaces. This functionality is available through the :ref:`PySCF Plugin <pyscf-avas-plugin>`.
 
 **Manual Approaches:**
 
-- **Valence selection** — User-specified active electrons and orbitals, typically centered around the HOMO-LUMO gap.
+- **Valence selection** — User-specified active electrons and orbitals, centered around the HOMO-LUMO gap (Fermi level).
 
 See :doc:`comprehensive/algorithms/active_space` for further details about available methods and implementations.
 
@@ -78,7 +78,7 @@ See :doc:`comprehensive/algorithms/active_space` for further details about avail
 Implementation Highlights
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **AutoCAS**: QDK/Chemistry includes a native implementation of the AutoCAS algorithm :cite:`Stein2019`, which leverages quantum information concepts to identify strongly correlated orbitals. The method computes single-orbital entropies—measures of how entangled each orbital is with the rest of the system—from the one- and two-electron reduced density matrices of a multi-configuration wavefunction. Orbitals with high entropy are strongly entangled and should be treated explicitly in the active space. QDK/Chemistry's implementation includes both standard AutoCAS and an enhanced variant using entanglement of orbitals with entropy differences (AutoCAS-EOS) for improved robustness. See the :ref:`AutoCAS Algorithm <autocas-algorithm-details>` documentation for further details.
+- **AutoCAS**: QDK/Chemistry includes a native implementation of the AutoCAS algorithm :cite:`Stein2019`, which leverages quantum information concepts to identify strongly correlated orbitals. The method computes single-orbital entropies—measures of how entangled each orbital is with the rest of the system—from the one- and two-electron reduced density matrices of a multi-configurational wavefunction. Orbitals with high entropy are strongly entangled and should be treated explicitly within the active space. QDK/Chemistry's implementation includes both standard AutoCAS and an enhanced variant (AutoCAS-EOS) for improved robustness. See the :ref:`AutoCAS Algorithm <autocas-algorithm-details>` documentation for further details.
 
 
 Multi-Configuration Methods
