@@ -29,8 +29,10 @@ enum class SpinChannel { aa, bb, aaaa, aabb, bbbb };
 
 /**
  * @class HamiltonianContainer
- * @brief Represents a molecular Hamiltonian implementation in the molecular
- * orbital basis
+ * @brief Pure virtual base class for a molecular Hamiltonian implementation in
+ * the molecular orbital basis. Concrete subclasses must provide an
+ * implementation that defines the underlying storage and/or computation
+ * mechanism for two-electron integrals.
  *
  * This class stores molecular Hamiltonian data for quantum chemistry
  * calculations, specifically designed for active space methods. It contains:

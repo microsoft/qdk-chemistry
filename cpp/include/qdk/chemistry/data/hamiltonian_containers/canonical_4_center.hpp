@@ -18,8 +18,8 @@ namespace qdk::chemistry::data {
 
 /**
  * @class CanonicalFourCenterHamiltonian
- * @brief Represents a molecular Hamiltonian in the molecular orbital
- * basis
+ * @brief Contains a molecular Hamiltonian using canonical four center
+ * integrals, implemented as a subclass of HamiltonianContainer.
  *
  * This class stores molecular Hamiltonian data for quantum chemistry
  * calculations, specifically designed for active space methods. It contains:
@@ -41,6 +41,7 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
  public:
   /**
    * @brief Constructor for active space Hamiltonian with four center integrals
+   *
    * @param one_body_integrals One-electron integrals in MO basis [norb x norb]
    * @param two_body_integrals Two-electron integrals in MO basis [norb x norb x
    * norb x norb]
@@ -50,6 +51,7 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
    * @param inactive_fock_matrix Inactive Fock matrix for the selected active
    * space
    * @param type Type of Hamiltonian (Hermitian by default)
+   *
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
   CanonicalFourCenterHamiltonian(
@@ -62,6 +64,7 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
   /**
    * @brief Constructor for active space Hamiltonian with four center integrals
    * using separate spin components
+   *
    * @param one_body_integrals_alpha One-electron integrals for alpha spin in MO
    * basis
    * @param one_body_integrals_beta One-electron integrals for beta spin in MO
@@ -78,6 +81,7 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
    * @param inactive_fock_matrix_beta Inactive Fock matrix for beta spin in the
    * selected active space
    * @param type Type of Hamiltonian (Hermitian by default)
+   *
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
   CanonicalFourCenterHamiltonian(
@@ -94,20 +98,20 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
   /**
    * @brief Destructor
    */
-  ~CanonicalFourCenterHamiltonian() override = default;
+  ~CanonicalFourCenterHamiltonian() override final = default;
 
   /**
    * @brief Create a deep copy of this container
    * @return Unique pointer to a cloned container
    */
-  virtual std::unique_ptr<HamiltonianContainer> clone() const override;
+  std::unique_ptr<HamiltonianContainer> clone() const override final;
 
   /**
    * @brief Get the type of the underlying container
    * @return String identifying the container type (e.g., "canonical_4_center",
    * "density_fitted")
    */
-  virtual std::string get_container_type() const override;
+  std::string get_container_type() const override final;
 
   /**
    * @brief Get two-electron integrals in MO basis for all spin channels
@@ -115,9 +119,9 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
    * vectors
    * @throws std::runtime_error if integrals are not set
    */
-  virtual std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
-                     const Eigen::VectorXd&>
-  get_two_body_integrals() const override;
+  std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
+             const Eigen::VectorXd&>
+  get_two_body_integrals() const override final;
 
   /**
    * @brief Get specific two-electron integral element
@@ -130,34 +134,34 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
    * @return Two-electron integral <ij|kl>
    * @throws std::out_of_range if indices are invalid
    */
-  virtual double get_two_body_element(
+  double get_two_body_element(
       unsigned i, unsigned j, unsigned k, unsigned l,
-      SpinChannel channel = SpinChannel::aaaa) const override;
+      SpinChannel channel = SpinChannel::aaaa) const override final;
 
   /**
    * @brief Check if two-body integrals are available
    * @return True if two-body integrals are set
    */
-  virtual bool has_two_body_integrals() const override;
+  bool has_two_body_integrals() const override final;
 
   /**
    * @brief Check if the Hamiltonian is restricted
    * @return True if alpha and beta integrals are identical
    */
-  virtual bool is_restricted() const override;
+  bool is_restricted() const override final;
 
   /**
    * @brief Convert Hamiltonian to JSON
    * @return JSON object containing Hamiltonian data
    */
-  virtual nlohmann::json to_json() const override;
+  nlohmann::json to_json() const override final;
 
   /**
    * @brief Serialize Hamiltonian data to HDF5 group
    * @param group HDF5 group to write data to
    * @throws std::runtime_error if I/O error occurs
    */
-  virtual void to_hdf5(H5::Group& group) const override;
+  void to_hdf5(H5::Group& group) const override final;
 
   /**
    * @brief Deserialize Hamiltonian data from HDF5 group
@@ -184,14 +188,14 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
    * @param nbeta Number of beta electrons
    * @throws std::runtime_error if I/O error occurs
    */
-  virtual void to_fcidump_file(const std::string& filename, size_t nalpha,
-                               size_t nbeta) const override;
+  void to_fcidump_file(const std::string& filename, size_t nalpha,
+                       size_t nbeta) const override final;
 
   /**
    * @brief Check if the Hamiltonian data is complete and consistent
    * @return True if all required data is set and dimensions are consistent
    */
-  virtual bool is_valid() const override;
+  bool is_valid() const override final;
 
  private:
   /// Two-electron integrals in MO basis, stored as flattened arrays [norb^4]
@@ -202,7 +206,7 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
       _two_body_integrals;
 
   /// Validation helpers
-  void validate_integral_dimensions() const;
+  void validate_integral_dimensions() const override final;
 
   size_t get_two_body_index(size_t i, size_t j, size_t k, size_t l) const;
 
