@@ -22,6 +22,17 @@ Using the DynamicalCorrelationCalculator
 This section demonstrates how to create, configure, and run a dynamical correlation calculation.
 The ``run`` method returns the total energy (reference plus correlation) and an updated wavefunction.
 
+Input requirements
+~~~~~~~~~~~~~~~~~~
+
+The :class:`~qdk_chemistry.algorithms.DynamicalCorrelationCalculator` requires the following input:
+
+**Ansatz**
+   An :doc:`Ansatz <../data/ansatz>` object that encapsulates:
+
+   - **Reference wavefunction**: A :class:`~qdk_chemistry.data.Wavefunction` from a prior calculation, providing the reference molecular orbitals.
+   - **Hamiltonian**: A :doc:`Hamiltonian <../data/hamiltonian>` containing the one- and two-electron integrals in the *same* molecular orbital basis.
+
 **Creating a calculator:**
 
 .. tab:: C++ API

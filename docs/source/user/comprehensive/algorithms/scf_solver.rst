@@ -2,7 +2,7 @@ Self-consistent field (SCF) solver
 ==================================
 
 The :class:`~qdk_chemistry.algorithms.ScfSolver` algorithm in QDK/Chemistry performs Self-Consistent Field (SCF) calculations to optimize molecular orbitals for a given molecular structure.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :doc:`Structure <../data/structure>` instance as input and produces an :doc:`Orbitals <../data/orbitals>` instance as output.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :doc:`Structure <../data/structure>` instance, total molecular charge and multiplicity, and a desired basis representation as input ,and produces an :doc:`Orbitals <../data/orbitals>` instance and the associated energy as output.
 Its primary purpose is to find the best single-particle orbitals within a mean-field approximation.
 For Hartree-Fock (HF) theory, it yields the mean field energy, which misses electron correlation and typically requires post-HF methods for accurate energetics.
 For Density Functional Theory (DFT), some correlation effects are included through the exchange-correlation functional.
@@ -29,7 +29,29 @@ Running an :term:`SCF` calculation
 ----------------------------------
 
 This section demonstrates how to setup, configure, and run a SCF calculation.
-The ``run`` method returns two values: a scalar representing the converged SCF energy and an :doc:`Orbitals <../data/orbitals>` object containing the optimized molecular orbitals.
+The ``run`` method returns two values: a scalar representing the converged SCF energy and a :class:`~qdk_chemistry.data.Wavefunction` object containing the optimized molecular orbitals.
+
+Input requirements
+~~~~~~~~~~~~~~~~~~
+
+The :class:`~qdk_chemistry.algorithms.ScfSolver` requires several inputs to perform a calculation:
+
+**Structure**
+   A :doc:`Structure <../data/structure>` instance defining the molecular geometry (atomic positions and element types).
+
+**Charge**
+   The total molecular charge (integer). A neutral molecule has charge 0.
+
+**Spin multiplicity**
+   The spin multiplicity of the system, defined as :math:`2S + 1` where :math:`S` is the total spin. Common values are 1 (singlet), 2 (doublet), 3 (triplet), etc.
+
+**Basis set or initial guess**
+   This required input specifies the atomic orbital basis for the calculation and can be provided in several forms:
+
+   - **String**: A standard basis set name (e.g., ``"sto-3g"``, ``"def2-svp"``, ``"cc-pvdz"``). See the :doc:`basis set documentation <../basis_functionals>` for available options.
+   - **BasisSet object**: A :class:`~qdk_chemistry.data.BasisSet` instance for custom basis sets. See the :doc:`BasisSet <../data/basis_set>` documentation for details.
+   - **Orbitals object**: A :class:`~qdk_chemistry.data.Orbitals` instance which provides both the basis set and an initial orbital guess for the SCF optimization.
+
 
 **Creating a SCF solver:**
 
@@ -50,7 +72,7 @@ The ``run`` method returns two values: a scalar representing the converged SCF e
 **Configuring settings:**
 
 Settings can be modified using the ``settings()`` object.
-See `Available settings`_ below for a complete list of options, or :doc:`basis sets and functionals <../basis_functionals>` for supported basis sets.
+See `Available settings`_ below for a complete list of options.
 
 .. tab:: C++ API
 
@@ -100,10 +122,6 @@ All implementations share a common base set of settings from ``ElectronicStructu
      - string
      - ``"hf"``
      - The method to use: ``"hf"`` for Hartree-Fock, or a DFT functional name (e.g., ``"b3lyp"``, ``"pbe"``)
-   * - ``basis_set``
-     - string
-     - ``"def2-svp"``
-     - The basis set to use for the calculation; see :doc:`basis sets documentation <../basis_functionals>`
    * - ``convergence_threshold``
      - float
      - ``1e-7``
@@ -209,10 +227,6 @@ This hybrid approach combines the speed of DIIS for typical systems with the rob
      - string
      - ``"hf"``
      - Method: ``"hf"`` for Hartree-Fock, or a DFT functional name
-   * - ``basis_set``
-     - string
-     - ``"def2-svp"``
-     - Basis set for the calculation
    * - ``convergence_threshold``
      - float
      - ``1e-7``
@@ -286,10 +300,6 @@ The PySCF plugin provides access to the comprehensive `PySCF <https://pyscf.org/
      - string
      - ``"hf"``
      - Method: ``"hf"`` for Hartree-Fock, or a DFT functional name
-   * - ``basis_set``
-     - string
-     - ``"def2-svp"``
-     - Basis set for the calculation
    * - ``convergence_threshold``
      - float
      - ``1e-7``

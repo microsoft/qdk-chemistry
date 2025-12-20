@@ -28,6 +28,21 @@ Using the MultiConfigurationCalculator
 This section demonstrates how to create, configure, and run a multi-configuration calculation.
 The ``run`` method takes a :doc:`Hamiltonian <../data/hamiltonian>` object as input and returns energy values and a :class:`~qdk_chemistry.data.Wavefunction` object.
 
+Input requirements
+~~~~~~~~~~~~~~~~~~
+
+The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` requires the following inputs:
+
+**Hamiltonian**
+   A :doc:`Hamiltonian <../data/hamiltonian>` instance that defines the electronic structure problem.
+
+**Number of alpha electrons**
+   The number of alpha (spin-up) electrons in the active space.
+
+**Number of beta electrons**
+   The number of beta (spin-down) electrons in the active space.
+
+
 **Creating an MC calculator:**
 
 .. tab:: C++ API

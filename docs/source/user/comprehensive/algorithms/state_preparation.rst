@@ -22,6 +22,15 @@ Using the StatePreparation
 This section demonstrates how to create, configure, and run a state preparation.
 The ``run`` method returns an OpenQASM circuit string that, when executed, loads the input wavefunction onto a qubit register.
 
+Input requirements
+~~~~~~~~~~~~~~~~~~
+
+The :class:`~qdk_chemistry.algorithms.StatePreparation` requires the following input:
+
+**Wavefunction**
+   A :class:`~qdk_chemistry.data.Wavefunction` instance containing the quantum state to be loaded onto qubits. This is typically obtained from a multi-configuration calculation using the :doc:`MultiConfigurationCalculator <mc_calculator>`. The method with which this encoding is achieved is implementation dependent.
+
+
 **Creating a state preparation algorithm:**
 
 .. tab:: Python API

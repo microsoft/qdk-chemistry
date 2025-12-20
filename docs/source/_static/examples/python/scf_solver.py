@@ -53,10 +53,16 @@ print(registry.available("scf_solver"))  # ['pyscf', 'qdk']
 ################################################################################
 # start-cell-pyscf-example
 from qdk_chemistry.algorithms import create  # noqa: E402
+from qdk_chemistry.data import Structure  # noqa: E402
 
+# Create and configure the PySCF solver
 solver = create("scf_solver", "pyscf")
 solver.settings().set("method", "b3lyp")
-solver.settings().set("basis_set", "cc-pvdz")
 solver.settings().set("scf_type", "restricted")
+
+# Run with basis set specified as input parameter
+water_coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.76, 0.59], [0.0, -0.76, 0.59]])
+water = Structure(water_coords, symbols=["O", "H", "H"])
+energy, wfn = solver.run(water, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz")
 # end-cell-pyscf-example
 ################################################################################

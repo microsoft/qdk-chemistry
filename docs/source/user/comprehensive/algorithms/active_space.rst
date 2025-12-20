@@ -42,6 +42,20 @@ Running an active space selection
 This section demonstrates how to create, configure, and run an active space selection.
 The ``run`` method takes a :doc:`Wavefunction <../data/wavefunction>` from a prior :term:`SCF` calculation and returns a new :doc:`Wavefunction <../data/wavefunction>` with active space information.
 
+Input requirements
+~~~~~~~~~~~~~~~~~~
+
+The :class:`~qdk_chemistry.algorithms.ActiveSpaceSelector` requires the following input:
+
+**Wavefunction**
+   A :class:`~qdk_chemistry.data.Wavefunction` instance containing data necessacary for active space selection, including: orbital information, electron counts, etc.
+
+   Some selection methods (e.g., entropy-based) may require additional information such as orbital occupation numbers or entropies from a prior multi-configuration calculation.
+
+.. note::
+
+   The specific requirements depend on the chosen implementation. Manual selection methods (like ``qdk_valence``) require user-specified active space sizes, while automatic methods (like ``qdk_occupation`` or ``qdk_entropy``) analyze orbital properties to determine the active space.
+
 **Creating an active space selector:**
 
 .. tab:: C++ API
@@ -172,6 +186,11 @@ QDK AutoCAS
 Entropy-based automatic selection using histogram-based plateau detection to identify strongly correlated orbitals.
 See :ref:`AutoCAS Algorithm <autocas-algorithm-details>` below for a detailed description.
 
+.. note::
+
+   This method requires the input wavefunction to have orbital entropies populated.
+   Orbital entropies are computed from the one- and two-electron reduced density matrices (1-RDM and 2-RDM), which are typically obtained from a multi-configuration calculation with ``calculate_one_rdm=True`` and ``calculate_two_rdm=True``. See :doc:`MultiConfigurationCalculator <mc_calculator>` for details on generating wavefunctions with RDMs.
+
 **Settings:**
 
 .. list-table::
@@ -206,6 +225,11 @@ QDK AutoCAS EOS
 
 Entropy-based selection using consecutive entropy differences to identify plateau boundaries.
 See :ref:`AutoCAS Algorithm <autocas-algorithm-details>` below for a detailed description.
+
+.. note::
+
+   This method requires the input wavefunction to have orbital entropies populated.
+   Orbital entropies are computed from the one- and two-electron reduced density matrices (1-RDM and 2-RDM), which are typically obtained from a multi-configuration calculation with ``calculate_one_rdm=True`` and ``calculate_two_rdm=True``. See :doc:`MultiConfigurationCalculator <mc_calculator>` for details on generating wavefunctions with RDMs.
 
 **Settings:**
 

@@ -27,6 +27,26 @@ Using the QubitMapper
 This section demonstrates how to create, configure, and run a qubit mapping.
 The ``run`` method returns a :class:`~qdk_chemistry.data.QubitHamiltonian` object containing the Pauli-string representation.
 
+Input requirements
+~~~~~~~~~~~~~~~~~~
+
+The :class:`~qdk_chemistry.algorithms.QubitMapper` requires the following input:
+
+**Hamiltonian**
+   A :doc:`Hamiltonian <../data/hamiltonian>` instance containing the fermionic one- and
+   two-electron integrals. This is typically constructed using the
+   :doc:`HamiltonianConstructor <hamiltonian_constructor>` algorithm.
+
+   The Hamiltonian defines the fermionic operators that will be transformed into
+   qubit (Pauli) operators using the selected encoding strategy.
+
+.. note::
+
+   Different encoding strategies (Jordan-Wigner, Bravyi-Kitaev, parity) produce
+   mathematically equivalent qubit Hamiltonians but with different Pauli-string
+   structures. The choice of encoding can affect circuit depth and measurement
+   requirements on quantum hardware.
+
 **Creating a mapper:**
 
 .. tab:: Python API

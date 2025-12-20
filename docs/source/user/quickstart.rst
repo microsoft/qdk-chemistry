@@ -127,6 +127,7 @@ QDK/Chemistry supports various Multi-Configuration (MC) methods including Comple
 
 While multi-configurational methods provide more accurate energy estimates than :term:`SCF`, their primary role in the quantum applications workflow is to generate high-quality initial states for quantum algorithms.
 On scaled fault-tolerant quantum computers, these classically-computed wavefunctions serve as the foundation for state preparation circuits, enabling algorithms such as quantum phase estimation to achieve chemical accuracy for systems that remain intractable for purely classical methods.
+These methods also serve as a critical analysis tool, allowing users to better understand the electronic structure of theire systems of interest and the potential for quantum algorithms to provide meaningful utility over classical state of the art.
 
 In the following example, as the aforementioned (6e, 6o) active space is relatively small, we perform a CASCI calculation to obtain the exact ground state wavefunction within the active space.
 
@@ -221,8 +222,8 @@ See :doc:`comprehensive/algorithms/state_preparation` for more details on the ot
       :end-before: # end-state-prep-circuit
 
 
-Estimate the ground state energy using a quantum algorithm
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Estimate the ground state energy by sampling
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The final step combines the state preparation circuit with the measurement circuits derived from the grouped qubit Hamiltonian to estimate the ground state energy.
 Each measurement circuit appends specific Pauli basis rotations to the state preparation circuit, followed by computational basis measurements.

@@ -32,7 +32,22 @@ Running orbital localization
 ----------------------------
 
 This section demonstrates how to create, configure, and run orbital localization.
-The ``run`` method takes an :doc:`Orbitals <../data/orbitals>` instance (typically from an :doc:`ScfSolver <scf_solver>` calculation) and returns a new :doc:`Orbitals <../data/orbitals>` object with transformed orbitals.
+The ``run`` method takes a :class:`~qdk_chemistry.data.Wavefunction` instance and returns a new :class:`~qdk_chemistry.data.Wavefunction` object with transformed orbitals.
+
+Input requirements
+~~~~~~~~~~~~~~~~~~
+
+The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` requires the following inputs:
+
+**Wavefunction**
+   A :class:`~qdk_chemistry.data.Wavefunction` instance containing the molecular orbitals to be localized.
+
+**Alpha orbital indices (loc_indices_a)**
+   A list/vector of indices specifying which alpha orbitals to include in the localization. Indices must be sorted in ascending order.
+
+**Beta orbital indices (loc_indices_b)**
+   A list/vector of indices specifying which beta orbitals to include in the localization. Indices must be sorted in ascending order.
+
 
 **Creating a localizer:**
 

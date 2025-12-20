@@ -21,8 +21,19 @@ The algorithm supports:
 Using the HamiltonianConstructor
 ---------------------------------
 
-This section demonstrates how to create, configure, and run a Hamiltonian construction.
-The ``run`` method returns a :doc:`Hamiltonian <../data/hamiltonian>` object containing the one- and two-electron integrals.
+This section demonstrates how to create, configure, and run a Hamiltonian construction. The ``run`` method returns a :doc:`Hamiltonian <../data/hamiltonian>` object containing the one- and two-electron integrals.
+
+Input requirements
+~~~~~~~~~~~~~~~~~~
+
+The ``HamiltonianConstructor`` requires the following input:
+
+**Orbitals**
+   An :doc:`Orbitals <../data/orbitals>` instance describing the single orbital basis in which to express the many-body Hamiltonian. This object contains information about the molecular structure, basis set, and orbital coefficients.
+
+.. note::
+
+   The Orbitals object carries all the information needed for integral transformation, including the basis set and molecular structure. Active space indices, if present, determine which orbitals are included in the output Hamiltonian.
 
 **Creating a constructor:**
 
