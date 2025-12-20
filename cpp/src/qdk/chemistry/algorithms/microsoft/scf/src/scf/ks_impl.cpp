@@ -121,8 +121,7 @@ double KSImpl::total_energy_() {
 
 std::pair<double, RowMajorMatrix>
 KSImpl::evaluate_trial_density_energy_and_fock(
-    const RowMajorMatrix& P_matrix,
-    const std::source_location& loc) const {
+    const RowMajorMatrix& P_matrix, const std::source_location& loc) const {
   QDK_LOG_TRACE_ENTERING();
   // Fock matrix from base class does not include XC contributions; XC terms are
   // added below
