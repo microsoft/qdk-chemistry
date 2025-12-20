@@ -3,8 +3,8 @@
 This script builds a structure from RDKit and optimizes it with UFF force field, converts the
 format to construct a Structure object for QDK Chemistry, then QDK Chemistry performs an SCF
 calculation to obtain the energy. User can extract the function create_structure_from_rdkit to
-build other molecules from RDKit. Note that the UFF optimization may not yield high-quality 
-geometries. Quantum chemistry based geometry optimization algorithms are strongly recommended 
+build other molecules from RDKit. Note that the UFF optimization may not yield high-quality
+geometries. Quantum chemistry based geometry optimization algorithms are strongly recommended
 for practical calculations.
 
 RDKit must be installed to run this sample.
