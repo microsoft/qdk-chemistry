@@ -313,7 +313,7 @@ def test_sample_rdkit_geometry():
 
     geometry_matches = len(actual_coords) == len(expected_coords) and all(
         sym_a == sym_e and np.allclose([xa, ya, za], [xe, ye, ze], atol=1e-4)
-        for (sym_a, xa, ya, za), (sym_e, xe, ye, ze) in zip(actual_coords, expected_coords)
+        for (sym_a, xa, ya, za), (sym_e, xe, ye, ze) in zip(actual_coords, expected_coords, strict=False)
     )
     # Extract and validate the SCF energy
     scf_energy = _extract_float(r"SCF Energy: ([+\-0-9.]+) Hartree", output_text)
