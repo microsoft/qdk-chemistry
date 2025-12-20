@@ -21,14 +21,25 @@ permissions:
 
 jobs:
   coverage:
-    name: Build, Test, and Coverage Analysis
-    runs-on: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
+    name: ${{ matrix.os-name }} Build, Test, and Coverage Analysis
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+        - os-name: Linux
+          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
+          build-parallel: 120
+          uarch: x86-64-v3
+        - os-name: macOS
+          runner: macos-26-xlarge
+          build-parallel: 5
+          uarch: armv8-a
     env:
       BUILD_DIR: cpp/build
-      CMAKE_BUILD_PARALLEL_LEVEL: 120
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
-      QDK_UARCH: x86-64-v3
       CTEST_OUTPUT_ON_FAILURE: 1
+      CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
+      QDK_UARCH: ${{ matrix.uarch }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -48,6 +59,7 @@ jobs:
         cache: pip
 
     - name: Install system packages
+      if: matrix.os-name == 'Linux'
       run: |
         sudo apt-get update
         sudo apt-get install -y \
@@ -65,7 +77,27 @@ jobs:
           graphviz \
           gcovr
 
+    - name: Mac Build Environment Setup
+      if: runner.os == 'macOS'
+      run: |
+        brew update
+        brew install \
+          cmake \
+          ninja \
+          eigen \
+          boost \
+          hdf5 \
+          openblas \
+          lapack \
+          doxygen \
+          graphviz \
+          gcovr \
+          nlohmann-json
+        brew info doxygen
+        brew list --versions doxygen
+
     - name: Install C++ dependencies
+      if: runner.os != 'macOS'
       env:
         INSTALL_PREFIX: ${{ github.workspace }}/install
         BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
@@ -79,13 +111,24 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install --prefix=${{ github.workspace }}/install coverage pytest pytest-cov
 
-    - name: Configure C++ Release build
+    - name: Configure C++ Linux Release build
+      if: runner.os != 'macOS'
       run: |
         cmake -S cpp -B "$BUILD_DIR" \
           -GNinja \
           -DCMAKE_BUILD_TYPE=Release \
           -DQDK_UARCH="$QDK_UARCH" \
           -DBUILD_TESTING=ON
+
+    - name: Configure C++ MacOS Release build
+      if: runner.os == 'macOS'
+      run: |
+        cmake -S cpp -B "$BUILD_DIR" \
+          -GNinja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DQDK_UARCH="$QDK_UARCH" \
+          -DBUILD_TESTING=ON \
+          -DQDK_CHEMISTRY_ENABLE_OPENMP=OFF
 
     - name: Build C++ Release library
       run: cmake --build "$BUILD_DIR"
