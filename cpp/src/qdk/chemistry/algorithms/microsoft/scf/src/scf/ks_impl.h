@@ -6,6 +6,8 @@
 
 #include <qdk/chemistry/scf/core/exc.h>
 
+#include <source_location>
+
 #include "scf/scf_impl.h"
 
 namespace qdk::chemistry::scf {
@@ -67,11 +69,14 @@ class KSImpl : public SCFImpl {
    * @brief Evaluate total energy for a trial density matrix
    *
    * @param P_matrix Trial density matrix
+   * @param loc Source location of the caller (automatically captured)
    * @return Pair of (total energy including XC in Hartree, Fock matrix in AO
    * basis)
    */
   std::pair<double, RowMajorMatrix> evaluate_trial_density_energy_and_fock(
-      const RowMajorMatrix& P_matrix) const override;
+      const RowMajorMatrix& P_matrix,
+      const std::source_location& loc =
+          std::source_location::current()) const override;
 
   /**
    * @brief Get hybridization coefficients for range-separated functionals

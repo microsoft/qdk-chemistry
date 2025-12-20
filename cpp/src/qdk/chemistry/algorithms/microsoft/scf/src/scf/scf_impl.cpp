@@ -970,10 +970,13 @@ void SCFImpl::write_gradients_(const std::vector<double>& gradients,
 
 std::pair<double, RowMajorMatrix>
 SCFImpl::evaluate_trial_density_energy_and_fock(
-    const RowMajorMatrix& P_matrix) const {
+    const RowMajorMatrix& P_matrix, const std::source_location& loc) const {
   QDK_LOG_TRACE_ENTERING();
+
   QDK_LOGGER().debug(
-      "Computing energy and Fock matrix by trial density matrix");
+      "Computing energy and Fock matrix by trial density matrix (called from "
+      "{}:{})",
+      loc.function_name(), loc.line());
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif

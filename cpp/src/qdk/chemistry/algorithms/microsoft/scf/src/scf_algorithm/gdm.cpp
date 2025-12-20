@@ -795,7 +795,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
                                        step_steepest, x_new, fx_new, gfx_new);
     } catch (const std::exception& e2) {
       // Fallback Level 2: Even steepest descent line search failed
-      QDK_LOGGER().error(
+      QDK_LOGGER().warn(
           "Steepest descent line search also failed: {}. Taking fixed 1e-4 "
           "step in steepest descent direction.",
           e2.what());
@@ -808,6 +808,8 @@ void GDM::iterate(SCFImpl& scf_impl) {
 
       double grad_norm = gfx_new.norm() / num_molecular_orbitals;
       const double og_threshold = ctx_.cfg->scf_algorithm.og_threshold;
+
+      // 0.5 at here is to make the criteria consist with |FPS - SPF|
       if (fx_new < last_accepted_energy_ || grad_norm < og_threshold * 0.5) {
         QDK_LOGGER().warn(
             "Accepted small fixed step in steepest descent direction with "
