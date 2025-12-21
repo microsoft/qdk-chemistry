@@ -970,7 +970,7 @@ class TestWavefunctionRdmIntegraion:
 
         # Run SCF
         scf = algorithms.create("scf_solver")
-        _, wfn_scf = scf.run(structure, 0, 1, "sto-3g") # minimal basis
+        _, wfn_scf = scf.run(structure, 0, 1, "sto-3g")
 
         # Build Hamiltonian (12e/12o active space)
         as_selector = algorithms.create("active_space_selector", "qdk_valence")
