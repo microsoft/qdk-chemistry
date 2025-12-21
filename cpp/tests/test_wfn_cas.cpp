@@ -460,11 +460,7 @@ TEST_F(CasWavefunctionTest, SerializationRDMs) {
 
   // scf
   auto scf_solver = ScfSolverFactory::create();
-<<<<<<< HEAD
   auto [E_default, wfn_default] = scf_solver->run(structure, 0, 1, basis_set);
-=======
-  auto [E_default, wfn_default] = scf_solver->run(structure, 0, 1, "def2-svp");
->>>>>>> f069de19c4dacb94ceb1384cbcd426aed01f60e0
 
   // build hamiltonian
   auto ham_gen = HamiltonianConstructorFactory::create();

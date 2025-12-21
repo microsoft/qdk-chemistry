@@ -396,14 +396,9 @@ TEST_F(SciWavefunctionTest, SerializationRDMs) {
 
   // scf
   auto scf_solver = ScfSolverFactory::create();
-<<<<<<< HEAD
   const char* basis_set = "sto-3g";
 
   auto [E_default, wfn_default] = scf_solver->run(structure, 0, 1, basis_set);
-=======
-
-  auto [E_default, wfn_default] = scf_solver->run(structure, 0, 1, "sto-3g");
->>>>>>> f069de19c4dacb94ceb1384cbcd426aed01f60e0
 
   // build hamiltonian
   auto ham_gen = HamiltonianConstructorFactory::create();

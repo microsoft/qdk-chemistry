@@ -976,10 +976,6 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
         complex_type.insertMember("r", 0, H5::PredType::NATIVE_DOUBLE);
         complex_type.insertMember("i", sizeof(double),
                                   H5::PredType::NATIVE_DOUBLE);
-        // Verify size
-        if (complex_type.getSize() != 16) {
-          throw std::runtime_error("HDF5 complex type size mismatch");
-        }
 
         H5::DataSet complex_dataset =
             group.createDataSet("coefficients", complex_type, coeff_space);
@@ -1253,20 +1249,10 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
         }
 
         // Native complex compound type
-<<<<<<< HEAD
         H5::CompType complex_type(sizeof(std::complex<double>));
         complex_type.insertMember("r", 0, H5::PredType::NATIVE_DOUBLE);
         complex_type.insertMember("i", sizeof(double),
-=======
-        H5::CompType complex_type(2 * sizeof(double));
-        complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
-        complex_type.insertMember("imag", sizeof(double),
->>>>>>> f069de19c4dacb94ceb1384cbcd426aed01f60e0
                                   H5::PredType::NATIVE_DOUBLE);
-        // Verify size
-        if (complex_type.getSize() != 16) {
-          throw std::runtime_error("HDF5 complex type size mismatch");
-        }
 
         Eigen::VectorXcd coeffs_complex(coeff_size);
         // Read directly into Eigen's memory without intermediate copying
