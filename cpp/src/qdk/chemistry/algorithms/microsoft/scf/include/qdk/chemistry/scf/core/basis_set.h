@@ -72,7 +72,7 @@ class BasisSet {
   std::vector<Shell> ecp_shells;  ///< Effective core potential shells
   std::unordered_map<int, int>
       element_ecp_electrons;  ///< Map from atomic number to ECP electron number
-  int n_ecp_electrons;  ///< Total number of core electrons replaced by ECPs
+  int n_ecp_electrons = 0;  ///< Total number of core electrons replaced by ECPs
 
   /**
    * @brief Load basis set from database (QCSchema) JSON file
@@ -167,6 +167,35 @@ class BasisSet {
    * @return Ordered JSON object containing all basis set data
    */
   nlohmann::ordered_json to_json() const;
+
+  /**
+   * @brief Constructor for basis set from shells
+   *
+   * @param mol Molecular structure
+   * @param input_shells Input shells
+   * @param mode Normalization convention
+   * @param pure Whether to use spherical harmonics
+   * @param sort Whether to sort shells
+   */
+  explicit BasisSet(std::shared_ptr<Molecule> mol,
+                    const std::vector<Shell>& input_shells, BasisMode mode,
+                    bool pure, bool sort);
+  /**
+   * @brief Constructor for basis set from shells with ECPs
+   * @param mol Molecular structure
+   * @param input_shells Orbital atomic orbital shells
+   * @param ecp_shells Effective core potential shells
+   * @param element_ecp_electrons Map from atomic number to ECP electron number
+   * @param n_ecp_electrons Total number of core electrons replaced by ECPs
+   * @param mode Normalization convention
+   * @param pure Whether to use spherical harmonics
+   * @param sort Whether to sort shells
+   */
+  explicit BasisSet(std::shared_ptr<Molecule> mol,
+                    const std::vector<Shell>& input_shells,
+                    const std::vector<Shell>& ecp_shells,
+                    const std::unordered_map<int, int>& element_ecp_electrons,
+                    int n_ecp_electrons, BasisMode mode, bool pure, bool sort);
 
  private:
   /**
