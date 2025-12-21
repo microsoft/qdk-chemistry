@@ -973,8 +973,8 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
         // Use HDF5's native complex number support - no data copying
         // Create compound type for complex numbers (real, imag)
         H5::CompType complex_type(sizeof(std::complex<double>));
-        complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
-        complex_type.insertMember("imag", sizeof(double),
+        complex_type.insertMember("r", 0, H5::PredType::NATIVE_DOUBLE);
+        complex_type.insertMember("i", sizeof(double),
                                   H5::PredType::NATIVE_DOUBLE);
 
         H5::DataSet complex_dataset =
@@ -1250,8 +1250,8 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
 
         // Native complex compound type
         H5::CompType complex_type(sizeof(std::complex<double>));
-        complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
-        complex_type.insertMember("imag", sizeof(double),
+        complex_type.insertMember("r", 0, H5::PredType::NATIVE_DOUBLE);
+        complex_type.insertMember("i", sizeof(double),
                                   H5::PredType::NATIVE_DOUBLE);
 
         Eigen::VectorXcd coeffs_complex(coeff_size);

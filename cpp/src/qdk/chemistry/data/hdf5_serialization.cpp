@@ -75,8 +75,8 @@ VectorVariant load_vector_variant_from_group(H5::Group& grp,
       }
 
       H5::CompType complex_type(sizeof(std::complex<double>));
-      complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
-      complex_type.insertMember("imag", sizeof(double),
+      complex_type.insertMember("r", 0, H5::PredType::NATIVE_DOUBLE);
+      complex_type.insertMember("i", sizeof(double),
                                 H5::PredType::NATIVE_DOUBLE);
 
       Eigen::VectorXcd vec_c(dim);
@@ -117,8 +117,8 @@ MatrixVariant load_matrix_variant_from_group(H5::Group& grp,
       }
 
       H5::CompType complex_type(sizeof(std::complex<double>));
-      complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
-      complex_type.insertMember("imag", sizeof(double),
+      complex_type.insertMember("r", 0, H5::PredType::NATIVE_DOUBLE);
+      complex_type.insertMember("i", sizeof(double),
                                 H5::PredType::NATIVE_DOUBLE);
 
       Eigen::MatrixXcd matrix_c(dims[0], dims[1]);
@@ -251,8 +251,8 @@ void write_vector_to_hdf5(H5::Group& grp, const std::string& name,
       H5::DataSpace dataspace(1, &dim);
 
       H5::CompType complex_type(sizeof(std::complex<double>));
-      complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
-      complex_type.insertMember("imag", sizeof(double),
+      complex_type.insertMember("r", 0, H5::PredType::NATIVE_DOUBLE);
+      complex_type.insertMember("i", sizeof(double),
                                 H5::PredType::NATIVE_DOUBLE);
 
       H5::DataSet dataset = grp.createDataSet(name, complex_type, dataspace);
@@ -279,9 +279,8 @@ void save_matrix_variant_to_group(
     H5::DataSpace matrix_space(2, matrix_dims);
 
     H5::CompType complex_type(sizeof(std::complex<double>));
-    complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
-    complex_type.insertMember("imag", sizeof(double),
-                              H5::PredType::NATIVE_DOUBLE);
+    complex_type.insertMember("r", 0, H5::PredType::NATIVE_DOUBLE);
+    complex_type.insertMember("i", sizeof(double), H5::PredType::NATIVE_DOUBLE);
     H5::DataSet complex_dataset =
         group.createDataSet(storage_name, complex_type, matrix_space);
     // Write directly from Eigen's memory layout without copying
@@ -309,9 +308,8 @@ void save_vector_variant_to_group(
     H5::DataSpace vector_space(1, &vector_dims);
 
     H5::CompType complex_type(sizeof(std::complex<double>));
-    complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
-    complex_type.insertMember("imag", sizeof(double),
-                              H5::PredType::NATIVE_DOUBLE);
+    complex_type.insertMember("r", 0, H5::PredType::NATIVE_DOUBLE);
+    complex_type.insertMember("i", sizeof(double), H5::PredType::NATIVE_DOUBLE);
     H5::DataSet complex_dataset =
         group.createDataSet(storage_name, complex_type, vector_space);
     // Write directly from Eigen's memory layout without copying
