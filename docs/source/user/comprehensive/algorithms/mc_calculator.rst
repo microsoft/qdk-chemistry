@@ -13,20 +13,14 @@ These methods can accurately describe systems with strong static correlation eff
 Static correlation arises when multiple electronic configurations contribute significantly to the wavefunction, such as in bond-breaking processes, transition states, excited states, and open-shell systems.
 The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` algorithm implements various :term:`CI` approaches, from full CI (FCI) to selected :term:`CI` methods that focus on the most important configurations.
 
-The ``run`` method returns:
-
-- **Energy**: Correlated electronic energies for one or more states
-- **Wavefunction**: A :class:`~qdk_chemistry.data.Wavefunction` object containing CI expansion coefficients
-- **RDMs** (optional): One- and two-electron reduced density matrices when ``calculate_one_rdm`` or ``calculate_two_rdm`` are enabled
-
 :term:`MC` calculations capture static correlation but typically require additional methods for dynamic correlation.
-For quantitative accuracy, consider :doc:`DynamicalCorrelationCalculator <dynamical_correlation>` or :doc:`MultiConfigurationScf <mcscf>` methods.
+See :doc:`DynamicalCorrelationCalculator <dynamical_correlation>` or :doc:`MultiConfigurationScf <mcscf>` for complementary approaches.
 
 Using the MultiConfigurationCalculator
 --------------------------------------
 
 This section demonstrates how to create, configure, and run a multi-configuration calculation.
-The ``run`` method takes a :doc:`Hamiltonian <../data/hamiltonian>` object as input and returns energy values and a :class:`~qdk_chemistry.data.Wavefunction` object.
+The ``run`` method takes a :doc:`Hamiltonian <../data/hamiltonian>` object as input and returns a :class:`~qdk_chemistry.data.Wavefunction` object along with its associated energy.
 
 Input requirements
 ~~~~~~~~~~~~~~~~~~
@@ -94,6 +88,39 @@ See `Available implementations`_ below for implementation-specific options.
       :start-after: # start-cell-run
       :end-before: # end-cell-run
 
+Available settings
+------------------
+
+The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` accepts a range of settings to control its behavior.
+All implementations share a common base set of settings from ``MultiConfigurationSettings``:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
+
+   * - Setting
+     - Type
+     - Default
+     - Description
+   * - ``ci_residual_tolerance``
+     - float
+     - ``1e-6``
+     - Convergence threshold for CI iterations
+   * - ``davidson_iterations``
+     - int
+     - ``200``
+     - Maximum number of Davidson iterations
+   * - ``calculate_one_rdm``
+     - bool
+     - ``False``
+     - Calculate one-electron reduced density matrix
+   * - ``calculate_two_rdm``
+     - bool
+     - ``False``
+     - Calculate two-electron reduced density matrix
+
+See :doc:`Settings <settings>` for a more general treatment of settings in QDK/Chemistry.
+
 Available implementations
 -------------------------
 
@@ -121,39 +148,10 @@ MACIS CAS
 
 The MACIS (Many-body Adaptive Configuration Interaction Solver) CAS implementation provides exact Full Configuration Interaction within the active space.
 
-**Capabilities:**
-
-- Complete Active Space CI (CAS-CI)
-- One- and two-electron reduced density matrices
-
-**Settings:**
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 15 15 45
-
-   * - Setting
-     - Type
-     - Default
-     - Description
-   * - ``ci_residual_threshold``
-     - float
-     - ``1e-6``
-     - Convergence threshold for CI iterations
-   * - ``davidson_iterations``
-     - int
-     - ``200``
-     - Maximum number of Davidson iterations
-   * - ``calculate_one_rdm``
-     - bool
-     - ``False``
-     - Calculate one-electron reduced density matrix
-   * - ``calculate_two_rdm``
-     - bool
-     - ``False``
-     - Calculate two-electron reduced density matrix
+This implementation uses only the common settings described above.
 
 .. _macis-asci:
+
 
 MACIS ASCI
 ~~~~~~~~~~
@@ -167,7 +165,20 @@ The MACIS ASCI (Adaptive Sampling Configuration Interaction) provides selected C
 - Adaptive Sampling Configuration Interaction (ASCI)
 - One- and two-electron reduced density matrices
 
-**Common Settings:**
+.. _asci-algorithm:
+
+ASCI Algorithm
+------------------
+
+The Adaptive Sampling Configuration Interaction (ASCI) algorithm :cite:`Tubman2016,Tubman2020` is a selected configuration interaction method that enables efficient treatment of large active spaces by iteratively identifying and including only the most important determinants. QDK/Chemistry integrates the high-performance, parallel implementation of ASCI in the MACIS library :cite:`Williams-Young2023`.
+
+ASCI works by growing the determinant space adaptively: at each iteration, it samples the space of possible determinants and selects those with the largest contributions to the wavefunction. This approach achieves near-CASCI accuracy at a fraction of the computational cost, making it possible to treat active spaces that are intractable for conventional CASCI.
+
+ASCI is especially useful for generating approximate wavefunctions and RDMs for use in automated active space selection protocols (such as AutoCAS), as it provides a good balance between computational cost and accuracy. For best practices, see the :ref:`AutoCAS Algorithm <autocas-algorithm-details>` section in the active space selector documentation.
+
+**Settings:**
+
+In addition to the common settings, MACIS ASCI supports the following implementation-specific settings:
 
 .. list-table::
    :header-rows: 1
@@ -177,22 +188,6 @@ The MACIS ASCI (Adaptive Sampling Configuration Interaction) provides selected C
      - Type
      - Default
      - Description
-   * - ``ci_residual_tolerance``
-     - float
-     - ``1e-6``
-     - Convergence threshold for CI iterations
-   * - ``davidson_iterations``
-     - int
-     - ``200``
-     - Maximum number of Davidson iterations
-   * - ``calculate_one_rdm``
-     - bool
-     - ``False``
-     - Calculate one-electron reduced density matrix
-   * - ``calculate_two_rdm``
-     - bool
-     - ``False``
-     - Calculate two-electron reduced density matrix
    * - ``ntdets_max``
      - int
      - ``100000``
@@ -218,14 +213,6 @@ The MACIS ASCI (Adaptive Sampling Configuration Interaction) provides selected C
      - ``1e-6``
      - Energy tolerance for refinement convergence
 
-**Example:**
-
-.. literalinclude:: ../../../_static/examples/python/mc_calculator.py
-   :language: python
-   :start-after: # start-cell-asci-example
-   :end-before: # end-cell-asci-example
-
-For more details on how to extend QDK/Chemistry with additional implementations, see the :doc:`plugin system <../plugins>` documentation.
 
 Related classes
 ---------------

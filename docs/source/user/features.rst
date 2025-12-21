@@ -84,7 +84,7 @@ Implementation Highlights
 Multi-Configuration Methods
 """""""""""""""""""""""""""
 
-Multi-configuration (:term:`MC`) methods represent the electronic wavefunction as a linear combination of many Slater determinants, enabling accurate description of static (strong) correlation effects.QDK/Chemistry provides access to a hierarchy of :term:`MC` methods:
+Multi-configuration (:term:`MC`) methods represent the electronic wavefunction as a linear combination of many Slater determinants, enabling accurate description of static correlation effects.QDK/Chemistry provides access to a hierarchy of :term:`MC` methods:
 
 **Configuration Interaction:**
 
@@ -103,7 +103,7 @@ See :doc:`comprehensive/algorithms/mc_calculator` and :doc:`comprehensive/algori
 Implementation Highlights
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **Adaptive Sampling Configuration Interaction** (:term:`ASCI`): QDK/Chemistry integrates :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :cite:`Williams-Young2023`, a high-performance, parallel implementation of the Adaptive Sampling Configuration Interaction (:term:`ASCI`) algorithm :cite:`Tubman2016,Tubman2020`. ASCI iteratively grows the determinant space by identifying configurations with the largest contributions to the wavefunction, achieving near-CASCI accuracy at a fraction of the cost. This enables treatment of active spaces that would be intractable for conventional CASCI.
+- **Adaptive Sampling Configuration Interaction** (:term:`ASCI`): QDK/Chemistry integrates :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :cite:`Williams-Young2023`, a high-performance, parallel implementation of the Adaptive Sampling Configuration Interaction (:term:`ASCI`) algorithm :cite:`Tubman2016,Tubman2020`. ASCI iteratively grows the determinant space by identifying configurations with the largest contributions to the wavefunction, achieving near-CASCI accuracy at a fraction of the cost. This enables treatment of active spaces that would be intractable for conventional CASCI. See the :ref:`ASCI Algorithm <asci-algorithm>` section in the MC calculator documentation for details.
 
 
 Dynamical Correlation Methods

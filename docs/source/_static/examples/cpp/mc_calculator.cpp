@@ -10,32 +10,15 @@
 using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 
-// List available multi-configuration calculator implementations
-auto available_mc = MultiConfigurationCalculatorFactory::available();
-std::cout << "Available MC calculators:" << std::endl;
-for (const auto& name : available_mc) {
-  std::cout << "  - " << name << std::endl;
-}
-
-// Create the default MultiConfigurationCalculator instance (MACIS
-// implementation)
+// Create the default MultiConfigurationCalculator instance
 auto mc_calculator = MultiConfigurationCalculatorFactory::create();
-
-// Create a specific type of CI calculator
-auto selected_ci = MultiConfigurationCalculatorFactory::create("macis_cas");
 // end-cell-create
 // --------------------------------------------------------------------------------------------
 
 // --------------------------------------------------------------------------------------------
 // start-cell-configure
 // Set the convergence threshold for the CI iterations
-mc_calculator->settings().set("ci_residual_threshold", 1.0e-6);
-
-// Set the maximum number of Davidson iterations
-mc_calculator->settings().set("davidson_iterations", 200);
-
-// Calculate one-electron reduced density matrix
-mc_calculator->settings().set("calculate_one_rdm", true);
+mc_calculator->settings().set("ci_residual_tolerance", 1.0e-6);
 // end-cell-configure
 // --------------------------------------------------------------------------------------------
 
@@ -48,8 +31,7 @@ Structure structure(coords, symbols);
 
 // Run SCF to get orbitals
 auto scf_solver = ScfSolverFactory::create();
-scf_solver->settings().set("basis_set", "sto-3g");
-auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);
+auto [E_scf, wfn] = scf_solver->run(structure, 0, 1, "sto-3g");
 
 // Build Hamiltonian from orbitals
 auto ham_constructor = HamiltonianConstructorFactory::create();
@@ -63,8 +45,6 @@ auto [E_ci, ci_wavefunction] = mc_calculator->run(hamiltonian, n_alpha, n_beta);
 
 std::cout << "SCF Energy: " << E_scf << " Hartree" << std::endl;
 std::cout << "CI Energy:  " << E_ci << " Hartree" << std::endl;
-std::cout << "Correlation energy: " << E_ci - E_scf << " Hartree" << std::endl;
-std::cout << ci_wavefunction->get_summary() << std::endl;
 // end-cell-run
 // --------------------------------------------------------------------------------------------
 
