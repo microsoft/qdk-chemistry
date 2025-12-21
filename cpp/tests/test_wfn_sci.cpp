@@ -396,9 +396,9 @@ TEST_F(SciWavefunctionTest, SerializationRDMs) {
 
   // scf
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "sto-3g");
+  const char* basis_set = "sto-3g";
 
-  auto [E_default, wfn_default] = scf_solver->run(structure, 0, 1);
+  auto [E_default, wfn_default] = scf_solver->run(structure, 0, 1, basis_set);
 
   // build hamiltonian
   auto ham_gen = HamiltonianConstructorFactory::create();
@@ -516,8 +516,9 @@ TEST_F(SciWavefunctionTest, SerializationRDMsUnrestricted) {
 
   // scf with multiplicity = 2 (doublet state for Li)
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "sto-3g");
-  auto [E_default, wfn_default] = scf_solver->run(structure, 0, 2);
+  const char* basis_set = "sto-3g";
+
+  auto [E_default, wfn_default] = scf_solver->run(structure, 0, 2, basis_set);
 
   // build hamiltonian
   auto ham_gen = HamiltonianConstructorFactory::create();

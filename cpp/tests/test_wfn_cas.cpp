@@ -456,10 +456,11 @@ TEST_F(CasWavefunctionTest, SerializationRDMs) {
   std::vector<Eigen::Vector3d> coords = {{0., 0., 0.}, {1.4, 0., 0.}};
   std::vector<std::string> symbols = {"H", "H"};
   auto structure = std::make_shared<Structure>(coords, symbols);
+  const char* basis_set = "def2-svp";
 
   // scf
   auto scf_solver = ScfSolverFactory::create();
-  auto [E_default, wfn_default] = scf_solver->run(structure, 0, 1);
+  auto [E_default, wfn_default] = scf_solver->run(structure, 0, 1, basis_set);
 
   // build hamiltonian
   auto ham_gen = HamiltonianConstructorFactory::create();
@@ -568,10 +569,11 @@ TEST_F(CasWavefunctionTest, SerializationRDMsUnrestricted) {
   std::vector<Eigen::Vector3d> coords = {{0., 0., 0.}, {1.4, 0., 0.}};
   std::vector<std::string> symbols = {"H", "H"};
   auto structure = std::make_shared<Structure>(coords, symbols);
+  const char* basis_set = "def2-svp";
 
   // scf
   auto scf_solver = ScfSolverFactory::create();
-  auto [E_default, wfn_default] = scf_solver->run(structure, 1, 2);
+  auto [E_default, wfn_default] = scf_solver->run(structure, 1, 2, basis_set);
 
   // build hamiltonian
   auto ham_gen = HamiltonianConstructorFactory::create();
