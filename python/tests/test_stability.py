@@ -589,7 +589,7 @@ class TestStabilityChecker:
         f_minus = create_f_minus_structure()
         scf_solver = self._create_scf_solver()
         scf_solver.settings().set("method", method)
-        _, wavefunction = scf_solver.run(f_minus, -1, 1)
+        _, wavefunction = scf_solver.run(f_minus, -1, 1, "def2-svp")
 
         # Test full stability analysis
         stability_checker = self._create_stability_checker(backend=backend)
@@ -620,7 +620,7 @@ class TestStabilityChecker:
         scf_solver.settings().set("method", method)
         if backend == "pyscf":
             scf_solver.settings().set("xc_grid", 5)
-        _, wavefunction = scf_solver.run(water, 1, 2)
+        _, wavefunction = scf_solver.run(water, 1, 2, "def2-svp")
 
         stability_checker_internal = self._create_stability_checker(backend=backend, internal=True, external=False)
         stability_checker_internal.settings().set("method", method)
