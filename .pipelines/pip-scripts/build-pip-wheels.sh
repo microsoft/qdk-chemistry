@@ -55,8 +55,7 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         wget \
         curl \
         patchelf
-    brew info doxygen
-    brew list --versions doxygen
+    export CMAKE_PREFIX_PATH="/usr/local/opt/homebrew"
 fi
 
 # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
@@ -122,17 +121,32 @@ cd python
 export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
 export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
 
-python3 -m build --wheel \
-    -C build-dir="build/{wheel_tag}" \
-    -C cmake.define.QDK_UARCH=${MARCH} \
-    -C cmake.define.BUILD_SHARED_LIBS=OFF \
-    -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \
-    -C cmake.define.QDK_ENABLE_OPENMP=OFF \
-    -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
-    -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
-    -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
-    -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
-    -C cmake.define.CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
+if [ "$MAC_BUILD" == "OFF" ]; then
+    python3 -m build --wheel \
+        -C build-dir="build/{wheel_tag}" \
+        -C cmake.define.QDK_UARCH=${MARCH} \
+        -C cmake.define.BUILD_SHARED_LIBS=OFF \
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \
+        -C cmake.define.QDK_ENABLE_OPENMP=OFF \
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
+        -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
+        -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
+        -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
+        -C cmake.define.CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
+elif [ "$MAC_BUILD" == "ON" ]; then
+    python3 -m build --wheel \
+        -C build-dir="build/{wheel_tag}" \
+        -C cmake.define.QDK_UARCH=${MARCH} \
+        -C cmake.define.BUILD_SHARED_LIBS=OFF \
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \
+        -C cmake.define.QDK_ENABLE_OPENMP=OFF \
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
+        -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
+        -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
+        -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
+        -C cmake.define.CMAKE_BUILD_PARALLEL_LEVEL=$(nproc) \
+        -C cmake.define.CMAKE_PREFIX_PATH="/usr/local/opt/homebrew"
+fi
 
 echo "Checking shared dependencies..."
 ldd build/cp*/_core.*.so
