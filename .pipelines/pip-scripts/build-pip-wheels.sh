@@ -11,40 +11,53 @@ HDF5_VERSION=${7:-1.13.0}
 BLIS_VERSION=${8:-2.0}
 LIBFLAME_VERSION=${9:-5.2.0}
 PYENV_VERSION=${10:-2.6.15}
+MAC_BUILD=${11:-OFF}
 
 export DEBIAN_FRONTEND=noninteractive
+if [ "$MAC_BUILD" == "OFF" ]; then
+    # Try to prevent stochastic segfault from libc-bin
+    echo "Reinstalling libc-bin..."
+    rm /var/lib/dpkg/info/libc-bin.*
+    apt-get clean
+    apt-get update -q
+    apt install -q libc-bin
 
-# Try to prevent stochastic segfault from libc-bin
-echo "Reinstalling libc-bin..."
-rm /var/lib/dpkg/info/libc-bin.*
-apt-get clean
-apt-get update -q
-apt install -q libc-bin
-
-# Update and install dependencies
-echo "Installing apt dependencies..."
-apt-get update -q
-apt-get install -y -q \
-    python3 python3-pip python3-dev \
-    libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev \
-    libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
-    libffi-dev liblzma-dev \
-    libeigen3-dev \
-    nlohmann-json3-dev \
-    libboost-all-dev \
-    libgtest-dev \
-    libgmock-dev \
-    libfmt-dev \
-    ninja-build \
-    gcc g++ \
-    make \
-    git \
-    wget \
-    curl \
-    unzip \
-    patchelf \
-    build-essential \
-    libpugixml-dev
+    # Update and install dependencies
+    echo "Installing apt dependencies..."
+    apt-get update -q
+    apt-get install -y -q \
+        python3 python3-pip python3-dev \
+        libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev \
+        libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
+        libffi-dev liblzma-dev \
+        libeigen3-dev \
+        nlohmann-json3-dev \
+        libboost-all-dev \
+        libgtest-dev \
+        libgmock-dev \
+        libfmt-dev \
+        ninja-build \
+        gcc g++ \
+        make \
+        git \
+        wget \
+        curl \
+        unzip \
+        patchelf \
+        build-essential \
+        libpugixml-dev
+elif [ "$MAC_BUILD" == "ON" ]; then
+    brew update
+    brew upgrade
+    brew install \
+        ninja \
+        eigen \
+        wget \
+        curl \
+        patchelf
+    brew info doxygen
+    brew list --versions doxygen
+fi
 
 # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
 echo "Downloading and installing CMake ${CMAKE_VERSION}..."

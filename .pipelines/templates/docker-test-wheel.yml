@@ -11,6 +11,9 @@ parameters:
 - name: pythonVersion
   type: string
   default: 3.11
+- name: macBuild
+  type: string
+  default: OFF
 
 steps:
 - script: |
@@ -20,5 +23,6 @@ steps:
       -v ${{ parameters.agentBuildDirectory }}:/workspace \
       -w /workspace/qdk-chemistry/python \
       ${{ parameters.dockerImage }} \
-      bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }}
+      bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
+                                                        ${{ parameters.macBuild }}
   displayName: Test Wheel in Docker Container

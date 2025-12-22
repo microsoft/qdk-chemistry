@@ -27,6 +27,11 @@ parameters:
     arch: aarch64
     march: armv8-a
     imageName: 1es-pt-azurelinux3-arm
+  - name: macos_arm64
+    os: macos
+    arch: aarch64
+    march: armv8-a
+    imageName: ACES_VM_SharedPool_Tahoe
 
 variables:
 - group: QdkChemistry
@@ -76,6 +81,13 @@ extends:
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
+          ${{ if eq(target.os, 'macos') }}:
+            pool:
+              name: AcesShared
+              demands:
+              - ImageOverride -equals ${{ target.imageName }}
+              os: ${{ target.os }}
+
           timeoutInMinutes: 480
           displayName: Build ${{ target.march }} wheels
           variables:
@@ -95,11 +107,11 @@ extends:
           templateContext:
             outputs:
             - output: pipelineArtifact
-              displayName: Upload Linux Python $(pythonVersion) Wheels for ${{ target.march }}
+              displayName: Upload Linux Python $(pythonVersion) Wheels for ${{ target.os }} ${{ target.march }}
               targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
               artifactName: linux-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
-          # Build - x86_64
+          # Build - Linux x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
             - template: .pipelines/templates/docker-pip-wheel.yml@self
               parameters:
@@ -111,7 +123,7 @@ extends:
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
 
-          # Test - x86_64
+          # Test - Linux x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
             - template: .pipelines/templates/docker-test-wheel.yml@self
               parameters:
@@ -120,8 +132,8 @@ extends:
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
 
-          # Build - ARM64
-          - ${{ if eq(target.arch, 'aarch64') }}:
+          # Build - Linux ARM64
+          - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, linux_aarch64) }}:
             - template: .pipelines/templates/docker-pip-wheel.yml@self
               parameters:
                 march: $(buildMarch)
@@ -132,14 +144,32 @@ extends:
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
 
-          # Test - ARM64
-          - ${{ if eq(target.arch, 'aarch64') }}:
+          # Test - Linux ARM64
+          - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, linux_aarch64) }}:
             - template: .pipelines/templates/docker-test-wheel.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
+
+          # Build - macOS ARM64
+          - ${{ if eq(target.os, macos_arm64) }}:
+            - template: .pipelines/templates/build-mac-wheel.yml@self
+              parameters:
+                march: $(buildMarch)
+                buildTesting: OFF
+                enableCoverage: OFF
+                agentBuildDirectory: $(Agent.BuildDirectory)
+                pythonVersion: $(pythonVersion)
+
+          # Test - macOS ARM64
+          - ${{ if eq(target.os, macos) }}:
+            - template: .pipelines/templates/test-mac-wheel.yml@self
+              parameters:
+                agentBuildDirectory: $(Agent.BuildDirectory)
+                pythonVersion: $(pythonVersion)
+                macBuild: ON
 
           # ARM builds require that we transfer ownership of the wheel directory
           # back to the original base image user
