@@ -15,7 +15,6 @@ import os
 import re
 import subprocess
 import sys
-import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
