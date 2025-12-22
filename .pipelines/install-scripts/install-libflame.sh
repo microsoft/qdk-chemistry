@@ -35,6 +35,7 @@ fi
 
 if [ "$MAC_BUID" == "OFF" ]; then
     ln -s /usr/bin/python3 /usr/bin/python
+fi
 
 CFLAGS=${CFLAGS} ./configure \
     --build=$LIBFLAME_BUILD \
