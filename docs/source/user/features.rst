@@ -32,7 +32,7 @@ Implementation Highlights
 
 - **Geometric Direct Minimization (GDM)**: The :ref:`QDK SCF Solver <qdk-scf-native>` implements the GDM algorithm :cite:`VanVoorhis2002` for robust and efficient SCF convergence of challenging systems. This method is particularly helpful for open-shell and small gap systems, which are of high interest in quantum computing applications, yet challenging for many SCF solvers. See the :ref:`SCF Convergence Algorithms <scf-convergence-algorithms>` section for further details.
 
-- **Stability Analysis and Reoptimization**: Challenging SCF problems often converge to local minima that do not represent the true mean-field ground state. QDK/Chemistry includes automated :doc:`comprehensive/algorithms/stability_checker` :cite:`Schlegel1991` tools to identify, perturb and reoptimize unstable solutions, helping users obtain physically meaningful reference states for subsequent calculations.
+- **Stability Analysis and Reoptimization**: Challenging SCF problems often converge to local minima that do not represent the true mean-field ground state, which in turn can lead to incorrect and unintuitive results in post-SCF calculations. QDK/Chemistry includes automated :doc:`comprehensive/algorithms/stability_checker` :cite:`Schlegel1991` tools to identify, perturb and reoptimize unstable solutions, helping users obtain physically meaningful reference states for subsequent calculations.
 
 
 Orbital Localization
@@ -61,9 +61,9 @@ The challenge lies in balancing accuracy and computational cost: an ideal active
 
 **Automated Approaches:**
 
-- **Entanglement-Based Methods**: Utilizing concepts from quantum information theory, these methods identify strongly correlated orbitals based on their entanglement with the rest of the system. QDK/Chemistry includes a native implementation of the AutoCAS algorithm :cite:`Stein2019`, which leverages single-orbital entropies computed from reduced density matrices to systematically select active spaces (see below for details).
+- **Entropy-Based Methods**: Utilizing concepts from quantum information theory, these methods identify strongly correlated orbitals based on their entanglement with the rest of the system. QDK/Chemistry includes a native implementation of the AutoCAS algorithm :cite:`Stein2019`, which leverages single-orbital entropies computed from reduced density matrices to systematically select active spaces (see below for details).
 
-- **Occupation-based Methods**: Automatic selection based on natural orbital occupation numbers. Orbitals with fractional occupations indicate entanglement and are included in the active space.
+- **Occupation-based Methods**: Automatic selection based on natural orbital occupation numbers obtained from correlated many-body methods. Orbitals with fractional occupations indicate entanglement and are included in the active space.
 
 - **AVAS (Automated Valence Active Space)** :cite:`Sayfutyarova2017` — Projects molecular orbitals onto a target atomic orbital basis (e.g., metal 3d orbitals) to systematically identify valence active spaces. This functionality is available through the :ref:`PySCF Plugin <pyscf-avas-plugin>`.
 
@@ -103,7 +103,7 @@ See :doc:`comprehensive/algorithms/mc_calculator` and :doc:`comprehensive/algori
 Implementation Highlights
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **Adaptive Sampling Configuration Interaction** (:term:`ASCI`): QDK/Chemistry integrates :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :cite:`Williams-Young2023`, a high-performance, parallel implementation of the Adaptive Sampling Configuration Interaction (:term:`ASCI`) algorithm :cite:`Tubman2016,Tubman2020`. ASCI iteratively grows the determinant space by identifying configurations with the largest contributions to the wavefunction, achieving near-CASCI accuracy at a fraction of the cost. This enables treatment of active spaces that would be intractable for conventional CASCI. See the :ref:`ASCI Algorithm <asci-algorithm>` section in the MC calculator documentation for details.
+- **Adaptive Sampling Configuration Interaction** (:term:`ASCI`): QDK/Chemistry integrates :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :cite:`Williams-Young2023`, a high-performance, parallel implementation of the Adaptive Sampling Configuration Interaction (:term:`ASCI`) algorithm :cite:`Tubman2016,Tubman2020`. ASCI iteratively grows the determinant space by identifying configurations with the largest contributions to the wavefunction, achieving near-CASCI accuracy at a fraction of the cost. This enables treatment of active spaces that would be intractable for conventional CASCI. See the :ref:`ASCI Algorithm <asci-algorithm>` section for details.
 
 
 Dynamical Correlation Methods
