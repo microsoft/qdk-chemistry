@@ -3,7 +3,7 @@ build-backend = "scikit_build_core.build"
 requires = [
   "scikit-build-core>=0.10.0",
   "pybind11>=2.13.6",
-  "numpy>=1.20.0",
+  "numpy>=1.20.0,<2.4.0",
 ]
 
 
@@ -29,7 +29,7 @@ classifiers = [
   "Topic :: Education",
 ]
 dependencies = [
-  "numpy>=1.20.0",
+  "numpy>=1.20.0,<2.4.0",
   "scipy>=1.7.0",
   "matplotlib==3.10.0",
   "qiskit[qasm3-import]>=2.2.0",
