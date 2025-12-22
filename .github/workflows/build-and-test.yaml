@@ -133,7 +133,7 @@ jobs:
           -DBUILD_TESTING=ON \
           -DQDK_CHEMISTRY_ENABLE_OPENMP=OFF \
           -DBLA_VENDOR=OpenBLAS \
-          -DCMAKE_PREFIX_PATH="/usr/local/opt/homebrew"
+          -DCMAKE_PREFIX_PATH="/opt/homebrew"
 
     - name: Build C++ Release library
       run: cmake --build "$BUILD_DIR"
