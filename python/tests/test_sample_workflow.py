@@ -282,6 +282,7 @@ def test_sample_rdkit_geometry():
     cmd = [sys.executable, "examples/sample_rdkit_geometry.py"]
 
     result = _run_workflow(cmd, repo_root)
+
     if result.returncode != 0 and "ModuleNotFoundError: No module named 'rdkit'" in result.stderr:
         pytest.skip("Skipping: RDKit not installed")
     if result.returncode != 0:
@@ -297,7 +298,7 @@ def test_sample_rdkit_geometry():
     assert any("Number of atoms" in line for line in lines), "Expected molecular summary not found in output."
 
     # Extract and validate the SCF energy
-    scf_energy = _extract_float(r"SCF Energy: ([+\-0-9.]+) Hartree", output_text)
+    scf_energy = _extract_float(r"SCF Energy: ([+\-0-9.]+) Hartree", result.stdout)
 
     # Water SCF energy is expected to be bad because UFF is not expected to yield a high-quality geometry
     reference_scf_energy = -67.13513170
