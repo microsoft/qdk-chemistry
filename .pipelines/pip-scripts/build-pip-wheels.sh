@@ -54,24 +54,26 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         eigen \
         wget \
         curl \
-        patchelf
+        cmake 
     export CMAKE_PREFIX_PATH="/opt/homebrew"
 fi
 
 # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
-echo "Downloading and installing CMake ${CMAKE_VERSION}..."
-export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
-wget -q https://cmake.org/files/v3.28/cmake-${CMAKE_VERSION}.tar.gz -O cmake-${CMAKE_VERSION}.tar.gz
-echo "${CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}.tar.gz" | shasum -a 256 -c || exit 1
-tar -xzf cmake-${CMAKE_VERSION}.tar.gz
-rm cmake-${CMAKE_VERSION}.tar.gz
-cd cmake-${CMAKE_VERSION}
-./bootstrap --parallel=$(nproc) --prefix=/usr/local
-make --silent -j$(nproc)
-make install
-cd ..
-rm -r cmake-${CMAKE_VERSION}
-cmake --version
+if [ "$MAC_BUILD" == "OFF" ]; then
+    echo "Downloading and installing CMake ${CMAKE_VERSION}..."
+    export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
+    wget -q https://cmake.org/files/v3.28/cmake-${CMAKE_VERSION}.tar.gz -O cmake-${CMAKE_VERSION}.tar.gz
+    echo "${CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}.tar.gz" | shasum -a 256 -c || exit 1
+    tar -xzf cmake-${CMAKE_VERSION}.tar.gz
+    rm cmake-${CMAKE_VERSION}.tar.gz
+    cd cmake-${CMAKE_VERSION}
+    ./bootstrap --parallel=$(nproc) --prefix=/usr/local
+    make --silent -j$(nproc)
+    make install
+    cd ..
+    rm -r cmake-${CMAKE_VERSION}
+    cmake --version
+fi
 
 export CFLAGS="-fPIC -Os"
 echo "Downloading and installing BLIS..."
@@ -148,28 +150,35 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         -C cmake.define.CMAKE_PREFIX_PATH="/opt/homebrew"
 fi
 
-echo "Checking shared dependencies..."
-ldd build/cp*/_core.*.so
+if [ "$MAC_BUILD" == "OFF" ]; then
+    echo "Checking shared dependencies..."
+    ldd build/cp*/_core.*.so
 
-# Repair wheel
-auditwheel repair dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
+    # Repair wheel
+    auditwheel repair dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
 
-# Fix RPATH
-WHEEL_FILE=$(ls repaired_wheelhouse/qdk_chemistry-*.whl)
-FULL_WHEEL_PATH="$PWD/$WHEEL_FILE"
-TEMP_DIR=$(mktemp -d)
-python3 -m zipfile -e "$WHEEL_FILE" "$TEMP_DIR"
+    # Fix RPATH
+    WHEEL_FILE=$(ls repaired_wheelhouse/qdk_chemistry-*.whl)
+    FULL_WHEEL_PATH="$PWD/$WHEEL_FILE"
+    TEMP_DIR=$(mktemp -d)
+    python3 -m zipfile -e "$WHEEL_FILE" "$TEMP_DIR"
 
-find "$TEMP_DIR" -name '*.so*' -type f -not -path '*/qdk_chemistry.libs/*' | while read so_file; do
-    echo "Fixing RPATH for main package: $so_file"
-    patchelf --set-rpath '$ORIGIN/../../qdk_chemistry.libs' "$so_file" || true
-done
+    find "$TEMP_DIR" -name '*.so*' -type f -not -path '*/qdk_chemistry.libs/*' | while read so_file; do
+        echo "Fixing RPATH for main package: $so_file"
+        patchelf --set-rpath '$ORIGIN/../../qdk_chemistry.libs' "$so_file" || true
+    done
 
-find "$TEMP_DIR" -path '*/qdk_chemistry.libs/*' -name '*.so*' -type f | while read so_file; do
-    echo "Fixing RPATH for bundled library: $so_file"
-    patchelf --set-rpath '$ORIGIN' "$so_file" || true
-done
+    find "$TEMP_DIR" -path '*/qdk_chemistry.libs/*' -name '*.so*' -type f | while read so_file; do
+        echo "Fixing RPATH for bundled library: $so_file"
+        patchelf --set-rpath '$ORIGIN' "$so_file" || true
+    done
 
-rm "$WHEEL_FILE"
-(cd "$TEMP_DIR" && python3 -m zipfile -c "$FULL_WHEEL_PATH" .)
-rm -rf "$TEMP_DIR"
+    rm "$WHEEL_FILE"
+    (cd "$TEMP_DIR" && python3 -m zipfile -c "$FULL_WHEEL_PATH" .)
+    rm -rf "$TEMP_DIR"
+if [ "$MAC_BUILD" == "ON" ]; then
+    echo "Repairing wheel for macOS..."
+    pip install delocate
+    WHEEL_FILE=$(ls dist/qdk_chemistry-*.whl)
+    python3 -m delocate.delocate_wheel -w repaired_wheelhouse/ "$WHEEL_FILE"
+fi
