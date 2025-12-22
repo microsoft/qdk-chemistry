@@ -12,11 +12,7 @@ The :class:`~qdk_chemistry.algorithms.QubitMapper` algorithm converts fermionic 
 This transformation preserves the operator algebra, particle-number constraints, and antisymmetry required by fermionic statistics.
 The resulting qubit Hamiltonian is mathematically equivalent to the original fermionic Hamiltonian but is now in a form that can be executed on quantum hardware or simulated by quantum algorithms.
 
-The mapper supports multiple encoding strategies:
 
-- **Jordan-Wigner mapping** :cite:`Jordan-Wigner1928`: Encodes each fermionic mode in a single qubit whose state directly represents the orbital occupation.
-- **Parity mapping** :cite:`Love2012`: Encodes qubits with cumulative electron-number parities of the orbitals.
-- **Bravyi-Kitaev mapping** :cite:`Bravyi-Kitaev2002`: Distributes both occupation and parity information across qubits using a binary-tree (Fenwick tree) structure, reducing the average Pauli-string length to logarithmic scaling.
 
 Using the QubitMapper
 ---------------------
@@ -95,7 +91,11 @@ Qiskit
 
 **Factory name:** ``"qiskit"``
 
-Qubit mapping implementation integrated through the Qiskit plugin. Supports multiple fermion-to-qubit encoding strategies including Jordan-Wigner, parity, and Bravyi-Kitaev mappings.
+Qubit mapping implementation integrated through the Qiskit plugin. This module supports multiple encoding strategies:
+
+- **Jordan-Wigner mapping** :cite:`Jordan-Wigner1928`: Encodes each fermionic mode in a single qubit whose state directly represents the orbital occupation.
+- **Parity mapping** :cite:`Love2012`: Encodes qubits with cumulative electron-number parities of the orbitals.
+- **Bravyi-Kitaev mapping** :cite:`Bravyi-Kitaev2002`: Distributes both occupation and parity information across qubits using a binary-tree (Fenwick tree) structure, reducing the average Pauli-string length to logarithmic scaling.
 
 **Settings:**
 
@@ -110,7 +110,6 @@ Qubit mapping implementation integrated through the Qiskit plugin. Supports mult
      - string
      - Qubit mapping strategy (``jordan-wigner``, ``bravyi-kitaev``, ``parity``)
 
-For more details on how QDK/Chemistry interfaces with external packages, see the :ref:`plugin system <plugin-system>` documentation.
 
 Related classes
 ---------------
