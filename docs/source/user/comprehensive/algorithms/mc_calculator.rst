@@ -13,7 +13,7 @@ These methods can accurately describe systems with strong static correlation eff
 Static correlation arises when multiple electronic configurations contribute significantly to the wavefunction, such as in bond-breaking processes, transition states, excited states, and open-shell systems.
 The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` algorithm implements various :term:`CI` approaches, from full CI (FCI) to selected :term:`CI` methods that focus on the most important configurations.
 
-:term:`MC` calculations capture static correlation but typically require additional methods for dynamic correlation.
+:term:`MC` calculations capture static correlation but typically require additional methods to capture dynamic correlation, particularly outside the active space.
 See :doc:`DynamicalCorrelationCalculator <dynamical_correlation>` or :doc:`MultiConfigurationScf <mcscf>` for complementary approaches.
 
 Using the MultiConfigurationCalculator
@@ -105,7 +105,7 @@ All implementations share a common base set of settings from ``MultiConfiguratio
    * - ``ci_residual_tolerance``
      - float
      - ``1e-6``
-     - Convergence threshold for CI iterations
+     - Convergence threshold for CI Davidson solver
    * - ``davidson_iterations``
      - int
      - ``200``
@@ -146,7 +146,7 @@ MACIS CAS
 
 **Factory name:** ``"macis_cas"`` (default)
 
-The MACIS (Many-body Adaptive Configuration Interaction Solver) CAS implementation provides exact Full Configuration Interaction within the active space.
+The MACIS (Many-body Adaptive Configuration Interaction Solver) CAS implementation provides a reference solver to compute the exact energy within the active space. This module is very memory and compute intensive, and is thus suitable only for small active spaces.
 
 This implementation uses only the common settings described above.
 
@@ -158,17 +158,12 @@ MACIS ASCI
 
 **Factory name:** ``"macis_asci"``
 
-The MACIS ASCI (Adaptive Sampling Configuration Interaction) provides selected CI for larger active spaces where FCI is computationally prohibitive.
-
-**Capabilities:**
-
-- Adaptive Sampling Configuration Interaction (ASCI)
-- One- and two-electron reduced density matrices
+The MACIS ASCI (Adaptive Sampling Configuration Interaction) implementation provides an efficient selected CI solver that can handle larger active spaces by adaptively selecting the most important configurations. This method balances accuracy and computational cost, making it suitable for medium-sized active spaces.
 
 .. _asci-algorithm:
 
 ASCI Algorithm
-------------------
+^^^^^^^^^^^^^^^
 
 The Adaptive Sampling Configuration Interaction (ASCI) algorithm :cite:`Tubman2016,Tubman2020` is a selected configuration interaction method that enables efficient treatment of large active spaces by iteratively identifying and including only the most important determinants. QDK/Chemistry integrates the high-performance, parallel implementation of ASCI in the MACIS library :cite:`Williams-Young2023`.
 
@@ -176,9 +171,21 @@ ASCI works by growing the determinant space adaptively: at each iteration, it sa
 
 ASCI is especially useful for generating approximate wavefunctions and RDMs for use in automated active space selection protocols (such as AutoCAS), as it provides a good balance between computational cost and accuracy. For best practices, see the :ref:`AutoCAS Algorithm <autocas-algorithm-details>` section in the active space selector documentation.
 
+The ASCI algorithm proceeds as a two-phase optimization:
+
+1. **Growth Phase**: The growth phase focuses on rapidly expanding the determinant space to capture the most important configurations. Starting from an initial set of determinants (often just the Hartree-Fock determinant), ASCI generates new candidate determinants by estimating their importance to the overall wavefunction through perturbation theory. ASCI then ranks their contributions to the wavefunction and selects the most significant ones to add to the determinant space for the subsequent iterations. The Hamiltonian is then projected into this expanded space and diagonalized to produce an improved wavefunction. This process is repeated with a iteratively larger determinant space until a target number of determinants (``ntdets_max``) is reached. The rate at which the determinant space grows is controlled by the ``grow_factor`` setting, which determines how many new determinants are added at each iteration. However, if the search algorithm fails to find enough important determinants, the growth factor is reduced by the ``growth_backoff_rate`` to ensure stability. Conversely, if the search is successful, the growth factor is increased by the ``growth_recovery_rate`` to accelerate convergence in subsequent iterations.
+
+2. **Refinement Phase**: Once the determinant space has reached the target size, the refinement phase begins. In this phase, ASCI focuses on fine-tuning the wavefunction by iteratively improving the selection of determinants within the fixed-size space. The algorithm evaluates the contributions of each determinant to the wavefunction and removes those that contribute least, replacing them with new candidates generated through perturbation theory. This selective pruning and replacement process continues until convergence is achieved, as determined by the ``refine_energy_tol`` setting or until the maximum number of refinement iterations (``max_refine_iter``) is reached.
+
+**The ASCI Search Algorithm**
+
+   In both the growth and refinement phases, the ASCI search algorithm is performed to update the current wavefunction. The key realization of ASCI is that the search can be drastically accelerated by only searching for determinants that are connected via the Hamiltonian from a small set of "core" determinants rather than the full wavefunction at any particular iteration. This module provides several ways to control the size of this core set, including a maximum number of core determinants (``ncdets_max``) as well as allowing the the core space to update dynamically as the wavefunction grows by specifiying that a fixed percentage of the current wavefunction determinants be included in the core set (``core_selection_threshold``). The method for selecting the core determinants is controlled by the ``core_selection_strategy`` setting.
+
+
 **Settings:**
 
 In addition to the common settings, MACIS ASCI supports the following implementation-specific settings:
+
 
 .. list-table::
    :header-rows: 1
@@ -188,26 +195,57 @@ In addition to the common settings, MACIS ASCI supports the following implementa
      - Type
      - Default
      - Description
+
    * - ``ntdets_max``
      - int
      - ``100000``
-     - Maximum number of trial determinants
+     - Maximum number of trial determinants in the variational space
+
    * - ``ntdets_min``
      - int
      - ``100``
-     - Minimum number of trial determinants
+     - Minimum number of trial determinants required
+
+   * - ``core_selection_strategy``
+     - str
+     - ``"percentage"``
+     - Strategy for selecting core determinants ("fixed" or "percentage")
+
+   * - ``core_selection_threshold``
+     - float
+     - ``0.95``
+     - Cumulative weight threshold for core selection (if using percentage strategy)
+
    * - ``ncdets_max``
      - int
      - ``100``
-     - Maximum number of connected determinants
+     - Maximum number of core determinants (if using fixed strategy)
+
    * - ``grow_factor``
      - float
      - ``8.0``
      - Factor for growing determinant space
+
+   * - ``min_grow_factor``
+     - float
+     - ``1.01``
+     - Minimum allowed growth factor
+
+   * - ``growth_backoff_rate``
+     - float
+     - ``0.5``
+     - Rate to reduce grow_factor on failure
+
+   * - ``growth_recovery_rate``
+     - float
+     - ``1.1``
+     - Rate to restore grow_factor on success
+
    * - ``max_refine_iter``
      - int
      - ``6``
-     - Maximum refinement iterations
+     - Maximum number of refinement iterations
+
    * - ``refine_energy_tol``
      - float
      - ``1e-6``

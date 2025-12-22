@@ -9,8 +9,8 @@
 # start-cell-create
 from qdk_chemistry.algorithms import create
 
-# Create the default MultiConfigurationCalculator instance
-mc_calculator = create("multi_configuration_calculator")
+# Create a CAS MultiConfigurationCalculator instance
+mc_calculator = create("multi_configuration_calculator", "macis_cas")
 # end-cell-create
 ################################################################################
 

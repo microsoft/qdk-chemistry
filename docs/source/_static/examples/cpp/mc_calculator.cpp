@@ -10,8 +10,8 @@
 using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 
-// Create the default MultiConfigurationCalculator instance
-auto mc_calculator = MultiConfigurationCalculatorFactory::create();
+// Create a CAS MultiConfigurationCalculator instance
+auto mc_calculator = MultiConfigurationCalculatorFactory::create("macis_cas");
 // end-cell-create
 // --------------------------------------------------------------------------------------------
 
