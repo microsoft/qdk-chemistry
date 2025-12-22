@@ -130,8 +130,7 @@ jobs:
           -DQDK_UARCH="$QDK_UARCH" \
           -DBUILD_TESTING=ON \
           -DQDK_CHEMISTRY_ENABLE_OPENMP=OFF \
-          -DQDK_CHEMISTRY_ENABLE_MPI=OFF \
-          -DCMAKE_PREFIX_PATH="/opt/homebrew"
+          -DQDK_CHEMISTRY_ENABLE_MPI=OFF
 
     - name: Build C++ Release library
       run: cmake --build "$BUILD_DIR"
