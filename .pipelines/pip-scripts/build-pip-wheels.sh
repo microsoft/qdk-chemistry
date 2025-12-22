@@ -77,10 +77,10 @@ fi
 
 export CFLAGS="-fPIC -Os"
 echo "Downloading and installing BLIS..."
-bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} ${CFLAGS}
+bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} ${CFLAGS} ${MAC_BUILD}
 
 echo "Downloading and installing libflame..."
-bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} ${CFLAGS}
+bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} ${CFLAGS} ${MAC_BUILD}
 
 echo "Downloading HDF5 $HDF5_VERSION..."
 export HDF5_CHECKSUM=1826e198df8dac679f0d3dc703aba02af4c614fd6b7ec936cf4a55e6aa0646ec

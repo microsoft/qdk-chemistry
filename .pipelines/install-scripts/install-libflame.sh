@@ -5,6 +5,7 @@ INSTALL_PREFIX=${1:-/usr/local}
 MARCH=${2:-x86-64-v3}
 LIBFLAME_VERSION=${3:-5.2.0}
 CFLAGS=${4:-"-fPIC -O3"}
+MAC_BUILD=${5:-OFF}
 
 # Select architectures to build BLIS for
 if [[ ${MARCH} == 'armv8-a' ]]; then
@@ -28,7 +29,13 @@ mv libflame-${LIBFLAME_VERSION} libflame
 
 # Configure and build libflame
 cd libflame
-ln -s /usr/bin/python3 /usr/bin/python
+if [ "$MAC_BUILD" == "ON" ]; then
+    sudo chmod 755 /usr/local/lib
+fi
+
+if [ "$MAC_BUID" == "OFF" ]; then
+    ln -s /usr/bin/python3 /usr/bin/python
+
 CFLAGS=${CFLAGS} ./configure \
     --build=$LIBFLAME_BUILD \
     --enable-static-build \
