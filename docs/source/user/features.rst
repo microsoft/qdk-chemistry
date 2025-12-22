@@ -132,6 +132,12 @@ Core to quantum algorithms for chemistry is the ability to efficiently prepare q
 
 See :doc:`comprehensive/algorithms/state_preparation` for further details about available state preparation methods and implementations.
 
+Implementation Highlights
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- **GF2+X Sparse Isometry State Preparation**: QDK/Chemistry implements an optimized state preparation algorithm for wavefunctions with sparse amplitude structure. The GF2+X method, a modification of the original sparse isometry work in :cite:`Malvetti2021`, applies GF(2) Gaussian elimination to the binary matrix representation of the quantum state to determine a reduced space representation of the sparse state. This reduced state is then densely encoded via regular isometry :cite:`Christandl2016` on a smaller number of qubits, and finally scattered to the full qubit space using X and CNOT gates. By focusing only on non-zero amplitudes, this approach substantially reduces circuit depth and gate count compared to dense isometry methods, making it especially suitable for selected CI and other sparse wavefunctions.
+
+
 Hamiltonian Encoding
 """"""""""""""""""""
 

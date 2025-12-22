@@ -12,12 +12,6 @@ The electronic Hamiltonian describes the energy of a system of electrons in the 
 It consists of kinetic energy terms, electron-nucleus attraction terms, and electron-electron repulsion terms.
 The ``HamiltonianConstructor`` algorithm computes the matrix elements of this operator in a given orbital basis, which can be the full orbital space or an active subspace.
 
-The algorithm supports:
-
-- **Full-space Hamiltonian**: Computation of the Hamiltonian in the complete orbital space
-- **Active-space Hamiltonian**: Projection of the Hamiltonian into a selected active space
-- **Integral Transformation**: Transformation of integrals from atomic orbital (AO) basis to molecular orbital (MO) basis
-
 Using the HamiltonianConstructor
 ---------------------------------
 

@@ -1,17 +1,16 @@
 State preparation
 =================
 
-The :class:`~qdk_chemistry.algorithms.StatePreparation` algorithm in QDK/Chemistry constructs quantum circuits that load target wavefunctions onto qubits.
+The :class:`~qdk_chemistry.algorithms.StatePreparation` algorithm in QDK/Chemistry constructs quantum circuits that load classical representations of target wavefunctions onto qubits.
 Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.Wavefunction` instance as input and produces an OpenQASM circuit as output.
 The output circuit, when executed, prepares the qubit register in a state that encodes the input wavefunction.
 
 Overview
 --------
 
-The :class:`~qdk_chemistry.algorithms.StatePreparation` module provides two complementary approaches for constructing circuits that load wavefunctions onto qubits:
+The :class:`~qdk_chemistry.algorithms.StatePreparation` module provides tools for constructing quantum circuits that load classical representations of wavefunctions(e.g., a Slater determinant or a linear combination thereof, represented by the `Wavefunction` class)  onto qubits. It supports multiple approaches for state preparation, allowing users to choose the method best suited to their problem. Each approach is designed to efficiently encode quantum states for chemistry applications.
 
-- **Sparse Isometry (GF2+X)**: An optimized approach that leverages sparsity in the target wavefunction. This method applies GF(2) Gaussian elimination to the binary matrix representation of the state, while removing duplicate rows, all-ones rows, and reducing the rank of the diagonal matrix. These reductions correspond to implementing CNOT and X gates that simplify the preparation basis. By performing this GF(2)+X elimination, the algorithm constructs circuits that prepare only the non-zero amplitudes, substantially reducing circuit depth and gate count compared with dense isometry methods.
-- **Regular Isometry**: Isometry-based state preparation proposed by Matthias Christandl :cite:`Christandl2016`, with circuit synthesis integrated through the Qiskit plugin.
+For details on individual methods and their technical implementations, see the `Available implementations`_ section below.
 
 Using the StatePreparation
 --------------------------
@@ -53,6 +52,7 @@ See `Available implementations`_ below for implementation-specific options.
       :end-before: # end-cell-configure
 
 **Running the calculation:**
+
 Once configured, the :class:`~qdk_chemistry.algorithms.StatePreparation` can be used to generate a quantum circuit from a :class:`~qdk_chemistry.data.Wavefunction`.
 
 .. tab:: Python API
@@ -80,7 +80,7 @@ Sparse Isometry GF2+X
 
 **Factory name:** ``"sparse_isometry_gf2x"``
 
-Native QDK/Chemistry implementation of sparse isometry state preparation using GF(2)+X elimination. Optimized for wavefunctions with sparse amplitude structure, substantially reducing circuit depth compared with dense methods.
+This method is an optimized approach that leverages sparsity in the target wavefunction. The GF2+X method, a modification of the original sparse isometry work in :cite:`Malvetti2021`, applies GF(2) Gaussian elimination to the binary matrix representation of the state to determine a reduced space representation of the sparse state. This reduced state is then densely encoded via regular isometry :cite:`Christandl2016` on a smaller number of qubits, and finally scattered to the full qubit space using X and CNOT gates. These reductions correspond to efficient gate sequences that simplify the preparation basis. By focusing only on non-zero amplitudes, this approach substantially reduces circuit depth and gate count compared with dense isometry methods. This method is native to QDK/Chemistry and is especially efficient for wavefunctions with sparse amplitude structure.
 
 **Settings:**
 
@@ -106,7 +106,7 @@ Regular Isometry
 
 **Factory name:** ``"regular_isometry"``
 
-State preparation using regular isometry synthesis via Qiskit. Implements the isometry-based approach proposed by Matthias Christandl.
+This method uses regular isometry synthesis via `Qiskit <https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.circuit.library.StatePreparation>`_, implementing the isometry-based approach proposed by Matthias Christandl :cite:`Christandl2016`. It provides a general solution for state preparation, and is suitable for cases where a dense representation is required or preferred.
 
 **Settings:**
 
