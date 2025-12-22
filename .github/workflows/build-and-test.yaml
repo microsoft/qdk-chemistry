@@ -58,7 +58,7 @@ jobs:
         python-version: '3.13'
         cache: pip
 
-    - name: Install system packages
+    - name: Install Linux system packages
       if: matrix.os-name == 'Linux'
       run: |
         sudo apt-get update
@@ -77,10 +77,11 @@ jobs:
           graphviz \
           gcovr
 
-    - name: Mac Build Environment Setup
+    - name: Install macOS system packages
       if: runner.os == 'macOS'
       run: |
         brew update
+        brew upgrade
         brew install \
           cmake \
           ninja \
@@ -134,8 +135,18 @@ jobs:
       run: cmake --build "$BUILD_DIR"
 
     - name: Run C++ tests in Release mode
+      if: runner.os != 'macOS'
       env:
         OMP_NUM_THREADS: 16
+      run: |
+        cd "$BUILD_DIR"
+        echo "=== Running C++ Tests in Release Mode ==="
+        ctest --output-on-failure --verbose --timeout 300
+
+    - name: Run C++ tests in Release mode
+      if: runner.os == 'macOS'
+      env:
+        OMP_NUM_THREADS: 1
       run: |
         cd "$BUILD_DIR"
         echo "=== Running C++ Tests in Release Mode ==="
