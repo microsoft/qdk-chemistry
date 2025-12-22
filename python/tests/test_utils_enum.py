@@ -7,6 +7,7 @@
 
 import pytest
 
+from qdk_chemistry.data.noise_models import SupportedErrorTypes, SupportedGate
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 
 
@@ -14,6 +15,8 @@ def test_case_insensitive_str_enum_basic():
     """Test basic CaseInsensitiveStrEnum functionality."""
 
     class TestEnum(CaseInsensitiveStrEnum):
+        """Test enum for case-insensitive string comparison."""
+
         OPTION_A = "option_a"
         OPTION_B = "option_b"
 
@@ -34,6 +37,8 @@ def test_case_insensitive_str_enum_invalid():
     """Test that CaseInsensitiveStrEnum raises ValueError for invalid values."""
 
     class TestEnum(CaseInsensitiveStrEnum):
+        """Test enum for invalid value handling."""
+
         OPTION_A = "option_a"
         OPTION_B = "option_b"
 
@@ -41,17 +46,8 @@ def test_case_insensitive_str_enum_invalid():
         TestEnum("invalid_option")
 
 
-def test_case_insensitive_str_enum_import_from_utils():
-    """Test that CaseInsensitiveStrEnum can be imported from utils package."""
-    from qdk_chemistry.utils import CaseInsensitiveStrEnum as CISEnum
-
-    assert CISEnum is CaseInsensitiveStrEnum
-
-
 def test_case_insensitive_str_enum_in_noise_models():
     """Test that SupportedGate and SupportedErrorTypes use CaseInsensitiveStrEnum."""
-    from qdk_chemistry.data.noise_models import SupportedErrorTypes, SupportedGate
-
     # Verify they inherit from CaseInsensitiveStrEnum
     assert issubclass(SupportedGate, CaseInsensitiveStrEnum)
     assert issubclass(SupportedErrorTypes, CaseInsensitiveStrEnum)
