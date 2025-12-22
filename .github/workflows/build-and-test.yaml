@@ -124,12 +124,16 @@ jobs:
     - name: Configure C++ MacOS Release build
       if: runner.os == 'macOS'
       run: |
+        export LDFLAGS="-L/usr/local/opt/openblas/lib -L/usr/local/opt/lapack/lib"
+        export CPPFLAGS="-I/usr/local/opt/openblas/include -I/usr/local/opt/lapack/include"
         cmake -S cpp -B "$BUILD_DIR" \
           -GNinja \
           -DCMAKE_BUILD_TYPE=Release \
           -DQDK_UARCH="$QDK_UARCH" \
           -DBUILD_TESTING=ON \
-          -DQDK_CHEMISTRY_ENABLE_OPENMP=OFF
+          -DQDK_CHEMISTRY_ENABLE_OPENMP=OFF \
+          -DBLA_VENDOR=OpenBLAS \
+          -DCMAKE_PREFIX_PATH="/usr/local/opt/homebrew"
 
     - name: Build C++ Release library
       run: cmake --build "$BUILD_DIR"
