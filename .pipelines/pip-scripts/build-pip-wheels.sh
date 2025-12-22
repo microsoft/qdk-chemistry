@@ -54,7 +54,8 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         eigen \
         wget \
         curl \
-        cmake
+        cmake \
+        gcc
     export CMAKE_PREFIX_PATH="/opt/homebrew"
 fi
 
