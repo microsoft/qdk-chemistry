@@ -46,6 +46,11 @@ CFLAGS=${CFLAGS} ./configure \
     --target=$LIBFLAME_ARCH
 
 make -j$(nproc)
-make install
+
+if [ "$MAC_BUILD" == "ON" ]; then
+    sudo make install
+elif [ "$MAC_BUILD" == "OFF" ]; then
+    make install
+fi
 
 cd ..

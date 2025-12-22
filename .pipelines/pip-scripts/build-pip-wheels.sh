@@ -54,7 +54,7 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         eigen \
         wget \
         curl \
-        cmake 
+        cmake
     export CMAKE_PREFIX_PATH="/opt/homebrew"
 fi
 
@@ -92,7 +92,7 @@ mv hdf5-${HDF5_VERSION} hdf5
 echo "HDF5 $HDF5_VERSION downloaded and extracted successfully"
 
 echo "Installing HDF5..."
-bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} ${CFLAGS}
+bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} ${CFLAGS} ${MAC_BUILD}
 
 # Install pyenv to use non-system python3 versions
 # pyenv is used in place of a venv to prevent any collisions with the system Python

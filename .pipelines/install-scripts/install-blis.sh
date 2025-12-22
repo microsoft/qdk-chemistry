@@ -16,10 +16,6 @@ mv blis-${BLIS_VERSION} blis
 
 cd blis
 
-if [ "$MAC_BUILD" == "ON" ]; then
-    sudo chmod 755 /usr/local/lib
-fi
-
 # Select architectures to build BLIS for
 if [[ ${MARCH} == 'armv8-a' ]]; then
     # Compile for generic architecture due to issues with block
@@ -43,6 +39,11 @@ elif [[ ${MARCH} == 'x86-64-v3' ]]; then
 fi
 
 make -j$(nproc)
-make install
+
+if [ "$MAC_BUILD" == "ON" ]; then
+    sudo make install
+elif [ "$MAC_BUILD" == "OFF" ]; then
+    make install
+fi
 
 cd ..
