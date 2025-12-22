@@ -55,7 +55,7 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         wget \
         curl \
         patchelf
-    export CMAKE_PREFIX_PATH="/usr/local/opt/homebrew"
+    export CMAKE_PREFIX_PATH="/opt/homebrew"
 fi
 
 # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
@@ -145,7 +145,7 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
         -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
         -C cmake.define.CMAKE_BUILD_PARALLEL_LEVEL=$(nproc) \
-        -C cmake.define.CMAKE_PREFIX_PATH="/usr/local/opt/homebrew"
+        -C cmake.define.CMAKE_PREFIX_PATH="/opt/homebrew"
 fi
 
 echo "Checking shared dependencies..."
