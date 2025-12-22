@@ -44,13 +44,12 @@ static void apply_orbital_rotation(RowMajorMatrix& C, const int spin_index,
   const int num_virtual_orbitals =
       num_molecular_orbitals - num_occupied_orbitals;
 
-  // Build the new MO by rotation matrix exp(kappa)
+  // Build the rotation matrix exp(kappa)
   const RowMajorMatrix kappa_matrix = Eigen::Map<const RowMajorMatrix>(
       kappa_vector.data(), num_occupied_orbitals, num_virtual_orbitals);
   RowMajorMatrix kappa_complete =
       RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
 
-  // Construct antisymmetric kappa matrix
   kappa_complete.block(0, num_occupied_orbitals, num_occupied_orbitals,
                        num_virtual_orbitals) = kappa_matrix / 2.0;
   kappa_complete.block(num_occupied_orbitals, 0, num_virtual_orbitals,
@@ -60,6 +59,7 @@ static void apply_orbital_rotation(RowMajorMatrix& C, const int spin_index,
       RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
   matrix_exp(kappa_complete.data(), exp_kappa.data(), num_molecular_orbitals);
 
+  // Rotate C: C' = C * exp(kappa)
   RowMajorMatrix C_before_rotate =
       C.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
               num_molecular_orbitals);
@@ -387,7 +387,6 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
       last_accepted_energy_(std::numeric_limits<double>::infinity()),
       gdm_step_count_(0) {
   QDK_LOG_TRACE_ENTERING();
-  // Calculate values from SCFContext
   const auto& cfg = *ctx.cfg;
   const auto& mol = *ctx.mol;
 
@@ -543,7 +542,6 @@ void GDM::generate_pseudo_canonical_orbital_(
 
 void GDM::iterate(SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
-  // Extract matrices from scf_impl
   auto& C = scf_impl.orbitals_matrix();
   const auto& F = scf_impl.get_fock_matrix();
 
@@ -732,10 +730,9 @@ void GDM::iterate(SCFImpl& scf_impl) {
         "Clearing history and restarting BFGS with initial Hessian.",
         kappa_dot_grad, latest_inverse_rho);
 
-    // Clear BFGS history
+    // Clear BFGS history, then recompute kappa using initial Hessian
+    // approximation
     history_size_ = 0;
-
-    // Recompute kappa using initial Hessian approximation
     for (int index = 0; index < total_rotation_size_; index++) {
       kappa_(index) = -current_gradient_(index) / initial_hessian(index);
     }
@@ -762,39 +759,42 @@ void GDM::iterate(SCFImpl& scf_impl) {
                               num_density_matrices, num_molecular_orbitals,
                               cfg->unrestricted);
 
-  Eigen::VectorXd x0 = Eigen::VectorXd::Zero(kappa_.size());
-  Eigen::VectorXd p = kappa_;  // Search direction
-  double step = 1.0;           // Initial step size
+  Eigen::VectorXd start_kappa = Eigen::VectorXd::Zero(kappa_.size());
+  Eigen::VectorXd kappa_dir = kappa_;  // Search direction
+  double step = 1.0;                   // Initial step size
 
   // assign variables for line search
-  double fx0 = last_accepted_energy_;
-  Eigen::VectorXd gfx0 = current_gradient_;
-  Eigen::VectorXd x_new(kappa_.size());
-  double fx_new = fx0;             // Initial function value at x0
-  Eigen::VectorXd gfx_new = gfx0;  // Initial gradient at x0
+  double energy_at_start_point = last_accepted_energy_;
+  Eigen::VectorXd grad_at_start_point = current_gradient_;
+  Eigen::VectorXd searched_kappa(kappa_.size());
+  // Function value at new point, initialized to energy_at_start_point
+  double energy_at_searched_kappa = energy_at_start_point;
+  // Function value at new point, initialized to grad_at_start_point
+  Eigen::VectorXd grad_at_searched_kappa = grad_at_start_point;
 
   try {
     // Call Nocedal-Wright line search with strong Wolfe conditions
-    bfgs::nocedal_wright_line_search(line_functor, x0, p, step, x_new, fx_new,
-                                     gfx_new);
+    bfgs::nocedal_wright_line_search(line_functor, start_kappa, kappa_dir, step,
+                                     searched_kappa, energy_at_searched_kappa,
+                                     grad_at_searched_kappa);
   } catch (const std::exception& e) {
     // BFGS line search failed - likely bad search direction
     QDK_LOGGER().warn(
         "BFGS line search failed: {}. Falling back to steepest descent.",
         e.what());
 
-    // Fallback Level 1: Try line search with steepest descent direction
+    // Try line search with steepest descent direction
     Eigen::VectorXd p_steepest = -current_gradient_;
     double step_steepest = 1.0;
 
     try {
-      fx_new = fx0;
-      gfx_new = gfx0;
-      // Attempt line search with gradient descent direction
-      bfgs::nocedal_wright_line_search(line_functor, x0, p_steepest,
-                                       step_steepest, x_new, fx_new, gfx_new);
+      energy_at_searched_kappa = energy_at_start_point;
+      grad_at_searched_kappa = grad_at_start_point;
+      bfgs::nocedal_wright_line_search(
+          line_functor, start_kappa, p_steepest, step_steepest, searched_kappa,
+          energy_at_searched_kappa, grad_at_searched_kappa);
     } catch (const std::exception& e2) {
-      // Fallback Level 2: Even steepest descent line search failed
+      // Even steepest descent line search failed
       QDK_LOGGER().warn(
           "Steepest descent line search also failed: {}. Taking fixed 1e-4 "
           "step in steepest descent direction.",
@@ -802,26 +802,31 @@ void GDM::iterate(SCFImpl& scf_impl) {
 
       // Take very small step in steepest descent direction
       double small_grad_step_length = 1e-4;
-      x_new = -small_grad_step_length * current_gradient_;
-      fx_new = line_functor.eval(x_new);
-      gfx_new = line_functor.grad(x_new);
+      searched_kappa = -small_grad_step_length * current_gradient_;
+      energy_at_searched_kappa = line_functor.eval(searched_kappa);
+      grad_at_searched_kappa = line_functor.grad(searched_kappa);
 
-      double grad_norm = gfx_new.norm() / num_molecular_orbitals;
+      double grad_norm = grad_at_searched_kappa.norm() / num_molecular_orbitals;
       const double og_threshold = ctx_.cfg->scf_algorithm.og_threshold;
 
-      // 0.5 at here is to make the criteria consist with |FPS - SPF|
-      if (fx_new < last_accepted_energy_ || grad_norm < og_threshold * 0.5) {
+      // grad_norm condition is to make the step acceptable when it meets the
+      // convergence criterion. 0.5 here is to make it consistent with
+      // |FPS - SPF| criterion in SCFImpl::check_convergence(), which is 2 times
+      // of the gradient norm criterion.
+      if (energy_at_searched_kappa < last_accepted_energy_ ||
+          grad_norm < og_threshold * 0.5) {
         QDK_LOGGER().warn(
             "Accepted small fixed step in steepest descent direction with "
             "energy {:.12e}.",
-            fx_new);
+            energy_at_searched_kappa);
       } else {
         QDK_LOGGER().error(
             "Small fixed step in steepest descent direction did not lower "
             "energy (energy {:.12e}). SCF iteration aborted.",
-            fx_new);
+            energy_at_searched_kappa);
         throw std::runtime_error(
-            "GDM SCF iteration failed: unable to find acceptable step.");
+            "GDM SCF optimization failed: unable to find acceptable step; "
+            "aborting SCF procedure.");
       }
     }
   }
@@ -830,9 +835,9 @@ void GDM::iterate(SCFImpl& scf_impl) {
   scf_impl.orbitals_matrix() = line_functor.get_cached_C();
   scf_impl.density_matrix() = line_functor.get_cached_P();
 
-  delta_energy_ = fx_new - last_accepted_energy_;
-  last_accepted_energy_ = fx_new;
-  history_kappa_.row(history_size_) = x_new;
+  delta_energy_ = energy_at_searched_kappa - last_accepted_energy_;
+  last_accepted_energy_ = energy_at_searched_kappa;
+  history_kappa_.row(history_size_) = searched_kappa;
   previous_gradient_ = current_gradient_;
 
   gdm_step_count_++;
