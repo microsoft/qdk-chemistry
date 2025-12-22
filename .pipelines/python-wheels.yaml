@@ -68,22 +68,22 @@ extends:
       jobs:
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
-          ${{ if eq(target.arch, 'aarch64') }}:
+          ${{ if eq(target.os, 'macos') }}:
+            pool:
+              name: AcesShared
+              demands:
+              - ImageOverride -equals ${{ target.imageName }}
+              os: ${{ target.os }}
+          ${{ elseif eq(target.arch, 'aarch64') }}:
             pool:
               name: $(CPU_POOL_ARM)
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
               hostArchitecture: Arm64
-          ${{ if eq(target.arch, 'x86_64') }}:
+          ${{ else }}:
             pool:
               name: $(CPU_POOL_X86)
-              demands:
-              - ImageOverride -equals ${{ target.imageName }}
-              os: ${{ target.os }}
-          ${{ if eq(target.os, 'macos') }}:
-            pool:
-              name: AcesShared
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
@@ -107,9 +107,9 @@ extends:
           templateContext:
             outputs:
             - output: pipelineArtifact
-              displayName: Upload Linux Python $(pythonVersion) Wheels for ${{ target.os }} ${{ target.march }}
+              displayName: Upload Python $(pythonVersion) Wheels for ${{ target.os }} ${{ target.march }}
               targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
-              artifactName: linux-${{ target.arch }}-wheels-python$(pythonVersion)
+              artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
           # Build - Linux x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
@@ -133,7 +133,7 @@ extends:
                 pythonVersion: $(pythonVersion)
 
           # Build - Linux ARM64
-          - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, linux_aarch64) }}:
+          - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
             - template: .pipelines/templates/docker-pip-wheel.yml@self
               parameters:
                 march: $(buildMarch)
@@ -145,7 +145,7 @@ extends:
                 pythonVersion: $(pythonVersion)
 
           # Test - Linux ARM64
-          - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, linux_aarch64) }}:
+          - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
             - template: .pipelines/templates/docker-test-wheel.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
@@ -154,7 +154,7 @@ extends:
                 pythonVersion: $(pythonVersion)
 
           # Build - macOS ARM64
-          - ${{ if eq(target.os, macos_arm64) }}:
+          - ${{ if eq(target.os, 'macos') }}:
             - template: .pipelines/templates/build-mac-wheel.yml@self
               parameters:
                 march: $(buildMarch)
@@ -164,7 +164,7 @@ extends:
                 pythonVersion: $(pythonVersion)
 
           # Test - macOS ARM64
-          - ${{ if eq(target.os, macos) }}:
+          - ${{ if eq(target.os, 'macos') }}:
             - template: .pipelines/templates/test-mac-wheel.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
@@ -222,10 +222,19 @@ extends:
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.11
           - input: pipelineArtifact
             artifactName: linux-aarch64-wheels-python3.12
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.12
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.12
           - input: pipelineArtifact
             artifactName: linux-aarch64-wheels-python3.13
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.13
+          - input: pipelineArtifact
+            artifactName: macos-aarch64-wheels-python3.11
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.11
+          - input: pipelineArtifact
+            artifactName: macos-aarch64-wheels-python3.12
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.12
+          - input: pipelineArtifact
+            artifactName: macos-aarch64-wheels-python3.13
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.13
         steps:
         - script: |
             mkdir -p $(System.DefaultWorkingDirectory)/target/wheels
