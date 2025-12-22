@@ -119,17 +119,43 @@ Capture instantaneous electron-electron interactions for quantitative accuracy.
 
 → :doc:`comprehensive/algorithms/dynamical_correlation`
 
-Quantum Methods
-^^^^^^^^^^^^^^^
+Quantum Algorithms
+^^^^^^^^^^^^^^^^^^
 
-- **State Preparation and Ansätze**: Construct parameterized quantum circuits for variational algorithms, including chemistry-inspired ansätze like UCCSD.
-  See :doc:`comprehensive/algorithms/state_preparation` and :doc:`comprehensive/data/ansatz`.
+State Preparation
+"""""""""""""""""
 
-- **Hamiltonian Representations**: Transform fermionic Hamiltonians to qubit operators using mappings such as Jordan-Wigner, Bravyi-Kitaev, and parity.
-  See :doc:`comprehensive/algorithms/hamiltonian_constructor` and :doc:`comprehensive/algorithms/qubit_mapper`.
+Core to quantum algorithms for chemistry is the ability to efficiently prepare quantum states that approximate the ground or excited states of molecular systems. In QDK/Chemistry, this process is generally viewed as a mapping between a classical representation of the molecular wavefunction (e.g., a Slater determinant or a linear combination thereof, represented by the `Wavefunction` class) and a circuit that prepares the corresponding quantum state on a quantum computer given a particular qubit encoding (e.g. binary, gray code, etc). QDK/Chemistry provides several state preparation techniques to facilitate this mapping, including:
 
-- **Measurement and Energy Estimation**: Estimate expectation values from quantum measurements using various grouping and sampling strategies.
-  See :doc:`comprehensive/algorithms/energy_estimator`.
+- **Dense Isometry State Preparation**: Implementations of general-purpose state preparation algorithms that can prepare arbitrary quantum states, represented in the occupation number formalism, given their amplitudes.
+- **Sparse Isometry State Preparation**: Optimized algorithms for preparing quantum states with a small number of non-zero amplitudes, such as those arising from selected CI methods.
+
+See :doc:`comprehensive/algorithms/state_preparation` for further details about available state preparation methods and implementations.
+
+Hamiltonian Encoding
+""""""""""""""""""""
+
+Classical quantum chemistry methods are generally expressed in the language of second quantization, using fermionic creation and annihilation operators to describe interactions between electron configurations. However, quantum computers operate on qubits, necessitating a transformation from fermionic operators to qubit operators. QDK/Chemistry implements several standard mapping techniques to achieve this:
+
+- **Jordan-Wigner Transformation** :cite:`Jordan-Wigner1928` — A straightforward mapping that encodes fermionic operators directly onto qubits, preserving the algebraic structure of the operators.
+- **Bravyi-Kitaev Transformation** :cite:`Bravyi-Kitaev2002` — A more efficient mapping that reduces the number of qubits required for certain operations by balancing locality and parity information.
+- **Parity Transformation** :cite:`Love2012` — An alternative mapping that encodes fermionic operators based on the parity of occupation numbers, offering advantages in specific contexts.
+
+Fermion-to-qubit mapping is currently supported through QDK/Chemistry's Qiskit plugin; see the :doc:`comprehensive/algorithms/qubit_mapper` for further details.
+
+
+Observable Sampling
+"""""""""""""""""""
+
+After preparing a quantum state representing the molecular system, a common next step is to compute physical observables, such as the ground state energy. One canonical choice for this task is to estimate the expectation value through statistical sampling of measurements performed on the quantum state relative to the operator of interest. This generally involves two primary steps:
+
+1. **Operator Decomposition**: The target operator (e.g., the electronic Hamiltonian) is decomposed into a sum of measurable components, often expressed in terms of Pauli operators. This decomposition facilitates efficient measurement on quantum hardware. Starting from a qubit mapped Hamiltonain, this task generally invobelves grouping Pauli terms into sets of mutually commuting operators that can be measured simultaneously. QDK/Chemistry provides utilities to perform, for example, `Pauli grouping by qubit-wise commutativity <https://qiskit.org/documentation/stubs/qiskit.opflow.grouping.PauliGrouper.html>`_ through its Qiskit plugin.
+
+2. **Circuit Execution and Measurement**: Given the state preparation circuit and the decomposed operator, quantum circuits are executed on quantum hardware or simulators to obtain measurement outcomes.
+3. **Classical Post-Processing**: The measurement results are processed classically to estimate the expectation value of the operator.
+
+See :doc:`comprehensive/algorithms/energy_estimator` for further details about available observable sampling methods and implementations.
+
 
 
 Community Open Source Software Dependencies
