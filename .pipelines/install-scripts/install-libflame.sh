@@ -29,11 +29,10 @@ mv libflame-${LIBFLAME_VERSION} libflame
 
 # Configure and build libflame
 cd libflame
-if [ "$MAC_BUILD" == "ON" ]; then
-    sudo chmod 755 /usr/local/lib
-fi
 
-if [ "$MAC_BUID" == "OFF" ]; then
+if [ "$MAC_BUILD" == "ON" ]; then
+    sudo ln -s /usr/bin/python3 /usr/bin/python
+elif [ "$MAC_BUILD" == "OFF" ]; then
     ln -s /usr/bin/python3 /usr/bin/python
 fi
 
