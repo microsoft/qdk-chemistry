@@ -191,8 +191,9 @@ elif [ "$MAC_BUILD" == "ON" ]; then
     echo "Repairing wheel for macOS..."
     pip install delocate
     WHEEL_FILE=$(ls dist/qdk_chemistry-*.whl)
-    python3 -m delocate.delocate_wheel -w repaired_wheelhouse/ "$WHEEL_FILE"
-    
+    delocate-wheel -w repaired_wheelhouse/ "$WHEEL_FILE"
+    delocate-listdeps --all repaired_wheelhouse/qdk_chemistry*.whl
+
     echo "Checking shared dependencies..."
     otool -L build/cp*/_core.*.so
 fi
