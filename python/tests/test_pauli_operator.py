@@ -1,9 +1,4 @@
-"""Tests for PauliOperator and Pauli operator expression math.
-
-These tests mirror the C++ tests in cpp/tests/test_pauli_operator.cpp.
-The Python API only directly exposes PauliOperator; Product and Sum expressions
-are created implicitly through arithmetic operations.
-"""
+"""Tests for PauliOperator and Pauli operator expression math."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
