@@ -56,7 +56,8 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         curl \
         cmake \
         gcc \
-        boost
+        boost \
+        pybind11
     export CMAKE_PREFIX_PATH="/opt/homebrew"
 fi
 
