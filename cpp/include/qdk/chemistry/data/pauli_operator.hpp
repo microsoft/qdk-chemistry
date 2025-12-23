@@ -100,12 +100,77 @@ class PauliOperatorExpression {
   virtual std::vector<std::pair<std::complex<double>, std::string>>
   to_canonical_terms() const = 0;
 
-  bool is_pauli_operator() const;
+  /**
+   * @brief Attempts to dynamically cast this expression to a PauliOperator.
+   * @return Pointer to PauliOperator if successful, nullptr otherwise.
+   */
+  PauliOperator* as_pauli_operator();
 
-  bool is_product_expression() const;
+  /**
+   * @brief Attempts to dynamically cast this expression to a PauliOperator.
+   * @return Pointer to PauliOperator if successful, nullptr otherwise.
+   */
+  const PauliOperator* as_pauli_operator() const;
 
-  bool is_sum_expression() const;
+  /**
+   * @brief Attempts to dynamically cast this expression to a
+   * ProductPauliOperatorExpression.
+   * @return Pointer to ProductPauliOperatorExpression if successful, nullptr
+   * otherwise.
+   */
+  ProductPauliOperatorExpression* as_product_expression();
 
+  /**
+   * @brief Attempts to dynamically cast this expression to a
+   * ProductPauliOperatorExpression.
+   * @return Pointer to ProductPauliOperatorExpression if successful, nullptr
+   * otherwise.
+   */
+  const ProductPauliOperatorExpression* as_product_expression() const;
+
+  /**
+   * @brief Attempts to dynamically cast this expression to a
+   * SumPauliOperatorExpression.
+   * @return Pointer to SumPauliOperatorExpression if successful, nullptr
+   * otherwise.
+   */
+  SumPauliOperatorExpression* as_sum_expression();
+
+  /**
+   * @brief Attempts to dynamically cast this expression to a
+   * SumPauliOperatorExpression.
+   * @return Pointer to SumPauliOperatorExpression if successful, nullptr
+   * otherwise.
+   */
+  const SumPauliOperatorExpression* as_sum_expression() const;
+
+  /**
+   * @brief Returns whether this expression is a Pauli operator.
+   * @return true if this is a PauliOperator, false otherwise.
+   */
+  inline bool is_pauli_operator() const {
+    return as_pauli_operator() != nullptr;
+  }
+
+  /**
+   * @brief Returns whether this expression is a product expression.
+   * @return true if this is a ProductPauliOperatorExpression, false otherwise.
+   */
+  inline bool is_product_expression() const {
+    return as_product_expression() != nullptr;
+  }
+
+  /**
+   * @brief Returns whether this expression is a sum expression.
+   * @return true if this is a SumPauliOperatorExpression, false otherwise.
+   */
+  inline bool is_sum_expression() const {
+    return as_sum_expression() != nullptr;
+  }
+  /**
+   * @brief Returns whether this expression is in distributed form.
+   * @return true if this is a SumPauliOperatorExpression, false otherwise.
+   */
   bool is_distributed() const;
 };
 
@@ -325,6 +390,35 @@ class SumPauliOperatorExpression : public PauliOperatorExpression {
  private:
   std::vector<std::unique_ptr<PauliOperatorExpression>> terms_;
 };
+
+// --- Inline member function definitions moved out of class body ---
+inline PauliOperator* PauliOperatorExpression::as_pauli_operator() {
+  return dynamic_cast<PauliOperator*>(this);
+}
+
+inline const PauliOperator* PauliOperatorExpression::as_pauli_operator() const {
+  return dynamic_cast<const PauliOperator*>(this);
+}
+
+inline ProductPauliOperatorExpression*
+PauliOperatorExpression::as_product_expression() {
+  return dynamic_cast<ProductPauliOperatorExpression*>(this);
+}
+
+inline const ProductPauliOperatorExpression*
+PauliOperatorExpression::as_product_expression() const {
+  return dynamic_cast<const ProductPauliOperatorExpression*>(this);
+}
+
+inline SumPauliOperatorExpression*
+PauliOperatorExpression::as_sum_expression() {
+  return dynamic_cast<SumPauliOperatorExpression*>(this);
+}
+
+inline const SumPauliOperatorExpression*
+PauliOperatorExpression::as_sum_expression() const {
+  return dynamic_cast<const SumPauliOperatorExpression*>(this);
+}
 
 // Operator Overloads
 

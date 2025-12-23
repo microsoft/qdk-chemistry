@@ -42,24 +42,11 @@ std::string pauli_operator_scalar_to_string(std::complex<double> coefficient) {
 
 // ABC methods
 
-bool PauliOperatorExpression::is_pauli_operator() const {
-  return dynamic_cast<const PauliOperator*>(this) != nullptr;
-}
-
-bool PauliOperatorExpression::is_product_expression() const {
-  return dynamic_cast<const ProductPauliOperatorExpression*>(this) != nullptr;
-}
-
-bool PauliOperatorExpression::is_sum_expression() const {
-  return dynamic_cast<const SumPauliOperatorExpression*>(this) != nullptr;
-}
-
 bool PauliOperatorExpression::is_distributed() const {
   if (is_pauli_operator()) {
     return true;
   } else if (is_product_expression()) {
-    const auto* prod =
-        dynamic_cast<const ProductPauliOperatorExpression*>(this);
+    const auto* prod = as_product_expression();
     for (const auto& factor : prod->get_factors()) {
       if (factor->is_sum_expression() || !factor->is_distributed()) {
         return false;
@@ -67,7 +54,7 @@ bool PauliOperatorExpression::is_distributed() const {
     }
     return true;
   } else if (is_sum_expression()) {
-    const auto* sum = dynamic_cast<const SumPauliOperatorExpression*>(this);
+    const auto* sum = as_sum_expression();
     for (const auto& term : sum->get_terms()) {
       if (!term->is_distributed()) {
         return false;
@@ -78,25 +65,17 @@ bool PauliOperatorExpression::is_distributed() const {
   return false;
 }
 
-// PauliOperator methods
+/*************************
+ * PauliOperator methods *
+ *************************/
 
 PauliOperator::PauliOperator(std::uint8_t operator_type,
                              std::uint64_t qubit_index)
     : operator_type_(operator_type), qubit_index_(qubit_index) {}
 
 std::string PauliOperator::to_string() const {
-  switch (operator_type_) {
-    case 0:
-      return "I(" + std::to_string(qubit_index_) + ")";
-    case 1:
-      return "X(" + std::to_string(qubit_index_) + ")";
-    case 2:
-      return "Y(" + std::to_string(qubit_index_) + ")";
-    case 3:
-      return "Z(" + std::to_string(qubit_index_) + ")";
-    default:
-      throw std::runtime_error("Invalid Pauli operator type");
-  }
+  return std::string(1, this->to_char()) + "(" + std::to_string(qubit_index_) +
+         ")";
 }
 
 std::unique_ptr<PauliOperatorExpression> PauliOperator::clone() const {
@@ -172,7 +151,10 @@ PauliOperator::to_canonical_terms() const {
   return to_canonical_terms(qubit_index_ + 1);
 }
 
-// ProductPauliOperatorExpression methods
+/******************************************
+ * ProductPauliOperatorExpression methods *
+ ******************************************/
+
 ProductPauliOperatorExpression::ProductPauliOperatorExpression()
     : coefficient_(1.0) {}
 
@@ -210,14 +192,12 @@ std::string ProductPauliOperatorExpression::to_string() const {
   }
 
   factors_str = factors_[0]->to_string();
-  if (auto _ =
-          dynamic_cast<const SumPauliOperatorExpression*>(factors_[0].get())) {
+  if (factors_[0]->is_sum_expression()) {
     factors_str = "(" + factors_str + ")";
   }
   for (size_t i = 1; i < factors_.size(); ++i) {
     auto _term_str = factors_[i]->to_string();
-    if (auto _ = dynamic_cast<const SumPauliOperatorExpression*>(
-            factors_[i].get())) {
+    if (factors_[i]->is_sum_expression()) {
       _term_str = "(" + _term_str + ")";
     }
     factors_str += " * " + _term_str;
@@ -256,8 +236,7 @@ ProductPauliOperatorExpression::distribute() const {
 
         // Get coefficient from existing term
         std::complex<double> coeff(1.0);
-        if (auto* prod = dynamic_cast<const ProductPauliOperatorExpression*>(
-                existing_term.get())) {
+        if (auto* prod = existing_term->as_product_expression()) {
           coeff = prod->get_coefficient();
           // Copy factors from existing term
           for (const auto& f : prod->get_factors()) {
@@ -268,8 +247,7 @@ ProductPauliOperatorExpression::distribute() const {
         }
 
         // Multiply coefficient from factor term
-        if (auto* prod = dynamic_cast<const ProductPauliOperatorExpression*>(
-                factor_term.get())) {
+        if (auto* prod = factor_term->as_product_expression()) {
           coeff *= prod->get_coefficient();
           // Add factors from factor term
           for (const auto& f : prod->get_factors()) {
@@ -301,8 +279,7 @@ ProductPauliOperatorExpression::simplify() const {
   std::complex<double> new_coefficient = coefficient_;
   for (const auto& factor : factors_) {
     auto simplified_factor = factor->simplify();
-    if (auto* prod = dynamic_cast<const ProductPauliOperatorExpression*>(
-            simplified_factor.get())) {
+    if (auto* prod = simplified_factor->as_product_expression()) {
       new_coefficient *= prod->get_coefficient();
     }
   }
@@ -312,8 +289,7 @@ ProductPauliOperatorExpression::simplify() const {
       std::make_unique<ProductPauliOperatorExpression>(new_coefficient);
   for (const auto& factor : factors_) {
     auto simplified_factor = factor->simplify();
-    if (auto* prod = dynamic_cast<ProductPauliOperatorExpression*>(
-            simplified_factor.get())) {
+    if (auto* prod = simplified_factor->as_product_expression()) {
       prod->set_coefficient(1.0);  // Remove coefficient from factor
     }
     simplified_product->add_factor(std::move(simplified_factor));
@@ -326,11 +302,9 @@ ProductPauliOperatorExpression::simplify() const {
   std::function<void(const std::unique_ptr<PauliOperatorExpression>&)> unroll =
       [&unrolled_factors,
        &unroll](const std::unique_ptr<PauliOperatorExpression>& expr) {
-        if (auto* pauli = dynamic_cast<const PauliOperator*>(expr.get())) {
+        if (auto* pauli = expr->as_pauli_operator()) {
           unrolled_factors.push_back(expr->clone());
-        } else if (auto* prod =
-                       dynamic_cast<const ProductPauliOperatorExpression*>(
-                           expr.get())) {
+        } else if (auto* prod = expr->as_product_expression()) {
           for (const auto& factor : prod->get_factors()) {
             unroll(factor);
           }
@@ -348,8 +322,8 @@ ProductPauliOperatorExpression::simplify() const {
     auto& factors = simplified_product->factors_;
     std::stable_sort(factors.begin(), factors.end(),
                      [](const auto& a, const auto& b) {
-                       auto* pa = dynamic_cast<const PauliOperator*>(a.get());
-                       auto* pb = dynamic_cast<const PauliOperator*>(b.get());
+                       auto* pa = a->as_pauli_operator();
+                       auto* pb = b->as_pauli_operator();
                        return pa->get_qubit_index() < pb->get_qubit_index();
                      });
 
@@ -366,14 +340,14 @@ ProductPauliOperatorExpression::simplify() const {
 
     size_t i = 0;
     while (i < factors.size()) {
-      auto* current = dynamic_cast<const PauliOperator*>(factors[i].get());
+      auto* current = factors[i]->as_pauli_operator();
       std::uint64_t qubit = current->get_qubit_index();
       std::uint8_t result_type = current->get_operator_type();
 
       // Combine all operators on the same qubit
       size_t j = i + 1;
       while (j < factors.size()) {
-        auto* next = dynamic_cast<const PauliOperator*>(factors[j].get());
+        auto* next = factors[j]->as_pauli_operator();
         if (next->get_qubit_index() != qubit) break;
 
         std::uint8_t next_type = next->get_operator_type();
@@ -462,15 +436,13 @@ std::uint64_t ProductPauliOperatorExpression::min_qubit_index() const {
   }
   std::uint64_t min_idx = std::numeric_limits<std::uint64_t>::max();
   for (const auto& factor : factors_) {
-    if (auto* pauli = dynamic_cast<const PauliOperator*>(factor.get())) {
+    if (auto* pauli = factor->as_pauli_operator()) {
       min_idx = std::min(min_idx, pauli->get_qubit_index());
-    } else if (auto* prod = dynamic_cast<const ProductPauliOperatorExpression*>(
-                   factor.get())) {
+    } else if (auto* prod = factor->as_product_expression()) {
       if (!prod->get_factors().empty()) {
         min_idx = std::min(min_idx, prod->min_qubit_index());
       }
-    } else if (auto* sum = dynamic_cast<const SumPauliOperatorExpression*>(
-                   factor.get())) {
+    } else if (auto* sum = factor->as_sum_expression()) {
       if (!sum->get_terms().empty()) {
         min_idx = std::min(min_idx, sum->min_qubit_index());
       }
@@ -486,15 +458,13 @@ std::uint64_t ProductPauliOperatorExpression::max_qubit_index() const {
   }
   std::uint64_t max_idx = 0;
   for (const auto& factor : factors_) {
-    if (auto* pauli = dynamic_cast<const PauliOperator*>(factor.get())) {
+    if (auto* pauli = factor->as_pauli_operator()) {
       max_idx = std::max(max_idx, pauli->get_qubit_index());
-    } else if (auto* prod = dynamic_cast<const ProductPauliOperatorExpression*>(
-                   factor.get())) {
+    } else if (auto* prod = factor->as_product_expression()) {
       if (!prod->get_factors().empty()) {
         max_idx = std::max(max_idx, prod->max_qubit_index());
       }
-    } else if (auto* sum = dynamic_cast<const SumPauliOperatorExpression*>(
-                   factor.get())) {
+    } else if (auto* sum = factor->as_sum_expression()) {
       if (!sum->get_terms().empty()) {
         max_idx = std::max(max_idx, sum->max_qubit_index());
       }
@@ -521,7 +491,7 @@ std::string ProductPauliOperatorExpression::to_canonical_string(
   std::vector<char> result(max_qubit - min_qubit + 1, 'I');
 
   for (const auto& factor : factors_) {
-    if (auto* pauli = dynamic_cast<const PauliOperator*>(factor.get())) {
+    if (auto* pauli = factor->as_pauli_operator()) {
       std::uint64_t idx = pauli->get_qubit_index();
       if (idx >= min_qubit && idx <= max_qubit) {
         result[idx - min_qubit] = pauli->to_char();
@@ -611,7 +581,7 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
       -> std::vector<std::pair<std::uint64_t, std::uint8_t>> {
     std::vector<std::pair<std::uint64_t, std::uint8_t>> key;
     for (const auto& factor : prod->get_factors()) {
-      if (auto* pauli = dynamic_cast<const PauliOperator*>(factor.get())) {
+      if (auto* pauli = factor->as_pauli_operator()) {
         key.emplace_back(pauli->get_qubit_index(), pauli->get_operator_type());
       }
     }
@@ -627,17 +597,15 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
       add_simplified_term;
   add_simplified_term = [&simplified_terms, &add_simplified_term](
                             std::unique_ptr<PauliOperatorExpression> expr) {
-    if (auto* prod =
-            dynamic_cast<ProductPauliOperatorExpression*>(expr.get())) {
+    if (auto* prod = expr->as_product_expression()) {
       simplified_terms.push_back(
           std::make_unique<ProductPauliOperatorExpression>(*prod));
-    } else if (auto* pauli = dynamic_cast<PauliOperator*>(expr.get())) {
+    } else if (auto* pauli = expr->as_pauli_operator()) {
       // Wrap single PauliOperator in a ProductPauliOperatorExpression
       auto wrapped = std::make_unique<ProductPauliOperatorExpression>();
       wrapped->add_factor(std::make_unique<PauliOperator>(*pauli));
       simplified_terms.push_back(std::move(wrapped));
-    } else if (auto* sum =
-                   dynamic_cast<SumPauliOperatorExpression*>(expr.get())) {
+    } else if (auto* sum = expr->as_sum_expression()) {
       // Recursively add terms from the sum
       for (const auto& term : sum->get_terms()) {
         add_simplified_term(term->clone());
@@ -698,18 +666,17 @@ SumPauliOperatorExpression::prune_threshold(double epsilon) const {
   std::function<void(const PauliOperatorExpression*)> process_term;
   process_term = [&result, epsilon,
                   &process_term](const PauliOperatorExpression* term) {
-    if (auto* sum = dynamic_cast<const SumPauliOperatorExpression*>(term)) {
+    if (auto* sum = term->as_sum_expression()) {
       // Recursively process nested sums
       for (const auto& nested_term : sum->get_terms()) {
         process_term(nested_term.get());
       }
-    } else if (auto* prod =
-                   dynamic_cast<const ProductPauliOperatorExpression*>(term)) {
+    } else if (auto* prod = term->as_product_expression()) {
       // Keep the term only if its coefficient magnitude is >= epsilon
       if (std::abs(prod->get_coefficient()) >= epsilon) {
         result->add_term(term->clone());
       }
-    } else if (auto* pauli = dynamic_cast<const PauliOperator*>(term)) {
+    } else if (auto* pauli = term->as_pauli_operator()) {
       // Bare PauliOperator has implicit coefficient of 1.0
       if (1.0 >= epsilon) {
         result->add_term(term->clone());
@@ -741,15 +708,13 @@ std::uint64_t SumPauliOperatorExpression::min_qubit_index() const {
   }
   std::uint64_t min_idx = std::numeric_limits<std::uint64_t>::max();
   for (const auto& term : terms_) {
-    if (auto* pauli = dynamic_cast<const PauliOperator*>(term.get())) {
+    if (auto* pauli = term->as_pauli_operator()) {
       min_idx = std::min(min_idx, pauli->get_qubit_index());
-    } else if (auto* prod = dynamic_cast<const ProductPauliOperatorExpression*>(
-                   term.get())) {
+    } else if (auto* prod = term->as_product_expression()) {
       if (!prod->get_factors().empty()) {
         min_idx = std::min(min_idx, prod->min_qubit_index());
       }
-    } else if (auto* sum = dynamic_cast<const SumPauliOperatorExpression*>(
-                   term.get())) {
+    } else if (auto* sum = term->as_sum_expression()) {
       if (!sum->get_terms().empty()) {
         min_idx = std::min(min_idx, sum->min_qubit_index());
       }
@@ -765,15 +730,13 @@ std::uint64_t SumPauliOperatorExpression::max_qubit_index() const {
   }
   std::uint64_t max_idx = 0;
   for (const auto& term : terms_) {
-    if (auto* pauli = dynamic_cast<const PauliOperator*>(term.get())) {
+    if (auto* pauli = term->as_pauli_operator()) {
       max_idx = std::max(max_idx, pauli->get_qubit_index());
-    } else if (auto* prod = dynamic_cast<const ProductPauliOperatorExpression*>(
-                   term.get())) {
+    } else if (auto* prod = term->as_product_expression()) {
       if (!prod->get_factors().empty()) {
         max_idx = std::max(max_idx, prod->max_qubit_index());
       }
-    } else if (auto* sum = dynamic_cast<const SumPauliOperatorExpression*>(
-                   term.get())) {
+    } else if (auto* sum = term->as_sum_expression()) {
       if (!sum->get_terms().empty()) {
         max_idx = std::max(max_idx, sum->max_qubit_index());
       }
@@ -806,11 +769,10 @@ std::string SumPauliOperatorExpression::to_canonical_string(
     std::string term_str;
     std::complex<double> coeff(1.0, 0.0);
 
-    if (auto* prod =
-            dynamic_cast<const ProductPauliOperatorExpression*>(term.get())) {
+    if (auto* prod = term->as_product_expression()) {
       coeff = prod->get_coefficient();
       term_str = prod->to_canonical_string(min_qubit, max_qubit);
-    } else if (auto* pauli = dynamic_cast<const PauliOperator*>(term.get())) {
+    } else if (auto* pauli = term->as_pauli_operator()) {
       // Wrap in a product to get canonical string
       ProductPauliOperatorExpression temp_prod;
       temp_prod.add_factor(pauli->clone());
@@ -864,11 +826,10 @@ SumPauliOperatorExpression::to_canonical_terms(std::uint64_t num_qubits) const {
     std::complex<double> coeff(1.0, 0.0);
     std::string term_str;
 
-    if (auto* prod =
-            dynamic_cast<const ProductPauliOperatorExpression*>(term.get())) {
+    if (auto* prod = term->as_product_expression()) {
       coeff = prod->get_coefficient();
       term_str = prod->to_canonical_string(num_qubits);
-    } else if (auto* pauli = dynamic_cast<const PauliOperator*>(term.get())) {
+    } else if (auto* pauli = term->as_pauli_operator()) {
       // Wrap in a product to get canonical string
       ProductPauliOperatorExpression temp_prod;
       temp_prod.add_factor(pauli->clone());
