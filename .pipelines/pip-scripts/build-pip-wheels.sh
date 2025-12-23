@@ -98,8 +98,16 @@ bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} 
 # Install pyenv to use non-system python3 versions
 # pyenv is used in place of a venv to prevent any collisions with the system Python
 # when building with a non-system Python version.
+echo "Installing pyenv ${PYENV_VERSION}..."
 export PYENV_CHECKSUM=95187d6ad9bc8310662b5b805a88506e5cbbe038f88890e5aabe3021711bf3c8
-export PYENV_ROOT="/workspace/.pyenv"
+# Root directory varies depending on whether we are building in a container or in the
+# native runner VM
+if [ "$MAC_BUILD" == "OFF" ]; then
+    export PYENV_ROOT="/workspace/.pyenv"
+elif [ "$MAC_BUILD" == "ON" ]; then
+    export PYENV_ROOT="$PWD/.pyenv"
+fi
+
 wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v${PYENV_VERSION}.zip -O pyenv.zip
 echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -a 256 -c || exit 1
 unzip -q pyenv.zip
@@ -125,6 +133,7 @@ export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
 export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
 
 if [ "$MAC_BUILD" == "OFF" ]; then
+    export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
     python3 -m build --wheel \
         -C build-dir="build/{wheel_tag}" \
         -C cmake.define.QDK_UARCH=${MARCH} \
@@ -134,9 +143,9 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
         -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
         -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
-        -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
-        -C cmake.define.CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
+        -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
 elif [ "$MAC_BUILD" == "ON" ]; then
+    export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
     python3 -m build --wheel \
         -C build-dir="build/{wheel_tag}" \
         -C cmake.define.QDK_UARCH=${MARCH} \
@@ -147,7 +156,6 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
         -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
         -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
-        -C cmake.define.CMAKE_BUILD_PARALLEL_LEVEL=$(nproc) \
         -C cmake.define.CMAKE_PREFIX_PATH="/opt/homebrew"
 fi
 
