@@ -9,9 +9,13 @@ MAC_BUILD=${5:-OFF}
 
 # Select architectures to build BLIS for
 if [[ ${MARCH} == 'armv8-a' ]]; then
-    # Compile for armsve, firestorm, thunderx2, cortexa57, cortexa53, and generic architectures
-    export LIBFLAME_ARCH=arm64
-    export LIBFLAME_BUILD=aarch64-unknown-linux-gnu
+    if [ "$MAC_BUILD" == "OFF" ]; then
+        # Compile for armsve, firestorm, thunderx2, cortexa57, cortexa53, and generic architectures
+        export LIBFLAME_ARCH=arm64
+        export LIBFLAME_BUILD=aarch64-unknown-linux-gnu
+    elif [ "$MAC_BUILD" == "ON" ]; then
+        export LIBFLAME_ARCH=arm64
+    fi
 elif [[ ${MARCH} == 'x86-64-v3' ]]; then
     # Compile for intel64, amd64, and amd64_legacy architectures
     export LIBFLAME_BUILD=x86_64-unknown-linux-gnu
@@ -30,8 +34,11 @@ mv libflame-${LIBFLAME_VERSION} libflame
 # Configure and build libflame
 cd libflame
 
+echo "Python location:"
+which python3
+
 if [ "$MAC_BUILD" == "ON" ]; then
-    sudo ln -s /usr/bin/python3 /usr/bin/python
+    sudo ln -s /usr/local/bin/python3 /usr/local/bin/python
 elif [ "$MAC_BUILD" == "OFF" ]; then
     ln -s /usr/bin/python3 /usr/bin/python
 fi
