@@ -320,12 +320,11 @@ ProductPauliOperatorExpression::simplify() const {
   // If we have factors, sort and combine them
   if (!simplified_product->factors_.empty()) {
     auto& factors = simplified_product->factors_;
-    std::stable_sort(factors.begin(), factors.end(),
-                     [](const auto& a, const auto& b) {
-                       auto* pa = a->as_pauli_operator();
-                       auto* pb = b->as_pauli_operator();
-                       return pa->get_qubit_index() < pb->get_qubit_index();
-                     });
+    std::ranges::stable_sort(factors, [](const auto& a, const auto& b) {
+      auto* pa = a->as_pauli_operator();
+      auto* pb = b->as_pauli_operator();
+      return pa->get_qubit_index() < pb->get_qubit_index();
+    });
 
     // Combine factors acting on the same qubit
     // Pauli multiplication rules:
@@ -364,9 +363,6 @@ ProductPauliOperatorExpression::simplify() const {
         } else {
           // Different non-identity Paulis
           // Use the Levi-Civita symbol for the phase
-          // X=1, Y=2, Z=3
-          // X*Y = iZ, Y*Z = iX, Z*X = iY (cyclic)
-          // Y*X = -iZ, Z*Y = -iX, X*Z = -iY (anti-cyclic)
           int a = result_type;
           int b = next_type;
           // Compute the third Pauli type: {1,2,3} \ {a,b}
@@ -487,10 +483,20 @@ std::string ProductPauliOperatorExpression::to_canonical_string(
 
 std::string ProductPauliOperatorExpression::to_canonical_string(
     std::uint64_t min_qubit, std::uint64_t max_qubit) const {
+  // Check if the term is distributed
+  if (!this->is_distributed()) {
+    throw std::logic_error(
+        "to_canonical_string() requires a distributed "
+        "ProductPauliOperatorExpression. "
+        "Call distribute() first.");
+  }
+
   // Build a map from qubit index to operator type
   std::vector<char> result(max_qubit - min_qubit + 1, 'I');
 
-  for (const auto& factor : factors_) {
+  auto simplified = this->simplify();
+  auto* simplified_product = simplified->as_product_expression();
+  for (const auto& factor : simplified_product->get_factors()) {
     if (auto* pauli = factor->as_pauli_operator()) {
       std::uint64_t idx = pauli->get_qubit_index();
       if (idx >= min_qubit && idx <= max_qubit) {
@@ -518,7 +524,10 @@ ProductPauliOperatorExpression::to_canonical_terms() const {
   return to_canonical_terms(effective_num_qubits);
 }
 
-// SumPauliOperatorExpression methods
+/***************************************
+ *  SumPauliOperatorExpression methods *
+ ***************************************/
+
 SumPauliOperatorExpression::SumPauliOperatorExpression() = default;
 
 SumPauliOperatorExpression::SumPauliOperatorExpression(
@@ -568,13 +577,6 @@ SumPauliOperatorExpression::distribute() const {
 
 std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
     const {
-  // Require the expression to be distributed before simplification
-  if (!this->is_distributed()) {
-    throw std::logic_error(
-        "SumPauliOperatorExpression::simplify() requires a distributed "
-        "expression. Call distribute() first.");
-  }
-
   // Helper function to create a term key from a simplified product
   // The key is a sorted vector of (qubit_index, operator_type) pairs
   auto make_term_key = [](const ProductPauliOperatorExpression* prod)
@@ -613,7 +615,10 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
     }
   };
 
-  for (const auto& term : terms_) {
+  // Distribute first to ensure all terms are products
+  auto distributed = this->distribute();
+
+  for (const auto& term : distributed->get_terms()) {
     auto simplified_term = term->simplify();
     add_simplified_term(std::move(simplified_term));
   }
@@ -628,9 +633,9 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
   for (auto& term : simplified_terms) {
     auto key = make_term_key(term.get());
     // Linear search for existing term with same key
-    auto it = std::find_if(
-        collected_terms.begin(), collected_terms.end(),
-        [&key](const auto& entry) { return std::get<0>(entry) == key; });
+    auto it = std::ranges::find_if(collected_terms, [&key](const auto& entry) {
+      return std::get<0>(entry) == key;
+    });
 
     if (it == collected_terms.end()) {
       // First occurrence of this Pauli string
@@ -763,59 +768,20 @@ std::string SumPauliOperatorExpression::to_canonical_string(
     return "0";
   }
 
-  std::string result;
-  bool first = true;
-  for (const auto& term : terms_) {
-    std::string term_str;
-    std::complex<double> coeff(1.0, 0.0);
-
-    if (auto* prod = term->as_product_expression()) {
-      coeff = prod->get_coefficient();
-      term_str = prod->to_canonical_string(min_qubit, max_qubit);
-    } else if (auto* pauli = term->as_pauli_operator()) {
-      // Wrap in a product to get canonical string
-      ProductPauliOperatorExpression temp_prod;
-      temp_prod.add_factor(pauli->clone());
-      term_str = temp_prod.to_canonical_string(min_qubit, max_qubit);
-    } else {
-      // Fallback for other types
-      term_str = term->to_string();
-    }
-
-    // Format the coefficient
-    std::string coeff_str = detail::pauli_operator_scalar_to_string(coeff);
-
-    if (first) {
-      if (coeff_str.empty()) {
-        result = term_str;
-      } else if (coeff_str == "-") {
-        result = "-" + term_str;
-      } else {
-        result = coeff_str + "*" + term_str;
-      }
-      first = false;
-    } else {
-      if (coeff_str.empty()) {
-        result += " + " + term_str;
-      } else if (coeff_str == "-") {
-        result += " - " + term_str;
-      } else if (coeff.real() < 0 || (coeff.real() == 0 && coeff.imag() < 0)) {
-        // Negative coefficient - format as subtraction
-        std::complex<double> neg_coeff = -coeff;
-        std::string neg_coeff_str =
-            detail::pauli_operator_scalar_to_string(neg_coeff);
-        if (neg_coeff_str.empty()) {
-          result += " - " + term_str;
-        } else {
-          result += " - " + neg_coeff_str + "*" + term_str;
-        }
-      } else {
-        result += " + " + coeff_str + "*" + term_str;
-      }
-    }
+  auto simplified = this->simplify();
+  auto* simplified_sum = simplified->as_sum_expression();
+  if (simplified_sum->get_terms().empty()) {
+    return "0";
   }
 
-  return result;
+  if (simplified_sum->get_terms().size() != 1) {
+    throw std::logic_error(
+        "to_canonical_string() requires a SumPauliOperatorExpression with a "
+        "single term after simplification.");
+  }
+
+  return simplified_sum->get_terms()[0]->to_canonical_string(min_qubit,
+                                                             max_qubit);
 }
 
 std::vector<std::pair<std::complex<double>, std::string>>

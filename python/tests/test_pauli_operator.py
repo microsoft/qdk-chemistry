@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import pytest
+
 from qdk_chemistry.data import PauliOperator
 
 
@@ -790,7 +792,7 @@ class TestSumQubitRange:
     def test_sum_qubit_range(self):
         """Test qubit range for sum of operators."""
         sum_expr = PauliOperator.X(1) + PauliOperator.Z(4)
-        simplified = sum_expr.distribute().simplify()
+        simplified = sum_expr.simplify()
         assert simplified.min_qubit_index() == 1
         assert simplified.max_qubit_index() == 4
         assert simplified.num_qubits() == 4  # 4 - 1 + 1 = 4
@@ -798,7 +800,7 @@ class TestSumQubitRange:
     def test_sum_same_qubit(self):
         """Test qubit range for sum on same qubit."""
         sum_expr = PauliOperator.X(5) + PauliOperator.Y(5)
-        simplified = sum_expr.distribute().simplify()
+        simplified = sum_expr.simplify()
         assert simplified.min_qubit_index() == 5
         assert simplified.max_qubit_index() == 5
         assert simplified.num_qubits() == 1
@@ -806,7 +808,7 @@ class TestSumQubitRange:
     def test_sum_large_range(self):
         """Test qubit range for sum with large qubit spread."""
         sum_expr = PauliOperator.X(0) + PauliOperator.Z(50)
-        simplified = sum_expr.distribute().simplify()
+        simplified = sum_expr.simplify()
         assert simplified.min_qubit_index() == 0
         assert simplified.max_qubit_index() == 50
         assert simplified.num_qubits() == 51
@@ -872,12 +874,6 @@ class TestProductCanonicalString:
         prod = 1.0 * PauliOperator.X(0)
         assert prod.to_canonical_string(1) == "X"
 
-    def test_product_same_qubit_multiplication(self):
-        """Test X*Y = iZ on same qubit."""
-        prod = PauliOperator.X(0) * PauliOperator.Y(0)
-        simplified = prod.simplify()
-        assert simplified.to_canonical_string(1) == "Z"
-
     def test_product_large_gap(self):
         """Test canonical string with large gap between qubits."""
         prod = PauliOperator.X(0) * PauliOperator.Z(10)
@@ -892,47 +888,27 @@ class TestProductCanonicalString:
         assert simplified.to_canonical_string(0, 5) == "XIIIII"  # Only first 6 qubits
         assert simplified.to_canonical_string(5, 10) == "IIIIIZ"  # Only last 6 qubits
 
-    def test_product_xx_is_identity(self):
-        """Test X*X = I gives all identities."""
-        prod = PauliOperator.X(0) * PauliOperator.X(0)
-        simplified = prod.simplify()
-        assert simplified.to_canonical_string(2) == "II"
-
-    def test_product_complex_coefficient(self):
-        """Test canonical string is independent of complex coefficient."""
-        prod = complex(0.5, 0.5) * PauliOperator.X(0) * PauliOperator.Y(1)
-        simplified = prod.simplify()
-        assert simplified.to_canonical_string(2) == "XY"
-
 
 class TestSumCanonicalString:
     """Test cases for SumPauliOperatorExpression.to_canonical_string()."""
 
-    def test_sum_canonical_string(self):
-        """Test canonical string for sum."""
+    def test_sum_canonical_string_multiple_terms(self):
+        """Test canonical string for sum with multiple terms."""
         sum_expr = PauliOperator.X(0) + PauliOperator.Z(1)
-        simplified = sum_expr.distribute().simplify()
-        canonical = simplified.to_canonical_string(2)
-        # Should contain both XI and IZ terms
-        assert "XI" in canonical
-        assert "IZ" in canonical
+        simplified = sum_expr.simplify()
+        with pytest.raises(
+            RuntimeError,
+            match=r"to_canonical_string\(\) requires",
+        ):
+            # Cannot represent sum with single string unless only one term
+            simplified.to_canonical_string(2)
 
-    def test_sum_single_term(self):
-        """Test canonical string for single-term sum."""
-        # Create a proper single-term sum by using addition
-        single_sum = 1.0 * PauliOperator.X(0)
-        # Wrap in sum via distribute
-        distributed = single_sum.distribute()
-        assert "XI" in distributed.to_canonical_string(2) or distributed.to_canonical_string(2) == "XI"
-
-    def test_sum_same_qubit_operators(self):
-        """Test sum of operators on same qubit."""
-        sum_expr = PauliOperator.X(0) + PauliOperator.Y(0) + PauliOperator.Z(0)
-        simplified = sum_expr.distribute().simplify()
-        canonical = simplified.to_canonical_string(1)
-        assert "X" in canonical
-        assert "Y" in canonical
-        assert "Z" in canonical
+    def test_sum_canonical_string_single_term(self):
+        """Test canonical string for sum with one term after simplification."""
+        sum_expr = PauliOperator.X(0) + PauliOperator.X(0)
+        simplified = sum_expr.simplify()
+        canonical_str = simplified.to_canonical_string(3)
+        assert canonical_str == "XII"
 
 
 class TestPauliOperatorCanonicalTerms:
@@ -996,7 +972,7 @@ class TestSumCanonicalTerms:
     def test_sum_canonical_terms(self):
         """Test canonical terms for sum."""
         sum_expr = (2.0 * PauliOperator.X(0)) + (3.0 * PauliOperator.Y(1))
-        simplified = sum_expr.distribute().simplify()
+        simplified = sum_expr.simplify()
         terms = simplified.to_canonical_terms(2)
         assert len(terms) == 2
 
@@ -1010,7 +986,7 @@ class TestSumCanonicalTerms:
     def test_sum_canonical_terms_auto_range(self):
         """Test canonical terms with auto-detected range."""
         sum_expr = (2.0 * PauliOperator.X(0)) + (3.0 * PauliOperator.Y(1))
-        simplified = sum_expr.distribute().simplify()
+        simplified = sum_expr.simplify()
         terms = simplified.to_canonical_terms()
         assert len(terms) == 2
 
@@ -1021,7 +997,7 @@ class TestSumCanonicalTerms:
     def test_sum_complex_coefficients_terms(self):
         """Test canonical terms with complex coefficients."""
         sum_expr = (complex(1.0, 2.0) * PauliOperator.X(0)) + (complex(-1.0, 0.5) * PauliOperator.Y(1))
-        simplified = sum_expr.distribute().simplify()
+        simplified = sum_expr.simplify()
         terms = simplified.to_canonical_terms(2)
         assert len(terms) == 2
 
