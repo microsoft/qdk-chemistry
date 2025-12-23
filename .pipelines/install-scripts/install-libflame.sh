@@ -43,8 +43,8 @@ elif [[ "$MAC_BUILD" == "OFF" ]]; then
     ln -s /usr/bin/python3 /usr/bin/python
 fi
 
-echo "Checking symlink path:"
-which python
+# echo "Checking symlink path:"
+# which python
 
 if [[ "$MAC_BUILD" == "OFF" ]]; then
     CFLAGS=${CFLAGS} ./configure \
