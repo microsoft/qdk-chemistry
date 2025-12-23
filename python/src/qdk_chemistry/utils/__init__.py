@@ -8,5 +8,6 @@
 
 # Import C++ utilities from the compiled extension
 from qdk_chemistry._core.utils import Logger, compute_valence_space_parameters, rotate_orbitals
+from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 
-__all__ = ["Logger", "compute_valence_space_parameters", "rotate_orbitals"]
+__all__ = ["CaseInsensitiveStrEnum", "Logger", "compute_valence_space_parameters", "rotate_orbitals"]
