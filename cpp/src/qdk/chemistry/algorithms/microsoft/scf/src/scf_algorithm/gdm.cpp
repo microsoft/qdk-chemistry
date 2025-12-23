@@ -15,7 +15,6 @@
 #include <vector>
 
 #include "../scf/scf_impl.h"
-#include "macis/bfgs/line_search.hpp"
 #include "qdk/chemistry/scf/core/scf.h"
 #include "qdk/chemistry/scf/core/types.h"
 #include "util/matrix_exp.h"
@@ -72,6 +71,169 @@ static void apply_orbital_rotation(RowMajorMatrix& C, const int spin_index,
                      num_molecular_orbitals, num_molecular_orbitals)
                  .data(),
              num_molecular_orbitals);
+}
+
+/**
+ * @brief Nocedal-Wright line search with strong Wolfe conditions
+ *
+ * Implements the line search algorithm described in "Numerical Optimization"
+ * by Nocedal and Wright. This is a two-phase algorithm:
+ * 1. Bracketing phase: Find an interval containing acceptable step sizes
+ * 2. Zoom phase: Refine the interval using interpolation to find optimal step
+ *
+ * The algorithm satisfies both Armijo (sufficient decrease) and strong Wolfe
+ * (curvature) conditions, ensuring global convergence properties for
+ * quasi-Newton methods like BFGS.
+ *
+ * @tparam Functor Function object type that provides:
+ *         - eval(x): Function evaluation
+ *         - grad(x): Gradient computation
+ *         - Static methods: dot(), axpy()
+ *
+ * @param op Function object implementing the objective function and gradient
+ * @param x0 Starting point for the line search
+ * @param p Search direction (must be a descent direction)
+ * @param step Initial step size (will be modified to optimal step)
+ * @param x Output: New point x0 + step * p (modified)
+ * @param fx Output: Function value at the new point (modified)
+ * @param gfx Output: Gradient at the new point (modified)
+ *
+ * @throws std::logic_error If search direction is not descent
+ * @throws std::runtime_error If step is non-positive or line search fails
+ *
+ * @note Uses standard parameters: c1=1e-4 (Armijo), c2=0.9 (Wolfe),
+ * expansion=2.0
+ * @note More robust than backtracking but computationally more expensive
+ */
+template <typename Functor>
+void nocedal_wright_line_search(Functor& op,
+                                const typename Functor::argument_type& x0,
+                                const typename Functor::argument_type& p,
+                                typename Functor::return_type& step,
+                                typename Functor::argument_type& x,
+                                typename Functor::return_type& fx,
+                                typename Functor::argument_type& gfx) {
+  using arg_type = typename Functor::argument_type;
+  using ret_type = typename Functor::return_type;
+
+  const auto fx0 = fx;                    // Starting function value
+  const auto dgi = Functor::dot(p, gfx);  // Initial directional derivative
+
+  // Validate inputs
+  if (dgi > 0)
+    throw std::logic_error(
+        "the moving direction increases the objective function value");
+  if (step <= 0.0) throw std::runtime_error("Step must be positive");
+
+  // Algorithm parameters (standard Nocedal-Wright values)
+  constexpr auto c1 = 1e-4;        // Armijo condition parameter
+  constexpr auto c2 = 0.9;         // Strong Wolfe condition parameter
+  constexpr auto expansion = 2.0;  // Step expansion factor in bracketing phase
+
+  // Precompute test values
+  const auto armijo_test_val = c1 * dgi;   // Armijo threshold
+  const auto wolfe_test_curv = -c2 * dgi;  // Wolfe curvature threshold
+
+  // Initialize bracketing variables
+  ret_type step_hi, step_lo = 0, fx_hi, fx_lo = fx0, dg_hi, dg_lo = dgi;
+
+  int iter = 0;
+  const size_t max_iter = 100;
+  bool converged = false;
+
+  // Phase 1: Bracketing - find interval containing acceptable step sizes
+  for (;;) {
+    // Evaluate function at current trial step
+    x = x0;
+    Functor::axpy(step, p, x);  // x = x0 + step * p
+
+    // Compute function value and gradient
+    fx = op.eval(x);
+    gfx = op.grad(x);
+
+    if (iter++ >= max_iter) break;
+    auto dg = Functor::dot(gfx, p);  // Directional derivative at current point
+
+    // Check if current step violates Armijo condition or function increased
+    if (fx - fx0 > step * armijo_test_val || (0 < step_lo and fx >= fx_lo)) {
+      // Set upper bracket - current step is too large
+      step_hi = step;
+      fx_hi = fx;
+      dg_hi = dg;
+      break;  // Exit to zoom phase
+    }
+
+    // Check if strong Wolfe conditions are satisfied
+    if (std::abs(dg) <= wolfe_test_curv) {
+      converged = true;  // Found acceptable step
+      break;
+    }
+
+    // Update bracketing interval - current step becomes lower bound
+    step_hi = step_lo;
+    fx_hi = fx_lo;
+    dg_hi = dg_lo;
+
+    step_lo = step;
+    fx_lo = fx;
+    dg_lo = dg;
+
+    if (dg >= 0) break;  // Gradient sign change indicates bracket found
+    step *= expansion;   // Expand step size for next trial
+  }
+  if (converged) return;  // Early termination if conditions satisfied
+
+  // Phase 2: Zoom - refine the bracket using interpolation
+  iter = 0;
+  for (;;) {
+    // Compute new trial step using quadratic interpolation
+    step = (fx_hi - fx_lo) * step_lo -
+           (step_hi * step_hi - step_lo * step_lo) * dg_lo / 2;
+    step /= (fx_hi - fx_lo) - (step_hi - step_lo) * dg_lo;
+
+    // Safeguard: use bisection if interpolation gives point outside interval
+    if (step <= std::min(step_lo, step_hi) ||
+        step >= std::max(step_lo, step_hi))
+      step = step_lo / 2 + step_hi / 2;  // Bisection fallback
+
+    // Evaluate function at new trial point
+    x = x0;
+    Functor::axpy(step, p, x);
+
+    fx = op.eval(x);
+    gfx = op.grad(x);
+
+    if (iter++ >= max_iter) break;
+    auto dg = Functor::dot(gfx, p);
+
+    // Check if Armijo condition is violated
+    if (fx - fx0 > step * armijo_test_val or fx >= fx_lo) {
+      if (step == step_hi) throw std::runtime_error("Line Search Failed");
+      // Update upper bracket
+      step_hi = step;
+      fx_hi = fx;
+      dg_hi = dg;
+    } else {
+      // Check if strong Wolfe conditions are satisfied
+      if (std::abs(dg) <= wolfe_test_curv) {
+        converged = true;
+        break;  // Found acceptable step
+      }
+      // Update bracket based on gradient sign
+      if (dg * (step_hi - step_lo) >= 0) {
+        step_hi = step_lo;
+        fx_hi = fx_lo;
+        dg_hi = dg_lo;
+      }
+      if (step == step_lo) throw std::runtime_error("Line Search Failed");
+      // Update lower bracket
+      step_lo = step;
+      fx_lo = fx;
+      dg_lo = dg;
+    }
+  }
+
+  if (!converged) throw std::runtime_error("Line Search Failed");
 }
 
 /**
@@ -641,8 +803,9 @@ void GDM::iterate(SCFImpl& scf_impl) {
         double pseudo_canonical_energy_diff =
             std::abs(pseudo_canonical_eigenvalues_(num_occupied_orbitals + v) -
                      pseudo_canonical_eigenvalues_(j));
-        initial_hessian(index) =
-            2.0 * (std::abs(delta_energy_) + pseudo_canonical_energy_diff);
+        initial_hessian(index) = std::max(
+            2.0 * (std::abs(delta_energy_) + pseudo_canonical_energy_diff),
+            nonpositive_threshold_);
       }
     }
   }
@@ -785,9 +948,9 @@ void GDM::iterate(SCFImpl& scf_impl) {
 
   try {
     // Call Nocedal-Wright line search with strong Wolfe conditions
-    bfgs::nocedal_wright_line_search(
-        line_functor, start_kappa, kappa_dir, step_size, searched_kappa,
-        energy_at_searched_kappa, grad_at_searched_kappa);
+    nocedal_wright_line_search(line_functor, start_kappa, kappa_dir, step_size,
+                               searched_kappa, energy_at_searched_kappa,
+                               grad_at_searched_kappa);
   } catch (const std::exception& e) {
     // BFGS line search failed - likely bad search direction
     QDK_LOGGER().warn(
@@ -801,7 +964,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
       energy_at_searched_kappa = energy_at_start_point;
       grad_at_searched_kappa = grad_at_start_point;
       searched_kappa.setZero();
-      bfgs::nocedal_wright_line_search(
+      nocedal_wright_line_search(
           line_functor, start_kappa, kappa_dir, step_size, searched_kappa,
           energy_at_searched_kappa, grad_at_searched_kappa);
     } catch (const std::exception& e2) {

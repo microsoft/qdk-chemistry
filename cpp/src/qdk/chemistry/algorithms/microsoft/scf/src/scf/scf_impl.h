@@ -186,6 +186,8 @@ class SCFImpl {
   /**
    * @brief Evaluate total energy and Fock matrix for a trial density matrix. It
    * is a const method and does not modify any member variables.
+   * Attention: the SCFImpl instance should have been fully initialized before,
+   * with correct H_, ctx_ and eri_ members.
    *
    * @param P_matrix Trial density matrix
    * @param loc Source location of the caller (automatically captured)
