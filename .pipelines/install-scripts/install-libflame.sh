@@ -10,17 +10,15 @@ MAC_BUILD=${5:-"OFF"}
 # Select architectures to build libflame for
 if [[ ${MARCH} == 'armv8-a' ]]; then
     if [[ "$MAC_BUILD" == "OFF" ]]; then
-        echo "I ran on ARM!"
         # Compile for armsve, firestorm, thunderx2, cortexa57, cortexa53, and generic architectures
         export LIBFLAME_ARCH=arm64
         export LIBFLAME_BUILD=aarch64-unknown-linux-gnu
     elif [[ "$MAC_BUILD" == "ON" ]]; then
-        echo "I ran on mac!"
+        # Let libflame autodetect the build type on macOS
         export LIBFLAME_ARCH=arm64
     fi
 elif [[ ${MARCH} == 'x86-64-v3' ]]; then
     # Compile for intel64, amd64, and amd64_legacy architectures
-    echo "I ran on x86!"
     export LIBFLAME_BUILD=x86_64-unknown-linux-gnu
     export LIBFLAME_ARCH=x86_64
 fi
@@ -43,13 +41,7 @@ mv libflame-${LIBFLAME_VERSION} libflame
 cd libflame
 
 if [[ ${MAC_BUILD} == "OFF" ]]; then
-    ln -s /usr/bin/python3 /usr/bin/python
-fi
-
-# echo "Checking symlink path:"
-# which python
-
-if [[ ${MAC_BUILD} == "OFF" ]]; then
+export PYTHON=/usr/bin/python3
     CFLAGS="${CFLAGS}" ./configure \
         --build=$LIBFLAME_BUILD \
         --enable-static-build \
@@ -67,8 +59,7 @@ elif [[ ${MAC_BUILD} == "ON" ]]; then
         --enable-lapack2flame \
         --enable-legacy-lapack \
         --enable-max-arg-list-hack \
-        --target=$LIBFLAME_ARCH \
-        --with-python=python3
+        --target=$LIBFLAME_ARCH
 fi
 make -j$(nproc)
 
