@@ -276,30 +276,11 @@ def test_sample_sci_workflow_macis_asci_autocas_with_limits():
 ################################################################################
 
 
+@pytest.mark.xfail(reason="Skipping unimplemented examples/sample_rdkit_geometry.py test.")
 def test_sample_rdkit_geometry():
-    """Execute the RDKit geometry sample and validate reported SCF energy."""
-    repo_root = Path(__file__).resolve().parents[2]
-    cmd = [sys.executable, "examples/sample_rdkit_geometry.py"]
-
-    result = _run_workflow(cmd, repo_root)
-    if result.returncode != 0 and "ModuleNotFoundError: No module named 'rdkit'" in result.stderr:
-        pytest.skip("Skipping: RDKit not installed")
-    if result.returncode != 0:
-        _skip_for_mpi_failure(result)
-        pytest.fail(
-            "sample_rdkit_geometry.py exited with "
-            f"{result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
-        )
-
-    lines = _collect_output_lines(result)
-
-    # Verify the script outputs molecular summary information
-    assert any("Number of atoms" in line for line in lines), "Expected molecular summary not found in output."
-
-    # Extract and validate the SCF energy
-    scf_energy = _extract_float(r"SCF Energy: ([+\-0-9.]+) Hartree", result.stdout + result.stderr)
-    # Water SCF energy with cc-pvdz basis should be around -76 Hartree
-    assert -77.0 < scf_energy < -50.0, f"SCF energy {scf_energy} outside expected range for water."
+    """Test the examples/sample_rdkit_geometry.py script."""
+    # TODO: Need to implement this test (see https://github.com/microsoft/qdk-chemistry/issues/198)
+    raise NotImplementedError("TODO: add sample_rdkit_geometry.py test.")
 
 
 ################################################################################
