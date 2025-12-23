@@ -3,7 +3,7 @@ INSTALL_PREFIX=${1:-/usr/local}
 MARCH=${2:-x86-64-v3}
 BLIS_VERSION=${3:-2.0}
 CFLAGS=${4:-"-fPIC -O3"}
-MAC_BUILD=${5:-OFF}
+MAC_BUILD=${5:-"OFF"}
 
 # Download BLIS v2.0
 echo "Downloading BLIS ${BLIS_VERSION}..."
@@ -40,9 +40,9 @@ fi
 
 make -j$(nproc)
 
-if [ "$MAC_BUILD" == "ON" ]; then
+if [[ ${MAC_BUILD} == "ON" ]]; then
     sudo make install
-elif [ "$MAC_BUILD" == "OFF" ]; then
+elif [[ ${MAC_BUILD} == "OFF" ]]; then
     make install
 fi
 

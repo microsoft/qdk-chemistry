@@ -5,23 +5,27 @@ INSTALL_PREFIX=${1:-/usr/local}
 MARCH=${2:-x86-64-v3}
 LIBFLAME_VERSION=${3:-5.2.0}
 CFLAGS=${4:-"-fPIC -O3"}
-MAC_BUILD=${5:-OFF}
+MAC_BUILD=${5:-"OFF"}
 
 # Select architectures to build BLIS for
 if [[ ${MARCH} == 'armv8-a' ]]; then
     if [[ "$MAC_BUILD" == "OFF" ]]; then
+        echo "I ran on ARM!"
         # Compile for armsve, firestorm, thunderx2, cortexa57, cortexa53, and generic architectures
         export LIBFLAME_ARCH=arm64
         export LIBFLAME_BUILD=aarch64-unknown-linux-gnu
     elif [[ "$MAC_BUILD" == "ON" ]]; then
+        echo "I ran on mac!"
         export LIBFLAME_ARCH=arm64
     fi
 elif [[ ${MARCH} == 'x86-64-v3' ]]; then
     # Compile for intel64, amd64, and amd64_legacy architectures
+    echo "I ran on x86!"
     export LIBFLAME_BUILD=x86_64-unknown-linux-gnu
     export LIBFLAME_ARCH=x86_64
 fi
 
+echo "Build with march: ${MARCH}"
 echo "Building libflame for architecture: ${LIBFLAME_ARCH}"
 echo "Build type: ${LIBFLAME_BUILD}"
 

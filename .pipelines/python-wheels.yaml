@@ -162,6 +162,7 @@ extends:
                 enableCoverage: OFF
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 pythonVersion: $(pythonVersion)
+                macBuild: ON
 
           # Test - macOS ARM64
           - ${{ if eq(target.os, 'macos') }}:
