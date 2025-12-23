@@ -1,14 +1,14 @@
+/*
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See LICENSE.txt in the project root for
+ * license information.
+ */
+
 // Custom plugin examples for QDK/Chemistry.
 //
 // This file demonstrates how to extend QDK/Chemistry with custom plugins:
 // 1. Adding a new backend for an existing algorithm type
 // 2. Defining an entirely new algorithm type
-
-// --------------------------------------------------------------------------------------------
-// Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT License. See LICENSE.txt in the project root for
-// license information.
-// --------------------------------------------------------------------------------------------
 
 #include <qdk/chemistry.hpp>
 
