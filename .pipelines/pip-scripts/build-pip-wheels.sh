@@ -78,10 +78,10 @@ fi
 
 export CFLAGS="-fPIC -Os"
 echo "Downloading and installing BLIS..."
-bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} ${CFLAGS} ${MAC_BUILD}
+bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} "${CFLAGS}" ${MAC_BUILD}
 
 echo "Downloading and installing libflame..."
-bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} ${CFLAGS} ${MAC_BUILD}
+bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} "${CFLAGS}" ${MAC_BUILD}
 
 echo "Downloading HDF5 $HDF5_VERSION..."
 export HDF5_CHECKSUM=1826e198df8dac679f0d3dc703aba02af4c614fd6b7ec936cf4a55e6aa0646ec
@@ -93,7 +93,7 @@ mv hdf5-${HDF5_VERSION} hdf5
 echo "HDF5 $HDF5_VERSION downloaded and extracted successfully"
 
 echo "Installing HDF5..."
-bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} ${CFLAGS} ${MAC_BUILD}
+bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} "${CFLAGS}" ${MAC_BUILD}
 
 # Install pyenv to use non-system python3 versions
 # pyenv is used in place of a venv to prevent any collisions with the system Python

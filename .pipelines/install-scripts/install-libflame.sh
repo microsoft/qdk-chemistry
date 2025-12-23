@@ -7,7 +7,7 @@ LIBFLAME_VERSION=${3:-5.2.0}
 CFLAGS=${4:-"-fPIC -O3"}
 MAC_BUILD=${5:-"OFF"}
 
-# Select architectures to build BLIS for
+# Select architectures to build libflame for
 if [[ ${MARCH} == 'armv8-a' ]]; then
     if [[ "$MAC_BUILD" == "OFF" ]]; then
         echo "I ran on ARM!"
@@ -26,6 +26,7 @@ elif [[ ${MARCH} == 'x86-64-v3' ]]; then
 fi
 
 echo "Build with march: ${MARCH}"
+echo "Building with CFLAGS: ${CFLAGS}"
 echo "Building libflame for architecture: ${LIBFLAME_ARCH}"
 echo "Build type: ${LIBFLAME_BUILD}"
 
@@ -41,7 +42,7 @@ mv libflame-${LIBFLAME_VERSION} libflame
 # Configure and build libflame
 cd libflame
 
-if [[ "$MAC_BUILD" == "OFF" ]]; then
+if [[ ${MAC_BUILD} == "OFF" ]]; then
     ln -s /usr/bin/python3 /usr/bin/python
 fi
 
@@ -49,7 +50,7 @@ fi
 # which python
 
 if [[ ${MAC_BUILD} == "OFF" ]]; then
-    CFLAGS=${CFLAGS} ./configure \
+    CFLAGS="${CFLAGS}" ./configure \
         --build=$LIBFLAME_BUILD \
         --enable-static-build \
         --prefix=${INSTALL_PREFIX} \
@@ -58,7 +59,7 @@ if [[ ${MAC_BUILD} == "OFF" ]]; then
         --enable-max-arg-list-hack \
         --target=$LIBFLAME_ARCH
 elif [[ ${MAC_BUILD} == "ON" ]]; then
-    CFLAGS=${CFLAGS} ./configure \
+    CFLAGS="${CFLAGS}" ./configure \
         --build=$LIBFLAME_BUILD \
         --enable-static-build \
         --prefix=${INSTALL_PREFIX} \
