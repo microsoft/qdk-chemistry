@@ -445,8 +445,6 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
             f"{result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
         )
 
-    lines = _collect_output_lines(result)
-
     # Verify SCF and CASCI energies are reported
     scf_energy = _extract_float(r"SCF total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
     casci_energy = _extract_float(r"CASCI total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)

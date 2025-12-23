@@ -3,22 +3,24 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""qdk-chemistry + OpenFermion Jordan-Wigner example.
+"""qdk-chemistry molecular Hamiltonian + OpenFermion Jordan-Wigner transformation example.
 
-This example demonstrates the use of QDK/Chemistry tools are used preparing the electronic 
-structure Hamiltonian, and OpenFermion to transform the resulting to map Fermion operators to 
-qubit operators while QDK/Chemistry tools are used preparing the electronic structure Hamiltonian. 
-OpenFermion is used to perform the Jordan-Wigner transformation and to obtain the ground state 
-energy of the resulting qubit Hamiltonian.
+This example demonstrates the use of QDK/Chemistry tools in preparing the electronic
+structure Hamiltonian, which is then passed to OpenFermion to perform the Jordan-Wigner
+transformation. The challenges are (1) to obtain integrals in the spin-orbital basis from
+spatial ones, and (2) pack the two electron molecular intergrals in the order OpenFermion
+expects.
+
 This example is adapted from the introduction to OpenFermion tutorial:
 https://quantumai.google/openfermion/tutorials/intro_to_openfermion
+Due to minor differences in the Hamiltonian (stemmed from different molecular orbitals), the
+calculated energy values differ from those in the OpenFermion tutorial by 1e-6 Hartree.
 """
 
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
-import numpy
 import scipy
 import scipy.linalg
 
@@ -96,13 +98,13 @@ two_body_flat = np.array(two_body_integrals, dtype=float)  # Two-electron integr
 two_body = two_body_flat.reshape((norb,) * 4)
 
 # Convert to open Fermion physicists' notation <pr|sq>. Note that the last two indices may be switched
-# from what you expect in other physicists' notation. OpenFermion takes the integral notaion below to be consistent
+# from what you expect in other physicists' notation. OpenFermion takes the integral notation below to be consistent
 # with the order of operators.
 # ĝ = ½ Σ (pq|rs) p† r† s q = ½ Σ ⟨pr|sq⟩ p† r† s q
 two_body_phys = np.transpose(two_body, (0, 2, 3, 1))
 
 
-# make spacial integrals into spin orbitals, ordered as alpha_1, beta_1, alpha_2, beta_2, ...
+# make spatial integrals into spin orbitals, ordered as alpha_1, beta_1, alpha_2, beta_2, ...
 n_spin_orbitals = 2 * norb
 one_body_coefficients = np.zeros((n_spin_orbitals, n_spin_orbitals))
 two_body_coefficients = np.zeros(
@@ -128,12 +130,14 @@ two_body_coefficients[1::2, 0::2, 0::2, 1::2] = two_body_phys
 core_energy = active_hamiltonian.get_core_energy()  # Core energy constant
 
 # Get the Hamiltonian in an active space.
-openFermion_molecular_hamiltonian = openfermion.ops.representations.InteractionOperator(
-    core_energy, one_body_coefficients, 1 / 2 * two_body_coefficients
+open_fermion_molecular_hamiltonian = (
+    openfermion.ops.representations.InteractionOperator(
+        core_energy, one_body_coefficients, 1 / 2 * two_body_coefficients
+    )
 )
 
 # Map operator to fermions and qubits.
-fermion_hamiltonian = get_fermion_operator(openFermion_molecular_hamiltonian)
+fermion_hamiltonian = get_fermion_operator(open_fermion_molecular_hamiltonian)
 qubit_hamiltonian = jordan_wigner(fermion_hamiltonian)
 qubit_hamiltonian.compress()
 Logger.info("=== The Jordan-Wigner Hamiltonian in canonical basis : ===")
@@ -146,16 +150,16 @@ energy, state = get_ground_state(sparse_hamiltonian)
 Logger.info(f"Ground state energy before rotation is {energy: .15f} Hartree.")
 
 # Randomly rotate.
-n_orbitals = openFermion_molecular_hamiltonian.n_qubits // 2
+n_orbitals = open_fermion_molecular_hamiltonian.n_qubits // 2
 n_variables = int(n_orbitals * (n_orbitals - 1) / 2)
-numpy.random.seed(1)
-random_angles = numpy.pi * (1.0 - 2.0 * numpy.random.rand(n_variables))
-kappa = numpy.zeros((n_orbitals, n_orbitals))
+np.random.seed(1)
+random_angles = np.pi * (1.0 - 2.0 * np.random.rand(n_variables))
+kappa = np.zeros((n_orbitals, n_orbitals))
 index = 0
 for p in range(n_orbitals):
     for q in range(p + 1, n_orbitals):
         kappa[p, q] = random_angles[index]
-        kappa[q, p] = -numpy.conjugate(random_angles[index])
+        kappa[q, p] = -np.conjugate(random_angles[index])
         index += 1
 
     # Build the unitary rotation matrix.
@@ -163,10 +167,10 @@ for p in range(n_orbitals):
     rotation_matrix = scipy.linalg.expm(kappa)
 
     # Apply the unitary.
-    openFermion_molecular_hamiltonian.rotate_basis(rotation_matrix)
+    open_fermion_molecular_hamiltonian.rotate_basis(rotation_matrix)
 
 # Get qubit Hamiltonian in rotated basis.
-qubit_hamiltonian = jordan_wigner(openFermion_molecular_hamiltonian)
+qubit_hamiltonian = jordan_wigner(open_fermion_molecular_hamiltonian)
 qubit_hamiltonian.compress()
 
 Logger.info("=== The Jordan-Wigner Hamiltonian in rotated basis : ===")
