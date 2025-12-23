@@ -17,11 +17,11 @@ source $HOME/.cargo/env
 which rustc
 
 # Install ipykernel
-pip install ipykernel ipywidgets pandas openfermion
+pip install ipykernel ipywidgets pandas pre-commit openfermion
 
 # Install QDK Chemistry package
-cd "$REPO_ROOT/python"
-export CMAKE_BUILD_PARALLEL_LEVEL=4
+cd ./python
+export CMAKE_BUILD_PARALLEL_LEVEL=2
 QDK_UARCH=native pip install -v .[all]
 
 # Install QDK Widgets

@@ -2,12 +2,15 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <qdk/chemistry/scf/config.h>
+
 #include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <regex>
 #include <sstream>
 #include <stdexcept>
 
@@ -16,6 +19,176 @@
 #include "json_serialization.hpp"
 
 namespace qdk::chemistry::data {
+
+namespace detail {
+
+std::string normalize_basis_set_name(const std::string& name) {
+  std::string normalized = std::regex_replace(name, std::regex("\\*"), "_st_");
+  normalized = std::regex_replace(normalized, std::regex("/"), "_sl_");
+  normalized = std::regex_replace(normalized, std::regex("\\+"), "_pl_");
+  return normalized;
+}
+
+std::string denormalize_basis_set_name(const std::string& normalized) {
+  std::string name = std::regex_replace(normalized, std::regex("_st_"), "*");
+  name = std::regex_replace(name, std::regex("_sl_"), "/");
+  name = std::regex_replace(name, std::regex("_pl_"), "+");
+  return name;
+}
+
+/**
+ * @brief Unpack the basis set archive and return the path to the temporary
+ * directory containing the extracted files.
+ * @param basis_set_name Name of the basis set to unpack.
+ * @return Path to the temporary directory with extracted files.
+ */
+std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
+  // Normalize the basis set name for filesystem operations
+  std::string normalized_name = normalize_basis_set_name(basis_set_name);
+  std::filesystem::path file_path =
+      qdk::chemistry::scf::QDKChemistryConfig::get_resources_dir() /
+      "compressed" / (normalized_name + ".tar.gz");
+
+  if (!std::filesystem::exists(file_path)) {
+    throw std::invalid_argument("Basis set file does not exist: " +
+                                file_path.string());
+  }
+
+  // create temporary directory to extract the tar.gz file
+  std::filesystem::path temp_dir =
+      std::filesystem::temp_directory_path() / "qdk" / "chemistry";
+  if (!std::filesystem::exists(temp_dir)) {
+    std::filesystem::create_directories(temp_dir);
+  }
+
+  // unpack the tar.gz file
+  auto cmd = "tar xzf \"" + file_path.generic_string() + "\" --directory \"" +
+             temp_dir.generic_string() + "\"";
+  int return_code = std::system(cmd.c_str());
+  if (return_code != 0) {
+    throw std::runtime_error("command execution failed: " + cmd);
+  }
+
+  return temp_dir;
+}
+
+/**
+ * @brief Get the correct basis set JSON file path after unpacking the archive.
+ * @param basis_set_name Name of the basis set.
+ * @return Path to the basis set JSON file.
+ */
+std::filesystem::path get_correct_basis_set_file(std::string& basis_set_name) {
+  // unpack basis set archive
+  std::filesystem::path temp_dir = unpack_basis_set_archive(basis_set_name);
+
+  // Normalize the basis set name for the JSON file path
+  std::string normalized_name = normalize_basis_set_name(basis_set_name);
+  // return path to the extracted JSON file
+  std::filesystem::path json_file_path =
+      temp_dir / "basis" / (normalized_name + ".json");
+  if (!std::filesystem::exists(json_file_path)) {
+    throw std::invalid_argument("Basis set JSON file does not exist: " +
+                                json_file_path.string());
+  }
+  return json_file_path;
+}
+
+/**
+ * @brief Get basis set shells and ECP information for a given nuclear charge.
+ * @param nuclear_charge Nuclear charge of the element.
+ * @param basis_set_name Name of the basis set.
+ * @param atom_index Index of the atom in the structure.
+ * @return A tuple containing:
+ *         - vector of Shells for the element,
+ *         - vector of ECP Shells for the element,
+ *         - number of ECP electrons for the element.
+ */
+std::tuple<std::vector<Shell>, std::vector<Shell>, size_t>
+get_basis_for_nuclear_charge(const double nuclear_charge,
+                             std::string basis_set_name,
+                             const size_t atom_index) {
+  std::filesystem::path json_file_path =
+      get_correct_basis_set_file(basis_set_name);
+
+  std::ifstream fin(json_file_path);
+  auto data = nlohmann::json::parse(fin);
+
+  // extract basis set information for each nuclear charge
+  size_t num_ecp_elecs = 0;
+  std::vector<Shell> ecp_shells;
+
+  std::vector<Shell> shells;
+  // convert nuclear_charge to int and then to string for JSON lookup
+  auto nuclear_charge_string = std::to_string(static_cast<int>(nuclear_charge));
+
+  // get element specific data
+  auto element_data = data["elements"][nuclear_charge_string];
+
+  // iterate over electron shells
+  for (const auto& shell : element_data["electron_shells"]) {
+    for (size_t i = 0; i < shell["coefficients"].size(); i++) {
+      size_t am_size = shell["angular_momentum"].size();
+      size_t momentum = shell["angular_momentum"][am_size > 1 ? i : 0];
+
+      // fill exponents and coefficients
+      std::vector<double> exponents;
+      std::vector<double> coefficients;
+      std::vector<int> rpowers;
+      int power = 0;
+      for (size_t k = 0; k < shell["exponents"].size(); k++) {
+        exponents.push_back(
+            std::stod(shell["exponents"][k].get<std::string>()));
+        coefficients.push_back(
+            std::stod(shell["coefficients"][i][k].get<std::string>()));
+        rpowers.push_back(0);
+        power++;
+      }
+
+      // create shell and add to list
+      Shell sh{atom_index, static_cast<OrbitalType>(momentum), exponents,
+               coefficients, rpowers};
+      shells.push_back(sh);
+    }
+  }
+
+  // handle ecps
+  if (element_data.contains("ecp_electrons")) {
+    auto num_core_elec = element_data["ecp_electrons"].get<int>();
+    num_ecp_elecs = static_cast<size_t>(num_core_elec);
+    auto ecp_data = element_data["ecp_potentials"];
+    for (const auto& ecp_entry : ecp_data) {
+      // only support scalar_ecp
+      if (ecp_entry["ecp_type"].get<std::string>() != "scalar_ecp") {
+        throw std::invalid_argument("only scalar_ecp is supported");
+      }
+      auto am_entry = ecp_entry["angular_momentum"];
+      if (am_entry.size() != 1) {
+        throw std::invalid_argument("only one angular momentum is expected");
+      }
+      auto contraction_size = ecp_entry["gaussian_exponents"].size();
+
+      // fill exponents, coefficients, and rpowers
+      std::vector<double> exponents;
+      std::vector<double> coefficients;
+      std::vector<int> rpowers;
+      for (size_t i = 0; i < contraction_size; i++) {
+        exponents.push_back(
+            std::stod(ecp_entry["gaussian_exponents"][i].get<std::string>()));
+        coefficients.push_back(
+            std::stod(ecp_entry["coefficients"][0][i].get<std::string>()));
+        rpowers.push_back(ecp_entry["r_exponents"][i].get<int>());
+      }
+
+      // create shell and add to ecp list
+      Shell sh{atom_index, static_cast<OrbitalType>(am_entry[0]), exponents,
+               coefficients, rpowers};
+      ecp_shells.push_back(sh);
+    }
+  }
+  return {shells, ecp_shells, num_ecp_elecs};
+}
+
+}  // namespace detail
 
 Shell::Shell(size_t atom_idx, OrbitalType orb_type,
              const std::vector<double>& exp_list,
@@ -56,18 +229,11 @@ Shell::Shell(size_t atom_idx, OrbitalType orb_type,
   std::copy(rpow_list.begin(), rpow_list.end(), rpowers.data());
 }
 
-BasisSet::BasisSet(const std::string& name, const Structure& structure,
-                   AOType atomic_orbital_type)
-    : BasisSet(name, std::make_shared<Structure>(structure),
-               atomic_orbital_type) {
-  QDK_LOG_TRACE_ENTERING();
-}
-
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    AOType atomic_orbital_type)
     : _name(name),
       _atomic_orbital_type(atomic_orbital_type),
-      _ecp_name("none") {
+      _ecp_name(std::string(BasisSet::default_ecp_name)) {
   QDK_LOG_TRACE_ENTERING();
   // Organize shells by atom index
   for (const auto& shell : shells) {
@@ -92,6 +258,13 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    const Structure& structure, AOType atomic_orbital_type)
     : BasisSet(name, shells, std::make_shared<Structure>(structure),
+               atomic_orbital_type) {
+  QDK_LOG_TRACE_ENTERING();
+}
+
+BasisSet::BasisSet(const std::string& name, const Structure& structure,
+                   AOType atomic_orbital_type)
+    : BasisSet(name, std::make_shared<Structure>(structure),
                atomic_orbital_type) {
   QDK_LOG_TRACE_ENTERING();
 }
@@ -262,6 +435,344 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
   }
+}
+
+std::vector<Element> BasisSet::get_supported_elements_for_basis_set(
+    std::string basis_set_name) {
+  std::vector<Element> elements;
+
+  std::filesystem::path basis_dir =
+      qdk::chemistry::scf::QDKChemistryConfig::get_resources_dir();
+
+  if (!std::filesystem::exists(basis_dir) ||
+      !std::filesystem::is_directory(basis_dir)) {
+    throw std::runtime_error("Basis set resources directory does not exist: " +
+                             basis_dir.string());
+  }
+
+  // read elements from basis_summary.json
+  std::filesystem::path summary_file = basis_dir / "basis_summary.json";
+  if (!std::filesystem::exists(summary_file)) {
+    throw std::runtime_error("Basis set summary file does not exist: " +
+                             summary_file.string());
+  }
+
+  std::ifstream fin(summary_file);
+  auto data = nlohmann::json::parse(fin);
+  for (const auto& basis_entry : data) {
+    if (basis_entry["name"].get<std::string>() == basis_set_name) {
+      for (const auto& elem_str : basis_entry["supported_elements"]) {
+        int atomic_number = std::stoi(elem_str.get<std::string>());
+        elements.push_back(static_cast<Element>(atomic_number));
+      }
+      break;
+    }
+  }
+  if (elements.empty()) {
+    throw std::invalid_argument("No supported elements found for basis set: " +
+                                basis_set_name);
+  }
+
+  return elements;
+}
+
+std::vector<std::string> BasisSet::get_supported_basis_set_names() {
+  std::vector<std::string> basis_set_names;
+
+  std::filesystem::path basis_dir =
+      qdk::chemistry::scf::QDKChemistryConfig::get_resources_dir() /
+      "compressed";
+
+  if (!std::filesystem::exists(basis_dir) ||
+      !std::filesystem::is_directory(basis_dir)) {
+    throw std::runtime_error("Basis set resources directory does not exist: " +
+                             basis_dir.string());
+  }
+
+  for (const auto& entry : std::filesystem::directory_iterator(basis_dir)) {
+    if (entry.is_regular_file()) {
+      auto path = entry.path();
+      if (path.extension() == ".gz" && path.stem().extension() == ".tar") {
+        // extract basis set name from filename and denormalize it
+        std::string filename = path.stem().stem().string();
+        std::string denormalized_name =
+            detail::denormalize_basis_set_name(filename);
+        basis_set_names.push_back(denormalized_name);
+      }
+    }
+  }
+
+  return basis_set_names;
+}
+
+std::shared_ptr<BasisSet> BasisSet::from_basis_name(
+    const std::string& name, const Structure& structure,
+    const std::string& ecp_name, AOType atomic_orbital_type) {
+  return BasisSet::from_basis_name(name, std::make_shared<Structure>(structure),
+                                   ecp_name, atomic_orbital_type);
+}
+
+std::shared_ptr<BasisSet> BasisSet::from_basis_name(
+    std::string basis_name, std::shared_ptr<Structure> structure,
+    std::string ecp_name, AOType atomic_orbital_type) {
+  if (!structure) {
+    throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
+  }
+  // convert names to lowercase
+  std::transform(basis_name.begin(), basis_name.end(), basis_name.begin(),
+                 ::tolower);
+  std::transform(ecp_name.begin(), ecp_name.end(), ecp_name.begin(), ::tolower);
+
+  // overwrite with real name if default
+  if (ecp_name == BasisSet::default_ecp_name) {
+    ecp_name = basis_name;
+  }
+
+  std::vector<Shell> all_basis_shells;
+  std::vector<Shell> all_ecp_shells;
+  std::vector<size_t> all_ecp_electrons;
+  // loop over each atom in the structure and get basis set shells
+  auto nuclear_charges = structure->get_nuclear_charges();
+  for (size_t atom_index = 0; atom_index < nuclear_charges.size();
+       ++atom_index) {
+    double nuclear_charge = nuclear_charges[atom_index];
+
+    auto [shells, ecp_shells, ecp_electrons] =
+        detail::get_basis_for_nuclear_charge(nuclear_charge, basis_name,
+                                             atom_index);
+
+    for (const auto& sh : shells) {
+      all_basis_shells.push_back(sh);
+    }
+
+    // check for specific ecp name
+    if (ecp_name != basis_name) {
+      all_ecp_electrons.push_back(0);
+      continue;
+    }
+
+    all_ecp_electrons.push_back(ecp_electrons);
+    for (const auto& sh : ecp_shells) {
+      all_ecp_shells.push_back(sh);
+    }
+  }
+
+  // if ecp_name is different from basis_name, get ecp shells
+  if (!(ecp_name == basis_name || ecp_name.empty())) {
+    for (size_t atom_index = 0; atom_index < nuclear_charges.size();
+         ++atom_index) {
+      double nuclear_charge = nuclear_charges[atom_index];
+
+      auto [shells, ecp_shells, ecp_electrons] =
+          detail::get_basis_for_nuclear_charge(nuclear_charge, basis_name,
+                                               atom_index);
+      all_ecp_electrons[atom_index] = ecp_electrons;
+
+      for (const auto& sh : ecp_shells) {
+        all_ecp_shells.push_back(sh);
+      }
+    }
+  }
+
+  // sort basis shells
+  std::vector<Shell> sorted_basis_shells;
+  stable_sort(all_basis_shells.begin(), all_basis_shells.end(),
+              [](const auto& x, const auto& y) {
+                return x.orbital_type == y.orbital_type
+                           ? x.exponents.size() > y.exponents.size()
+                           : x.orbital_type < y.orbital_type;
+              });
+  sorted_basis_shells.insert(sorted_basis_shells.end(),
+                             all_basis_shells.begin(), all_basis_shells.end());
+  // sort ecp shells
+  std::vector<Shell> sorted_ecp_shells;
+  stable_sort(all_ecp_shells.begin(), all_ecp_shells.end(),
+              [](const auto& x, const auto& y) {
+                return x.orbital_type == y.orbital_type
+                           ? x.exponents.size() > y.exponents.size()
+                           : x.orbital_type < y.orbital_type;
+              });
+  sorted_ecp_shells.insert(sorted_ecp_shells.end(), all_ecp_shells.begin(),
+                           all_ecp_shells.end());
+
+  return std::make_shared<BasisSet>(basis_name, sorted_basis_shells, ecp_name,
+                                    sorted_ecp_shells, all_ecp_electrons,
+                                    structure, atomic_orbital_type);
+}
+
+std::shared_ptr<BasisSet> BasisSet::from_element_map(
+    const std::map<std::string, std::string>& element_to_basis_map,
+    const Structure& structure,
+    const std::map<std::string, std::string>& element_to_ecp_map,
+    AOType atomic_orbital_type) {
+  return BasisSet::from_element_map(element_to_basis_map,
+                                    std::make_shared<Structure>(structure),
+                                    element_to_ecp_map, atomic_orbital_type);
+}
+
+std::shared_ptr<BasisSet> BasisSet::from_element_map(
+    const std::map<std::string, std::string>& element_to_basis_map,
+    std::shared_ptr<Structure> structure,
+    const std::map<std::string, std::string>& element_to_ecp_map,
+    AOType atomic_orbital_type) {
+  if (!structure) {
+    throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
+  }
+
+  // convert basis and ecp to index_map
+  std::map<size_t, std::string> tmp_basis_index_map;
+  std::map<size_t, std::string> tmp_ecp_index_map;
+  auto elements = structure->get_atomic_symbols();
+  for (size_t atom_index = 0; atom_index < elements.size(); ++atom_index) {
+    // basis
+    auto it_basis = element_to_basis_map.find(elements[atom_index]);
+    if (it_basis == element_to_basis_map.end()) {
+      throw std::invalid_argument("No basis set specified for element: " +
+                                  elements[atom_index]);
+    }
+    tmp_basis_index_map[atom_index] = it_basis->second;
+
+    // ecp
+    auto it_ecp = element_to_ecp_map.find(elements[atom_index]);
+    if (it_ecp != element_to_ecp_map.end()) {
+      tmp_ecp_index_map[atom_index] = it_ecp->second;
+    }
+  }
+
+  return BasisSet::from_index_map(tmp_basis_index_map, structure,
+                                  tmp_ecp_index_map, atomic_orbital_type);
+}
+
+std::shared_ptr<BasisSet> BasisSet::from_index_map(
+    const std::map<size_t, std::string>& index_to_basis_map,
+    const Structure& structure,
+    const std::map<size_t, std::string>& index_to_ecp_map,
+    AOType atomic_orbital_type) {
+  return BasisSet::from_index_map(index_to_basis_map,
+                                  std::make_shared<Structure>(structure),
+                                  index_to_ecp_map, atomic_orbital_type);
+}
+
+std::shared_ptr<BasisSet> BasisSet::from_index_map(
+    const std::map<size_t, std::string>& index_to_basis_map,
+    std::shared_ptr<Structure> structure,
+    const std::map<size_t, std::string>& index_to_ecp_map,
+    AOType atomic_orbital_type) {
+  if (!structure) {
+    throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
+  }
+
+  std::vector<Shell> all_basis_shells;
+  std::vector<Shell> all_ecp_shells;
+  std::vector<size_t> all_ecp_electrons;
+  // loop over each atom in the structure and get basis set shells
+  auto nuclear_charges = structure->get_nuclear_charges();
+  for (size_t atom_index = 0; atom_index < nuclear_charges.size();
+       ++atom_index) {
+    double nuclear_charge = nuclear_charges[atom_index];
+    auto it = index_to_basis_map.find(atom_index);
+    if (it == index_to_basis_map.end()) {
+      throw std::invalid_argument("No basis set specified for atom index: " +
+                                  std::to_string(atom_index));
+    }
+    std::string tmp_basis_set_name = it->second;
+    // convert basis_set_name to lowercase
+    std::transform(tmp_basis_set_name.begin(), tmp_basis_set_name.end(),
+                   tmp_basis_set_name.begin(), ::tolower);
+
+    auto [shells, ecp_shells, ecp_electrons] =
+        detail::get_basis_for_nuclear_charge(nuclear_charge, tmp_basis_set_name,
+                                             atom_index);
+
+    for (const auto& sh : shells) {
+      all_basis_shells.push_back(sh);
+    }
+
+    // if no ecp map, use standard ecp
+    if (index_to_ecp_map.empty()) {
+      all_ecp_electrons.push_back(ecp_electrons);
+      for (const auto& sh : ecp_shells) {
+        all_ecp_shells.push_back(sh);
+      }
+    }
+    // no ecp for this atom use standard ecp
+    else if (index_to_ecp_map.find(atom_index) == index_to_ecp_map.end()) {
+      all_ecp_electrons.push_back(ecp_electrons);
+      for (const auto& sh : ecp_shells) {
+        all_ecp_shells.push_back(sh);
+      }
+    }
+    // specific ecp for this atom
+    else {
+      auto ecp_name = index_to_ecp_map.find(atom_index)->second;
+      std::transform(ecp_name.begin(), ecp_name.end(), ecp_name.begin(),
+                     ::tolower);
+      // if ecp_name is same as basis set name, default ecp
+      if (ecp_name == tmp_basis_set_name) {
+        all_ecp_electrons.push_back(ecp_electrons);
+        for (const auto& sh : ecp_shells) {
+          all_ecp_shells.push_back(sh);
+        }
+        // handle later
+      } else {
+        all_ecp_electrons.push_back(0);
+      }
+    }
+  }
+
+  // check if any ecp map is not empty
+  if (!index_to_ecp_map.empty()) {
+    for (size_t atom_index = 0; atom_index < nuclear_charges.size();
+         ++atom_index) {
+      if (index_to_ecp_map.find(atom_index) != index_to_ecp_map.end()) {
+        double nuclear_charge = nuclear_charges[atom_index];
+        // get ecp name
+        auto ecp_name = index_to_ecp_map.find(atom_index)->second;
+        std::transform(ecp_name.begin(), ecp_name.end(), ecp_name.begin(),
+                       ::tolower);
+        // if ecp_name is same as basis set name, already handled
+        // get basis set name
+        auto basis_set_name = index_to_basis_map.find(atom_index)->second;
+        std::transform(basis_set_name.begin(), basis_set_name.end(),
+                       basis_set_name.begin(), ::tolower);
+        if (ecp_name != basis_set_name) {
+          auto [shells, ecp_shells, ecp_electrons] =
+              detail::get_basis_for_nuclear_charge(nuclear_charge, ecp_name,
+                                                   atom_index);
+          all_ecp_electrons[atom_index] = ecp_electrons;
+          for (const auto& sh : ecp_shells) {
+            all_ecp_shells.push_back(sh);
+          }
+        }
+      }
+    }
+  }
+
+  // sort basis shells
+  std::vector<Shell> sorted_basis_shells;
+  stable_sort(all_basis_shells.begin(), all_basis_shells.end(),
+              [](const auto& x, const auto& y) {
+                return x.orbital_type == y.orbital_type
+                           ? x.exponents.size() > y.exponents.size()
+                           : x.orbital_type < y.orbital_type;
+              });
+  sorted_basis_shells.insert(sorted_basis_shells.end(),
+                             all_basis_shells.begin(), all_basis_shells.end());
+  // sort ecp shells
+  std::vector<Shell> sorted_ecp_shells;
+  stable_sort(all_ecp_shells.begin(), all_ecp_shells.end(),
+              [](const auto& x, const auto& y) {
+                return x.orbital_type == y.orbital_type
+                           ? x.exponents.size() > y.exponents.size()
+                           : x.orbital_type < y.orbital_type;
+              });
+  sorted_ecp_shells.insert(sorted_ecp_shells.end(), all_ecp_shells.begin(),
+                           all_ecp_shells.end());
+
+  return std::make_shared<BasisSet>(
+      std::string(BasisSet::custom_name), sorted_basis_shells,
+      std::string(BasisSet::custom_ecp_name), sorted_ecp_shells,
+      all_ecp_electrons, structure, atomic_orbital_type);
 }
 
 BasisSet::BasisSet(const BasisSet& other)
@@ -687,17 +1198,15 @@ bool BasisSet::_is_consistent_with_structure() const {
     return true;  // No structure to validate against
   }
 
-  const Structure& structure = *_structure;
-
   // Check if we have shells for atoms that don't exist in the structure
-  if (_shells_per_atom.size() > structure.get_num_atoms()) {
+  if (_shells_per_atom.size() > _structure->get_num_atoms()) {
     return false;
   }
 
   // Check if any atom has shells but is beyond the structure's atom count
   for (size_t atom_idx = 0; atom_idx < _shells_per_atom.size(); ++atom_idx) {
     if (!_shells_per_atom[atom_idx].empty() &&
-        atom_idx >= structure.get_num_atoms()) {
+        atom_idx >= _structure->get_num_atoms()) {
       return false;
     }
   }
@@ -725,7 +1234,6 @@ bool BasisSet::_is_valid() const {
       }
     }
   }
-
   return has_shells && _is_consistent_with_structure();
 }
 
@@ -857,9 +1365,9 @@ std::shared_ptr<BasisSet> BasisSet::_from_json_file(
 
   std::ifstream file(filename);
   if (!file.is_open()) {
-    throw std::runtime_error(
-        "Unable to open BasisSet JSON file '" + filename +
-        "'. Please check that the file exists and you have read permissions.");
+    throw std::runtime_error("Unable to open BasisSet JSON file '" + filename +
+                             "'. Please check that the file exists and you "
+                             "have read permissions.");
   }
 
   nlohmann::json j;
