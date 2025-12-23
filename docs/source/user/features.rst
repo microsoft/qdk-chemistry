@@ -106,19 +106,6 @@ Implementation Highlights
 - **Adaptive Sampling Configuration Interaction** (:term:`ASCI`): QDK/Chemistry integrates :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :cite:`Williams-Young2023`, a high-performance, parallel implementation of the Adaptive Sampling Configuration Interaction (:term:`ASCI`) algorithm :cite:`Tubman2016,Tubman2020`. ASCI iteratively grows the determinant space by identifying configurations with the largest contributions to the wavefunction, achieving near-CASCI accuracy at a fraction of the cost. This enables treatment of active spaces that would be intractable for conventional CASCI. See the :ref:`ASCI Algorithm <asci-algorithm>` section for details.
 
 
-Dynamical Correlation Methods
-"""""""""""""""""""""""""""""
-
-Capture instantaneous electron-electron interactions for quantitative accuracy.
-
-**Perturbation theory:**
-  - Second-order Møller-Plesset (MP2)
-
-**Coupled Cluster:**
-  - CCSD, CCSD(T)
-
-→ :doc:`comprehensive/algorithms/dynamical_correlation`
-
 Quantum Algorithms
 ^^^^^^^^^^^^^^^^^^
 

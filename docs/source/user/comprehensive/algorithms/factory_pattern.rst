@@ -58,12 +58,6 @@ In Python, algorithm instantiation is managed through a centralized registry mod
    * - :doc:`MultiConfigurationScf <../algorithms/mcscf>`
      - ``"multi_configuration_scf"``
      - ``MultiConfigurationScfFactory``
-   * - :doc:`ProjectedMultiConfigurationCalculator <../algorithms/pmc>`
-     - ``"projected_multi_configuration_calculator"``
-     - ``ProjectedMultiConfigurationCalculatorFactory``
-   * - :doc:`DynamicalCorrelationCalculator <../algorithms/dynamical_correlation>`
-     - ``"dynamical_correlation_calculator"``
-     - ``DynamicalCorrelationCalculatorFactory``
    * - :doc:`StabilityChecker <../algorithms/stability_checker>`
      - ``"stability_checker"``
      - ``StabilityCheckerFactory``

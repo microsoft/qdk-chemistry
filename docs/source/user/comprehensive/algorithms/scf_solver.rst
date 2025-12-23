@@ -15,12 +15,6 @@ Both methods rely on a single Slater determinant representation of the many-elec
 This single-determinant approach is a key simplification that makes these methods computationally efficient but limits their ability to capture certain correlation effects.
 The :term:`SCF` procedure iteratively refines these orbitals until self-consistency is achieved.
 
-:term:`SCF` methods provide an excellent starting point, but they miss important electronic correlation effects:
-
-- **Static correlation**: Essential for systems with near-degenerate states or bond-breaking processes.
-  See the :doc:`MCCalculator <mc_calculator>` documentation for electronic structure methods targeted at capturing static correlation.
-- **Dynamical correlation**: Required for all molecular systems to account for instantaneous electron-electron interactions.
-  See the :doc:`DynamicalCorrelationCalculator <dynamical_correlation>` documentation for electronic structure methods targeting dynamical correlation.
 
 The orbitals from :term:`SCF` calculations typically serve as input for these post-:term:`SCF` methods which capture correlation effects.
 :term:`SCF` methods thus serve as the foundation for more advanced quantum and classical electronic structure calculations and provide essential insights into molecular properties, reactivity, and spectroscopic characteristics.

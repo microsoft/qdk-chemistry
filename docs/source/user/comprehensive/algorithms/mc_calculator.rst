@@ -13,8 +13,6 @@ These methods can accurately describe systems with strong static correlation eff
 Static correlation arises when multiple electronic configurations contribute significantly to the wavefunction, such as in bond-breaking processes, transition states, excited states, and open-shell systems.
 The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` algorithm implements various :term:`CI` approaches, from full CI (FCI) to selected :term:`CI` methods that focus on the most important configurations.
 
-:term:`MC` calculations capture static correlation but typically require additional methods to capture dynamic correlation, particularly outside the active space.
-See :doc:`DynamicalCorrelationCalculator <dynamical_correlation>` or :doc:`MultiConfigurationScf <mcscf>` for complementary approaches.
 
 Using the MultiConfigurationCalculator
 --------------------------------------

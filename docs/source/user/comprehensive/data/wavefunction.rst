@@ -280,6 +280,5 @@ Further reading
 ---------------
 
 - :doc:`Settings <../algorithms/settings>`: Configuration settings for algorithms
-- :doc:`DynamicalCorrelationCalculator <../algorithms/dynamical_correlation>`: Algorithm for dynamical correlation calculators (includes coupled cluster and MP2)
 - :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
 - :doc:`Active space methods <../algorithms/active_space>`: Active space selection from wavefunctions

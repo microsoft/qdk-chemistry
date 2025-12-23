@@ -150,7 +150,6 @@ Select important configurations
 
 For large active spaces, the multi-configuration :class:`~qdk_chemistry.data.Wavefunction` may contain thousands or millions of configurations, but often only a small subset contributes significantly to the overall state.
 By identifying and retaining only the dominant configurations (those with the largest amplitudes), we can create a sparse wavefunction that maintains high fidelity with respect to the original Wavefunction while dramatically reducing resource requirements for quantum state preparation.
-This truncation is characterized by computing the overlap between the truncated state and the full wavefunction, and by recalculating the energy of the sparse wavefunction using the :doc:`comprehensive/algorithms/pmc`.
 
 .. tab:: C++ API
 

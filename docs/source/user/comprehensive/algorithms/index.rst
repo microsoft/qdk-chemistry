@@ -20,14 +20,12 @@ Algorithm classes
    localizer
    mc_calculator
    mcscf
-   pmc
    qubit_mapper
-   dynamical_correlation
    scf_solver
    stability_checker
    state_preparation
 
-QDK/Chemistry provides a comprehensive set of algorithm classes whixh express core methological primitives for quantum and classical chemistry calculations.
+QDK/Chemistry provides a comprehensive set of algorithm classes which express core methodological primitives for quantum and classical chemistry calculations.
 All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowing you to create instances by name and configured through a unified :doc:`settings <settings>` interface.
 
 Quick reference
@@ -69,12 +67,6 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`EnergyEstimator <energy_estimator>`
      - Quantum energy expectation values
      - Circuit + QubitHamiltonian → Energy
-   * - :doc:`DynamicalCorrelationCalculator <dynamical_correlation>`
-     - Post-HF correlation calculations (MP2, CC)
-     - Ansatz → Energy
-   * - :doc:`ProjectedMultiConfigurationCalculator <pmc>`
-     - Projected multi-configuration calculations
-     - Hamiltonian → Wavefunction
    * - :doc:`StabilityChecker <stability_checker>`
      - SCF stability analysis
      - Orbitals → Stability
