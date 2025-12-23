@@ -68,8 +68,7 @@ class TestMCCalculator:
         ham_constructor = algorithms.create("hamiltonian_constructor")
 
         # Perform SCF calculation
-        scf_solver.settings().set("basis_set", "sto-3g")
-        _, wfn_hf = scf_solver.run(water, 0, 1)
+        _, wfn_hf = scf_solver.run(water, 0, 1, "sto-3g")
 
         # Compute the Hamiltonian
         ham = ham_constructor.run(wfn_hf.get_orbitals())
