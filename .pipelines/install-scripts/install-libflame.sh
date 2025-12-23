@@ -46,15 +46,26 @@ fi
 echo "Checking symlink path:"
 which python
 
-CFLAGS=${CFLAGS} ./configure \
-    --build=$LIBFLAME_BUILD \
-    --enable-static-build \
-    --prefix=${INSTALL_PREFIX} \
-    --enable-lapack2flame \
-    --enable-legacy-lapack \
-    --enable-max-arg-list-hack \
-    --target=$LIBFLAME_ARCH
-
+if [[ "$MAC_BUILD" == "OFF" ]]; then
+    CFLAGS=${CFLAGS} ./configure \
+        --build=$LIBFLAME_BUILD \
+        --enable-static-build \
+        --prefix=${INSTALL_PREFIX} \
+        --enable-lapack2flame \
+        --enable-legacy-lapack \
+        --enable-max-arg-list-hack \
+        --target=$LIBFLAME_ARCH
+elif [[ "$MAC_BUILD" == "ON" ]]; then
+    CFLAGS=${CFLAGS} ./configure \
+        --build=$LIBFLAME_BUILD \
+        --enable-static-build \
+        --prefix=${INSTALL_PREFIX} \
+        --enable-lapack2flame \
+        --enable-legacy-lapack \
+        --enable-max-arg-list-hack \
+        --target=$LIBFLAME_ARCH \
+        --with-python=python3
+fi
 make -j$(nproc)
 
 if [[ "$MAC_BUILD" == "ON" ]]; then
