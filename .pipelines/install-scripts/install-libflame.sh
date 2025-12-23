@@ -22,6 +22,9 @@ elif [[ ${MARCH} == 'x86-64-v3' ]]; then
     export LIBFLAME_ARCH=x86_64
 fi
 
+echo "Building libflame for architecture: ${LIBFLAME_ARCH}"
+echo "Build type: ${LIBFLAME_BUILD}"
+
 # Download libflame
 echo "Downloading libflame ${LIBFLAME_VERSION}..."
 export LIBFLAME_CHECKSUM=e120f559758c21392448f45301918f45760f5ab59d246e4d144079c664d5b64b
@@ -34,19 +37,14 @@ mv libflame-${LIBFLAME_VERSION} libflame
 # Configure and build libflame
 cd libflame
 
-echo "Python location:"
-which python3
-
-if [[ "$MAC_BUILD" == "ON" ]]; then
-    sudo ln -s /usr/local/bin/python3 /usr/local/bin/python
-elif [[ "$MAC_BUILD" == "OFF" ]]; then
+if [[ "$MAC_BUILD" == "OFF" ]]; then
     ln -s /usr/bin/python3 /usr/bin/python
 fi
 
 # echo "Checking symlink path:"
 # which python
 
-if [[ "$MAC_BUILD" == "OFF" ]]; then
+if [[ ${MAC_BUILD} == "OFF" ]]; then
     CFLAGS=${CFLAGS} ./configure \
         --build=$LIBFLAME_BUILD \
         --enable-static-build \
@@ -55,7 +53,7 @@ if [[ "$MAC_BUILD" == "OFF" ]]; then
         --enable-legacy-lapack \
         --enable-max-arg-list-hack \
         --target=$LIBFLAME_ARCH
-elif [[ "$MAC_BUILD" == "ON" ]]; then
+elif [[ ${MAC_BUILD} == "ON" ]]; then
     CFLAGS=${CFLAGS} ./configure \
         --build=$LIBFLAME_BUILD \
         --enable-static-build \
