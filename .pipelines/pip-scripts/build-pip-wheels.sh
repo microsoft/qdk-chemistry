@@ -55,7 +55,8 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         wget \
         curl \
         cmake \
-        gcc
+        gcc \
+        boost
     export CMAKE_PREFIX_PATH="/opt/homebrew"
 fi
 
@@ -186,6 +187,8 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     (cd "$TEMP_DIR" && python3 -m zipfile -c "$FULL_WHEEL_PATH" .)
     rm -rf "$TEMP_DIR"
 if [ "$MAC_BUILD" == "ON" ]; then
+    echo "Checking shared dependencies..."
+    otool -L build/cp*/_core.*.so
     echo "Repairing wheel for macOS..."
     pip install delocate
     WHEEL_FILE=$(ls dist/qdk_chemistry-*.whl)
