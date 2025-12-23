@@ -155,7 +155,7 @@ extends:
 
           # Build - macOS ARM64
           - ${{ if eq(target.os, 'macos') }}:
-            - template: .pipelines/templates/build-mac-wheel.yml@self
+            - template: .pipelines/templates/docker-pip-wheel.yml@self
               parameters:
                 march: $(buildMarch)
                 buildTesting: OFF
@@ -166,7 +166,7 @@ extends:
 
           # Test - macOS ARM64
           - ${{ if eq(target.os, 'macos') }}:
-            - template: .pipelines/templates/test-mac-wheel.yml@self
+            - template: .pipelines/templates/docker-test-wheel.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 pythonVersion: $(pythonVersion)

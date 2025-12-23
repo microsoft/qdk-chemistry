@@ -1,6 +1,25 @@
 #!/bin/bash
 set -e
 PYTHON_VERSION=${1:-3.11}
+MAC_BUILD=${2:-OFF}
+export MAC_BUILD
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+if [ -d "/workspace/qdk-chemistry/python" ]; then
+    PYTHON_DIR="/workspace/qdk-chemistry/python"
+else
+    PYTHON_DIR="$REPO_ROOT/python"
+fi
+
+if [ "$MAC_BUILD" == "OFF" ] && [ -d "/workspace" ]; then
+    export PYENV_ROOT="/workspace/.pyenv"
+    VENV_DIR="/workspace/test_wheel_env"
+else
+    export PYENV_ROOT="$REPO_ROOT/.pyenv"
+    VENV_DIR="$REPO_ROOT/.test_wheel_env"
+fi
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -35,7 +54,6 @@ elif [ "$MAC_BUILD" == "ON" ]; then
 fi
 
 # Install pyenv to use non-system python3 versions
-export PYENV_ROOT="/workspace/.pyenv"
 if [ ! -d "$PYENV_ROOT" ]; then
     wget -q https://github.com/pyenv/pyenv/archive/refs/heads/master.zip -O pyenv.zip
     unzip -q pyenv.zip
@@ -52,15 +70,16 @@ export PATH="$PYENV_ROOT/shims:$PATH"
 python3 --version
 
 # Create a clean virtual environment for testing the wheel
-python3 -m venv /workspace/test_wheel_env
-. /workspace/test_wheel_env/bin/activate
+rm -rf "$VENV_DIR"
+python3 -m venv "$VENV_DIR"
+. "$VENV_DIR/bin/activate"
 
 # Upgrade pip packages
 python3 -m pip install --upgrade pip
 python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
 
 # Install the wheel in the clean environment
-cd /workspace/qdk-chemistry/python
+cd "$PYTHON_DIR"
 python3 -m pip install pytest pyscf
 pip3 install repaired_wheelhouse/qdk_chemistry*.whl
 

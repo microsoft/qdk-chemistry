@@ -51,23 +51,41 @@ steps:
   inputs:
     artifactFeeds: ""
 
-- script: |
-    echo "Running pip wheel build..."
-    docker run --rm \
-      --platform ${{ parameters.imageTag }} \
-      -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
-      -e QDK_UARCH=${{ parameters.march }} \
-      -w /workspace/qdk-chemistry \
-      ${{ parameters.dockerImage }} \
-    bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} \
-                                                    ${{ parameters.pythonVersion }} \
-                                                    ${{ parameters.buildType }} \
-                                                    ${{ parameters.buildTesting }} \
-                                                    ${{ parameters.enableCoverage }} \
-                                                    ${{ parameters.cmakeVersion }} \
-                                                    ${{ parameters.hdf5Version }} \
-                                                    ${{ parameters.blisVersion }} \
-                                                    ${{ parameters.libflameVersion }} \
-                                                    ${{ parameters.pyenvVersion }} \
-                                                    ${{ parameters.macBuild }}
-  displayName: Build Linux wheel in container
+- ${{ if eq(parameters.macBuild, 'OFF') }}:
+  - script: |
+      echo "Running pip wheel build (Linux)..."
+      docker run --rm \
+        --platform ${{ parameters.imageTag }} \
+        -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
+        -e QDK_UARCH=${{ parameters.march }} \
+        -w /workspace/qdk-chemistry \
+        ${{ parameters.dockerImage }} \
+      bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} \
+                                                      ${{ parameters.pythonVersion }} \
+                                                      ${{ parameters.buildType }} \
+                                                      ${{ parameters.buildTesting }} \
+                                                      ${{ parameters.enableCoverage }} \
+                                                      ${{ parameters.cmakeVersion }} \
+                                                      ${{ parameters.hdf5Version }} \
+                                                      ${{ parameters.blisVersion }} \
+                                                      ${{ parameters.libflameVersion }} \
+                                                      ${{ parameters.pyenvVersion }} \
+                                                      ${{ parameters.macBuild }}
+    displayName: Build wheel (Linux)
+
+- ${{ if eq(parameters.macBuild, 'ON') }}:
+  - script: |
+      echo "Running pip wheel build (native)..."
+      cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry
+      bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} \
+                                                      ${{ parameters.pythonVersion }} \
+                                                      ${{ parameters.buildType }} \
+                                                      ${{ parameters.buildTesting }} \
+                                                      ${{ parameters.enableCoverage }} \
+                                                      ${{ parameters.cmakeVersion }} \
+                                                      ${{ parameters.hdf5Version }} \
+                                                      ${{ parameters.blisVersion }} \
+                                                      ${{ parameters.libflameVersion }} \
+                                                      ${{ parameters.pyenvVersion }} \
+                                                      ${{ parameters.macBuild }}
+    displayName: Build wheel (macOS native)

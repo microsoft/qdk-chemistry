@@ -187,11 +187,12 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     rm "$WHEEL_FILE"
     (cd "$TEMP_DIR" && python3 -m zipfile -c "$FULL_WHEEL_PATH" .)
     rm -rf "$TEMP_DIR"
-if [ "$MAC_BUILD" == "ON" ]; then
-    echo "Checking shared dependencies..."
-    otool -L build/cp*/_core.*.so
+elif [ "$MAC_BUILD" == "ON" ]; then
     echo "Repairing wheel for macOS..."
     pip install delocate
     WHEEL_FILE=$(ls dist/qdk_chemistry-*.whl)
     python3 -m delocate.delocate_wheel -w repaired_wheelhouse/ "$WHEEL_FILE"
+    
+    echo "Checking shared dependencies..."
+    otool -L build/cp*/_core.*.so
 fi

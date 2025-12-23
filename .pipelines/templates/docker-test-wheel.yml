@@ -16,13 +16,22 @@ parameters:
   default: OFF
 
 steps:
-- script: |
-    echo "Running wheel tests in Docker container..."
-    docker run --rm \
-      --platform ${{ parameters.imageTag }} \
-      -v ${{ parameters.agentBuildDirectory }}:/workspace \
-      -w /workspace/qdk-chemistry/python \
-      ${{ parameters.dockerImage }} \
+- ${{ if eq(parameters.macBuild, 'OFF') }}:
+  - script: |
+      echo "Running wheel tests (Docker)..."
+      docker run --rm \
+        --platform ${{ parameters.imageTag }} \
+        -v ${{ parameters.agentBuildDirectory }}:/workspace \
+        -w /workspace/qdk-chemistry/python \
+        ${{ parameters.dockerImage }} \
+        bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
+                                                          ${{ parameters.macBuild }}
+    displayName: Test wheel (Docker)
+
+- ${{ if eq(parameters.macBuild, 'ON') }}:
+  - script: |
+      echo "Running wheel tests (native)..."
+      cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry/python
       bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
                                                         ${{ parameters.macBuild }}
-  displayName: Test Wheel in Docker Container
+    displayName: Test wheel (native)
