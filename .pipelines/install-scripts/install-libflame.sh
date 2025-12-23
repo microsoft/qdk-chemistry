@@ -59,6 +59,7 @@ if [[ ${MAC_BUILD} == "OFF" ]]; then
         --enable-max-arg-list-hack \
         --target=$LIBFLAME_ARCH
 elif [[ ${MAC_BUILD} == "ON" ]]; then
+    export PYTHON=/usr/local/bin/python3
     CFLAGS="${CFLAGS}" ./configure \
         --build=$LIBFLAME_BUILD \
         --enable-static-build \
