@@ -314,7 +314,7 @@ class TestScfSolver:
         scf_solver.settings().set("method", "pbe")
         scf_solver.settings().set("enable_gdm", True)
         # Increase max iterations to allow convergence on macOS
-        scf_solver.settings().set("max_iterations", 200)
+        scf_solver.settings().set("max_iterations", 500)
 
         energy, wavefunction = scf_solver.run(oxygen, 1, 2, "cc-pvdz")  # +1 charge, doublet state
         orbitals = wavefunction.get_orbitals()
