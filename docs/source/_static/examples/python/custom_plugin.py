@@ -35,7 +35,12 @@ class CustomScfSettings(ElectronicStructureSettings):
 ################################################################################
 # start-cell-custom-scf-solver
 from qdk_chemistry.algorithms import ScfSolver  # noqa: E402
-from qdk_chemistry.data import Orbitals, Structure, Wavefunction  # noqa: E402
+from qdk_chemistry.data import (  # noqa: E402
+    BasisSet,
+    Orbitals,
+    Structure,
+    Wavefunction,
+)
 
 
 class CustomScfSolver(ScfSolver):
@@ -53,19 +58,37 @@ class CustomScfSolver(ScfSolver):
         structure: Structure,
         charge: int,
         spin_multiplicity: int,
-        initial_guess: Orbitals | None = None,
+        basis_or_guess: Orbitals | BasisSet | str | None = None,
     ) -> tuple[float, Wavefunction]:
+        """Perform a self-consistent field (SCF) calculation using a custom backend.
+
+        This method should convert the input structure to the external format, run the SCF calculation
+        using the specified method and basis set, and return the electronic energy and wavefunction
+        in QDK/Chemistry format.
+
+        Args:
+            structure: The molecular structure to be calculated.
+            charge: The total charge of the molecular system.
+            spin_multiplicity: The spin multiplicity (2S+1) of the system.
+            basis_or_guess: Basis set information or initial guess, which can be:
+                - An Orbitals object (used as initial guess)
+                - A BasisSet object
+                - A string specifying the basis set name
+                - None (use default from settings)
+
+        Returns:
+            Tuple of (energy, wavefunction)
+        """
         # Convert to external format
-        # external_mol = external_package.Molecule(structure.positions, structure.elements)
 
         # Execute external calculation
-        _basis_set = self.settings().get("basis_set")  # noqa: F841
-        # energy, external_orbs = external_package.run_scf(external_mol, basis=_basis_set)
 
         # Convert results to QDK format
-        # wavefunction = self._convert_to_wavefunction(external_orbs)
 
-        return energy, wavefunction
+        # energy = 0.0
+        # wavefunction = Wavefunction(...)
+        # return energy, wavefunction
+        return 0.0, None
 
 
 # end-cell-custom-scf-solver
@@ -82,16 +105,21 @@ register(lambda: CustomScfSolver())
 
 ################################################################################
 # start-cell-usage-after-registration
-from qdk_chemistry.algorithms import ScfSolver  # noqa: E402
+from qdk_chemistry.algorithms import available, create  # noqa: E402
+from qdk_chemistry.data import Structure  # noqa: E402
+
+# Define a molecular structure (e.g., H2 molecule)
+coords = [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]]
+molecule = Structure(coords, symbols=["H", "H"])
 
 # Instantiate the custom solver
-solver = ScfSolver.create("custom")
-solver.settings()["basis_set"] = "cc-pvdz"
-molecule = ...  # Assume molecule is defined elsewhere
-energy, wavefunction = solver.run(molecule, charge=0, spin_multiplicity=1)  # noqa: F821
+solver = create("scf_solver", "custom")
+# energy, wavefunction = solver.run(
+#     molecule, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+# )
 
 # Verify registration
-print(ScfSolver.available())  # [..., 'custom']
+print(available("scf_solver"))  # [..., 'custom']
 # end-cell-usage-after-registration
 ################################################################################
 
@@ -166,11 +194,12 @@ class BfgsOptimizer(GeometryOptimizer):
         return "bfgs"
 
     def _run_impl(self, structure: Structure) -> Structure:
-        _max_steps = self.settings().get("max_steps")  # noqa: F841
-        _threshold = self.settings().get("convergence_threshold")  # noqa: F841
+        # max_steps = self.settings().get("max_steps")
+        # threshold = self.settings().get("convergence_threshold")
 
         # BFGS optimization implementation
-        optimized_structure = structure  # Placeholder
+        # Placeholder for optimized structure
+        optimized_structure = Structure()
         return optimized_structure
 
 
@@ -192,7 +221,8 @@ class SteepestDescentOptimizer(GeometryOptimizer):
 
     def _run_impl(self, structure: Structure) -> Structure:
         # Steepest descent implementation
-        optimized_structure = structure  # Placeholder
+        # Placeholder for optimized structure
+        optimized_structure = Structure()
         return optimized_structure
 
 
@@ -201,14 +231,14 @@ class SteepestDescentOptimizer(GeometryOptimizer):
 
 ################################################################################
 # start-cell-geometry-registration
-from qdk_chemistry.algorithms import registry  # noqa: E402
+import qdk_chemistry.algorithms as algorithms  # noqa: E402
 
 # Register the factory
-registry.register_factory(GeometryOptimizerFactory())
+algorithms.registry.register_factory(GeometryOptimizerFactory())
 
 # Register implementations
-registry.register(lambda: BfgsOptimizer())
-registry.register(lambda: SteepestDescentOptimizer())
+algorithms.register(lambda: BfgsOptimizer())
+algorithms.register(lambda: SteepestDescentOptimizer())
 # end-cell-geometry-registration
 ################################################################################
 
@@ -225,7 +255,6 @@ optimizer.settings().set("max_steps", 200)
 optimizer.settings().set("convergence_threshold", 1e-6)
 
 # Execute
-initial_structure = ...  # Assume initial_structure is defined elsewhere
-optimized_structure = optimizer.run(initial_structure)  # noqa: F821
+# optimized_structure = optimizer.run(initial_structure)
 # end-cell-geometry-usage
 ################################################################################

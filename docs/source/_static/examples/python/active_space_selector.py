@@ -10,7 +10,7 @@
 from qdk_chemistry.algorithms import create
 
 # Create the default ActiveSpaceSelector instance
-active_space_selector = create("active_space_selector")
+active_space_selector = create("active_space_selector", "qdk_valence")
 # end-cell-create
 ################################################################################
 
@@ -62,7 +62,7 @@ print(registry.available("active_space_selector"))
 from qdk_chemistry.algorithms import create  # noqa: E402
 
 avas = create("active_space_selector", "pyscf_avas")
-avas.settings().set("ao_labels", ["Fe 3d", "Fe 4d"])
+avas.settings().set("ao_labels", ["O 2p", "O 2s"])
 avas.settings().set("canonicalize", True)
 
 active_wavefunction = avas.run(scf_wavefunction)

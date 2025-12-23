@@ -37,7 +37,7 @@ structure = Structure(coords, symbols=symbols)
 # Run scf
 scf_solver = create("scf_solver")
 E_scf, wfn_scf = scf_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_or_guess="def2-tzvpp"
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
 )
 
 # Compute the Hamiltonian
@@ -45,7 +45,7 @@ hamiltonian_constructor = create("hamiltonian_constructor")
 hamiltonian = hamiltonian_constructor.run(wfn_scf.get_orbitals())
 
 # Compute CAS wavefunction
-cas_solver = create("macis_cas")
+cas_solver = create("multi_configuration_calculator", "macis_cas")
 E_cas, wfn_cas = cas_solver.run(hamiltonian, 1, 1)
 
 # Construct the circuit

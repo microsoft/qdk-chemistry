@@ -3,7 +3,6 @@ Energy estimation
 
 The :class:`~qdk_chemistry.algorithms.EnergyEstimator` algorithm in QDK/Chemistry estimates the energy of a quantum state by measuring expectation values of Pauli operators.
 Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes an OpenQASM circuit (from :doc:`StatePreparation <state_preparation>`) and a :class:`~qdk_chemistry.data.QubitHamiltonian` (from :doc:`QubitMapper <qubit_mapper>`) as input and returns energy expectation values with statistical uncertainty.
-This algorithm forms the final stage of a quantum chemistry workflow, where a prepared wavefunction is measured to obtain the system's energy.
 
 Overview
 --------

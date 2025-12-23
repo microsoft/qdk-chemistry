@@ -70,7 +70,6 @@ from qdk_chemistry.algorithms import create  # noqa E402
 scf_solver = create(
     "scf_solver",
     max_iterations=100,
-    basis_set="def2-tzvp",
     convergence_threshold=1.0e-8,
 )
 
@@ -141,20 +140,27 @@ json_data = settings.to_json()
 settings_from_json = Settings.from_json(json_data)
 # end-cell-serialization
 ################################################################################
+import numpy as np  # noqa: E402
+from qdk_chemistry.data import Structure  # noqa: E402
+
+coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+structure = Structure(coords, ["H", "H"])
 
 ################################################################################
 # start-cell-settings-locked
 scf = create("scf_solver")
-scf.settings().set("basis_set", "sto-3g")
-energy, wfn = scf.run(structure, charge=0, spin_multiplicity=1)  # type: ignore[name-defined]  # noqa: F821
+scf.settings().set("method", "hf")
+energy, wfn = scf.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")  # type: ignore[name-defined]  # noqa: F821
 
 # Settings are now locked - this raises SettingsAreLocked:
-# scf.settings().set("basis_set", "cc-pvdz")
+# scf.settings().set("method", "b3lyp")
 
 # Create a new instance for different settings
 scf2 = create("scf_solver")
-scf2.settings().set("basis_set", "cc-pvdz")
-energy2, wfn2 = scf2.run(structure, charge=0, spin_multiplicity=1)  # type: ignore[name-defined]  # noqa: F821
+scf2.settings().set("method", "b3lyp")
+energy2, wfn2 = scf2.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
+)  # type: ignore[name-defined]  # noqa: F821
 # end-cell-settings-locked
 ################################################################################
 
@@ -192,8 +198,8 @@ except qdk_chemistry.data.SettingNotFound as e:
 expected_type = settings.get_expected_python_type("convergence_threshold")
 print(expected_type)  # "float"
 
-expected_type = settings.get_expected_python_type("active_orbitals")
-print(expected_type)  # "list[int]"
+expected_type = settings.get_expected_python_type("method")
+print(expected_type)  # "str"
 # end-cell-get-expected-type
 ################################################################################
 

@@ -24,7 +24,8 @@ scf_solver.settings().set("max_iterations", 100)
 ################################################################################
 # start-cell-data-flow
 # Create molecular structure from an XYZ file
-structure = Structure.from_xyz_file("molecule.xyz")
+coords = [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]]
+structure = Structure(coords, symbols=["H", "H"])
 
 # Configure and run SCF calculation
 scf_solver = create("scf_solver")
@@ -37,8 +38,8 @@ active_space_selector = create(
     "active_space_selector",
     algorithm_name="qdk_valence",
 )
-active_space_selector.settings().set("num_active_orbitals", 6)
-active_space_selector.settings().set("num_active_electrons", 6)
+active_space_selector.settings().set("num_active_orbitals", 2)
+active_space_selector.settings().set("num_active_electrons", 2)
 active_wfn = active_space_selector.run(scf_wavefunction)
 active_orbitals = active_wfn.get_orbitals()
 

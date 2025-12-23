@@ -52,7 +52,7 @@ hamiltonian = hamiltonian_constructor.run(active_orbitals)
 
 # Map the fermionic Hamiltonian to a qubit Hamiltonian
 qubit_hamiltonian = qubit_mapper.run(hamiltonian)
-print(f"Qubit Hamiltonian has {qubit_hamiltonian.num_qubits()} qubits")
+print(f"Qubit Hamiltonian has {qubit_hamiltonian.num_qubits} qubits")
 # end-cell-run
 ################################################################################
 
