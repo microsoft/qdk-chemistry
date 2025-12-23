@@ -997,7 +997,7 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
 
   QDK_LOGGER().debug(
       "Computing energy and Fock matrix by trial density matrix (called from "
-      "{}:{})",
+      "function '{}' at line {})",
       loc.function_name(), loc.line());
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();

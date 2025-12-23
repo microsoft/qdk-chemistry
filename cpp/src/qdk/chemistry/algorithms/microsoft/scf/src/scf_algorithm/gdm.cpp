@@ -106,7 +106,9 @@ class GDMLineFunctor {
   double eval(const Eigen::VectorXd& x);
 
   /**
-   * @brief Evaluate gradient at given kappa vector x
+   * @brief Evaluate gradient at given kappa vector x. If the vector x has been
+   * catched during eval(), the cached Fock matrix will be reused. Otherwise, it
+   * will call eval() to compute both energy and Fock matrix.
    */
   Eigen::VectorXd grad(const Eigen::VectorXd& x);
 
@@ -247,9 +249,9 @@ Eigen::VectorXd GDMLineFunctor::grad(const Eigen::VectorXd& x) {
     // gradient is computed separately for each spin component, in that case the
     // coefficient before F_{ia, spin} is -2.0
     RowMajorMatrix gradient_matrix =
-        -(4.0 / num_density_matrices_) * F_MO.block(0, num_occupied_orbitals,
-                                                    num_occupied_orbitals,
-                                                    num_virtual_orbitals);
+        -(unrestricted_ ? 2.0 : 4.0) * F_MO.block(0, num_occupied_orbitals,
+                                                  num_occupied_orbitals,
+                                                  num_virtual_orbitals);
 
     // Flatten matrix to vector and store in appropriate segment
     gradient.segment(rotation_offset_[i], rotation_size_[i]) =
@@ -373,6 +375,9 @@ class GDM {
   RowMajorMatrix Uvv_;
 
   Eigen::VectorXd kappa_;  // vertical rotation matrix of this step
+
+  // Used for fallback gradient step length when line search fails
+  const double fallback_step_length_ = 1e-4;
   /// Energy of the last accepted step, used to decide if we rescale the kappa
   /// vector in this step
   double last_accepted_energy_;
@@ -573,9 +578,9 @@ void GDM::iterate(SCFImpl& scf_impl) {
     // gradient is computed separately for each spin component, in that case the
     // coefficient before F_{ia, spin} is -2.0
     RowMajorMatrix current_gradient_matrix =
-        -(4.0 / num_density_matrices) * F_MO.block(0, num_occupied_orbitals,
-                                                   num_occupied_orbitals,
-                                                   num_virtual_orbitals);
+        -(cfg->unrestricted ? 2.0 : 4.0) * F_MO.block(0, num_occupied_orbitals,
+                                                      num_occupied_orbitals,
+                                                      num_virtual_orbitals);
     current_gradient_.segment(rotation_offset_[i], rotation_size_[i]) =
         Eigen::Map<const Eigen::VectorXd>(current_gradient_matrix.data(),
                                           rotation_size);
@@ -590,7 +595,8 @@ void GDM::iterate(SCFImpl& scf_impl) {
     }
   }
 
-  // Update history size and manage history overflow
+  // Update history size and manage history overflow. History for both spins are
+  // concatenated together, so we only need to check once.
   if (gdm_step_count_ != 0) {
     history_size_++;
 
@@ -722,16 +728,21 @@ void GDM::iterate(SCFImpl& scf_impl) {
 
   // Validate BFGS search direction
   double kappa_dot_grad = kappa_.dot(current_gradient_);
-  if ((kappa_dot_grad > 0.0) || (latest_inverse_rho < nonpositive_threshold_)) {
-    // Bad direction detected - BFGS history no longer fits current landscape
+  if (kappa_dot_grad > 0.0) {
     QDK_LOGGER().warn(
-        "BFGS search direction is invalid (kappa·grad = {:.6e} > 0). "
-        "or history curvature condition violated (latest inverse rho {:.6e}). "
-        "Clearing history and restarting BFGS with initial Hessian.",
-        kappa_dot_grad, latest_inverse_rho);
-
-    // Clear BFGS history, then recompute kappa using initial Hessian
-    // approximation
+        "Invalid BFGS search direction detected: kappa·grad = {:.6e} > 0. "
+        "This indicates a non-descent direction.",
+        kappa_dot_grad);
+  }
+  if (latest_inverse_rho < nonpositive_threshold_) {
+    QDK_LOGGER().warn(
+        "Invalid BFGS history curvature condition detected: latest inverse "
+        "rho = {:.6e} < 0.",
+        latest_inverse_rho);
+  }
+  if ((kappa_dot_grad > 0.0) || (latest_inverse_rho < nonpositive_threshold_)) {
+    // Bad direction detected. Clear BFGS history, then recompute kappa using
+    // initial Hessian
     history_size_ = 0;
     for (int index = 0; index < total_rotation_size_; index++) {
       kappa_(index) = -current_gradient_(index) / initial_hessian(index);
@@ -742,8 +753,8 @@ void GDM::iterate(SCFImpl& scf_impl) {
   } else {
     QDK_LOGGER().debug(
         "BFGS search direction validated: kappa·grad = {:.6e} (descent "
-        "direction)",
-        kappa_dot_grad);
+        "direction), inverse rho = {:.6e} (positive curvature).",
+        kappa_dot_grad, latest_inverse_rho);
   }
 
   // Save pseudo-canonical C for trials in the line search
@@ -761,12 +772,12 @@ void GDM::iterate(SCFImpl& scf_impl) {
 
   Eigen::VectorXd start_kappa = Eigen::VectorXd::Zero(kappa_.size());
   Eigen::VectorXd kappa_dir = kappa_;  // Search direction
-  double step = 1.0;                   // Initial step size
+  double step_size = 1.0;              // Initial step size
 
   // assign variables for line search
   double energy_at_start_point = last_accepted_energy_;
   Eigen::VectorXd grad_at_start_point = current_gradient_;
-  Eigen::VectorXd searched_kappa(kappa_.size());
+  Eigen::VectorXd searched_kappa = Eigen::VectorXd::Zero(kappa_.size());
   // Function value at new point, initialized to energy_at_start_point
   double energy_at_searched_kappa = energy_at_start_point;
   // Function value at new point, initialized to grad_at_start_point
@@ -774,9 +785,9 @@ void GDM::iterate(SCFImpl& scf_impl) {
 
   try {
     // Call Nocedal-Wright line search with strong Wolfe conditions
-    bfgs::nocedal_wright_line_search(line_functor, start_kappa, kappa_dir, step,
-                                     searched_kappa, energy_at_searched_kappa,
-                                     grad_at_searched_kappa);
+    bfgs::nocedal_wright_line_search(
+        line_functor, start_kappa, kappa_dir, step_size, searched_kappa,
+        energy_at_searched_kappa, grad_at_searched_kappa);
   } catch (const std::exception& e) {
     // BFGS line search failed - likely bad search direction
     QDK_LOGGER().warn(
@@ -784,14 +795,14 @@ void GDM::iterate(SCFImpl& scf_impl) {
         e.what());
 
     // Try line search with steepest descent direction
-    Eigen::VectorXd p_steepest = -current_gradient_;
-    double step_steepest = 1.0;
-
     try {
+      kappa_dir = -current_gradient_;
+      step_size = 1.0;
       energy_at_searched_kappa = energy_at_start_point;
       grad_at_searched_kappa = grad_at_start_point;
+      searched_kappa.setZero();
       bfgs::nocedal_wright_line_search(
-          line_functor, start_kappa, p_steepest, step_steepest, searched_kappa,
+          line_functor, start_kappa, kappa_dir, step_size, searched_kappa,
           energy_at_searched_kappa, grad_at_searched_kappa);
     } catch (const std::exception& e2) {
       // Even steepest descent line search failed
@@ -801,8 +812,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
           e2.what());
 
       // Take very small step in steepest descent direction
-      double small_grad_step_length = 1e-4;
-      searched_kappa = -small_grad_step_length * current_gradient_;
+      searched_kappa = -fallback_step_length_ * current_gradient_;
       energy_at_searched_kappa = line_functor.eval(searched_kappa);
       grad_at_searched_kappa = line_functor.grad(searched_kappa);
 

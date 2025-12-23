@@ -184,7 +184,8 @@ class SCFImpl {
   RowMajorMatrix& eigenvalues() { return eigenvalues_; }
 
   /**
-   * @brief Evaluate total energy and Fock matrix for a trial density matrix
+   * @brief Evaluate total energy and Fock matrix for a trial density matrix. It
+   * is a const method and does not modify any member variables.
    *
    * @param P_matrix Trial density matrix
    * @param loc Source location of the caller (automatically captured)
