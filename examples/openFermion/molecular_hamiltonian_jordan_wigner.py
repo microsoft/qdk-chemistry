@@ -9,7 +9,7 @@ This example demonstrates the use of QDK/Chemistry tools are used preparing the 
 OpenFermion to transform the resulting to map Fermion operators to qubit
 operators while QDK/Chemistry tools are used preparing the electronic structure Hamiltonian. OpenFermion is used to perform the Jordan-Wigner
 transformation and to obtain the ground state energy of the resulting qubit Hamiltonian.
-This example is adapted from the introduction to OpenFermion tutorial: 
+This example is adapted from the introduction to OpenFermion tutorial:
 https://quantumai.google/openfermion/tutorials/intro_to_openfermion
 """
 
@@ -46,13 +46,12 @@ ACTIVE_ORBITALS = 2
 # 1. QDK/Chemistry calculation for LiH (1.45 Å, STO-3G)
 ########################################################################################
 structure = Structure(
-    np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.45 * ANGSTROM_TO_BOHR]], dtype=float), ["Li", "H"]
+    np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.45 * ANGSTROM_TO_BOHR]], dtype=float),
+    ["Li", "H"],
 )  # Geometry in bohr
 
 scf_solver = create("scf_solver", basis_set="sto-3g")
-scf_energy, scf_wavefunction = scf_solver.run(
-        structure, charge=0, spin_multiplicity=1
-)
+scf_energy, scf_wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1)
 
 
 ########################################################################################
@@ -93,19 +92,21 @@ norb = one_body_aa.shape[0]  # Number of spatial orbitals
 # Obtain a rank-4 tensor in chemists' notation (pq|rs) from QDK
 (two_body_integrals, _, _) = active_hamiltonian.get_two_body_integrals()
 two_body_flat = np.array(two_body_integrals, dtype=float)  # Two-electron integrals
-two_body = two_body_flat.reshape((norb,) * 4)  
+two_body = two_body_flat.reshape((norb,) * 4)
 
 # Convert to open Fermion physicists' notation <pr|sq>. Note that the last two indices may be switched
 # from what you expect in other physicists' notation. OpenFermion takes the integral notaion below to be consistent
 # with the order of operators.
 # ĝ = ½ Σ (pq|rs) p† r† s q = ½ Σ ⟨pr|sq⟩ p† r† s q
-two_body_phys = np.transpose(two_body, (0, 2, 3, 1)) 
+two_body_phys = np.transpose(two_body, (0, 2, 3, 1))
 
 
 # make spacial integrals into spin orbitals, ordered as alpha_1, beta_1, alpha_2, beta_2, ...
 n_spin_orbitals = 2 * norb
 one_body_coefficients = np.zeros((n_spin_orbitals, n_spin_orbitals))
-two_body_coefficients = np.zeros((n_spin_orbitals, n_spin_orbitals, n_spin_orbitals, n_spin_orbitals))
+two_body_coefficients = np.zeros(
+    (n_spin_orbitals, n_spin_orbitals, n_spin_orbitals, n_spin_orbitals)
+)
 
 # For those less familiar with vectorized notation:
 # one_body_coefficients[2 * p, 2 * q] = one_body_aa[p, q]
@@ -118,14 +119,16 @@ one_body_coefficients[0::2, 0::2] = one_body_aa
 one_body_coefficients[1::2, 1::2] = one_body_bb
 two_body_coefficients[0::2, 0::2, 0::2, 0::2] = two_body_phys
 two_body_coefficients[1::2, 1::2, 1::2, 1::2] = two_body_phys
-two_body_coefficients[0::2, 1::2, 1::2, 0::2] = two_body_phys # note order of last two indices again
+two_body_coefficients[0::2, 1::2, 1::2, 0::2] = (
+    two_body_phys  # note order of last two indices again
+)
 two_body_coefficients[1::2, 0::2, 0::2, 1::2] = two_body_phys
 
 core_energy = active_hamiltonian.get_core_energy()  # Core energy constant
 
 # Get the Hamiltonian in an active space.
 openFermion_molecular_hamiltonian = openfermion.ops.representations.InteractionOperator(
-    core_energy, one_body_coefficients, 1/2 * two_body_coefficients
+    core_energy, one_body_coefficients, 1 / 2 * two_body_coefficients
 )
 
 # Map operator to fermions and qubits.
@@ -145,7 +148,7 @@ Logger.info(f"Ground state energy before rotation is {energy: .15f} Hartree.")
 n_orbitals = openFermion_molecular_hamiltonian.n_qubits // 2
 n_variables = int(n_orbitals * (n_orbitals - 1) / 2)
 numpy.random.seed(1)
-random_angles = numpy.pi * (1. - 2. * numpy.random.rand(n_variables))
+random_angles = numpy.pi * (1.0 - 2.0 * numpy.random.rand(n_variables))
 kappa = numpy.zeros((n_orbitals, n_orbitals))
 index = 0
 for p in range(n_orbitals):

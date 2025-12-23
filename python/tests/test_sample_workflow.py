@@ -483,9 +483,9 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
     )
 
     # Ground state energy should be invariant under basis rotation
-    assert np.isclose(
-        energy_before, energy_after, rtol=float_comparison_relative_tolerance, atol=1e-10
-    ), f"Ground state energy changed after rotation: {energy_before} vs {energy_after}"
+    assert np.isclose(energy_before, energy_after, rtol=float_comparison_relative_tolerance, atol=1e-10), (
+        f"Ground state energy changed after rotation: {energy_before} vs {energy_after}"
+    )
 
 
 ################################################################################
