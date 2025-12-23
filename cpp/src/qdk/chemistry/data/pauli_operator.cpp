@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <limits>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <stdexcept>
 #include <tuple>
@@ -124,6 +125,51 @@ std::unique_ptr<SumPauliOperatorExpression> PauliOperator::prune_threshold(
     result->add_term(std::move(prod));
   }
   return result;
+}
+
+char PauliOperator::to_char() const {
+  switch (operator_type_) {
+    case 0:
+      return 'I';
+    case 1:
+      return 'X';
+    case 2:
+      return 'Y';
+    case 3:
+      return 'Z';
+    default:
+      throw std::runtime_error("Invalid Pauli operator type");
+  }
+}
+
+std::uint64_t PauliOperator::min_qubit_index() const { return qubit_index_; }
+
+std::uint64_t PauliOperator::max_qubit_index() const { return qubit_index_; }
+
+std::uint64_t PauliOperator::num_qubits() const { return 1; }
+
+std::string PauliOperator::to_canonical_string(std::uint64_t num_qubits) const {
+  return to_canonical_string(0, num_qubits - 1);
+}
+
+std::string PauliOperator::to_canonical_string(std::uint64_t min_qubit,
+                                               std::uint64_t max_qubit) const {
+  std::string result(max_qubit - min_qubit + 1, 'I');
+  if (qubit_index_ >= min_qubit && qubit_index_ <= max_qubit) {
+    result[qubit_index_ - min_qubit] = to_char();
+  }
+  return result;
+}
+
+std::vector<std::pair<std::complex<double>, std::string>>
+PauliOperator::to_canonical_terms(std::uint64_t num_qubits) const {
+  return {{std::complex<double>(1.0, 0.0), to_canonical_string(num_qubits)}};
+}
+
+std::vector<std::pair<std::complex<double>, std::string>>
+PauliOperator::to_canonical_terms() const {
+  // Single Pauli operator spans 1 qubit, but we include from 0 to qubit_index_
+  return to_canonical_terms(qubit_index_ + 1);
 }
 
 // ProductPauliOperatorExpression methods
@@ -409,6 +455,99 @@ void ProductPauliOperatorExpression::set_coefficient(std::complex<double> c) {
   coefficient_ = c;
 }
 
+std::uint64_t ProductPauliOperatorExpression::min_qubit_index() const {
+  if (factors_.empty()) {
+    throw std::logic_error(
+        "min_qubit_index() called on empty ProductPauliOperatorExpression");
+  }
+  std::uint64_t min_idx = std::numeric_limits<std::uint64_t>::max();
+  for (const auto& factor : factors_) {
+    if (auto* pauli = dynamic_cast<const PauliOperator*>(factor.get())) {
+      min_idx = std::min(min_idx, pauli->get_qubit_index());
+    } else if (auto* prod = dynamic_cast<const ProductPauliOperatorExpression*>(
+                   factor.get())) {
+      if (!prod->get_factors().empty()) {
+        min_idx = std::min(min_idx, prod->min_qubit_index());
+      }
+    } else if (auto* sum = dynamic_cast<const SumPauliOperatorExpression*>(
+                   factor.get())) {
+      if (!sum->get_terms().empty()) {
+        min_idx = std::min(min_idx, sum->min_qubit_index());
+      }
+    }
+  }
+  return min_idx;
+}
+
+std::uint64_t ProductPauliOperatorExpression::max_qubit_index() const {
+  if (factors_.empty()) {
+    throw std::logic_error(
+        "max_qubit_index() called on empty ProductPauliOperatorExpression");
+  }
+  std::uint64_t max_idx = 0;
+  for (const auto& factor : factors_) {
+    if (auto* pauli = dynamic_cast<const PauliOperator*>(factor.get())) {
+      max_idx = std::max(max_idx, pauli->get_qubit_index());
+    } else if (auto* prod = dynamic_cast<const ProductPauliOperatorExpression*>(
+                   factor.get())) {
+      if (!prod->get_factors().empty()) {
+        max_idx = std::max(max_idx, prod->max_qubit_index());
+      }
+    } else if (auto* sum = dynamic_cast<const SumPauliOperatorExpression*>(
+                   factor.get())) {
+      if (!sum->get_terms().empty()) {
+        max_idx = std::max(max_idx, sum->max_qubit_index());
+      }
+    }
+  }
+  return max_idx;
+}
+
+std::uint64_t ProductPauliOperatorExpression::num_qubits() const {
+  if (factors_.empty()) {
+    return 0;
+  }
+  return max_qubit_index() - min_qubit_index() + 1;
+}
+
+std::string ProductPauliOperatorExpression::to_canonical_string(
+    std::uint64_t num_qubits) const {
+  return to_canonical_string(0, num_qubits - 1);
+}
+
+std::string ProductPauliOperatorExpression::to_canonical_string(
+    std::uint64_t min_qubit, std::uint64_t max_qubit) const {
+  // Build a map from qubit index to operator type
+  std::vector<char> result(max_qubit - min_qubit + 1, 'I');
+
+  for (const auto& factor : factors_) {
+    if (auto* pauli = dynamic_cast<const PauliOperator*>(factor.get())) {
+      std::uint64_t idx = pauli->get_qubit_index();
+      if (idx >= min_qubit && idx <= max_qubit) {
+        result[idx - min_qubit] = pauli->to_char();
+      }
+    }
+  }
+
+  return std::string(result.begin(), result.end());
+}
+
+std::vector<std::pair<std::complex<double>, std::string>>
+ProductPauliOperatorExpression::to_canonical_terms(
+    std::uint64_t num_qubits) const {
+  return {{coefficient_, to_canonical_string(num_qubits)}};
+}
+
+std::vector<std::pair<std::complex<double>, std::string>>
+ProductPauliOperatorExpression::to_canonical_terms() const {
+  if (factors_.empty()) {
+    // Pure scalar - return single term with all identities
+    return {{coefficient_, "I"}};
+  }
+  std::uint64_t effective_num_qubits = max_qubit_index() + 1;
+  return to_canonical_terms(effective_num_qubits);
+}
+
 // SumPauliOperatorExpression methods
 SumPauliOperatorExpression::SumPauliOperatorExpression() = default;
 
@@ -593,6 +732,167 @@ void SumPauliOperatorExpression::add_term(
 const std::vector<std::unique_ptr<PauliOperatorExpression>>&
 SumPauliOperatorExpression::get_terms() const {
   return terms_;
+}
+
+std::uint64_t SumPauliOperatorExpression::min_qubit_index() const {
+  if (terms_.empty()) {
+    throw std::logic_error(
+        "min_qubit_index() called on empty SumPauliOperatorExpression");
+  }
+  std::uint64_t min_idx = std::numeric_limits<std::uint64_t>::max();
+  for (const auto& term : terms_) {
+    if (auto* pauli = dynamic_cast<const PauliOperator*>(term.get())) {
+      min_idx = std::min(min_idx, pauli->get_qubit_index());
+    } else if (auto* prod = dynamic_cast<const ProductPauliOperatorExpression*>(
+                   term.get())) {
+      if (!prod->get_factors().empty()) {
+        min_idx = std::min(min_idx, prod->min_qubit_index());
+      }
+    } else if (auto* sum = dynamic_cast<const SumPauliOperatorExpression*>(
+                   term.get())) {
+      if (!sum->get_terms().empty()) {
+        min_idx = std::min(min_idx, sum->min_qubit_index());
+      }
+    }
+  }
+  return min_idx;
+}
+
+std::uint64_t SumPauliOperatorExpression::max_qubit_index() const {
+  if (terms_.empty()) {
+    throw std::logic_error(
+        "max_qubit_index() called on empty SumPauliOperatorExpression");
+  }
+  std::uint64_t max_idx = 0;
+  for (const auto& term : terms_) {
+    if (auto* pauli = dynamic_cast<const PauliOperator*>(term.get())) {
+      max_idx = std::max(max_idx, pauli->get_qubit_index());
+    } else if (auto* prod = dynamic_cast<const ProductPauliOperatorExpression*>(
+                   term.get())) {
+      if (!prod->get_factors().empty()) {
+        max_idx = std::max(max_idx, prod->max_qubit_index());
+      }
+    } else if (auto* sum = dynamic_cast<const SumPauliOperatorExpression*>(
+                   term.get())) {
+      if (!sum->get_terms().empty()) {
+        max_idx = std::max(max_idx, sum->max_qubit_index());
+      }
+    }
+  }
+  return max_idx;
+}
+
+std::uint64_t SumPauliOperatorExpression::num_qubits() const {
+  if (terms_.empty()) {
+    return 0;
+  }
+  return max_qubit_index() - min_qubit_index() + 1;
+}
+
+std::string SumPauliOperatorExpression::to_canonical_string(
+    std::uint64_t num_qubits) const {
+  return to_canonical_string(0, num_qubits - 1);
+}
+
+std::string SumPauliOperatorExpression::to_canonical_string(
+    std::uint64_t min_qubit, std::uint64_t max_qubit) const {
+  if (terms_.empty()) {
+    return "0";
+  }
+
+  std::string result;
+  bool first = true;
+  for (const auto& term : terms_) {
+    std::string term_str;
+    std::complex<double> coeff(1.0, 0.0);
+
+    if (auto* prod =
+            dynamic_cast<const ProductPauliOperatorExpression*>(term.get())) {
+      coeff = prod->get_coefficient();
+      term_str = prod->to_canonical_string(min_qubit, max_qubit);
+    } else if (auto* pauli = dynamic_cast<const PauliOperator*>(term.get())) {
+      // Wrap in a product to get canonical string
+      ProductPauliOperatorExpression temp_prod;
+      temp_prod.add_factor(pauli->clone());
+      term_str = temp_prod.to_canonical_string(min_qubit, max_qubit);
+    } else {
+      // Fallback for other types
+      term_str = term->to_string();
+    }
+
+    // Format the coefficient
+    std::string coeff_str = detail::pauli_operator_scalar_to_string(coeff);
+
+    if (first) {
+      if (coeff_str.empty()) {
+        result = term_str;
+      } else if (coeff_str == "-") {
+        result = "-" + term_str;
+      } else {
+        result = coeff_str + "*" + term_str;
+      }
+      first = false;
+    } else {
+      if (coeff_str.empty()) {
+        result += " + " + term_str;
+      } else if (coeff_str == "-") {
+        result += " - " + term_str;
+      } else if (coeff.real() < 0 || (coeff.real() == 0 && coeff.imag() < 0)) {
+        // Negative coefficient - format as subtraction
+        std::complex<double> neg_coeff = -coeff;
+        std::string neg_coeff_str =
+            detail::pauli_operator_scalar_to_string(neg_coeff);
+        if (neg_coeff_str.empty()) {
+          result += " - " + term_str;
+        } else {
+          result += " - " + neg_coeff_str + "*" + term_str;
+        }
+      } else {
+        result += " + " + coeff_str + "*" + term_str;
+      }
+    }
+  }
+
+  return result;
+}
+
+std::vector<std::pair<std::complex<double>, std::string>>
+SumPauliOperatorExpression::to_canonical_terms(std::uint64_t num_qubits) const {
+  std::vector<std::pair<std::complex<double>, std::string>> result;
+
+  for (const auto& term : terms_) {
+    std::complex<double> coeff(1.0, 0.0);
+    std::string term_str;
+
+    if (auto* prod =
+            dynamic_cast<const ProductPauliOperatorExpression*>(term.get())) {
+      coeff = prod->get_coefficient();
+      term_str = prod->to_canonical_string(num_qubits);
+    } else if (auto* pauli = dynamic_cast<const PauliOperator*>(term.get())) {
+      // Wrap in a product to get canonical string
+      ProductPauliOperatorExpression temp_prod;
+      temp_prod.add_factor(pauli->clone());
+      term_str = temp_prod.to_canonical_string(num_qubits);
+    } else {
+      term_str = term->to_string();
+    }
+
+    result.emplace_back(coeff, term_str);
+  }
+
+  return result;
+}
+
+std::vector<std::pair<std::complex<double>, std::string>>
+SumPauliOperatorExpression::to_canonical_terms() const {
+  if (terms_.empty()) {
+    return {};
+  }
+  std::uint64_t n = num_qubits();
+  std::uint64_t min_q = min_qubit_index();
+  // Adjust num_qubits to cover from 0 to max_qubit
+  std::uint64_t effective_num_qubits = min_q + n;
+  return to_canonical_terms(effective_num_qubits);
 }
 
 }  // namespace qdk::chemistry::data

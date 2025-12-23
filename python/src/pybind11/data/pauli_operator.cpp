@@ -55,9 +55,111 @@ Returns:
            "Check if this expression is a product of operators.")
       .def("is_sum_expression", &PauliOperatorExpression::is_sum_expression,
            "Check if this expression is a sum of operators.")
+      .def("is_distributed", &PauliOperatorExpression::is_distributed,
+           "Check if this expression is in distributed form (sum of products).")
+      .def("min_qubit_index", &PauliOperatorExpression::min_qubit_index,
+           R"(
+Return the minimum qubit index referenced in this expression.
+
+Returns:
+    int: The minimum qubit index.
+
+Raises:
+    RuntimeError: If the expression is empty.
+)")
+      .def("max_qubit_index", &PauliOperatorExpression::max_qubit_index,
+           R"(
+Return the maximum qubit index referenced in this expression.
+
+Returns:
+    int: The maximum qubit index.
+
+Raises:
+    RuntimeError: If the expression is empty.
+)")
+      .def("num_qubits", &PauliOperatorExpression::num_qubits,
+           R"(
+Return the number of qubits spanned by this expression.
+
+Returns:
+    int: max_qubit_index() - min_qubit_index() + 1, or 0 if empty.
+)")
       .def(
-          "is_distributed", &PauliOperatorExpression::is_distributed,
-          "Check if this expression is in distributed form (sum of products).");
+          "to_canonical_string",
+          [](const PauliOperatorExpression& self, std::uint64_t num_qubits) {
+            return self.to_canonical_string(num_qubits);
+          },
+          py::arg("num_qubits"),
+          R"(
+Return the canonical string representation of this expression.
+
+The canonical string is a sequence of characters representing the Pauli
+operators on each qubit, in little-endian order (qubit 0 is leftmost).
+Identity operators are represented as 'I'.
+
+Args:
+    num_qubits: The total number of qubits to represent.
+
+Returns:
+    str: A string of length num_qubits, e.g., "XIZI" for X(0)*Z(2) on 4 qubits.
+)")
+      .def(
+          "to_canonical_string",
+          [](const PauliOperatorExpression& self, std::uint64_t min_qubit,
+             std::uint64_t max_qubit) {
+            return self.to_canonical_string(min_qubit, max_qubit);
+          },
+          py::arg("min_qubit"), py::arg("max_qubit"),
+          R"(
+Return the canonical string representation for a qubit range.
+
+Args:
+    min_qubit: The minimum qubit index to include.
+    max_qubit: The maximum qubit index to include (inclusive).
+
+Returns:
+    str: A string of length (max_qubit - min_qubit + 1).
+)")
+      .def(
+          "to_canonical_terms",
+          [](const PauliOperatorExpression& self, std::uint64_t num_qubits) {
+            return self.to_canonical_terms(num_qubits);
+          },
+          py::arg("num_qubits"),
+          R"(
+Return a list of (coefficient, canonical_string) tuples.
+
+Args:
+    num_qubits: The total number of qubits to represent.
+
+Returns:
+    list[tuple[complex, str]]: A list of tuples where each tuple contains
+        the coefficient and canonical string for each term.
+
+Examples:
+    >>> X0 = PauliOperator.X(0)
+    >>> X0.to_canonical_terms(2)
+    [((1+0j), 'XI')]
+)")
+      .def(
+          "to_canonical_terms",
+          [](const PauliOperatorExpression& self) {
+            return self.to_canonical_terms();
+          },
+          R"(
+Return a list of (coefficient, canonical_string) tuples.
+
+Uses auto-detected qubit range based on min_qubit_index() and max_qubit_index().
+
+Returns:
+    list[tuple[complex, str]]: A list of tuples where each tuple contains
+        the coefficient and canonical string for each term.
+
+Examples:
+    >>> expr = PauliOperator.X(0) + PauliOperator.Z(1)
+    >>> expr.to_canonical_terms()
+    [((1+0j), 'XI'), ((1+0j), 'IZ')]
+)");
 
   // PauliOperator class
   py::class_<PauliOperator, PauliOperatorExpression,
@@ -128,6 +230,19 @@ Returns:
 )")
       .def_property_readonly("qubit_index", &PauliOperator::get_qubit_index,
                              "The index of the qubit this operator acts on.")
+      .def("to_char", &PauliOperator::to_char,
+           R"(
+Return the character representation of this Pauli operator.
+
+Returns:
+    str: 'I', 'X', 'Y', or 'Z'.
+
+Examples:
+    >>> PauliOperator.X(0).to_char()
+    'X'
+    >>> PauliOperator.Z(1).to_char()
+    'Z'
+)")
       // Arithmetic operators
       .def(
           "__mul__",
@@ -194,7 +309,26 @@ Returns:
           "__sub__",
           [](const PauliOperator& self,
              const SumPauliOperatorExpression& other) { return self - other; },
-          py::arg("other"), "Subtract a sum expression.");
+          py::arg("other"), "Subtract a sum expression.")
+      .def(
+          "__neg__", [](const PauliOperator& self) { return -self; },
+          "Negate the Pauli operator.")
+      .def(
+          "prune_threshold",
+          [](const PauliOperator& self,
+             double epsilon) -> std::unique_ptr<SumPauliOperatorExpression> {
+            return self.prune_threshold(epsilon);
+          },
+          py::arg("epsilon"),
+          R"(
+Remove terms with coefficient magnitude below the threshold.
+
+Args:
+    epsilon: The threshold below which terms are removed.
+
+Returns:
+    SumPauliOperatorExpression: A new expression with small terms filtered out.
+)");
 
   // ProductPauliOperatorExpression class
   py::class_<ProductPauliOperatorExpression, PauliOperatorExpression,
@@ -279,7 +413,27 @@ Examples:
           "__sub__",
           [](const ProductPauliOperatorExpression& self,
              const SumPauliOperatorExpression& other) { return self - other; },
-          py::arg("other"), "Subtract a sum expression.");
+          py::arg("other"), "Subtract a sum expression.")
+      .def(
+          "__neg__",
+          [](const ProductPauliOperatorExpression& self) { return -self; },
+          "Negate the product expression.")
+      .def(
+          "prune_threshold",
+          [](const ProductPauliOperatorExpression& self,
+             double epsilon) -> std::unique_ptr<SumPauliOperatorExpression> {
+            return self.prune_threshold(epsilon);
+          },
+          py::arg("epsilon"),
+          R"(
+Remove terms with coefficient magnitude below the threshold.
+
+Args:
+    epsilon: The threshold below which terms are removed.
+
+Returns:
+    SumPauliOperatorExpression: A new expression with small terms filtered out.
+)");
 
   // SumPauliOperatorExpression class
   py::class_<SumPauliOperatorExpression, PauliOperatorExpression,
@@ -361,5 +515,25 @@ Examples:
           "__sub__",
           [](const SumPauliOperatorExpression& self,
              const SumPauliOperatorExpression& other) { return self - other; },
-          py::arg("other"), "Subtract a sum expression.");
+          py::arg("other"), "Subtract a sum expression.")
+      .def(
+          "__neg__",
+          [](const SumPauliOperatorExpression& self) { return -self; },
+          "Negate the sum expression.")
+      .def(
+          "prune_threshold",
+          [](const SumPauliOperatorExpression& self,
+             double epsilon) -> std::unique_ptr<SumPauliOperatorExpression> {
+            return self.prune_threshold(epsilon);
+          },
+          py::arg("epsilon"),
+          R"(
+Remove terms with coefficient magnitude below the threshold.
+
+Args:
+    epsilon: The threshold below which terms are removed.
+
+Returns:
+    SumPauliOperatorExpression: A new expression with small terms filtered out.
+)");
 }

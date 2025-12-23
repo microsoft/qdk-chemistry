@@ -38,6 +38,68 @@ class PauliOperatorExpression {
   virtual std::unique_ptr<SumPauliOperatorExpression> prune_threshold(
       double epsilon) const = 0;
 
+  /**
+   * @brief Returns the minimum qubit index referenced in this expression.
+   * @return The minimum qubit index, or throws if the expression is empty.
+   */
+  virtual std::uint64_t min_qubit_index() const = 0;
+
+  /**
+   * @brief Returns the maximum qubit index referenced in this expression.
+   * @return The maximum qubit index, or throws if the expression is empty.
+   */
+  virtual std::uint64_t max_qubit_index() const = 0;
+
+  /**
+   * @brief Returns the number of qubits spanned by this expression.
+   * @return max_qubit_index() - min_qubit_index() + 1, or 0 if empty.
+   */
+  virtual std::uint64_t num_qubits() const = 0;
+
+  /**
+   * @brief Returns the canonical string representation of this expression.
+   *
+   * The canonical string is a sequence of characters representing the Pauli
+   * operators on each qubit, in little-endian order (qubit 0 is leftmost).
+   * Identity operators are represented as 'I'.
+   *
+   * @param num_qubits The total number of qubits to represent.
+   * @return A canonical string representation.
+   */
+  virtual std::string to_canonical_string(std::uint64_t num_qubits) const = 0;
+
+  /**
+   * @brief Returns the canonical string representation for a qubit range.
+   *
+   * @param min_qubit The minimum qubit index to include.
+   * @param max_qubit The maximum qubit index to include (inclusive).
+   * @return A canonical string representation.
+   */
+  virtual std::string to_canonical_string(std::uint64_t min_qubit,
+                                          std::uint64_t max_qubit) const = 0;
+
+  /**
+   * @brief Returns a vector of (coefficient, canonical_string) pairs.
+   *
+   * @param num_qubits The total number of qubits to represent.
+   * @return Vector of pairs where each pair contains the coefficient and
+   *         canonical string for each term.
+   */
+  virtual std::vector<std::pair<std::complex<double>, std::string>>
+  to_canonical_terms(std::uint64_t num_qubits) const = 0;
+
+  /**
+   * @brief Returns a vector of (coefficient, canonical_string) pairs.
+   *
+   * Uses auto-detected qubit range based on min_qubit_index() and
+   * max_qubit_index().
+   *
+   * @return Vector of pairs where each pair contains the coefficient and
+   *         canonical string for each term.
+   */
+  virtual std::vector<std::pair<std::complex<double>, std::string>>
+  to_canonical_terms() const = 0;
+
   bool is_pauli_operator() const;
 
   bool is_product_expression() const;
@@ -61,6 +123,19 @@ class PauliOperator : public PauliOperatorExpression {
   std::unique_ptr<PauliOperatorExpression> simplify() const override;
   std::unique_ptr<SumPauliOperatorExpression> prune_threshold(
       double epsilon) const override;
+
+  std::uint64_t min_qubit_index() const override;
+  std::uint64_t max_qubit_index() const override;
+  std::uint64_t num_qubits() const override;
+  std::string to_canonical_string(std::uint64_t num_qubits) const override;
+  std::string to_canonical_string(std::uint64_t min_qubit,
+                                  std::uint64_t max_qubit) const override;
+
+  std::vector<std::pair<std::complex<double>, std::string>> to_canonical_terms(
+      std::uint64_t num_qubits) const override;
+  std::vector<std::pair<std::complex<double>, std::string>> to_canonical_terms()
+      const override;
+
   inline std::uint8_t get_operator_type() const { return operator_type_; }
   inline std::uint64_t get_qubit_index() const { return qubit_index_; }
 
@@ -79,6 +154,12 @@ class PauliOperator : public PauliOperatorExpression {
   inline static PauliOperator Z(std::uint64_t qubit_index) {
     return PauliOperator(3, qubit_index);
   }
+
+  /**
+   * @brief Returns the character representation of this Pauli operator.
+   * @return 'I', 'X', 'Y', or 'Z'
+   */
+  char to_char() const;
 
  private:
   std::uint8_t operator_type_;  ///< e.g., 0 for I, 1 for X, 2 for Y, 3 for Z
@@ -112,6 +193,52 @@ class ProductPauliOperatorExpression : public PauliOperatorExpression {
   std::complex<double> get_coefficient() const;
   void set_coefficient(std::complex<double> c);
 
+  /**
+   * @brief Returns the minimum qubit index referenced in this expression.
+   * @return The minimum qubit index, or throws if the expression is empty.
+   */
+  std::uint64_t min_qubit_index() const override;
+
+  /**
+   * @brief Returns the maximum qubit index referenced in this expression.
+   * @return The maximum qubit index, or throws if the expression is empty.
+   */
+  std::uint64_t max_qubit_index() const override;
+
+  /**
+   * @brief Returns the number of qubits spanned by this expression.
+   * @return max_qubit_index() - min_qubit_index() + 1, or 0 if empty.
+   */
+  std::uint64_t num_qubits() const override;
+
+  /**
+   * @brief Returns the canonical string representation of this product.
+   *
+   * The canonical string is a sequence of characters representing the Pauli
+   * operators on each qubit, in little-endian order (qubit 0 is leftmost).
+   * Identity operators are represented as 'I'.
+   *
+   * @param num_qubits The total number of qubits to represent.
+   * @return A string of length num_qubits, e.g., "XIZI" for X(0)*Z(2) on 4
+   * qubits.
+   */
+  std::string to_canonical_string(std::uint64_t num_qubits) const override;
+
+  /**
+   * @brief Returns the canonical string representation for a qubit range.
+   *
+   * @param min_qubit The minimum qubit index to include.
+   * @param max_qubit The maximum qubit index to include (inclusive).
+   * @return A string of length (max_qubit - min_qubit + 1).
+   */
+  std::string to_canonical_string(std::uint64_t min_qubit,
+                                  std::uint64_t max_qubit) const override;
+
+  std::vector<std::pair<std::complex<double>, std::string>> to_canonical_terms(
+      std::uint64_t num_qubits) const override;
+  std::vector<std::pair<std::complex<double>, std::string>> to_canonical_terms()
+      const override;
+
  private:
   std::complex<double> coefficient_;
   std::vector<std::unique_ptr<PauliOperatorExpression>> factors_;
@@ -137,16 +264,71 @@ class SumPauliOperatorExpression : public PauliOperatorExpression {
   const std::vector<std::unique_ptr<PauliOperatorExpression>>& get_terms()
       const;
 
+  /**
+   * @brief Returns the minimum qubit index referenced in this expression.
+   * @return The minimum qubit index, or throws if the expression is empty.
+   */
+  std::uint64_t min_qubit_index() const override;
+
+  /**
+   * @brief Returns the maximum qubit index referenced in this expression.
+   * @return The maximum qubit index, or throws if the expression is empty.
+   */
+  std::uint64_t max_qubit_index() const override;
+
+  /**
+   * @brief Returns the number of qubits spanned by this expression.
+   * @return max_qubit_index() - min_qubit_index() + 1, or 0 if empty.
+   */
+  std::uint64_t num_qubits() const override;
+
+  /**
+   * @brief Returns the canonical string representation of this sum.
+   *
+   * @param num_qubits The total number of qubits to represent.
+   * @return A string representation showing all terms in canonical form.
+   */
+  std::string to_canonical_string(std::uint64_t num_qubits) const override;
+
+  /**
+   * @brief Returns the canonical string representation for a qubit range.
+   *
+   * @param min_qubit The minimum qubit index to include.
+   * @param max_qubit The maximum qubit index to include (inclusive).
+   * @return A string representation showing all terms in canonical form.
+   */
+  std::string to_canonical_string(std::uint64_t min_qubit,
+                                  std::uint64_t max_qubit) const override;
+
+  /**
+   * @brief Returns a vector of (coefficient, canonical_string) pairs.
+   *
+   * @param num_qubits The total number of qubits to represent.
+   * @return Vector of pairs where each pair contains the coefficient and
+   *         canonical string for each term.
+   */
+  std::vector<std::pair<std::complex<double>, std::string>> to_canonical_terms(
+      std::uint64_t num_qubits) const override;
+
+  /**
+   * @brief Returns a vector of (coefficient, canonical_string) pairs.
+   *
+   * Uses auto-detected qubit range based on min_qubit_index() and
+   * max_qubit_index().
+   *
+   * @return Vector of pairs where each pair contains the coefficient and
+   *         canonical string for each term.
+   */
+  std::vector<std::pair<std::complex<double>, std::string>> to_canonical_terms()
+      const override;
+
  private:
   std::vector<std::unique_ptr<PauliOperatorExpression>> terms_;
 };
 
 // Operator Overloads
 
-template <IsPauliOperatorExpression Ex>
-ProductPauliOperatorExpression operator*(std::complex<double> s, const Ex& op) {
-  return ProductPauliOperatorExpression(s, op);
-}
+// ProductPauliOperatorExpression specializations keep products flat.
 
 // Specialization for ProductPauliOperatorExpression: multiply coefficient
 // directly
@@ -157,12 +339,83 @@ inline ProductPauliOperatorExpression operator*(
   return result;
 }
 
+inline ProductPauliOperatorExpression operator*(
+    const ProductPauliOperatorExpression& op, std::complex<double> s) {
+  return s * op;
+}
+
+inline ProductPauliOperatorExpression operator*(
+    const ProductPauliOperatorExpression& prod, const PauliOperator& op) {
+  ProductPauliOperatorExpression result(prod);
+  result.add_factor(op.clone());
+  return result;
+}
+
+inline ProductPauliOperatorExpression operator*(
+    const PauliOperator& op, const ProductPauliOperatorExpression& prod) {
+  ProductPauliOperatorExpression result(prod.get_coefficient(), op);
+  for (const auto& factor : prod.get_factors()) {
+    result.add_factor(factor->clone());
+  }
+  return result;
+}
+
+inline ProductPauliOperatorExpression operator*(
+    const ProductPauliOperatorExpression& left,
+    const ProductPauliOperatorExpression& right) {
+  ProductPauliOperatorExpression result(left.get_coefficient() *
+                                        right.get_coefficient());
+  for (const auto& factor : left.get_factors()) {
+    result.add_factor(factor->clone());
+  }
+  for (const auto& factor : right.get_factors()) {
+    result.add_factor(factor->clone());
+  }
+  return result;
+}
+
+inline ProductPauliOperatorExpression operator-(
+    const ProductPauliOperatorExpression& op) {
+  ProductPauliOperatorExpression result(op);
+  result.set_coefficient(-op.get_coefficient());
+  return result;
+}
+
+inline ProductPauliOperatorExpression operator*(
+    const ProductPauliOperatorExpression& prod,
+    const SumPauliOperatorExpression& sum) {
+  ProductPauliOperatorExpression result(prod);
+  result.add_factor(sum.clone());
+  return result;
+}
+
+inline ProductPauliOperatorExpression operator*(
+    const SumPauliOperatorExpression& sum,
+    const ProductPauliOperatorExpression& prod) {
+  ProductPauliOperatorExpression result(prod.get_coefficient(), sum);
+  for (const auto& factor : prod.get_factors()) {
+    result.add_factor(factor->clone());
+  }
+  return result;
+}
+
+// Generic templates (excluded for ProductPauliOperatorExpression).
+
 template <IsPauliOperatorExpression Ex>
+  requires(!std::same_as<Ex, ProductPauliOperatorExpression>)
+ProductPauliOperatorExpression operator*(std::complex<double> s, const Ex& op) {
+  return ProductPauliOperatorExpression(s, op);
+}
+
+template <IsPauliOperatorExpression Ex>
+  requires(!std::same_as<Ex, ProductPauliOperatorExpression>)
 ProductPauliOperatorExpression operator*(const Ex& op, std::complex<double> s) {
   return s * op;
 }
 
 template <IsPauliOperatorExpression Lhs, IsPauliOperatorExpression Rhs>
+  requires(!std::same_as<Lhs, ProductPauliOperatorExpression> &&
+           !std::same_as<Rhs, ProductPauliOperatorExpression>)
 ProductPauliOperatorExpression operator*(const Lhs& left, const Rhs& right) {
   return ProductPauliOperatorExpression(left, right);
 }
@@ -182,6 +435,7 @@ SumPauliOperatorExpression operator-(const Lhs& left, const Rhs& right) {
  * @return A ProductPauliOperatorExpression representing -1 * expr.
  */
 template <IsPauliOperatorExpression Ex>
+  requires(!std::same_as<Ex, ProductPauliOperatorExpression>)
 ProductPauliOperatorExpression operator-(const Ex& expr) {
   return -1 * expr;
 }
