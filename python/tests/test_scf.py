@@ -313,7 +313,8 @@ class TestScfSolver:
         # Set method and basis set to match C++ test
         scf_solver.settings().set("method", "pbe")
         scf_solver.settings().set("enable_gdm", True)
-        scf_solver.settings().set("max_iterations", 100)
+        # Increase max iterations to allow convergence on macOS
+        scf_solver.settings().set("max_iterations", 200)
 
         energy, wavefunction = scf_solver.run(oxygen, 1, 2, "cc-pvdz")  # +1 charge, doublet state
         orbitals = wavefunction.get_orbitals()

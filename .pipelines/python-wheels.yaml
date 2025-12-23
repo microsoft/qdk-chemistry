@@ -113,7 +113,7 @@ extends:
           steps:
           # Build - Linux x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
-            - template: .pipelines/templates/docker-pip-wheel.yml@self
+            - template: .pipelines/templates/build-pip-wheels.yml@self
               parameters:
                 march: $(buildMarch)
                 buildTesting: OFF
@@ -125,7 +125,7 @@ extends:
 
           # Test - Linux x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
-            - template: .pipelines/templates/docker-test-wheel.yml@self
+            - template: .pipelines/templates/test-pip-wheels.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
@@ -134,7 +134,7 @@ extends:
 
           # Build - Linux ARM64
           - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
-            - template: .pipelines/templates/docker-pip-wheel.yml@self
+            - template: .pipelines/templates/build-pip-wheels.yml@self
               parameters:
                 march: $(buildMarch)
                 buildTesting: OFF
@@ -146,7 +146,7 @@ extends:
 
           # Test - Linux ARM64
           - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
-            - template: .pipelines/templates/docker-test-wheel.yml@self
+            - template: .pipelines/templates/test-pip-wheels.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
@@ -155,7 +155,7 @@ extends:
 
           # Build - macOS ARM64
           - ${{ if eq(target.os, 'macos') }}:
-            - template: .pipelines/templates/docker-pip-wheel.yml@self
+            - template: .pipelines/templates/build-pip-wheels.yml@self
               parameters:
                 march: $(buildMarch)
                 buildTesting: OFF
@@ -166,7 +166,7 @@ extends:
 
           # Test - macOS ARM64
           - ${{ if eq(target.os, 'macos') }}:
-            - template: .pipelines/templates/docker-test-wheel.yml@self
+            - template: .pipelines/templates/test-pip-wheels.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 pythonVersion: $(pythonVersion)
