@@ -5,10 +5,11 @@
 
 """qdk-chemistry + OpenFermion Jordan-Wigner example.
 
-This example demonstrates the use of QDK/Chemistry tools are used preparing the electronic structure Hamiltonian, and
-OpenFermion to transform the resulting to map Fermion operators to qubit
-operators while QDK/Chemistry tools are used preparing the electronic structure Hamiltonian. OpenFermion is used to perform the Jordan-Wigner
-transformation and to obtain the ground state energy of the resulting qubit Hamiltonian.
+This example demonstrates the use of QDK/Chemistry tools are used preparing the electronic 
+structure Hamiltonian, and OpenFermion to transform the resulting to map Fermion operators to 
+qubit operators while QDK/Chemistry tools are used preparing the electronic structure Hamiltonian. 
+OpenFermion is used to perform the Jordan-Wigner transformation and to obtain the ground state 
+energy of the resulting qubit Hamiltonian.
 This example is adapted from the introduction to OpenFermion tutorial:
 https://quantumai.google/openfermion/tutorials/intro_to_openfermion
 """
