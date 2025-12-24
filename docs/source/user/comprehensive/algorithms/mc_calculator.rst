@@ -1,9 +1,9 @@
 Multi-configuration calculations
 ================================
 
-The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` algorithm in QDK/Chemistry performs Multi-Configurational (MC) calculations to solve the electronic structure problem beyond the mean-field approximation.
+The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` algorithm in QDK/Chemistry performs Multi-Configurational (:term:`MC`) calculations to solve the electronic structure problem beyond the mean-field approximation.
 Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :doc:`Hamiltonian <../data/hamiltonian>` instance as input and produces a :class:`~qdk_chemistry.data.Wavefunction` instance as output.
-It provides access to various Configuration Interaction (CI) methods to account for static electron correlation effects, which are critical for accurately describing systems with near-degenerate electronic states.
+It provides access to various Configuration Interaction (:term:`CI`) methods to account for static electron correlation effects, which are critical for accurately describing systems with near-degenerate electronic states.
 
 Overview
 --------
@@ -11,7 +11,7 @@ Overview
 :term:`MC` methods represent the electronic wavefunction as a linear combination of many electron configurations (Slater determinants).
 These methods can accurately describe systems with strong static correlation effects where single-reference methods like Hartree-Fock are inadequate.
 Static correlation arises when multiple electronic configurations contribute significantly to the wavefunction, such as in bond-breaking processes, transition states, excited states, and open-shell systems.
-The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` algorithm implements various :term:`CI` approaches, from full CI (FCI) to selected :term:`CI` methods that focus on the most important configurations.
+The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` algorithm implements various :term:`CI` approaches, from full :term:`CI` (:term:`FCI`) to selected :term:`CI` methods that focus on the most important configurations.
 
 
 Using the MultiConfigurationCalculator
@@ -103,7 +103,7 @@ All implementations share a common base set of settings from ``MultiConfiguratio
    * - ``ci_residual_tolerance``
      - float
      - ``1e-6``
-     - Convergence threshold for CI Davidson solver
+     - Convergence threshold for :term:`CI` Davidson solver
    * - ``davidson_iterations``
      - int
      - ``200``
@@ -144,7 +144,7 @@ MACIS CAS
 
 **Factory name:** ``"macis_cas"`` (default)
 
-The MACIS (Many-body Adaptive Configuration Interaction Solver) CAS implementation provides a reference solver to compute the exact energy within the active space. This module is very memory and compute intensive, and is thus suitable only for small active spaces.
+The :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :term:`CAS` implementation provides a reference solver to compute the exact energy within the active space. This module is very memory and compute intensive, and is thus suitable only for small active spaces.
 
 This implementation uses only the common settings described above.
 
@@ -156,33 +156,33 @@ MACIS ASCI
 
 **Factory name:** ``"macis_asci"``
 
-The MACIS ASCI (Adaptive Sampling Configuration Interaction) implementation provides an efficient selected CI solver that can handle larger active spaces by adaptively selecting the most important configurations. This method balances accuracy and computational cost, making it suitable for medium-sized active spaces.
+The :term:`MACIS` :term:`ASCI` (Adaptive Sampling Configuration Interaction) implementation provides an efficient selected :term:`CI` solver that can handle larger active spaces by adaptively selecting the most important configurations. This method balances accuracy and computational cost, making it suitable for medium-sized active spaces.
 
 .. _asci-algorithm:
 
 ASCI Algorithm
 ^^^^^^^^^^^^^^^
 
-The Adaptive Sampling Configuration Interaction (ASCI) algorithm :cite:`Tubman2016,Tubman2020` is a selected configuration interaction method that enables efficient treatment of large active spaces by iteratively identifying and including only the most important determinants. QDK/Chemistry integrates the high-performance, parallel implementation of ASCI in the MACIS library :cite:`Williams-Young2023`.
+The Adaptive Sampling Configuration Interaction (:term:`ASCI`) algorithm :cite:`Tubman2016,Tubman2020` is a selected configuration interaction method that enables efficient treatment of large active spaces by iteratively identifying and including only the most important determinants. QDK/Chemistry integrates the high-performance, parallel implementation of :term:`ASCI` in the :term:`MACIS` library :cite:`Williams-Young2023`.
 
-ASCI works by growing the determinant space adaptively: at each iteration, it samples the space of possible determinants and selects those with the largest contributions to the wavefunction. This approach achieves near-CASCI accuracy at a fraction of the computational cost, making it possible to treat active spaces that are intractable for conventional CASCI.
+The :term:`ASCI` works by growing the determinant space adaptively: at each iteration, it samples the space of possible determinants and selects those with the largest contributions to the wavefunction. This approach achieves near-:term:`CASCI` accuracy at a fraction of the computational cost, making it possible to treat active spaces that are intractable for conventional :term:`CASCI`.
 
-ASCI is especially useful for generating approximate wavefunctions and RDMs for use in automated active space selection protocols (such as AutoCAS), as it provides a good balance between computational cost and accuracy. For best practices, see the :ref:`AutoCAS Algorithm <autocas-algorithm-details>` section in the active space selector documentation.
+ :term:`ASCI` is especially useful for generating approximate wavefunctions and RDMs for use in automated active space selection protocols (such as AutoCAS), as it provides a good balance between computational cost and accuracy. For best practices, see the :ref:`AutoCAS Algorithm <autocas-algorithm-details>` section in the active space selector documentation.
 
-The ASCI algorithm proceeds as a two-phase optimization:
+The :term:`ASCI` algorithm proceeds as a two-phase optimization:
 
-1. **Growth Phase**: The growth phase focuses on rapidly expanding the determinant space to capture the most important configurations. Starting from an initial set of determinants (often just the Hartree-Fock determinant), ASCI generates new candidate determinants by estimating their importance to the overall wavefunction through perturbation theory. ASCI then ranks their contributions to the wavefunction and selects the most significant ones to add to the determinant space for the subsequent iterations. The Hamiltonian is then projected into this expanded space and diagonalized to produce an improved wavefunction. This process is repeated with a iteratively larger determinant space until a target number of determinants (``ntdets_max``) is reached. The rate at which the determinant space grows is controlled by the ``grow_factor`` setting, which determines how many new determinants are added at each iteration. However, if the search algorithm fails to find enough important determinants, the growth factor is reduced by the ``growth_backoff_rate`` to ensure stability. Conversely, if the search is successful, the growth factor is increased by the ``growth_recovery_rate`` to accelerate convergence in subsequent iterations.
+1. **Growth Phase**: The growth phase focuses on rapidly expanding the determinant space to capture the most important configurations. Starting from an initial set of determinants (often just the Hartree-Fock determinant), :term:`ASCI` generates new candidate determinants by estimating their importance to the overall wavefunction through perturbation theory. :term:`ASCI` then ranks their contributions to the wavefunction and selects the most significant ones to add to the determinant space for the subsequent iterations. The Hamiltonian is then projected into this expanded space and diagonalized to produce an improved wavefunction. This process is repeated with a iteratively larger determinant space until a target number of determinants (``ntdets_max``) is reached. The rate at which the determinant space grows is controlled by the ``grow_factor`` setting, which determines how many new determinants are added at each iteration. However, if the search algorithm fails to find enough important determinants, the growth factor is reduced by the ``growth_backoff_rate`` to ensure stability. Conversely, if the search is successful, the growth factor is increased by the ``growth_recovery_rate`` to accelerate convergence in subsequent iterations.
 
-2. **Refinement Phase**: Once the determinant space has reached the target size, the refinement phase begins. In this phase, ASCI focuses on fine-tuning the wavefunction by iteratively improving the selection of determinants within the fixed-size space. The algorithm evaluates the contributions of each determinant to the wavefunction and removes those that contribute least, replacing them with new candidates generated through perturbation theory. This selective pruning and replacement process continues until convergence is achieved, as determined by the ``refine_energy_tol`` setting or until the maximum number of refinement iterations (``max_refine_iter``) is reached.
+2. **Refinement Phase**: Once the determinant space has reached the target size, the refinement phase begins. In this phase, :term:`ASCI` focuses on fine-tuning the wavefunction by iteratively improving the selection of determinants within the fixed-size space. The algorithm evaluates the contributions of each determinant to the wavefunction and removes those that contribute least, replacing them with new candidates generated through perturbation theory. This selective pruning and replacement process continues until convergence is achieved, as determined by the ``refine_energy_tol`` setting or until the maximum number of refinement iterations (``max_refine_iter``) is reached.
 
 **The ASCI Search Algorithm**
 
-   In both the growth and refinement phases, the ASCI search algorithm is performed to update the current wavefunction. The key realization of ASCI is that the search can be drastically accelerated by only searching for determinants that are connected via the Hamiltonian from a small set of "core" determinants rather than the full wavefunction at any particular iteration. This module provides several ways to control the size of this core set, including a maximum number of core determinants (``ncdets_max``) as well as allowing the the core space to update dynamically as the wavefunction grows by specifiying that a fixed percentage of the current wavefunction determinants be included in the core set (``core_selection_threshold``). The method for selecting the core determinants is controlled by the ``core_selection_strategy`` setting.
+  In both the growth and refinement phases, the :term:`ASCI` search algorithm is performed to update the current wavefunction. The key realization of :term:`ASCI` is that the search can be drastically accelerated by only searching for determinants that are connected via the Hamiltonian from a small set of "core" determinants rather than the full wavefunction at any particular iteration. This module provides several ways to control the size of this core set, including a maximum number of core determinants (``ncdets_max``) as well as allowing the the core space to update dynamically as the wavefunction grows by specifiying that a fixed percentage of the current wavefunction determinants be included in the core set (``core_selection_threshold``). The method for selecting the core determinants is controlled by the ``core_selection_strategy`` setting.
 
 
 **Settings:**
 
-In addition to the common settings, MACIS ASCI supports the following implementation-specific settings:
+In addition to the common settings, :term:`MACIS` :term:`ASCI` supports the following implementation-specific settings:
 
 
 .. list-table::
@@ -253,14 +253,14 @@ In addition to the common settings, MACIS ASCI supports the following implementa
 Related classes
 ---------------
 
-- :doc:`Hamiltonian <../data/hamiltonian>`: Input Hamiltonian for CI calculation
-- :class:`~qdk_chemistry.data.Wavefunction`: Output CI wavefunction
+- :doc:`Hamiltonian <../data/hamiltonian>`: Input Hamiltonian for :term:`CI` calculation
+- :class:`~qdk_chemistry.data.Wavefunction`: Output :term:`CI` wavefunction
 
 Further reading
 ---------------
 
 - The above examples can be downloaded as complete `Python <../../../_static/examples/python/mc_calculator.py>`_ or `C++ <../../../_static/examples/cpp/mc_calculator.cpp>`_ code.
-- :doc:`HamiltonianConstructor <hamiltonian_constructor>`: Produces the Hamiltonian for CI
+- :doc:`HamiltonianConstructor <hamiltonian_constructor>`: Produces the Hamiltonian for :term:`CI`
 - :doc:`ActiveSpaceSelector <active_space>`: Helps identify important orbitals for the active space
 - :doc:`Settings <settings>`: Configuration settings for algorithms
 - :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation

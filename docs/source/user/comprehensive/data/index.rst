@@ -32,7 +32,7 @@ Quick reference
      - One- and two-electron integrals
      - :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`
    * - ``Wavefunction``
-     - Electronic state (orbitals + CI coefficients)
+     - Electronic state (orbitals + :term:`CI` coefficients)
      - :doc:`MCCalculator <../algorithms/mc_calculator>`
    * - ``QubitHamiltonian``
      - Pauli operator representation

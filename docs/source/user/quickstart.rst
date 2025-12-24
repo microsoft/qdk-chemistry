@@ -53,7 +53,7 @@ Instantiations of the :doc:`comprehensive/algorithms/scf_solver` algorithm (and 
 See the :doc:`comprehensive/algorithms/factory_pattern` documentation for more information on how it is used in the code base.
 
 The inputs for an :term:`SCF` calculation are a :doc:`comprehensive/data/structure` object, the total charge and spin multiplicity of the molecular system, and information about the single-particle basis to be used.
-Optionally, :doc:`comprehensive/algorithms/settings` specific to the particular :doc:`comprehensive/algorithms/scf_solver` can be configured to control the execution of the SCF algorihm (e.g. convergence tolerances, etc) by accessing the ``settings()`` method.
+Optionally, :doc:`comprehensive/algorithms/settings` specific to the particular :doc:`comprehensive/algorithms/scf_solver` can be configured to control the execution of the :term:`SCF` algorihm (e.g. convergence tolerances, etc) by accessing the ``settings()`` method.
 The basis for the :term:`SCF` calculation can be set via a string input (specifying one of the :ref:`available_basis_sets`), a custom :doc:`comprehensive/data/basis_set` or initial :doc:`comprehensive/data/orbitals` can also be provided.
 
 .. tab:: C++ API
@@ -122,14 +122,14 @@ Compute a multi-configurational wavefunction for the active space
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 With the active space Hamiltonian constructed, quantum many-body calculations can be performed to obtain multi-configurational wavefunctions that go beyond the single-determinant :term:`SCF` approximation.
-QDK/Chemistry supports various Multi-Configuration (MC) methods including Complete Active Space Configuration Interaction (CASCI) and selected :term:`CI` approaches.
+QDK/Chemistry supports various Multi-Configuration (:term:`MC`) methods including Complete Active Space Configuration Interaction (:term:`CASCI`) and selected :term:`CI` approaches.
 :term:`MC` calculations are performed via instantiations of the :doc:`comprehensive/algorithms/mc_calculator` algorithm, which takes as input an instance of an active space :doc:`comprehensive/data/hamiltonian`, and the number of alpha and beta electrons, and produces as output a :class:`~qdk_chemistry.data.Wavefunction` representing the multi-configurational state as well as its associated energy.
 
 While multi-configurational methods provide more accurate energy estimates than :term:`SCF`, their primary role in the quantum applications workflow is to generate high-quality initial states for quantum algorithms.
 On scaled fault-tolerant quantum computers, these classically-computed wavefunctions serve as the foundation for state preparation circuits, enabling algorithms such as quantum phase estimation to achieve chemical accuracy for systems that remain intractable for purely classical methods.
 These methods also serve as a critical analysis tool, allowing users to better understand the electronic structure of theire systems of interest and the potential for quantum algorithms to provide meaningful utility over classical state of the art.
 
-In the following example, as the aforementioned (6e, 6o) active space is relatively small, we perform a CASCI calculation to obtain the exact ground state wavefunction within the active space.
+In the following example, as the aforementioned (6e, 6o) active space is relatively small, we perform a :term:`CASCI` calculation to obtain the exact ground state wavefunction within the active space.
 
 .. tab:: C++ API
 

@@ -24,7 +24,7 @@ All implementations inherit from the same base class and conform to the same int
 This design supports several workflows:
 
 - Benchmarking native implementations against established packages
-- Mixing backends (e.g., PySCF for SCF, MACIS for multi-configurational methods)
+- Mixing backends (e.g., PySCF for :term:`SCF`, :term:`MACIS` for multi-configurational methods)
 - Adding custom implementations
 
 The implementations for each algorithm type are managed by a :doc:`factory class <algorithms/factory_pattern>`, which provides a consistent interface for creating instances and listing available implementations.
@@ -106,7 +106,7 @@ The following sections provide comprehensive examples of each approach.
 Implementing a new algorithm backend
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This section demonstrates how to integrate an external SCF solver as a QDK/Chemistry plugin, enabling access through the standard API.
+This section demonstrates how to integrate an external :term:`SCF` solver as a QDK/Chemistry plugin, enabling access through the standard API.
 
 **Interface requirements**
 

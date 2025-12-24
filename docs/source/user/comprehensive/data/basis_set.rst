@@ -250,7 +250,7 @@ For a complete list of available basis sets and their specifications, see the :d
       :end-before: # end-cell-library
 
 .. note::
-   The basis set library includes popular basis sets such as STO-nG, Pople basis sets (3-21G, 6-31G, etc.), correlation-consistent basis sets (cc-pVDZ, cc-pVTZ, etc.), and more.
+   The basis set library includes popular basis sets such as :term:`STO`-nG, Pople basis sets (3-21G, 6-31G, etc.), correlation-consistent basis sets (cc-pVDZ, cc-pVTZ, etc.), and more.
    The availability may depend on your QDK/Chemistry installation.
 
 Related classes

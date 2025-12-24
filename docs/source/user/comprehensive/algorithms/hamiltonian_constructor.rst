@@ -108,7 +108,7 @@ QDK (Native)
 
 **Factory name:** ``"qdk"`` (default)
 
-The native QDK/Chemistry implementation for Hamiltonian construction. Transforms molecular orbitals from AO to MO basis and computes one- and two-electron integrals.
+The native QDK/Chemistry implementation for Hamiltonian construction. Transforms molecular orbitals from :term:`AO` to :term:`MO` basis and computes one- and two-electron integrals.
 
 **Settings:**
 
@@ -124,7 +124,7 @@ The native QDK/Chemistry implementation for Hamiltonian construction. Transforms
      - Method for computing electron repulsion integrals ("direct" or "incore")
    * - ``scf_type``
      - string
-     - Type of SCF reference ("rhf", "rohf", or "uhf")
+     - Type of :term:`SCF` reference ("rhf", "rohf", or "uhf")
 
 Related classes
 ---------------

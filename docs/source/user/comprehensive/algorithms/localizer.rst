@@ -162,7 +162,7 @@ QDK MP2 Natural Orbitals
 
 **Factory name:** ``"qdk_mp2_natural_orbitals"``
 
-Computes natural orbitals :cite:`Lowdin1956` from the MP2 one-particle density matrix.
+Computes natural orbitals :cite:`Lowdin1956` from the :term:`MP2` one-particle density matrix.
 These orbitals diagonalize the correlation effects and provide occupation numbers that can guide :doc:`active space selection <active_space>`.
 
 **Settings:** This implementation has no configurable settings.
@@ -174,7 +174,7 @@ QDK VVHV
 
 **Factory name:** ``"qdk_vvhv"``
 
-The VVHV (Valence Virtual--Hard Virtual) localizer addresses the numerical challenges of orbital localization in near-complete basis sets by partitioning the virtual space into chemically meaningful subspaces.
+The :term:`VVHV` (Valence Virtual--Hard Virtual) localizer addresses the numerical challenges of orbital localization in near-complete basis sets by partitioning the virtual space into chemically meaningful subspaces.
 See :ref:`VVHV Algorithm <vvhv-algorithm>` below for a detailed description.
 
 **Settings:**
@@ -215,7 +215,7 @@ VVHV Algorithm
 
 Localization of molecular orbitals expressed in near-complete :doc:`basis sets <../data/basis_set>` is numerically ill-posed and challenging for most localizers.
 This can lead to orbitals that do not vary smoothly with molecular geometry, numerically unstable results, and reproducibility difficulties across architectures and compute environments.
-The Valence Virtual--Hard Virtual (VVHV) separation :cite:`Subotnik2005` addresses these problems by partitioning the virtual orbital space into chemically meaningful subspaces before localization.
+The Valence Virtual--Hard Virtual (:term:`VVHV`) separation :cite:`Subotnik2005` addresses these problems by partitioning the virtual orbital space into chemically meaningful subspaces before localization.
 
 **The Problem with Standard Localization**
 
@@ -229,9 +229,9 @@ When localization is applied to the full virtual space, the optimizer may mix th
 
 **The VVHV Separation Procedure**
 
-The VVHV algorithm proceeds in three stages:
+The :term:`VVHV` algorithm proceeds in three stages:
 
-1. **Minimal Basis Projection**: Project the canonical virtual orbitals onto a minimal basis set (e.g., STO-3G) to identify the valence-virtual subspace.
+1. **Minimal Basis Projection**: Project the canonical virtual orbitals onto a minimal basis set (e.g., :term:`STO`-3G) to identify the valence-virtual subspace.
    Given the overlap matrix :math:`\mathbf{S}_{\text{min}}` between the computational basis and minimal basis, the valence-virtual orbitals span the range of:
 
    .. math::
@@ -247,8 +247,8 @@ The VVHV algorithm proceeds in three stages:
 
 **Benefits for Active Space Selection**
 
-The VVHV separation is particularly valuable for multi-configuration calculations where a consistent active space must be maintained along a reaction pathway.
-By localizing only the valence-virtual orbitals, which are the chemically relevant virtual orbitals for active space construction, the VVHV procedure ensures:
+The :term:`VVHV` separation is particularly valuable for multi-configuration calculations where a consistent active space must be maintained along a reaction pathway.
+By localizing only the valence-virtual orbitals, which are the chemically relevant virtual orbitals for active space construction, the :term:`VVHV` procedure ensures:
 
 - Orbitals that track smoothly as bonds stretch and form
 - Numerically stable and reproducable results

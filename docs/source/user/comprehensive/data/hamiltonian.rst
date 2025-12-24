@@ -46,7 +46,7 @@ For unrestricted Hamiltonians, the one-electron and two-electron integrals are s
 Usage
 -----
 
-The :class:`~qdk_chemistry.data.Hamiltonian` class is typically used as input to correlation methods such as Configuration Interaction (CI) and Multi-Configuration Self-Consistent Field (MCSCF) calculations.
+The :class:`~qdk_chemistry.data.Hamiltonian` class is typically used as input to correlation methods such as Configuration Interaction (:term:`CI`) and Multi-Configuration Self-Consistent Field (:term:`MCSCF`) calculations.
 The :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm is the primary tool for generating :class:`~qdk_chemistry.data.Hamiltonian` objects from molecular data.
 
 Creating a Hamiltonian object

@@ -120,7 +120,7 @@ QDK Valence
 **Factory name:** ``"qdk_valence"`` (default)
 
 Manual valence-based selection where users specify the number of active electrons and orbitals.
-Selects orbitals near the HOMO-LUMO gap.
+Selects orbitals near the :term:`HOMO`-:term:`LUMO` gap.
 
 **Settings:**
 
@@ -176,7 +176,7 @@ See :ref:`AutoCAS Algorithm <autocas-algorithm-details>` below for a detailed de
 .. note::
 
    This method requires the input wavefunction to have orbital entropies populated.
-   Orbital entropies are computed from the one- and two-electron reduced density matrices (1-RDM and 2-RDM), which are typically obtained from a multi-configuration calculation with ``calculate_one_rdm=True`` and ``calculate_two_rdm=True``. See :doc:`MultiConfigurationCalculator <mc_calculator>` for details on generating wavefunctions with RDMs.
+  Orbital entropies are computed from the one- and two-electron reduced density matrices (1-:term:`RDM` and 2-:term:`RDM`), which are typically obtained from a multi-configuration calculation with ``calculate_one_rdm=True`` and ``calculate_two_rdm=True``. See :doc:`MultiConfigurationCalculator <mc_calculator>` for details on generating wavefunctions with RDMs.
 
 **Settings:**
 
@@ -216,7 +216,7 @@ See :ref:`AutoCAS Algorithm <autocas-algorithm-details>` below for a detailed de
 .. note::
 
    This method requires the input wavefunction to have orbital entropies populated.
-   Orbital entropies are computed from the one- and two-electron reduced density matrices (1-RDM and 2-RDM), which are typically obtained from a multi-configuration calculation with ``calculate_one_rdm=True`` and ``calculate_two_rdm=True``. See :doc:`MultiConfigurationCalculator <mc_calculator>` for details on generating wavefunctions with RDMs.
+   Orbital entropies are computed from the one- and two-electron reduced density matrices (1-:term:`RDM` and 2-:term:`RDM`), which are typically obtained from a multi-configuration calculation with ``calculate_one_rdm=True`` and ``calculate_two_rdm=True``. See :doc:`MultiConfigurationCalculator <mc_calculator>` for details on generating wavefunctions with RDMs.
 
 **Settings:**
 
@@ -254,7 +254,7 @@ AutoCAS leverages concepts from quantum information theory to quantify orbital c
 The key insight is that strongly correlated orbitals are highly *entangled* with the rest of the electronic system.
 This entanglement can be measured using the single-orbital entropy :math:`s_i^{(1)}`, which quantifies how much information about orbital :math:`i` is "shared" with all other orbitals.
 
-Single orbital entropies can be calculated for many-body systems given access to (approximate) one- and two-particle reduced density matrices (RDM) :cite:`Boguslawski2015`, which are easily accessible in QDK/Chemistry through multi-configuration wavefunction data structures. As such, single orbital entropies are computed by default when RDMs are requested in :doc:`multi-configuration calculations <mc_calculator>`. The QDK/Chemistry implementation of AutoCAS is agnostic to the underlying wavefunction method, as long as the required RDMs are available, thus allowing for comparisons across different multi-configuration approaches.
+Single orbital entropies can be calculated for many-body systems given access to (approximate) one- and two-particle reduced density matrices (:term:`RDM`) :cite:`Boguslawski2015`, which are easily accessible in QDK/Chemistry through multi-configuration wavefunction data structures. As such, single orbital entropies are computed by default when RDMs are requested in :doc:`multi-configuration calculations <mc_calculator>`. The QDK/Chemistry implementation of AutoCAS is agnostic to the underlying wavefunction method, as long as the required RDMs are available, thus allowing for comparisons across different multi-configuration approaches.
 
 **QDK/Chemistry AutoCAS Variants**
 
@@ -273,14 +273,14 @@ These RDMs must be obtained from a :doc:`multi-configuration calculation <mc_cal
 A key practical consideration is balancing the cost of this initial calculation against the quality of the resulting entropies.
 
 A recommended approach is to use :ref:`Selected Configuration Interaction (SCI) <macis-asci>` with a relatively small number of determinants (e.g., 10,000–50,000).
-SCI methods are well-suited for this purpose because they:
+:term:`SCI` methods are well-suited for this purpose because they:
 
 - Automatically identify the most important determinants for capturing static correlation
 - Scale favorably compared to full configuration interaction
 - Provide high-quality RDMs even with truncated determinant spaces
 
 This approach has been shown to provide a reasonable trade-off between computational cost and entropy accuracy for active space selection.
-The resulting entropies are typically sufficient to identify strongly correlated orbitals, even when the SCI calculation uses a fraction of the determinants that would be required for quantitative energy accuracy.
+The resulting entropies are typically sufficient to identify strongly correlated orbitals, even when the :term:`SCI` calculation uses a fraction of the determinants that would be required for quantitative energy accuracy.
 
 .. _pyscf-avas-plugin:
 
@@ -289,9 +289,9 @@ PySCF AVAS
 
 **Factory name:** ``"pyscf_avas"``
 
-The PySCF plugin provides access to the Automated Valence Active Space (AVAS) method from `PySCF <https://pyscf.org/>`_.
-AVAS selects active orbitals by projecting molecular orbitals onto a target atomic orbital basis.
-See the `original AVAS publication <https://doi.org/10.1021/acs.jctc.7b00128>`_ for details.
+The PySCF plugin provides access to the Automated Valence Active Space (:term:`AVAS`) method from `PySCF <https://pyscf.org/>`_.
+:term:`AVAS` selects active orbitals by projecting molecular orbitals onto a target atomic orbital basis.
+See the `original :term:`AVAS` publication <https://doi.org/10.1021/acs.jctc.7b00128>`_ for details.
 
 **Settings:**
 
@@ -319,7 +319,7 @@ See the `original AVAS publication <https://doi.org/10.1021/acs.jctc.7b00128>`_ 
 Related classes
 ---------------
 
-- :doc:`Wavefunction <../data/wavefunction>`: Input wavefunction from SCF calculation
+- :doc:`Wavefunction <../data/wavefunction>`: Input wavefunction from :term:`SCF` calculation
 - :doc:`Orbitals <../data/orbitals>`: Contains orbital information and active space indices
 
 Further reading

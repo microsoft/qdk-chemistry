@@ -2,7 +2,7 @@ Wavefunction
 ============
 
 The :class:`~qdk_chemistry.data.Wavefunction` class in QDK/Chemistry represents quantum mechanical wavefunctions for molecular systems.
-This class provides access to wavefunction coefficients, determinants, reduced density matrices (RDMs), orbital entropies :cite:`Boguslawski2015`, and other quantum chemical properties.
+This class provides access to wavefunction coefficients, determinants, reduced density matrices (:term:`RDM`s), orbital entropies :cite:`Boguslawski2015`, and other quantum chemical properties.
 
 Overview
 --------
@@ -77,7 +77,7 @@ Sparse multi-determinant wavefunctions for Selected Configuration Interaction me
 CAS wavefunction container
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A multi-determinant wavefunction from Complete Active Space methods (CASSCF/CASCI).
+A multi-determinant wavefunction from Complete Active Space methods (:term:`CASSCF`/:term:`CASCI`).
 
 .. tab:: C++ API
 
@@ -96,7 +96,7 @@ A multi-determinant wavefunction from Complete Active Space methods (CASSCF/CASC
 MP2 wavefunction container
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A wavefunction container for second-order Møller-Plesset perturbation theory (MP2), which stores a reference wavefunction and Hamiltonian.
+A wavefunction container for second-order Møller-Plesset perturbation theory (:term:`MP2`), which stores a reference wavefunction and Hamiltonian.
 From these, T1 and T2 amplitudes can be computed on demand.
 
 .. tab:: C++ API
@@ -117,7 +117,7 @@ Coupled cluster wavefunction container
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A coupled cluster wavefunction container that stores T1 and T2 cluster amplitudes along with a reference wavefunction.
-The container supports reduced density matrices (RDMs), which are available if they are provided at construction or computed and stored; otherwise, RDM-related operations are not available.
+The container supports reduced density matrices (:term:`RDM`s), which are available if they are provided at construction or computed and stored; otherwise, :term:`RDM`-related operations are not available.
 
 .. tab:: C++ API
 
@@ -144,9 +144,9 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
 
    * - Property
      - Slater determinant
-     - CAS
-     - SCI
-     - MP2
+   - :term:`CAS`
+   - :term:`SCI`
+   - :term:`MP2`
      - Coupled cluster
    * - **Coefficients**
      - ✓
@@ -248,7 +248,7 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides methods to access c
 Accessing cluster amplitudes
 ----------------------------
 
-For MP2 and coupled cluster wavefunctions, one can access T1 and T2 cluster amplitudes:
+For :term:`MP2` and coupled cluster wavefunctions, one can access T1 and T2 cluster amplitudes:
 
 .. tab:: C++ API
 
@@ -273,7 +273,7 @@ Related classes
 - :doc:`Structure <structure>`: Molecular structure that defines the system
 - :doc:`Orbitals <orbitals>`: Orbital basis set for the wavefunction
 - :doc:`Hamiltonian <hamiltonian>`: Electronic Hamiltonian constructed from wavefunction
-- :doc:`ScfSolver <../algorithms/scf_solver>`: Algorithm that produces SCF wavefunctions
+- :doc:`ScfSolver <../algorithms/scf_solver>`: Algorithm that produces :term:`SCF` wavefunctions
 - :doc:`MCCalculator <../algorithms/mc_calculator>`: Algorithm for multi-configuration wavefunctions
 
 Further reading

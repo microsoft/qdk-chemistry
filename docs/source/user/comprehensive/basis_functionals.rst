@@ -1,7 +1,7 @@
 Available functionals and basis sets
 ====================================
 
-In the following sections, we provide lists of the basis sets and density functional theory (DFT) functionals that are available in QDK/Chemistry's built-in implementations.
+In the following sections, we provide lists of the basis sets and density functional theory (:term:`DFT`) functionals that are available in QDK/Chemistry's built-in implementations.
 
 Additional features may be available through plugins; see the :ref:`Plugins <plugins>` documentation for more information.
 
@@ -247,8 +247,8 @@ The following keywords are supported for the corresponding basis sets:
 Available DFT functionals
 -------------------------
 
-The default DFT implementation in QDK/Chemistry uses gauxc :cite:`Petrone2018`
-and thus also libxc :cite:`Lehtola2018` for the evaluation of DFT functionals.
+The default :term:`DFT` implementation in QDK/Chemistry uses gauxc :cite:`Petrone2018`
+and thus also libxc :cite:`Lehtola2018` for the evaluation of :term:`DFT` functionals.
 The following keywords are supported for the corresponding functionals:
 
 .. hlist::

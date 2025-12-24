@@ -41,7 +41,7 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
      - Purpose
      - Input → Output
    * - :doc:`ScfSolver <scf_solver>`
-     - Mean-field (HF/DFT) calculations
+     - Mean-field (:term:`HF`/:term:`DFT`) calculations
      - Structure → Orbitals
    * - :doc:`OrbitalLocalizer <localizer>`
      - Orbital transformations
@@ -68,7 +68,7 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
      - Quantum energy expectation values
      - Circuit + QubitHamiltonian → Energy
    * - :doc:`StabilityChecker <stability_checker>`
-     - SCF stability analysis
+     - :term:`SCF` stability analysis
      - Orbitals → Stability
 
 Discovering implementations

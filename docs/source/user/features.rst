@@ -17,28 +17,28 @@ Classical Quantum Chemistry Methods
 Self-Consistent Field (SCF)
 """""""""""""""""""""""""""
 
-QDK/Chemistry provides access to a variety of robust, high-performance implementations mean-field electronic structure methods that produce optimized molecular orbitals and reference energies. In particular, the following SCF types are supported:
+QDK/Chemistry provides access to a variety of robust, high-performance implementations mean-field electronic structure methods that produce optimized molecular orbitals and reference energies. In particular, the following :term:`SCF` types are supported:
 
-**Hartree-Fock (HF):**
-  - Restricted (RHF), Unrestricted (UHF), Restricted Open-Shell (ROHF)
+**Hartree-Fock (:term:`HF`):**
+  - Restricted (:term:`RHF`), Unrestricted (:term:`UHF`), Restricted Open-Shell (:term:`ROHF`)
 
-**Density Functional Theory (DFT):**
-  - Kohn-Sham methods: RKS, UKS, ROKS
+**Density Functional Theory (:term:`DFT`):**
+  - Kohn-Sham methods: :term:`RKS`, :term:`UKS`, :term:`ROKS`
 
-See :doc:`comprehensive/algorithms/scf_solver` for further details about available SCF methods and implementations.
+See :doc:`comprehensive/algorithms/scf_solver` for further details about available :term:`SCF` methods and implementations.
 
 Implementation Highlights
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **Geometric Direct Minimization (GDM)**: The :ref:`QDK SCF Solver <qdk-scf-native>` implements the GDM algorithm :cite:`VanVoorhis2002` for robust and efficient SCF convergence of challenging systems. This method is particularly helpful for open-shell and small gap systems, which are of high interest in quantum computing applications, yet challenging for many SCF solvers. See the :ref:`SCF Convergence Algorithms <scf-convergence-algorithms>` section for further details.
+- **Geometric Direct Minimization (:term:`GDM`)**: The :ref:`QDK SCF Solver <qdk-scf-native>` implements the :term:`GDM` algorithm :cite:`VanVoorhis2002` for robust and efficient convergence of challenging :term:`SCF` systems. This method is particularly helpful for open-shell and small gap systems, which are of high interest in quantum computing applications, yet challenging for many :term:`SCF` solvers. See the :ref:`SCF Convergence Algorithms <scf-convergence-algorithms>` section for further details.
 
-- **Stability Analysis and Reoptimization**: Challenging SCF problems often converge to local minima that do not represent the true mean-field ground state, which in turn can lead to incorrect and unintuitive results in post-SCF calculations. QDK/Chemistry includes automated :doc:`comprehensive/algorithms/stability_checker` :cite:`Schlegel1991` tools to identify, perturb and reoptimize unstable solutions, helping users obtain physically meaningful reference states for subsequent calculations.
+- **Stability Analysis and Reoptimization**: Challenging :term:`SCF` problems often converge to local minima that do not represent the true mean-field ground state, which in turn can lead to incorrect and unintuitive results in post-:term:`SCF` calculations. QDK/Chemistry includes automated :doc:`comprehensive/algorithms/stability_checker` :cite:`Schlegel1991` tools to identify, perturb and reoptimize unstable solutions, helping users obtain physically meaningful reference states for subsequent calculations.
 
 
 Orbital Localization
 """"""""""""""""""""
 
-The canonical orbitals produced by SCF calculations are typically delocalized over the entire molecule, which can complicate chemical interpretation and slow the convergence of post-SCF correlation methods. QDK/Chemistry provides several classes of orbital transformation techniques to yield specialized representations which accelerate the convergence of correlation methods and enhance chemical insight:
+The canonical orbitals produced by :term:`SCF` calculations are typically delocalized over the entire molecule, which can complicate chemical interpretation and slow the convergence of post-:term:`SCF` correlation methods. QDK/Chemistry provides several classes of orbital transformation techniques to yield specialized representations which accelerate the convergence of correlation methods and enhance chemical insight:
 
 - **Optimization-Based Methods**: The vast majority of orbital localization methods fall into this category, where a cost function is iteratively minimized to yield localized orbitals :cite:`Lehtola2013`. QDK/Chemistry supports, either through our :ref:`native implementations <localizer-qdk-pipek-mezey>` or via :ref:`integration with external libraries <localizer-pyscf-multi>`, several popular choices of cost functions, including: **Pipek-Mezey** :cite:`Pipek1989`, **Foster-Boys** :cite:`Foster1960`, and **Edmiston-Ruedenberg** :cite:`Edmiston1963`.
 
@@ -50,7 +50,7 @@ See :doc:`comprehensive/algorithms/localizer` for further details about availabl
 Implementation Highlights
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **Valence Virtual--Hard Virtual (VVHV) Orbital Localization**: Localization of molecular orbitals expressed in a near-complete :doc:`./comprehensive/data/basis_set` is numerically ill-posed and challenging for most iterative methods. QDK/Chemistry includes an implementation of the VVHV separation :cite:`Subotnik2005`, which partitions the virtual orbital space into valence-virtual and hard-virtual subspaces for more numerically stable treatments. This produces orbitals that vary smoothly with molecular geometry, which is particularly useful for selecting consistent active spaces along reaction pathways. See the :ref:`VVHV Algorithm <vvhv-algorithm>` section for further details.
+- **Valence Virtual--Hard Virtual (:term:`VVHV`) Orbital Localization**: Localization of molecular orbitals expressed in a near-complete :doc:`./comprehensive/data/basis_set` is numerically ill-posed and challenging for most iterative methods. QDK/Chemistry includes an implementation of the :term:`VVHV` separation :cite:`Subotnik2005`, which partitions the virtual orbital space into valence-virtual and hard-virtual subspaces for more numerically stable treatments. This produces orbitals that vary smoothly with molecular geometry, which is particularly useful for selecting consistent active spaces along reaction pathways. See the :ref:`VVHV Algorithm <vvhv-algorithm>` section for further details.
 
 Active Space Selection
 """"""""""""""""""""""
@@ -65,11 +65,11 @@ The challenge lies in balancing accuracy and computational cost: an ideal active
 
 - **Occupation-based Methods**: Automatic selection based on natural orbital occupation numbers obtained from correlated many-body methods. Orbitals with fractional occupations indicate entanglement and are included in the active space.
 
-- **AVAS (Automated Valence Active Space)** :cite:`Sayfutyarova2017` — Projects molecular orbitals onto a target atomic orbital basis (e.g., metal 3d orbitals) to systematically identify valence active spaces. This functionality is available through the :ref:`PySCF Plugin <pyscf-avas-plugin>`.
+- **:term:`AVAS` (Automated Valence Active Space)** :cite:`Sayfutyarova2017` — Projects molecular orbitals onto a target atomic orbital basis (e.g., metal 3d orbitals) to systematically identify valence active spaces. This functionality is available through the :ref:`PySCF Plugin <pyscf-avas-plugin>`.
 
 **Manual Approaches:**
 
-- **Valence selection** — User-specified active electrons and orbitals, centered around the HOMO-LUMO gap (Fermi level).
+- **Valence selection** — User-specified active electrons and orbitals, centered around the :term:`HOMO`-:term:`LUMO` gap (Fermi level).
 
 See :doc:`comprehensive/algorithms/active_space` for further details about available methods and implementations.
 
@@ -88,13 +88,13 @@ Multi-configuration (:term:`MC`) methods represent the electronic wavefunction a
 
 **Configuration Interaction:**
 
-- **Complete Active Space CI (CASCI)** — Exact solution within a defined active space, with core orbitals frozen and virtual orbitals excluded.
+- **Complete Active Space :term:`CI` (:term:`CASCI`)** — Exact solution within a defined active space, with core orbitals frozen and virtual orbitals excluded.
 
-- **Selected CI (SCI)** — Iteratively identifies and includes only the most important configurations, enabling treatment of larger active spaces at the cost of approximation.
+- **Selected :term:`CI` (:term:`SCI`)** — Iteratively identifies and includes only the most important configurations, enabling treatment of larger active spaces at the cost of approximation.
 
 **Orbital-Optimized Methods:**
 
-- **Multi-Configuration SCF (MCSCF)** — Simultaneously optimizes configuration coefficients and orbital shapes for improved accuracy.
+- **Multi-Configuration :term:`SCF` (:term:`MCSCF`)** — Simultaneously optimizes configuration coefficients and orbital shapes for improved accuracy.
 
 See :doc:`comprehensive/algorithms/mc_calculator` and :doc:`comprehensive/algorithms/mcscf` for further details.
 
@@ -103,7 +103,7 @@ See :doc:`comprehensive/algorithms/mc_calculator` and :doc:`comprehensive/algori
 Implementation Highlights
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **Adaptive Sampling Configuration Interaction** (:term:`ASCI`): QDK/Chemistry integrates :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :cite:`Williams-Young2023`, a high-performance, parallel implementation of the Adaptive Sampling Configuration Interaction (:term:`ASCI`) algorithm :cite:`Tubman2016,Tubman2020`. ASCI iteratively grows the determinant space by identifying configurations with the largest contributions to the wavefunction, achieving near-CASCI accuracy at a fraction of the cost. This enables treatment of active spaces that would be intractable for conventional CASCI. See the :ref:`ASCI Algorithm <asci-algorithm>` section for details.
+- **Adaptive Sampling Configuration Interaction** (:term:`ASCI`): QDK/Chemistry integrates :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :cite:`Williams-Young2023`, a high-performance, parallel implementation of the Adaptive Sampling Configuration Interaction (:term:`ASCI`) algorithm :cite:`Tubman2016,Tubman2020`. :term:`ASCI` iteratively grows the determinant space by identifying configurations with the largest contributions to the wavefunction, achieving near-:term:`CASCI` accuracy at a fraction of the cost. This enables treatment of active spaces that would be intractable for conventional :term:`CASCI`. See the :ref:`ASCI Algorithm <asci-algorithm>` section for details.
 
 
 Quantum Algorithms
@@ -115,14 +115,14 @@ State Preparation
 Core to quantum algorithms for chemistry is the ability to efficiently prepare quantum states that approximate the ground or excited states of molecular systems. In QDK/Chemistry, this process is generally viewed as a mapping between a classical representation of the molecular wavefunction (e.g., a Slater determinant or a linear combination thereof, represented by the `Wavefunction` class) and a circuit that prepares the corresponding quantum state on a quantum computer given a particular qubit encoding (e.g. binary, gray code, etc). QDK/Chemistry provides several state preparation techniques to facilitate this mapping, including:
 
 - **Dense Isometry State Preparation**: Implementations of general-purpose state preparation algorithms that can prepare arbitrary quantum states, represented in the occupation number formalism, given their amplitudes.
-- **Sparse Isometry State Preparation**: Optimized algorithms for preparing quantum states with a small number of non-zero amplitudes, such as those arising from selected CI methods.
+- **Sparse Isometry State Preparation**: Optimized algorithms for preparing quantum states with a small number of non-zero amplitudes, such as those arising from selected :term:`CI` methods.
 
 See :doc:`comprehensive/algorithms/state_preparation` for further details about available state preparation methods and implementations.
 
 Implementation Highlights
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **GF2+X Sparse Isometry State Preparation**: QDK/Chemistry implements an optimized state preparation algorithm for wavefunctions with sparse amplitude structure. The GF2+X method, a modification of the original sparse isometry work in :cite:`Malvetti2021`, applies GF(2) Gaussian elimination to the binary matrix representation of the quantum state to determine a reduced space representation of the sparse state. This reduced state is then densely encoded via regular isometry :cite:`Christandl2016` on a smaller number of qubits, and finally scattered to the full qubit space using X and CNOT gates. By focusing only on non-zero amplitudes, this approach substantially reduces circuit depth and gate count compared to dense isometry methods, making it especially suitable for selected CI and other sparse wavefunctions.
+- **GF2+X Sparse Isometry State Preparation**: QDK/Chemistry implements an optimized state preparation algorithm for wavefunctions with sparse amplitude structure. The GF2+X method, a modification of the original sparse isometry work in :cite:`Malvetti2021`, applies GF(2) Gaussian elimination to the binary matrix representation of the quantum state to determine a reduced space representation of the sparse state. This reduced state is then densely encoded via regular isometry :cite:`Christandl2016` on a smaller number of qubits, and finally scattered to the full qubit space using X and :term:`CNOT` gates. By focusing only on non-zero amplitudes, this approach substantially reduces circuit depth and gate count compared to dense isometry methods, making it especially suitable for selected :term:`CI` and other sparse wavefunctions.
 
 
 Hamiltonian Encoding
@@ -164,17 +164,17 @@ QDK/Chemistry builds upon a foundation of well-established open source libraries
 Basis Sets and Effective Core Potentials
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Basis Set Exchange (BSE)** :cite:`Pritchard2019, Feller1996, Schuchardt2007`
-   A comprehensive repository of standardized basis sets for quantum chemistry calculations. All of the basis sets and effective core potentials distributed with QDK/Chemistry are sourced from the BSE. If you publish results obtained with detault basis sets provided with QDK/Chemistry, in addition to the reference for the basis set itself, please cite the BSE. For guirance on citing specific basis sets and effective core potentials, see the `Basis Set Exchange Website <https://www.basissetexchange.org/>`_.
+**Basis Set Exchange (:term:`BSE`)** :cite:`Pritchard2019, Feller1996, Schuchardt2007`
+   A comprehensive repository of standardized basis sets for quantum chemistry calculations. All of the basis sets and effective core potentials distributed with QDK/Chemistry are sourced from the :term:`BSE`. If you publish results obtained with detault basis sets provided with QDK/Chemistry, in addition to the reference for the basis set itself, please cite the :term:`BSE`. For guirance on citing specific basis sets and effective core potentials, see the `Basis Set Exchange Website <https://www.basissetexchange.org/>`_.
 
 **Libecpint** :cite:`Shaw2017,Shaw2021`
-   Provides efficient evaluation of effective core potential (ECP) integrals over Gaussian-type orbitals. QDK/Chemistry's native SCF solver relies on Libecpint for ECP integral computation. If you publish results obtained with any of the native quantum chemistry modules within QDK/Chemistry that utilize ECPs, please cite Libecpint. The `Libecpint repository <https://github.com/robashaw/libecpint>`_ includes additional guidance on citing Libecpint.
+   Provides efficient evaluation of effective core potential (:term:`ECP`) integrals over Gaussian-type orbitals. QDK/Chemistry's native :term:`SCF` solver relies on Libecpint for :term:`ECP` integral computation. If you publish results obtained with any of the native quantum chemistry modules within QDK/Chemistry that utilize ECPs, please cite Libecpint. The `Libecpint repository <https://github.com/robashaw/libecpint>`_ includes additional guidance on citing Libecpint.
 
 Integral Evaluation
 ^^^^^^^^^^^^^^^^^^^
 
 **Libint** :cite:`Libint2_290`
-   Provides efficient evaluation of molecular integrals over Gaussian-type orbitals, including one- and two-electron repulsion integrals essential for all electronic structure methods. QDK/Chemistry's native SCF solver, orbital localization, and post-SCF modules rely on Libint for integral computation. If you publish results obtained with any of the native quantum chemistry modules within QDK/Chemistry, please cite Libint. The `Libint repository <https://github.com/evaleev/libint>`_ includes additional guidance on citing Libint.
+   Provides efficient evaluation of molecular integrals over Gaussian-type orbitals, including one- and two-electron repulsion integrals essential for all electronic structure methods. QDK/Chemistry's native :term:`SCF` solver, orbital localization, and post-:term:`SCF` modules rely on Libint for integral computation. If you publish results obtained with any of the native quantum chemistry modules within QDK/Chemistry, please cite Libint. The `Libint repository <https://github.com/evaleev/libint>`_ includes additional guidance on citing Libint.
 
 **GauXC** :cite:`Petrone2018,williams20on,williams2021achieving,williams2023distributed,kovtun2024relativistic`
    Handles numerical integration on atom-centered grids, which is required for evaluating exchange-correlation contributions in density functional theory. GauXC supports both CPU and GPU acceleration, enabling scalable :term:`DFT` calculations on modern hardware. If you publish :term:`DFT` results obtained with QDK/Chemistry, please cite GauXC. See the `GauXC repository <https://github.com/wavefunction91/gauxc>`_ for guidance on citing GauXC.
@@ -184,7 +184,7 @@ Exchange-Correlation Functionals
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Libxc** :cite:`Lehtola2013`
-   A comprehensive library providing implementations of over 600 exchange-correlation functionals spanning LDA, GGA, meta-GGA, and hybrid rungs of Jacob's ladder. GauXC depends on Libxc for functional evaluation. If you publish :term:`DFT` results obtained with QDK/Chemistry, in addition to the reference for the functional used, please cite Libxc. For guidance on citing specific functionals, see the `Libxc Website <https://tddft.org/programs/libxc/>`_.
+   A comprehensive library providing implementations of over 600 exchange-correlation functionals spanning :term:`LDA`, :term:`GGA`, meta-:term:`GGA`, and hybrid rungs of Jacob's ladder. GauXC depends on Libxc for functional evaluation. If you publish :term:`DFT` results obtained with QDK/Chemistry, in addition to the reference for the functional used, please cite Libxc. For guidance on citing specific functionals, see the `Libxc Website <https://tddft.org/programs/libxc/>`_.
 
 
 Multi-Configuration Solvers
