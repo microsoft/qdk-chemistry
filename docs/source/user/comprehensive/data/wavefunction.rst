@@ -2,7 +2,7 @@ Wavefunction
 ============
 
 The :class:`~qdk_chemistry.data.Wavefunction` class in QDK/Chemistry represents quantum mechanical wavefunctions for molecular systems.
-This class provides access to wavefunction coefficients, determinants, reduced density matrices (:term:`RDM`s), orbital entropies :cite:`Boguslawski2015`, and other quantum chemical properties.
+This class provides access to wavefunction coefficients, determinants, reduced density matrices (:term:`RDM`), orbital entropies :cite:`Boguslawski2015`, and other quantum chemical properties.
 
 Overview
 --------
@@ -117,7 +117,7 @@ Coupled cluster wavefunction container
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A coupled cluster wavefunction container that stores T1 and T2 cluster amplitudes along with a reference wavefunction.
-The container supports reduced density matrices (:term:`RDM`s), which are available if they are provided at construction or computed and stored; otherwise, :term:`RDM`-related operations are not available.
+The container supports reduced density matrices (:term:`RDM`), which are available if they are provided at construction or computed and stored; otherwise, :term:`RDM`-related operations are not available.
 
 .. tab:: C++ API
 
@@ -138,82 +138,95 @@ Properties
 
 The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various quantum chemical properties. Availability depends on the specific container type:
 
+
 .. list-table:: Property availability by container type
    :header-rows: 1
    :widths: 30 15 15 15 15 15
 
    * - Property
      - Slater determinant
-   - :term:`CAS`
-   - :term:`SCI`
-   - :term:`MP2`
+     - :term:`CAS`
+     - :term:`SCI`
+     - :term:`MP2`
      - Coupled cluster
+
    * - **Coefficients**
      - ✓
      - ✓
      - ✓
      - ✗
      - ✗
+
    * - **Determinants**
      - ✓
      - ✓
      - ✓
      - ✗
      - ✗
+
    * - **Electron counts**
      - ✓
      - ✓
      - ✓
      - ✓
      - ✓
+
    * - **Orbital occupations**
      - ✓
      - ✓
      - ✓
      - ✗
      - ✓
+
    * - **1-RDMs (spin-dependent)**
      - ✓
      - ✓
      - ✓
      - ✗
      - ✓
+
    * - **1-RDMs (spin-traced)**
      - ✓
      - ✓
      - ✓
      - ✗
      - ✓
+
    * - **2-RDMs (spin-dependent)**
      - ✓
      - ✓*
      - ✓*
      - ✗
      - ✓
+
    * - **2-RDMs (spin-traced)**
      - ✓
      - ✓*
      - ✓*
      - ✗
      - ✓
+
    * - **Orbital entropies**
      - ✓
      - ✓*
      - ✓*
      - ✗
      - ✓
+
    * - **T1/T2 amplitudes**
      - ✗
      - ✗
      - ✗
      - ✓
      - ✓
+
    * - **Overlap calculations**
      - ✗
      - ✓
      - ✗
      - ✗
      - ✗
+
    * - **Norm calculations**
      - ✓
      - ✓
@@ -221,9 +234,15 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
      - ✗
      - ✗
 
+
+
+
 Legend:
+
 - ✓ Available and implemented
+
 - ✗ Not available (method not implemented)
+
 - ✓* Implemented and available only if 2-RDMs were provided during construction
 
 Accessing wavefunction data
@@ -248,7 +267,7 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides methods to access c
 Accessing cluster amplitudes
 ----------------------------
 
-For :term:`MP2` and coupled cluster wavefunctions, one can access T1 and T2 cluster amplitudes:
+For :term:`MP2` and coupled cluster wavefunctions, one can access T1 and T2 cluster amplitudes.
 
 .. tab:: C++ API
 

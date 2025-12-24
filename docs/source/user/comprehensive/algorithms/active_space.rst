@@ -175,8 +175,10 @@ See :ref:`AutoCAS Algorithm <autocas-algorithm-details>` below for a detailed de
 
 .. note::
 
-   This method requires the input wavefunction to have orbital entropies populated.
-  Orbital entropies are computed from the one- and two-electron reduced density matrices (1-:term:`RDM` and 2-:term:`RDM`), which are typically obtained from a multi-configuration calculation with ``calculate_one_rdm=True`` and ``calculate_two_rdm=True``. See :doc:`MultiConfigurationCalculator <mc_calculator>` for details on generating wavefunctions with RDMs.
+  This method requires the input wavefunction to have orbital entropies populated.
+  Orbital entropies are computed from the one- and two-electron reduced density matrices (1-:term:`RDM` and 2-:term:`RDM`), which are typically obtained from a multi-configuration calculation with ``calculate_one_rdm=True`` and ``calculate_two_rdm=True``.
+
+  See :doc:`MultiConfigurationCalculator <mc_calculator>` for details on generating wavefunctions with RDMs.
 
 **Settings:**
 
