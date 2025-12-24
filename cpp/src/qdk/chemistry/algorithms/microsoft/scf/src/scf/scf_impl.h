@@ -191,7 +191,9 @@ class SCFImpl {
    *
    * @param P_matrix Trial density matrix
    * @param loc Source location of the caller (automatically captured)
-   * @return Pair of (total energy in Hartree, Fock matrix in AO basis)
+   * @return std::pair containing:
+   *   - first: total energy in Hartree
+   *   - second: Fock matrix in AO basis
    */
   virtual std::pair<double, RowMajorMatrix>
   evaluate_trial_density_energy_and_fock(

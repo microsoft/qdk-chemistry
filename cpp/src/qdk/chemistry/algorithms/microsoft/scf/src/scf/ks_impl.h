@@ -83,8 +83,9 @@ class KSImpl : public SCFImpl {
    *
    * @param P_matrix Trial density matrix
    * @param loc Source location of the caller (automatically captured)
-   * @return Pair of (total energy including XC in Hartree, Fock matrix in AO
-   * basis)
+   * @return std::pair containing:
+   *   - first: total energy including XC in Hartree
+   *   - second: Fock matrix in AO basis
    */
   std::pair<double, RowMajorMatrix> evaluate_trial_density_energy_and_fock(
       const RowMajorMatrix& P_matrix,

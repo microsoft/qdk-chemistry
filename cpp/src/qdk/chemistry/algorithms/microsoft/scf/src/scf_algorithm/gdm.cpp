@@ -269,7 +269,7 @@ class GDMLineFunctor {
 
   /**
    * @brief Evaluate gradient at given kappa vector x. If the vector x has been
-   * catched during eval(), the cached Fock matrix will be reused. Otherwise, it
+   * cached during eval(), the cached Fock matrix will be reused. Otherwise, it
    * will call eval() to compute both energy and Fock matrix.
    */
   Eigen::VectorXd grad(const Eigen::VectorXd& x);
@@ -538,7 +538,8 @@ class GDM {
 
   Eigen::VectorXd kappa_;  // vertical rotation matrix of this step
 
-  // Used for fallback gradient step length when line search fails
+  // Fallback gradient step length used when the line search cannot find an
+  // acceptable step size.
   const double fallback_step_length_ = 1e-4;
   /// Energy of the last accepted step, used to decide if we rescale the kappa
   /// vector in this step
