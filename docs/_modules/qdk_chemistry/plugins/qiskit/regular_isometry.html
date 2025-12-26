@@ -49,6 +49,7 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
@@ -107,9 +108,8 @@
     <span class="n">RemoveZBasisOnZeroState</span><span class="p">,</span>
     <span class="n">SubstituteCliffordRz</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_statevector_from_wavefunction</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.bitstring</span><span class="w"> </span><span class="kn">import</span> <span class="n">separate_alpha_beta_to_binary_string</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.statevector</span><span class="w"> </span><span class="kn">import</span> <span class="n">_create_statevector_from_coeffs_and_dets_string</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;RegularIsometryStatePreparation&quot;</span><span class="p">]</span>
 
@@ -152,25 +152,16 @@
                 <span class="s2">&quot;alpha and beta orbitals are not supported for state preparation.&quot;</span>
             <span class="p">)</span>
 
-        <span class="n">coeffs</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()</span>
-        <span class="n">dets</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">()</span>
-        <span class="n">num_orbitals</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
-        <span class="n">bitstrings</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">det</span> <span class="ow">in</span> <span class="n">dets</span><span class="p">:</span>
-            <span class="n">alpha_str</span><span class="p">,</span> <span class="n">beta_str</span> <span class="o">=</span> <span class="n">separate_alpha_beta_to_binary_string</span><span class="p">(</span><span class="n">det</span><span class="o">.</span><span class="n">to_string</span><span class="p">()[:</span><span class="n">num_orbitals</span><span class="p">])</span>
-            <span class="n">bitstring</span> <span class="o">=</span> <span class="n">beta_str</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">alpha_str</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># Qiskit uses little-endian convention</span>
-            <span class="n">bitstrings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">bitstring</span><span class="p">)</span>
+        <span class="n">num_orbitals</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">alpha_indices</span><span class="p">)</span>
+        <span class="n">n_qubits</span> <span class="o">=</span> <span class="n">num_orbitals</span> <span class="o">*</span> <span class="mi">2</span>
+        <span class="n">num_dets</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using </span><span class="si">{</span><span class="n">num_dets</span><span class="si">}</span><span class="s2"> determinants for state preparation&quot;</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">bitstrings</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No valid bitstrings found. The determinants list might be empty.&quot;</span><span class="p">)</span>
-        <span class="n">n_qubits</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">)</span><span class="si">}</span><span class="s2"> determinants for state preparation&quot;</span><span class="p">)</span>
-
-        <span class="c1"># Create a statevector from the filtered terms</span>
-        <span class="n">statevector_data</span> <span class="o">=</span> <span class="n">_create_statevector_from_coeffs_and_dets_string</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">bitstrings</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">)</span>
+        <span class="c1"># Create statevector using Python conversion function</span>
+        <span class="n">statevector_data</span> <span class="o">=</span> <span class="n">create_statevector_from_wavefunction</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
         <span class="c1"># Create the circuit</span>
-        <span class="n">circuit</span> <span class="o">=</span> <span class="n">QuantumCircuit</span><span class="p">(</span><span class="n">n_qubits</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;regular_isometry_</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">)</span><span class="si">}</span><span class="s2">_det&quot;</span><span class="p">)</span>
+        <span class="n">circuit</span> <span class="o">=</span> <span class="n">QuantumCircuit</span><span class="p">(</span><span class="n">n_qubits</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;regular_isometry_</span><span class="si">{</span><span class="n">num_dets</span><span class="si">}</span><span class="s2">_det&quot;</span><span class="p">)</span>
 
         <span class="c1"># Use the StatePreparation class which implements efficient decomposition</span>
         <span class="n">state_prep</span> <span class="o">=</span> <span class="n">QiskitStatePreparation</span><span class="p">(</span><span class="n">Statevector</span><span class="p">(</span><span class="n">statevector_data</span><span class="p">),</span> <span class="n">normalize</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>

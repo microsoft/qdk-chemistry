@@ -26,8 +26,8 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Dynamical correlation calculations" href="dynamical_correlation.html" />
-    <link rel="prev" title="Projected multi-configuration calculations" href="pmc.html" /> 
+    <link rel="next" title="Self-consistent field (SCF) solver" href="scf_solver.html" />
+    <link rel="prev" title="Multi-configuration SCF" href="mcscf.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -52,34 +52,35 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data management</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="index.html">Available algorithms</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Algorithm classes</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
+<li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
 <li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
 <li class="toctree-l3"><a class="reference internal" href="energy_estimator.html">Energy estimation</a></li>
-<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Classical Hamiltonian construction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
-<li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected multi-configuration calculations</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Qubit mapping</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#capabilities">Capabilities</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#creating-a-qubitmapper">Creating a QubitMapper</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mapping-a-hamiltonian">Mapping a Hamiltonian</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#available-settings">Available settings</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#implemented-interface">Implemented interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#using-the-qubitmapper">Using the QubitMapper</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#available-implementations">Available implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="dynamical_correlation.html">Dynamical correlation calculations</a></li>
-<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solving</a></li>
-<li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Self-consistent field stability checks</a></li>
-<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State Preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field (SCF) solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Stability analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#discovering-implementations">Discovering implementations</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
@@ -111,7 +112,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="index.html">Available algorithms</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Algorithm classes</a></li>
       <li class="breadcrumb-item active">Qubit mapping</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/algorithms/qubit_mapper.rst.txt" rel="nofollow"> View page source</a>
@@ -124,55 +125,78 @@
              
   <section id="qubit-mapping">
 <h1>Qubit mapping<a class="headerlink" href="#qubit-mapping" title="Link to this heading"></a></h1>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper" title="qdk_chemistry.algorithms.QubitMapper"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitMapper</span></code></a> algorithm in QDK/Chemistry performs the essential task of transforming electronic-structure Hamiltonians into qubit Hamiltonians suitable for quantum computation.</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper" title="qdk_chemistry.algorithms.QubitMapper"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitMapper</span></code></a> algorithm in QDK/Chemistry transforms electronic-structure Hamiltonians into qubit Hamiltonians suitable for quantum computation.
+Following QDK/Chemistry’s <a class="reference internal" href="../design/index.html"><span class="doc">algorithm design principles</span></a>, it takes a <a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> instance as input and produces a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a> instance as output.
+This transformation is essential for executing quantum chemistry algorithms on quantum hardware.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper" title="qdk_chemistry.algorithms.QubitMapper"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitMapper</span></code></a> algorithm converts fermionic Hamiltonians into qubit-operator representations composed of Pauli strings.
 This transformation preserves the operator algebra, particle-number constraints, and antisymmetry required by fermionic statistics.
 The resulting qubit Hamiltonian is mathematically equivalent to the original fermionic Hamiltonian but is now in a form that can be executed on quantum hardware or simulated by quantum algorithms.</p>
-<p>The mapper supports multiple encoding strategies:</p>
-<blockquote>
-<div><ul class="simple">
-<li><p><strong>Jordan-Wigner mapping</strong> <span id="id1">[<a class="reference internal" href="../../../references.html#id12" title="P. Jordan and E. Wigner. Über das paulische äquivalenzverbot. Zeitschrift für Physik, 47:631-651, 1928. doi:10.1007/BF01331938.">JW28</a>]</span>: Encodes each fermionic mode in a single qubit whose state directly represents the orbital occupation.</p></li>
-<li><p><strong>Parity mapping</strong> <span id="id2">[<a class="reference internal" href="../../../references.html#id13" title="Jacob T. Seeley, Martin J. Richard, and Peter J. Love. The Bravyi-Kitaev transformation for quantum computation of electronic structure. The Journal of Chemical Physics, 137(22):224109, 12 2012. doi:10.1063/1.4768229.">SRL12</a>]</span>: Encodes qubits with cumulative electron-number parities of the orbitals.</p></li>
-<li><p><strong>Bravyi-Kitaev mapping</strong> <span id="id3">[<a class="reference internal" href="../../../references.html#id14" title="Sergey B. Bravyi and Alexei Yu. Kitaev. Fermionic quantum computation. Annals of Physics, 298(1):210-226, 2002. doi:10.1006/aphy.2002.6254.">BK02</a>]</span>: Distributes both occupation and parity information across qubits using a binary-tree (Fenwick tree) structure, reducing the average Pauli-string length to logarithmic scaling.</p></li>
-</ul>
-</div></blockquote>
 </section>
-<section id="capabilities">
-<h2>Capabilities<a class="headerlink" href="#capabilities" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper" title="qdk_chemistry.algorithms.QubitMapper"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitMapper</span></code></a> in QDK/Chemistry provides:</p>
-<ul class="simple">
-<li><p><strong>Encoding Options</strong>: Support for different encoding options integrated through Qiskit plugin (Jordan-Wigner, Parity, Bravyi-Kitaev).</p></li>
-</ul>
-</section>
-<section id="creating-a-qubitmapper">
-<h2>Creating a QubitMapper<a class="headerlink" href="#creating-a-qubitmapper" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper" title="qdk_chemistry.algorithms.QubitMapper"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitMapper</span></code></a> is created using the <a class="reference internal" href="../design/factory_pattern.html"><span class="doc">factory pattern</span></a>.</p>
+<section id="using-the-qubitmapper">
+<h2>Using the QubitMapper<a class="headerlink" href="#using-the-qubitmapper" title="Link to this heading"></a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This algorithm is currently available only in the Python API.</p>
+</div>
+<p>This section demonstrates how to create, configure, and run a qubit mapping.
+The <code class="docutils literal notranslate"><span class="pre">run</span></code> method returns a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a> object containing the Pauli-string representation.</p>
+<section id="input-requirements">
+<h3>Input requirements<a class="headerlink" href="#input-requirements" title="Link to this heading"></a></h3>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper" title="qdk_chemistry.algorithms.QubitMapper"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitMapper</span></code></a> requires the following input:</p>
+<dl>
+<dt><strong>Hamiltonian</strong></dt><dd><p>A <a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> instance containing the fermionic one- and
+two-electron integrals. This is typically constructed using the
+<a class="reference internal" href="hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a> algorithm.</p>
+<p>The Hamiltonian defines the fermionic operators that will be transformed into
+qubit (Pauli) operators using the selected encoding strategy.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Different encoding strategies (Jordan-Wigner, Bravyi-Kitaev, parity) produce
+mathematically equivalent qubit Hamiltonians but with different Pauli-string
+structures. The choice of encoding can affect circuit depth and measurement
+requirements on quantum hardware.</p>
+</div>
+<p><strong>Creating a mapper:</strong></p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
 
-<span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;qiskit&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;jordan-wigner&quot;</span><span class="p">)</span>
+<span class="c1"># Create a QubitMapper instance</span>
+<span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;qiskit&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 </div>
-</section>
-<section id="mapping-a-hamiltonian">
-<h2>Mapping a Hamiltonian<a class="headerlink" href="#mapping-a-hamiltonian" title="Link to this heading"></a></h2>
-<p>This mapper is used to create a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a> object from a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a>.</p>
+<p><strong>Configuring settings:</strong></p>
+<p>Settings can be modified using the <code class="docutils literal notranslate"><span class="pre">settings()</span></code> object.
+See <a class="reference internal" href="#available-implementations">Available implementations</a> below for implementation-specific options.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Read a molecular structure from XYZ file</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Configure the encoding strategy</span>
+<span class="n">qubit_mapper</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;encoding&quot;</span><span class="p">,</span> <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p><strong>Running the calculation:</strong></p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>  <span class="c1"># noqa: E402</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>  <span class="c1"># noqa: E402</span>
+
+<span class="c1"># Read a molecular structure from XYZ file</span>
 <span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="s2">&quot;../data/water.structure.xyz&quot;</span><span class="p">)</span>
 
 <span class="c1"># Perform an SCF calculation to generate initial orbitals</span>
-<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="n">basis_set</span><span class="o">=</span><span class="s2">&quot;cc-pvdz&quot;</span><span class="p">)</span>
-<span class="n">_</span><span class="p">,</span> <span class="n">wfn_hf</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Orbital occupancies: </span><span class="si">{</span><span class="n">wfn_hf</span><span class="o">.</span><span class="n">get_total_orbital_occupations</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">wfn_hf</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;cc-pvdz&quot;</span>
+<span class="p">)</span>
 
 <span class="c1"># Select an active space</span>
 <span class="n">active_space_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
@@ -183,26 +207,44 @@ The resulting qubit Hamiltonian is mathematically equivalent to the original fer
 <span class="p">)</span>
 <span class="n">active_wfn</span> <span class="o">=</span> <span class="n">active_space_selector</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_hf</span><span class="p">)</span>
 <span class="n">active_orbitals</span> <span class="o">=</span> <span class="n">active_wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">active_orbitals</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
 
-<span class="c1"># Construct Hamiltonian in the active space and print its summary</span>
+<span class="c1"># Construct Hamiltonian in the active space</span>
 <span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
 <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">active_orbitals</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Active space Hamiltonian:</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
 
-<span class="c1"># Create the qubit Hamiltonian with the mapper</span>
-<span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qiskit&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;jordan-wigner&quot;</span><span class="p">)</span>
+<span class="c1"># Map the fermionic Hamiltonian to a qubit Hamiltonian</span>
 <span class="n">qubit_hamiltonian</span> <span class="o">=</span> <span class="n">qubit_mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Qubit Hamiltonian has </span><span class="si">{</span><span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">num_qubits</span><span class="si">}</span><span class="s2"> qubits&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 </div>
 </section>
-<section id="available-settings">
-<h2>Available settings<a class="headerlink" href="#available-settings" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper" title="qdk_chemistry.algorithms.QubitMapper"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitMapper</span></code></a> accepts a range of settings to control its behavior.</p>
-<section id="base-settings">
-<h3>Base settings<a class="headerlink" href="#base-settings" title="Link to this heading"></a></h3>
+</section>
+<section id="available-implementations">
+<h2>Available implementations<a class="headerlink" href="#available-implementations" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry’s <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper" title="qdk_chemistry.algorithms.QubitMapper"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitMapper</span></code></a> provides a unified interface for qubit mapping methods.
+You can discover available implementations programmatically:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>  <span class="c1"># noqa: E402</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">))</span>
+<span class="c1"># [&#39;qiskit&#39;]</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="qiskit">
+<h3>Qiskit<a class="headerlink" href="#qiskit" title="Link to this heading"></a></h3>
+<p><strong>Factory name:</strong> <code class="docutils literal notranslate"><span class="pre">&quot;qiskit&quot;</span></code></p>
+<p>Qubit mapping implementation integrated through the Qiskit plugin. This module supports multiple encoding strategies:</p>
+<ul class="simple">
+<li><p><strong>Jordan-Wigner mapping</strong> <span id="id1">[<a class="reference internal" href="../../../references.html#id10" title="P. Jordan and E. Wigner. Über das Paulische Äquivalenzverbot. Zeitschrift für Physik, 47:631-651, 1928. doi:10.1007/BF01331938.">JW28</a>]</span>: Encodes each fermionic mode in a single qubit whose state directly represents the orbital occupation.</p></li>
+<li><p><strong>Parity mapping</strong> <span id="id2">[<a class="reference internal" href="../../../references.html#id11" title="Jacob T. Seeley, Martin J. Richard, and Peter J. Love. The Bravyi-Kitaev transformation for quantum computation of electronic structure. The Journal of Chemical Physics, 137(22):224109, 2012. doi:10.1063/1.4768229.">SRL12</a>]</span>: Encodes qubits with cumulative electron-number parities of the orbitals.</p></li>
+<li><p><strong>Bravyi-Kitaev mapping</strong> <span id="id3">[<a class="reference internal" href="../../../references.html#id12" title="Sergey B. Bravyi and Alexei Yu. Kitaev. Fermionic quantum computation. Annals of Physics, 298(1):210-226, 2002. doi:10.1006/aphy.2002.6254.">BK02</a>]</span>: Distributes both occupation and parity information across qubits using a binary-tree (Fenwick tree) structure, reducing the average Pauli-string length to logarithmic scaling.</p></li>
+</ul>
+<p><strong>Settings:</strong></p>
 <table class="docutils align-default">
 <colgroup>
 <col style="width: 25.0%" />
@@ -224,24 +266,21 @@ The resulting qubit Hamiltonian is mathematically equivalent to the original fer
 </table>
 </section>
 </section>
-<section id="implemented-interface">
-<h2>Implemented interface<a class="headerlink" href="#implemented-interface" title="Link to this heading"></a></h2>
-<p>QDK/Chemistry’s <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper" title="qdk_chemistry.algorithms.QubitMapper"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitMapper</span></code></a> provides a unified interface for qubit mapping methods.</p>
-<section id="third-party-interfaces">
-<h3>Third-party interfaces<a class="headerlink" href="#third-party-interfaces" title="Link to this heading"></a></h3>
+<section id="related-classes">
+<h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><strong>qiskit</strong>: Qiskit QubitMapper implementation with multiple encoding strategies</p></li>
+<li><p><a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Input Hamiltonian for mapping</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a>: Output qubit operator representation</p></li>
 </ul>
-<p>The factory pattern allows seamless selection between these implementations, with the most appropriate option chosen
-based on the calculation requirements and available packages.</p>
-<p>For more details on how QDK/Chemistry interfaces with external packages, see the <a class="reference internal" href="../design/interfaces.html"><span class="doc">Interfaces</span></a> documentation.</p>
-</section>
 </section>
 <section id="further-reading">
 <h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p>The above examples can be downloaded as a complete <a class="reference external" href="../../../_static/examples/python/qubit_mapper.py">Python</a> script.</p></li>
-<li><p><a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Input Hamiltonian for mapping</p></li>
+<li><p><a class="reference internal" href="state_preparation.html"><span class="doc">StatePreparation</span></a>: Prepare quantum circuits from wavefunctions</p></li>
+<li><p><a class="reference internal" href="energy_estimator.html"><span class="doc">EnergyEstimator</span></a>: Estimate energies using the qubit Hamiltonian</p></li>
+<li><p><a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
+<li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Understanding algorithm creation</p></li>
 </ul>
 </section>
 </section>
@@ -250,8 +289,8 @@ based on the calculation requirements and available packages.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="pmc.html" class="btn btn-neutral float-left" title="Projected multi-configuration calculations" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="dynamical_correlation.html" class="btn btn-neutral float-right" title="Dynamical correlation calculations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="mcscf.html" class="btn btn-neutral float-left" title="Multi-configuration SCF" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="scf_solver.html" class="btn btn-neutral float-right" title="Self-consistent field (SCF) solver" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

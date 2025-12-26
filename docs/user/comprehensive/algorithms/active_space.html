@@ -23,11 +23,12 @@
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../../_static/copybutton.js?v=f281be69"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
     <link rel="next" title="Energy estimation" href="energy_estimator.html" />
-    <link rel="prev" title="Available algorithms" href="index.html" /> 
+    <link rel="prev" title="Settings" href="settings.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -52,36 +53,35 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data management</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="index.html">Available algorithms</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Algorithm classes</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
+<li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Active space selection</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#capabilities">Capabilities</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#creating-an-active-space-selector">Creating an active space selector</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#configuring-the-active-space-selection">Configuring the active space selection</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#running-active-space-selection">Running active space selection</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#available-settings">Available settings</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#implemented-interfaces">Implemented interfaces</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#running-an-active-space-selection">Running an active space selection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#available-implementations">Available implementations</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="energy_estimator.html">Energy estimation</a></li>
-<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Classical Hamiltonian construction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
-<li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
-<li class="toctree-l3"><a class="reference internal" href="dynamical_correlation.html">Dynamical correlation calculations</a></li>
-<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solving</a></li>
-<li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Self-consistent field stability checks</a></li>
-<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State Preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field (SCF) solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Stability analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#discovering-implementations">Discovering implementations</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
@@ -113,7 +113,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="index.html">Available algorithms</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Algorithm classes</a></li>
       <li class="breadcrumb-item active">Active space selection</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/algorithms/active_space.rst.txt" rel="nofollow"> View page source</a>
@@ -126,7 +126,7 @@
              
   <section id="active-space-selection">
 <h1>Active space selection<a class="headerlink" href="#active-space-selection" title="Link to this heading"></a></h1>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector" title="qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="xref py py-class docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a> algorithm in QDK/Chemistry performs active space selection to identify the most chemically relevant orbitals for multireference calculations.
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector" title="qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="xref py py-class docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a> algorithm in QDK/Chemistry performs active space selection to identify the most chemically relevant orbitals for <a class="reference internal" href="mc_calculator.html"><span class="doc">multi-configurational calculations</span></a>.
 Following QDK/Chemistry’s <a class="reference internal" href="../design/index.html"><span class="doc">algorithm design principles</span></a>, it takes a <a class="reference internal" href="../data/wavefunction.html"><span class="doc">Wavefunction</span></a> instance as input and produces a <a class="reference internal" href="../data/wavefunction.html"><span class="doc">Wavefunction</span></a> instance with active space information as output.
 Its primary purpose is to reduce the cost of quantum chemistry calculations by focusing on a specific set of relevant (active) orbitals while treating others as either fully occupied (core) or empty (virtual).</p>
 <section id="overview">
@@ -140,169 +140,149 @@ Its primary purpose is to reduce the cost of quantum chemistry calculations by f
 <p>The key challenge is selecting which orbitals to include in the active space.
 An ideal active space should:</p>
 <ul class="simple">
-<li><p>Include all orbitals with significant multireference character</p></li>
-<li><p>Be as small as possible to keep computational cost manageable</p></li>
+<li><p>Include all orbitals with significant entanglement character</p></li>
+<li><p>Be as compact as possible to keep computational cost manageable</p></li>
 <li><p>Capture the essential chemistry of the system</p></li>
 </ul>
-<p>At its core, active space selection:</p>
-<ol class="arabic simple">
-<li><p><strong>Analyzes molecular orbitals</strong> from a mean-field calculation (typically <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a>)</p></li>
-<li><p><strong>Applies selection criteria</strong> based on orbital properties (occupations, energies, entropies, etc.)</p></li>
-<li><p><strong>Identifies chemically relevant orbitals</strong> that show strong correlation effects</p></li>
-<li><p><strong>Returns updated orbitals</strong> with active space indices and metadata</p></li>
-</ol>
 <p>The selected active space then serves as input for post-<a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> methods like <a class="reference internal" href="mc_calculator.html"><span class="doc">multi-configuration calculations</span></a> that explicitly treat electron correlation within the active space.</p>
 </section>
-<section id="capabilities">
-<h2>Capabilities<a class="headerlink" href="#capabilities" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector" title="qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="xref py py-class docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a> in QDK/Chemistry provides several selection strategies:</p>
-<ul class="simple">
-<li><p><strong>Valence-based selection</strong>: Selects orbitals near the HOMO-LUMO gap based on user-specified numbers of electrons and orbitals</p>
-<ul>
-<li><p><code class="docutils literal notranslate"><span class="pre">qdk_valence</span></code>: Manual specification of active electrons and orbitals</p></li>
-</ul>
-</li>
-<li><p><strong>Occupation-based selection</strong>: Identifies orbitals with fractional occupation numbers</p>
-<ul>
-<li><p><code class="docutils literal notranslate"><span class="pre">qdk_occupation</span></code>: Selects orbitals with occupations deviating from 0 or 2</p></li>
-</ul>
-</li>
-<li><p><strong>Entropy-based selection</strong>: Uses orbital entropies to identify strongly correlated orbitals</p>
-<ul>
-<li><p><code class="docutils literal notranslate"><span class="pre">qdk_autocas</span></code>: Automated selection based on single orbital entropies <span id="id1">[<a class="reference internal" href="../../../references.html#id27" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">qdk_autocas_eos</span></code>: Enhanced entropy-based selection with plateau detection</p></li>
-</ul>
-</li>
-<li><p><strong>Orbital type support</strong>:</p>
-<ul>
-<li><p>Restricted orbitals (closed-shell and open-shell systems)</p></li>
-<li><p>Support for both canonical and localized orbitals</p></li>
-</ul>
-</li>
-</ul>
-</section>
-<section id="creating-an-active-space-selector">
-<h2>Creating an active space selector<a class="headerlink" href="#creating-an-active-space-selector" title="Link to this heading"></a></h2>
-<p>Below is an example of how to create and run an active space selector using the default (Microsoft) QDK/Chemistry implementation:</p>
+<section id="running-an-active-space-selection">
+<h2>Running an active space selection<a class="headerlink" href="#running-an-active-space-selection" title="Link to this heading"></a></h2>
+<p>This section demonstrates how to create, configure, and run an active space selection.
+The <code class="docutils literal notranslate"><span class="pre">run</span></code> method takes a <a class="reference internal" href="../data/wavefunction.html"><span class="doc">Wavefunction</span></a> from a prior <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation and returns a new <a class="reference internal" href="../data/wavefunction.html"><span class="doc">Wavefunction</span></a> with active space information populated.</p>
+<section id="input-requirements">
+<h3>Input requirements<a class="headerlink" href="#input-requirements" title="Link to this heading"></a></h3>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector" title="qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="xref py py-class docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a> requires the following input:</p>
+<dl>
+<dt><strong>Wavefunction</strong></dt><dd><p>A <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> instance containing data necessacary for active space selection, including: orbital information, electron counts, etc.</p>
+<p>Some selection methods (e.g., entropy-based) may require additional information such as orbital occupation numbers or entropies from a prior multi-configuration calculation.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The specific requirements depend on the chosen implementation. Manual selection methods (like <code class="docutils literal notranslate"><span class="pre">qdk_valence</span></code>) require user-specified active space sizes, while automatic methods (like <code class="docutils literal notranslate"><span class="pre">qdk_occupation</span></code> or <code class="docutils literal notranslate"><span class="pre">qdk_entropy</span></code>) analyze orbital properties to determine the active space.</p>
+</div>
+<p><strong>Creating an active space selector:</strong></p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create a molecular structure (water molecule)</span>
-<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="p">{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.8897</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="mf">1.7802</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">-0.4738</span><span class="p">}};</span>
-<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">symbols</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;O&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">};</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">structure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">&gt;</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span><span class="w"> </span><span class="n">symbols</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">algorithms</span><span class="p">;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
 
-<span class="c1">// First, run SCF to get molecular orbitals</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">algorithms</span><span class="o">::</span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
-<span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;6-31g&quot;</span><span class="p">);</span>
-<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">scf_energy</span><span class="p">,</span><span class="w"> </span><span class="n">scf_wavefunction</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="o">*</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
-
-<span class="c1">// Create an active space selector using the default implementation</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">active_space_selector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">algorithms</span><span class="o">::</span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
-<span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Default active space selector: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">()</span>
-<span class="w">          </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="c1">// Create the default ActiveSpaceSelector instance</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">active_space_selector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry</span><span class="w"> </span><span class="kn">import</span> <span class="n">algorithms</span><span class="p">,</span> <span class="n">data</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
 
-<span class="c1"># Create a molecular structure (water molecule)</span>
-<span class="n">coords</span> <span class="o">=</span> <span class="p">[[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.8897</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.7802</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.4738</span><span class="p">]]</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;O&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
-
-<span class="c1"># First, run SCF to get molecular orbitals</span>
-<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">algorithms</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
-<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;6-31g&quot;</span><span class="p">)</span>
-<span class="n">scf_energy</span><span class="p">,</span> <span class="n">scf_wavefunction</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-
-<span class="c1"># Create an active space selector using the default implementation</span>
-<span class="n">active_space_selector</span> <span class="o">=</span> <span class="n">algorithms</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;active_space_selector&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Default active space selector: </span><span class="si">{</span><span class="n">active_space_selector</span><span class="o">.</span><span class="n">name</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="c1"># Create the default ActiveSpaceSelector instance</span>
+<span class="n">active_space_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;active_space_selector&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_valence&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 </div>
-</section>
-<section id="configuring-the-active-space-selection">
-<h2>Configuring the active space selection<a class="headerlink" href="#configuring-the-active-space-selection" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector" title="qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="xref py py-class docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a> can be configured using the <code class="docutils literal notranslate"><span class="pre">Settings</span></code> object.
-Different selectors have different configuration options depending on their selection strategy.</p>
+<p><strong>Configuring settings:</strong></p>
+<p>Settings can be modified using the <code class="docutils literal notranslate"><span class="pre">settings()</span></code> object.
+See <a class="reference internal" href="#available-implementations">Available implementations</a> below for implementation-specific options.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Configure the selector for valence-based selection</span>
-<span class="c1">// Select 4 electrons in 4 orbitals (oxygen 2p and bonding/antibonding</span>
-<span class="c1">// combinations)</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">valence_selector</span><span class="w"> </span><span class="o">=</span>
-<span class="w">    </span><span class="n">algorithms</span><span class="o">::</span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;qdk_valence&quot;</span><span class="p">);</span>
-<span class="n">valence_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_electrons&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span>
-<span class="n">valence_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_orbitals&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span>
-
-<span class="c1">// Alternative: occupation-based automatic selection</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">occupation_selector</span><span class="w"> </span><span class="o">=</span>
-<span class="w">    </span><span class="n">algorithms</span><span class="o">::</span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;qdk_occupation&quot;</span><span class="p">);</span>
-<span class="n">occupation_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;occupation_threshold&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1</span><span class="p">);</span>
-
-<span class="c1">// Alternative: entropy-based automatic selection</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">autocas_selector</span><span class="w"> </span><span class="o">=</span>
-<span class="w">    </span><span class="n">algorithms</span><span class="o">::</span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;qdk_autocas&quot;</span><span class="p">);</span>
-<span class="n">autocas_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;min_plateau_size&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Configure the selector using the settings interface</span>
+<span class="c1">// Set the number of electrons and orbitals for the active space</span>
+<span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_electrons&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span>
+<span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_orbitals&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Configure the selector for valence-based selection</span>
-<span class="c1"># Select 4 electrons in 4 orbitals (oxygen 2p and bonding/antibonding combinations)</span>
-<span class="n">valence_selector</span> <span class="o">=</span> <span class="n">algorithms</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;active_space_selector&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_valence&quot;</span><span class="p">)</span>
-<span class="n">valence_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_active_electrons&quot;</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
-<span class="n">valence_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_active_orbitals&quot;</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Configure the selector using the settings interface</span>
+<span class="c1"># Set the number of electrons and orbitals for the active space</span>
+<span class="n">active_space_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_active_electrons&quot;</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+<span class="n">active_space_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_active_orbitals&quot;</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
 
-<span class="c1"># Alternative: occupation-based automatic selection</span>
-<span class="n">occupation_selector</span> <span class="o">=</span> <span class="n">algorithms</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;active_space_selector&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_occupation&quot;</span><span class="p">)</span>
-<span class="n">occupation_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;occupation_threshold&quot;</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)</span>
-
-<span class="c1"># Alternative: entropy-based automatic selection</span>
-<span class="n">autocas_selector</span> <span class="o">=</span> <span class="n">algorithms</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;active_space_selector&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_autocas&quot;</span><span class="p">)</span>
-<span class="n">autocas_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;min_plateau_size&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 </div>
-</section>
-<section id="running-active-space-selection">
-<h2>Running active space selection<a class="headerlink" href="#running-active-space-selection" title="Link to this heading"></a></h2>
-<p>Once configured, the active space selection can be executed on a wavefunction from a prior <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation.
-The <code class="docutils literal notranslate"><span class="pre">run</span></code> method returns a <a class="reference internal" href="../data/wavefunction.html"><span class="doc">Wavefunction</span></a> object with active space information populated.</p>
+<p><strong>Running the selection:</strong></p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Run active space selection with valence selector</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">active_wavefunction</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">valence_selector</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">scf_wavefunction</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create a molecular structure (water molecule)</span>
+<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="o">&gt;</span><span class="w"> </span><span class="n">coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.8897</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="mf">1.7802</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">-0.4738</span><span class="p">}};</span>
+<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">symbols</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;O&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">};</span>
+<span class="n">Structure</span><span class="w"> </span><span class="nf">structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span><span class="w"> </span><span class="n">symbols</span><span class="p">);</span>
+
+<span class="c1">// First, run SCF to get molecular orbitals</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">scf_energy</span><span class="p">,</span><span class="w"> </span><span class="n">scf_wavefunction</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;6-31g&quot;</span><span class="p">);</span>
+
+<span class="c1">// Run active space selection</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">active_wavefunction</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">scf_wavefunction</span><span class="p">);</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">active_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">active_wavefunction</span><span class="o">-&gt;</span><span class="n">get_orbitals</span><span class="p">();</span>
 
+<span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;SCF Energy: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">scf_energy</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 <span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Active orbitals summary:</span><span class="se">\n</span><span class="s">&quot;</span>
 <span class="w">          </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">active_orbitals</span><span class="o">-&gt;</span><span class="n">get_summary</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
-<span class="c1">// The active space can now be used for multireference calculations</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Run active space selection with valence selector</span>
-<span class="n">active_wavefunction</span> <span class="o">=</span> <span class="n">valence_selector</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">scf_wavefunction</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>  <span class="c1"># noqa: E402</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>  <span class="c1"># noqa: E402</span>
+
+<span class="c1"># Create a molecular structure (water molecule)</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.8897</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.7802</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.4738</span><span class="p">]])</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;O&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
+
+<span class="c1"># First, run SCF to get molecular orbitals</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">scf_energy</span><span class="p">,</span> <span class="n">scf_wavefunction</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;6-31g&quot;</span>
+<span class="p">)</span>
+
+<span class="c1"># Run active space selection</span>
+<span class="n">active_wavefunction</span> <span class="o">=</span> <span class="n">active_space_selector</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">scf_wavefunction</span><span class="p">)</span>
 <span class="n">active_orbitals</span> <span class="o">=</span> <span class="n">active_wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
 
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SCF Energy: </span><span class="si">{</span><span class="n">scf_energy</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Active orbitals summary:</span><span class="se">\n</span><span class="si">{</span><span class="n">active_orbitals</span><span class="o">.</span><span class="n">get_summary</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="c1"># The active space can now be used for multireference calculations</span>
-
 </pre></div>
 </div>
 </div>
 </div>
 </section>
-<section id="available-settings">
-<h2>Available settings<a class="headerlink" href="#available-settings" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector" title="qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="xref py py-class docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a> accepts different settings depending on the selection method.</p>
-<section id="valence-selector-settings-qdk-valence">
-<h3>Valence selector settings (<code class="docutils literal notranslate"><span class="pre">qdk_valence</span></code>)<a class="headerlink" href="#valence-selector-settings-qdk-valence" title="Link to this heading"></a></h3>
+</section>
+<section id="available-implementations">
+<h2>Available implementations<a class="headerlink" href="#available-implementations" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry’s <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector" title="qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="xref py py-class docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a> provides implementations for various selection strategies.
+You can discover available implementations programmatically:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">available</span><span class="p">();</span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">names</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>  <span class="c1"># noqa: E402</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;active_space_selector&quot;</span><span class="p">))</span>
+<span class="c1"># [&#39;pyscf_avas&#39;, &#39;qdk_occupation&#39;, &#39;qdk_autocas_eos&#39;, &#39;qdk_autocas&#39;, &#39;qdk_valence&#39;]</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="qdk-valence">
+<h3>QDK Valence<a class="headerlink" href="#qdk-valence" title="Link to this heading"></a></h3>
+<p><strong>Factory name:</strong> <code class="docutils literal notranslate"><span class="pre">&quot;qdk_valence&quot;</span></code> (default)</p>
+<p>Manual valence-based selection where users specify the number of active electrons and orbitals.
+Selects orbitals near the <a class="reference internal" href="../../../glossary.html#term-HOMO"><span class="xref std std-term">HOMO</span></a>-<a class="reference internal" href="../../../glossary.html#term-LUMO"><span class="xref std std-term">LUMO</span></a> gap.</p>
+<p><strong>Settings:</strong></p>
 <table class="docutils align-default">
 <colgroup>
 <col style="width: 25.0%" />
@@ -320,19 +300,22 @@ The <code class="docutils literal notranslate"><span class="pre">run</span></cod
 <tbody>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">num_active_electrons</span></code></p></td>
 <td><p>int</p></td>
-<td><p>-1</p></td>
-<td><p>Number of electrons to include in the active space (required)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">-1</span></code></p></td>
+<td><p>Number of electrons in the active space (required)</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">num_active_orbitals</span></code></p></td>
 <td><p>int</p></td>
-<td><p>-1</p></td>
-<td><p>Number of orbitals to include in the active space (required)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">-1</span></code></p></td>
+<td><p>Number of orbitals in the active space (required)</p></td>
 </tr>
 </tbody>
 </table>
 </section>
-<section id="occupation-selector-settings-qdk-occupation">
-<h3>Occupation selector settings (<code class="docutils literal notranslate"><span class="pre">qdk_occupation</span></code>)<a class="headerlink" href="#occupation-selector-settings-qdk-occupation" title="Link to this heading"></a></h3>
+<section id="qdk-occupation">
+<h3>QDK Occupation<a class="headerlink" href="#qdk-occupation" title="Link to this heading"></a></h3>
+<p><strong>Factory name:</strong> <code class="docutils literal notranslate"><span class="pre">&quot;qdk_occupation&quot;</span></code></p>
+<p>Automatic selection based on orbital occupation numbers, identifying orbitals with fractional occupation.</p>
+<p><strong>Settings:</strong></p>
 <table class="docutils align-default">
 <colgroup>
 <col style="width: 25.0%" />
@@ -350,14 +333,24 @@ The <code class="docutils literal notranslate"><span class="pre">run</span></cod
 <tbody>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">occupation_threshold</span></code></p></td>
 <td><p>float</p></td>
-<td><p>0.1</p></td>
-<td><p>Threshold for selecting orbitals with fractional occupation</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.1</span></code></p></td>
+<td><p>Orbitals with occupations deviating from 0 or 2 by more than this threshold are selected</p></td>
 </tr>
 </tbody>
 </table>
 </section>
-<section id="entropy-selector-settings-qdk-autocas-qdk-autocas-eos">
-<h3>Entropy selector settings (<code class="docutils literal notranslate"><span class="pre">qdk_autocas</span></code>, <code class="docutils literal notranslate"><span class="pre">qdk_autocas_eos</span></code>)<a class="headerlink" href="#entropy-selector-settings-qdk-autocas-qdk-autocas-eos" title="Link to this heading"></a></h3>
+<section id="qdk-autocas">
+<span id="autocas-algorithm"></span><h3>QDK AutoCAS<a class="headerlink" href="#qdk-autocas" title="Link to this heading"></a></h3>
+<p><strong>Factory name:</strong> <code class="docutils literal notranslate"><span class="pre">&quot;qdk_autocas&quot;</span></code></p>
+<p>Entropy-based automatic selection using histogram-based plateau detection to identify strongly correlated orbitals.
+See <a class="reference internal" href="#autocas-algorithm-details"><span class="std std-ref">AutoCAS Algorithm</span></a> below for a detailed description.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This method requires the input wavefunction to have orbital entropies populated.
+Orbital entropies are computed from the one- and two-electron reduced density matrices (1-<a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a> and 2-<a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a>), which are typically obtained from a multi-configuration calculation with <code class="docutils literal notranslate"><span class="pre">calculate_one_rdm=True</span></code> and <code class="docutils literal notranslate"><span class="pre">calculate_two_rdm=True</span></code>.</p>
+<p>See <a class="reference internal" href="mc_calculator.html"><span class="doc">MultiConfigurationCalculator</span></a> for details on generating wavefunctions with RDMs.</p>
+</div>
+<p><strong>Settings:</strong></p>
 <table class="docutils align-default">
 <colgroup>
 <col style="width: 25.0%" />
@@ -373,48 +366,158 @@ The <code class="docutils literal notranslate"><span class="pre">run</span></cod
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">min_plateau_size</span></code></p></td>
-<td><p>int</p></td>
-<td><p>2</p></td>
-<td><p>Minimum size of entropy plateau for autocas selection</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">entropy_threshold</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">entropy_threshold</span></code></p></td>
 <td><p>float</p></td>
-<td><p>0.1</p></td>
-<td><p>Entropy threshold for eos-based selection</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.14</span></code></p></td>
+<td><p>Entropy threshold for selection</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">min_plateau_size</span></code></p></td>
+<td><p>int</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">10</span></code></p></td>
+<td><p>Minimum size of entropy plateau for selection</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">num_bins</span></code></p></td>
+<td><p>int</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">100</span></code></p></td>
+<td><p>Number of histogram bins for plateau detection</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">normalize_entropies</span></code></p></td>
+<td><p>bool</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">True</span></code></p></td>
+<td><p>Whether to normalize entropy values</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="qdk-autocas-eos">
+<h3>QDK AutoCAS EOS<a class="headerlink" href="#qdk-autocas-eos" title="Link to this heading"></a></h3>
+<p><strong>Factory name:</strong> <code class="docutils literal notranslate"><span class="pre">&quot;qdk_autocas_eos&quot;</span></code></p>
+<p>Entropy-based selection using consecutive entropy differences to identify plateau boundaries.
+See <a class="reference internal" href="#autocas-algorithm-details"><span class="std std-ref">AutoCAS Algorithm</span></a> below for a detailed description.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This method requires the input wavefunction to have orbital entropies populated.
+Orbital entropies are computed from the one- and two-electron reduced density matrices (1-<a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a> and 2-<a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a>), which are typically obtained from a multi-configuration calculation with <code class="docutils literal notranslate"><span class="pre">calculate_one_rdm=True</span></code> and <code class="docutils literal notranslate"><span class="pre">calculate_two_rdm=True</span></code>. See <a class="reference internal" href="mc_calculator.html"><span class="doc">MultiConfigurationCalculator</span></a> for details on generating wavefunctions with RDMs.</p>
+</div>
+<p><strong>Settings:</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 15.0%" />
+<col style="width: 45.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">entropy_threshold</span></code></p></td>
+<td><p>float</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.14</span></code></p></td>
+<td><p>Entropy threshold for selection</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">diff_threshold</span></code></p></td>
+<td><p>float</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.1</span></code></p></td>
+<td><p>Difference threshold for EOS-based selection</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">normalize_entropies</span></code></p></td>
+<td><p>bool</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">True</span></code></p></td>
+<td><p>Whether to normalize entropy values by the maximum</p></td>
+</tr>
+</tbody>
+</table>
+<section id="autocas-algorithm-details">
+<span id="id1"></span><h4>AutoCAS Algorithm<a class="headerlink" href="#autocas-algorithm-details" title="Link to this heading"></a></h4>
+<p>Selecting an appropriate active space is one of the most challenging aspects of multi-configuration calculations.
+Traditional approaches rely on chemical intuition and trial-and-error, which can be unreliable for complex systems.
+The AutoCAS algorithm <span id="id2">[<a class="reference internal" href="../../../references.html#id25" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span> provides a systematic, black-box approach to active space selection.</p>
+<p>AutoCAS leverages concepts from quantum information theory to quantify orbital correlation.
+The key insight is that strongly correlated orbitals are highly <em>entangled</em> with the rest of the electronic system.
+This entanglement can be measured using the single-orbital entropy <span class="math notranslate nohighlight">\(s_i^{(1)}\)</span>, which quantifies how much information about orbital <span class="math notranslate nohighlight">\(i\)</span> is “shared” with all other orbitals.</p>
+<p>Single orbital entropies can be calculated for many-body systems given access to (approximate) one- and two-particle reduced density matrices (<a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a>) <span id="id3">[<a class="reference internal" href="../../../references.html#id4" title="Katharina Boguslawski and Paweł Tecmer. Orbital entanglement in quantum chemistry. International Journal of Quantum Chemistry, 115(19):1289-1295, 2015. doi:10.1002/qua.24832.">BT15</a>]</span>, which are easily accessible in QDK/Chemistry through multi-configuration wavefunction data structures. As such, single orbital entropies are computed by default when RDMs are requested in <a class="reference internal" href="mc_calculator.html"><span class="doc">multi-configuration calculations</span></a>. The QDK/Chemistry implementation of AutoCAS is agnostic to the underlying wavefunction method, as long as the required RDMs are available, thus allowing for comparisons across different multi-configuration approaches.</p>
+<p><strong>QDK/Chemistry AutoCAS Variants</strong></p>
+<p>QDK/Chemistry provides two entropy-based selection methods:</p>
+<ul class="simple">
+<li><p><strong>AutoCAS (Histogram-Based Plateau Detection)</strong>: As described in the original AutoCAS protocol <span id="id4">[<a class="reference internal" href="../../../references.html#id25" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span>, this method discretizes the entropy distribution into histogram bins and identifies plateaus—contiguous regions where the count of orbitals above each entropy threshold remains constant. This approach is robust for systems with clear entropy gaps but requires tuning of <code class="docutils literal notranslate"><span class="pre">num_bins</span></code> and <code class="docutils literal notranslate"><span class="pre">min_plateau_size</span></code> parameters. The algorithm selects the plateau containing the most orbitals that exceed the <code class="docutils literal notranslate"><span class="pre">entropy_threshold</span></code>.</p></li>
+<li><p><strong>AutoCAS-EOS (Entropy Difference Detection)</strong>: Uses a direct approach that examines consecutive differences in the sorted entropy values. When the difference between adjacent entropies exceeds <code class="docutils literal notranslate"><span class="pre">diff_threshold</span></code> and the entropy is above <code class="docutils literal notranslate"><span class="pre">entropy_threshold</span></code>, a plateau boundary is identified.</p></li>
+</ul>
+<p>Both methods sort orbitals by decreasing entropy and select the largest identified group of strongly correlated orbitals for the active space.</p>
+<p><strong>Populating Orbital Entropies</strong></p>
+<p>The entropy-based AutoCAS methods require orbital entropies as input, which are computed from the one- and two-electron reduced density matrices (RDMs).
+These RDMs must be obtained from a <a class="reference internal" href="mc_calculator.html"><span class="doc">multi-configuration calculation</span></a> that captures static correlation.
+A key practical consideration is balancing the cost of this initial calculation against the quality of the resulting entropies.</p>
+<p>A recommended approach is to use <a class="reference internal" href="mc_calculator.html#macis-asci"><span class="std std-ref">Selected Configuration Interaction (SCI)</span></a> with a relatively small number of determinants (e.g., 10,000–50,000).
+<a class="reference internal" href="../../../glossary.html#term-SCI"><span class="xref std std-term">SCI</span></a> methods are well-suited for this purpose because they:</p>
+<ul class="simple">
+<li><p>Automatically identify the most important determinants for capturing static correlation</p></li>
+<li><p>Scale favorably compared to full configuration interaction</p></li>
+<li><p>Provide high-quality RDMs even with truncated determinant spaces</p></li>
+</ul>
+<p>This approach has been shown to provide a reasonable trade-off between computational cost and entropy accuracy for active space selection.
+The resulting entropies are typically sufficient to identify strongly correlated orbitals, even when the <a class="reference internal" href="../../../glossary.html#term-SCI"><span class="xref std std-term">SCI</span></a> calculation uses a fraction of the determinants that would be required for quantitative energy accuracy.</p>
+</section>
+</section>
+<section id="pyscf-avas">
+<span id="pyscf-avas-plugin"></span><h3>PySCF AVAS<a class="headerlink" href="#pyscf-avas" title="Link to this heading"></a></h3>
+<p><strong>Factory name:</strong> <code class="docutils literal notranslate"><span class="pre">&quot;pyscf_avas&quot;</span></code></p>
+<p>The PySCF plugin provides access to the Automated Valence Active Space (<a class="reference internal" href="../../../glossary.html#term-AVAS"><span class="xref std std-term">AVAS</span></a>) method from <a class="reference external" href="https://pyscf.org/">PySCF</a>.
+<a class="reference internal" href="../../../glossary.html#term-AVAS"><span class="xref std std-term">AVAS</span></a> selects active orbitals by projecting molecular orbitals onto a target atomic orbital basis.
+See the <cite>original :term:`AVAS</cite> publication &lt;<a class="reference external" href="https://doi.org/10.1021/acs.jctc.7b00128">https://doi.org/10.1021/acs.jctc.7b00128</a>&gt;`_ for details.</p>
+<p><strong>Settings:</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 15.0%" />
+<col style="width: 45.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ao_labels</span></code></p></td>
+<td><p>list[str]</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">[]</span></code></p></td>
+<td><p>Atomic orbital labels to include (e.g., <code class="docutils literal notranslate"><span class="pre">[&quot;Fe</span> <span class="pre">3d&quot;,</span> <span class="pre">&quot;Fe</span> <span class="pre">4d&quot;]</span></code>); required</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">canonicalize</span></code></p></td>
+<td><p>bool</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>Whether to canonicalize active orbitals after selection</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">openshell_option</span></code></p></td>
+<td><p>int</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">2</span></code></p></td>
+<td><p>Handling of singly-occupied orbitals: <code class="docutils literal notranslate"><span class="pre">2</span></code> = project as alpha, <code class="docutils literal notranslate"><span class="pre">3</span></code> = keep in active space</p></td>
 </tr>
 </tbody>
 </table>
 </section>
 </section>
-<section id="implemented-interfaces">
-<h2>Implemented interfaces<a class="headerlink" href="#implemented-interfaces" title="Link to this heading"></a></h2>
-<p>QDK/Chemistry’s <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector" title="qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="xref py py-class docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a> provides implementations for various selection strategies:</p>
-<section id="qdk-chemistry-implementations">
-<h3>QDK/Chemistry implementations<a class="headerlink" href="#qdk-chemistry-implementations" title="Link to this heading"></a></h3>
-<ul class="simple">
-<li><p><strong>qdk_valence</strong>: Manual valence-based selection</p></li>
-<li><p><strong>qdk_occupation</strong>: Occupation-based automatic selection</p></li>
-<li><p><strong>qdk_autocas</strong>: Entropy-based automatic selection <span id="id2">[<a class="reference internal" href="../../../references.html#id27" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span></p></li>
-<li><p><strong>qdk_autocas_eos</strong>: Enhanced entropy-based selection</p></li>
-</ul>
-<p>The factory pattern allows seamless selection between these implementations based on the system requirements and desired level of automation.</p>
-</section>
-</section>
 <section id="related-classes">
 <h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><a class="reference internal" href="../data/wavefunction.html"><span class="doc">Wavefunction</span></a>: Input wavefunction from SCF calculation</p></li>
+<li><p><a class="reference internal" href="../data/wavefunction.html"><span class="doc">Wavefunction</span></a>: Input wavefunction from <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation</p></li>
 <li><p><a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a>: Contains orbital information and active space indices</p></li>
-<li><p><a class="reference internal" href="mc_calculator.html"><span class="doc">MCCalculator</span></a>: Uses active space for multireference calculations</p></li>
 </ul>
 </section>
 <section id="further-reading">
 <h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p>The above examples can be downloaded as a complete <a class="reference external" href="../../../_static/examples/python/active_space_selector.py">Python</a> script or <a class="reference external" href="../../../_static/examples/cpp/active_space_selector.cpp">C++</a> source file.</p></li>
-<li><p><a class="reference internal" href="../design/settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
-<li><p><a class="reference internal" href="../design/factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Understanding algorithm creation</p></li>
+<li><p><a class="reference internal" href="mc_calculator.html"><span class="doc">MCCalculator</span></a>: Uses active space for multiconfigurational calculations</p></li>
+<li><p><a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
+<li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Understanding algorithm creation</p></li>
 </ul>
 </section>
 </section>
@@ -423,7 +526,7 @@ The <code class="docutils literal notranslate"><span class="pre">run</span></cod
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="index.html" class="btn btn-neutral float-left" title="Available algorithms" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="settings.html" class="btn btn-neutral float-left" title="Settings" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="energy_estimator.html" class="btn btn-neutral float-right" title="Energy estimation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

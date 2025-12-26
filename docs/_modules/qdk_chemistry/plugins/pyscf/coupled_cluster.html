@@ -49,6 +49,7 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
@@ -126,7 +127,7 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">DynamicalCorrelationCalculator</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">CoupledClusterContainer</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">Wavefunction</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">hamiltonian_to_scf</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">hamiltonian_to_scf</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;PyscfCoupledClusterCalculator&quot;</span><span class="p">,</span> <span class="s2">&quot;PyscfCoupledClusterSettings&quot;</span><span class="p">]</span>

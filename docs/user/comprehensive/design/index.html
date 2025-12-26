@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Design principles of QDK/Chemistry &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>High-level design &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -26,7 +26,7 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Factory pattern" href="factory_pattern.html" />
+    <link rel="next" title="Data classes" href="../data/index.html" />
     <link rel="prev" title="In-depth user guide" href="../index.html" /> 
 </head>
 
@@ -52,28 +52,23 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Design principles of QDK/Chemistry</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#separation-of-data-and-algorithms">Separation of data and algorithms</a><ul>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">High-level design</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#separation-of-data-and-algorithms">Separation of Data and Algorithms</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#data-classes">Data classes</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#algorithm-classes">Algorithm classes</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#factory-pattern">Factory pattern</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#settings-pattern">Settings pattern</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#data-flow-example">Data flow example</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#interface-architecture-plugins">Interface architecture (plugins)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#further-reading">Further reading</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
-<li class="toctree-l4"><a class="reference internal" href="interfaces.html">Interface system</a></li>
-<li class="toctree-l4"><a class="reference internal" href="settings.html">Settings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#runtime-configuration-with-settings">Runtime configuration with settings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#a-complete-dataflow-example">A complete dataflow example</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data management</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Algorithm classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
@@ -105,7 +100,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-      <li class="breadcrumb-item active">Design principles of QDK/Chemistry</li>
+      <li class="breadcrumb-item active">High-level design</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/design/index.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -115,21 +110,20 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="design-principles-of-qdk-chemistry">
-<h1>Design principles of QDK/Chemistry<a class="headerlink" href="#design-principles-of-qdk-chemistry" title="Link to this heading"></a></h1>
+  <section id="high-level-design">
+<h1>High-level design<a class="headerlink" href="#high-level-design" title="Link to this heading"></a></h1>
 <p>This document outlines the core architectural design principles of QDK/Chemistry, explaining the conceptual framework that guides the library’s organization and implementation.
-For a complete overview of QDK/Chemistry’s documentation, see the <a class="reference internal" href="../index.html"><span class="doc">comprehensive documentation index</span></a>.</p>
-<p>QDK/Chemistry is designed with a clear separation between <strong>data containers</strong> and <strong>algorithms</strong>.
-This fundamental design choice enables flexibility, extensibility, and maintainability of the codebase, while providing users with a consistent and intuitive API.</p>
+For a complete overview of QDK/Chemistry’s documentation, see the <a class="reference internal" href="../index.html"><span class="doc">in-depth documentation index</span></a>.</p>
+<p>QDK/Chemistry is designed with a clear separation between <strong>data classes</strong> and <strong>algorithms</strong>.
+This design choice enables flexibility, extensibility, and maintainability of the codebase, while providing users with a consistent and intuitive API.</p>
 <section id="separation-of-data-and-algorithms">
-<h2>Separation of data and algorithms<a class="headerlink" href="#separation-of-data-and-algorithms" title="Link to this heading"></a></h2>
+<h2>Separation of Data and Algorithms<a class="headerlink" href="#separation-of-data-and-algorithms" title="Link to this heading"></a></h2>
 <p>QDK/Chemistry follows a design pattern that strictly separates:</p>
 <ol class="arabic simple">
 <li><p><strong>Data Classes</strong>: Immutable containers that store and manage quantum chemical data</p></li>
 <li><p><strong>Algorithm Classes</strong>: Processors that operate on data objects to produce new data objects</p></li>
 </ol>
-<p>This separation follows the principle of single responsibility and creates a clear flow of data through computational
-workflows.</p>
+<p>This separation follows the principle of single responsibility and creates a clear flow of data through computational workflows.</p>
 <div class="graphviz"><img src="../../../_images/graphviz-81cb93437fff91546debeb5cb5e3d380016e084e.png" alt="digraph DataFlow {
     rankdir=LR;
     bgcolor=&quot;#FAFAFA&quot;;
@@ -143,192 +137,32 @@ workflows.</p>
     Input -&gt; Algorithm;
     Algorithm -&gt; Output;
 }" class="graphviz" /></div>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
 <section id="data-classes">
-<h3>Data classes<a class="headerlink" href="#data-classes" title="Link to this heading"></a></h3>
-<p>Data classes in QDK/Chemistry are designed to be:</p>
+<span id="hl-data-class"></span><h3>Data classes<a class="headerlink" href="#data-classes" title="Link to this heading"></a></h3>
+<p>Data classes in QDK/Chemistry concretely represent intermediate quantities commonly encountered in quantum applications workflows. These classes are designed to be:</p>
 <ul class="simple">
-<li><p>Immutable: Once created, the core data cannot be modified</p></li>
-<li><p>Self-contained: Include all information necessary to represent the concept</p></li>
+<li><p><strong>Immutable</strong>: Once created, the core data cannot be modified</p></li>
+<li><p><strong>Self-contained</strong>: Include all information necessary to represent the underlying quantum chemical quantity</p></li>
 <li><p><a class="reference internal" href="../data/serialization.html"><span class="doc">Serializable</span></a>: Can be easily saved to and loaded from files</p></li>
-<li><p>Language-agnostic: Accessible through identical APIs in both C++ and Python</p></li>
+<li><p><strong>Language-agnostic</strong>: Accessible through identical APIs in both C++ and Python</p></li>
 </ul>
-<p>QDK/Chemistry includes the following data classes:</p>
-<ul class="simple">
-<li><p><a class="reference internal" href="../data/structure.html"><span class="doc">Structure</span></a>: Molecular geometry and composition</p></li>
-<li><p><a class="reference internal" href="../data/basis_set.html"><span class="doc">BasisSet</span></a>: Quantum chemistry basis set definitions</p></li>
-<li><p><a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a>: Molecular orbital coefficients and energies</p></li>
-<li><p><a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Molecular Hamiltonian</p></li>
-<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>: Wavefunction representation</p></li>
-</ul>
+<p>See the <a class="reference internal" href="../data/index.html"><span class="doc">Data Classes</span></a> documentation for further details on the availability and usage of QDK/Chemistry’s data classes.</p>
 </section>
 <section id="algorithm-classes">
-<h3>Algorithm classes<a class="headerlink" href="#algorithm-classes" title="Link to this heading"></a></h3>
-<p>Algorithm classes in QDK/Chemistry are designed to be:</p>
+<span id="hl-algorithm-class"></span><h3>Algorithm classes<a class="headerlink" href="#algorithm-classes" title="Link to this heading"></a></h3>
+<p>Algorithm classes represent mutations on data, such as the execution of quantum chemical methods and generation of circuit components commonly found in quantum applications workflows.
+These classes are designed to be:</p>
 <ul class="simple">
 <li><p><strong>Stateless</strong>: Their behavior depends only on their input data and configuration</p></li>
 <li><p><strong>Configurable</strong>: Through a standardized <code class="docutils literal notranslate"><span class="pre">Settings</span></code> interface</p></li>
-<li><p><strong>Factory-constructed</strong>: Created through factory methods for flexibility and extensibility</p></li>
-<li><p><strong>Consistent</strong>: Follow a uniform interface pattern</p></li>
-<li><p><strong>Interoperable</strong>: Provide unified interfaces to both native implementations and third-party packages</p></li>
+<li><p><strong>Conforming</strong>: Exposing a common interface for disparate implementations to enable a unified user experience.</p></li>
+<li><p><strong>Extensible</strong>: Allowing new implementations to be added without modifying existing code</p></li>
 </ul>
-<p>QDK/Chemistry includes the following algorithm classes:</p>
-<ul class="simple">
-<li><p><a class="reference internal" href="../algorithms/scf_solver.html"><span class="doc">ScfSolver</span></a>: Self-consistent field calculations</p></li>
-<li><p><a class="reference internal" href="../algorithms/localizer.html"><span class="doc">Localizer</span></a>: Orbital localization methods</p></li>
-<li><p><a class="reference internal" href="../algorithms/active_space.html"><span class="doc">ActiveSpaceSelector</span></a>: Active space selection methods</p></li>
-<li><p><a class="reference internal" href="../algorithms/hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a>: Hamiltonian construction</p></li>
-<li><p><a class="reference internal" href="../algorithms/mc_calculator.html"><span class="doc">MCCalculator</span></a>: Multi-configuration calculations</p></li>
-</ul>
-<p>Each algorithm class can leverage both Microsoft-developed implementations (developed within QDK/Chemistry) and <a class="reference internal" href="interfaces.html"><span class="doc">interfaces</span></a> to established third-party electronic structure packages.
-This design allows users to benefit from specialized capabilities of external software while maintaining a consistent API.</p>
-</section>
-</section>
-<section id="factory-pattern">
-<h2>Factory pattern<a class="headerlink" href="#factory-pattern" title="Link to this heading"></a></h2>
-<p>QDK/Chemistry implements the <a class="reference internal" href="factory_pattern.html"><span class="doc">factory pattern</span></a> for algorithm creation:</p>
-<div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
-
-<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
-<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">algorithms</span><span class="p">;</span>
-
-<span class="k">auto</span><span class="w"> </span><span class="n">scf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
-
-<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-</div>
-<p>This pattern allows:</p>
-<ul class="simple">
-<li><p>Runtime selection of the most appropriate implementation</p></li>
-<li><p>Extension with new implementations without changing client code</p></li>
-<li><p>Centralized management of dependencies and resources</p></li>
-</ul>
-<p>Read more in the <a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a> documentation.</p>
-</section>
-<section id="settings-pattern">
-<h2>Settings pattern<a class="headerlink" href="#settings-pattern" title="Link to this heading"></a></h2>
-<p>Algorithm configuration is managed through a consistent <a class="reference internal" href="settings.html"><span class="doc">Settings</span></a> interface:</p>
-<div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;max_iterations&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">);</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Available settings: </span><span class="si">{</span><span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-</div>
-<p>This approach provides:</p>
-<ul class="simple">
-<li><p>Uniform configuration across all algorithms</p></li>
-<li><p>Type safety and validation</p></li>
-<li><p>Default values with explicit overrides</p></li>
-<li><p>Documentation of available options</p></li>
-</ul>
-<p>Read more in the <a class="reference internal" href="settings.html"><span class="doc">Settings</span></a> documentation.</p>
-</section>
-<section id="data-flow-example">
-<h2>Data flow example<a class="headerlink" href="#data-flow-example" title="Link to this heading"></a></h2>
-<p>A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:</p>
-<div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="c1">// Create molecular structure from an XYZ file</span>
-<span class="w">  </span><span class="n">Structure</span><span class="w"> </span><span class="n">molecule</span><span class="p">;</span>
-<span class="w">  </span><span class="n">molecule</span><span class="p">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s">&quot;molecule.xyz&quot;</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Configure and run SCF calculation</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
-<span class="w">  </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;cc-pvdz&quot;</span><span class="p">);</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">scf_energy</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">solve</span><span class="p">(</span><span class="n">molecule</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Select active space orbitals</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_selector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
-<span class="w">  </span><span class="n">active_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_orbitals&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">);</span>
-<span class="w">  </span><span class="n">active_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_electrons&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">);</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_indices</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">active_selector</span><span class="o">-&gt;</span><span class="n">select</span><span class="p">(</span><span class="n">orbitals</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Create Hamiltonian with active space</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ham_constructor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">HamiltonianConstructorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
-<span class="w">  </span><span class="n">ham_constructor</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;active_orbitals&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">active_indices</span><span class="p">);</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ham_constructor</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">orbitals</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Run multi-configuration calculation</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">mc_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MCCalculatorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">mc_energy</span><span class="p">,</span><span class="w"> </span><span class="n">wave_function</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mc_solver</span><span class="o">-&gt;</span><span class="n">solve</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">);</span>
-
-<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
-<span class="p">}</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a Structure (coordinates in Bohr/atomic units) or read from file</span>
-<span class="c1"># Data classes in QDK/Chemistry are immutable by design (coordinates in Bohr/atomic units)</span>
-<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
-
-<span class="c1"># Configure and run SCF calculation</span>
-<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Available SCF settings: </span><span class="si">{</span><span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;cc-pvdz&quot;</span><span class="p">)</span>
-<span class="n">scf_energy</span><span class="p">,</span> <span class="n">scf_wavefunction</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total number of electrons: </span><span class="si">{</span><span class="n">scf_wavefunction</span><span class="o">.</span><span class="n">get_total_num_electrons</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Orbital occupations: </span><span class="si">{</span><span class="n">scf_wavefunction</span><span class="o">.</span><span class="n">get_total_orbital_occupations</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-<span class="c1"># Select active space orbitals</span>
-<span class="n">active_space_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
-    <span class="s2">&quot;active_space_selector&quot;</span><span class="p">,</span>
-    <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qdk_valence&quot;</span><span class="p">,</span>
-<span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span>
-    <span class="sa">f</span><span class="s2">&quot;Available active space selector settings: </span><span class="si">{</span><span class="n">active_space_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
-<span class="p">)</span>
-<span class="n">active_space_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_active_orbitals&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
-<span class="n">active_space_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_active_electrons&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
-<span class="n">active_wfn</span> <span class="o">=</span> <span class="n">active_space_selector</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">scf_wavefunction</span><span class="p">)</span>
-<span class="n">active_orbitals</span> <span class="o">=</span> <span class="n">active_wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Active orbitals: </span><span class="si">{</span><span class="n">active_orbitals</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-<span class="c1"># Create Hamiltonian with active space</span>
-<span class="n">ham_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span>
-    <span class="sa">f</span><span class="s2">&quot;Available Hamiltonian constructor settings: </span><span class="si">{</span><span class="n">ham_constructor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
-<span class="p">)</span>
-<span class="n">ham_constructor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;eri_method&quot;</span><span class="p">,</span> <span class="s2">&quot;incore&quot;</span><span class="p">)</span>
-<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">ham_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">active_orbitals</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Active Space Hamiltonian:</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
-
-<span class="n">mc</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Available multi-configuration calculator settings: </span><span class="si">{</span><span class="n">mc</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="n">mc</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;davidson_iterations&quot;</span><span class="p">,</span> <span class="mi">300</span><span class="p">)</span>
-<span class="n">E_cas</span><span class="p">,</span> <span class="n">wfn_cas</span> <span class="o">=</span> <span class="n">mc</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">hamiltonian</span><span class="p">,</span> <span class="n">n_active_alpha_electrons</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_active_beta_electrons</span><span class="o">=</span><span class="mi">1</span>
-<span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span>
-    <span class="sa">f</span><span class="s2">&quot;CASCI energy is </span><span class="si">{</span><span class="n">E_cas</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> Hartree, and the electron correlation energy is </span><span class="si">{</span><span class="n">E_cas</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">scf_energy</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span>
-<span class="p">)</span>
-</pre></div>
-</div>
-</div>
-</div>
-</section>
-<section id="interface-architecture-plugins">
-<h2>Interface architecture (plugins)<a class="headerlink" href="#interface-architecture-plugins" title="Link to this heading"></a></h2>
-<p>QDK/Chemistry is designed with a plugin architecture that allows for consistent <a class="reference internal" href="interfaces.html"><span class="doc">interfaces</span></a> to various external packages:</p>
+<p>Programatically, Algorithms are specified as abstract interfaces which can be specialized downstream through concrete implementations.
+This allows QDK/Chemistry to be expressed as a <a class="reference internal" href="../plugins.html"><span class="doc">plugin architecture</span></a>, for which algorithm implementations may be specified either natively within QDK/Chemistry or through established third-party quantum chemistry packages:</p>
 <div class="graphviz"><img src="../../../_images/graphviz-425f73d86fb873b40e9ee4489a05e57b826832b4.png" alt="digraph PluginArchitecture {
     rankdir=LR;
     bgcolor=&quot;#FAFAFA&quot;;
@@ -342,24 +176,142 @@ This design allows users to benefit from specialized capabilities of external so
     Interface -&gt; QDK;
     Interface -&gt; ThirdParty;
 }" class="graphviz" /></div>
-<p>This design provides several advantages:</p>
-<ol class="arabic simple">
-<li><p><strong>Unified API</strong>: Users interact with a consistent interface regardless of the underlying implementation</p></li>
-<li><p><strong>Implementation Flexibility</strong>: Algorithms can be implemented natively or delegate to specialized external packages</p></li>
-<li><p><strong>Best-of-Breed Approach</strong>: Leverage strengths of different packages while maintaining consistent data structures</p></li>
-<li><p><strong>Future-Proofing</strong>: New implementations can be added without changing the user-facing API</p></li>
-</ol>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>This design allows users to benefit from specialized capabilities of “best-in-breed” software while maintaining a consistent user experience.
+See the <a class="reference internal" href="../plugins.html"><span class="doc">Plugin System</span></a> documentation for further details on how to contribute new algorithm implementations.</p>
+<p>Further details on the availablity and usage of QDK/Chemistry’s algorithm implementations can be found in the <a class="reference internal" href="../algorithms/index.html"><span class="doc">Algorithms</span></a> documentation.</p>
+</section>
+</section>
+<section id="factory-pattern">
+<span id="hl-factory-pattertn"></span><h2>Factory pattern<a class="headerlink" href="#factory-pattern" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry’s <a class="reference internal" href="../plugins.html"><span class="doc">plugin architecture</span></a> leverages a <a class="reference internal" href="../algorithms/factory_pattern.html"><span class="doc">factory pattern</span></a> for algorithm creation:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
+
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">algorithms</span><span class="p">;</span>
+
+<span class="k">auto</span><span class="w"> </span><span class="n">scf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
+
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>This pattern allows:</p>
+<ul class="simple">
+<li><p>Extension of workflows by new Algorithm implementations without changing client code</p></li>
+<li><p>Centralized management of dependencies and resources</p></li>
+</ul>
+<p>Read more on QDK/Chemistry’s usage of this pattern in the <a class="reference internal" href="../algorithms/factory_pattern.html"><span class="doc">Factory Pattern</span></a> documentation.</p>
+</section>
+<section id="runtime-configuration-with-settings">
+<span id="hl-settings"></span><h2>Runtime configuration with settings<a class="headerlink" href="#runtime-configuration-with-settings" title="Link to this heading"></a></h2>
+<p>Algorithm configuration is managed through instances of <a class="reference internal" href="../algorithms/settings.html"><span class="doc">Settings</span></a> objects, which contain a type-safe data store of configuration parameters consistent between the python and C++ APIs:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Available settings: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">scf_solver</span><span class="p">.</span><span class="n">settings</span><span class="p">().</span><span class="n">get_summary</span><span class="p">()</span>
+<span class="w">          </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;max_iterations&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Available settings: </span><span class="si">{</span><span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get_summary</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>Read more on how one can configure, discover, and extend instances of Settings objects in the
+<a class="reference internal" href="../algorithms/settings.html"><span class="doc">Settings</span></a> documentation.</p>
+</section>
+<section id="a-complete-dataflow-example">
+<span id="hl-dataflow-example"></span><h2>A complete dataflow example<a class="headerlink" href="#a-complete-dataflow-example" title="Link to this heading"></a></h2>
+<p>A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// Create molecular structure from an XYZ file</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">molecule</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Structure</span><span class="o">::</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s">&quot;molecule.xyz&quot;</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Configure and run SCF calculation</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+<span class="w">  </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;cc-pvdz&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">scf_energy</span><span class="p">,</span><span class="w"> </span><span class="n">wfn_hf</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">molecule</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Select active space orbitals</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_selector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;qdk_valence&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="n">active_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_orbitals&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">);</span>
+<span class="w">  </span><span class="n">active_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_electrons&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_wfn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">active_selector</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_hf</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">active_wfn</span><span class="o">-&gt;</span><span class="n">get_orbitals</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Create Hamiltonian with active space</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ham_constructor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">HamiltonianConstructorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ham_constructor</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">active_orbitals</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Run multi-configuration calculation</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">mc_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MultiConfigurationCalculatorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">mc_energy</span><span class="p">,</span><span class="w"> </span><span class="n">wave_function</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mc_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
+
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create molecular structure from an XYZ file</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="p">[[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]]</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
+
+<span class="c1"># Configure and run SCF calculation</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">scf_energy</span><span class="p">,</span> <span class="n">scf_wavefunction</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;cc-pvdz&quot;</span>
+<span class="p">)</span>
+
+<span class="c1"># Select active space orbitals</span>
+<span class="n">active_space_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
+    <span class="s2">&quot;active_space_selector&quot;</span><span class="p">,</span>
+    <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qdk_valence&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">active_space_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_active_orbitals&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<span class="n">active_space_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_active_electrons&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<span class="n">active_wfn</span> <span class="o">=</span> <span class="n">active_space_selector</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">scf_wavefunction</span><span class="p">)</span>
+<span class="n">active_orbitals</span> <span class="o">=</span> <span class="n">active_wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+
+<span class="c1"># Create Hamiltonian with active space</span>
+<span class="n">ham_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
+<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">ham_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">active_orbitals</span><span class="p">)</span>
+
+<span class="n">mc</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">)</span>
+<span class="n">mc</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;davidson_iterations&quot;</span><span class="p">,</span> <span class="mi">300</span><span class="p">)</span>
+<span class="n">E_cas</span><span class="p">,</span> <span class="n">wfn_cas</span> <span class="o">=</span> <span class="n">mc</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">hamiltonian</span><span class="p">,</span> <span class="n">n_active_alpha_electrons</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_active_beta_electrons</span><span class="o">=</span><span class="mi">1</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
 </section>
 <section id="further-reading">
 <h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p>The above examples can be downloaded as complete <a class="reference external" href="../../../_static/examples/cpp/design_principles.cpp">C++</a> and <a class="reference external" href="../../../_static/examples/python/design_principles.py">Python</a> scripts.</p></li>
-<li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Details on QDK/Chemistry’s implementation of the factory pattern</p></li>
-<li><p><a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>: How to configure algorithms through the Settings interface</p></li>
-<li><p><a class="reference internal" href="interfaces.html"><span class="doc">Interfaces</span></a>: QDK/Chemistry’s interface system to external packages</p></li>
+<li><p><a class="reference internal" href="../algorithms/factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Details on QDK/Chemistry’s implementation of the factory pattern</p></li>
+<li><p><a class="reference internal" href="../algorithms/settings.html"><span class="doc">Settings</span></a>: How to configure the execution behavior of algorithms through the Settings interface</p></li>
+<li><p><a class="reference internal" href="../plugins.html#plugin-system"><span class="std std-ref">Plugin system</span></a>: QDK/Chemistry’s plugin system for extending functionality</p></li>
 </ul>
-<div class="toctree-wrapper compound">
-</div>
 </section>
 </section>
 
@@ -368,7 +320,7 @@ This design allows users to benefit from specialized capabilities of external so
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="../index.html" class="btn btn-neutral float-left" title="In-depth user guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="factory_pattern.html" class="btn btn-neutral float-right" title="Factory pattern" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="../data/index.html" class="btn btn-neutral float-right" title="Data classes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

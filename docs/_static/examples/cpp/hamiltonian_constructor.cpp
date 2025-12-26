@@ -1,11 +1,8 @@
-// Hamiltonian Constructor usage examples.
-
-// --------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
-// --------------------------------------------------------------------------------------------
-#include <iomanip>
+
+// Hamiltonian Constructor usage examples.
 #include <iostream>
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::algorithms;
@@ -35,7 +32,7 @@ std::vector<Eigen::Vector3d> coords = {Eigen::Vector3d{0.0, 0.0, 0.0},
 std::vector<std::string> symbols = {"H", "H"};
 auto structure = std::make_shared<Structure>(coords, symbols);
 
-// Run an SCF to get orbitals
+// Run a SCF to get orbitals
 auto scf_solver = ScfSolverFactory::create();
 scf_solver->settings().set("basis_set", "sto-3g");
 auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);
@@ -58,4 +55,13 @@ std::cout << "Core energy: " << std::fixed << std::setprecision(10)
           << core_energy << " Hartree" << std::endl;
 std::cout << hamiltonian->get_summary() << std::endl;
 // end-cell-construct
+// --------------------------------------------------------------------------------------------
+
+// --------------------------------------------------------------------------------------------
+// start-cell-list-implementations
+auto names = HamiltonianConstructorFactory::available();
+for (const auto& name : names) {
+  std::cout << name << std::endl;
+}
+// end-cell-list-implementations
 // --------------------------------------------------------------------------------------------

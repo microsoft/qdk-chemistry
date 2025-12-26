@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Basis set &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>BasisSet &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -53,31 +53,22 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data management</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization</a></li>
-<li class="toctree-l3 current"><a class="current reference internal" href="#">Basis set</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#usage">Usage</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#core-concepts">Core concepts</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#creating-a-basis-set">Creating a basis set</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#accessing-basis-set-data">Accessing basis set data</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#working-with-shells">Working with shells</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#serialization">Serialization</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#utility-functions">Utility functions</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#predefined-basis-sets">Predefined basis sets</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data classes</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="index.html#quick-reference">Quick reference</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="serialization.html">Serialization</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">BasisSet</a></li>
+<li class="toctree-l4"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
+<li class="toctree-l4"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="structure.html">Structure</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
-<li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
-<li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Algorithm classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
@@ -109,8 +100,8 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="index.html">Data management</a></li>
-      <li class="breadcrumb-item active">Basis set</li>
+          <li class="breadcrumb-item"><a href="index.html">Data classes</a></li>
+      <li class="breadcrumb-item active">BasisSet</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/data/basis_set.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -120,8 +111,8 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="basis-set">
-<h1>Basis set<a class="headerlink" href="#basis-set" title="Link to this heading"></a></h1>
+  <section id="basisset">
+<h1>BasisSet<a class="headerlink" href="#basisset" title="Link to this heading"></a></h1>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a> class in QDK/Chemistry represents a collection of basis functions used to describe the electronic structure of molecules.
 It organizes atomic orbitals into shells and provides methods for managing, querying, and serializing basis set data.</p>
 <section id="overview">
@@ -550,7 +541,7 @@ For a complete list of available basis sets and their specifications, see the <a
 </div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The basis set library includes popular basis sets such as STO-nG, Pople basis sets (3-21G, 6-31G, etc.), correlation-consistent basis sets (cc-pVDZ, cc-pVTZ, etc.), and more.
+<p>The basis set library includes popular basis sets such as <a class="reference internal" href="../../../glossary.html#term-STO"><span class="xref std std-term">STO</span></a>-nG, Pople basis sets (3-21G, 6-31G, etc.), correlation-consistent basis sets (cc-pVDZ, cc-pVTZ, etc.), and more.
 The availability may depend on your QDK/Chemistry installation.</p>
 </div>
 </section>
@@ -567,7 +558,7 @@ The availability may depend on your QDK/Chemistry installation.</p>
 <ul class="simple">
 <li><p>The above examples can be downloaded as complete <a class="reference external" href="../../../_static/examples/cpp/basis_set.cpp">C++</a> and <a class="reference external" href="../../../_static/examples/python/basis_set.py">Python</a> scripts.</p></li>
 <li><p><a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a>: Data serialization and deserialization</p></li>
-<li><p><a class="reference internal" href="../design/settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
+<li><p><a class="reference internal" href="../algorithms/settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
 <li><p><a class="reference internal" href="../basis_functionals.html"><span class="doc">Supported basis sets</span></a>: List of pre-defined basis sets available in QDK/Chemistry</p></li>
 </ul>
 </section>

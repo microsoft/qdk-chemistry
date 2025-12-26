@@ -52,6 +52,7 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
@@ -2006,6 +2007,82 @@
 </dd></dl>
 
 <dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data8BasisSet15from_basis_nameERKNSt6stringERK9StructureRKNSt6stringE6AOType">
+<span id="_CPPv3N3qdk9chemistry4data8BasisSet15from_basis_nameERKNSt6stringERK9StructureRKNSt6stringE6AOType"></span><span id="_CPPv2N3qdk9chemistry4data8BasisSet15from_basis_nameERKNSt6stringERK9StructureRKNSt6stringE6AOType"></span><span id="qdk::chemistry::data::BasisSet::from_basis_name__ssCR.StructureCR.ssCR.AOType"></span><span class="target" id="classqdk_1_1chemistry_1_1data_1_1BasisSet_1a660698bc337d4d4c58e111a64e13db41"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shared_ptr</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data8BasisSetE" title="qdk::chemistry::data::BasisSet"><span class="n"><span class="pre">BasisSet</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">from_basis_name</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">basis_name</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data9StructureE" title="qdk::chemistry::data::Structure"><span class="n"><span class="pre">Structure</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">structure</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ecp_name</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">(</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data8BasisSet16default_ecp_nameE" title="qdk::chemistry::data::BasisSet::default_ecp_name"><span class="n"><span class="pre">default_ecp_name</span></span></a><span class="p"><span class="pre">)</span></span>, <a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOTypeE" title="qdk::chemistry::data::AOType"><span class="n"><span class="pre">AOType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">atomic_orbital_type</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOTypeE" title="qdk::chemistry::data::AOType"><span class="n"><span class="pre">AOType</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOType9SphericalE" title="qdk::chemistry::data::AOType::Spherical"><span class="n"><span class="pre">Spherical</span></span></a><span class="sig-paren">)</span><br /></dt>
+<dd><p>Constructor with basis set name and structure. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>basis_name</strong> – Name of the basis set (e.g., “6-31G”, “cc-pVDZ”) </p></li>
+<li><p><strong>structure</strong> – The molecular structure </p></li>
+<li><p><strong>ecp_name</strong> – Name of the ECP (default: “default_ecp”) </p></li>
+<li><p><strong>atomic_orbital_type</strong> – Whether to use spherical or cartesian atomic orbitals </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Shared pointer to the created <a class="reference internal" href="#classqdk_1_1chemistry_1_1data_1_1BasisSet"><span class="std std-ref">BasisSet</span></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data8BasisSet15from_basis_nameENSt6stringENSt10shared_ptrI9StructureEENSt6stringE6AOType">
+<span id="_CPPv3N3qdk9chemistry4data8BasisSet15from_basis_nameENSt6stringENSt10shared_ptrI9StructureEENSt6stringE6AOType"></span><span id="_CPPv2N3qdk9chemistry4data8BasisSet15from_basis_nameENSt6stringENSt10shared_ptrI9StructureEENSt6stringE6AOType"></span><span id="qdk::chemistry::data::BasisSet::from_basis_name__ss.std::shared_ptr:Structure:.ss.AOType"></span><span class="target" id="classqdk_1_1chemistry_1_1data_1_1BasisSet_1ac05eccfc345690dd80fc025d0ad05569"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shared_ptr</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data8BasisSetE" title="qdk::chemistry::data::BasisSet"><span class="n"><span class="pre">BasisSet</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">from_basis_name</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">basis_name</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shared_ptr</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data9StructureE" title="qdk::chemistry::data::Structure"><span class="n"><span class="pre">Structure</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">structure</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">ecp_name</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">(</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data8BasisSet16default_ecp_nameE" title="qdk::chemistry::data::BasisSet::default_ecp_name"><span class="n"><span class="pre">default_ecp_name</span></span></a><span class="p"><span class="pre">)</span></span>, <a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOTypeE" title="qdk::chemistry::data::AOType"><span class="n"><span class="pre">AOType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">atomic_orbital_type</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOTypeE" title="qdk::chemistry::data::AOType"><span class="n"><span class="pre">AOType</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOType9SphericalE" title="qdk::chemistry::data::AOType::Spherical"><span class="n"><span class="pre">Spherical</span></span></a><span class="sig-paren">)</span><br /></dt>
+<dd><p>Constructor with basis set name and structure. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>basis_name</strong> – Name of the basis set (e.g., “6-31G”, “cc-pVDZ”) </p></li>
+<li><p><strong>structure</strong> – Shared pointer to the molecular structure </p></li>
+<li><p><strong>ecp_name</strong> – Name of the ECP (default: “default_ecp”) </p></li>
+<li><p><strong>atomic_orbital_type</strong> – Whether to use spherical or cartesian atomic orbitals </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Shared pointer to the created <a class="reference internal" href="#classqdk_1_1chemistry_1_1data_1_1BasisSet"><span class="std std-ref">BasisSet</span></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data8BasisSet16from_element_mapERKNSt3mapINSt6stringENSt6stringEEERK9StructureRKNSt3mapINSt6stringENSt6stringEEE6AOType">
+<span id="_CPPv3N3qdk9chemistry4data8BasisSet16from_element_mapERKNSt3mapINSt6stringENSt6stringEEERK9StructureRKNSt3mapINSt6stringENSt6stringEEE6AOType"></span><span id="_CPPv2N3qdk9chemistry4data8BasisSet16from_element_mapERKNSt3mapINSt6stringENSt6stringEEERK9StructureRKNSt3mapINSt6stringENSt6stringEEE6AOType"></span><span id="qdk::chemistry::data::BasisSet::from_element_map__std::map:ss.ss:CR.StructureCR.std::map:ss.ss:CR.AOType"></span><span class="target" id="classqdk_1_1chemistry_1_1data_1_1BasisSet_1a933a9157b2c7408378d2bc40107a107c"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shared_ptr</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data8BasisSetE" title="qdk::chemistry::data::BasisSet"><span class="n"><span class="pre">BasisSet</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">from_element_map</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">map</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">element_to_basis_map</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data9StructureE" title="qdk::chemistry::data::Structure"><span class="n"><span class="pre">Structure</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">structure</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">map</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">element_to_ecp_map</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><span class="p"><span class="pre">}</span></span>, <a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOTypeE" title="qdk::chemistry::data::AOType"><span class="n"><span class="pre">AOType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">atomic_orbital_type</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOTypeE" title="qdk::chemistry::data::AOType"><span class="n"><span class="pre">AOType</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOType9SphericalE" title="qdk::chemistry::data::AOType::Spherical"><span class="n"><span class="pre">Spherical</span></span></a><span class="sig-paren">)</span><br /></dt>
+<dd><p>Constructor with basis set name and structure. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>element_to_basis_map</strong> – Mapping from element symbols to basis set names </p></li>
+<li><p><strong>structure</strong> – The molecular structure </p></li>
+<li><p><strong>element_to_ecp_map</strong> – Mapping from element symbols to ECP names </p></li>
+<li><p><strong>atomic_orbital_type</strong> – Whether to use spherical or cartesian atomic orbitals </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Shared pointer to the created <a class="reference internal" href="#classqdk_1_1chemistry_1_1data_1_1BasisSet"><span class="std std-ref">BasisSet</span></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data8BasisSet16from_element_mapERKNSt3mapINSt6stringENSt6stringEEENSt10shared_ptrI9StructureEERKNSt3mapINSt6stringENSt6stringEEE6AOType">
+<span id="_CPPv3N3qdk9chemistry4data8BasisSet16from_element_mapERKNSt3mapINSt6stringENSt6stringEEENSt10shared_ptrI9StructureEERKNSt3mapINSt6stringENSt6stringEEE6AOType"></span><span id="_CPPv2N3qdk9chemistry4data8BasisSet16from_element_mapERKNSt3mapINSt6stringENSt6stringEEENSt10shared_ptrI9StructureEERKNSt3mapINSt6stringENSt6stringEEE6AOType"></span><span id="qdk::chemistry::data::BasisSet::from_element_map__std::map:ss.ss:CR.std::shared_ptr:Structure:.std::map:ss.ss:CR.AOType"></span><span class="target" id="classqdk_1_1chemistry_1_1data_1_1BasisSet_1a75a3577656bf84ad538ebf989d787077"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shared_ptr</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data8BasisSetE" title="qdk::chemistry::data::BasisSet"><span class="n"><span class="pre">BasisSet</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">from_element_map</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">map</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">element_to_basis_map</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shared_ptr</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data9StructureE" title="qdk::chemistry::data::Structure"><span class="n"><span class="pre">Structure</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">structure</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">map</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">element_to_ecp_map</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><span class="p"><span class="pre">}</span></span>, <a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOTypeE" title="qdk::chemistry::data::AOType"><span class="n"><span class="pre">AOType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">atomic_orbital_type</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOTypeE" title="qdk::chemistry::data::AOType"><span class="n"><span class="pre">AOType</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOType9SphericalE" title="qdk::chemistry::data::AOType::Spherical"><span class="n"><span class="pre">Spherical</span></span></a><span class="sig-paren">)</span><br /></dt>
+<dd><p>Constructor with basis set name and structure. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>element_to_basis_map</strong> – Mapping from element symbols to basis set names </p></li>
+<li><p><strong>structure</strong> – Shared pointer to the molecular structure </p></li>
+<li><p><strong>element_to_ecp_map</strong> – Mapping from element symbols to ECP names </p></li>
+<li><p><strong>atomic_orbital_type</strong> – Whether to use spherical or cartesian atomic orbitals </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Shared pointer to the created <a class="reference internal" href="#classqdk_1_1chemistry_1_1data_1_1BasisSet"><span class="std std-ref">BasisSet</span></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data8BasisSet9from_fileERKNSt6stringERKNSt6stringE">
 <span id="_CPPv3N3qdk9chemistry4data8BasisSet9from_fileERKNSt6stringERKNSt6stringE"></span><span id="_CPPv2N3qdk9chemistry4data8BasisSet9from_fileERKNSt6stringERKNSt6stringE"></span><span id="qdk::chemistry::data::BasisSet::from_file__ssCR.ssCR"></span><span class="target" id="classqdk_1_1chemistry_1_1data_1_1BasisSet_1a258b8d6bf4b8bf83e8634d4dce51c5e5"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shared_ptr</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data8BasisSetE" title="qdk::chemistry::data::BasisSet"><span class="n"><span class="pre">BasisSet</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">from_file</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">filename</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">type</span></span><span class="sig-paren">)</span><br /></dt>
 <dd><p>Generic file I/O - load from file based on type parameter. </p>
@@ -2055,6 +2132,44 @@
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Shared pointer to const <a class="reference internal" href="#classqdk_1_1chemistry_1_1data_1_1BasisSet"><span class="std std-ref">BasisSet</span></a> instance loaded from file </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data8BasisSet14from_index_mapERKNSt3mapI6size_tNSt6stringEEERK9StructureRKNSt3mapI6size_tNSt6stringEEE6AOType">
+<span id="_CPPv3N3qdk9chemistry4data8BasisSet14from_index_mapERKNSt3mapI6size_tNSt6stringEEERK9StructureRKNSt3mapI6size_tNSt6stringEEE6AOType"></span><span id="_CPPv2N3qdk9chemistry4data8BasisSet14from_index_mapERKNSt3mapI6size_tNSt6stringEEERK9StructureRKNSt3mapI6size_tNSt6stringEEE6AOType"></span><span id="qdk::chemistry::data::BasisSet::from_index_map__std::map:s.ss:CR.StructureCR.std::map:s.ss:CR.AOType"></span><span class="target" id="classqdk_1_1chemistry_1_1data_1_1BasisSet_1affc019a9138beda2d34416bfe2554d4f"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shared_ptr</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data8BasisSetE" title="qdk::chemistry::data::BasisSet"><span class="n"><span class="pre">BasisSet</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">from_index_map</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">map</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="../../_cpp_placeholders.html#_CPPv46size_t" title="size_t"><span class="n"><span class="pre">size_t</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">index_to_basis_map</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data9StructureE" title="qdk::chemistry::data::Structure"><span class="n"><span class="pre">Structure</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">structure</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">map</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="../../_cpp_placeholders.html#_CPPv46size_t" title="size_t"><span class="n"><span class="pre">size_t</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">index_to_ecp_map</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><span class="p"><span class="pre">}</span></span>, <a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOTypeE" title="qdk::chemistry::data::AOType"><span class="n"><span class="pre">AOType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">atomic_orbital_type</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOTypeE" title="qdk::chemistry::data::AOType"><span class="n"><span class="pre">AOType</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOType9SphericalE" title="qdk::chemistry::data::AOType::Spherical"><span class="n"><span class="pre">Spherical</span></span></a><span class="sig-paren">)</span><br /></dt>
+<dd><p>Constructor with basis set name and structure. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>index_to_basis_map</strong> – Mapping from atom indices (as strings) to basis set names </p></li>
+<li><p><strong>structure</strong> – The molecular structure </p></li>
+<li><p><strong>index_to_ecp_map</strong> – Mapping from atom indices to ECP names </p></li>
+<li><p><strong>atomic_orbital_type</strong> – Whether to use spherical or cartesian atomic orbitals </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Shared pointer to the created <a class="reference internal" href="#classqdk_1_1chemistry_1_1data_1_1BasisSet"><span class="std std-ref">BasisSet</span></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data8BasisSet14from_index_mapERKNSt3mapI6size_tNSt6stringEEENSt10shared_ptrI9StructureEERKNSt3mapI6size_tNSt6stringEEE6AOType">
+<span id="_CPPv3N3qdk9chemistry4data8BasisSet14from_index_mapERKNSt3mapI6size_tNSt6stringEEENSt10shared_ptrI9StructureEERKNSt3mapI6size_tNSt6stringEEE6AOType"></span><span id="_CPPv2N3qdk9chemistry4data8BasisSet14from_index_mapERKNSt3mapI6size_tNSt6stringEEENSt10shared_ptrI9StructureEERKNSt3mapI6size_tNSt6stringEEE6AOType"></span><span id="qdk::chemistry::data::BasisSet::from_index_map__std::map:s.ss:CR.std::shared_ptr:Structure:.std::map:s.ss:CR.AOType"></span><span class="target" id="classqdk_1_1chemistry_1_1data_1_1BasisSet_1a1fef4415879918fcca5601a7a01fdc8e"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shared_ptr</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data8BasisSetE" title="qdk::chemistry::data::BasisSet"><span class="n"><span class="pre">BasisSet</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">from_index_map</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">map</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="../../_cpp_placeholders.html#_CPPv46size_t" title="size_t"><span class="n"><span class="pre">size_t</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">index_to_basis_map</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shared_ptr</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data9StructureE" title="qdk::chemistry::data::Structure"><span class="n"><span class="pre">Structure</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">structure</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">map</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="../../_cpp_placeholders.html#_CPPv46size_t" title="size_t"><span class="n"><span class="pre">size_t</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">index_to_ecp_map</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><span class="p"><span class="pre">}</span></span>, <a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOTypeE" title="qdk::chemistry::data::AOType"><span class="n"><span class="pre">AOType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">atomic_orbital_type</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOTypeE" title="qdk::chemistry::data::AOType"><span class="n"><span class="pre">AOType</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data6AOType9SphericalE" title="qdk::chemistry::data::AOType::Spherical"><span class="n"><span class="pre">Spherical</span></span></a><span class="sig-paren">)</span><br /></dt>
+<dd><p>Constructor with basis set name and structure. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>index_to_basis_map</strong> – Mapping from atom indices (as strings) to basis set names </p></li>
+<li><p><strong>structure</strong> – Shared pointer to the molecular structure </p></li>
+<li><p><strong>index_to_ecp_map</strong> – Mapping from atom indices to ECP names </p></li>
+<li><p><strong>atomic_orbital_type</strong> – Whether to use spherical or cartesian atomic orbitals </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Shared pointer to the created <a class="reference internal" href="#classqdk_1_1chemistry_1_1data_1_1BasisSet"><span class="std std-ref">BasisSet</span></a></p>
 </dd>
 </dl>
 </dd></dl>
@@ -2130,6 +2245,31 @@
 <dd></dd></dl>
 
 <dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data8BasisSet29get_supported_basis_set_namesEv">
+<span id="_CPPv3N3qdk9chemistry4data8BasisSet29get_supported_basis_set_namesEv"></span><span id="_CPPv2N3qdk9chemistry4data8BasisSet29get_supported_basis_set_namesEv"></span><span id="qdk::chemistry::data::BasisSet::get_supported_basis_set_names"></span><span class="target" id="classqdk_1_1chemistry_1_1data_1_1BasisSet_1a0fc4afef9e83bd73fa1a6a42ba8177c6"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">get_supported_basis_set_names</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Get supported basis set names. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Vector of supported basis set names </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data8BasisSet36get_supported_elements_for_basis_setENSt6stringE">
+<span id="_CPPv3N3qdk9chemistry4data8BasisSet36get_supported_elements_for_basis_setENSt6stringE"></span><span id="_CPPv2N3qdk9chemistry4data8BasisSet36get_supported_elements_for_basis_setENSt6stringE"></span><span id="qdk::chemistry::data::BasisSet::get_supported_elements_for_basis_set__ss"></span><span class="target" id="classqdk_1_1chemistry_1_1data_1_1BasisSet_1a05236a98a70779102757e04ac2081d84"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data7ElementE" title="qdk::chemistry::data::Element"><span class="n"><span class="pre">Element</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">get_supported_elements_for_basis_set</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">basis_name</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Get supported elements for a given basis set. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>basis_name</strong> – Name of the basis set </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Vector of supported elements as enum </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data8BasisSet17l_to_orbital_typeEi">
 <span id="_CPPv3N3qdk9chemistry4data8BasisSet17l_to_orbital_typeEi"></span><span id="_CPPv2N3qdk9chemistry4data8BasisSet17l_to_orbital_typeEi"></span><span id="qdk::chemistry::data::BasisSet::l_to_orbital_type__i"></span><span class="target" id="classqdk_1_1chemistry_1_1data_1_1BasisSet_1a63173e56b9e5956de3c53b8c64354ca4"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data11OrbitalTypeE" title="qdk::chemistry::data::OrbitalType"><span class="n"><span class="pre">OrbitalType</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">l_to_orbital_type</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">l</span></span><span class="sig-paren">)</span><br /></dt>
 <dd><p>Convert an integer orbital angular momentum quantum number to orbital type. </p>
@@ -2192,6 +2332,27 @@
 <dd class="field-odd"><p>Orbital type enumeration </p>
 </dd>
 </dl>
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-static-attributes">Public Static Attributes</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data8BasisSet15custom_ecp_nameE">
+<span id="_CPPv3N3qdk9chemistry4data8BasisSet15custom_ecp_nameE"></span><span id="_CPPv2N3qdk9chemistry4data8BasisSet15custom_ecp_nameE"></span><span id="qdk::chemistry::data::BasisSet::custom_ecp_name__std::string_view"></span><span class="target" id="classqdk_1_1chemistry_1_1data_1_1BasisSet_1a55d1a163aa43909a08a2a84ef473dd2c"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string_view</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">custom_ecp_name</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="s"><span class="pre">&quot;custom_ecp&quot;</span></span><br /></dt>
+<dd><p>Name for custom ecps. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data8BasisSet11custom_nameE">
+<span id="_CPPv3N3qdk9chemistry4data8BasisSet11custom_nameE"></span><span id="_CPPv2N3qdk9chemistry4data8BasisSet11custom_nameE"></span><span id="qdk::chemistry::data::BasisSet::custom_name__std::string_view"></span><span class="target" id="classqdk_1_1chemistry_1_1data_1_1BasisSet_1a60a034eecf777e4d80cfaa94a585ff95"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string_view</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">custom_name</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="s"><span class="pre">&quot;custom_basis_set&quot;</span></span><br /></dt>
+<dd><p>Name for custom basis sets. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data8BasisSet16default_ecp_nameE">
+<span id="_CPPv3N3qdk9chemistry4data8BasisSet16default_ecp_nameE"></span><span id="_CPPv2N3qdk9chemistry4data8BasisSet16default_ecp_nameE"></span><span id="qdk::chemistry::data::BasisSet::default_ecp_name__std::string_view"></span><span class="target" id="classqdk_1_1chemistry_1_1data_1_1BasisSet_1a191b88860150dc69b661752c2c54f0e3"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string_view</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">default_ecp_name</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="s"><span class="pre">&quot;default_ecp&quot;</span></span><br /></dt>
+<dd><p>Default name for default ecp. </p>
 </dd></dl>
 
 </div>
@@ -2721,6 +2882,29 @@ This constraint type defines inclusive bounds [min, max] for numeric settings. B
 </dd></dl>
 
 <dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK3qdk9chemistry4data13Configuration17to_binary_stringsE6size_t">
+<span id="_CPPv3NK3qdk9chemistry4data13Configuration17to_binary_stringsE6size_t"></span><span id="_CPPv2NK3qdk9chemistry4data13Configuration17to_binary_stringsE6size_t"></span><span id="qdk::chemistry::data::Configuration::to_binary_strings__sC"></span><span class="target" id="classqdk_1_1chemistry_1_1data_1_1Configuration_1ad51c055f8a239f2812acb49417d46038"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">pair</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">to_binary_strings</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="../../_cpp_placeholders.html#_CPPv46size_t" title="size_t"><span class="n"><span class="pre">size_t</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">num_orbitals</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><br /></dt>
+<dd><p>Convert configuration to separate alpha and beta binary strings in little-endian format. </p>
+<p>
+Converts the compact representation to two binary strings:<ul class="simple">
+<li><p>Alpha string: ‘1’ if orbital has alpha or doubly occupied</p></li>
+<li><p>Beta string: ‘1’ if orbital has beta or doubly occupied Example: “2du0” -&gt; (“1010”, “1100”) </p></li>
+</ul>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Throws<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">runtime_error</span></span></span> – If num_orbitals exceeds configuration capacity </p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>num_orbitals</strong> – How many orbitals to extract (if we want to slice for active space) </p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Pair of binary strings (alpha, beta) where ‘1’ indicates occupied and ‘0’ indicates unoccupied for each spin channel, in little endian format</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4I_6size_tENK3qdk9chemistry4data13Configuration9to_bitsetENSt6bitsetI1NEEv">
 <span id="_CPPv3I_6size_tENK3qdk9chemistry4data13Configuration9to_bitsetEv"></span><span id="_CPPv2I_6size_tENK3qdk9chemistry4data13Configuration9to_bitsetEv"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="../../_cpp_placeholders.html#_CPPv46size_t" title="size_t"><span class="n"><span class="pre">size_t</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">N</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="classqdk_1_1chemistry_1_1data_1_1Configuration_1a2668407fc28c2b049b3b7bfaa1814d29"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">bitset</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4I_6size_tENK3qdk9chemistry4data13Configuration9to_bitsetENSt6bitsetI1NEEv" title="qdk::chemistry::data::Configuration::to_bitset::N"><span class="n"><span class="pre">N</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">to_bitset</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><br /></dt>
 <dd><p>Convert the configuration to a bitset representation. </p>
@@ -2853,6 +3037,23 @@ Fills orbitals from lowest energy according to the Aufbau principle:<ul class="s
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p><a class="reference internal" href="#classqdk_1_1chemistry_1_1data_1_1Configuration"><span class="std std-ref">Configuration</span></a> representing the HF ground state</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data13Configuration19from_binary_stringsENSt6stringENSt6stringE">
+<span id="_CPPv3N3qdk9chemistry4data13Configuration19from_binary_stringsENSt6stringENSt6stringE"></span><span id="_CPPv2N3qdk9chemistry4data13Configuration19from_binary_stringsENSt6stringENSt6stringE"></span><span id="qdk::chemistry::data::Configuration::from_binary_strings__ss.ss"></span><span class="target" id="classqdk_1_1chemistry_1_1data_1_1Configuration_1a114fe0f0186c9c03da00832198f2db65"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data13ConfigurationE" title="qdk::chemistry::data::Configuration"><span class="n"><span class="pre">Configuration</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">from_binary_strings</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">alpha_string</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">beta_string</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Convert separate alpha and beta binary strings in little-endian format to a <a class="reference internal" href="#classqdk_1_1chemistry_1_1data_1_1Configuration"><span class="std std-ref">Configuration</span></a>. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>alpha_string</strong> – Alpha string where ‘1’ indicates occupied and ‘0’ indicates unoccupied for each spin channel, in little endian format </p></li>
+<li><p><strong>beta_string</strong> – Beta string where ‘1’ indicates occupied and ‘0’ indicates unoccupied for each spin channel, in little endian format </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#classqdk_1_1chemistry_1_1data_1_1Configuration"><span class="std std-ref">Configuration</span></a> object </p>
 </dd>
 </dl>
 </dd></dl>
@@ -9689,8 +9890,15 @@ Converts stored active-space-only determinants to full orbital space by prependi
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data10ciaaw_2024E">
 <span id="_CPPv3N3qdk9chemistry4data10ciaaw_2024E"></span><span id="_CPPv2N3qdk9chemistry4data10ciaaw_2024E"></span><span id="qdk::chemistry::data::ciaaw_2024"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1data_1_1ciaaw__2024"></span><span class="k"><span class="pre">namespace</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ciaaw_2024</span></span></span><br /></dt>
 <dd><p>CIAAW 2024 recommended values for atomic weights. </p>
-<p>Standard atomic weights in AMU (atomic mass units) for all elements 1-118. IUPAC (International Union of Pure and Applied Chemistry) Commission on Isotopic Abundances and Atomic Weights (CIAAW), 2024. T. Prohaska et al., Standard atomic weights of the elements 2021 (IUPAC Technical Report), Pure and Applied Chemistry 2022, 94, 573-600. DOI: 10.1515/pac-2019-0603. Standard atomic masses of gadolinium, lutetium, and zirconium have been revised by IUPAC CIAAW in 2024 and these revisions are included here. For radioactive elements the mass number of the most stable isotope is used. F. G. Kondev et al., The NUBASE2020 evaluation of nuclear physics properties Chinese Physics C 2021, 45, 030001. DOI: 10.1088/1674-1137/abddae.</p>
-<p>Isotope masses in AMU (atomic mass units) for all elements 1-118. IUPAC (International Union of Pure and Applied Chemistry) Commission on Isotopic Abundances and Atomic Weights (CIAAW), 2021. W. J. Huang et al., The AME 2020 atomic mass evaluation (I). Evaluation of input data, and adjustment procedures, Chinese Phys. C 2021, 45, 030002. DOI: 10.1088/1674-1137/abddb0. M. Wang et al., The AME 2020 atomic mass evaluation (II). Tables, graphs and references, Chinese Phys. C 2021, 45, 030003. DOI: 10.1088/1674-1137/abddaf. F. G. Kondev et al., The NUBASE2020 evaluation of nuclear physics properties Chinese Physics C 2021, 45, 030001. DOI: 10.1088/1674-1137/abddae. </p>
+<p>Standard atomic weights in AMU (atomic mass units) for all elements 1-118. IUPAC (International Union of Pure and Applied Chemistry) Commission on Isotopic Abundances and Atomic Weights (CIAAW), 2024.</p>
+<p>T. Prohaska et al., Standard atomic weights of the elements 2021 (IUPAC Technical Report), Pure and Applied Chemistry 2022, 94, 573-600 (DOI: 10.1515/pac-2019-0603). :cite:<code class="docutils literal notranslate"><span class="pre">Prohaska2022</span></code></p>
+<p>Standard atomic masses of gadolinium, lutetium, and zirconium have been revised by IUPAC CIAAW in 2024 and these revisions are included here.</p>
+<p>For radioactive elements the mass number of the most stable isotope is used as standard atomic weight.</p>
+<p>F. G. Kondev et al., The NUBASE2020 evaluation of nuclear physics properties, Chinese Physics C 2021, 45, 030001 (DOI: 10.1088/1674-1137/abddae). :cite:<code class="docutils literal notranslate"><span class="pre">Kondev2021</span></code></p>
+<p>Isotope masses in AMU (atomic mass units) for all elements 1-118. IUPAC (International Union of Pure and Applied Chemistry) Commission on Isotopic Abundances and Atomic Weights (CIAAW), 2021.</p>
+<p>W. J. Huang et al., The AME 2020 atomic mass evaluation (I). Evaluation of input data, and adjustment procedures, Chinese Physics C 2021, 45, 030002 (DOI: 10.1088/1674-1137/abddb0). :cite:<code class="docutils literal notranslate"><span class="pre">Huang2021</span></code></p>
+<p>M. Wang et al., The AME 2020 atomic mass evaluation (II). Tables, graphs and references, Chinese Physics C 2021, 45, 030003 (DOI: 10.1088/1674-1137/abddaf). :cite:<code class="docutils literal notranslate"><span class="pre">Wang2021</span></code></p>
+<p>F. G. Kondev et al., The NUBASE2020 evaluation of nuclear physics properties, Chinese Physics C 2021, 45, 030001 (DOI: 10.1088/1674-1137/abddae). :cite:<code class="docutils literal notranslate"><span class="pre">Kondev2021</span></code></p>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-functions">Functions</p>
 <dl class="cpp function">
@@ -9836,6 +10044,26 @@ For isotopes, put the atomic mass number in the unsigned’s bit representation.
 </dd></dl>
 
 <dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data6detail26denormalize_basis_set_nameERKNSt6stringE">
+<span id="_CPPv3N3qdk9chemistry4data6detail26denormalize_basis_set_nameERKNSt6stringE"></span><span id="_CPPv2N3qdk9chemistry4data6detail26denormalize_basis_set_nameERKNSt6stringE"></span><span id="qdk::chemistry::data::detail::denormalize_basis_set_name__ssCR"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1data_1_1detail_1a8b0a83c2e98ba960c95589cf6ddc52bd"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">denormalize_basis_set_name</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">normalized</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Denormalize basis set name from filesystem representation. </p>
+<p>Reverses the normalization:<ul class="simple">
+<li><p>’<em>st</em>’ -&gt; ‘*’</p></li>
+<li><p>’<em>sl</em>’ -&gt; ‘/’</p></li>
+<li><p>’<em>pl</em>’ -&gt; ‘+’ </p></li>
+</ul>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>normalized</strong> – Normalized name from filesystem </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Original basis set name </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data6detail25is_matrix_variant_complexERKN14ContainerTypes13MatrixVariantE">
 <span id="_CPPv3N3qdk9chemistry4data6detail25is_matrix_variant_complexERKN14ContainerTypes13MatrixVariantE"></span><span id="_CPPv2N3qdk9chemistry4data6detail25is_matrix_variant_complexERKN14ContainerTypes13MatrixVariantE"></span><span id="qdk::chemistry::data::detail::is_matrix_variant_complex__ContainerTypes::MatrixVariantCR"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1data_1_1detail_1a50bd4ef6e709f1ab954499a9c90136a1"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">is_matrix_variant_complex</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data14ContainerTypesE" title="qdk::chemistry::data::ContainerTypes"><span class="n"><span class="pre">ContainerTypes</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data14ContainerTypes13MatrixVariantE" title="qdk::chemistry::data::ContainerTypes::MatrixVariant"><span class="n"><span class="pre">MatrixVariant</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">variant</span></span><span class="sig-paren">)</span><br /></dt>
 <dd><p>Check if a <a class="reference internal" href="namespaceqdk_1_1chemistry_1_1data_1_1ContainerTypes.html#namespaceqdk_1_1chemistry_1_1data_1_1ContainerTypes_1a5a6e0c9667c9142cd9ed9192e41a4b85"><span class="std std-ref">ContainerTypes::MatrixVariant</span></a> contains complex type. </p>
@@ -9893,6 +10121,26 @@ For isotopes, put the atomic mass number in the unsigned’s bit representation.
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>Shared pointer to new <a class="reference internal" href="namespaceqdk_1_1chemistry_1_1data_1_1ContainerTypes.html#namespaceqdk_1_1chemistry_1_1data_1_1ContainerTypes_1ae0a916b96daf243a607e0f54df2b81c0"><span class="std std-ref">ContainerTypes::VectorVariant</span></a> containing the result </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data6detail24normalize_basis_set_nameERKNSt6stringE">
+<span id="_CPPv3N3qdk9chemistry4data6detail24normalize_basis_set_nameERKNSt6stringE"></span><span id="_CPPv2N3qdk9chemistry4data6detail24normalize_basis_set_nameERKNSt6stringE"></span><span id="qdk::chemistry::data::detail::normalize_basis_set_name__ssCR"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1data_1_1detail_1a1ace4909ac9bedc31362fd8ea3f0b3f1"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">normalize_basis_set_name</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">name</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Normalize basis set name for filesystem usage. </p>
+<p>Replaces special characters that are problematic in filenames:<ul class="simple">
+<li><p>’*’ -&gt; ‘<em>st</em>’ (star)</p></li>
+<li><p>’/’ -&gt; ‘<em>sl</em>’ (slash)</p></li>
+<li><p>’+’ -&gt; ‘<em>pl</em>’ (plus) </p></li>
+</ul>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> – Original basis set name (e.g., “6-31g*+”) </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Normalized name safe for filesystem (e.g., “6-31g_st__pl_”) </p>
 </dd>
 </dl>
 </dd></dl>

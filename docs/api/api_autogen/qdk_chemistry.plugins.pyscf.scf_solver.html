@@ -52,6 +52,7 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
@@ -130,7 +131,7 @@ SCF solver registry under the name “pyscf”.</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.scf_solver</span><span class="w"> </span><span class="kn">import</span> <span class="n">PyscfScfSolver</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">solver</span> <span class="o">=</span> <span class="n">PyscfScfSolver</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;b3lyp&quot;</span>  <span class="c1"># Use B3LYP DFT</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">energy</span><span class="p">,</span> <span class="n">orbitals</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">molecule</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">energy</span><span class="p">,</span> <span class="n">orbitals</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">molecule</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>This module requires both QDK/Chemistry and PySCF to be installed. The solver supports both
@@ -143,30 +144,23 @@ restricted and unrestricted variants for both HF and DFT calculations.</p>
 <p>This class manages the configuration parameters for the PySCF Self-Consistent
 Field (SCF) solver, inheriting common electronic structure defaults from
 ElectronicStructureSettings and adding PySCF-specific customizations.</p>
-<p>Inherits from ElectronicStructureSettings:</p>
-<ul class="simple">
-<li><p>method (str, default=”hf”): The electronic structure method (Hartree-Fock).</p></li>
-<li><p>basis_set (str, default=”def2-svp”): The basis set used for quantum chemistry calculations.
-Common options include “def2-svp”, “def2-tzvp”, “cc-pvdz”, etc.</p></li>
-<li><p>convergence_threshold (float, default=1e-7): Convergence tolerance for orbital gradient norm.</p></li>
-<li><p>max_iterations (int, default=50): Maximum number of iterations.</p></li>
-<li><dl class="simple">
-<dt>scf_type (str, default=”auto”): Type of SCF calculation. Can be:</dt><dd><ul>
-<li><p>“auto”: Automatically detect based on spin (RHF for singlet, UHF for open-shell)</p></li>
-<li><p>“restricted”: Force restricted calculation (RHF/ROHF for HF, RKS/ROKS for DFT)</p></li>
-<li><p>“unrestricted”: Force unrestricted calculation (UHF for HF, UKS for DFT)</p></li>
-</ul>
-</dd>
-</dl>
-</li>
-</ul>
+<p>Inherits from ElectronicStructureSettings:
+- method (str, default=”hf”): The electronic structure method (Hartree-Fock).
+- basis_set (str, default=”def2-svp”): The basis set used for quantum chemistry calculations.
+Common options include “def2-svp”, “def2-tzvp”, “cc-pvdz”, etc.
+- convergence_threshold (float, default=1e-7): Convergence tolerance for orbital gradient norm.
+- max_iterations (int, default=50): Maximum number of iterations.
+- scf_type (str, default=”auto”): Type of SCF calculation. Can be:
+“auto”: Automatically detect based on spin (RHF for singlet, UHF for open-shell)
+“restricted”: Force restricted calculation (RHF/ROHF for HF, RKS/ROKS for DFT)
+“unrestricted”: Force unrestricted calculation (UHF for HF, UKS for DFT)</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span> <span class="o">=</span> <span class="n">PyscfScfSettings</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">)</span>
-<span class="go">&#39;def2-svp&#39;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;cc-pvdz&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">)</span>
-<span class="go">&#39;cc-pvdz&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>
+<span class="go">50</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>
+<span class="go">100</span>
 </pre></div>
 </div>
 <p class="rubric">Notes</p>
@@ -199,9 +193,8 @@ and the scf setting, returning electronic energy (excluding nuclear
 repulsion) along with molecular orbitals information.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">solver</span> <span class="o">=</span> <span class="n">PyscfScfSolver</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()[</span><span class="s2">&quot;basis_set&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;6-31G*&quot;</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;b3lyp&quot;</span>  <span class="c1"># Use B3LYP DFT</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">energy</span><span class="p">,</span> <span class="n">orbitals</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">molecule_structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">energy</span><span class="p">,</span> <span class="n">orbitals</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">molecule_structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;6-31G*&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Electronic energy: </span><span class="si">{</span><span class="n">energy</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
 </pre></div>
 </div>

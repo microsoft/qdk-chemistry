@@ -27,4 +27,3 @@ Submodules
 
    qdk_chemistry.constants
    qdk_chemistry.definitions
-   qdk_chemistry.noise_models

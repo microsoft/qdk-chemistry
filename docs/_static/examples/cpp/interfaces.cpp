@@ -1,16 +1,13 @@
-// Interfaces usage examples.
-
-// --------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
-// --------------------------------------------------------------------------------------------
 
+// Interfaces usage examples.
 // -----------------------------------------------------------------------------
 // start-cell-scf
 #include <qdk/chemistry.hpp>
 
-// Create an SCF solver that uses the QDK/Chemistry library as solver
+// Create a SCF solver that uses the QDK/Chemistry library as solver
 auto scf = ScfSolverFactory::create();
 
 // Configure it using the standard settings interface
@@ -36,6 +33,21 @@ for (const auto& solver : available_solvers) {
 // Get documentation for a specific implementation
 std::cout << ScfSolverFactory::get_docstring("default") << std::endl;
 // end-cell-list-methods
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// start-cell-discover-implementations
+#include <qdk/chemistry/algorithms/scf.hpp>
+
+// List all registered SCF solver implementations
+auto names = qdk::chemistry::algorithms::ScfSolver::available();
+for (const auto& name : names) {
+  std::cout << name << std::endl;
+}
+
+// Create a specific implementation
+auto solver = qdk::chemistry::algorithms::ScfSolver::create("pyscf");
+// end-cell-discover-implementations
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------

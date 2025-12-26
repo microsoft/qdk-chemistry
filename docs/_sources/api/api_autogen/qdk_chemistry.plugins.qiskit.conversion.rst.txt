@@ -1,0 +1,8 @@
+qdk\_chemistry.plugins.qiskit.conversion module
+===============================================
+
+.. automodule:: qdk_chemistry.plugins.qiskit.conversion
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

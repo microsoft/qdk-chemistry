@@ -26,7 +26,7 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Classical Hamiltonian construction" href="hamiltonian_constructor.html" />
+    <link rel="next" title="Hamiltonian construction" href="hamiltonian_constructor.html" />
     <link rel="prev" title="Active space selection" href="active_space.html" /> 
 </head>
 
@@ -52,33 +52,35 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data management</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="index.html">Available algorithms</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Algorithm classes</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
+<li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
 <li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Energy estimation</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#capabilities">Capabilities</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#creating-an-energy-estimator">Creating an energy estimator</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#configuring-the-energy-estimator">Configuring the energy estimator</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#implemented-interface">Implemented interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#using-the-energyestimator">Using the EnergyEstimator</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#available-implementations">Available implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Classical Hamiltonian construction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
-<li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
-<li class="toctree-l3"><a class="reference internal" href="dynamical_correlation.html">Dynamical correlation calculations</a></li>
-<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solving</a></li>
-<li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Self-consistent field stability checks</a></li>
-<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State Preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field (SCF) solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Stability analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#discovering-implementations">Discovering implementations</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
@@ -110,7 +112,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="index.html">Available algorithms</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Algorithm classes</a></li>
       <li class="breadcrumb-item active">Energy estimation</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/algorithms/energy_estimator.rst.txt" rel="nofollow"> View page source</a>
@@ -123,26 +125,53 @@
              
   <section id="energy-estimation">
 <h1>Energy estimation<a class="headerlink" href="#energy-estimation" title="Link to this heading"></a></h1>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator" title="qdk_chemistry.algorithms.EnergyEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a> algorithm in QDK/Chemistry provides a flexible and efficient framework for computing expectation values with quantum circuit and Hamiltonians.
-The estimator evaluates energies by generating measurement circuits, executing them on a backend with a configurable number of shots, and statistically aggregating the resulting bitstring outcomes.
-It is designed to support multiple backend simulators.</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator" title="qdk_chemistry.algorithms.EnergyEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a> algorithm in QDK/Chemistry estimates the energy of a quantum state by measuring expectation values of Pauli operators.
+Following QDK/Chemistry’s <a class="reference internal" href="../design/index.html"><span class="doc">algorithm design principles</span></a>, it takes an OpenQASM circuit (from <a class="reference internal" href="state_preparation.html"><span class="doc">StatePreparation</span></a>) and a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a> (from <a class="reference internal" href="qubit_mapper.html"><span class="doc">QubitMapper</span></a>) as input and returns energy expectation values with statistical uncertainty.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator" title="qdk_chemistry.algorithms.EnergyEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a> evaluates the expectation value of a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a> with respect to a given quantum circuit.
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator" title="qdk_chemistry.algorithms.EnergyEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a> evaluates the expectation value of a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a> with respect to a given quantum circuit that loads a wavefunction onto qubits.
 It takes a Circuit object with target qubit Hamiltonians and automatically generates the corresponding measurement circuits.
 These circuits are executed on a selected backend simulator with the user-specified number of shots, and the resulting bitstring statistics are used to calculate per-term expectation values and the total energy.</p>
-</section>
-<section id="capabilities">
-<h2>Capabilities<a class="headerlink" href="#capabilities" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator" title="qdk_chemistry.algorithms.EnergyEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a> provides the following capabilities:</p>
+<p>The algorithm supports:</p>
 <ul class="simple">
-<li><p><strong>Expectation Value and Variance Calculation</strong>: Computes the energy expectation value and variance for a given quantum circuit and Hamiltonians. It supports multiple Hamiltonians for simultaneous evaluation.</p></li>
-<li><p><strong>Backend Flexibility</strong>: Allows users to choose between Qsharp and Qiskit backends, each with unique features and configurations, such as noise modeling.</p></li>
+<li><p><strong>Multiple simulator backends</strong>: QDK’s native Q# simulator or Qiskit’s Aer simulator</p></li>
+<li><p><strong>Noise modeling</strong>: Depolarizing noise, bit flip noise, Pauli noise, phase flip noise, and qubit loss simulation</p></li>
+<li><p><strong>Grouped measurements</strong>: Efficient measurement of commuting Pauli terms in a single circuit execution</p></li>
+<li><p><strong>Classical coefficient handling</strong>: Pre-computed classical contributions from Hamiltonian filtering</p></li>
 </ul>
+<p>A typical workflow connects <a class="reference internal" href="state_preparation.html"><span class="doc">StatePreparation</span></a> (which loads the wavefunction onto qubits) with EnergyEstimator (which measures the energy):</p>
+<ol class="arabic simple">
+<li><p>Prepare a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> from a multi-configuration calculation</p></li>
+<li><p>Generate an OpenQASM circuit using <a class="reference internal" href="state_preparation.html"><span class="doc">StatePreparation</span></a></p></li>
+<li><p>Map the Hamiltonian to qubit operators using <a class="reference internal" href="qubit_mapper.html"><span class="doc">QubitMapper</span></a></p></li>
+<li><p>Estimate the energy using EnergyEstimator</p></li>
+</ol>
 </section>
-<section id="creating-an-energy-estimator">
-<h2>Creating an energy estimator<a class="headerlink" href="#creating-an-energy-estimator" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator" title="qdk_chemistry.algorithms.EnergyEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a> is created using the <a class="reference internal" href="../design/factory_pattern.html"><span class="doc">factory pattern</span></a>.</p>
+<section id="using-the-energyestimator">
+<h2>Using the EnergyEstimator<a class="headerlink" href="#using-the-energyestimator" title="Link to this heading"></a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This algorithm is currently available only in the Python API.</p>
+</div>
+<p>This section demonstrates how to create, configure, and run an energy estimation.
+The <code class="docutils literal notranslate"><span class="pre">run</span></code> method returns an energy expectation value with variance and the raw measurement data.</p>
+<section id="input-requirements">
+<h3>Input requirements<a class="headerlink" href="#input-requirements" title="Link to this heading"></a></h3>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator" title="qdk_chemistry.algorithms.EnergyEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a> requires the following inputs:</p>
+<dl class="simple">
+<dt><strong>OpenQASM circuit</strong></dt><dd><p>A quantum circuit string in OpenQASM format that prepares the target quantum state. This is typically generated by the <a class="reference internal" href="state_preparation.html"><span class="doc">StatePreparation</span></a> algorithm from a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>.</p>
+</dd>
+<dt><strong>QubitHamiltonian</strong></dt><dd><p>A <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a> instance containing the Pauli-string representation of the electronic Hamiltonian. This is obtained from the <a class="reference internal" href="qubit_mapper.html"><span class="doc">QubitMapper</span></a> algorithm.</p>
+</dd>
+<dt><strong>Number of shots</strong></dt><dd><p>The number of measurement repetitions to perform for statistical sampling.
+More shots reduce statistical uncertainty but increase computational cost.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The circuit and Hamiltonian must be compatible—they should use the same qubit encoding and be derived from the same underlying molecular system. The estimator automatically generates measurement circuits for each Pauli term in the Hamiltonian and performs the circuit sampling internally.</p>
+</div>
+<p><strong>Creating an estimator:</strong></p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
@@ -164,18 +193,10 @@ These circuits are executed on a selected backend simulator with the user-specif
 </div>
 </div>
 </div>
-</section>
-<section id="configuring-the-energy-estimator">
-<h2>Configuring the energy estimator<a class="headerlink" href="#configuring-the-energy-estimator" title="Link to this heading"></a></h2>
-<section id="qsharp-backend">
-<h3>Qsharp backend<a class="headerlink" href="#qsharp-backend" title="Link to this heading"></a></h3>
-<p>The Qsharp implementation of the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator" title="qdk_chemistry.algorithms.EnergyEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a> leverages the QDK simulator to execute quantum circuits. Key features include:</p>
-<ul class="simple">
-<li><p>Support for depolarizing noise, bit flip noise, pauli noise, and phase flip noise.</p></li>
-<li><p>Simulation with qubit loss.</p></li>
-</ul>
+<p><strong>Configuring settings and running:</strong></p>
+<p>Settings vary by implementation. The QDK backend supports noise models and qubit loss, while the Qiskit backend supports custom Aer noise models.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">Python API (QDK Backend)</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define a simple quantum circuit in QASM and a qubit Hamiltonian</span>
 <span class="n">circuit</span> <span class="o">=</span> <span class="n">Circuit</span><span class="p">(</span>
     <span class="n">qasm</span><span class="o">=</span><span class="s2">&quot;&quot;&quot;</span>
@@ -220,17 +241,7 @@ These circuits are executed on a selected backend simulator with the user-specif
 </pre></div>
 </div>
 </div>
-</div>
-</section>
-<section id="qiskit-backend">
-<h3>Qiskit backend<a class="headerlink" href="#qiskit-backend" title="Link to this heading"></a></h3>
-<p>The Qiskit implementation uses the Aer simulator to execute quantum circuits. Key features include:</p>
-<ul class="simple">
-<li><p>Support for custom noise models.</p></li>
-<li><p>Support for other configurations of Aer simulator backends.</p></li>
-</ul>
-<div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API (Qiskit Backend)</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Run energy estimation using Qiskit Aer simulator without noise</span>
 <span class="n">energy_expectation_results</span><span class="p">,</span> <span class="n">measurement_data</span> <span class="o">=</span> <span class="n">qiskit_estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
     <span class="n">circuit</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span>
@@ -261,31 +272,132 @@ These circuits are executed on a selected backend simulator with the user-specif
 </div>
 </section>
 </section>
-<section id="implemented-interface">
-<h2>Implemented interface<a class="headerlink" href="#implemented-interface" title="Link to this heading"></a></h2>
-<p>QDK/Chemistry’s <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator" title="qdk_chemistry.algorithms.EnergyEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a> provides a unified interface for selecting simulator backend for energy estimation.</p>
-<section id="qdk-chemistry-implementations">
-<h3>QDK/Chemistry implementations<a class="headerlink" href="#qdk-chemistry-implementations" title="Link to this heading"></a></h3>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">qdk_base_simulator</span></code>: Native implementation with support for Qsharp simulator backends</p></li>
-</ul>
+<section id="available-implementations">
+<h2>Available implementations<a class="headerlink" href="#available-implementations" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry’s <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator" title="qdk_chemistry.algorithms.EnergyEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a> provides a unified interface for quantum circuit simulation and energy measurement.
+You can discover available implementations programmatically:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>  <span class="c1"># noqa: E402</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;energy_estimator&quot;</span><span class="p">))</span>
+<span class="c1"># [&#39;qdk_base_simulator&#39;, &#39;qiskit_aer_simulator&#39;]</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="qdk-base-simulator">
+<h3>QDK base simulator<a class="headerlink" href="#qdk-base-simulator" title="Link to this heading"></a></h3>
+<p><strong>Factory name:</strong> <code class="docutils literal notranslate"><span class="pre">&quot;qdk_base_simulator&quot;</span></code></p>
+<p>Native QDK/Chemistry implementation using the Q# simulator. Supports various noise models for realistic quantum hardware simulation.</p>
+<p><strong>Constructor parameters:</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">seed</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Random seed for reproducibility. Default is 42.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">noise_model</span></code></p></td>
+<td><p>NoiseModel | None</p></td>
+<td><p>Q# noise model (<code class="docutils literal notranslate"><span class="pre">DepolarizingNoise</span></code>, <code class="docutils literal notranslate"><span class="pre">BitFlipNoise</span></code>, <code class="docutils literal notranslate"><span class="pre">PauliNoise</span></code>, or <code class="docutils literal notranslate"><span class="pre">PhaseFlipNoise</span></code>). Default is None (noiseless).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">qubit_loss</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Probability of qubit loss per operation (0.0 to 1.0). Default is 0.0.</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Run parameters:</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">circuit_qasm</span></code></p></td>
+<td><p>str</p></td>
+<td><p>OpenQASM circuit string (from StatePreparation)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">qubit_hamiltonians</span></code></p></td>
+<td><p>list[QubitHamiltonian]</p></td>
+<td><p>List of qubit Hamiltonians to measure</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">total_shots</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Total number of measurement shots</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">classical_coeffs</span></code></p></td>
+<td><p>list | None</p></td>
+<td><p>Pre-computed classical coefficients from Hamiltonian filtering. Default is None.</p></td>
+</tr>
+</tbody>
+</table>
 </section>
-<section id="third-party-interfaces">
-<h3>Third-party interfaces<a class="headerlink" href="#third-party-interfaces" title="Link to this heading"></a></h3>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">qiskit_aer_simulator</span></code>: Qiskit Aer simulator backend with customizable noise models and configurations</p></li>
-</ul>
-<p>The factory pattern allows seamless selection between these implementations, with the most appropriate option chosen
-based on the calculation requirements and available packages.</p>
-<p>For more details on how QDK/Chemistry interfaces with external packages, see the <a class="reference internal" href="../design/interfaces.html"><span class="doc">Interfaces</span></a> documentation.</p>
+<section id="qiskit-aer-simulator">
+<h3>Qiskit Aer Simulator<a class="headerlink" href="#qiskit-aer-simulator" title="Link to this heading"></a></h3>
+<p><strong>Factory name:</strong> <code class="docutils literal notranslate"><span class="pre">&quot;qiskit_aer_simulator&quot;</span></code></p>
+<p>Energy estimation using Qiskit’s Aer simulator backend. Provides access to Qiskit’s extensive noise modeling capabilities.</p>
+<p><strong>Constructor parameters:</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">backend</span></code></p></td>
+<td><p>BackendV2 | None</p></td>
+<td><p>Qiskit Aer backend instance with optional noise model. Default is None (uses default Aer simulator).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">seed</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Random seed for reproducibility. Default is 42.</p></td>
+</tr>
+</tbody>
+</table>
+<p>For more details on how QDK/Chemistry interfaces with external packages, see the <a class="reference internal" href="../plugins.html#plugin-system"><span class="std std-ref">plugin system</span></a> documentation.</p>
 </section>
+</section>
+<section id="related-classes">
+<h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a>: Input qubit Hamiltonian from QubitMapper</p></li>
+<li><p><a class="reference internal" href="../data/wavefunction.html"><span class="doc">Wavefunction</span></a>: Source wavefunction for state preparation</p></li>
+</ul>
 </section>
 <section id="further-reading">
 <h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p>The above examples can be downloaded as a complete <a class="reference external" href="../../../_static/examples/python/energy_estimator.py">Python</a> script.</p></li>
-<li><p><a class="reference internal" href="state_preparation.html"><span class="doc">StatePreparation</span></a>: Prepare molecule wavefunctions into quantum circuits.</p></li>
-<li><p><a class="reference internal" href="qubit_mapper.html"><span class="doc">QubitMapper</span></a>: Prepare qubit Hamiltonians.</p></li>
+<li><p><a class="reference internal" href="state_preparation.html"><span class="doc">StatePreparation</span></a>: Load wavefunctions onto qubits as quantum circuits</p></li>
+<li><p><a class="reference internal" href="qubit_mapper.html"><span class="doc">QubitMapper</span></a>: Map fermionic Hamiltonians to qubit operators</p></li>
+<li><p>See the <code class="docutils literal notranslate"><span class="pre">examples/state_prep_energy.ipynb</span></code> notebook for an end-to-end workflow demonstration</p></li>
+<li><p><a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
+<li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Understanding algorithm creation</p></li>
 </ul>
 </section>
 </section>
@@ -295,7 +407,7 @@ based on the calculation requirements and available packages.</p>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="active_space.html" class="btn btn-neutral float-left" title="Active space selection" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="hamiltonian_constructor.html" class="btn btn-neutral float-right" title="Classical Hamiltonian construction" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="hamiltonian_constructor.html" class="btn btn-neutral float-right" title="Hamiltonian construction" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

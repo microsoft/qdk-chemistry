@@ -51,6 +51,7 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user/comprehensive/index.html">In-depth user guide</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
@@ -90,18 +91,22 @@
              
   <section id="qdk-chemistry-a-quantum-applications-toolkit">
 <h1>QDK/Chemistry:  A Quantum Applications Toolkit<a class="headerlink" href="#qdk-chemistry-a-quantum-applications-toolkit" title="Link to this heading"></a></h1>
-<section id="welcome-to-qdk-chemistry-documentation">
-<h2>Welcome to QDK/Chemistry Documentation<a class="headerlink" href="#welcome-to-qdk-chemistry-documentation" title="Link to this heading"></a></h2>
-<p><strong>QDK/Chemistry</strong> (Quantum Applications Toolkit) provides a comprehensive set of tools and libraries for quantum chemistry calculations and simulations.
-It features a unified interface for vast community of quantum chemistry packages.</p>
+<section id="welcome-to-qdk-chemistry">
+<h2>Welcome to QDK/Chemistry<a class="headerlink" href="#welcome-to-qdk-chemistry" title="Link to this heading"></a></h2>
+<p><strong>QDK/Chemistry</strong> provides a set of tools and libraries to enable cutting edge quantum chemistry calculations on quantum computers.
+QDK/Chemistry tackles this problem holistically, by recognizing that a significant portion of the quantum applications pipeline heavily relies on the quality, robustness, and efficiency of the classical data preparation and post-processing steps.
+QDK/Chemisty also serves as a platform for innovation, by providing a unified interface to a variety of quantum chemistry methods and packages, allowing researchers to focus on their areas of interest while intergrating with a vast community of existing tools to accelerate development.</p>
 </section>
 <section id="key-features">
 <h2>Key Features<a class="headerlink" href="#key-features" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><strong>Unified Interface</strong> - Consistent API across quantum chemistry methods and packages</p></li>
-<li><p><strong>Molecular Structure Support</strong> - Work with molecular coordinates, electronic structures, and quantum states</p></li>
-<li><p><strong>Advanced Algorithms</strong> - Implementations of state-of-the-art quantum chemistry methods</p></li>
-<li><p><strong>Plugin System</strong> - Extendable architecture for integrating with other quantum chemistry packages</p></li>
+<li><p><strong>A Unified Interface for Modular Quantum Applications Development</strong> - The primary feature of QDK/Chemistry is its modular architecture that allows users to easily swap components in and out of their quantum applications workflows.
+This design promotes code reuse and accelerates development by enabling researchers to focus on their specific areas of interest.</p></li>
+<li><p><strong>Extensible-by-Design</strong> - We recognize that the field of quantum algorithms for chemistry is rapidly evolving, and our goal is to provide a platform that can adapt to these changes.
+Through our plugin system, QDK/Chemistry is built with extensibility in mind, allowing users to easily integrate and modify new quantum chemistry methods, algorithms, and workflows to the framework.</p></li>
+<li><p><strong>Access to State-of-the-Art Algorithms</strong> - QDK/Chemistry provides access to an ever-evolving collection of cutting-edge methods for solving quantum chemistry problems on quantum computers, available through both built-in modules and our extensible plugin system.
+This comprehensive toolkit spans from robust, best-in-class implementations of classical computational chemistry methods that generate essential input data for quantum algorithms, to sophisticated “chemistry-aware” quantum algorithms that leverage symmetries and other chemical properties to optimize calculations for near-term quantum hardware.
+By maintaining this broad spectrum of capabilities, we ensure researchers have the tools they need to push the boundaries of quantum chemistry while remaining practical for current quantum computing limitations.</p></li>
 </ul>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
@@ -112,11 +117,17 @@ It features a unified interface for vast community of quantum chemistry packages
 <li class="toctree-l2"><a class="reference internal" href="user/quickstart.html#additional-examples">Additional examples</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="user/features.html">Features, methods and dependencies</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="user/features.html#supported-methods">Supported Methods</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/features.html#community-open-source-software-dependencies">Community Open Source Software Dependencies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/features.html#see-also">See Also</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="user/comprehensive/index.html">In-depth user guide</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/design/index.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/data/index.html">Data management</a></li>
-<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/algorithms/index.html">Available algorithms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/basis_functionals.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/design/index.html">High-level design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/data/index.html">Data classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/algorithms/index.html">Algorithm classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/basis_functionals.html">Available functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user/comprehensive/model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user/comprehensive/plugins.html">Plugins</a></li>
 </ul>

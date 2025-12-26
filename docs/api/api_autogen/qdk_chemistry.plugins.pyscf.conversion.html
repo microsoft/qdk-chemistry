@@ -1,0 +1,355 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.plugins.pyscf.conversion module &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="qdk_chemistry.plugins.pyscf.coupled_cluster module" href="qdk_chemistry.plugins.pyscf.coupled_cluster.html" />
+    <link rel="prev" title="qdk_chemistry.plugins.pyscf.active_space_avas module" href="qdk_chemistry.plugins.pyscf.active_space_avas.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#plugins">Plugins</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.plugins.html">qdk_chemistry.plugins package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#purpose-and-benefits">Purpose and Benefits</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#available-plugins">Available Plugins</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#using-plugins">Using Plugins</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.plugins.html#subpackages">Subpackages</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#utilities">Utilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#constants">Constants</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../python_api.html">Python API</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.plugins.html">qdk_chemistry.plugins package</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.plugins.pyscf.html">qdk_chemistry.plugins.pyscf package</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.plugins.pyscf.conversion module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api/api_autogen/qdk_chemistry.plugins.pyscf.conversion.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-qdk_chemistry.plugins.pyscf.conversion">
+<span id="qdk-chemistry-plugins-pyscf-conversion-module"></span><h1>qdk_chemistry.plugins.pyscf.conversion module<a class="headerlink" href="#module-qdk_chemistry.plugins.pyscf.conversion" title="Link to this heading"></a></h1>
+<p>Utilities for converting between QDK/Chemistry and PySCF data structures.</p>
+<p>This module provides conversion functions to bridge between QDK/Chemistry and PySCF data structures.
+It enables integration between the two quantum chemistry libraries by handling the conversion of molecular structures,
+basis sets, and Hamiltonians.</p>
+<p>The main functionality includes:</p>
+<ul class="simple">
+<li><p>Converting QDK/Chemistry Structure objects to PySCF atom format.</p></li>
+<li><p>Converting QDK/Chemistry BasisSet objects to PySCF Mole objects.</p></li>
+<li><p>Converting PySCF Mole objects back to QDK/Chemistry BasisSet objects.</p></li>
+<li><p>Converting QDK/Chemistry Hamiltonian objects to PySCF SCF objects.</p></li>
+</ul>
+<p>These utilities are essential for workflows that need to leverage both QDK/Chemistry’s data management capabilities and
+PySCF’s quantum chemistry calculations.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Currently supports spherical atomic orbitals only. Cartesian basis set support is planned for future versions,
+and the helper routines assume atomic numbers do not exceed 200.</p>
+</div>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">structure_to_pyscf_atom_labels</span><span class="p">,</span> <span class="n">basis_to_pyscf_mol</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Convert structure to PySCF format</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">atoms</span><span class="p">,</span> <span class="n">pyscf_symbols</span><span class="p">,</span> <span class="n">elements</span> <span class="o">=</span> <span class="n">structure_to_pyscf_atom_labels</span><span class="p">(</span><span class="n">structure</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Convert basis set to PySCF Mole object</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pyscf_mol</span> <span class="o">=</span> <span class="n">basis_to_pyscf_mol</span><span class="p">(</span><span class="n">basis_set</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.conversion.basis_to_pyscf_mol">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.pyscf.conversion.</span></span><span class="sig-name descname"><span class="pre">basis_to_pyscf_mol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">basis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">charge</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">multiplicity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/pyscf/conversion.html#basis_to_pyscf_mol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.conversion.basis_to_pyscf_mol" title="Link to this definition"></a></dt>
+<dd><p>Convert QDK/Chemistry BasisSet instance to PySCF Mole object.</p>
+<p>This function extracts the structure and basis information from the QDK/Chemistry
+BasisSet instance and uses it to initialize a PySCF Mole object. If the BasisSet
+contains ECP shells, they are converted to PySCF’s ECP format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Mole</span></code></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>basis</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><em>BasisSet</em></a>) – QDK/Chemistry BasisSet instance with populated basis set.</p></li>
+<li><p><strong>charge</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Total charge of the molecule (default: 0).</p></li>
+<li><p><strong>multiplicity</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Spin multiplicity (2S + 1) of the molecule (default: 1).</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>PySCF Mole object initialized with the QDK/Chemistry basis set data,
+including ECP shells if present.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When ECP shells are present, the function reconstructs the full PySCF ECP
+structure from QDK’s ECP shells with radial powers, preserving all
+exponents, coefficients, and r^n terms for each angular momentum channel.</p>
+</div>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">pyscf_mol</span> <span class="o">=</span> <span class="n">basis_to_pyscf_mol</span><span class="p">(</span><span class="n">basis</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">atom</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.conversion.hamiltonian_to_scf">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.pyscf.conversion.</span></span><span class="sig-name descname"><span class="pre">hamiltonian_to_scf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha_occ</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beta_occ</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/pyscf/conversion.html#hamiltonian_to_scf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.conversion.hamiltonian_to_scf" title="Link to this definition"></a></dt>
+<dd><p>Convert QDK/Chemistry Hamiltonian to PySCF SCF object.</p>
+<p>This function creates a PySCF SCF object from a QDK/Chemistry Hamiltonian object, making it possible to use
+QDK/Chemistry Hamiltonian data with PySCF’s post-HF methods such as Coupled Cluster. It extracts one- and two-body
+integrals, core energy, and electron counts from the Hamiltonian and configures them in a PySCF SCF object without
+performing an actual SCF calculation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">RHF</span></code></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>hamiltonian</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><em>Hamiltonian</em></a>) – <p>QDK/Chemistry Hamiltonian object.</p>
+<p>Contains the electronic structure information including one- and two-body integrals,
+core energy, and orbital data.</p>
+</p></li>
+<li><p><strong>alpha_occ</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.4)"><em>ndarray</em></a>) – Occupation numbers for alpha (spin-up) electrons.</p></li>
+<li><p><strong>beta_occ</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.4)"><em>ndarray</em></a>) – Occupation numbers for beta (spin-down) electrons.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>PySCF RHF object initialized with the Hamiltonian data, ready for post-HF calculations. This is a “fake” SCF
+object that provides the necessary interfaces for post-HF methods without having performed an SCF calculation.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If the Hamiltonian uses unsupported features like model Hamiltonian with unrestricted orbitals,
+    open-shell systems, or active spaces.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>This function is intended for (restricted) model hamiltonian usage, since the orbitals are not used directly.</p></li>
+<li><p>If a non-model Hamiltonian is passed, this function automatically re-routes to orbitals_to_scf.</p></li>
+<li><p>Active spaces are not supported.</p></li>
+<li><p>The function creates a “fake” SCF object with the necessary interfaces for post-HF methods without actually
+performing an SCF calculation.</p></li>
+<li><p>The returned SCF object contains dummy molecular orbitals and occupations suitable for post-HF method
+initialization.</p></li>
+<li><p>For an interface using n_electrons and multiplicity, see
+<code class="docutils literal notranslate"><span class="pre">hamiltonian_to_scf_from_n_electrons_and_multiplicity</span></code>.</p></li>
+</ul>
+</div>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">hamiltonian_to_scf</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Convert a QDK/Chemistry Hamiltonian to a PySCF SCF object</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Example for 10-electron system with 5 doubly occupied orbitals</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">norb</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_occ</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">norb</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">beta_occ</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">norb</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_occ</span><span class="p">[:</span><span class="mi">5</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>  <span class="c1"># 5 alpha electrons</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">beta_occ</span><span class="p">[:</span><span class="mi">5</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>   <span class="c1"># 5 beta electrons</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pyscf_scf</span> <span class="o">=</span> <span class="n">hamiltonian_to_scf</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">alpha_occ</span><span class="p">,</span> <span class="n">beta_occ</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Use with PySCF post-HF methods</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pyscf</span><span class="w"> </span><span class="kn">import</span> <span class="n">cc</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cc_calc</span> <span class="o">=</span> <span class="n">cc</span><span class="o">.</span><span class="n">CCSD</span><span class="p">(</span><span class="n">pyscf_scf</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cc_calc</span><span class="o">.</span><span class="n">kernel</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.conversion.pyscf_mol_to_qdk_basis">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.pyscf.conversion.</span></span><span class="sig-name descname"><span class="pre">pyscf_mol_to_qdk_basis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pyscf_mol</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">structure</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">basis_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/pyscf/conversion.html#pyscf_mol_to_qdk_basis"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.conversion.pyscf_mol_to_qdk_basis" title="Link to this definition"></a></dt>
+<dd><p>Convert PySCF Mole object to QDK/Chemistry BasisSet instance.</p>
+<p>This function extracts the basis set information from a PySCF Mole object
+and returns a corresponding QDK/Chemistry BasisSet instance. Both regular
+basis shells and ECP (Effective Core Potential) shells are extracted and
+converted.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>pyscf_mol</strong> (<em>Mole</em>) – PySCF Mole object with basis set data.</p></li>
+<li><p><strong>structure</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><em>Structure</em></a>) – QDK/Chemistry Structure instance that defines the atomic positions and types.</p></li>
+<li><p><strong>basis_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>) – <p>Name for the basis set.</p>
+<p>If None, attempts to derive from the PySCF molecule’s basis set or defaults to “pyscf_basis”.</p>
+</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>QDK/Chemistry BasisSet instance initialized with the PySCF basis set data,
+including both regular shells and ECP shells.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>ECP shells are extracted with their radial powers (r^n terms) preserved.
+Each combination of (atom, angular momentum, radial power) with non-empty
+primitives creates a separate ECP shell.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.conversion.structure_to_pyscf_atom_labels">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.pyscf.conversion.</span></span><span class="sig-name descname"><span class="pre">structure_to_pyscf_atom_labels</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">structure</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/pyscf/conversion.html#structure_to_pyscf_atom_labels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.conversion.structure_to_pyscf_atom_labels" title="Link to this definition"></a></dt>
+<dd><p>Convert QDK/Chemistry Structure to PySCF atom labels format.</p>
+<p>This function transforms a QDK/Chemistry Structure object into the format (a tuple) required by PySCF
+for molecular calculations. It extracts atomic information and formats it with unique labels
+for each atom.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>structure</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><em>Structure</em></a>) – QDK/Chemistry Structure object containing molecular geometry and atomic information.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><p>A tuple containing three lists:</p>
+<ul class="simple">
+<li><p>atoms: List of atom strings in PySCF format, where each string contains
+the atom label and its Cartesian coordinates (x, y, z) in Angstroms.
+Format: <code class="docutils literal notranslate"><span class="pre">Symbol&lt;count&gt;</span> <span class="pre">x</span> <span class="pre">y</span> <span class="pre">z</span></code> (e.g., <code class="docutils literal notranslate"><span class="pre">H1</span> <span class="pre">0.000000000000</span> <span class="pre">0.000000000000</span> <span class="pre">0.000000000000</span></code>).</p></li>
+<li><p>pyscf_symbols: List of unique atom labels used in PySCF, where each atom of the same
+element is numbered sequentially (e.g., <code class="docutils literal notranslate"><span class="pre">[&quot;H1&quot;,</span> <span class="pre">&quot;H2&quot;,</span> <span class="pre">&quot;O1&quot;]</span></code>).</p></li>
+<li><p>elements: List of atomic symbols without numbering, preserving the original
+element symbols from the structure (e.g., <code class="docutils literal notranslate"><span class="pre">[&quot;H&quot;,</span> <span class="pre">&quot;H&quot;,</span> <span class="pre">&quot;O&quot;]</span></code>).</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>], <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>], <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]]</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>Coordinates are formatted with 12 decimal places for precision.</p></li>
+<li><p>Each atom of the same element receives a unique numerical suffix starting from 1.</p></li>
+<li><p>The function assumes atomic numbers do not exceed 200.</p></li>
+</ul>
+</div>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>  <span class="c1"># Create or load a structure (coords in Bohr)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">atoms</span><span class="p">,</span> <span class="n">pyscf_symbols</span><span class="p">,</span> <span class="n">elements</span> <span class="o">=</span> <span class="n">structure_to_pyscf_atom_labels</span><span class="p">(</span><span class="n">structure</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">atoms</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="go">&#39;H1 0.000000000000 0.757000000000 0.587000000000&#39;</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qdk_chemistry.plugins.pyscf.active_space_avas.html" class="btn btn-neutral float-left" title="qdk_chemistry.plugins.pyscf.active_space_avas module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.plugins.pyscf.coupled_cluster.html" class="btn btn-neutral float-right" title="qdk_chemistry.plugins.pyscf.coupled_cluster module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

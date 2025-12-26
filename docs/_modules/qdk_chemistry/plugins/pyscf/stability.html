@@ -49,6 +49,7 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
@@ -119,7 +120,7 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">StabilityChecker</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">StabilityResult</span><span class="p">,</span> <span class="n">Wavefunction</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">orbitals_to_scf</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">orbitals_to_scf</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;PyscfStabilityChecker&quot;</span><span class="p">,</span> <span class="s2">&quot;PyscfStabilitySettings&quot;</span><span class="p">]</span>
@@ -383,10 +384,10 @@
         <span class="n">mf</span> <span class="o">=</span> <span class="n">orbitals_to_scf</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span> <span class="n">occ_alpha</span><span class="p">,</span> <span class="n">occ_beta</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">)</span>
 
         <span class="c1"># Determine wavefunction type and perform appropriate stability analysis</span>
-        <span class="n">internal_eigenvalues_list</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">internal_eigenvectors_list</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">external_eigenvalues_list</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">external_eigenvectors_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">internal_eigenvalues_list</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">internal_eigenvectors_list</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">external_eigenvalues_list</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">external_eigenvectors_list</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[]</span>
 
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">scf</span><span class="o">.</span><span class="n">rohf</span><span class="o">.</span><span class="n">ROHF</span><span class="p">):</span>
             <span class="c1"># ROHF stability analysis</span>

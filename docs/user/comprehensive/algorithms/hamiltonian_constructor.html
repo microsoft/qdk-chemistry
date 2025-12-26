@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Classical Hamiltonian construction &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>Hamiltonian construction &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -52,34 +52,35 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data management</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="index.html">Available algorithms</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Algorithm classes</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
+<li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
 <li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
 <li class="toctree-l3"><a class="reference internal" href="energy_estimator.html">Energy estimation</a></li>
-<li class="toctree-l3 current"><a class="current reference internal" href="#">Classical Hamiltonian construction</a><ul>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Hamiltonian construction</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#capabilities">Capabilities</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#creating-a-hamiltonianconstructor">Creating a HamiltonianConstructor</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#configuring-the-hamiltonian-construction">Configuring the Hamiltonian construction</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#constructing-the-hamiltonian">Constructing the Hamiltonian</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#available-settings">Available settings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#using-the-hamiltonianconstructor">Using the HamiltonianConstructor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#available-implementations">Available implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
-<li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
-<li class="toctree-l3"><a class="reference internal" href="dynamical_correlation.html">Dynamical correlation calculations</a></li>
-<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solving</a></li>
-<li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Self-consistent field stability checks</a></li>
-<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State Preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field (SCF) solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Stability analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#discovering-implementations">Discovering implementations</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
@@ -111,8 +112,8 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="index.html">Available algorithms</a></li>
-      <li class="breadcrumb-item active">Classical Hamiltonian construction</li>
+          <li class="breadcrumb-item"><a href="index.html">Algorithm classes</a></li>
+      <li class="breadcrumb-item active">Hamiltonian construction</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/algorithms/hamiltonian_constructor.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -122,34 +123,32 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="classical-hamiltonian-construction">
-<h1>Classical Hamiltonian construction<a class="headerlink" href="#classical-hamiltonian-construction" title="Link to this heading"></a></h1>
-<p>The <code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code> algorithm in QDK/Chemistry is responsible for constructing the electronic Hamiltonian, which is essential for quantum chemistry calculations.
+  <section id="hamiltonian-construction">
+<h1>Hamiltonian construction<a class="headerlink" href="#hamiltonian-construction" title="Link to this heading"></a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code> algorithm in QDK/Chemistry constructs electronic Hamiltonians for quantum chemistry calculations.
+Following QDK/Chemistry’s <a class="reference internal" href="../design/index.html"><span class="doc">algorithm design principles</span></a>, it takes an <a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a> instance as input and produces a <a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> instance as output.
 It generates the one- and two-electron integrals that define the energy operator for the electronic structure.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>The electronic Hamiltonian describes the energy of a system of electrons in the field of atomic nuclei.
 It consists of kinetic energy terms, electron-nucleus attraction terms, and electron-electron repulsion terms.
 The <code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code> algorithm computes the matrix elements of this operator in a given orbital basis, which can be the full orbital space or an active subspace.</p>
-<p>The sole purpose of the <code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code> class is to transform a set of molecular orbitals into a Hamiltonian representation that can be used for subsequent quantum chemistry calculations.
-It acts as a bridge between the orbital representation of a molecular system and its Hamiltonian operator formulation.</p>
 </section>
-<section id="capabilities">
-<h2>Capabilities<a class="headerlink" href="#capabilities" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code> in QDK/Chemistry provides:</p>
-<ul class="simple">
-<li><p><strong>Full-space Hamiltonian</strong>: Computation of the Hamiltonian in the full orbital space</p></li>
-<li><p><strong>Active-space Hamiltonian</strong>: Projection of the Hamiltonian into a selected active space</p></li>
-<li><p><strong>Integral Transformation</strong>: Transformation of integrals from atomic orbital (AO) basis to molecular orbital (MO)
-basis</p></li>
-<li><p><strong>Orbitals Support</strong>: Works with both restricted and unrestricted orbitals</p></li>
-</ul>
-</section>
-<section id="creating-a-hamiltonianconstructor">
-<h2>Creating a HamiltonianConstructor<a class="headerlink" href="#creating-a-hamiltonianconstructor" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code> is created using the factory pattern.
-This constructor is used to create a <a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> object from a set of <a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a>.
-The orbitals provide the necessary information about the molecular system including the basis set, orbital coefficients, and electron occupations.</p>
+<section id="using-the-hamiltonianconstructor">
+<h2>Using the HamiltonianConstructor<a class="headerlink" href="#using-the-hamiltonianconstructor" title="Link to this heading"></a></h2>
+<p>This section demonstrates how to create, configure, and run a Hamiltonian construction. The <code class="docutils literal notranslate"><span class="pre">run</span></code> method returns a <a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> object containing the one- and two-electron integrals.</p>
+<section id="input-requirements">
+<h3>Input requirements<a class="headerlink" href="#input-requirements" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code> requires the following input:</p>
+<dl class="simple">
+<dt><strong>Orbitals</strong></dt><dd><p>An <a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a> instance describing the single orbital basis in which to express the many-body Hamiltonian. This object contains information about the molecular structure, basis set, and orbital coefficients.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The Orbitals object carries all the information needed for integral transformation, including the basis set and molecular structure. Active space indices, if present, determine which orbitals are included in the output Hamiltonian.</p>
+</div>
+<p><strong>Creating a constructor:</strong></p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create the default HamiltonianConstructor instance</span>
@@ -168,10 +167,9 @@ The orbitals provide the necessary information about the molecular system includ
 </div>
 </div>
 </div>
-</section>
-<section id="configuring-the-hamiltonian-construction">
-<h2>Configuring the Hamiltonian construction<a class="headerlink" href="#configuring-the-hamiltonian-construction" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code> can be configured using the <code class="docutils literal notranslate"><span class="pre">Settings</span></code> object to control how integrals are computed.</p>
+<p><strong>Configuring settings:</strong></p>
+<p>Settings can be modified using the <code class="docutils literal notranslate"><span class="pre">settings()</span></code> object.
+See <a class="reference internal" href="#available-implementations">Available implementations</a> below for implementation-specific options.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>All orbital indices in QDK/Chemistry are 0-based, following the convention used in most programming languages.</p>
@@ -196,10 +194,7 @@ The orbitals provide the necessary information about the molecular system includ
 </div>
 </div>
 </div>
-</section>
-<section id="constructing-the-hamiltonian">
-<h2>Constructing the Hamiltonian<a class="headerlink" href="#constructing-the-hamiltonian" title="Link to this heading"></a></h2>
-<p>Once configured, the Hamiltonian can be constructed from a set of orbitals:</p>
+<p><strong>Running the calculation:</strong></p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create a structure</span>
@@ -208,7 +203,7 @@ The orbitals provide the necessary information about the molecular system includ
 <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">symbols</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;H&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">};</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">structure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span><span class="n">Structure</span><span class="o">&gt;</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span><span class="w"> </span><span class="n">symbols</span><span class="p">);</span>
 
-<span class="c1">// Run an SCF to get orbitals</span>
+<span class="c1">// Run a SCF to get orbitals</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
 <span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;sto-3g&quot;</span><span class="p">);</span>
 <span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_scf</span><span class="p">,</span><span class="w"> </span><span class="n">wfn</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
@@ -234,19 +229,16 @@ The orbitals provide the necessary information about the molecular system includ
 </div>
 </div>
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This example shows a complete working workflow including structure creation, SCF calculation, and Hamiltonian construction.</p>
-</div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a structure</span>
 <span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
 <span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
 <span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="p">)</span>
 
-<span class="c1"># Run an SCF to get orbitals</span>
+<span class="c1"># Run a SCF to get orbitals</span>
 <span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
-<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
-<span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+<span class="p">)</span>
 <span class="n">orbitals</span> <span class="o">=</span> <span class="n">wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
 
 <span class="c1"># Construct the Hamiltonian from orbitals</span>
@@ -266,11 +258,34 @@ The orbitals provide the necessary information about the molecular system includ
 </div>
 </div>
 </section>
-<section id="available-settings">
-<h2>Available settings<a class="headerlink" href="#available-settings" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code> accepts a range of settings to control its behavior.
-These settings are divided into base settings (common to all Hamiltonian construction) and specialized settings (specific to certain construction variants).</p>
-<p>These settings are available in the default <code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code>:</p>
+</section>
+<section id="available-implementations">
+<h2>Available implementations<a class="headerlink" href="#available-implementations" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry’s <code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code> provides a unified interface for Hamiltonian construction methods.
+You can discover available implementations programmatically:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">HamiltonianConstructorFactory</span><span class="o">::</span><span class="n">available</span><span class="p">();</span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">names</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>  <span class="c1"># noqa: E402</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">))</span>
+<span class="c1"># [&#39;qdk&#39;]</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="qdk-native">
+<h3>QDK (Native)<a class="headerlink" href="#qdk-native" title="Link to this heading"></a></h3>
+<p><strong>Factory name:</strong> <code class="docutils literal notranslate"><span class="pre">&quot;qdk&quot;</span></code> (default)</p>
+<p>The native QDK/Chemistry implementation for Hamiltonian construction. Transforms molecular orbitals from <a class="reference internal" href="../../../glossary.html#term-AO"><span class="xref std std-term">AO</span></a> to <a class="reference internal" href="../../../glossary.html#term-MO"><span class="xref std std-term">MO</span></a> basis and computes one- and two-electron integrals.</p>
+<p><strong>Settings:</strong></p>
 <table class="docutils align-default">
 <colgroup>
 <col style="width: 25.0%" />
@@ -288,21 +303,29 @@ These settings are divided into base settings (common to all Hamiltonian constru
 <td><p>string</p></td>
 <td><p>Method for computing electron repulsion integrals (“direct” or “incore”)</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">force_unrestricted</span></code></p></td>
-<td><p>bool</p></td>
-<td><p>Force unrestricted calculation even for closed-shell systems (default: false)</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">scf_type</span></code></p></td>
+<td><p>string</p></td>
+<td><p>Type of <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> reference (“rhf”, “rohf”, or “uhf”)</p></td>
 </tr>
 </tbody>
 </table>
+</section>
+</section>
+<section id="related-classes">
+<h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a>: Input orbitals for Hamiltonian construction</p></li>
+<li><p><a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Output Hamiltonian representation</p></li>
+</ul>
 </section>
 <section id="further-reading">
 <h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p>The above examples can be downloaded as complete <a class="reference external" href="../../../_static/examples/python/hamiltonian_constructor.py">Python</a> or <a class="reference external" href="../../../_static/examples/cpp/hamiltonian_constructor.cpp">C++</a> scripts.</p></li>
-<li><p><a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a>: Input orbitals for Hamiltonian construction</p></li>
-<li><p><a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Output Hamiltonian representation</p></li>
 <li><p><a class="reference internal" href="active_space.html"><span class="doc">ActiveSpaceSelector</span></a>: Provides active orbital indices</p></li>
 <li><p><a class="reference internal" href="mc_calculator.html"><span class="doc">MCCalculator</span></a>: Uses the Hamiltonian for correlation calculations</p></li>
+<li><p><a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
+<li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Understanding algorithm creation</p></li>
 </ul>
 </section>
 </section>

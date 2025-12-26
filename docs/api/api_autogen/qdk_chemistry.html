@@ -50,6 +50,7 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
@@ -498,8 +499,14 @@
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.__init__"><code class="docutils literal notranslate"><span class="pre">BasisSet.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.atomic_orbital_type_to_string"><code class="docutils literal notranslate"><span class="pre">BasisSet.atomic_orbital_type_to_string()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.basis_to_shell_index"><code class="docutils literal notranslate"><span class="pre">BasisSet.basis_to_shell_index()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.custom_ecp_name"><code class="docutils literal notranslate"><span class="pre">BasisSet.custom_ecp_name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.custom_name"><code class="docutils literal notranslate"><span class="pre">BasisSet.custom_name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.default_ecp_name"><code class="docutils literal notranslate"><span class="pre">BasisSet.default_ecp_name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.from_basis_name"><code class="docutils literal notranslate"><span class="pre">BasisSet.from_basis_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.from_element_map"><code class="docutils literal notranslate"><span class="pre">BasisSet.from_element_map()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.from_file"><code class="docutils literal notranslate"><span class="pre">BasisSet.from_file()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.from_hdf5_file"><code class="docutils literal notranslate"><span class="pre">BasisSet.from_hdf5_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.from_index_map"><code class="docutils literal notranslate"><span class="pre">BasisSet.from_index_map()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.from_json"><code class="docutils literal notranslate"><span class="pre">BasisSet.from_json()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.from_json_file"><code class="docutils literal notranslate"><span class="pre">BasisSet.from_json_file()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.get_angular_momentum"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_angular_momentum()</span></code></a></li>
@@ -531,6 +538,8 @@
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.get_shells_for_atom"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_shells_for_atom()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.get_structure"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_structure()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.get_summary"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_summary()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.get_supported_basis_set_names"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_supported_basis_set_names()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.get_supported_elements_for_basis_set"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_supported_elements_for_basis_set()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.has_ecp_electrons"><code class="docutils literal notranslate"><span class="pre">BasisSet.has_ecp_electrons()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.has_ecp_shells"><code class="docutils literal notranslate"><span class="pre">BasisSet.has_ecp_shells()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet.has_structure"><code class="docutils literal notranslate"><span class="pre">BasisSet.has_structure()</span></code></a></li>
@@ -566,6 +575,7 @@
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration.canonical_hf_configuration"><code class="docutils literal notranslate"><span class="pre">Configuration.canonical_hf_configuration()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration.get_n_electrons"><code class="docutils literal notranslate"><span class="pre">Configuration.get_n_electrons()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration.n_electrons"><code class="docutils literal notranslate"><span class="pre">Configuration.n_electrons</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration.to_binary_strings"><code class="docutils literal notranslate"><span class="pre">Configuration.to_binary_strings()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration.to_string"><code class="docutils literal notranslate"><span class="pre">Configuration.to_string()</span></code></a></li>
 </ul>
 </li>
@@ -879,6 +889,24 @@
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QpeResult.to_json"><code class="docutils literal notranslate"><span class="pre">QpeResult.to_json()</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile.name"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile.description"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.description</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile.errors"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.errors</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile.one_qubit_gates"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.one_qubit_gates</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile.two_qubit_gates"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.two_qubit_gates</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile.__init__"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile.basis_gates"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.basis_gates</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile.basis_gates_exclusion"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.basis_gates_exclusion</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile.from_hdf5"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.from_hdf5()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile.from_json"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.from_json()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile.from_yaml_file"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.from_yaml_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile.get_summary"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.get_summary()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile.to_hdf5"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.to_hdf5()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile.to_json"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.to_json()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile.to_yaml_file"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.to_yaml_file()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian.pauli_strings"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.pauli_strings</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian.coefficients"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.coefficients</span></code></a></li>
@@ -1141,6 +1169,12 @@
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.base.html">qdk_chemistry.data.base module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.circuit.html">qdk_chemistry.data.circuit module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.estimator_data.html">qdk_chemistry.data.estimator_data module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.noise_models.html">qdk_chemistry.data.noise_models module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.noise_models.html#qdk_chemistry.data.noise_models.GateErrorDef"><code class="docutils literal notranslate"><span class="pre">GateErrorDef</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.noise_models.html#qdk_chemistry.data.noise_models.SupportedErrorTypes"><code class="docutils literal notranslate"><span class="pre">SupportedErrorTypes</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.noise_models.html#qdk_chemistry.data.noise_models.SupportedGate"><code class="docutils literal notranslate"><span class="pre">SupportedGate</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.qpe_result.html">qdk_chemistry.data.qpe_result module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.qubit_hamiltonian.html">qdk_chemistry.data.qubit_hamiltonian module</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.filter_and_group_pauli_ops_from_wavefunction"><code class="docutils literal notranslate"><span class="pre">filter_and_group_pauli_ops_from_wavefunction()</span></code></a></li>
@@ -1186,18 +1220,16 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.utils.html">qdk_chemistry.utils package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.CaseInsensitiveStrEnum"><code class="docutils literal notranslate"><span class="pre">CaseInsensitiveStrEnum</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.compute_valence_space_parameters"><code class="docutils literal notranslate"><span class="pre">compute_valence_space_parameters()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.rotate_orbitals"><code class="docutils literal notranslate"><span class="pre">rotate_orbitals()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.html#submodules">Submodules</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.bitstring.html">qdk_chemistry.utils.bitstring module</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.bitstring.html#qdk_chemistry.utils.bitstring.binary_string_to_configuration"><code class="docutils literal notranslate"><span class="pre">binary_string_to_configuration()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.bitstring.html#qdk_chemistry.utils.bitstring.binary_to_decimal"><code class="docutils literal notranslate"><span class="pre">binary_to_decimal()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.bitstring.html#qdk_chemistry.utils.bitstring.bitstrings_to_binary_matrix"><code class="docutils literal notranslate"><span class="pre">bitstrings_to_binary_matrix()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.bitstring.html#qdk_chemistry.utils.bitstring.separate_alpha_beta_to_binary_string"><code class="docutils literal notranslate"><span class="pre">separate_alpha_beta_to_binary_string()</span></code></a></li>
-</ul>
-</li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.cubegen.html">qdk_chemistry.utils.cubegen module</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.cubegen.html#qdk_chemistry.utils.cubegen.generate_cubefiles_from_orbitals"><code class="docutils literal notranslate"><span class="pre">generate_cubefiles_from_orbitals()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.enum.html">qdk_chemistry.utils.enum module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.enum.html#qdk_chemistry.utils.enum.CaseInsensitiveStrEnum"><code class="docutils literal notranslate"><span class="pre">CaseInsensitiveStrEnum</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.phase.html">qdk_chemistry.utils.phase module</a><ul>
@@ -1207,10 +1239,6 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.phase.html#qdk_chemistry.utils.phase.iterative_phase_feedback_update"><code class="docutils literal notranslate"><span class="pre">iterative_phase_feedback_update()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.phase.html#qdk_chemistry.utils.phase.phase_fraction_from_feedback"><code class="docutils literal notranslate"><span class="pre">phase_fraction_from_feedback()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.phase.html#qdk_chemistry.utils.phase.resolve_energy_aliases"><code class="docutils literal notranslate"><span class="pre">resolve_energy_aliases()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.statevector.html">qdk_chemistry.utils.statevector module</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.statevector.html#qdk_chemistry.utils.statevector.create_statevector_from_wavefunction"><code class="docutils literal notranslate"><span class="pre">create_statevector_from_wavefunction()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.time_evolution.html">qdk_chemistry.utils.time_evolution module</a><ul>
@@ -1258,95 +1286,6 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.definitions.html">qdk_chemistry.definitions module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.noise_models.html">qdk_chemistry.noise_models module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.CaseInsensitiveStrEnum"><code class="docutils literal notranslate"><span class="pre">CaseInsensitiveStrEnum</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate"><code class="docutils literal notranslate"><span class="pre">SupportedGate</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.BARRIER"><code class="docutils literal notranslate"><span class="pre">SupportedGate.BARRIER</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.CCX"><code class="docutils literal notranslate"><span class="pre">SupportedGate.CCX</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.CCZ"><code class="docutils literal notranslate"><span class="pre">SupportedGate.CCZ</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.CH"><code class="docutils literal notranslate"><span class="pre">SupportedGate.CH</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.CP"><code class="docutils literal notranslate"><span class="pre">SupportedGate.CP</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.CRX"><code class="docutils literal notranslate"><span class="pre">SupportedGate.CRX</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.CRY"><code class="docutils literal notranslate"><span class="pre">SupportedGate.CRY</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.CRZ"><code class="docutils literal notranslate"><span class="pre">SupportedGate.CRZ</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.CS"><code class="docutils literal notranslate"><span class="pre">SupportedGate.CS</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.CSDG"><code class="docutils literal notranslate"><span class="pre">SupportedGate.CSDG</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.CSWAP"><code class="docutils literal notranslate"><span class="pre">SupportedGate.CSWAP</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.CSX"><code class="docutils literal notranslate"><span class="pre">SupportedGate.CSX</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.CU"><code class="docutils literal notranslate"><span class="pre">SupportedGate.CU</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.CX"><code class="docutils literal notranslate"><span class="pre">SupportedGate.CX</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.CY"><code class="docutils literal notranslate"><span class="pre">SupportedGate.CY</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.CZ"><code class="docutils literal notranslate"><span class="pre">SupportedGate.CZ</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.DCX"><code class="docutils literal notranslate"><span class="pre">SupportedGate.DCX</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.DELAY"><code class="docutils literal notranslate"><span class="pre">SupportedGate.DELAY</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.ECR"><code class="docutils literal notranslate"><span class="pre">SupportedGate.ECR</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.H"><code class="docutils literal notranslate"><span class="pre">SupportedGate.H</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.ID"><code class="docutils literal notranslate"><span class="pre">SupportedGate.ID</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.INITIALIZE"><code class="docutils literal notranslate"><span class="pre">SupportedGate.INITIALIZE</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.ISWAP"><code class="docutils literal notranslate"><span class="pre">SupportedGate.ISWAP</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.MCP"><code class="docutils literal notranslate"><span class="pre">SupportedGate.MCP</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.MCRX"><code class="docutils literal notranslate"><span class="pre">SupportedGate.MCRX</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.MCRY"><code class="docutils literal notranslate"><span class="pre">SupportedGate.MCRY</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.MCRZ"><code class="docutils literal notranslate"><span class="pre">SupportedGate.MCRZ</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.MCX"><code class="docutils literal notranslate"><span class="pre">SupportedGate.MCX</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.MEASURE"><code class="docutils literal notranslate"><span class="pre">SupportedGate.MEASURE</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.MS"><code class="docutils literal notranslate"><span class="pre">SupportedGate.MS</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.P"><code class="docutils literal notranslate"><span class="pre">SupportedGate.P</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.PAULI"><code class="docutils literal notranslate"><span class="pre">SupportedGate.PAULI</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.R"><code class="docutils literal notranslate"><span class="pre">SupportedGate.R</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.RCCCX"><code class="docutils literal notranslate"><span class="pre">SupportedGate.RCCCX</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.RCCX"><code class="docutils literal notranslate"><span class="pre">SupportedGate.RCCX</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.RESET"><code class="docutils literal notranslate"><span class="pre">SupportedGate.RESET</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.RV"><code class="docutils literal notranslate"><span class="pre">SupportedGate.RV</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.RX"><code class="docutils literal notranslate"><span class="pre">SupportedGate.RX</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.RXX"><code class="docutils literal notranslate"><span class="pre">SupportedGate.RXX</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.RY"><code class="docutils literal notranslate"><span class="pre">SupportedGate.RY</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.RYY"><code class="docutils literal notranslate"><span class="pre">SupportedGate.RYY</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.RZ"><code class="docutils literal notranslate"><span class="pre">SupportedGate.RZ</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.RZX"><code class="docutils literal notranslate"><span class="pre">SupportedGate.RZX</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.RZZ"><code class="docutils literal notranslate"><span class="pre">SupportedGate.RZZ</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.S"><code class="docutils literal notranslate"><span class="pre">SupportedGate.S</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.SDG"><code class="docutils literal notranslate"><span class="pre">SupportedGate.SDG</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.SWAP"><code class="docutils literal notranslate"><span class="pre">SupportedGate.SWAP</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.SX"><code class="docutils literal notranslate"><span class="pre">SupportedGate.SX</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.SXDG"><code class="docutils literal notranslate"><span class="pre">SupportedGate.SXDG</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.T"><code class="docutils literal notranslate"><span class="pre">SupportedGate.T</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.TDG"><code class="docutils literal notranslate"><span class="pre">SupportedGate.TDG</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.U"><code class="docutils literal notranslate"><span class="pre">SupportedGate.U</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.UNITARY"><code class="docutils literal notranslate"><span class="pre">SupportedGate.UNITARY</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.X"><code class="docutils literal notranslate"><span class="pre">SupportedGate.X</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.Y"><code class="docutils literal notranslate"><span class="pre">SupportedGate.Y</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.Z"><code class="docutils literal notranslate"><span class="pre">SupportedGate.Z</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedGate.from_string"><code class="docutils literal notranslate"><span class="pre">SupportedGate.from_string()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedErrorTypes"><code class="docutils literal notranslate"><span class="pre">SupportedErrorTypes</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.SupportedErrorTypes.DEPOLARIZING_ERROR"><code class="docutils literal notranslate"><span class="pre">SupportedErrorTypes.DEPOLARIZING_ERROR</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.GateErrorDef"><code class="docutils literal notranslate"><span class="pre">GateErrorDef</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.GateErrorDef.type"><code class="docutils literal notranslate"><span class="pre">GateErrorDef.type</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.GateErrorDef.rate"><code class="docutils literal notranslate"><span class="pre">GateErrorDef.rate</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.GateErrorDef.num_qubits"><code class="docutils literal notranslate"><span class="pre">GateErrorDef.num_qubits</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.BASIS_GATES_EXCLUSION"><code class="docutils literal notranslate"><span class="pre">BASIS_GATES_EXCLUSION</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.QuantumErrorProfile"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.QuantumErrorProfile.name"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.name</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.QuantumErrorProfile.description"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.description</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.QuantumErrorProfile.errors"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.errors</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.QuantumErrorProfile.one_qubit_gates"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.one_qubit_gates</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.QuantumErrorProfile.__init__"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.QuantumErrorProfile.two_qubit_gates"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.two_qubit_gates</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.QuantumErrorProfile.supported_yaml_keys"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.supported_yaml_keys</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.QuantumErrorProfile.to_dict"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.to_dict()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.QuantumErrorProfile.from_yaml"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.from_yaml()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.QuantumErrorProfile.to_yaml"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.to_yaml()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.noise_models.html#qdk_chemistry.noise_models.QuantumErrorProfile.basis_gates"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.basis_gates</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
 </ul>
 </div>
 </section>

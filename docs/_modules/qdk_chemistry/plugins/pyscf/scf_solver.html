@@ -49,6 +49,7 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
@@ -112,7 +113,7 @@
 <span class="sd">&gt;&gt;&gt; from qdk_chemistry.plugins.pyscf.scf_solver import PyscfScfSolver</span>
 <span class="sd">&gt;&gt;&gt; solver = PyscfScfSolver()</span>
 <span class="sd">&gt;&gt;&gt; solver.settings()[&quot;method&quot;] = &quot;b3lyp&quot;  # Use B3LYP DFT</span>
-<span class="sd">&gt;&gt;&gt; energy, orbitals = solver.run(molecule)</span>
+<span class="sd">&gt;&gt;&gt; energy, orbitals = solver.run(molecule, 0, 1, &quot;sto-3g&quot;)</span>
 
 <span class="sd">This module requires both QDK/Chemistry and PySCF to be installed. The solver supports both</span>
 <span class="sd">restricted and unrestricted variants for both HF and DFT calculations.</span>
@@ -128,9 +129,11 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyscf</span><span class="w"> </span><span class="kn">import</span> <span class="n">gto</span><span class="p">,</span> <span class="n">scf</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyscf.gto.mole</span><span class="w"> </span><span class="kn">import</span> <span class="n">bse_predefined_ecp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyscf.lib.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">BasisNotFoundError</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">ScfSolver</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">BasisSet</span><span class="p">,</span>
     <span class="n">Configuration</span><span class="p">,</span>
     <span class="n">ElectronicStructureSettings</span><span class="p">,</span>
     <span class="n">Orbitals</span><span class="p">,</span>
@@ -138,7 +141,7 @@
     <span class="n">Structure</span><span class="p">,</span>
     <span class="n">Wavefunction</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">SCFType</span><span class="p">,</span>
     <span class="n">orbitals_to_scf</span><span class="p">,</span>
     <span class="n">pyscf_mol_to_qdk_basis</span><span class="p">,</span>
@@ -159,24 +162,23 @@
 <span class="sd">    ElectronicStructureSettings and adding PySCF-specific customizations.</span>
 
 <span class="sd">    Inherits from ElectronicStructureSettings:</span>
-
 <span class="sd">    - method (str, default=&quot;hf&quot;): The electronic structure method (Hartree-Fock).</span>
 <span class="sd">    - basis_set (str, default=&quot;def2-svp&quot;): The basis set used for quantum chemistry calculations.</span>
-<span class="sd">      Common options include &quot;def2-svp&quot;, &quot;def2-tzvp&quot;, &quot;cc-pvdz&quot;, etc.</span>
+<span class="sd">    Common options include &quot;def2-svp&quot;, &quot;def2-tzvp&quot;, &quot;cc-pvdz&quot;, etc.</span>
 <span class="sd">    - convergence_threshold (float, default=1e-7): Convergence tolerance for orbital gradient norm.</span>
 <span class="sd">    - max_iterations (int, default=50): Maximum number of iterations.</span>
 <span class="sd">    - scf_type (str, default=&quot;auto&quot;): Type of SCF calculation. Can be:</span>
-<span class="sd">        * &quot;auto&quot;: Automatically detect based on spin (RHF for singlet, UHF for open-shell)</span>
-<span class="sd">        * &quot;restricted&quot;: Force restricted calculation (RHF/ROHF for HF, RKS/ROKS for DFT)</span>
-<span class="sd">        * &quot;unrestricted&quot;: Force unrestricted calculation (UHF for HF, UKS for DFT)</span>
+<span class="sd">    &quot;auto&quot;: Automatically detect based on spin (RHF for singlet, UHF for open-shell)</span>
+<span class="sd">    &quot;restricted&quot;: Force restricted calculation (RHF/ROHF for HF, RKS/ROKS for DFT)</span>
+<span class="sd">    &quot;unrestricted&quot;: Force unrestricted calculation (UHF for HF, UKS for DFT)</span>
 
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; settings = PyscfScfSettings()</span>
-<span class="sd">        &gt;&gt;&gt; settings.get(&quot;basis_set&quot;)</span>
-<span class="sd">        &#39;def2-svp&#39;</span>
-<span class="sd">        &gt;&gt;&gt; settings.set(&quot;basis_set&quot;, &quot;cc-pvdz&quot;)</span>
-<span class="sd">        &gt;&gt;&gt; settings.get(&quot;basis_set&quot;)</span>
-<span class="sd">        &#39;cc-pvdz&#39;</span>
+<span class="sd">        &gt;&gt;&gt; settings.get(&quot;max_iterations&quot;)</span>
+<span class="sd">        50</span>
+<span class="sd">        &gt;&gt;&gt; settings.set(&quot;max_iterations&quot;, 100)</span>
+<span class="sd">        &gt;&gt;&gt; settings.get(&quot;max_iterations&quot;)</span>
+<span class="sd">        100</span>
 
 <span class="sd">    Notes:</span>
 <span class="sd">        The PySCF SCF solver is used for performing self-consistent field calculations in quantum chemistry, which</span>
@@ -215,9 +217,8 @@
 
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; solver = PyscfScfSolver()</span>
-<span class="sd">        &gt;&gt;&gt; solver.settings()[&quot;basis_set&quot;] = &quot;6-31G*&quot;</span>
 <span class="sd">        &gt;&gt;&gt; solver.settings()[&quot;method&quot;] = &quot;b3lyp&quot;  # Use B3LYP DFT</span>
-<span class="sd">        &gt;&gt;&gt; energy, orbitals = solver.run(molecule_structure, charge=0, spin_multiplicity=1)</span>
+<span class="sd">        &gt;&gt;&gt; energy, orbitals = solver.run(molecule_structure, charge=0, spin_multiplicity=1, &quot;6-31G*&quot;)</span>
 <span class="sd">        &gt;&gt;&gt; print(f&quot;Electronic energy: {energy} Hartree&quot;)</span>
 
 <span class="sd">    See Also:</span>
@@ -236,7 +237,7 @@
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">,</span> <span class="n">charge</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">initial_guess</span><span class="p">:</span> <span class="n">Orbitals</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">,</span> <span class="n">charge</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="p">:</span> <span class="n">Orbitals</span> <span class="o">|</span> <span class="n">BasisSet</span> <span class="o">|</span> <span class="nb">str</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Wavefunction</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Perform a self-consistent field (SCF) calculation using PySCF.</span>
 
@@ -256,9 +257,10 @@
 <span class="sd">            spin_multiplicity: The spin multiplicity :math:`(2S+1)` of the system, where :math:`S` is the total spin.</span>
 <span class="sd">                Note: This parameter is not used directly; the spin_multiplicity from ``self._settings`` is used</span>
 <span class="sd">                instead.</span>
-<span class="sd">            initial_guess: Initial orbital guess for the SCF calculation. If provided, the</span>
-<span class="sd">                molecular orbital coefficients will be used as the starting point</span>
-<span class="sd">                for the SCF iteration. If None, PySCF&#39;s default initial guess will be used.</span>
+<span class="sd">            basis_or_guess: Basis set information, which can be provided as:</span>
+<span class="sd">                - A ``qdk_chemistry.data.BasisSet`` object</span>
+<span class="sd">                - A string specifying the name of a standard basis set (e.g., &quot;sto-3g&quot;)</span>
+<span class="sd">                - A ``qdk_chemistry.data.Orbitals`` object to be used as an initial guess</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            * The electronic energy of the system in atomic units (Hartree), excluding nuclear repulsion energy</span>
@@ -272,7 +274,20 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="n">atoms</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">structure_to_pyscf_atom_labels</span><span class="p">(</span><span class="n">structure</span><span class="p">)</span>
-        <span class="n">basis_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;basis_set&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Determine basis set name and initial guess</span>
+        <span class="n">basis_name</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">initial_guess</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">basis_or_guess</span><span class="p">,</span> <span class="n">Orbitals</span><span class="p">):</span>
+            <span class="n">basis_name</span> <span class="o">=</span> <span class="n">basis_or_guess</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">()</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span>
+            <span class="n">initial_guess</span> <span class="o">=</span> <span class="n">basis_or_guess</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">basis_or_guess</span><span class="p">,</span> <span class="n">BasisSet</span><span class="p">):</span>
+            <span class="n">basis_name</span> <span class="o">=</span> <span class="n">basis_or_guess</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Custom BasisSet input not yet implemented in PyscfScfSolver.&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">basis_or_guess</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">basis_name</span> <span class="o">=</span> <span class="n">basis_or_guess</span>
+
+        <span class="c1"># settings</span>
         <span class="n">method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
         <span class="n">convergence_threshold</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">]</span>
         <span class="n">max_iterations</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">]</span>
@@ -286,6 +301,7 @@
         <span class="k">if</span> <span class="n">ecp_atoms</span><span class="p">:</span>
             <span class="n">ecp_dict</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">ecp_atoms</span><span class="p">,</span> <span class="n">ecp</span><span class="p">)</span>
 
+        <span class="c1"># build pyscf molecule</span>
         <span class="n">mol</span> <span class="o">=</span> <span class="n">gto</span><span class="o">.</span><span class="n">Mole</span><span class="p">(</span>
             <span class="n">atom</span><span class="o">=</span><span class="n">atoms</span><span class="p">,</span>
             <span class="n">basis</span><span class="o">=</span><span class="n">basis_name</span><span class="p">,</span>
@@ -294,7 +310,10 @@
             <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;Bohr&quot;</span><span class="p">,</span>
             <span class="n">ecp</span><span class="o">=</span><span class="n">ecp_dict</span> <span class="k">if</span> <span class="n">ecp_atoms</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="n">mol</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">mol</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+        <span class="k">except</span> <span class="n">BasisNotFoundError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis set &#39;</span><span class="si">{</span><span class="n">basis_name</span><span class="si">}</span><span class="s2">&#39; not found in PySCF.&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
 
         <span class="c1"># Determine SCF type from settings</span>
         <span class="n">scf_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;scf_type&quot;</span><span class="p">]</span>

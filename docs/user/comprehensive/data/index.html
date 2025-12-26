@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Data management &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>Data classes &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -27,7 +27,7 @@
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
     <link rel="next" title="Serialization" href="serialization.html" />
-    <link rel="prev" title="Settings" href="../design/settings.html" /> 
+    <link rel="prev" title="High-level design" href="../design/index.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -52,18 +52,22 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Data management</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization</a></li>
-<li class="toctree-l3"><a class="reference internal" href="basis_set.html">Basis set</a></li>
-<li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
-<li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
-<li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Data classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#quick-reference">Quick reference</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="serialization.html">Serialization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="basis_set.html">BasisSet</a></li>
+<li class="toctree-l4"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
+<li class="toctree-l4"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="structure.html">Structure</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Algorithm classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
@@ -95,7 +99,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-      <li class="breadcrumb-item active">Data management</li>
+      <li class="breadcrumb-item active">Data classes</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/data/index.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -105,28 +109,73 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="data-management">
-<h1>Data management<a class="headerlink" href="#data-management" title="Link to this heading"></a></h1>
-<p>Individual data classes are described in detail in the <a class="reference internal" href="../../../index.html#apidocs"><span class="std std-ref">API documentation</span></a>.
-This section provides examples and explanations of commonly used data classes in QDK/Chemistry
-for preparing quantum chemistry calculations.</p>
+  <section id="data-classes">
+<h1>Data classes<a class="headerlink" href="#data-classes" title="Link to this heading"></a></h1>
+<p>QDK/Chemistry uses immutable data classes to represent molecular information, electronic structure results, and quantum objects.
+These classes serve as the inputs and outputs for <a class="reference internal" href="../algorithms/index.html"><span class="doc">algorithm classes</span></a>, enabling a clean flow of data through the computational pipeline.
+All data classes support <a class="reference internal" href="serialization.html"><span class="doc">serialization</span></a> to JSON and HDF5 formats for persistence and interoperability.</p>
+<p>Comprehensive details on each data class can be found in the <a class="reference internal" href="../../../index.html#apidocs"><span class="std std-ref">API documentation</span></a>.
+Here, we provide a quick reference guide to help users understand the purpose and typical sources of commonly encountered data classes.
+Each of the links below leads to a detailed description of the data class, including its attributes, methods, and usage examples.</p>
+<section id="quick-reference">
+<h2>Quick reference<a class="headerlink" href="#quick-reference" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 55.0%" />
+<col style="width: 20.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Data Class</p></th>
+<th class="head"><p>Purpose</p></th>
+<th class="head"><p>Typical Source</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><a class="reference internal" href="structure.html"><span class="doc">Structure</span></a></p></td>
+<td><p>Molecular geometry (atoms and coordinates)</p></td>
+<td><p>User input</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="basis_set.html"><span class="doc">BasisSet</span></a></p></td>
+<td><p>Atomic orbital basis definitions</p></td>
+<td><p>Library lookup, User input</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="orbitals.html"><span class="doc">Orbitals</span></a></p></td>
+<td><p>Molecular orbital coefficients and energies</p></td>
+<td><p><a class="reference internal" href="../algorithms/scf_solver.html"><span class="doc">ScfSolver</span></a></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="hamiltonian.html"><span class="doc">Hamiltonian</span></a></p></td>
+<td><p>One- and two-electron integrals</p></td>
+<td><p><a class="reference internal" href="../algorithms/hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Wavefunction</span></code></p></td>
+<td><p>Electronic state (orbitals + <a class="reference internal" href="../../../glossary.html#term-CI"><span class="xref std std-term">CI</span></a> coefficients)</p></td>
+<td><p><a class="reference internal" href="../algorithms/mc_calculator.html"><span class="doc">MCCalculator</span></a></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></p></td>
+<td><p>Pauli operator representation</p></td>
+<td><p><a class="reference internal" href="../algorithms/qubit_mapper.html"><span class="doc">QubitMapper</span></a></p></td>
+</tr>
+</tbody>
+</table>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="serialization.html">Serialization</a></li>
-<li class="toctree-l1"><a class="reference internal" href="basis_set.html">Basis set</a></li>
+<li class="toctree-l1"><a class="reference internal" href="basis_set.html">BasisSet</a></li>
 <li class="toctree-l1"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
 <li class="toctree-l1"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
 <li class="toctree-l1"><a class="reference internal" href="structure.html">Structure</a></li>
 </ul>
 </div>
 </section>
+</section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../design/settings.html" class="btn btn-neutral float-left" title="Settings" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../design/index.html" class="btn btn-neutral float-left" title="High-level design" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="serialization.html" class="btn btn-neutral float-right" title="Serialization" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

@@ -50,6 +50,7 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
@@ -129,6 +130,26 @@
 </dd></dl>
 
 <dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data6detail26denormalize_basis_set_nameERKNSt6stringE">
+<span id="_CPPv3N3qdk9chemistry4data6detail26denormalize_basis_set_nameERKNSt6stringE"></span><span id="_CPPv2N3qdk9chemistry4data6detail26denormalize_basis_set_nameERKNSt6stringE"></span><span id="qdk::chemistry::data::detail::denormalize_basis_set_name__ssCR"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1data_1_1detail_1a8b0a83c2e98ba960c95589cf6ddc52bd"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">denormalize_basis_set_name</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">normalized</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Denormalize basis set name from filesystem representation. </p>
+<p>Reverses the normalization:<ul class="simple">
+<li><p>’<em>st</em>’ -&gt; ‘*’</p></li>
+<li><p>’<em>sl</em>’ -&gt; ‘/’</p></li>
+<li><p>’<em>pl</em>’ -&gt; ‘+’ </p></li>
+</ul>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>normalized</strong> – Normalized name from filesystem </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Original basis set name </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data6detail25is_matrix_variant_complexERKN14ContainerTypes13MatrixVariantE">
 <span id="_CPPv3N3qdk9chemistry4data6detail25is_matrix_variant_complexERKN14ContainerTypes13MatrixVariantE"></span><span id="_CPPv2N3qdk9chemistry4data6detail25is_matrix_variant_complexERKN14ContainerTypes13MatrixVariantE"></span><span id="qdk::chemistry::data::detail::is_matrix_variant_complex__ContainerTypes::MatrixVariantCR"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1data_1_1detail_1a50bd4ef6e709f1ab954499a9c90136a1"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">is_matrix_variant_complex</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data14ContainerTypesE" title="qdk::chemistry::data::ContainerTypes"><span class="n"><span class="pre">ContainerTypes</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data14ContainerTypes13MatrixVariantE" title="qdk::chemistry::data::ContainerTypes::MatrixVariant"><span class="n"><span class="pre">MatrixVariant</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">variant</span></span><span class="sig-paren">)</span><br /></dt>
 <dd><p>Check if a <a class="reference internal" href="namespaceqdk_1_1chemistry_1_1data_1_1ContainerTypes.html#namespaceqdk_1_1chemistry_1_1data_1_1ContainerTypes_1a5a6e0c9667c9142cd9ed9192e41a4b85"><span class="std std-ref">ContainerTypes::MatrixVariant</span></a> contains complex type. </p>
@@ -186,6 +207,26 @@
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>Shared pointer to new <a class="reference internal" href="namespaceqdk_1_1chemistry_1_1data_1_1ContainerTypes.html#namespaceqdk_1_1chemistry_1_1data_1_1ContainerTypes_1ae0a916b96daf243a607e0f54df2b81c0"><span class="std std-ref">ContainerTypes::VectorVariant</span></a> containing the result </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data6detail24normalize_basis_set_nameERKNSt6stringE">
+<span id="_CPPv3N3qdk9chemistry4data6detail24normalize_basis_set_nameERKNSt6stringE"></span><span id="_CPPv2N3qdk9chemistry4data6detail24normalize_basis_set_nameERKNSt6stringE"></span><span id="qdk::chemistry::data::detail::normalize_basis_set_name__ssCR"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1data_1_1detail_1a1ace4909ac9bedc31362fd8ea3f0b3f1"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">normalize_basis_set_name</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">name</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Normalize basis set name for filesystem usage. </p>
+<p>Replaces special characters that are problematic in filenames:<ul class="simple">
+<li><p>’*’ -&gt; ‘<em>st</em>’ (star)</p></li>
+<li><p>’/’ -&gt; ‘<em>sl</em>’ (slash)</p></li>
+<li><p>’+’ -&gt; ‘<em>pl</em>’ (plus) </p></li>
+</ul>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> – Original basis set name (e.g., “6-31g*+”) </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Normalized name safe for filesystem (e.g., “6-31g_st__pl_”) </p>
 </dd>
 </dl>
 </dd></dl>

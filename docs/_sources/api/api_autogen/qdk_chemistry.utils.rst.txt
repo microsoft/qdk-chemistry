@@ -13,9 +13,8 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   qdk_chemistry.utils.bitstring
    qdk_chemistry.utils.cubegen
+   qdk_chemistry.utils.enum
    qdk_chemistry.utils.phase
-   qdk_chemistry.utils.statevector
    qdk_chemistry.utils.time_evolution
    qdk_chemistry.utils.wavefunction

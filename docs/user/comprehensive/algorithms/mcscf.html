@@ -26,7 +26,7 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Projected multi-configuration calculations" href="pmc.html" />
+    <link rel="next" title="Qubit mapping" href="qubit_mapper.html" />
     <link rel="prev" title="Multi-configuration calculations" href="mc_calculator.html" /> 
 </head>
 
@@ -52,25 +52,28 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data management</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="index.html">Available algorithms</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Algorithm classes</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
+<li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
 <li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
 <li class="toctree-l3"><a class="reference internal" href="energy_estimator.html">Energy estimation</a></li>
-<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Classical Hamiltonian construction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
-<li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
-<li class="toctree-l3"><a class="reference internal" href="dynamical_correlation.html">Dynamical correlation calculations</a></li>
-<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solving</a></li>
-<li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Self-consistent field stability checks</a></li>
-<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State Preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field (SCF) solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Stability analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#discovering-implementations">Discovering implementations</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
@@ -102,7 +105,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="index.html">Available algorithms</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Algorithm classes</a></li>
       <li class="breadcrumb-item active">Multi-configuration <span class="xref std std-term">SCF</span></li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/algorithms/mcscf.rst.txt" rel="nofollow"> View page source</a>
@@ -127,7 +130,7 @@ In the meantime, please see <a class="reference internal" href="../../../api/api
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="mc_calculator.html" class="btn btn-neutral float-left" title="Multi-configuration calculations" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="pmc.html" class="btn btn-neutral float-right" title="Projected multi-configuration calculations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="qubit_mapper.html" class="btn btn-neutral float-right" title="Qubit mapping" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

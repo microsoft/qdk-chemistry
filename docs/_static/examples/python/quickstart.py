@@ -18,16 +18,16 @@ from qdk_chemistry.utils.wavefunction import get_top_determinants
 # Define benzene diradical structure directly using numpy arrays
 coords = np.array(
     [
-        [0.000000, 1.396000, 0.000000],
-        [1.209077, 0.698000, 0.000000],
-        [1.209077, -0.698000, 0.000000],
-        [0.000000, -1.396000, 0.000000],
-        [-1.209077, -0.698000, 0.000000],
-        [-1.209077, 0.698000, 0.000000],
-        [2.151000, 1.242000, 0.000000],
-        [2.151000, -1.242000, 0.000000],
-        [-2.151000, -1.242000, 0.000000],
-        [-2.151000, 1.242000, 0.000000],
+        [0.00000000, 2.63805767, 0.00000000],
+        [2.28482439, 1.31902883, 0.00000000],
+        [2.28482439, -1.31902883, 0.00000000],
+        [0.00000000, -2.63805767, 0.00000000],
+        [-2.28482439, -1.31902883, 0.00000000],
+        [-2.28482439, 1.31902883, 0.00000000],
+        [4.06480089, 2.34703985, 0.00000000],
+        [4.06480089, -2.34703985, 0.00000000],
+        [-4.06480089, -2.34703985, 0.00000000],
+        [-4.06480089, 2.34703985, 0.00000000],
     ]
 )
 elements = ["C", "C", "C", "C", "C", "C", "H", "H", "H", "H"]
@@ -45,8 +45,10 @@ print(f"Elements: {structure.get_elements()}")
 ################################################################################
 # start-cell-scf
 # Perform an SCF calculation, returning the energy and wavefunction
-scf_solver = create("scf_solver", basis_set="cc-pvdz")
-E_hf, wfn_hf = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+scf_solver = create("scf_solver")
+E_hf, wfn_hf = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
+)
 print(f"SCF energy is {E_hf:.3f} Hartree")
 
 # Display a summary of the molecular orbitals obtained from the SCF calculation
@@ -107,9 +109,15 @@ print(f"Reference energy for top 2 determinants is {E_sparse:.6f} Hartree")
 # end-cell-wfn-select-configs
 ################################################################################
 
+################################################################################
+# start-state-prep-circuit
+
 # Generate state preparation circuit for the sparse state via sparse isometry (GF2 + X)
 state_prep = create("state_prep", "sparse_isometry_gf2x")
 sparse_isometry_circuit = state_prep.run(wfn_sparse)
+
+# end-state-prep-circuit
+################################################################################
 
 ################################################################################
 # start-cell-qubit-hamiltonian

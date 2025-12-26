@@ -14,9 +14,9 @@ from qdk_chemistry.data import Structure, SpinChannel
 # Create a structure object
 coords = np.array(
     [
-        [0.000000, 0.000000, 0.000000],
-        [1.43233673, 0.000000, 0.000000],
-        [-0.44604614, 1.09629126, 0.000000],
+        [0.00000000, 0.00000000, 0.00000000],
+        [2.70672414, 0.00000000, 0.00000000],
+        [-0.84290504, 2.07169023, 0.00000000],
     ]
 )
 symbols = ["O", "H", "H"]
@@ -24,8 +24,9 @@ structure = Structure(coords, symbols)
 
 # Run intiial SCF to get orbitals
 scf_solver = create("scf_solver")
-scf_solver.settings().set("basis_set", "sto-3g")
-E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+E_scf, wfn = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
 orbitals = wfn.get_orbitals()
 
 # Create a Hamiltonian constructor

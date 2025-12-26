@@ -28,7 +28,7 @@
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
     <link rel="next" title="Orbitals" href="orbitals.html" />
-    <link rel="prev" title="Basis set" href="basis_set.html" /> 
+    <link rel="prev" title="BasisSet" href="basis_set.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -53,30 +53,22 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data management</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization</a></li>
-<li class="toctree-l3"><a class="reference internal" href="basis_set.html">Basis set</a></li>
-<li class="toctree-l3 current"><a class="current reference internal" href="#">Hamiltonian</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#properties">Properties</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#usage">Usage</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#creating-a-hamiltonian-object">Creating a Hamiltonian object</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#accessing-hamiltonian-data">Accessing Hamiltonian data</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#serialization">Serialization</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#active-space-hamiltonian">Active space Hamiltonian</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#validation-methods">Validation methods</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data classes</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="index.html#quick-reference">Quick reference</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="serialization.html">Serialization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="basis_set.html">BasisSet</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Hamiltonian</a></li>
+<li class="toctree-l4"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="structure.html">Structure</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
-<li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Algorithm classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
@@ -108,7 +100,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="index.html">Data management</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Data classes</a></li>
       <li class="breadcrumb-item active">Hamiltonian</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/data/hamiltonian.rst.txt" rel="nofollow"> View page source</a>
@@ -163,19 +155,19 @@ While setter methods are available for construction and initialization purposes,
 </section>
 <section id="usage">
 <h2>Usage<a class="headerlink" href="#usage" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a> class is typically used as input to correlation methods such as Configuration Interaction (CI) and Multi-Configuration Self-Consistent Field (MCSCF) calculations.
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a> class is typically used as input to correlation methods such as Configuration Interaction (<a class="reference internal" href="../../../glossary.html#term-CI"><span class="xref std std-term">CI</span></a>) and Multi-Configuration Self-Consistent Field (<a class="reference internal" href="../../../glossary.html#term-MCSCF"><span class="xref std std-term">MCSCF</span></a>) calculations.
 The <a class="reference internal" href="../algorithms/hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a> algorithm is the primary tool for generating <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a> objects from molecular data.</p>
 </section>
 <section id="creating-a-hamiltonian-object">
 <h2>Creating a Hamiltonian object<a class="headerlink" href="#creating-a-hamiltonian-object" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a> object is typically created using the <a class="reference internal" href="../algorithms/hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a> algorithm (recommended approach for most users), or it can be created directly with the appropriate integral data. Once properly constructed with all required data, the
-Hamiltonian object should be considered constant and not modified:</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a> object is typically created using the <a class="reference internal" href="../algorithms/hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a> algorithm (recommended approach for most users), or it can be created directly with the appropriate integral data.
+Once properly constructed with all required data, the Hamiltonian object should be considered constant and not modified:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create a structure object</span>
-<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="o">&gt;</span><span class="w"> </span><span class="n">coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{{</span><span class="mf">0.000000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">},</span>
-<span class="w">                                       </span><span class="p">{</span><span class="mf">1.43233673</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">},</span>
-<span class="w">                                       </span><span class="p">{</span><span class="mf">-0.44604614</span><span class="p">,</span><span class="w"> </span><span class="mf">1.09629126</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">}};</span>
+<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="o">&gt;</span><span class="w"> </span><span class="n">coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{{</span><span class="mf">0.00000000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.00000000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.00000000</span><span class="p">},</span>
+<span class="w">                                       </span><span class="p">{</span><span class="mf">2.70672414</span><span class="p">,</span><span class="w"> </span><span class="mf">0.00000000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.00000000</span><span class="p">},</span>
+<span class="w">                                       </span><span class="p">{</span><span class="mf">-0.84290504</span><span class="p">,</span><span class="w"> </span><span class="mf">2.07169023</span><span class="p">,</span><span class="w"> </span><span class="mf">0.00000000</span><span class="p">}};</span>
 <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">symbols</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;O&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">};</span>
 <span class="n">Structure</span><span class="w"> </span><span class="nf">structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span><span class="w"> </span><span class="n">symbols</span><span class="p">);</span>
 
@@ -201,9 +193,9 @@ Hamiltonian object should be considered constant and not modified:</p>
 <span class="c1"># Create a structure object</span>
 <span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
     <span class="p">[</span>
-        <span class="p">[</span><span class="mf">0.000000</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">],</span>
-        <span class="p">[</span><span class="mf">1.43233673</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">],</span>
-        <span class="p">[</span><span class="o">-</span><span class="mf">0.44604614</span><span class="p">,</span> <span class="mf">1.09629126</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">0.00000000</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">2.70672414</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">],</span>
+        <span class="p">[</span><span class="o">-</span><span class="mf">0.84290504</span><span class="p">,</span> <span class="mf">2.07169023</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">],</span>
     <span class="p">]</span>
 <span class="p">)</span>
 <span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;O&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
@@ -211,8 +203,9 @@ Hamiltonian object should be considered constant and not modified:</p>
 
 <span class="c1"># Run intiial SCF to get orbitals</span>
 <span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
-<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
-<span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+<span class="p">)</span>
 <span class="n">orbitals</span> <span class="o">=</span> <span class="n">wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
 
 <span class="c1"># Create a Hamiltonian constructor</span>
@@ -227,8 +220,8 @@ Hamiltonian object should be considered constant and not modified:</p>
 </section>
 <section id="accessing-hamiltonian-data">
 <h2>Accessing Hamiltonian data<a class="headerlink" href="#accessing-hamiltonian-data" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a> class provides methods to access the one- and two-electron integrals and other properties. In line
-with its immutable design principle, these methods return const references or copies of the internal data:</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a> class provides methods to access the one- and two-electron integrals and other properties.
+In line with its immutable design principle, these methods return const references or copies of the internal data:</p>
 <section id="two-electron-integral-storage-and-notation">
 <h3>Two-electron integral storage and notation<a class="headerlink" href="#two-electron-integral-storage-and-notation" title="Link to this heading"></a></h3>
 <p>Two-electron integrals in quantum chemistry can be represented using different notations and storage formats.
@@ -244,8 +237,8 @@ The symbols differ (parentheses vs square brackets), but the indexing convention
 <p>The relationship between physicist and chemist notation is:</p>
 <div class="math notranslate nohighlight">
 \[\left\langle ij | kl \right\rangle = \left(ik|jl \right)\]</div>
-<p>Two-electron integrals with real-valued orbitals possess inherent symmetry properties. From a theoretical perspective,
-these symmetries can be expressed as:</p>
+<p>Two-electron integrals with real-valued orbitals possess inherent symmetry properties.
+From a theoretical perspective, these symmetries can be expressed as:</p>
 <div class="math notranslate nohighlight">
 \[\left\langle ij|kl \right\rangle = \left\langle ji|lk \right\rangle = \left\langle kl|ij \right\rangle = \left\langle lk|ji \right\rangle = \left\langle jl|ki \right\rangle = \left\langle lj|ik \right\rangle = \left\langle ki|jl \right\rangle = \left\langle ik|lj \right\rangle\]</div>
 <p>These permutational symmetries arise from the mathematical properties of the two-electron repulsion integrals.
@@ -377,7 +370,7 @@ The <a class="reference internal" href="../algorithms/hamiltonian_constructor.ht
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="basis_set.html" class="btn btn-neutral float-left" title="Basis set" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="basis_set.html" class="btn btn-neutral float-left" title="BasisSet" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="orbitals.html" class="btn btn-neutral float-right" title="Orbitals" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

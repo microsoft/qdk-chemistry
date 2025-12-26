@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Self-consistent field stability checks &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>Stability analysis &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -26,8 +26,8 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="State Preparation" href="state_preparation.html" />
-    <link rel="prev" title="Self-consistent field solving" href="scf_solver.html" /> 
+    <link rel="next" title="State preparation" href="state_preparation.html" />
+    <link rel="prev" title="Self-consistent field (SCF) solver" href="scf_solver.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -52,25 +52,28 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data management</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="index.html">Available algorithms</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Algorithm classes</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
+<li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
 <li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
 <li class="toctree-l3"><a class="reference internal" href="energy_estimator.html">Energy estimation</a></li>
-<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Classical Hamiltonian construction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
-<li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
-<li class="toctree-l3"><a class="reference internal" href="dynamical_correlation.html">Dynamical correlation calculations</a></li>
-<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solving</a></li>
-<li class="toctree-l3 current"><a class="current reference internal" href="#">Self-consistent field stability checks</a></li>
-<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State Preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field (SCF) solver</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Stability analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#discovering-implementations">Discovering implementations</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
@@ -102,8 +105,8 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="index.html">Available algorithms</a></li>
-      <li class="breadcrumb-item active">Self-consistent field stability checks</li>
+          <li class="breadcrumb-item"><a href="index.html">Algorithm classes</a></li>
+      <li class="breadcrumb-item active">Stability analysis</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/algorithms/stability_checker.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -113,8 +116,9 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="self-consistent-field-stability-checks">
-<h1>Self-consistent field stability checks<a class="headerlink" href="#self-consistent-field-stability-checks" title="Link to this heading"></a></h1>
+  <section id="stability-analysis">
+<h1>Stability analysis<a class="headerlink" href="#stability-analysis" title="Link to this heading"></a></h1>
+<p>Stability analysis <span id="id1">[<a class="reference internal" href="../../../references.html#id33" title="H. B. Schlegel and J. J. W. McDouall. Do You Have SCF Stability and Convergence Problems?, pages 167–185. Springer Netherlands, Dordrecht, 1991. URL: https://doi.org/10.1007/978-94-011-3262-6_2, doi:10.1007/978-94-011-3262-6_2.">SM91</a>]</span> is a crucial step in self-consistent field (<a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a>) calculations to ensure that the obtained solution corresponds to a true energy minimum rather than a saddle point or maximum. Unstable solutions can lead to inaccurate results in subsequent calculations, such as correlation methods or excited state computations.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>The <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> stability checks documentation is currently under construction.
@@ -126,8 +130,8 @@ In the meantime, please refer to <a class="reference internal" href="../../../ap
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="scf_solver.html" class="btn btn-neutral float-left" title="Self-consistent field solving" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="state_preparation.html" class="btn btn-neutral float-right" title="State Preparation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="scf_solver.html" class="btn btn-neutral float-left" title="Self-consistent field (SCF) solver" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="state_preparation.html" class="btn btn-neutral float-right" title="State preparation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

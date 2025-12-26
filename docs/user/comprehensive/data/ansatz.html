@@ -50,6 +50,7 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../index.html">In-depth user guide</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
@@ -157,8 +158,9 @@ The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.d
 
 <span class="c1"># SCF</span>
 <span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
-<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
-<span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn_scf</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn_scf</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+<span class="p">)</span>
 
 <span class="c1"># Create Hamiltonian from SCF orbitals</span>
 <span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
@@ -223,7 +225,7 @@ The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.d
 <h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a>: Data serialization and deserialization</p></li>
-<li><p><a class="reference internal" href="../design/settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
+<li><p><a class="reference internal" href="../algorithms/settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
 <li><p><a class="reference internal" href="wavefunction.html"><span class="doc">Wavefunction</span></a>: Quantum state component of the ansatz</p></li>
 <li><p><a class="reference internal" href="hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Energy operator component of the ansatz</p></li>
 <li><p><a class="reference internal" href="orbitals.html"><span class="doc">Orbitals</span></a>: Molecular orbital basis set</p></li>

@@ -27,7 +27,7 @@
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
     <link rel="next" title="Plugins" href="plugins.html" />
-    <link rel="prev" title="Functionals and basis sets" href="basis_functionals.html" /> 
+    <link rel="prev" title="Available functionals and basis sets" href="basis_functionals.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -52,11 +52,12 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="design/index.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l2"><a class="reference internal" href="data/index.html">Data management</a></li>
-<li class="toctree-l2"><a class="reference internal" href="algorithms/index.html">Available algorithms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="basis_functionals.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/index.html">High-level design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data/index.html">Data classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms/index.html">Algorithm classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="basis_functionals.html">Available functionals and basis sets</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Model Hamiltonians</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#creating-model-hamiltonians">Creating model Hamiltonians</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#example-hubbard-model-hamiltonian">Example: Hubbard model Hamiltonian</a></li>
@@ -171,7 +172,6 @@ This is particularly useful for studying model systems like Hubbard models, Heis
 <p>Model Hamiltonians created with <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.ModelOrbitals" title="qdk_chemistry.data.ModelOrbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelOrbitals</span></code></a> can be used with any QDK/Chemistry algorithm that accepts <a class="reference internal" href="data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> objects, including:</p>
 <ul class="simple">
 <li><p><a class="reference internal" href="algorithms/mc_calculator.html"><span class="doc">Multi-configuration calculators</span></a> (<a class="reference internal" href="../../glossary.html#term-FCI"><span class="xref std std-term">FCI</span></a>, <a class="reference internal" href="../../glossary.html#term-ASCI"><span class="xref std std-term">ASCI</span></a>, etc.)</p></li>
-<li><p><a class="reference internal" href="../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.DynamicalCorrelationCalculator" title="qdk_chemistry.algorithms.DynamicalCorrelationCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">DynamicalCorrelationCalculator</span></code></a> (<a class="reference internal" href="../../glossary.html#term-CCSD"><span class="xref std std-term">CCSD</span></a>, <a class="reference internal" href="../../glossary.html#term-CCSD-T"><span class="xref std std-term">CCSD(T)</span></a>, etc.)</p></li>
 <li><p>Quantum algorithm interfaces (<a class="reference internal" href="../../glossary.html#term-VQE"><span class="xref std std-term">VQE</span></a>, <a class="reference internal" href="../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a>, etc.)</p></li>
 </ul>
 <p>Example with multi-configuration calculator:</p>
@@ -204,7 +204,7 @@ This is particularly useful for studying model systems like Hubbard models, Heis
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="basis_functionals.html" class="btn btn-neutral float-left" title="Functionals and basis sets" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="basis_functionals.html" class="btn btn-neutral float-left" title="Available functionals and basis sets" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="plugins.html" class="btn btn-neutral float-right" title="Plugins" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

@@ -1,0 +1,8 @@
+qdk\_chemistry.data.noise\_models module
+========================================
+
+.. automodule:: qdk_chemistry.data.noise_models
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

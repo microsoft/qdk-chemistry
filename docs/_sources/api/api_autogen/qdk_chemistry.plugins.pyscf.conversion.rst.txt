@@ -1,0 +1,8 @@
+qdk\_chemistry.plugins.pyscf.conversion module
+==============================================
+
+.. automodule:: qdk_chemistry.plugins.pyscf.conversion
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

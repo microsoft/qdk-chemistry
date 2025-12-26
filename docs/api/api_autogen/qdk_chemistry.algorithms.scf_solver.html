@@ -52,6 +52,7 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
@@ -244,12 +245,8 @@ Configuration options can be modified through the <code class="docutils literal 
 
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.scf_solver.ScfSolver.run">
-<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.scf_solver.ScfSolver.run" title="Link to this definition"></a></dt>
-<dd><p>Overloaded function.</p>
-<ol class="arabic simple">
-<li><p>run(self: qdk_chemistry.algorithms.ScfSolver, structure: qdk_chemistry.data.Structure, charge: typing.SupportsInt, spin_multiplicity: typing.SupportsInt, initial_guess: qdk_chemistry.data.Orbitals | None = None) -&gt; tuple[float, qdk_chemistry.data.Wavefunction]</p></li>
-</ol>
-<p>Perform SCF calculation on the given molecular structure.</p>
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ScfSolver" title="qdk_chemistry.algorithms.ScfSolver"><span class="pre">qdk_chemistry.algorithms.ScfSolver</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">structure</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><span class="pre">qdk_chemistry.data.Structure</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">charge</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">spin_multiplicity</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">basis_or_guess</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><span class="pre">qdk_chemistry.data.Orbitals</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><span class="pre">qdk_chemistry.data.BasisSet</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><span class="pre">qdk_chemistry.data.Wavefunction</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.scf_solver.ScfSolver.run" title="Link to this definition"></a></dt>
+<dd><p>Perform SCF calculation on the given molecular structure.</p>
 <p>This method automatically locks settings before execution.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -257,31 +254,17 @@ Configuration options can be modified through the <code class="docutils literal 
 <li><p><strong>structure</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><em>qdk_chemistry.data.Structure</em></a>) – The molecular structure to solve</p></li>
 <li><p><strong>charge</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – The molecular charge</p></li>
 <li><p><strong>spin_multiplicity</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – The spin multiplicity of the molecular system</p></li>
-<li><p><strong>initial_guess</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><em>qdk_chemistry.data.Orbitals</em></a><em> | </em><em>None</em>) – Initial orbital guess for the SCF calculation. Defaults to <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p></li>
+<li><p><strong>basis_or_guess</strong> (<em>Union</em><em>[</em><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><em>qdk_chemistry.data.Orbitals</em></a><em>, </em><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><em>qdk_chemistry.data.BasisSet</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – <p>Basis set information, which can be provided as:</p>
+<ul>
+<li><p>A <code class="docutils literal notranslate"><span class="pre">qdk_chemistry.data.BasisSet</span></code> object</p></li>
+<li><p>A string specifying the name of a standard basis set (e.g., “sto-3g”)</p></li>
+<li><p>A <code class="docutils literal notranslate"><span class="pre">qdk_chemistry.data.Orbitals</span></code> object to be used as an initial guess</p></li>
+</ul>
+</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>Converged total energy (nuclear + electronic) and the resulting wavefunction.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a>, <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction">qdk_chemistry.data.Wavefunction</a>]</p>
-</dd>
-</dl>
-<ol class="arabic simple" start="2">
-<li><p>run(self: qdk_chemistry.algorithms.ScfSolver, structure: qdk_chemistry.data.Structure, charge: typing.SupportsInt, spin_multiplicity: typing.SupportsInt) -&gt; tuple[float, qdk_chemistry.data.Wavefunction]</p></li>
-</ol>
-<p>Perform SCF calculation on the given molecular structure (without initial guess).</p>
-<p>This method automatically locks settings before execution.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>structure</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><em>qdk_chemistry.data.Structure</em></a>) – The molecular structure to solve</p></li>
-<li><p><strong>charge</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – The molecular charge</p></li>
-<li><p><strong>spin_multiplicity</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – The spin multiplicity of the molecular system</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Converged total energy (nuclear + electronic) and the resulting wavefunction</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a>, <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction">qdk_chemistry.data.Wavefunction</a>]</p>
