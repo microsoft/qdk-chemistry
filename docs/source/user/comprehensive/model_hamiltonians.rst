@@ -33,7 +33,6 @@ Using model Hamiltonians with algorithms
 Model Hamiltonians created with :class:`~qdk_chemistry.data.ModelOrbitals` can be used with any QDK/Chemistry algorithm that accepts :doc:`Hamiltonian <data/hamiltonian>` objects, including:
 
 * :doc:`Multi-configuration calculators <algorithms/mc_calculator>` (:term:`FCI`, :term:`ASCI`, etc.)
-* :class:`~qdk_chemistry.algorithms.DynamicalCorrelationCalculator` (:term:`CCSD`, :term:`CCSD(T)`, etc.)
 * Quantum algorithm interfaces (:term:`VQE`, :term:`QPE`, etc.)
 
 Example with multi-configuration calculator:

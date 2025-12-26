@@ -5,9 +5,8 @@
 Internal C++ Placeholder Types
 ==============================
 
-The objects below exist solely to satisfy cross references generated from
-Doxygen/Breathe output. They do not correspond to concrete symbols in the public
-API.
+The objects below exist solely to satisfy cross references generated from Doxygen/Breathe output.
+They do not correspond to concrete symbols in the public API.
 
 .. cpp:type:: size_t
 

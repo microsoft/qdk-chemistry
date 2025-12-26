@@ -106,17 +106,6 @@
       "component": {
         "type": "git",
         "git": {
-          "repositoryUrl": "https://github.com/dftd3/simple-dftd3",
-          "commitHash": "8c3219d0b4f8c0e9fb9e8b56ef3bb63897fe3bb6",
-          "tag": "v1.0.0"
-        }
-      },
-      "developmentDependency": false
-    },
-    {
-      "component": {
-        "type": "git",
-        "git": {
           "repositoryUrl": "https://github.com/NVIDIA/NVTX",
           "commitHash": "c4dcd75c589917324a261c295055ef3aad243b67",
           "tag": "release-v3"

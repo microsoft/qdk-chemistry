@@ -16,7 +16,7 @@ coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 symbols = ["H", "H"]
 structure = Structure(coords, symbols=symbols)
 
-# Obtain orbitals from an SCF calculation
+# Obtain orbitals from a SCF calculation
 scf_solver = create("scf_solver")
 E_scf, wfn = scf_solver.run(
     structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"

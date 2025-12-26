@@ -7,51 +7,60 @@
 
 ################################################################################
 # start-cell-create
-import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import (
-    BasisSet,
-    CasWavefunctionContainer,
-    Configuration,
-    Orbitals,
-    OrbitalType,
-    Shell,
-    Wavefunction,
-)
 
-regular_prep = create("state_prep", "regular_isometry")
+# Create a StatePreparation instance
 sparse_prep = create("state_prep", "sparse_isometry_gf2x")
-sparse_prep.settings().set("transpile", True)
-sparse_prep.settings().set("basis_gates", ["rz", "cz", "sdg", "h"])
-sparse_prep.settings().set("transpile_optimization_level", 3)
+regular_prep = create("state_prep", "regular_isometry")
 # end-cell-create
 ################################################################################
 
 ################################################################################
+# start-cell-configure
+# Configure transpilation settings
+sparse_prep.settings().set("transpile", True)
+sparse_prep.settings().set("basis_gates", ["rz", "cz", "sdg", "h"])
+sparse_prep.settings().set("transpile_optimization_level", 3)
+# end-cell-configure
+################################################################################
+
+################################################################################
 # start-cell-run
-# Create a basis set
-shells = []
-for _ in range(3):
-    exps = np.array([1.0])
-    coefs = np.array([1.0])
-    shell = Shell(0, OrbitalType.S, exps, coefs)
-    shells.append(shell)
-basis_set = BasisSet("foo", shells)
+import numpy as np  # noqa: E402
+from qdk_chemistry.data import Structure  # noqa: E402
 
-# Create orbitals
-coeffs = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 0.0]])
-orbitals = Orbitals(coeffs, None, None, basis_set)
+# Specify a structure
+coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+symbols = ["H", "H"]
+structure = Structure(coords, symbols=symbols)
 
-# Construct a wavefunction
-dets = [Configuration("200"), Configuration("ud0")]
-coeffs = np.array([0.9, 0.1])
-container = CasWavefunctionContainer(coeffs, dets, orbitals)
-wavefunction = Wavefunction(container)
+# Run scf
+scf_solver = create("scf_solver")
+E_scf, wfn_scf = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
+
+# Compute the Hamiltonian
+hamiltonian_constructor = create("hamiltonian_constructor")
+hamiltonian = hamiltonian_constructor.run(wfn_scf.get_orbitals())
+
+# Compute CAS wavefunction
+cas_solver = create("multi_configuration_calculator", "macis_cas")
+E_cas, wfn_cas = cas_solver.run(hamiltonian, 1, 1)
 
 # Construct the circuit
-regular_circuit = regular_prep.run(wavefunction)
-sparse_circuit = sparse_prep.run(wavefunction)
+regular_circuit = regular_prep.run(wfn_cas)
+sparse_circuit = sparse_prep.run(wfn_cas)
 print(f"Regular isometry QASM:\n{regular_circuit.get_qasm()}")
 print(f"Sparse isometry QASM:\n{sparse_circuit.get_qasm()}")
 # end-cell-run
+################################################################################
+
+################################################################################
+# start-cell-list-implementations
+from qdk_chemistry.algorithms import registry  # noqa: E402
+
+print(registry.available("state_prep"))
+# ['sparse_isometry_gf2x', 'regular_isometry']
+# end-cell-list-implementations
 ################################################################################

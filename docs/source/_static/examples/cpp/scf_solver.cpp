@@ -19,12 +19,9 @@ auto scf_solver = ScfSolverFactory::create();
 int main() {
   // --------------------------------------------------------------------------------------------
   // start-cell-configure
-  // Standard settings that work with all solvers
   // Set the method
   // Note the following line is optional, since hf is the default method
   scf_solver->settings().set("method", "hf");
-  // Set the basis set
-  scf_solver->settings().set("basis_set", "def2-tzvpp");
 
   // end-cell-configure
   // --------------------------------------------------------------------------------------------
@@ -38,10 +35,19 @@ int main() {
   Structure structure(coords, symbols);
 
   // Run the SCF calculation
-  auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);
+  auto [E_scf, wfn] = scf_solver->run(structure, 0, 1, "def2-tzvpp");
   auto scf_orbitals = wfn->get_orbitals();
   std::cout << "SCF Energy: " << E_scf << " Hartree" << std::endl;
   // end-cell-run
+  // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-list-implementations
+  auto names = ScfSolverFactory::available();
+  for (const auto& name : names) {
+    std::cout << name << std::endl;
+  }
+  // end-cell-list-implementations
   // --------------------------------------------------------------------------------------------
   return 0;
 }

@@ -46,14 +46,14 @@ For unrestricted Hamiltonians, the one-electron and two-electron integrals are s
 Usage
 -----
 
-The :class:`~qdk_chemistry.data.Hamiltonian` class is typically used as input to correlation methods such as Configuration Interaction (CI) and Multi-Configuration Self-Consistent Field (MCSCF) calculations.
+The :class:`~qdk_chemistry.data.Hamiltonian` class is typically used as input to correlation methods such as Configuration Interaction (:term:`CI`) and Multi-Configuration Self-Consistent Field (:term:`MCSCF`) calculations.
 The :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm is the primary tool for generating :class:`~qdk_chemistry.data.Hamiltonian` objects from molecular data.
 
 Creating a Hamiltonian object
 -----------------------------
 
-The :class:`~qdk_chemistry.data.Hamiltonian` object is typically created using the :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm (recommended approach for most users), or it can be created directly with the appropriate integral data. Once properly constructed with all required data, the
-Hamiltonian object should be considered constant and not modified:
+The :class:`~qdk_chemistry.data.Hamiltonian` object is typically created using the :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm (recommended approach for most users), or it can be created directly with the appropriate integral data.
+Once properly constructed with all required data, the Hamiltonian object should be considered constant and not modified:
 
 .. tab:: C++ API
 
@@ -72,8 +72,8 @@ Hamiltonian object should be considered constant and not modified:
 Accessing Hamiltonian data
 --------------------------
 
-The :class:`~qdk_chemistry.data.Hamiltonian` class provides methods to access the one- and two-electron integrals and other properties. In line
-with its immutable design principle, these methods return const references or copies of the internal data:
+The :class:`~qdk_chemistry.data.Hamiltonian` class provides methods to access the one- and two-electron integrals and other properties.
+In line with its immutable design principle, these methods return const references or copies of the internal data:
 
 Two-electron integral storage and notation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -95,8 +95,8 @@ The relationship between physicist and chemist notation is:
 
    \left\langle ij | kl \right\rangle = \left(ik|jl \right)
 
-Two-electron integrals with real-valued orbitals possess inherent symmetry properties. From a theoretical perspective,
-these symmetries can be expressed as:
+Two-electron integrals with real-valued orbitals possess inherent symmetry properties.
+From a theoretical perspective, these symmetries can be expressed as:
 
 .. math::
 
