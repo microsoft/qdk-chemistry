@@ -16,6 +16,7 @@
 #include <qdk/chemistry/utils/logger.hpp>
 #include <vector>
 
+#include "scf_algorithm/asahf.h"
 #include "util/macros.h"
 
 namespace qdk::chemistry::scf {
@@ -29,36 +30,36 @@ void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
     guess_chk = guess_chk / "guess" / (obs.name + "_cart");
   }
 
-  if (!std::filesystem::exists(guess_chk)) {
-    QDK_LOGGER().error(
-        "{} not found, use `scripts/generate_guess.py` to prepare basis",
-        obs.name);
-    exit(EXIT_FAILURE);
-  }
-  std::map<int, RowMajorMatrix> atom_dm;
-  std::ifstream fin(guess_chk);
-  int atomic_number;
-  while (fin >> atomic_number) {
-    int n;
-    fin >> n;
-    RowMajorMatrix d(n, n);
-    for (int i = 0; i < n; i++) {
-      for (int j = 0; j < n; j++) {
-        fin >> d(i, j);
-      }
-    }
-    atom_dm[atomic_number] = d;
-  }
   int N = obs.num_atomic_orbitals;
   RowMajorMatrix tD = RowMajorMatrix::Zero(N, N);
+  if (!std::filesystem::exists(guess_chk)) {
+    QDK_LOGGER().info("Guess file {} not found, generating atomic guesses",
+                      guess_chk.string());
+    get_atom_guess(obs, mol, tD);
+  } else {
+    std::map<int, RowMajorMatrix> atom_dm;
+    std::ifstream fin(guess_chk);
+    int atomic_number;
+    while (fin >> atomic_number) {
+      int n;
+      fin >> n;
+      RowMajorMatrix d(n, n);
+      for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+          fin >> d(i, j);
+        }
+      }
+      atom_dm[atomic_number] = d;
+    }
 
-  for (size_t i = 0, p = 0; i < mol.n_atoms; i++) {
-    int z = mol.atomic_nums[i];
-    VERIFY_INPUT(atom_dm.count(z),
-                 fmt::format("No basis for Atom(Z={}) in {}", z, obs.name));
-    const auto& d = atom_dm[z];
-    tD.block(p, p, d.rows(), d.cols()) = d;
-    p += d.rows();
+    for (size_t i = 0, p = 0; i < mol.n_atoms; i++) {
+      int z = mol.atomic_nums[i];
+      VERIFY_INPUT(atom_dm.count(z),
+                   fmt::format("No basis for Atom(Z={}) in {}", z, obs.name));
+      const auto& d = atom_dm[z];
+      tD.block(p, p, d.rows(), d.cols()) = d;
+      p += d.rows();
+    }
   }
 
   std::vector<int> order(obs.shells.size());

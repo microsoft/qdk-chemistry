@@ -10,8 +10,24 @@ Acronym definitions
    ASCI
       Adaptive Sampling Configuration Interaction.
 
+   AVAS
+      Automated Valence Active Space.
+      Method that projects molecular orbitals onto a target atomic orbital basis to identify valence active orbitals.
+
+   BFGS
+      Broyden–Fletcher–Goldfarb–Shanno quasi-Newton optimization algorithm.
+
+   BSE
+      Basis Set Exchange, a repository of standardized quantum chemistry basis sets and effective core potentials.
+
    CAS
       Complete Active Space.
+
+   CASCI
+      Complete Active Space Configuration Interaction.
+
+   CASSCF
+      Complete Active Space Self-Consistent Field.
 
    CCSD
       Coupled Cluster with Single and Double excitations.
@@ -22,14 +38,29 @@ Acronym definitions
    CI
       Configuration Interaction.
 
+   CNOT
+      Controlled-NOT two-qubit gate used in quantum circuits.
+
    DFT
       Density Functional Theory.
 
-   ERIs
-      Electron Repulsion Integrals.
+   DIIS
+      Direct Inversion in the Iterative Subspace.
+
+   ECP
+      Effective Core Potential, a pseudopotential that replaces core electrons to simplify calculations.
+
+   ERI
+      Electron Repulsion Integral.
+
+   FCIDUMP
+      Text format for storing one- and two-electron integrals (FCIDUMP standard).
 
    FCI
       Full Configuration Interaction.
+
+   GDM
+      Geometric Direct Minimization.
 
    GGA
       Generalized Gradient Approximation.
@@ -37,8 +68,14 @@ Acronym definitions
    HF
       Hartree-Fock.
 
+   HOMO
+      Highest Occupied Molecular Orbital.
+
    LDA
       Local Density Approximation.
+
+   LUMO
+      Lowest Unoccupied Molecular Orbital.
 
    MACIS
       Many-body Adaptive Configuration Interaction Solver.
@@ -62,6 +99,9 @@ Acronym definitions
    QPE
       Quantum Phase Estimation.
 
+   RDM
+      Reduced Density Matrix; one- or two-particle reduced density matrices used for many-body properties.
+
    RHF
       Restricted Hartree-Fock.
 
@@ -79,6 +119,9 @@ Acronym definitions
 
    SCI
       Selected Configuration Interaction.
+
+   STO
+      Slater-type orbital minimal basis family (e.g., STO-3G minimal basis sets).
 
    UHF
       Unrestricted Hartree-Fock.
