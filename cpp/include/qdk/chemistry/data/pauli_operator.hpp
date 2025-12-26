@@ -101,19 +101,17 @@ class PauliOperatorExpression {
   virtual std::uint64_t num_qubits() const = 0;
 
   /**
-   * @brief Returns the canonical string representation of this expression.
+   * @brief Returns the canonical string representation for a qubit range.
    *
    * The canonical string is a sequence of characters representing the Pauli
    * operators on each qubit, in little-endian order (qubit 0 is leftmost).
    * Identity operators are represented as 'I'.
    *
-   * @param num_qubits The total number of qubits to represent.
-   * @return A canonical string representation.
-   */
-  virtual std::string to_canonical_string(std::uint64_t num_qubits) const = 0;
-
-  /**
-   * @brief Returns the canonical string representation for a qubit range.
+   * For example, for min_qubit=1 and max_qubit=3 for the expression
+   *
+   *  X(0) * Y(1) * Z(3) * X(4)
+   *
+   * the returned string would be "YIZ".
    *
    * @param min_qubit The minimum qubit index to include.
    * @param max_qubit The maximum qubit index to include (inclusive).
@@ -123,7 +121,20 @@ class PauliOperatorExpression {
                                           std::uint64_t max_qubit) const = 0;
 
   /**
+   * @brief Returns the canonical string representation of this expression.
+   *
+   * Wraps to_canonical_string(0, max_qubit_index()+1).
+   *
+   * @param num_qubits The total number of qubits to represent.
+   * @return A canonical string representation.
+   */
+  virtual std::string to_canonical_string(std::uint64_t num_qubits) const = 0;
+
+  /**
    * @brief Returns a vector of (coefficient, canonical_string) pairs.
+   *
+   * For example, the expression 2*X(0)*Z(2) + 3i*Y(1) on 4 qubits would return:
+   * [ (2, "XIZI"), (3i, "IYII") ]
    *
    * @param num_qubits The total number of qubits to represent.
    * @return Vector of pairs where each pair contains the coefficient and
@@ -135,8 +146,7 @@ class PauliOperatorExpression {
   /**
    * @brief Returns a vector of (coefficient, canonical_string) pairs.
    *
-   * Uses auto-detected qubit range based on min_qubit_index() and
-   * max_qubit_index().
+   * Wraps to_canonical_terms(max_qubit_index()+1).
    *
    * @return Vector of pairs where each pair contains the coefficient and
    *         canonical string for each term.
@@ -213,53 +223,231 @@ class PauliOperatorExpression {
   }
   /**
    * @brief Returns whether this expression is in distributed form.
-   * @return true if this is a SumPauliOperatorExpression, false otherwise.
+   * @return true if this is in distributed form, false otherwise.
+   * @see distribute()
    */
   bool is_distributed() const;
 };
 
+/**
+ * @brief Concept to check if a type is derived from PauliOperatorExpression.
+ * @tparam T The type to check.
+ */
 template <typename T>
 concept IsPauliOperatorExpression =
     std::derived_from<T, PauliOperatorExpression>;
 
+/**
+ * @brief A PauliOperatorExpression representing a single Pauli operator
+ * acting on a qubit.
+ *
+ * This class serves as the leaf node in the expression tree for
+ * PauliOperatorExpression trees. It represents one of the four Pauli operators:
+ *
+ * - Identity (I)
+ * - Pauli-X (X)
+ * - Pauli-Y (Y)
+ * - Pauli-Z (Z)
+ */
 class PauliOperator : public PauliOperatorExpression {
  public:
+  /**
+   * @brief Constructs a PauliOperator with the specified type and qubit index.
+   * @param operator_type The type of Pauli operator (0=I, 1=X, 2=Y, 3=Z).
+   * @param qubit_index The index of the qubit this operator acts on.
+   */
   PauliOperator(std::uint8_t operator_type, std::uint64_t qubit_index);
 
+  /**
+   * @brief Returns a string representation of this Pauli operator.
+   *
+   * For example, "X(0)" for a Pauli-X operator on qubit 0.
+   *
+   * See PauliOperatorExpression::to_string() for more details.
+   * @return A string representing this Pauli operator.
+   * @see PauliOperatorExpression::to_string()
+   */
   std::string to_string() const override;
+
+  /**
+   * @brief Creates a deep copy of this Pauli operator.
+   * @return A unique_ptr to the cloned Pauli operator.
+   * @see PauliOperatorExpression::clone()
+   */
   std::unique_ptr<PauliOperatorExpression> clone() const override;
+
+  /**
+   * @brief Distributes this Pauli operator.
+   *
+   * Since a single Pauli operator is already in simplest form, this method
+   * simply returns a new SumPauliOperatorExpression containing this operator.
+   *
+   * @return A new SumPauliOperatorExpression containing this operator.
+   * @see PauliOperatorExpression::distribute()
+   */
   std::unique_ptr<SumPauliOperatorExpression> distribute() const override;
+
+  /**
+   * @brief Simplifies this Pauli operator.
+   *
+   * Since a single Pauli operator is already in simplest form, this method
+   * simply returns a clone of this operator.
+   *
+   * @return A clone of this Pauli operator.
+   * @see PauliOperatorExpression::simplify()
+   */
   std::unique_ptr<PauliOperatorExpression> simplify() const override;
+
+  /**
+   * @brief Prunes this Pauli operator based on the threshold.
+   *
+   * Singple Puali operators are interpreted as having coefficient 1.0.
+   * If the threshold epsilon is >= 1.0, this operator is pruned away.
+   * Otherwise, it is retained.
+   *
+   * @param epsilon The threshold below which terms are removed.
+   * @return A new SumPauliOperatorExpression containing this operator if
+   * epsilon < 1.0, or an empty SumPauliOperatorExpression otherwise.
+   * @see PauliOperatorExpression::prune_threshold()
+   */
   std::unique_ptr<SumPauliOperatorExpression> prune_threshold(
       double epsilon) const override;
 
+  /**
+   * @brief Returns the minimum qubit index referenced in this operator.
+   *
+   * Since this operator acts on a single qubit, it simply returns that index.
+   *
+   * @return The qubit index this operator acts on.
+   */
   std::uint64_t min_qubit_index() const override;
+
+  /**
+   * @brief Returns the maximum qubit index referenced in this operator.
+   *
+   * Since this operator acts on a single qubit, it simply returns that index.
+   *
+   * @return The qubit index this operator acts on.
+   */
   std::uint64_t max_qubit_index() const override;
+
+  /**
+   * @brief Returns the number of qubits spanned by this operator.
+   *
+   * Since this operator acts on a single qubit, it always returns 1.
+   *
+   * @return 1
+   */
   std::uint64_t num_qubits() const override;
-  std::string to_canonical_string(std::uint64_t num_qubits) const override;
+
+  /**
+   * @brief Returns the canonical string representation for a qubit range.
+   *
+   * See PauliOperatorExpression::to_canonical_string() for more details.
+   *
+   * @param min_qubit The minimum qubit index to include.
+   * @param max_qubit The maximum qubit index to include (inclusive).
+   * @return A string of length (max_qubit - min_qubit + 1).
+   * @see PauliOperatorExpression::to_canonical_string()
+   */
   std::string to_canonical_string(std::uint64_t min_qubit,
                                   std::uint64_t max_qubit) const override;
 
+  /**
+   * @brief Returns the canonical string representation of this Pauli operator.
+   *
+   * Wraps to_canonical_string(0, max_qubit_index()+1).
+   *
+   * @param num_qubits The total number of qubits to represent.
+   * @return A string of length num_qubits.
+   * @see PauliOperatorExpression::to_canonical_string()
+   */
+  std::string to_canonical_string(std::uint64_t num_qubits) const override;
+
+  /**
+   * @brief Returns a vector of (coefficient, canonical_string) pairs.
+   *
+   * For a single Pauli operator, this returns a single pair with
+   * coefficient 1.0 and the canonical string representation if the requested
+   * num_qubits includes the qubit this operator acts on. Otherwise, it returns
+   * a single pair with coefficient 1.0 and a string of all identities.
+   *
+   * @param num_qubits The total number of qubits to represent.
+   * @return Vector of pairs where each pair contains the coefficient and
+   *         canonical string for each term.
+   * @see PauliOperatorExpression::to_canonical_terms()
+   */
   std::vector<std::pair<std::complex<double>, std::string>> to_canonical_terms(
       std::uint64_t num_qubits) const override;
+
+  /**
+   * @brief Returns a vector of (coefficient, canonical_string) pairs.
+   *
+   * Wraps to_canonical_terms(max_qubit_index()+1).
+   *
+   * @return Vector of pairs where each pair contains the coefficient and
+   *         canonical string for each term.
+   * @see PauliOperatorExpression::to_canonical_terms()
+   */
   std::vector<std::pair<std::complex<double>, std::string>> to_canonical_terms()
       const override;
 
+  /**
+   * @brief Returns the type of this Pauli operator.
+   * @return The operator type (0=I, 1=X, 2=Y, 3=Z).
+   */
   inline std::uint8_t get_operator_type() const { return operator_type_; }
+
+  /**
+   * @brief Returns the qubit index this Pauli operator acts on.
+   * @return The qubit index.
+   */
   inline std::uint64_t get_qubit_index() const { return qubit_index_; }
 
+  /**
+   * @brief Factory method to crete an Identity Pauli operator acting on a
+   * specified qubit.
+   *
+   * @param qubit_index The index of the qubit.
+   * @return PauliOperator representing the Identity operator on the specified
+   * qubit.
+   */
   inline static PauliOperator I(std::uint64_t qubit_index) {
     return PauliOperator(0, qubit_index);
   }
 
+  /**
+   * @brief Factory method to crete a Pauli-X operator acting on a specified
+   * qubit.
+   *
+   * @param qubit_index The index of the qubit.
+   * @return PauliOperator representing the Pauli-X operator on the specified
+   * qubit.
+   */
   inline static PauliOperator X(std::uint64_t qubit_index) {
     return PauliOperator(1, qubit_index);
   }
 
+  /**
+   * @brief Factory method to crete a Pauli-Y operator acting on a specified
+   * qubit.
+   *
+   * @param qubit_index The index of the qubit.
+   * @return PauliOperator representing the Pauli-Y operator on the specified
+   * qubit.
+   */
   inline static PauliOperator Y(std::uint64_t qubit_index) {
     return PauliOperator(2, qubit_index);
   }
 
+  /**
+   * @brief Factory method to crete a Pauli-Z operator acting on a specified
+   * qubit.
+   *
+   * @param qubit_index The index of the qubit.
+   * @return PauliOperator representing the Pauli-Z operator on the specified
+   * qubit.
+   */
   inline static PauliOperator Z(std::uint64_t qubit_index) {
     return PauliOperator(3, qubit_index);
   }
@@ -275,15 +463,71 @@ class PauliOperator : public PauliOperatorExpression {
   std::uint64_t qubit_index_;   ///< Index of the qubit this operator acts on
 };
 
+/**
+ * @brief A PauliOperatorExpression representing Kronecker products of multiple
+ * PauliOperatorExpression instances.
+ *
+ * For example, the expression X(0) * Y(1) represents the Pauli-X operator on
+ * qubit 0 tensor product with the Pauli-Y operator on qubit 1, with an implicit
+ * coefficient of 1.0.
+ *
+ * The class also supports nesting of expressions, e.g.,
+ * 2.0 * (X(0) + Z(2)) * Y(1)
+ *
+ * where the left factor is SumPauliOperatorExpression and the right factor is
+ * a PauliOperator.
+ *
+ * The product expression follows standard arithmetic rules for Kronecker
+ * products:
+ * - Distributive: A*(B + C) = A*B + A*C
+ * - Associative: (A*B)*C = A*(B*C)
+ * - Non-commutative: A*B != B*A in general for expressions acting on
+ *   overlapping qubits.
+ */
 class ProductPauliOperatorExpression : public PauliOperatorExpression {
  public:
+  /**
+   * @brief Constructs an empty ProductPauliOperatorExpression with
+   * coefficient 1.0.
+   */
   ProductPauliOperatorExpression();
+
+  /**
+   * @brief Constructs a ProductPauliOperatorExpression with the specified
+   * coefficient and no expression factors.
+   * @param coefficient The scalar coefficient for this product expression.
+   */
   ProductPauliOperatorExpression(std::complex<double> coefficient);
+
+  /**
+   * @brief Constructs a ProductPauliOperatorExpression representing the product
+   * of two PauliOperatorExpression instances.
+   *
+   * For example:
+   *  auto left = PauliOperator::X(0);
+   *  auto right = SumPauliOperatorExpression(PauliOperator::Y(1),
+   *    PauliOperator::Z(2));
+   *  auto product = ProductPauliOperatorExpression(left, right);
+   *
+   * @param left The left PauliOperatorExpression factor.
+   * @param right The right PauliOperatorExpression factor.
+   */
   ProductPauliOperatorExpression(const PauliOperatorExpression& left,
                                  const PauliOperatorExpression& right);
+
+  /**
+   * @brief Constructs a ProductPauliOperatorExpression with the specified
+   * coefficient and a single PauliOperatorExpression factor.
+   * @param coefficient The scalar coefficient for this product expression.
+   * @param expr The PauliOperatorExpression factor.
+   */
   ProductPauliOperatorExpression(std::complex<double> coefficient,
                                  const PauliOperatorExpression& expr);
 
+  /**
+   * @brief Copy constructor.
+   * @param other The ProductPauliOperatorExpression to copy.
+   */
   ProductPauliOperatorExpression(const ProductPauliOperatorExpression& other);
 
   std::string to_string() const override;
