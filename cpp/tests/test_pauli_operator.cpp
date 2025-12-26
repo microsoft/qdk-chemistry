@@ -730,8 +730,7 @@ TEST(PauliOperatorExpressionTest, ProductCanonicalString) {
   // X(0)*Z(2) on 4 qubits should be "XIZI"
   auto prod = PauliOperator::X(0) * PauliOperator::Z(2);
   auto simplified = prod.simplify();
-  auto* prod_ptr =
-      dynamic_cast<ProductPauliOperatorExpression*>(simplified.get());
+  auto* prod_ptr = simplified->as_product_expression();
   ASSERT_NE(prod_ptr, nullptr);
   EXPECT_EQ(prod_ptr->to_canonical_string(4), "XIZI");
 
@@ -747,16 +746,14 @@ TEST(PauliOperatorExpressionTest, ProductCanonicalString) {
   // X(2)*Y(4) with range [2,5] should be "XIYI"
   auto prod3 = PauliOperator::X(2) * PauliOperator::Y(4);
   auto simplified3 = prod3.simplify();
-  auto* prod3_ptr =
-      dynamic_cast<ProductPauliOperatorExpression*>(simplified3.get());
+  auto* prod3_ptr = simplified3->as_product_expression();
   EXPECT_EQ(prod3_ptr->to_canonical_string(2, 5), "XIYI");
 }
 
 TEST(PauliOperatorExpressionTest, ProductQubitRange) {
   auto prod = PauliOperator::X(2) * PauliOperator::Z(5);
   auto simplified = prod.simplify();
-  auto* prod_ptr =
-      dynamic_cast<ProductPauliOperatorExpression*>(simplified.get());
+  auto* prod_ptr = simplified->as_product_expression();
 
   EXPECT_EQ(prod_ptr->min_qubit_index(), 2);
   EXPECT_EQ(prod_ptr->max_qubit_index(), 5);
@@ -773,7 +770,7 @@ TEST(PauliOperatorExpressionTest, SumCanonicalString) {
   // X(0) + Z(1) on 2 qubits
   auto sum = PauliOperator::X(0) + PauliOperator::Z(1);
   auto simplified = sum.simplify();
-  auto* sum_ptr = dynamic_cast<SumPauliOperatorExpression*>(simplified.get());
+  auto* sum_ptr = simplified->as_sum_expression();
   ASSERT_NE(sum_ptr, nullptr);
 
   // Not a single product term, should throw
@@ -782,7 +779,7 @@ TEST(PauliOperatorExpressionTest, SumCanonicalString) {
   // Single term after simplification: X(0) + X(0) -> 2*X(0)
   auto sum3 = PauliOperator::X(0) + PauliOperator::X(0);
   auto simplified3 = sum3.simplify();
-  auto* sum3_ptr = dynamic_cast<SumPauliOperatorExpression*>(simplified3.get());
+  auto* sum3_ptr = simplified3->as_sum_expression();
   ASSERT_NE(sum3_ptr, nullptr);
   EXPECT_EQ(sum3_ptr->to_canonical_string(3), "XII");
 }
@@ -790,7 +787,7 @@ TEST(PauliOperatorExpressionTest, SumCanonicalString) {
 TEST(PauliOperatorExpressionTest, SumQubitRange) {
   auto sum = PauliOperator::X(1) + PauliOperator::Z(4);
   auto simplified = sum.simplify();
-  auto* sum_ptr = dynamic_cast<SumPauliOperatorExpression*>(simplified.get());
+  auto* sum_ptr = simplified->as_sum_expression();
 
   EXPECT_EQ(sum_ptr->min_qubit_index(), 1);
   EXPECT_EQ(sum_ptr->max_qubit_index(), 4);
@@ -807,7 +804,7 @@ TEST(PauliOperatorExpressionTest, CanonicalTerms) {
   // 2*X(0) + 3*Y(1)
   auto sum = (2.0 * PauliOperator::X(0)) + (3.0 * PauliOperator::Y(1));
   auto simplified = sum.simplify();
-  auto* sum_ptr = dynamic_cast<SumPauliOperatorExpression*>(simplified.get());
+  auto* sum_ptr = simplified->as_sum_expression();
 
   auto terms = sum_ptr->to_canonical_terms(2);
   EXPECT_EQ(terms.size(), 2);
@@ -917,14 +914,14 @@ TEST(PauliOperatorExpressionTest, ProductCanonicalStringEdgeCases) {
   // Qubit index 0 at edge
   auto prod2 = PauliOperator::X(0) * PauliOperator::Y(0);
   auto s2 = prod2.simplify();
-  auto* p2 = dynamic_cast<ProductPauliOperatorExpression*>(s2.get());
+  auto* p2 = s2->as_product_expression();
   // X*Y = iZ on same qubit
   EXPECT_EQ(p2->to_canonical_string(1), "Z");
 
   // Large gap between qubit indices
   auto prod3 = PauliOperator::X(0) * PauliOperator::Z(10);
   auto s3 = prod3.simplify();
-  auto* p3 = dynamic_cast<ProductPauliOperatorExpression*>(s3.get());
+  auto* p3 = s3->as_product_expression();
   EXPECT_EQ(p3->to_canonical_string(11), "XIIIIIIIIIZ");
   EXPECT_EQ(p3->to_canonical_string(0, 10), "XIIIIIIIIIZ");
 
@@ -935,7 +932,7 @@ TEST(PauliOperatorExpressionTest, ProductCanonicalStringEdgeCases) {
   // All identity Pauli operators after simplification
   auto prod4 = PauliOperator::X(0) * PauliOperator::X(0);  // X*X = I
   auto s4 = prod4.simplify();
-  auto* p4 = dynamic_cast<ProductPauliOperatorExpression*>(s4.get());
+  auto* p4 = s4->as_product_expression();
   EXPECT_EQ(p4->to_canonical_string(2), "II");  // Pure scalar, all identities
 }
 
@@ -944,14 +941,14 @@ TEST(PauliOperatorExpressionTest, ProductWithComplexCoefficients) {
   auto prod = std::complex<double>(0.5, 0.5) * PauliOperator::X(0) *
               PauliOperator::Y(1);
   auto s = prod.simplify();
-  auto* p = dynamic_cast<ProductPauliOperatorExpression*>(s.get());
+  auto* p = s->as_product_expression();
   EXPECT_EQ(p->to_canonical_string(2), "XY");
 
   // Canonical string is independent of coefficient
   auto prod2 = std::complex<double>(-1.0, 2.0) * PauliOperator::X(0) *
                PauliOperator::Y(1);
   auto s2 = prod2.simplify();
-  auto* p2 = dynamic_cast<ProductPauliOperatorExpression*>(s2.get());
+  auto* p2 = s2->as_product_expression();
   EXPECT_EQ(p2->to_canonical_string(2), "XY");
 }
 
@@ -963,7 +960,7 @@ TEST(PauliOperatorExpressionTest, SumQubitRangeEdgeCases) {
   // Sum with all terms on same qubit
   auto sum1 = PauliOperator::X(5) + PauliOperator::Y(5);
   auto s1 = sum1.simplify();
-  auto* sum1_ptr = dynamic_cast<SumPauliOperatorExpression*>(s1.get());
+  auto* sum1_ptr = s1->as_sum_expression();
   EXPECT_EQ(sum1_ptr->min_qubit_index(), 5);
   EXPECT_EQ(sum1_ptr->max_qubit_index(), 5);
   EXPECT_EQ(sum1_ptr->num_qubits(), 1);
@@ -971,7 +968,7 @@ TEST(PauliOperatorExpressionTest, SumQubitRangeEdgeCases) {
   // Sum with large qubit range
   auto sum2 = PauliOperator::X(0) + PauliOperator::Z(50);
   auto s2 = sum2.simplify();
-  auto* sum2_ptr = dynamic_cast<SumPauliOperatorExpression*>(s2.get());
+  auto* sum2_ptr = s2->as_sum_expression();
   EXPECT_EQ(sum2_ptr->min_qubit_index(), 0);
   EXPECT_EQ(sum2_ptr->max_qubit_index(), 50);
   EXPECT_EQ(sum2_ptr->num_qubits(), 51);
@@ -990,7 +987,7 @@ TEST(PauliOperatorExpressionTest, CanonicalTermsEdgeCases) {
   auto sum2 = (std::complex<double>(1.0, 2.0) * PauliOperator::X(0)) +
               (std::complex<double>(-1.0, 0.5) * PauliOperator::Y(1));
   auto s2 = sum2.simplify();
-  auto* sum2_ptr = dynamic_cast<SumPauliOperatorExpression*>(s2.get());
+  auto* sum2_ptr = s2->as_sum_expression();
   auto terms2 = sum2_ptr->to_canonical_terms(2);
   EXPECT_EQ(terms2.size(), 2);
 
@@ -1052,8 +1049,7 @@ TEST(PauliOperatorExpressionTest, ProductToCanonicalTerms) {
   // Test ProductPauliOperatorExpression::to_canonical_terms
   auto prod = 2.5 * PauliOperator::X(0) * PauliOperator::Z(2);
   auto simplified = prod.simplify();
-  auto* prod_ptr =
-      dynamic_cast<ProductPauliOperatorExpression*>(simplified.get());
+  auto* prod_ptr = simplified->as_product_expression();
   ASSERT_NE(prod_ptr, nullptr);
 
   auto terms = prod_ptr->to_canonical_terms(4);

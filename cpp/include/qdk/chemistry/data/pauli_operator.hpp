@@ -24,9 +24,53 @@ class SumPauliOperatorExpression;
 class PauliOperatorExpression {
  public:
   virtual ~PauliOperatorExpression() = default;
+
+  /**
+   * @brief Returns a string representation of this expression.
+   *
+   * Returns a human-readable string showing the structure of the arithmetic
+   * expression. For example, a product of two Pauli operators might be
+   * represented as "(X(0) * Z(1))".
+   *
+   * For the canonical string representation consistent with other frameworks,
+   * use to_canonical_string().
+   *
+   * @return A string representing this expression.
+   * @see to_canonical_string()
+   */
   virtual std::string to_string() const = 0;
+
+  /**
+   * @brief Creates a deep copy of this expression.
+   * @return A unique_ptr to the cloned expression.
+   */
   virtual std::unique_ptr<PauliOperatorExpression> clone() const = 0;
+
+  /**
+   * @brief Distributes nested expressions to create a flat sum of products.
+   *
+   * For example, it transforms expressions like
+   * (A + B) * (C - D) into A*C - A*D + B*C - B*D.
+   *
+   * @return A new SumPauliOperatorExpression in distributed form.
+   */
   virtual std::unique_ptr<SumPauliOperatorExpression> distribute() const = 0;
+
+  /**
+   * @brief Simplifies the expression by combining like terms and carrying out
+   *        qubit-wise multiplications.
+   *
+   * For example, it combines terms like 2*X(0)*Y(1) + 3*X(0)*Y(1) into
+   * 5*X(0)*Y(1), and simplifies products like X(0)*X(0) into I(0).
+   *
+   * This function will also reorder terms into a canonical form. e.g.
+   * X(1)*Y(0) will be reordered to Y(0)*X(1).
+   *
+   * By convention, distribute will be called internally before simplify to
+   * ensure the expression is in a suitable form for simplification.
+   *
+   * @return A new simplified PauliOperatorExpression.
+   */
   virtual std::unique_ptr<PauliOperatorExpression> simplify() const = 0;
 
   /**
