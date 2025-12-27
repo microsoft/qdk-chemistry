@@ -13,55 +13,40 @@ from qdk_chemistry.data import PauliOperator
 class TestPauliOperatorConstruction:
     """Test cases for PauliOperator construction."""
 
-    def test_pauli_x_construction(self):
-        """Test creating a Pauli X operator."""
-        op_x = PauliOperator.X(0)
-        assert op_x.is_pauli_operator()
-        assert not op_x.is_product_expression()
-        assert not op_x.is_sum_expression()
-        assert op_x.qubit_index == 0
-
-    def test_pauli_y_construction(self):
-        """Test creating a Pauli Y operator."""
-        op_y = PauliOperator.Y(1)
-        assert op_y.is_pauli_operator()
-        assert op_y.qubit_index == 1
-
-    def test_pauli_z_construction(self):
-        """Test creating a Pauli Z operator."""
-        op_z = PauliOperator.Z(2)
-        assert op_z.is_pauli_operator()
-        assert op_z.qubit_index == 2
-
-    def test_pauli_i_construction(self):
-        """Test creating a Pauli I (identity) operator."""
-        op_i = PauliOperator.I(3)
-        assert op_i.is_pauli_operator()
-        assert op_i.qubit_index == 3
+    @pytest.mark.parametrize(
+        ("factory", "qubit_index"),
+        [
+            (PauliOperator.X, 0),
+            (PauliOperator.Y, 1),
+            (PauliOperator.Z, 2),
+            (PauliOperator.I, 3),
+        ],
+    )
+    def test_pauli_construction(self, factory, qubit_index):
+        """Test creating Pauli operators (X, Y, Z, I)."""
+        op = factory(qubit_index)
+        assert op.is_pauli_operator()
+        assert not op.is_product_expression()
+        assert not op.is_sum_expression()
+        assert op.qubit_index == qubit_index
 
 
 class TestPauliOperatorToString:
     """Test cases for PauliOperator string representation."""
 
-    def test_pauli_x_to_string(self):
-        """Test X operator string representation."""
-        op_x = PauliOperator.X(0)
-        assert str(op_x) == "X(0)"
-
-    def test_pauli_y_to_string(self):
-        """Test Y operator string representation."""
-        op_y = PauliOperator.Y(1)
-        assert str(op_y) == "Y(1)"
-
-    def test_pauli_z_to_string(self):
-        """Test Z operator string representation."""
-        op_z = PauliOperator.Z(2)
-        assert str(op_z) == "Z(2)"
-
-    def test_pauli_i_to_string(self):
-        """Test I operator string representation."""
-        op_i = PauliOperator.I(3)
-        assert str(op_i) == "I(3)"
+    @pytest.mark.parametrize(
+        ("factory", "qubit_index", "expected_str"),
+        [
+            (PauliOperator.X, 0, "X(0)"),
+            (PauliOperator.Y, 1, "Y(1)"),
+            (PauliOperator.Z, 2, "Z(2)"),
+            (PauliOperator.I, 3, "I(3)"),
+        ],
+    )
+    def test_pauli_to_string(self, factory, qubit_index, expected_str):
+        """Test Pauli operator string representation."""
+        op = factory(qubit_index)
+        assert str(op) == expected_str
 
 
 class TestProductPauliOperatorExpression:
@@ -423,29 +408,24 @@ class TestSimplify:
         simplified_expr = prod.simplify()
         assert str(simplified_expr) == "2"
 
-    def test_product_simplify_xy_equals_iz(self):
-        """X * Y = iZ."""
-        prod = PauliOperator.X(0) * PauliOperator.Y(0)
+    @pytest.mark.parametrize(
+        ("op1_factory", "op2_factory", "qubit", "coeff", "expected_str"),
+        [
+            # X * Y = iZ
+            (PauliOperator.X, PauliOperator.Y, 0, 1, "i * Z(0)"),
+            # Y * X = -iZ
+            (PauliOperator.Y, PauliOperator.X, 0, 1, "-i * Z(0)"),
+            # Y * Z = iX (with coefficient 3)
+            (PauliOperator.Y, PauliOperator.Z, 2, 3, "3i * X(2)"),
+            # Z * X = iY
+            (PauliOperator.Z, PauliOperator.X, 0, 1, "i * Y(0)"),
+        ],
+    )
+    def test_product_simplify_pauli_commutation(self, op1_factory, op2_factory, qubit, coeff, expected_str):
+        """Test Pauli commutation relations: XY=iZ, YX=-iZ, YZ=iX, ZX=iY."""
+        prod = coeff * op1_factory(qubit) * op2_factory(qubit)
         simplified_expr = prod.simplify()
-        assert str(simplified_expr) == "i * Z(0)"
-
-    def test_product_simplify_yx_equals_minus_iz(self):
-        """Y * X = -iZ."""
-        prod = PauliOperator.Y(0) * PauliOperator.X(0)
-        simplified_expr = prod.simplify()
-        assert str(simplified_expr) == "-i * Z(0)"
-
-    def test_product_simplify_yz_equals_ix(self):
-        """Y * Z = iX."""
-        prod = 3 * PauliOperator.Y(2) * PauliOperator.Z(2)
-        simplified_expr = prod.simplify()
-        assert str(simplified_expr) == "3i * X(2)"
-
-    def test_product_simplify_zx_equals_iy(self):
-        """Z * X = iY."""
-        prod = PauliOperator.Z(0) * PauliOperator.X(0)
-        simplified_expr = prod.simplify()
-        assert str(simplified_expr) == "i * Y(0)"
+        assert str(simplified_expr) == expected_str
 
     def test_product_simplify_multiple_same_qubit(self):
         """Multiple operators on the same qubit with reordering."""
@@ -521,69 +501,33 @@ class TestTermCollection:
 class TestPruneThreshold:
     """Test cases for the prune_threshold() method."""
 
-    def test_prune_threshold_keeps_large_terms(self):
-        """Test that terms above threshold are kept."""
-        # Create a sum with terms of varying coefficient magnitudes
-        sum_expr = (
+    @pytest.fixture
+    def sum_with_varying_coefficients(self):
+        """Create a sum with terms of varying coefficient magnitudes."""
+        return (
             (1e-5 * PauliOperator.X(0))
             + (0.5 * PauliOperator.Y(1))
             + (1e-12 * PauliOperator.Z(2))
             + (2.0 * PauliOperator.X(3))
         )
 
-        # Threshold at 1e-10: should remove only Z(2)
-        thresholded = sum_expr.prune_threshold(1e-10)
-        assert str(thresholded).count("+") == 2  # 3 terms, 2 plus signs
-
-    def test_prune_threshold_removes_small_terms(self):
-        """Test that terms below threshold are removed."""
-        sum_expr = (
-            (1e-5 * PauliOperator.X(0))
-            + (0.5 * PauliOperator.Y(1))
-            + (1e-12 * PauliOperator.Z(2))
-            + (2.0 * PauliOperator.X(3))
-        )
-
-        # Threshold at 1e-4: should remove X(0) and Z(2)
-        thresholded = sum_expr.prune_threshold(1e-4)
-        assert str(thresholded).count("+") == 1  # 2 terms, 1 plus sign
-
-    def test_prune_threshold_leaves_one_term(self):
-        """Test pruning that leaves only one term."""
-        sum_expr = (
-            (1e-5 * PauliOperator.X(0))
-            + (0.5 * PauliOperator.Y(1))
-            + (1e-12 * PauliOperator.Z(2))
-            + (2.0 * PauliOperator.X(3))
-        )
-
-        # Threshold at 1.0: should remove X(0), Y(1), and Z(2), leaving only X(3)
-        thresholded = sum_expr.prune_threshold(1.0)
-        assert str(thresholded) == "2 * X(3)"
-
-    def test_prune_threshold_zero_keeps_all(self):
-        """Test that threshold 0 keeps all terms."""
-        sum_expr = (
-            (1e-5 * PauliOperator.X(0))
-            + (0.5 * PauliOperator.Y(1))
-            + (1e-12 * PauliOperator.Z(2))
-            + (2.0 * PauliOperator.X(3))
-        )
-
-        thresholded = sum_expr.prune_threshold(0.0)
-        assert str(thresholded).count("+") == 3  # 4 terms, 3 plus signs
-
-    def test_prune_threshold_large_removes_all(self):
-        """Test that very large threshold removes all terms."""
-        sum_expr = (
-            (1e-5 * PauliOperator.X(0))
-            + (0.5 * PauliOperator.Y(1))
-            + (1e-12 * PauliOperator.Z(2))
-            + (2.0 * PauliOperator.X(3))
-        )
-
-        thresholded = sum_expr.prune_threshold(100.0)
-        assert str(thresholded) == "0"
+    @pytest.mark.parametrize(
+        ("threshold", "expected_plus_count", "expected_str"),
+        [
+            (1e-10, 2, None),  # Removes only Z(2), leaves 3 terms
+            (1e-4, 1, None),  # Removes X(0) and Z(2), leaves 2 terms
+            (1.0, None, "2 * X(3)"),  # Leaves only X(3)
+            (0.0, 3, None),  # Keeps all 4 terms
+            (100.0, None, "0"),  # Removes all terms
+        ],
+    )
+    def test_prune_threshold_on_sum(self, sum_with_varying_coefficients, threshold, expected_plus_count, expected_str):
+        """Test prune_threshold with various thresholds on sum expression."""
+        thresholded = sum_with_varying_coefficients.prune_threshold(threshold)
+        if expected_str is not None:
+            assert str(thresholded) == expected_str
+        else:
+            assert str(thresholded).count("+") == expected_plus_count
 
     def test_prune_threshold_on_pauli_operator(self):
         """Test prune_threshold on single Pauli operator."""
@@ -717,21 +661,18 @@ class TestIsDistributed:
 class TestPauliOperatorToChar:
     """Test cases for the PauliOperator.to_char() method."""
 
-    def test_identity_to_char(self):
-        """Test I operator returns 'I'."""
-        assert PauliOperator.I(0).to_char() == "I"
-
-    def test_pauli_x_to_char(self):
-        """Test X operator returns 'X'."""
-        assert PauliOperator.X(1).to_char() == "X"
-
-    def test_pauli_y_to_char(self):
-        """Test Y operator returns 'Y'."""
-        assert PauliOperator.Y(2).to_char() == "Y"
-
-    def test_pauli_z_to_char(self):
-        """Test Z operator returns 'Z'."""
-        assert PauliOperator.Z(3).to_char() == "Z"
+    @pytest.mark.parametrize(
+        ("factory", "qubit_index", "expected_char"),
+        [
+            (PauliOperator.I, 0, "I"),
+            (PauliOperator.X, 1, "X"),
+            (PauliOperator.Y, 2, "Y"),
+            (PauliOperator.Z, 3, "Z"),
+        ],
+    )
+    def test_pauli_to_char(self, factory, qubit_index, expected_char):
+        """Test that each Pauli operator returns correct character."""
+        assert factory(qubit_index).to_char() == expected_char
 
 
 class TestPauliOperatorQubitRange:
