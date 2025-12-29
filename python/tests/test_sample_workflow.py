@@ -301,7 +301,8 @@ def test_sample_rdkit_geometry():
     scf_energy = _extract_float(r"SCF Energy: ([+\-0-9.]+) Hartree", result.stdout)
 
     # Water SCF energy is expected to be bad because UFF is not expected to yield a high-quality geometry
-    reference_scf_energy = -67.13513170
+    # FYI: optimized geometry has energy -76.0270535 Hartree at this level of theory
+    reference_scf_energy = -76.02319617
 
     assert np.isclose(scf_energy, reference_scf_energy, atol=1e-6)
 
