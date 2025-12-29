@@ -544,6 +544,10 @@ class ProductPauliOperatorExpression : public PauliOperatorExpression {
    * Sum factors are wrapped in parentheses. An empty product returns "1" or
    * the coefficient string.
    *
+   * To improve readability, coefficients sufficiently close (within fp64
+   * epsilon: ~2.22e-16) to {-1, 1, i, -i} are rendered as "-", "", "i", or
+   * "-i" respectively.
+   *
    * @return A string like "2 * X(0) * Y(1)" or "(X(0) + Z(1)) * Y(2)".
    */
   std::string to_string() const override;

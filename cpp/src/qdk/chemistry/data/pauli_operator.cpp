@@ -15,18 +15,19 @@ namespace qdk::chemistry::data {
 namespace detail {
 
 std::string pauli_operator_scalar_to_string(std::complex<double> coefficient) {
+  constexpr double zero_tolerance = std::numeric_limits<double>::epsilon();
   std::ostringstream oss;
   if (coefficient.imag() == 0.0) {
-    if (std::abs(coefficient.real() - 1.0) < 1e-10) {
+    if (std::abs(coefficient.real() - 1.0) < zero_tolerance) {
       return "";
-    } else if (std::abs(coefficient.real() + 1.0) < 1e-10) {
+    } else if (std::abs(coefficient.real() + 1.0) < zero_tolerance) {
       return "-";
     }
     oss << coefficient.real();
   } else if (coefficient.real() == 0.0) {
-    if (std::abs(coefficient.imag() - 1.0) < 1e-10) {
+    if (std::abs(coefficient.imag() - 1.0) < zero_tolerance) {
       return "i";
-    } else if (std::abs(coefficient.imag() + 1.0) < 1e-10) {
+    } else if (std::abs(coefficient.imag() + 1.0) < zero_tolerance) {
       return "-i";
     }
     oss << coefficient.imag() << "i";
