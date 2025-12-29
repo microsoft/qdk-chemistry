@@ -95,8 +95,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     nuclear_repulsion = water.calculate_nuclear_repulsion_energy()
     scf_solver = create("scf_solver")
     e_scf, scf_wavefunction = scf_solver.run(water, args.charge, args.spin, args.basis)
-    total_scf_energy = e_scf + nuclear_repulsion
-    Logger.info(f"SCF Energy: {total_scf_energy:.8f} Hartree")
+    Logger.info(f"SCF Energy: {e_scf:.8f} Hartree")
 
 
 if __name__ == "__main__":
