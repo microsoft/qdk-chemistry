@@ -49,7 +49,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then
 elif [ "$MAC_BUILD" == "ON" ]; then
     brew update
     brew upgrade
-    brew install \
+    arch -arm64 brew install \
         ninja \
         eigen \
         wget \
