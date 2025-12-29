@@ -92,7 +92,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     ########################################################################################
     # 2. Run the SCF stage to obtain the reference wavefunction.
     ########################################################################################
-    nuclear_repulsion = water.calculate_nuclear_repulsion_energy()
     scf_solver = create("scf_solver")
     e_scf, scf_wavefunction = scf_solver.run(water, args.charge, args.spin, args.basis)
     Logger.info(f"SCF Energy: {e_scf:.8f} Hartree")
