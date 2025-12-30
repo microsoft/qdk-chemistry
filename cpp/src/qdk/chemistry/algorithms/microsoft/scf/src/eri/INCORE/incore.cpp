@@ -35,6 +35,13 @@ void ERIINCORE::quarter_trans_impl(size_t nt, const double* C, double* out) {
   eri_impl_->quarter_trans(nt, C, out);
 }
 
+const double* ERIINCORE::get_raw_eris() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  if (!eri_impl_) throw std::runtime_error("ERIINCORE NOT INITIALIZED");
+  return eri_impl_->get_raw_eris();
+}
+
 void ERIINCORE::get_gradients(const double* P, double* dJ, double* dK,
                               double alpha, double beta, double omega) {
   QDK_LOG_TRACE_ENTERING();

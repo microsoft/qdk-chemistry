@@ -135,6 +135,12 @@ class ERI {
   void quarter_trans(size_t nt, const double* C, double* out);
 
   /**
+   * @brief Get direct read-only access to raw stored AO ERIs
+   * @return Const pointer to the stored ERI tensor
+   */
+  const double* get_raw_eris() const { return h_eri_.get(); }
+
+  /**
    * @brief Destructor
    */
   ~ERI() noexcept;

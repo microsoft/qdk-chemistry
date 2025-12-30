@@ -4,6 +4,8 @@
 
 #include "hamiltonian.hpp"
 
+#include "cholesky.hpp"
+
 // STL Headers
 #include <filesystem>
 #include <set>
@@ -159,6 +161,9 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   } else if (!method_name.compare("direct")) {
     scf_config->eri.method = qcs::ERIMethod::Libint2Direct;
     scf_config->k_eri.method = qcs::ERIMethod::Libint2Direct;
+  } else if (!method_name.compare("cholesky")) {
+    scf_config->eri.method = qcs::ERIMethod::Incore;
+    scf_config->k_eri.method = qcs::ERIMethod::Incore;
   } else {
     throw std::runtime_error("Unsupported ERI method '" + method_name +
                              "'. Only CPU ERI methods are supported now");
@@ -237,7 +242,56 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   const size_t moeri_size = nactive * nactive * nactive * nactive;
 
-  if (is_restricted_calc) {
+  if (method_name == "cholesky") {
+    // Use Cholesky Decomposition
+    double cholesky_tol = _settings->get<double>("cholesky_tolerance");
+
+    // Get ao eris
+    const double* raw_eris = eri->get_raw_eris();
+    if (raw_eris == nullptr) {
+      throw std::runtime_error(
+          "Cholesky decomposition requires in-core ERI storage. "
+          "Please set eri_method to 'incore' when using eri_method='cholesky'");
+    }
+
+    // Map raw ERIs to Eigen matrix
+    Eigen::Map<const Eigen::MatrixXd> eri(
+        raw_eris, num_atomic_orbitals * num_atomic_orbitals,
+        num_atomic_orbitals * num_atomic_orbitals);
+
+    // Compute AO Cholesky Vectors
+    auto L_ao = pivoted_cholesky_decomposition(eri, cholesky_tol);
+
+    /**
+     * @brief Reconstruct MO ERIs from Cholesky vectors
+     * @param L_left Left Cholesky vectors in MO basis
+     * @param L_right Right Cholesky vectors in MO basis
+     * @param output Output vector to store reconstructed ERIs
+     */
+    auto reconstruct_eris = [moeri_size](const Eigen::MatrixXd& L_left,
+                                         const Eigen::MatrixXd& L_right,
+                                         Eigen::VectorXd& output) {
+      output.resize(moeri_size);
+      size_t n = L_left.rows();  // n_mo * n_mo
+      Eigen::Map<Eigen::MatrixXd> output_matrix(output.data(), n, n);
+      output_matrix.noalias() = L_left * L_right.transpose();
+    };
+
+    if (is_restricted_calc) {
+      // Transform to MO
+      Eigen::MatrixXd L_mo = transform_cholesky_to_mo(L_ao, Ca_active);
+      reconstruct_eris(L_mo, L_mo, moeri_aaaa);
+    } else {
+      // Transform to MO (Alpha and Beta)
+      Eigen::MatrixXd L_mo_alpha = transform_cholesky_to_mo(L_ao, Ca_active);
+      Eigen::MatrixXd L_mo_beta = transform_cholesky_to_mo(L_ao, Cb_active);
+
+      reconstruct_eris(L_mo_alpha, L_mo_alpha, moeri_aaaa);  // (aaaa)
+      reconstruct_eris(L_mo_beta, L_mo_beta, moeri_bbbb);    // (bbbb)
+      reconstruct_eris(L_mo_beta, L_mo_alpha, moeri_aabb);   // (aabb)
+    }
+
+  } else if (is_restricted_calc) {
     // Only allocate and compute (αα|αα) integrals - the others are identical
     moeri_aaaa.resize(moeri_size);
     moeri_c.compute(num_atomic_orbitals, nactive, Ca_active_rm.data(),

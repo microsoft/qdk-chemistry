@@ -87,6 +87,12 @@ class ERIINCORE : public ERI {
    */
   void quarter_trans_impl(size_t nt, const double* C, double* out) override;
 
+  /**
+   * @brief Get direct read-only access to raw stored AO ERIs
+   * @see ERI::get_raw_eris for more details
+   */
+  const double* get_raw_eris() const override;
+
   /// PIMPL pointer to implementation
   std::unique_ptr<incore::ERI> eri_impl_;
 };
@@ -168,6 +174,12 @@ class ERIINCORE_DF : public ERI {
    * will be thrown.
    */
   void quarter_trans_impl(size_t nt, const double* C, double* out) override;
+
+  /**
+   * @brief Get raw ERIs (not available for density-fitted method)
+   * @return nullptr (DF stores 3-center integrals, not 4-center ERIs)
+   */
+  const double* get_raw_eris() const override { return nullptr; }
 
   /// PIMPL pointer to DF implementation
   std::unique_ptr<incore::ERI_DF> eri_impl_;

@@ -84,6 +84,12 @@ class LIBINT2_DIRECT : public ERI {
    */
   void quarter_trans_impl(size_t nt, const double* C, double* out) override;
 
+  /**
+   * @brief Get raw ERIs (not available for direct method)
+   * @return nullptr (direct method does not store integrals)
+   */
+  const double* get_raw_eris() const override { return nullptr; }
+
   /// PIMPL pointer to implementation
   std::unique_ptr<libint2::direct::ERI> eri_impl_;
 };

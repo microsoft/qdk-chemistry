@@ -86,6 +86,12 @@ class SNK : public ERI {
    */
   void quarter_trans_impl(size_t nt, const double* C, double* out) override;
 
+  /**
+   * @brief Get raw ERIs (not available for SNK method)
+   * @return nullptr (SNK method does not store integrals)
+   */
+  const double* get_raw_eris() const override { return nullptr; }
+
   /// PIMPL pointer to implementation
   std::unique_ptr<snk::ERI> eri_impl_;
 };

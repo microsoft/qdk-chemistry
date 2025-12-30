@@ -133,5 +133,13 @@ class ERIMultiplexer : public ERI {
    * The actual work is delegated to qt_impl_.
    */
   void quarter_trans_impl(size_t nt, const double* C, double* out) override {};
+
+  /**
+   * @brief Get raw ERIs from underlying implementation
+   * @return Const pointer to raw ERIs if available from underlying implementation
+   */
+  const double* get_raw_eris() const override {
+    return qt_impl_ ? qt_impl_->get_raw_eris() : nullptr;
+  }
 };
 }  // namespace qdk::chemistry::scf
