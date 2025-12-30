@@ -1055,9 +1055,8 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
 
           } else {
             throw std::runtime_error(
-                "Supposedly we have one-rdms available, but they are not "
-                "available as _one_rdm_spin_traced, _one_rdm_spin_dependent_aa "
-                "or _one_rdm_spin_dependent_bb.");
+                "Spin-dependent one-body RDMs are supposedly available, but "
+                "could not be retrieved in the expected format");
           }
         } else {
           // unrestricted - want to store both
