@@ -4,8 +4,8 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-from qdk_chemistry.algorithms import available, create
 import numpy as np
+from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.data import Structure
 
 ################################################################################
@@ -36,7 +36,7 @@ coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 symbols = ["H", "H"]
 structure = Structure(coords, symbols)
 
-# Run an SCF to get orbitals
+# Run a SCF to get orbitals
 scf_solver = create("scf_solver")
 E_scf, wfn = scf_solver.run(
     structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
@@ -56,4 +56,13 @@ print(f"Two-body integrals shape: {h2_aaaa.shape}")
 print(f"Core energy: {core_energy:.10f} Hartree")
 print(hamiltonian.get_summary())
 # end-cell-construct
+################################################################################
+
+################################################################################
+# start-cell-list-implementations
+from qdk_chemistry.algorithms import registry  # noqa: E402
+
+print(registry.available("hamiltonian_constructor"))
+# ['qdk']
+# end-cell-list-implementations
 ################################################################################
