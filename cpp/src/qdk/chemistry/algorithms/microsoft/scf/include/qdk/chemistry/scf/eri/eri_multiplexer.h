@@ -136,7 +136,8 @@ class ERIMultiplexer : public ERI {
 
   /**
    * @brief Get raw ERIs from underlying implementation
-   * @return Const pointer to raw ERIs if available from underlying implementation
+   * @return Const pointer to raw ERIs if available from underlying
+   * implementation
    */
   const double* get_raw_eris() const override {
     return qt_impl_ ? qt_impl_->get_raw_eris() : nullptr;
