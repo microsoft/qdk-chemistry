@@ -108,4 +108,74 @@ Eigen::MatrixXd transform_cholesky_to_mo(
   return mo_vectors;
 }
 
+Eigen::MatrixXd build_J_from_cholesky(
+    const Eigen::MatrixXd& ao_cholesky_vectors,
+    const Eigen::MatrixXd& density) {
+  size_t n_ao = density.rows();
+  size_t rank = ao_cholesky_vectors.cols();
+
+  // Validate dimensions
+  if (density.cols() != density.rows()) {
+    throw std::invalid_argument("Density matrix must be square");
+  }
+  if (ao_cholesky_vectors.rows() != n_ao * n_ao) {
+    throw std::invalid_argument(
+        "ao_cholesky_vectors dimensions do not match density matrix");
+  }
+
+  // Initialize J
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n_ao, n_ao);
+  for (size_t k = 0; k < rank; ++k) {
+    // Reshape Cholesky vector to matrix (n_ao x n_ao)
+    Eigen::Map<const Eigen::MatrixXd> L_k(ao_cholesky_vectors.col(k).data(),
+                                          n_ao, n_ao);
+
+    // V_k = P_\mu\nu L^k_\mu\nu
+    double Vk = L_k.cwiseProduct(density).sum();
+
+    // J_\lambda\sigma = L^k_\lambda\sigma * Vk
+    J.noalias() += L_k * Vk;
+  }
+  return J;
+}
+
+Eigen::MatrixXd build_K_from_cholesky(
+    const Eigen::MatrixXd& ao_cholesky_vectors, const Eigen::MatrixXd& coeffs,
+    const std::vector<size_t>& occ_orb_ind) {
+  size_t n_ao = coeffs.rows();
+  size_t n_mo = coeffs.cols();
+  size_t rank = ao_cholesky_vectors.cols();
+
+  // Validate dimensions
+  if (ao_cholesky_vectors.rows() != n_ao * n_ao) {
+    throw std::invalid_argument(
+        "ao_cholesky_vectors dimensions do not match density matrix");
+  }
+
+  // initermediates
+  Eigen::MatrixXd L_sigma_i(n_ao * n_mo, rank);
+  for (size_t k = 0; k < rank; ++k) {
+    // Reshape Cholesky vector to matrix (n_ao x n_ao)
+    Eigen::Map<const Eigen::MatrixXd> L_k(ao_cholesky_vectors.col(k).data(),
+                                          n_ao, n_ao);
+
+    // L^k\sigma,i = L^k_\mu\sigma * C_\mu,i
+    L_sigma_i.col(k) = L_k * coeffs;
+  }
+
+  // Initialize K
+  Eigen::MatrixXd K = Eigen::MatrixXd::Zero(n_ao, n_ao);
+  for (size_t k = 0; k < rank; ++k) {
+    // Temp_{\sigma,i} = L^k_{\sigma,i} for occupied orbitals
+    Eigen::Map<const Eigen::MatrixXd> Temp(L_sigma_i.col(k).data(), n_ao, n_mo);
+
+    // K_\lambda\sigma += \sum_{i}^{occ} Temp_\sigma,i * Temp_\lambda,i
+    for (auto i : occ_orb_ind) {
+      K.noalias() += Temp.col(i) * Temp.col(i).transpose();
+    }
+  }
+
+  return K;
+}
+
 }  // namespace qdk::chemistry::algorithms::microsoft

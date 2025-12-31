@@ -120,7 +120,7 @@ TEST_F(CholeskyTest, N2_Restricted_Comparison) {
     EXPECT_LT(max_diff, testing::numerical_zero_tolerance);
   }
 
-  // active space
+  // continuous active space
   {
     auto active_space_selector =
         ActiveSpaceSelectorFactory::create("qdk_valence");
@@ -153,17 +153,82 @@ TEST_F(CholeskyTest, N2_Restricted_Comparison) {
         ham_incore->get_two_body_integrals();
     auto [aaaa_chol, aabb_chol, bbbb_chol] = ham_chol->get_two_body_integrals();
 
-    EXPECT_EQ(aaaa_incore.size(), aaaa_chol.size());
-    double max_diff = (aaaa_incore - aaaa_chol).cwiseAbs().maxCoeff();
-    EXPECT_LT(max_diff, testing::numerical_zero_tolerance);
+    EXPECT_TRUE(
+        aaaa_incore.isApprox(aaaa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        aabb_incore.isApprox(aabb_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        bbbb_incore.isApprox(bbbb_chol, testing::numerical_zero_tolerance));
 
-    EXPECT_EQ(aabb_incore.size(), aabb_chol.size());
-    max_diff = (aabb_incore - aabb_chol).cwiseAbs().maxCoeff();
-    EXPECT_LT(max_diff, testing::numerical_zero_tolerance);
+    // inactive fock matrix
+    auto fock_incore = ham_incore->get_inactive_fock_matrix();
+    auto fock_chol = ham_chol->get_inactive_fock_matrix();
+    EXPECT_TRUE(fock_incore.first.isApprox(fock_chol.first,
+                                           testing::numerical_zero_tolerance));
+    EXPECT_TRUE(fock_incore.second.isApprox(fock_chol.second,
+                                            testing::numerical_zero_tolerance));
 
-    EXPECT_EQ(bbbb_incore.size(), bbbb_chol.size());
-    max_diff = (bbbb_incore - bbbb_chol).cwiseAbs().maxCoeff();
-    EXPECT_LT(max_diff, testing::numerical_zero_tolerance);
+    // core energy
+    auto core_incore = ham_incore->get_core_energy();
+    auto core_chol = ham_chol->get_core_energy();
+    EXPECT_NEAR(core_incore, core_chol, testing::numerical_zero_tolerance);
+  }
+
+  // discontinuous active space
+  {
+    auto full_orbitals = wavefunction->get_orbitals();
+    // manual active space selection
+    std::vector<size_t> active_alpha = {2, 3, 5, 6, 7, 9};
+    std::vector<size_t> inactive_alpha = {0, 1, 4};
+    auto orbitals = std::make_shared<Orbitals>(
+        full_orbitals->get_coefficients().first,
+        full_orbitals->get_energies().first,
+        full_orbitals->get_overlap_matrix(), full_orbitals->get_basis_set(),
+        std::make_tuple(active_alpha, inactive_alpha));
+
+    // 3. Run Hamiltonian with Incore (Exact)
+    auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");
+    ham_incore_factory->settings().set("eri_method", "incore");
+    auto ham_incore = ham_incore_factory->run(orbitals);
+
+    // 4. Run Hamiltonian with Cholesky
+    auto ham_chol_factory = HamiltonianConstructorFactory::create("qdk");
+    ham_chol_factory->settings().set("eri_method", "cholesky");
+    ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
+    auto ham_chol = ham_chol_factory->run(orbitals);
+
+    // 5. Compare
+    // One-body
+    auto [aa_incore, bb_incore] = ham_incore->get_one_body_integrals();
+    auto [aa_chol, bb_chol] = ham_chol->get_one_body_integrals();
+
+    EXPECT_TRUE(aa_incore.isApprox(aa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(bb_incore.isApprox(bb_chol, testing::numerical_zero_tolerance));
+
+    // Two-body
+    auto [aaaa_incore, aabb_incore, bbbb_incore] =
+        ham_incore->get_two_body_integrals();
+    auto [aaaa_chol, aabb_chol, bbbb_chol] = ham_chol->get_two_body_integrals();
+
+    EXPECT_TRUE(
+        aaaa_incore.isApprox(aaaa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        aabb_incore.isApprox(aabb_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        bbbb_incore.isApprox(bbbb_chol, testing::numerical_zero_tolerance));
+
+    // inactive fock matrix
+    auto fock_incore = ham_incore->get_inactive_fock_matrix();
+    auto fock_chol = ham_chol->get_inactive_fock_matrix();
+    EXPECT_TRUE(fock_incore.first.isApprox(fock_chol.first,
+                                           testing::numerical_zero_tolerance));
+    EXPECT_TRUE(fock_incore.second.isApprox(fock_chol.second,
+                                            testing::numerical_zero_tolerance));
+
+    // core energy
+    auto core_incore = ham_incore->get_core_energy();
+    auto core_chol = ham_chol->get_core_energy();
+    EXPECT_NEAR(core_incore, core_chol, testing::numerical_zero_tolerance);
   }
 }
 
@@ -219,63 +284,135 @@ TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
         ham_incore->get_two_body_integrals();
     auto [aaaa_chol, aabb_chol, bbbb_chol] = ham_chol->get_two_body_integrals();
 
-    EXPECT_EQ(aaaa_incore.size(), aaaa_chol.size());
-    double max_diff = (aaaa_incore - aaaa_chol).cwiseAbs().maxCoeff();
-    EXPECT_LT(max_diff, testing::numerical_zero_tolerance);
-
-    EXPECT_EQ(aabb_incore.size(), aabb_chol.size());
-    max_diff = (aabb_incore - aabb_chol).cwiseAbs().maxCoeff();
-    EXPECT_LT(max_diff, testing::numerical_zero_tolerance);
-
-    EXPECT_EQ(bbbb_incore.size(), bbbb_chol.size());
-    max_diff = (bbbb_incore - bbbb_chol).cwiseAbs().maxCoeff();
-    EXPECT_LT(max_diff, testing::numerical_zero_tolerance);
+    EXPECT_TRUE(
+        aaaa_incore.isApprox(aaaa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        aabb_incore.isApprox(aabb_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        bbbb_incore.isApprox(bbbb_chol, testing::numerical_zero_tolerance));
   }
 
-  // active space (selection not supported for unrestricted yet)
-  // {
-  //   auto active_space_selector =
-  //       ActiveSpaceSelectorFactory::create("qdk_valence");
-  //   active_space_selector->settings().set("num_active_electrons", 12);
-  //   active_space_selector->settings().set("num_active_orbitals", 8);
-  //   auto wavefunction_active = active_space_selector->run(wavefunction);
-  //   auto orbitals = wavefunction_active->get_orbitals();
+  // continuous active space
+  {
+    auto full_orbitals = wavefunction->get_orbitals();
+    // manual active space selection
+    std::vector<size_t> active_alpha = {2, 3, 4, 5, 6, 7, 8, 9};
+    std::vector<size_t> inactive_alpha = {0, 1};
+    std::vector<size_t> active_beta = {2, 3, 4, 5, 6, 7, 8, 9};
+    std::vector<size_t> inactive_beta = {0, 1};
+    auto orbitals = std::make_shared<Orbitals>(
+        full_orbitals->get_coefficients().first,
+        full_orbitals->get_coefficients().second,
+        full_orbitals->get_energies().first,
+        full_orbitals->get_energies().second,
+        full_orbitals->get_overlap_matrix(), full_orbitals->get_basis_set(),
+        std::make_tuple(active_alpha, active_beta, inactive_alpha,
+                        inactive_beta));
 
-  //   // 3. Run Hamiltonian with Incore (Exact)
-  //   auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");
-  //   ham_incore_factory->settings().set("eri_method", "incore");
-  //   auto ham_incore = ham_incore_factory->run(orbitals);
+    // 3. Run Hamiltonian with Incore (Exact)
+    auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");
+    ham_incore_factory->settings().set("eri_method", "incore");
+    auto ham_incore = ham_incore_factory->run(orbitals);
 
-  //   // 4. Run Hamiltonian with Cholesky
-  //   auto ham_chol_factory = HamiltonianConstructorFactory::create("qdk");
-  //   ham_chol_factory->settings().set("eri_method", "cholesky");
-  //   ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
-  //   auto ham_chol = ham_chol_factory->run(orbitals);
+    // 4. Run Hamiltonian with Cholesky
+    auto ham_chol_factory = HamiltonianConstructorFactory::create("qdk");
+    ham_chol_factory->settings().set("eri_method", "cholesky");
+    ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
+    auto ham_chol = ham_chol_factory->run(orbitals);
 
-  //   // 5. Compare
-  //   // One-body
-  //   auto [aa_incore, bb_incore] = ham_incore->get_one_body_integrals();
-  //   auto [aa_chol, bb_chol] = ham_chol->get_one_body_integrals();
+    // 5. Compare
+    // One-body
+    auto [aa_incore, bb_incore] = ham_incore->get_one_body_integrals();
+    auto [aa_chol, bb_chol] = ham_chol->get_one_body_integrals();
 
-  //   EXPECT_TRUE(aa_incore.isApprox(aa_chol, tolerance));
-  //   EXPECT_TRUE(bb_incore.isApprox(bb_chol, tolerance));
+    EXPECT_TRUE(aa_incore.isApprox(aa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(bb_incore.isApprox(bb_chol, testing::numerical_zero_tolerance));
 
-  //   // Two-body
-  //   auto [aaaa_incore, aabb_incore, bbbb_incore] =
-  //       ham_incore->get_two_body_integrals();
-  //   auto [aaaa_chol, aabb_chol, bbbb_chol] =
-  //   ham_chol->get_two_body_integrals();
+    // Two-body
+    auto [aaaa_incore, aabb_incore, bbbb_incore] =
+        ham_incore->get_two_body_integrals();
+    auto [aaaa_chol, aabb_chol, bbbb_chol] = ham_chol->get_two_body_integrals();
 
-  //   EXPECT_EQ(aaaa_incore.size(), aaaa_chol.size());
-  //   double max_diff = (aaaa_incore - aaaa_chol).cwiseAbs().maxCoeff();
-  //   EXPECT_LT(max_diff, tolerance);
+    EXPECT_TRUE(
+        aaaa_incore.isApprox(aaaa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        aabb_incore.isApprox(aabb_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        bbbb_incore.isApprox(bbbb_chol, testing::numerical_zero_tolerance));
 
-  //   EXPECT_EQ(aabb_incore.size(), aabb_chol.size());
-  //   max_diff = (aabb_incore - aabb_chol).cwiseAbs().maxCoeff();
-  //   EXPECT_LT(max_diff, tolerance);
+    // inactive fock matrix
+    auto fock_incore = ham_incore->get_inactive_fock_matrix();
+    auto fock_chol = ham_chol->get_inactive_fock_matrix();
+    EXPECT_TRUE(fock_incore.first.isApprox(fock_chol.first,
+                                           testing::numerical_zero_tolerance));
+    EXPECT_TRUE(fock_incore.second.isApprox(fock_chol.second,
+                                            testing::numerical_zero_tolerance));
 
-  //   EXPECT_EQ(bbbb_incore.size(), bbbb_chol.size());
-  //   max_diff = (bbbb_incore - bbbb_chol).cwiseAbs().maxCoeff();
-  //   EXPECT_LT(max_diff, tolerance);
-  // }
+    // core energy
+    auto core_incore = ham_incore->get_core_energy();
+    auto core_chol = ham_chol->get_core_energy();
+    EXPECT_NEAR(core_incore, core_chol, testing::numerical_zero_tolerance);
+  }
+
+  // discontinuous active space
+  {
+    auto full_orbitals = wavefunction->get_orbitals();
+    // manual active space selection
+    std::vector<size_t> active_alpha = {2, 3, 5, 6, 7, 9};
+    std::vector<size_t> inactive_alpha = {0, 1, 4};
+    std::vector<size_t> active_beta = {2, 3, 5, 6, 7, 9};
+    std::vector<size_t> inactive_beta = {0, 1, 4};
+    auto orbitals = std::make_shared<Orbitals>(
+        full_orbitals->get_coefficients().first,
+        full_orbitals->get_coefficients().second,
+        full_orbitals->get_energies().first,
+        full_orbitals->get_energies().second,
+        full_orbitals->get_overlap_matrix(), full_orbitals->get_basis_set(),
+        std::make_tuple(active_alpha, active_beta, inactive_alpha,
+                        inactive_beta));
+
+    // 3. Run Hamiltonian with Incore (Exact)
+    auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");
+    ham_incore_factory->settings().set("eri_method", "incore");
+    auto ham_incore = ham_incore_factory->run(orbitals);
+
+    // 4. Run Hamiltonian with Cholesky
+    auto ham_chol_factory = HamiltonianConstructorFactory::create("qdk");
+    ham_chol_factory->settings().set("eri_method", "cholesky");
+    ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
+    auto ham_chol = ham_chol_factory->run(orbitals);
+
+    // 5. Compare
+    // One-body
+    auto [aa_incore, bb_incore] = ham_incore->get_one_body_integrals();
+    auto [aa_chol, bb_chol] = ham_chol->get_one_body_integrals();
+
+    EXPECT_TRUE(aa_incore.isApprox(aa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(bb_incore.isApprox(bb_chol, testing::numerical_zero_tolerance));
+
+    // Two-body
+    auto [aaaa_incore, aabb_incore, bbbb_incore] =
+        ham_incore->get_two_body_integrals();
+    auto [aaaa_chol, aabb_chol, bbbb_chol] = ham_chol->get_two_body_integrals();
+
+    EXPECT_TRUE(
+        aaaa_incore.isApprox(aaaa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        aabb_incore.isApprox(aabb_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        bbbb_incore.isApprox(bbbb_chol, testing::numerical_zero_tolerance));
+
+    // inactive fock matrix
+    auto fock_incore = ham_incore->get_inactive_fock_matrix();
+    auto fock_chol = ham_chol->get_inactive_fock_matrix();
+    EXPECT_TRUE(fock_incore.first.isApprox(fock_chol.first,
+                                           testing::numerical_zero_tolerance));
+    EXPECT_TRUE(fock_incore.second.isApprox(fock_chol.second,
+                                            testing::numerical_zero_tolerance));
+
+    // core energy
+    auto core_incore = ham_incore->get_core_energy();
+    auto core_chol = ham_chol->get_core_energy();
+    EXPECT_NEAR(core_incore, core_chol, testing::numerical_zero_tolerance);
+  }
 }

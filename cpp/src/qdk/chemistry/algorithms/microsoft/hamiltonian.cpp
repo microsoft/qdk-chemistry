@@ -242,6 +242,9 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   const size_t moeri_size = nactive * nactive * nactive * nactive;
 
+  // Store Cholesky vectors for later use in inactive space computation
+  Eigen::MatrixXd L_ao;
+
   if (method_name == "cholesky") {
     // Use Cholesky Decomposition
     double cholesky_tol = _settings->get<double>("cholesky_tolerance");
@@ -260,7 +263,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
         num_atomic_orbitals * num_atomic_orbitals);
 
     // Compute AO Cholesky Vectors
-    auto L_ao = pivoted_cholesky_decomposition(eri, cholesky_tol);
+    L_ao = pivoted_cholesky_decomposition(eri, cholesky_tol);
 
     /**
      * @brief Reconstruct MO ERIs from Cholesky vectors
@@ -370,7 +373,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   if (is_restricted_calc) {
     // Restricted case
-    auto inactive_indices = inactive_indices_alpha;
+    const auto& inactive_indices = inactive_indices_alpha;
 
     // Determine whether the inactive space is contiguous
     bool inactive_space_is_contiguous = true;
@@ -395,10 +398,18 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     }
 
     // Compute the two electron part of the inactive fock matrix
-    Eigen::MatrixXd J_inactive_ao(num_atomic_orbitals, num_atomic_orbitals),
-        K_inactive_ao(num_atomic_orbitals, num_atomic_orbitals);
-    eri->build_JK(D_inactive.data(), J_inactive_ao.data(), K_inactive_ao.data(),
-                  1.0, 0.0, 0.0);
+    Eigen::MatrixXd J_inactive_ao, K_inactive_ao;
+    if (method_name == "cholesky") {
+      // Use Cholesky vectors to build J and K
+      J_inactive_ao = build_J_from_cholesky(L_ao, D_inactive);
+      K_inactive_ao = build_K_from_cholesky(L_ao, Ca, inactive_indices);
+    } else {
+      // Use traditional ERI method
+      J_inactive_ao.resize(num_atomic_orbitals, num_atomic_orbitals);
+      K_inactive_ao.resize(num_atomic_orbitals, num_atomic_orbitals);
+      eri->build_JK(D_inactive.data(), J_inactive_ao.data(),
+                    K_inactive_ao.data(), 1.0, 0.0, 0.0);
+    }
     Eigen::MatrixXd G_inactive_ao = 2 * J_inactive_ao - K_inactive_ao;
 
     // Compute the inactive Fock matrix
@@ -479,15 +490,24 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     }
 
     // Compute J and K matrices for alpha and beta densities
-    Eigen::MatrixXd J_alpha_ao(num_atomic_orbitals, num_atomic_orbitals),
-        K_alpha_ao(num_atomic_orbitals, num_atomic_orbitals);
-    Eigen::MatrixXd J_beta_ao(num_atomic_orbitals, num_atomic_orbitals),
-        K_beta_ao(num_atomic_orbitals, num_atomic_orbitals);
-
-    eri->build_JK(D_inactive_alpha.data(), J_alpha_ao.data(), K_alpha_ao.data(),
-                  1.0, 0.0, 0.0);
-    eri->build_JK(D_inactive_beta.data(), J_beta_ao.data(), K_beta_ao.data(),
-                  1.0, 0.0, 0.0);
+    Eigen::MatrixXd J_alpha_ao, K_alpha_ao, J_beta_ao, K_beta_ao;
+    if (method_name == "cholesky") {
+      // Use Cholesky vectors to build J and K
+      J_alpha_ao = build_J_from_cholesky(L_ao, D_inactive_alpha);
+      K_alpha_ao = build_K_from_cholesky(L_ao, Ca, inactive_indices_alpha);
+      J_beta_ao = build_J_from_cholesky(L_ao, D_inactive_beta);
+      K_beta_ao = build_K_from_cholesky(L_ao, Cb, inactive_indices_beta);
+    } else {
+      // Use traditional ERI method
+      J_alpha_ao.resize(num_atomic_orbitals, num_atomic_orbitals);
+      K_alpha_ao.resize(num_atomic_orbitals, num_atomic_orbitals);
+      J_beta_ao.resize(num_atomic_orbitals, num_atomic_orbitals);
+      K_beta_ao.resize(num_atomic_orbitals, num_atomic_orbitals);
+      eri->build_JK(D_inactive_alpha.data(), J_alpha_ao.data(),
+                    K_alpha_ao.data(), 1.0, 0.0, 0.0);
+      eri->build_JK(D_inactive_beta.data(), J_beta_ao.data(), K_beta_ao.data(),
+                    1.0, 0.0, 0.0);
+    }
 
     Eigen::MatrixXd F_inactive_alpha_ao =
         H_full + J_alpha_ao + J_beta_ao - K_alpha_ao;
