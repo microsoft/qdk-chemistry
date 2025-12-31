@@ -60,8 +60,11 @@ Basis types
 
 The :class:`~qdk_chemistry.data.BasisSet` class supports two types of basis functions:
 
-- **Spherical**: Uses spherical harmonics with :math:`2l+1` functions per shell
-- **Cartesian**: Uses Cartesian coordinates with :math:`(l+1)(l+2)/2` functions per shell
+Spherical
+   Uses spherical harmonics with :math:`2l+1` functions per shell
+
+Cartesian
+   Uses Cartesian coordinates with :math:`(l+1)(l+2)/2` functions per shell
 
 Creating a basis set
 --------------------

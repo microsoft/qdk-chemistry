@@ -50,7 +50,7 @@ There are many ways in which you can participate in this project, for example:
 - Review the documentation and make pull requests for anything from typos to additional and new content
 
 If you are interested in fixing issues and contributing directly to the code base,
-please see the document [How to Contribute](https://github.com/microsoft/qdk-chemistryblob/main/CONTRIBUTING.md).
+please see the document [How to Contribute](https://github.com/microsoft/qdk-chemistry/blob/main/CONTRIBUTING.md).
 
 ## Code of Conduct
 

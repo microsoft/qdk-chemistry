@@ -13,10 +13,17 @@ It provides the foundation for all quantum chemistry calculations by defining th
 Properties
 ~~~~~~~~~~
 
-- **Coordinates**: 3D Cartesian coordinates for each atom
-- **Elements**: Chemical elements of the atoms
-- **Masses**: Atomic masses of each of the atoms
-- **Nuclear charges**: Nuclear charges (atomic numbers) of each of the atoms
+Coordinates
+   3D Cartesian coordinates for each atom
+
+Elements
+   Chemical elements of the atoms
+
+Masses
+   Atomic masses of each of the atoms
+
+Nuclear charges
+   Nuclear charges (atomic numbers) of each of the atoms
 
 Units
 -----

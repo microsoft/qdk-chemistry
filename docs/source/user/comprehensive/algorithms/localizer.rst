@@ -13,12 +13,12 @@ The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` algorithm applies unitar
 
 Orbital transformation techniques broadly fall into two categories:
 
-**Optimization-Based Methods**
+Optimization-Based Methods
    The vast majority of localization methods define a cost function and iteratively minimize it to yield localized orbitals :cite:`Lehtola2013`.
    Popular choices include **Pipek-Mezey** :cite:`Pipek1989`, **Foster-Boys** :cite:`Foster1960`, and **Edmiston-Ruedenberg** :cite:`Edmiston1963` localization.
    These methods produce orbitals that are maximally localized on specific atoms or bonds.
 
-**Analytical Methods**
+Analytical Methods
    These methods transform orbitals in a single step through analytical techniques rather than iterative optimization.
    **Natural orbitals** :cite:`Lowdin1956`, which diagonalize the one-particle reduced density matrix, are a prominent example and can be particularly useful for :doc:`active space selection <active_space>`.
    **Cholesky localization** :cite:`Aquilante2006` provides efficient approximate localization via Cholesky decomposition of the density matrix.
@@ -39,17 +39,17 @@ Input requirements
 
 The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` requires the following inputs:
 
-**Wavefunction**
+Wavefunction
    A :class:`~qdk_chemistry.data.Wavefunction` instance containing the molecular orbitals to be localized.
 
-**Alpha orbital indices (loc_indices_a)**
+Alpha orbital indices (``loc_indices_a``)
    A list/vector of indices specifying which alpha orbitals to include in the localization. Indices must be sorted in ascending order.
 
-**Beta orbital indices (loc_indices_b)**
+Beta orbital indices (``loc_indices_b``)
    A list/vector of indices specifying which beta orbitals to include in the localization. Indices must be sorted in ascending order.
 
 
-**Creating a localizer:**
+.. rubric:: Creating a localizer
 
 .. tab:: C++ API
 
@@ -65,7 +65,7 @@ The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` requires the following i
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-**Configuring settings:**
+.. rubric:: Configuring settings
 
 Settings can be modified using the ``settings()`` object.
 See `Available implementations`_ below for implementation-specific options.
@@ -84,8 +84,7 @@ See `Available implementations`_ below for implementation-specific options.
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-**Running localization:**
-
+.. rubric:: Running localization
 
 .. note::
    For restricted calculations, ``loc_indices_a`` and ``loc_indices_b`` must be identical.
@@ -129,12 +128,12 @@ You can discover available implementations programmatically:
 QDK Pipek-Mezey
 ~~~~~~~~~~~~~~~
 
-**Factory name:** ``"qdk_pipek_mezey"`` (default)
+.. rubric:: Factory name: ``"qdk_pipek_mezey"`` (default)
 
 Native implementation of Pipek-Mezey localization :cite:`Pipek1989`, which maximizes the sum of squared Mulliken charges on each atom for each orbital.
 This produces orbitals that are maximally localized on specific atoms or bonds, making them well-suited for chemical interpretation and local correlation methods.
 
-**Settings:**
+.. rubric:: Settings
 
 .. list-table::
    :header-rows: 1
@@ -160,24 +159,26 @@ This produces orbitals that are maximally localized on specific atoms or bonds, 
 QDK MP2 Natural Orbitals
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Factory name:** ``"qdk_mp2_natural_orbitals"``
+.. rubric:: Factory name: ``"qdk_mp2_natural_orbitals"``
 
 Computes natural orbitals :cite:`Lowdin1956` from the :term:`MP2` one-particle density matrix.
 These orbitals diagonalize the correlation effects and provide occupation numbers that can guide :doc:`active space selection <active_space>`.
 
-**Settings:** This implementation has no configurable settings.
+.. rubric:: Settings
+
+This implementation has no configurable settings.
 
 .. _localizer-qdk-vvhv:
 
 QDK VVHV
 ~~~~~~~~
 
-**Factory name:** ``"qdk_vvhv"``
+.. rubric:: Factory name: ``"qdk_vvhv"``
 
 The :term:`VVHV` (Valence Virtual--Hard Virtual) localizer addresses the numerical challenges of orbital localization in near-complete basis sets by partitioning the virtual space into chemically meaningful subspaces.
 See :ref:`VVHV Algorithm <vvhv-algorithm>` below for a detailed description.
 
-**Settings:**
+.. rubric:: Settings
 
 .. list-table::
    :header-rows: 1
@@ -217,17 +218,19 @@ Localization of molecular orbitals expressed in near-complete :doc:`basis sets <
 This can lead to orbitals that do not vary smoothly with molecular geometry, numerically unstable results, and reproducibility difficulties across architectures and compute environments.
 The Valence Virtual--Hard Virtual (:term:`VVHV`) separation :cite:`Subotnik2005` addresses these problems by partitioning the virtual orbital space into chemically meaningful subspaces before localization.
 
-**The Problem with Standard Localization**
+.. rubric:: The Problem with Standard Localization
 
 Standard orbital localization methods optimize a cost function (e.g., Pipek-Mezey, Foster-Boys) over blocks of orbitals simultaneously (e.g. occupied, virtual, active).
 In large basis sets, the virtual space contains orbitals of vastly different character:
 
-- **Valence-virtual orbitals**: Low-lying virtual orbitals that are chemically relevant for describing bond breaking/formation and correlation effects
-- **Hard-virtual orbitals**: High-energy orbitals that primarily describe core-valence polarization and basis set completeness
+Valence-virtual orbitals
+   Low-lying virtual orbitals that are chemically relevant for describing bond breaking/formation and correlation effects
+Hard-virtual orbitals
+   High-energy orbitals that primarily describe core-valence polarization and basis set completeness
 
 When localization is applied to the full virtual space, the optimizer may mix these distinct orbital types, leading to non-physical results that are sensitive to numerical precision and can vary discontinuously along reaction coordinates.
 
-**The VVHV Separation Procedure**
+.. rubric:: The VVHV Separation Procedure
 
 The :term:`VVHV` algorithm proceeds in three stages:
 
@@ -245,7 +248,7 @@ The :term:`VVHV` algorithm proceeds in three stages:
 3. **Subspace Localization**: Apply the chosen localization method (e.g., Pipek-Mezey) separately within each subspace.
    This ensures that the optimization landscape is well-behaved and that orbitals vary smoothly with geometry.
 
-**Benefits for Active Space Selection**
+.. rubric:: Benefits for Active Space Selection
 
 The :term:`VVHV` separation is particularly valuable for multi-configuration calculations where a consistent active space must be maintained along a reaction pathway.
 By localizing only the valence-virtual orbitals, which are the chemically relevant virtual orbitals for active space construction, the :term:`VVHV` procedure ensures:
@@ -261,16 +264,20 @@ For details on using localized orbitals in active space selection, see :doc:`Act
 PySCF Multi
 ~~~~~~~~~~~
 
-**Factory name:** ``"pyscf_multi"``
+.. rubric:: Factory name: ``"pyscf_multi"``
 
 The PySCF :doc:`plugin <../plugins>` provides access to additional localization algorithms through `PySCF <https://pyscf.org/>`_:
 
-- **Pipek-Mezey** :cite:`Pipek1989` — Maximizes atomic charge localization
-- **Foster-Boys** :cite:`Foster1960` — Minimizes the spatial extent of orbitals
-- **Edmiston-Ruedenberg** :cite:`Edmiston1963` — Maximizes self-repulsion energy
-- **Cholesky** :cite:`Aquilante2006` — Efficient analytical localization via Cholesky decomposition
+Pipek-Mezey :cite:`Pipek1989`
+   Maximizes atomic charge localization
+Foster-Boys :cite:`Foster1960`
+   Minimizes the spatial extent of orbitals
+Edmiston-Ruedenberg :cite:`Edmiston1963`
+   Maximizes self-repulsion energy
+Cholesky :cite:`Aquilante2006`
+   Efficient analytical localization via Cholesky decomposition
 
-**Settings:**
+.. rubric:: Settings
 
 .. list-table::
    :header-rows: 1
