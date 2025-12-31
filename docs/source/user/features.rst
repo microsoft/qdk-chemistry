@@ -84,7 +84,8 @@ Implementation Highlights
 Multi-Configuration Methods
 """""""""""""""""""""""""""
 
-Multi-configuration (:term:`MC`) methods represent the electronic wavefunction as a linear combination of many Slater determinants, enabling accurate description of static correlation effects.QDK/Chemistry provides access to a hierarchy of :term:`MC` methods:
+Multi-configuration (:term:`MC`) methods represent the electronic wavefunction as a linear combination of many Slater determinants, enabling accurate description of static correlation effects.
+QDK/Chemistry provides access to a hierarchy of :term:`MC` methods:
 
 **Configuration Interaction:**
 
@@ -141,11 +142,11 @@ Observable Sampling
 """""""""""""""""""
 
 After preparing a quantum state representing the molecular system, a common next step is to compute physical observables, such as the ground state energy.
-One canonical choice for this task is to estimate the expectation value through statistical sampling of measurements performed on the quantum state relative to the operator of interest. 
+One canonical choice for this task is to estimate the expectation value through statistical sampling of measurements performed on the quantum state relative to the operator of interest.
 This generally involves the following steps:
 
 1. **Operator Decomposition**:
-   The target operator (e.g., the electronic Hamiltonian) is decomposed into a sum of measurable components, often expressed in terms of Pauli operators.  
+   The target operator (e.g., the electronic Hamiltonian) is decomposed into a sum of measurable components, often expressed in terms of Pauli operators.
    This decomposition facilitates efficient measurement on quantum hardware.
    Starting from a qubit-mapped Hamiltonian, this task generally involves grouping Pauli terms into sets of mutually commuting operators that can be measured simultaneously.
    QDK/Chemistry provides utilities to perform, for example, `Pauli grouping by qubit-wise commutativity <https://qiskit.org/documentation/stubs/qiskit.opflow.grouping.PauliGrouper.html>`_ through its Qiskit plugin.
@@ -172,7 +173,10 @@ Basis Sets and Effective Core Potentials
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Basis Set Exchange (:term:`BSE`)** :cite:`Pritchard2019, Feller1996, Schuchardt2007`
-   A comprehensive repository of standardized basis sets for quantum chemistry calculations. All of the basis sets and effective core potentials distributed with QDK/Chemistry are sourced from the :term:`BSE`. If you publish results obtained with detault basis sets provided with QDK/Chemistry, in addition to the reference for the basis set itself, please cite the :term:`BSE`. For guirance on citing specific basis sets and effective core potentials, see the `Basis Set Exchange Website <https://www.basissetexchange.org/>`_.
+   A comprehensive repository of standardized basis sets for quantum chemistry calculations.
+   All of the basis sets and effective core potentials distributed with QDK/Chemistry are sourced from the :term:`BSE`.
+   If you publish results obtained with default basis sets provided with QDK/Chemistry, in addition to the reference for the basis set itself, please cite the :term:`BSE`.
+   For guidance on citing specific basis sets and effective core potentials, see the `Basis Set Exchange Website <https://www.basissetexchange.org/>`_.
 
 **Libecpint** :cite:`Shaw2017,Shaw2021`
    Provides efficient evaluation of effective core potential (:term:`ECP`) integrals over Gaussian-type orbitals. QDK/Chemistry's native :term:`SCF` solver relies on Libecpint for :term:`ECP` integral computation. If you publish results obtained with any of the native quantum chemistry modules within QDK/Chemistry that utilize ECPs, please cite Libecpint. The `Libecpint repository <https://github.com/robashaw/libecpint>`_ includes additional guidance on citing Libecpint.

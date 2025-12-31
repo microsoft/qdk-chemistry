@@ -127,7 +127,7 @@ QDK/Chemistry supports various Multi-Configuration (:term:`MC`) methods includin
 
 While multi-configurational methods provide more accurate energy estimates than :term:`SCF`, their primary role in the quantum applications workflow is to generate high-quality initial states for quantum algorithms.
 On scaled fault-tolerant quantum computers, these classically-computed wavefunctions serve as the foundation for state preparation circuits, enabling algorithms such as quantum phase estimation to achieve chemical accuracy for systems that remain intractable for purely classical methods.
-These methods also serve as a critical analysis tool, allowing users to better understand the electronic structure of theire systems of interest and the potential for quantum algorithms to provide meaningful utility over classical state of the art.
+These methods also serve as a critical analysis tool, allowing users to better understand the electronic structure of their systems of interest and the potential for quantum algorithms to provide meaningful utility over classical state of the art.
 
 In the following example, as the aforementioned (6e, 6o) active space is relatively small, we perform a :term:`CASCI` calculation to obtain the exact ground state wavefunction within the active space.
 

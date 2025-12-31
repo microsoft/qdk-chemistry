@@ -35,7 +35,7 @@ Input requirements
 The :class:`~qdk_chemistry.algorithms.ActiveSpaceSelector` requires the following input:
 
 **Wavefunction**
-   A :class:`~qdk_chemistry.data.Wavefunction` instance containing data necessacary for active space selection, including: orbital information, electron counts, etc.
+   A :class:`~qdk_chemistry.data.Wavefunction` instance containing data necessary for active space selection, including: orbital information, electron counts, etc.
 
    Some selection methods (e.g., entropy-based) may require additional information such as orbital occupation numbers or entropies from a prior multi-configuration calculation.
 

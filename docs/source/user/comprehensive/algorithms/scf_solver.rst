@@ -177,7 +177,7 @@ QDK/Chemistry implements two complementary algorithms that can be used independe
 
 :term:`DIIS` is an extrapolation technique that accelerates :term:`SCF` convergence by constructing an optimal linear combination of previous Fock matrices :cite:`Pulay1982`.
 :term:`DIIS` is highly effective for well-behaved systems, often achieving convergence in low number of  iterations.
-However, it can fail for challenging cases such as open-shell systems or molecules with near-degenerate orbitals, where the error surface is highly non-linear.
+However, it can fail for challenging cases such as open-shell systems or molecules with near-degenerate orbitals, where the error surface is highly nonlinear.
 
 **Geometric Direct Minimization (GDM)**
 

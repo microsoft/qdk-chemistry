@@ -7,7 +7,7 @@ Welcome to QDK/Chemistry
 
 **QDK/Chemistry** provides a set of tools and libraries to enable cutting edge quantum chemistry calculations on quantum computers.
 QDK/Chemistry tackles this problem holistically, by recognizing that a significant portion of the quantum applications pipeline heavily relies on the quality, robustness, and efficiency of the classical data preparation and post-processing steps.
-QDK/Chemisty also serves as a platform for innovation, by providing a unified interface to a variety of quantum chemistry methods and packages, allowing researchers to focus on their areas of interest while intergrating with a vast community of existing tools to accelerate development.
+QDK/Chemistry also serves as a platform for innovation, by providing a unified interface to a variety of quantum chemistry methods and packages, allowing researchers to focus on their areas of interest while integrating with a vast community of existing tools to accelerate development.
 
 Key Features
 ============
