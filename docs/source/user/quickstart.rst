@@ -53,7 +53,7 @@ Instantiations of the :doc:`comprehensive/algorithms/scf_solver` algorithm (and 
 See the :doc:`comprehensive/algorithms/factory_pattern` documentation for more information on how it is used in the code base.
 
 The inputs for an :term:`SCF` calculation are a :doc:`comprehensive/data/structure` object, the total charge and spin multiplicity of the molecular system, and information about the single-particle basis to be used.
-Optionally, :doc:`comprehensive/algorithms/settings` specific to the particular :doc:`comprehensive/algorithms/scf_solver` can be configured to control the execution of the :term:`SCF` algorihm (e.g. convergence tolerances, etc) by accessing the ``settings()`` method.
+Optionally, :doc:`comprehensive/algorithms/settings` specific to the particular :doc:`comprehensive/algorithms/scf_solver` can be configured to control the execution of the :term:`SCF` algorithm (e.g. convergence tolerances, etc) by accessing the ``settings()`` method.
 The basis for the :term:`SCF` calculation can be set via a string input (specifying one of the :ref:`available_basis_sets`), a custom :doc:`comprehensive/data/basis_set` or initial :doc:`comprehensive/data/orbitals` can also be provided.
 
 .. tab:: C++ API
@@ -199,12 +199,12 @@ For efficient energy estimation, the qubit Hamiltonian can be optimized in two w
 Generate the state preparation circuit
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. TODO: Add more references to other meothds
+.. TODO: Add more references to other methods
 
 Given the classical representation of the sparse multi-configurational :class:`~qdk_chemistry.data.Wavefunction`, a quantum circuit can be generated to prepare this state on a quantum computer.
-This can be done in many ways, including via Isometry encoding :cite:`Christandl2016`, linear combinations of unitaries [...], and tensor product methods [...].
+This can be done in many ways, including via Isometry encoding :cite:`Christandl2016`, linear combinations of unitaries, and tensor product methods.
 However, when the wavefunction is very sparse, these methods can be inefficient.
-In QDK/Chemistry, we provide a specialized method for generating state preparation circuits for sparse wavefunctions based on the construction of sparse isometries over GF(2) with X gates [...], provided as a :doc:`comprehensive/algorithms/state_preparation` algorithm.
+In QDK/Chemistry, we provide a specialized method for generating state preparation circuits for sparse wavefunctions based on the construction of sparse isometries over GF(2) with X gates, provided as a :doc:`comprehensive/algorithms/state_preparation` algorithm.
 See :doc:`comprehensive/algorithms/state_preparation` for more details on the other algorithms provided for state preparation in QDK/Chemistry.
 
 .. tab:: C++ API
