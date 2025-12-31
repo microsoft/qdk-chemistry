@@ -179,7 +179,7 @@ The :term:`ASCI` algorithm proceeds as a two-phase optimization:
 
 In both the growth and refinement phases, the :term:`ASCI` search algorithm is performed to update the current wavefunction.
 The key realization of :term:`ASCI` is that the search can be drastically accelerated by only searching for determinants that are connected via the Hamiltonian from a small set of "core" determinants rather than the full wavefunction at any particular iteration.
-This module provides several ways to control the size of this core set, including a maximum number of core determinants (``ncdets_max``) as well as allowing the the core space to update dynamically as the wavefunction grows by specifiying that a fixed percentage of the current wavefunction determinants be included in the core set (``core_selection_threshold``).
+This module provides several ways to control the size of this core set, including a maximum number of core determinants (``ncdets_max``) as well as allowing the core space to update dynamically as the wavefunction grows by specifying that a fixed percentage of the current wavefunction determinants be included in the core set (``core_selection_threshold``).
 The method for selecting the core determinants is controlled by the ``core_selection_strategy`` setting.
 
 
