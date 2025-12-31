@@ -26,11 +26,11 @@ Input requirements
 
 The :class:`~qdk_chemistry.algorithms.StatePreparation` requires the following input:
 
-**Wavefunction**
+Wavefunction
    A :class:`~qdk_chemistry.data.Wavefunction` instance containing the quantum state to be loaded onto qubits. This is typically obtained from a multi-configuration calculation using the :doc:`MultiConfigurationCalculator <mc_calculator>`. The method with which this encoding is achieved is implementation dependent.
 
 
-**Creating a state preparation algorithm:**
+.. rubric:: Creating a state preparation algorithm
 
 .. tab:: Python API
 
@@ -39,7 +39,7 @@ The :class:`~qdk_chemistry.algorithms.StatePreparation` requires the following i
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-**Configuring settings:**
+.. rubric:: Configuring settings
 
 Settings can be modified using the ``settings()`` object.
 See `Available implementations`_ below for implementation-specific options.
@@ -51,7 +51,7 @@ See `Available implementations`_ below for implementation-specific options.
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-**Running the calculation:**
+.. rubric:: Running the calculation
 
 Once configured, the :class:`~qdk_chemistry.algorithms.StatePreparation` can be used to generate a quantum circuit from a :class:`~qdk_chemistry.data.Wavefunction`.
 
@@ -78,11 +78,11 @@ You can discover available implementations programmatically:
 Sparse Isometry GF2+X
 ~~~~~~~~~~~~~~~~~~~~~
 
-**Factory name:** ``"sparse_isometry_gf2x"``
+.. rubric:: Factory name: ``"sparse_isometry_gf2x"``
 
 This method is an optimized approach that leverages sparsity in the target wavefunction. The GF2+X method, a modification of the original sparse isometry work in :cite:`Malvetti2021`, applies GF(2) Gaussian elimination to the binary matrix representation of the state to determine a reduced space representation of the sparse state. This reduced state is then densely encoded via regular isometry :cite:`Christandl2016` on a smaller number of qubits, and finally scattered to the full qubit space using X and :term:`CNOT` gates. These reductions correspond to efficient gate sequences that simplify the preparation basis. By focusing only on non-zero amplitudes, this approach substantially reduces circuit depth and gate count compared with dense isometry methods. This method is native to QDK/Chemistry and is especially efficient for wavefunctions with sparse amplitude structure.
 
-**Settings:**
+.. rubric:: Settings
 
 .. list-table::
    :header-rows: 1
@@ -104,11 +104,11 @@ This method is an optimized approach that leverages sparsity in the target wavef
 Regular Isometry
 ~~~~~~~~~~~~~~~~
 
-**Factory name:** ``"regular_isometry"``
+.. rubric:: Factory name: ``"regular_isometry"``
 
 This method uses regular isometry synthesis via `Qiskit <https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.circuit.library.StatePreparation>`_, implementing the isometry-based approach proposed by Matthias Christandl :cite:`Christandl2016`. It provides a general solution for state preparation, and is suitable for cases where a dense representation is required or preferred.
 
-**Settings:**
+.. rubric:: Settings
 
 .. list-table::
    :header-rows: 1

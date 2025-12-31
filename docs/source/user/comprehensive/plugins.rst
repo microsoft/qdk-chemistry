@@ -31,9 +31,6 @@ The implementations for each algorithm type are managed by a :doc:`factory class
 We refer the reader to the :doc:`factory pattern <algorithms/factory_pattern>` and :doc:`algorithm <algorithms/index>` documentation pages for more details on this design pattern.
 
 
-
-
-
 Using plugins
 ~~~~~~~~~~~~~
 
@@ -108,7 +105,7 @@ Implementing a new algorithm backend
 
 This section demonstrates how to integrate an external :term:`SCF` solver as a QDK/Chemistry plugin, enabling access through the standard API.
 
-**Interface requirements**
+.. rubric:: Interface requirements
 
 Each algorithm type in QDK/Chemistry defines an abstract base class specifying the interface that all implementations must satisfy:
 
@@ -116,7 +113,7 @@ Each algorithm type in QDK/Chemistry defines an abstract base class specifying t
 - A ``_run_impl()`` method containing the computational logic
 - A ``settings()`` object for runtime configuration
 
-**Defining custom settings**
+.. rubric:: Defining custom settings
 
 When an implementation requires configuration options beyond those provided by the base settings class, a derived settings class can be defined:
 
@@ -134,7 +131,7 @@ When an implementation requires configuration options beyond those provided by t
       :start-after: # start-cell-custom-settings
       :end-before: # end-cell-custom-settings
 
-**Implementation structure**
+.. rubric:: Implementation structure
 
 The implementation class inherits from the algorithm base class and overrides the required methods.
 The ``_run_impl()`` method is responsible for:
@@ -157,7 +154,7 @@ The ``_run_impl()`` method is responsible for:
       :start-after: # start-cell-custom-scf-solver
       :end-before: # end-cell-custom-scf-solver
 
-**Registration**
+.. rubric:: Registration
 
 Implementations are registered with the algorithm factory to enable discovery and instantiation by name.
 Registration is typically performed during module initialization:
@@ -191,15 +188,18 @@ Defining a new algorithm type
 When the required functionality does not correspond to an existing algorithm category, a new algorithm type can be defined.
 This section demonstrates the complete process using a geometry optimizer as an example.
 
-**Interface design**
+.. rubric:: Interface design
 
 The first step is to specify the algorithm's interface:
 
-- **Input type**: The data the algorithm operates on (e.g., ``Structure``)
-- **Output type**: The data the algorithm produces (e.g., optimized ``Structure``)
-- **Configuration**: Required settings (e.g., convergence thresholds, iteration limits)
+Input type
+   The data the algorithm operates on (e.g., ``Structure``)
+Output type
+   The data the algorithm produces (e.g., optimized ``Structure``)
+Configuration
+   Required settings (e.g., convergence thresholds, iteration limits)
 
-**Settings class definition**
+.. rubric:: Settings class definition
 
 Define a settings class containing all configuration parameters:
 
@@ -217,7 +217,7 @@ Define a settings class containing all configuration parameters:
       :start-after: # start-cell-geometry-settings
       :end-before: # end-cell-geometry-settings
 
-**Base class definition**
+.. rubric:: Base class definition
 
 Define an abstract base class specifying the interface for all implementations:
 
@@ -235,7 +235,7 @@ Define an abstract base class specifying the interface for all implementations:
       :start-after: # start-cell-geometry-base-class
       :end-before: # end-cell-geometry-base-class
 
-**Factory definition**
+.. rubric:: Factory definition
 
 The factory manages implementation registration and provides instance creation:
 
@@ -253,7 +253,7 @@ The factory manages implementation registration and provides instance creation:
       :start-after: # start-cell-geometry-factory
       :end-before: # end-cell-geometry-factory
 
-**Concrete implementations**
+.. rubric:: Concrete implementations
 
 Implement the algorithm by inheriting from the base class:
 
@@ -278,7 +278,7 @@ Additional implementations follow the same pattern:
    :start-after: # start-cell-steepest-descent
    :end-before: # end-cell-steepest-descent
 
-**Registration**
+.. rubric:: Registration
 
 Register the factory and all implementations:
 
@@ -296,7 +296,7 @@ Register the factory and all implementations:
       :start-after: # start-cell-geometry-registration
       :end-before: # end-cell-geometry-registration
 
-**Usage**
+.. rubric:: Usage
 
 Following registration, the new algorithm type is accessible through the standard API:
 
