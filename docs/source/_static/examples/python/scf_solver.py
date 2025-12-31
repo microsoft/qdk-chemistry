@@ -41,3 +41,28 @@ scf_orbitals = wfn.get_orbitals()
 print(f"SCF Energy: {E_scf:.10f} Hartree")
 # end-cell-run
 ################################################################################
+
+################################################################################
+# start-cell-list-implementations
+from qdk_chemistry.algorithms import registry  # noqa: E402
+
+print(registry.available("scf_solver"))  # ['pyscf', 'qdk']
+# end-cell-list-implementations
+################################################################################
+
+################################################################################
+# start-cell-pyscf-example
+from qdk_chemistry.algorithms import create  # noqa: E402
+from qdk_chemistry.data import Structure  # noqa: E402
+
+# Create and configure the PySCF solver
+solver = create("scf_solver", "pyscf")
+solver.settings().set("method", "b3lyp")
+solver.settings().set("scf_type", "restricted")
+
+# Run with basis set specified as input parameter
+water_coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.76, 0.59], [0.0, -0.76, 0.59]])
+water = Structure(water_coords, symbols=["O", "H", "H"])
+energy, wfn = solver.run(water, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz")
+# end-cell-pyscf-example
+################################################################################

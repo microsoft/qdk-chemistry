@@ -5,9 +5,8 @@
 Internal Python Placeholder Types
 =================================
 
-The objects below exist solely to satisfy cross references generated from
-pybind11 output. They do not correspond to concrete symbols in the public
-API.
+The objects below exist solely to satisfy cross references generated from pybind11 output.
+They do not correspond to concrete symbols in the public API.
 
 .. py:class:: optional
 
