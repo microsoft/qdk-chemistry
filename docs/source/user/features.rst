@@ -140,12 +140,19 @@ Fermion-to-qubit mapping is currently supported through QDK/Chemistry's Qiskit p
 Observable Sampling
 """""""""""""""""""
 
-After preparing a quantum state representing the molecular system, a common next step is to compute physical observables, such as the ground state energy. One canonical choice for this task is to estimate the expectation value through statistical sampling of measurements performed on the quantum state relative to the operator of interest. This generally involves two primary steps:
+After preparing a quantum state representing the molecular system, a common next step is to compute physical observables, such as the ground state energy.
+One canonical choice for this task is to estimate the expectation value through statistical sampling of measurements performed on the quantum state relative to the operator of interest. 
+This generally involves the following steps:
 
-1. **Operator Decomposition**: The target operator (e.g., the electronic Hamiltonian) is decomposed into a sum of measurable components, often expressed in terms of Pauli operators. This decomposition facilitates efficient measurement on quantum hardware. Starting from a qubit mapped Hamiltonain, this task generally invobelves grouping Pauli terms into sets of mutually commuting operators that can be measured simultaneously. QDK/Chemistry provides utilities to perform, for example, `Pauli grouping by qubit-wise commutativity <https://qiskit.org/documentation/stubs/qiskit.opflow.grouping.PauliGrouper.html>`_ through its Qiskit plugin.
-
-2. **Circuit Execution and Measurement**: Given the state preparation circuit and the decomposed operator, quantum circuits are executed on quantum hardware or simulators to obtain measurement outcomes.
-3. **Classical Post-Processing**: The measurement results are processed classically to estimate the expectation value of the operator.
+1. **Operator Decomposition**:
+   The target operator (e.g., the electronic Hamiltonian) is decomposed into a sum of measurable components, often expressed in terms of Pauli operators.  
+   This decomposition facilitates efficient measurement on quantum hardware.
+   Starting from a qubit-mapped Hamiltonian, this task generally involves grouping Pauli terms into sets of mutually commuting operators that can be measured simultaneously.
+   QDK/Chemistry provides utilities to perform, for example, `Pauli grouping by qubit-wise commutativity <https://qiskit.org/documentation/stubs/qiskit.opflow.grouping.PauliGrouper.html>`_ through its Qiskit plugin.
+2. **Circuit Execution and Measurement**:
+   Given the state preparation circuit and the decomposed operator, quantum circuits are executed on quantum hardware or simulators to obtain measurement outcomes.
+3. **Classical Post-Processing**:
+   The measurement results are processed classically to estimate the expectation value of the operator.
 
 See :doc:`comprehensive/algorithms/energy_estimator` for further details about available observable sampling methods and implementations.
 
