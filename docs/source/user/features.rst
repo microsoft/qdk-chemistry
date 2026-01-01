@@ -180,6 +180,7 @@ Parity Transformation :cite:`Love2012`
    An alternative mapping that encodes fermionic operators based on the parity of occupation numbers, offering advantages in specific contexts.
 
 Fermion-to-qubit mapping is currently supported through QDK/Chemistry's Qiskit plugin; see the :doc:`comprehensive/algorithms/qubit_mapper` for further details.
+QDK/Chemistry also provides :doc:`Pauli operator arithmetic <comprehensive/data/pauli_operator>` for building and manipulating qubit Hamiltonians using natural mathematical notation.
 
 
 Observable Sampling
