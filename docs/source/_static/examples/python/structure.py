@@ -8,13 +8,15 @@
 ################################################################################
 # start-cell-create
 import numpy as np
+from pathlib import Path
 from qdk_chemistry.data import Structure, Element
 
-# Specify a structure using coordinates, and either symbols or elements
+# Specify a structure using coordinates (in Bohr), and either symbols or elements
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])  # Bohr
 symbols = ["H", "H"]
 
 structure = Structure(coords, symbols=symbols)
+
 # Equivalent to 'structure', but uses 'elements' instead of 'symbols'
 elements = [Element.H, Element.H]
 structure_alternative = Structure(coords, elements)
@@ -26,6 +28,20 @@ structure_custom = Structure(
     coords, elements=elements, masses=custom_masses, nuclear_charges=custom_charges
 )
 # end-cell-create
+################################################################################
+
+################################################################################
+# start-cell-from-file
+# Load a structure from an XYZ file (coordinates in Angstrom are converted to Bohr)
+structure_from_file = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/h2.structure.xyz"
+)
+
+# Load a structure from a JSON file (coordinates are stored in Bohr)
+structure_from_json = Structure.from_json_file(
+    Path(__file__).parent / "../data/water.structure.json"
+)
+# end-cell-from-file
 ################################################################################
 
 ################################################################################

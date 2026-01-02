@@ -12,11 +12,8 @@ using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
 int main() {
-  // Create H2 structure
-  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
-  std::vector<std::string> symbols = {"H", "H"};
-
-  Structure structure(coords, symbols);
+  // Load H2 structure from XYZ file
+  auto structure = Structure::from_xyz_file("../data/h2.structure.xyz");
 
   // SCF
   auto scf_solver = ScfSolverFactory::create();

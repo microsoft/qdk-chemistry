@@ -7,12 +7,12 @@
 
 ################################################################################
 # start-cell-scf
-import numpy as np
+from pathlib import Path
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.data import Structure
 
-coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
-structure = Structure(coords, ["H", "H"])
+# Load H2 molecule from XYZ file
+structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
 
 # Create a SCF solver using the factory
 scf_solver = create("scf_solver", "pyscf")
