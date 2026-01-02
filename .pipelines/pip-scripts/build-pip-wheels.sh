@@ -78,11 +78,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     cmake --version
 fi
 
-if [ "$MAC_BUILD" == "ON" ]; then
-    export CFLAGS="-fPIC -Os -ffloat-store"
-elif [ "$MAC_BUILD" == "OFF" ]; then
-    export CFLAGS="-fPIC -Os"
-fi
+export CFLAGS="-fPIC -Os"
 
 echo "Downloading and installing BLIS..."
 bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} "${CFLAGS}" ${MAC_BUILD}
@@ -136,13 +132,9 @@ python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
 cd python
 
 # Build wheel with all necessary CMake flags
-if [ "$MAC_BUILD" == "OFF" ]; then
-    export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
-    export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
-elif [ "$MAC_BUILD" == "ON" ]; then
-    export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden -ffloat-store"
-    export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden -ffloat-store"
-fi
+export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
+export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
+
 
 if [ "$MAC_BUILD" == "OFF" ]; then
     export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
@@ -160,7 +152,7 @@ elif [ "$MAC_BUILD" == "ON" ]; then
     export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
     python3 -m build --wheel \
         -C build-dir="build/{wheel_tag}" \
-        -C cmake.define.QDK_UARCH=${MARCH} \
+        -C cmake.define.QDK_UARCH=native \
         -C cmake.define.BUILD_SHARED_LIBS=OFF \
         -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \
         -C cmake.define.QDK_ENABLE_OPENMP=OFF \
