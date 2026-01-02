@@ -53,6 +53,7 @@ configure_file(${QDK_SCF_TEST_DIR}/test_config.h.in ${PROJECT_BINARY_DIR}/tests/
 
 # Collect all test source files
 file(GLOB_RECURSE TEST_SOURCES "test_*.cpp")
+
 list(APPEND TEST_SOURCES
     ${QDK_SCF_TEST_DIR}/int1e_test.cpp
     ${QDK_SCF_TEST_DIR}/basis_test.cpp
