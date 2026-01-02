@@ -33,7 +33,7 @@ jobs:
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
-          uarch: armv8-a
+          uarch: native
     env:
       BUILD_DIR: cpp/build
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
