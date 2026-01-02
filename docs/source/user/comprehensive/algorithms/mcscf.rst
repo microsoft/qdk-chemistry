@@ -10,31 +10,50 @@ Its primary purpose is to optimize the orbitals and wavefunction for systems wit
 Overview
 --------
 
-MCSCF methods extend beyond both mean-field and configuration interaction approaches by simultaneously optimizing molecular orbitals and multi-configurational wavefunctions.
+:term:`MCSCF` methods extend beyond both mean-field and configuration interaction approaches by simultaneously optimizing molecular orbitals and multi-configurational wavefunctions.
 Unlike :doc:`Hartree-Fock <scf_solver>`, which optimizes orbitals for a single configuration, or :doc:`CI calculations <mc_calculator>`, which only optimize configuration coefficients with fixed orbitals,
-MCSCF performs a full variational optimization of both components.
+:term:`MCSCF` performs a full variational optimization of both components.
 
 As a prerequisite, an active space must be defined, typically using an :doc:`ActiveSpaceSelector <active_space>`.
-Afterwards, the :term:`MCSCF` procedure alternates between:
+The :term:`MCSCF` procedure alternates between:
 
 - **Configuration interaction**: Solving the :term:`CI` problem in the active space with fixed orbitals
 - **Orbital optimization**: Updating molecular orbital coefficients while keeping :term:`CI` coefficients fixed
 
 Due to the relaxation of the orbitals, :term:`MCSCF` can capture both static and some dynamic correlation effects more effectively and hence, results in lower energies than :term:`CI` calculations.
 
-Capabilities
-------------
 
-The :class:`~qdk_chemistry.algorithms.MultiConfigurationScf` in QDK/Chemistry provides:
+Running an :term:`MCSCF` calculation
+------------------------------------
 
-- **Simultaneous orbital and CI optimization**: Variational optimization of both molecular orbital coefficients and configuration interaction coefficients
-- **Flexible CI solver integration**: Support for various :term:`CI` solvers through the factory pattern (e.g., full :term:`CI`, selected :term:`CI`)
-- **Customizable Hamiltonian construction**: Compatible with different Hamiltonian constructor implementations
+This section demonstrates how to create, configure, and run an :term:`MCSCF` calculation.
+The ``run`` method takes initial :doc:`Orbitals <../data/orbitals>`, a :doc:`HamiltonianConstructor <hamiltonian_constructor>`,
+a :doc:`MultiConfigurationCalculator <mc_calculator>`, and the number of electrons as input and returns an optimized :class:`~qdk_chemistry.data.Wavefunction` object along with its associated energy.
 
-Creating a MultiConfigurationScf
---------------------------------
+Input requirements
+~~~~~~~~~~~~~~~~~~
 
-The :class:`~qdk_chemistry.algorithms.MultiConfigurationScf` is created using the :doc:`factory pattern <../design/factory_pattern>`.
+The :class:`~qdk_chemistry.algorithms.MultiConfigurationScf` requires the following inputs:
+
+**Orbitals**
+   Initial :doc:`Orbitals <../data/orbitals>` containing orbital coefficients and active space information.
+
+**HamiltonianConstructor**
+   A :doc:`HamiltonianConstructor <hamiltonian_constructor>` instance that builds the Hamiltonian for the :term:`CI` step.
+
+**MultiConfigurationCalculator**
+   A :doc:`MultiConfigurationCalculator <mc_calculator>` for solving the :term:`CI` problem in the active space.
+
+**Number of alpha electrons**
+   The number of alpha (spin-up) electrons in the active space.
+
+**Number of beta electrons**
+   The number of beta (spin-down) electrons in the active space.
+
+
+**Creating an :term:`MCSCF` solver:**
+
+The :class:`~qdk_chemistry.algorithms.MultiConfigurationScf` is created using the :doc:`factory pattern <factory_pattern>`.
 
 .. tab:: Python API
 
@@ -43,15 +62,10 @@ The :class:`~qdk_chemistry.algorithms.MultiConfigurationScf` is created using th
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-Configuring the MCSCF calculation
----------------------------------
+**Configuring settings:**
 
-The :class:`~qdk_chemistry.algorithms.MultiConfigurationScf` can be configured using the ``Settings`` object of the :class:`~qdk_chemistry.algorithms.HamiltonianConstructor`, the ``Settings`` object of
-the :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator`, and its own ``Settings`` object:
-
-.. note::
-   The examples below show commonly used settings.
-   For a complete list of available settings with descriptions, see the `Available settings`_ section.
+Each of the required algorithms can be configured through its settings which can be modified using the ``settings()`` object.
+See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: Python API
 
@@ -60,11 +74,7 @@ the :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator`, and its own
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-Running an MCSCF calculation
-----------------------------
-
-Once configured, the :term:`MCSCF` calculation requires initial :doc:`orbitals <../data/orbitals>`, a :doc:`Hamiltonian constructor <hamiltonian_constructor>`,
-a :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` for the :term:`CI` solver, and the number of alpha and beta electrons in the active space.
+**Running the calculation:**
 
 .. tab:: Python API
 
@@ -73,30 +83,11 @@ a :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` for the :term:
       :start-after: # start-cell-run
       :end-before: # end-cell-run
 
-Available MCSCF methods
------------------------
-
-.. list-table::
-   :header-rows: 1
-   :widths: 20 40 40
-
-   * - Method
-     - Description
-     - Typical Use Cases
-   * - ``pyscf``
-     - PySCF-based CASSCF implementation
-     - General MCSCF calculations
-
 Available settings
 ------------------
 
 The :class:`~qdk_chemistry.algorithms.MultiConfigurationScf` accepts a range of settings to control its behavior.
-These settings control the :term:`MCSCF` orbital optimization procedure.
-
-Base settings
-~~~~~~~~~~~~~
-
-These settings apply to all :term:`MCSCF` calculation methods:
+All implementations share a common base set of settings from ``MultiConfigurationScfSettings``:
 
 .. list-table::
    :header-rows: 1
@@ -108,12 +99,14 @@ These settings apply to all :term:`MCSCF` calculation methods:
      - Description
    * - ``max_cycle_macro``
      - int
-     - 50
+     - ``50``
      - Maximum number of :term:`MCSCF` macro iterations (orbital optimization cycles)
    * - ``verbose``
      - int
-     - 0
+     - ``0``
      - Verbosity level for output (0 = minimal, higher = more detailed)
+
+See :doc:`Settings <settings>` for a more general treatment of settings in QDK/Chemistry.
 
 .. note::
 
@@ -121,20 +114,23 @@ These settings apply to all :term:`MCSCF` calculation methods:
    for the Hamiltonian constructor are configured through the :doc:`Hamiltonian constructor <hamiltonian_constructor>` object.
    See :doc:`MultiConfigurationCalculator settings <mc_calculator>` and :doc:`HamiltonianConstructor settings <hamiltonian_constructor>` for more details.
 
-Implemented interfaces
-----------------------
+Available implementations
+-------------------------
 
-QDK/Chemistry's :class:`~qdk_chemistry.algorithms.MultiConfigurationScf` provides a unified interface for :term:`MCSCF` calculations:
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.MultiConfigurationScf` provides a unified interface for :term:`MCSCF` calculations.
+You can discover available implementations programmatically:
 
-- **PySCF**: Interface to PySCF's :term:`CASSCF` implementation, using QDK :term:`MC` calculators as :term:`FCI` solvers
+.. tab:: Python API
 
-The factory pattern allows seamless selection between implementations, with the most appropriate option chosen
-based on the calculation requirements and available packages.
+   .. literalinclude:: ../../../_static/examples/python/mcscf.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
 
-For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
+PySCF
+~~~~~
 
-PySCF implementation
---------------------
+**Factory name:** ``"pyscf"`` (default)
 
 The current :class:`~qdk_chemistry.algorithms.MultiConfigurationScf` implementation in QDK/Chemistry uses PySCF's :term:`CASSCF` framework.
 The implementation wraps a QDK :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` to serve as the :term:`FCI` solver within PySCF's :term:`MCSCF` procedure.
@@ -150,18 +146,20 @@ Key features of the PySCF implementation:
    The current implementation in QDK/Chemistry uses PySCF's :term:`CASSCF` framework as the underlying engine for the :term:`MCSCF` procedure.
    This implementation does not yet utilize the provided Hamiltonian constructor, and uses the integrals directly from PySCF.
 
+**Settings:** This implementation uses only the common settings described above.
+
 Related classes
 ---------------
 
-- :doc:`Wavefunction <../data/wavefunction>`: Input orbitals and output optimized wavefunction
-- :doc:`Orbitals <../data/orbitals>`: Contains orbital information and active space indices
-- :doc:`MultiConfigurationCalculator <mc_calculator>`: CI solver used within MCSCF iterations
-- :doc:`ActiveSpaceSelector <active_space>`: Defines the active space for MCSCF calculations
-- :doc:`HamiltonianConstructor <hamiltonian_constructor>`: Builds the Hamiltonian within the MCSCF
+- :doc:`Orbitals <../data/orbitals>`: Input orbitals containing orbital coefficients and active space information
+- :class:`~qdk_chemistry.data.Wavefunction`: Output optimized wavefunction
+- :doc:`MultiConfigurationCalculator <mc_calculator>`: :term:`CI` solver used within :term:`MCSCF` iterations
+- :doc:`HamiltonianConstructor <hamiltonian_constructor>`: Builds the Hamiltonian for the :term:`CI` step
 
 Further reading
 ---------------
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/mcscf.py>`_ script.
-- :doc:`Settings <../design/settings>`: Configuration settings for algorithms
-- :doc:`Factory Pattern <../design/factory_pattern>`: Understanding algorithm creation
+- :doc:`ActiveSpaceSelector <active_space>`: Helps identify important orbitals for the active space
+- :doc:`Settings <settings>`: Configuration settings for algorithms
+- :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation
