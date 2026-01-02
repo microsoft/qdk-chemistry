@@ -158,7 +158,9 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
         -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
         -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
-        -C cmake.define.CMAKE_PREFIX_PATH="/opt/homebrew"
+        -C cmake.define.CMAKE_PREFIX_PATH="/opt/homebrew" \
+        -C cmake.define.BLAS_LIBRARIES="/usr/local/lib/libblis.a" \
+        -C cmake.define.LAPACK_LIBRARIES="/usr/local/lib/libflame.a"
 fi
 
 if [ "$MAC_BUILD" == "OFF" ]; then
