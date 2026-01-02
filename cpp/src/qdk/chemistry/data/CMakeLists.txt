@@ -8,6 +8,7 @@ target_sources(chemistry PRIVATE
     json_serialization.cpp
     hamiltonian.cpp
     orbitals.cpp
+    pauli_operator.cpp
     settings.cpp
     stability_result.cpp
     structure.cpp

@@ -99,3 +99,13 @@ print(
 )
 # end-cell-qiskit
 ################################################################################
+
+################################################################################
+# start-cell-list-implementations
+from qdk_chemistry.algorithms import registry  # noqa: E402
+
+print(registry.available("energy_estimator"))
+# ['qdk_base_simulator', 'qiskit_aer_simulator']
+# end-cell-list-implementations
+################################################################################
+################################################################################
