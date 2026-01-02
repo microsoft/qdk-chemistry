@@ -79,7 +79,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then
 fi
 
 if [ "$MAC_BUILD" == "ON" ]; then
-    export CFLAGS="-fPIC -Os --ffloat-store"
+    export CFLAGS="-fPIC -Os -ffloat-store"
 elif [ "$MAC_BUILD" == "OFF" ]; then
     export CFLAGS="-fPIC -Os"
 fi
