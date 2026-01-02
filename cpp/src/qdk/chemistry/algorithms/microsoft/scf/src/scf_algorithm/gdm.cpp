@@ -260,14 +260,13 @@ class GDMLineFunctor {
                  const std::vector<int>& num_electrons,
                  const std::vector<int>& rotation_offset,
                  const std::vector<int>& rotation_size,
-                 int num_density_matrices, int num_molecular_orbitals,
-                 bool unrestricted)
+                 int num_molecular_orbitals, bool unrestricted)
       : scf_impl_(scf_impl),
         C_pseudo_canonical_(C_pseudo_canonical),
         num_electrons_(num_electrons),
         rotation_offset_(rotation_offset),
         rotation_size_(rotation_size),
-        num_density_matrices_(num_density_matrices),
+        num_density_matrices_(unrestricted ? 2 : 1),
         num_molecular_orbitals_(num_molecular_orbitals),
         unrestricted_(unrestricted),
         cached_kappa_(Eigen::VectorXd()) {}
@@ -415,8 +414,8 @@ Eigen::VectorXd GDMLineFunctor::grad(const Eigen::VectorXd& x) {
 
     // Extract occupied-virtual block and compute gradient
     // The -4.0 before F_{ia} comes from derivative of energy w.r.t. kappa
-    // Reference: Helgaker, T., Jørgensen, P., & Olsen, J. (2013). Molecular
-    // electronic-structure theory, Eq. 10.8.34
+    // Reference: Helgaker, T., Jørgensen, P., & Olsen, J. (2000). Molecular
+    // electronic-structure theory, Eq. 10.8.34 (2013 reprint edition)
     // -4.0 is for restricted closed-shell system. For unrestricted systems, the
     // gradient is computed separately for each spin component, in that case the
     // coefficient before F_{ia, spin} is -2.0
@@ -745,8 +744,8 @@ void GDM::iterate(SCFImpl& scf_impl) {
 
     // Extract occupied-virtual block and compute gradient
     // The -4.0 before F_{ia} comes from derivative of energy w.r.t. kappa
-    // Reference: Helgaker, T., Jørgensen, P., & Olsen, J. (2013). Molecular
-    // electronic-structure theory, Eq. 10.8.34
+    // Reference: Helgaker, T., Jørgensen, P., & Olsen, J. (2000). Molecular
+    // electronic-structure theory, Eq. 10.8.34 (2013 reprint edition)
     // -4.0 is for restricted closed-shell system. For unrestricted systems, the
     // gradient is computed separately for each spin component, in that case the
     // coefficient before F_{ia, spin} is -2.0
@@ -946,8 +945,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
   // Create line search functor for energy evaluation
   GDMLineFunctor line_functor(scf_impl, C_pseudo_canonical, num_electrons_,
                               rotation_offset_, rotation_size_,
-                              num_density_matrices, num_molecular_orbitals,
-                              cfg->unrestricted);
+                              num_molecular_orbitals, cfg->unrestricted);
 
   Eigen::VectorXd start_kappa = Eigen::VectorXd::Zero(kappa_.size());
   Eigen::VectorXd kappa_dir = kappa_;  // Search direction
