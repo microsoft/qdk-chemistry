@@ -25,17 +25,17 @@ Input requirements
 
 The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` requires the following inputs:
 
-**Hamiltonian**
+Hamiltonian
    A :doc:`Hamiltonian <../data/hamiltonian>` instance that defines the electronic structure problem.
 
-**Number of alpha electrons**
+Number of alpha electrons
    The number of alpha (spin-up) electrons in the active space.
 
-**Number of beta electrons**
+Number of beta electrons
    The number of beta (spin-down) electrons in the active space.
 
 
-**Creating an MC calculator:**
+.. rubric:: Creating an MC calculator
 
 .. tab:: C++ API
 
@@ -51,7 +51,7 @@ The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` requires the
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-**Configuring settings:**
+.. rubric:: Configuring settings
 
 Settings can be modified using the ``settings()`` object.
 See `Available implementations`_ below for implementation-specific options.
@@ -70,7 +70,7 @@ See `Available implementations`_ below for implementation-specific options.
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-**Running the calculation:**
+.. rubric:: Running the calculation
 
 .. tab:: C++ API
 
@@ -142,7 +142,7 @@ You can discover available implementations programmatically:
 MACIS CAS
 ~~~~~~~~~
 
-**Factory name:** ``"macis_cas"`` (default)
+.. rubric:: Factory name: ``"macis_cas"`` (default)
 
 The :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :term:`CAS` implementation provides a reference solver to compute the exact energy within the active space. This module is very memory and compute intensive, and is thus suitable only for small active spaces.
 
@@ -154,7 +154,7 @@ This implementation uses only the common settings described above.
 MACIS ASCI
 ~~~~~~~~~~
 
-**Factory name:** ``"macis_asci"``
+.. rubric:: Factory name: ``"macis_asci"``
 
 The :term:`MACIS` :term:`ASCI` (Adaptive Sampling Configuration Interaction) implementation provides an efficient selected :term:`CI` solver that can handle larger active spaces by adaptively selecting the most important configurations. This method balances accuracy and computational cost, making it suitable for medium-sized active spaces.
 
@@ -167,7 +167,7 @@ The Adaptive Sampling Configuration Interaction (:term:`ASCI`) algorithm :cite:`
 
 The :term:`ASCI` works by growing the determinant space adaptively: at each iteration, it samples the space of possible determinants and selects those with the largest contributions to the wavefunction. This approach achieves near-:term:`CASCI` accuracy at a fraction of the computational cost, making it possible to treat active spaces that are intractable for conventional :term:`CASCI`.
 
- :term:`ASCI` is especially useful for generating approximate wavefunctions and RDMs for use in automated active space selection protocols (such as AutoCAS), as it provides a good balance between computational cost and accuracy. For best practices, see the :ref:`AutoCAS Algorithm <autocas-algorithm-details>` section in the active space selector documentation.
+:term:`ASCI` is especially useful for generating approximate wavefunctions and RDMs for use in automated active space selection protocols (such as AutoCAS), as it provides a good balance between computational cost and accuracy. For best practices, see the :ref:`AutoCAS Algorithm <autocas-algorithm-details>` section in the active space selector documentation.
 
 The :term:`ASCI` algorithm proceeds as a two-phase optimization:
 
@@ -175,12 +175,15 @@ The :term:`ASCI` algorithm proceeds as a two-phase optimization:
 
 2. **Refinement Phase**: Once the determinant space has reached the target size, the refinement phase begins. In this phase, :term:`ASCI` focuses on fine-tuning the wavefunction by iteratively improving the selection of determinants within the fixed-size space. The algorithm evaluates the contributions of each determinant to the wavefunction and removes those that contribute least, replacing them with new candidates generated through perturbation theory. This selective pruning and replacement process continues until convergence is achieved, as determined by the ``refine_energy_tol`` setting or until the maximum number of refinement iterations (``max_refine_iter``) is reached.
 
-**The ASCI Search Algorithm**
+.. rubric:: The ASCI Search Algorithm
 
-  In both the growth and refinement phases, the :term:`ASCI` search algorithm is performed to update the current wavefunction. The key realization of :term:`ASCI` is that the search can be drastically accelerated by only searching for determinants that are connected via the Hamiltonian from a small set of "core" determinants rather than the full wavefunction at any particular iteration. This module provides several ways to control the size of this core set, including a maximum number of core determinants (``ncdets_max``) as well as allowing the the core space to update dynamically as the wavefunction grows by specifiying that a fixed percentage of the current wavefunction determinants be included in the core set (``core_selection_threshold``). The method for selecting the core determinants is controlled by the ``core_selection_strategy`` setting.
+In both the growth and refinement phases, the :term:`ASCI` search algorithm is performed to update the current wavefunction.
+The key realization of :term:`ASCI` is that the search can be drastically accelerated by only searching for determinants that are connected via the Hamiltonian from a small set of "core" determinants rather than the full wavefunction at any particular iteration.
+This module provides several ways to control the size of this core set, including a maximum number of core determinants (``ncdets_max``) as well as allowing the core space to update dynamically as the wavefunction grows by specifying that a fixed percentage of the current wavefunction determinants be included in the core set (``core_selection_threshold``).
+The method for selecting the core determinants is controlled by the ``core_selection_strategy`` setting.
 
 
-**Settings:**
+.. rubric:: Settings
 
 In addition to the common settings, :term:`MACIS` :term:`ASCI` supports the following implementation-specific settings:
 

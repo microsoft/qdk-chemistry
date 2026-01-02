@@ -9,6 +9,7 @@ target_sources(chemistry PRIVATE
     hamiltonian.cpp
     hamiltonian_containers/canonical_4_center.cpp
     orbitals.cpp
+    pauli_operator.cpp
     settings.cpp
     stability_result.cpp
     structure.cpp

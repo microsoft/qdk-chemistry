@@ -23,6 +23,7 @@ Exposed classes are:
 - :class:`MP2Container`: Container for MP2 wavefunction with Hamiltonian reference and optional amplitudes.
 - :class:`Orbitals`: Molecular orbital information and properties.
 - :class:`OrbitalType`: Enumeration of orbital angular momentum types (s, p, d, f, etc.).
+- :class:`PauliOperator`: Pauli operator (I, X, Y, Z) for quantum operator expressions with arithmetic support.
 - :class:`QpeResult`: Result of quantum phase estimation workflows, including phase, energy, and metadata.
 - :class:`QuantumErrorProfile`: Information about quantum gates and error properties.
 - :class:`QubitHamiltonian`: Molecular electronic Hamiltonians mapped to qubits.
@@ -67,6 +68,7 @@ from qdk_chemistry._core.data import (
     MP2Container,
     Orbitals,
     OrbitalType,
+    PauliOperator,
     SciWavefunctionContainer,
     SettingNotFound,
     Settings,
@@ -116,6 +118,7 @@ __all__ = [
     "ModelOrbitals",
     "OrbitalType",
     "Orbitals",
+    "PauliOperator",
     "QpeResult",
     "QuantumErrorProfile",
     "QubitHamiltonian",

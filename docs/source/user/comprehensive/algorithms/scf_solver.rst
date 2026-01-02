@@ -30,24 +30,27 @@ Input requirements
 
 The :class:`~qdk_chemistry.algorithms.ScfSolver` requires several inputs to perform a calculation:
 
-**Structure**
-   A :doc:`Structure <../data/structure>` instance defining the molecular geometry (atomic positions and element types).
+Structure
+  A :doc:`Structure <../data/structure>` instance defining the molecular geometry (atomic positions and element types).
 
-**Charge**
-   The total molecular charge (integer). A neutral molecule has charge 0.
+Charge
+  The total molecular charge (integer). A neutral molecule has charge 0.
 
-**Spin multiplicity**
-   The spin multiplicity of the system, defined as :math:`2S + 1` where :math:`S` is the total spin. Common values are 1 (singlet), 2 (doublet), 3 (triplet), etc.
+Spin multiplicity
+  The spin multiplicity of the system, defined as :math:`2S + 1` where :math:`S` is the total spin. Common values are 1 (singlet), 2 (doublet), 3 (triplet), etc.
 
-**Basis set or initial guess**
-   This required input specifies the atomic orbital basis for the calculation and can be provided in several forms:
+Basis set or initial guess
+  This required input specifies the atomic orbital basis for the calculation and can be provided in several forms:
 
-   - **String**: A standard basis set name (e.g., ``"sto-3g"``, ``"def2-svp"``, ``"cc-pvdz"``). See the :doc:`basis set documentation <../basis_functionals>` for available options.
-   - **BasisSet object**: A :class:`~qdk_chemistry.data.BasisSet` instance for custom basis sets. See the :doc:`BasisSet <../data/basis_set>` documentation for details.
-   - **Orbitals object**: A :class:`~qdk_chemistry.data.Orbitals` instance which provides both the basis set and an initial orbital guess for the :term:`SCF` optimization.
+  String
+    A standard basis set name (e.g., ``"sto-3g"``, ``"def2-svp"``, ``"cc-pvdz"``). See the :doc:`basis set documentation <../basis_functionals>` for available options.
+  BasisSet object
+    A :class:`~qdk_chemistry.data.BasisSet` instance for custom basis sets. See the :doc:`BasisSet <../data/basis_set>` documentation for details.
+  Orbitals object
+    A :class:`~qdk_chemistry.data.Orbitals` instance which provides both the basis set and an initial orbital guess for the :term:`SCF` optimization.
 
 
-**Creating a :term:`SCF` solver:**
+.. rubric:: Creating a :term:`SCF` solver
 
 .. tab:: C++ API
 
@@ -63,7 +66,7 @@ The :class:`~qdk_chemistry.algorithms.ScfSolver` requires several inputs to perf
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-**Configuring settings:**
+.. rubric:: Configuring settings
 
 Settings can be modified using the ``settings()`` object.
 See `Available settings`_ below for a complete list of options.
@@ -82,7 +85,7 @@ See `Available settings`_ below for a complete list of options.
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-**Running the calculation:**
+.. rubric:: Running the calculation
 
 .. tab:: C++ API
 
@@ -153,11 +156,11 @@ You can discover available implementations programmatically:
 QDK (Native)
 ~~~~~~~~~~~~
 
-**Factory name:** ``"qdk"`` (default)
+.. rubric:: Factory name: ``"qdk"`` (default)
 
 The native QDK/Chemistry implementation provides high-performance :term:`SCF` calculations using the built-in quantum chemistry engine.
 
-**Capabilities:**
+.. rubric:: Capabilities
 
 - Restricted Hartree-Fock (:term:`RHF`) and Unrestricted Hartree-Fock (:term:`UHF`)
 - Restricted Kohn-Sham (:term:`RKS`) and Unrestricted Kohn-Sham (:term:`UKS`) :term:`DFT`
@@ -173,13 +176,13 @@ SCF Convergence Algorithms in QDK
 Achieving stable :term:`SCF` convergence is a non-trivial problem in computational chemistry.
 QDK/Chemistry implements two complementary algorithms that can be used independently or in combination.
 
-**Direct Inversion in the Iterative Subspace (DIIS)**
+.. rubric:: Direct Inversion in the Iterative Subspace (DIIS)
 
 :term:`DIIS` is an extrapolation technique that accelerates :term:`SCF` convergence by constructing an optimal linear combination of previous Fock matrices :cite:`Pulay1982`.
 :term:`DIIS` is highly effective for well-behaved systems, often achieving convergence in low number of  iterations.
-However, it can fail for challenging cases such as open-shell systems or molecules with near-degenerate orbitals, where the error surface is highly non-linear.
+However, it can fail for challenging cases such as open-shell systems or molecules with near-degenerate orbitals, where the error surface is highly nonlinear.
 
-**Geometric Direct Minimization (GDM)**
+.. rubric:: Geometric Direct Minimization (GDM)
 
 When :term:`DIIS` encounters difficulties, the :term:`GDM` algorithm provides a robust alternative :cite:`VanVoorhis2002`.
 Rather than extrapolating Fock matrices, :term:`GDM` directly minimizes the energy with respect to orbital rotation parameters using a quasi-Newton optimization approach.
@@ -190,9 +193,7 @@ This allows the use of standard nonlinear optimization techniques while preservi
 
 The :term:`GDM` algorithm then proceeds via a slightly modified :cite:`VanVoorhis2002` :term:`BFGS` optimization :cite:`Liu1989` which smoothly converges to a nearby energy minimum. If provided a guess close to the true minimum, :term:`GDM` can converge in a similar number of iterations as :term:`DIIS`, but it is more robust for difficult cases. However, if initialized further from the minimum, :term:`GDM` may converge to local minima, which may require additional strategies (e.g. :doc:`Stability analysis<stability_checker>`) to ensure the global minimum is found. This may be overcome in many cases by combining :term:`GDM` with :term:`DIIS` in a hybrid approach.
 
-
-
-**Hybrid DIIS-GDM Strategy**
+.. rubric:: Hybrid DIIS-GDM Strategy
 
 By default, the native QDK implementation uses :term:`DIIS` alone (``enable_gdm=False``).
 When enabled, the hybrid strategy (``enable_gdm=True``) provides enhanced robustness:
@@ -203,7 +204,7 @@ When enabled, the hybrid strategy (``enable_gdm=True``) provides enhanced robust
 
 This hybrid approach combines the speed of :term:`DIIS` for typical systems with the robustness of :term:`GDM` for challenging cases.
 
-**Settings:**
+.. rubric:: Settings
 
 .. list-table::
    :header-rows: 1
@@ -265,17 +266,17 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
 PySCF
 ~~~~~
 
-**Factory name:** ``"pyscf"``
+.. rubric:: Factory name: ``"pyscf"``
 
 The PySCF plugin provides access to the comprehensive `PySCF <https://pyscf.org/>`_ quantum chemistry package.
 
-**Capabilities:**
+.. rubric:: Capabilities
 
 - Full :term:`HF` support: :term:`RHF`, :term:`UHF`, :term:`ROHF`
 - Full :term:`DFT` support: :term:`RKS`, :term:`UKS`, :term:`ROKS` with extensive functional library
 - Automatic spin-restricted/unrestricted selection based on multiplicity
 
-**Settings:**
+.. rubric:: Settings
 
 .. list-table::
    :header-rows: 1
@@ -306,7 +307,7 @@ The PySCF plugin provides access to the comprehensive `PySCF <https://pyscf.org/
        * ``"restricted"``: Force restricted calculation
        * ``"unrestricted"``: Force unrestricted calculation
 
-**Example:**
+.. rubric:: Example
 
 .. literalinclude:: ../../../_static/examples/python/scf_solver.py
    :language: python

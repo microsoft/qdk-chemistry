@@ -20,10 +20,17 @@ Supported formats
 
 QDK/Chemistry supports multiple serialization formats:
 
-- **JSON**: Human-readable text format, suitable for small to medium data
-- **HDF5**: Hierarchical binary format, suitable for large data sets
-- **XYZ**: Standard format for molecular geometries (for ``Structure`` only)
-- **:term:`FCIDUMP`**: Format for Hamiltonian integrals (for ``Hamiltonian`` only)
+JSON
+  Human-readable text format, suitable for small to medium data
+
+HDF5
+  Hierarchical binary format, suitable for large data sets
+
+XYZ
+  Standard format for molecular geometries (for ``Structure`` only)
+
+:term:`FCIDUMP`
+  Format for Hamiltonian integrals (for ``Hamiltonian`` only)
 
 Common serialization interface
 ------------------------------
