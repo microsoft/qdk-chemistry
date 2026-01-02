@@ -90,12 +90,28 @@ jobs:
           hdf5 \
           openblas \
           lapack \
-          doxygen \
           graphviz \
           gcovr \
-          nlohmann-json
-        brew info doxygen
-        brew list --versions doxygen
+          nlohmann-json \
+          bison \
+          flex
+
+    - name: Build doxygen from source on macOS
+      if: runner.os == 'macOS'
+      run: |
+        # Clone repo for working Doxygen version
+        git clone https://github.com/doxygen/doxygen.git
+        cd doxygen
+
+        # Checkout working release
+        git checkout Release_1_9_8
+        mkdir build && cd build
+
+        cmake -DBISON_EXECUTABLE=/usr/local/Cellar/Bison/*/bin/bison \
+        -DCMAKE_CXX_FLAGS="-Wno-missing-template-arg-list-after-template-kw $CMAKE_CXX_FLAGS" \
+        -G "Unix Makefiles" ..
+        make -j$(sysctl -n hw.ncpu)
+        make install
 
     - name: Install C++ dependencies
       if: runner.os != 'macOS'
