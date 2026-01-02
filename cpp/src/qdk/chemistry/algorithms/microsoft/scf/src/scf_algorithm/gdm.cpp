@@ -116,11 +116,11 @@ void nocedal_wright_line_search(Functor& op,
   using arg_type = typename Functor::argument_type;
   using ret_type = typename Functor::return_type;
 
-  const auto fx0 = fx;                    // Starting function value
-  const auto dgi = Functor::dot(p, gfx);  // Initial directional derivative
+  const auto fx0 = fx;  // Starting function value
+  const auto init_grad_dot_p = Functor::dot(p, gfx);
 
   // Validate inputs
-  if (dgi > 0)
+  if (init_grad_dot_p > 0)
     throw std::logic_error(
         "the moving direction increases the objective function value");
   if (step <= 0.0) throw std::runtime_error("Step must be positive");
@@ -131,12 +131,13 @@ void nocedal_wright_line_search(Functor& op,
   constexpr auto expansion = 2.0;  // Step expansion factor in bracketing phase
 
   // Precompute test values
-  const auto armijo_test_val = c1 * dgi;   // Armijo threshold
-  const auto wolfe_test_curv = -c2 * dgi;  // Wolfe curvature threshold
+  const auto armijo_test_val = c1 * init_grad_dot_p;  // Armijo threshold
+  const auto wolfe_test_curv =
+      -c2 * init_grad_dot_p;  // Wolfe curvature threshold
 
   // Initialize bracketing variables
-  ret_type step_hi, step_lo = 0, fx_hi, fx_lo = fx0, dg_hi, dg_lo = dgi;
-
+  ret_type step_hi, step_lo = 0, fx_hi, fx_lo = fx0, grad_dot_p_hi,
+                    grad_dot_p_lo = init_grad_dot_p;
   int iter = 0;
   const size_t max_iter = 100;
   bool converged = false;
@@ -152,19 +153,20 @@ void nocedal_wright_line_search(Functor& op,
     gfx = op.grad(x);
 
     if (iter++ >= max_iter) break;
-    auto dg = Functor::dot(gfx, p);  // Directional derivative at current point
+    auto grad_dot_p =
+        Functor::dot(gfx, p);  // Directional derivative at current point
 
     // Check if current step violates Armijo condition or function increased
-    if (fx - fx0 > step * armijo_test_val || (0 < step_lo and fx >= fx_lo)) {
+    if (fx - fx0 > step * armijo_test_val || (step_lo > 0 && fx >= fx_lo)) {
       // Set upper bracket - current step is too large
       step_hi = step;
       fx_hi = fx;
-      dg_hi = dg;
+      grad_dot_p_hi = grad_dot_p;
       break;  // Exit to zoom phase
     }
 
     // Check if strong Wolfe conditions are satisfied
-    if (std::abs(dg) <= wolfe_test_curv) {
+    if (std::abs(grad_dot_p) <= wolfe_test_curv) {
       converged = true;  // Found acceptable step
       break;
     }
@@ -172,14 +174,13 @@ void nocedal_wright_line_search(Functor& op,
     // Update bracketing interval - current step becomes lower bound
     step_hi = step_lo;
     fx_hi = fx_lo;
-    dg_hi = dg_lo;
+    grad_dot_p_hi = grad_dot_p_lo;
 
     step_lo = step;
     fx_lo = fx;
-    dg_lo = dg;
-
-    if (dg >= 0) break;  // Gradient sign change indicates bracket found
-    step *= expansion;   // Expand step size for next trial
+    grad_dot_p_lo = grad_dot_p;
+    if (grad_dot_p >= 0) break;  // Gradient sign change indicates bracket found
+    step *= expansion;           // Expand step size for next trial
   }
   if (converged) return;  // Early termination if conditions satisfied
 
@@ -188,8 +189,8 @@ void nocedal_wright_line_search(Functor& op,
   for (;;) {
     // Compute new trial step using quadratic interpolation
     step = (fx_hi - fx_lo) * step_lo -
-           (step_hi * step_hi - step_lo * step_lo) * dg_lo / 2;
-    step /= (fx_hi - fx_lo) - (step_hi - step_lo) * dg_lo;
+           (step_hi * step_hi - step_lo * step_lo) * grad_dot_p_lo / 2;
+    step /= (fx_hi - fx_lo) - (step_hi - step_lo) * grad_dot_p_lo;
 
     // Safeguard: use bisection if interpolation gives point outside interval
     if (step <= std::min(step_lo, step_hi) ||
@@ -204,32 +205,41 @@ void nocedal_wright_line_search(Functor& op,
     gfx = op.grad(x);
 
     if (iter++ >= max_iter) break;
-    auto dg = Functor::dot(gfx, p);
+    auto grad_dot_p = Functor::dot(gfx, p);
 
     // Check if Armijo condition is violated
-    if (fx - fx0 > step * armijo_test_val or fx >= fx_lo) {
-      if (step == step_hi) throw std::runtime_error("Line Search Failed");
+    if (fx - fx0 > step * armijo_test_val || fx >= fx_lo) {
+      if (step == step_hi) {
+        QDK_LOGGER().error(
+            "Armijo condition not met, step value {}, fx value {}", step, fx);
+        throw std::runtime_error("Line Search Failed");
+      }
       // Update upper bracket
       step_hi = step;
       fx_hi = fx;
-      dg_hi = dg;
+      grad_dot_p_hi = grad_dot_p;
     } else {
       // Check if strong Wolfe conditions are satisfied
-      if (std::abs(dg) <= wolfe_test_curv) {
+      if (std::abs(grad_dot_p) <= wolfe_test_curv) {
         converged = true;
         break;  // Found acceptable step
       }
       // Update bracket based on gradient sign
-      if (dg * (step_hi - step_lo) >= 0) {
+      if (grad_dot_p * (step_hi - step_lo) >= 0) {
         step_hi = step_lo;
         fx_hi = fx_lo;
-        dg_hi = dg_lo;
+        grad_dot_p_hi = grad_dot_p_lo;
       }
-      if (step == step_lo) throw std::runtime_error("Line Search Failed");
+      if (step == step_lo) {
+        QDK_LOGGER().error(
+            "Strong Wolfe condition not met, step value {}, fx value {}", step,
+            fx);
+        throw std::runtime_error("Line Search Failed");
+      }
       // Update lower bracket
       step_lo = step;
       fx_lo = fx;
-      dg_lo = dg;
+      grad_dot_p_lo = grad_dot_p;
     }
   }
 
@@ -465,7 +475,7 @@ class GDM {
   /**
    * @brief Transform history matrices (either history_dgrad or history_kappa)
    * using current rotation matrices Uoo and Uvv to transform into the
-   * pseudo-canonical orbital basis
+   * pseudo-canonical orbital basis, K_new = Uoo^T * K_old * Uvv
    * @param[in,out] history History matrix block to be transformed (either
    * history_dgrad or history_kappa)
    * @param[in] history_size Number of history entries
@@ -837,6 +847,11 @@ void GDM::iterate(SCFImpl& scf_impl) {
     std::vector<double> alpha_values;
 
     for (int hist_idx = history_size_ - 1; hist_idx >= 0; hist_idx--) {
+      // inverse_rho_values[hist_idx] is independent of pseudo-canonical
+      // transformation. The previous inverse_rho_values are larger than
+      // nonpositive_threshold_. The latest_inverse_rho will be checked later:
+      // once it is less than nonpositive_threshold_, the history will be
+      // cleared and kappa will be recomputed using initial Hessian.
       double alpha =
           history_kappa_.row(hist_idx).dot(q) / inverse_rho_values[hist_idx];
       q = q - alpha * history_dgrad_.row(hist_idx).transpose();
@@ -984,11 +999,14 @@ void GDM::iterate(SCFImpl& scf_impl) {
       const double og_threshold = ctx_.cfg->scf_algorithm.og_threshold;
 
       // grad_norm condition is to make the step acceptable when it meets the
-      // convergence criterion. 0.5 here is to make it consistent with
-      // |FPS - SPF| criterion in SCFImpl::check_convergence(), which is 2 times
-      // of the gradient norm criterion.
+      // convergence criterion. grad_norm_coeff here is to make it
+      // consistent with |FPS - SPF| criterion in SCFImpl::check_convergence(),
+      // |FPS-SPF|^2 / 2 = |grad / 4|^2 for restricted case and
+      // |FPS-SPF|^2 / 2 = |grad / 2|^2 for unrestricted case.
+      double grad_norm_coeff =
+          cfg->unrestricted ? std::sqrt(2.0) : std::sqrt(8.0);
       if (energy_at_searched_kappa < last_accepted_energy_ ||
-          grad_norm < og_threshold * 0.5) {
+          grad_norm < og_threshold * grad_norm_coeff) {
         QDK_LOGGER().warn(
             "Accepted small fixed step in steepest descent direction with "
             "energy {:.12e}.",

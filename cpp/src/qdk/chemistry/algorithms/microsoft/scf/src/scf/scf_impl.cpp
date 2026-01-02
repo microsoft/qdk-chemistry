@@ -1014,18 +1014,7 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
   eri_->build_JK(P_matrix.data(), J_matrix.data(), K_matrix.data(), alpha, beta,
                  omega);
 #ifdef QDK_CHEMISTRY_ENABLE_PCM
-  double scf_pcm_energy = 0.0;
-  RowMajorMatrix Vpcm_matrix = RowMajorMatrix::Zero(
-      num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
-  if (pcm_ != nullptr) {
-    pcm_->build_pcm_potential(P_matrix.data(), Vpcm_matrix.data());
-    TIMEIT(pcm_->compute_PCM_terms(P_matrix.data(), Vpcm_matrix.data(),
-                                   &scf_pcm_energy),
-           "PCM::compute_PCM_terms");
-    if (ctx_.cfg->mpi.world_rank == 0) {
-      F_matrix += Vpcm_matrix;
-    }
-  }
+  throw std::runtime_error("PCM is not supported for now.");
 #endif
 
   if (ctx_.cfg->mpi.world_rank == 0) {
@@ -1054,9 +1043,7 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
   total_energy += scf_pcm_energy;
 #endif
 #ifdef QDK_CHEMISTRY_ENABLE_DFTD3
-  const double scf_dispersion_correction_energy =
-      ctx_.result.scf_dispersion_correction_energy;
-  total_energy += scf_dispersion_correction_energy;
+  throw std::runtime_error("DFT-D3 is not supported for now.");
 #endif
   QDK_LOGGER().debug(
       "MPI world rank: {}, nuclear_repulsion_energy: {:.10e}, "
