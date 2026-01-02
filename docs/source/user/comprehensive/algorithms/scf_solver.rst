@@ -1,11 +1,11 @@
-Self-consistent field solving
-=============================
+Self-consistent field (SCF) solver
+==================================
 
-The :class:`~qdk_chemistry.algorithms.ScfSolver` algorithm in QDK/Chemistry performs Self-Consistent Field (SCF) calculations to optimize molecular orbitals for a given molecular structure.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :doc:`Structure <../data/structure>` instance as input and produces an :doc:`Orbitals <../data/orbitals>` instance as output.
+The :class:`~qdk_chemistry.algorithms.ScfSolver` algorithm in QDK/Chemistry performs Self-Consistent Field (:term:`SCF`) calculations to optimize molecular orbitals for a given molecular structure.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :doc:`Structure <../data/structure>` instance, total molecular charge and multiplicity, and a desired basis representation as input ,and produces an :doc:`Orbitals <../data/orbitals>` instance and the associated energy as output.
 Its primary purpose is to find the best single-particle orbitals within a mean-field approximation.
-For Hartree-Fock (HF) theory, it yields the mean field energy, which misses electron correlation and typically requires post-HF methods for accurate energetics.
-For Density Functional Theory (DFT), some correlation effects are included through the exchange-correlation functional.
+For Hartree-Fock (:term:`HF`) theory, it yields the mean field energy, which misses electron correlation and typically requires post-:term:`HF` methods for accurate energetics.
+For Density Functional Theory (:term:`DFT`), some correlation effects are included through the exchange-correlation functional.
 
 Overview
 --------
@@ -15,68 +15,42 @@ Both methods rely on a single Slater determinant representation of the many-elec
 This single-determinant approach is a key simplification that makes these methods computationally efficient but limits their ability to capture certain correlation effects.
 The :term:`SCF` procedure iteratively refines these orbitals until self-consistency is achieved.
 
-At its core, an :term:`SCF` calculation:
 
-1. **Initializes a starting guess** for the molecular orbitals, typically using a superposition of atomic orbitals
-2. **Constructs the Fock matrix** which represents the effective one-electron Hamiltonian
-3. **Diagonalizes the matrix** to obtain a new set of molecular orbitals and their energies
-4. **Computes the electron density** from the occupied molecular orbitals
-5. **Checks for convergence** by comparing the new density with that from the previous iteration
-6. **Repeats steps 2-5** until the density and energy no longer change significantly between iterations
-
-This iterative process is called "self-consistent" because the orbitals used to construct the Fock/Kohn-Sham operator must be consistent with the orbitals obtained by solving the resulting eigenvalue equation.
-The final result provides:
-
-- Optimized molecular orbitals and their energies
-- Mean-field energy (for :term:`HF`), which excludes electron correlation
-- Approximated ground state energy (for :term:`DFT`), with correlation treated through the functional
-- Electron density distribution
-- Various electronic properties derived from the wavefunction/density
-
-:term:`SCF` methods provide an excellent starting point, but they miss important electronic correlation effects:
-
-- **Static correlation**: Essential for systems with near-degenerate states ogir bond-breaking processes.
-  See :doc:`MCCalculator <mc_calculator>` documentation.
-- **Dynamic correlation**: Required for all molecular systems to account for instantaneous electron-electron interactions.
-  See :doc:`DynamicalCorrelationCalculator <dynamical_correlation>` documentation.
-
-The orbitals from :term:`SCF` calculations typically serve as input for post-:term:`SCF` methods that capture these correlation effects.
-:term:`SCF` methods thus serve as the foundation for more advanced electronic structure calculations and provide essential insights into molecular properties, reactivity, and spectroscopic characteristics.
-
-Capabilities
-------------
-
-The :class:`~qdk_chemistry.algorithms.ScfSolver` in QDK/Chemistry provides the following calculation types for both :term:`HF` and :term:`DFT` methods:
-
-- **Restricted calculations**: For closed-shell systems with paired electrons
-
-  - Restricted Hartree-Fock (RHF)
-  - Restricted Kohn-Sham :term:`DFT` (RKS)
-
-- **Unrestricted calculations**: For open-shell systems with unpaired electrons
-
-  - Unrestricted Hartree-Fock (UHF)
-  - Unrestricted Kohn-Sham :term:`DFT` (UKS)
-
-- **Restricted open-shell calculations**: For open-shell systems with restricted orbitals
-
-  - Restricted Open-shell Hartree-Fock (ROHF)
-  - Restricted Open-shell Kohn-Sham :term:`DFT` (ROKS)
-
-- **DFT-specific features**:
-
-  - Support for :doc:`various exchange-correlation functionals <../basis_functionals>` including :term:`LDA`, :term:`GGA`, meta-:term:`GGA`, hybrid, and range-separated functionals
-
-- **Basis set support**:
-
-  - Extensive library of standard quantum chemistry :doc:`basis sets <../basis_functionals>` including Pople (STO-nG, 3-21G,
-    6-31G, etc.), Dunning (cc-pVDZ, cc-pVTZ, etc.), and Karlsruhe (def2-SVP, def2-TZVP, etc.) families
-  - Support for custom basis sets and effective core potentials (ECPs)
+The orbitals from :term:`SCF` calculations typically serve as input for these post-:term:`SCF` methods which capture correlation effects.
+:term:`SCF` methods thus serve as the foundation for more advanced quantum and classical electronic structure calculations and provide essential insights into molecular properties, reactivity, and spectroscopic characteristics.
 
 Running an :term:`SCF` calculation
 ----------------------------------
 
-Below is an example of how to run SCF using the default (Microsoft) QDK/Chemistry solver, with mostly default settings (except the basis set):
+This section demonstrates how to setup, configure, and run a :term:`SCF` calculation.
+The ``run`` method returns two values: a scalar representing the converged :term:`SCF` energy and a :class:`~qdk_chemistry.data.Wavefunction` object containing the optimized molecular orbitals.
+
+Input requirements
+~~~~~~~~~~~~~~~~~~
+
+The :class:`~qdk_chemistry.algorithms.ScfSolver` requires several inputs to perform a calculation:
+
+Structure
+  A :doc:`Structure <../data/structure>` instance defining the molecular geometry (atomic positions and element types).
+
+Charge
+  The total molecular charge (integer). A neutral molecule has charge 0.
+
+Spin multiplicity
+  The spin multiplicity of the system, defined as :math:`2S + 1` where :math:`S` is the total spin. Common values are 1 (singlet), 2 (doublet), 3 (triplet), etc.
+
+Basis set or initial guess
+  This required input specifies the atomic orbital basis for the calculation and can be provided in several forms:
+
+  String
+    A standard basis set name (e.g., ``"sto-3g"``, ``"def2-svp"``, ``"cc-pvdz"``). See the :doc:`basis set documentation <../basis_functionals>` for available options.
+  BasisSet object
+    A :class:`~qdk_chemistry.data.BasisSet` instance for custom basis sets. See the :doc:`BasisSet <../data/basis_set>` documentation for details.
+  Orbitals object
+    A :class:`~qdk_chemistry.data.Orbitals` instance which provides both the basis set and an initial orbital guess for the :term:`SCF` optimization.
+
+
+.. rubric:: Creating a :term:`SCF` solver
 
 .. tab:: C++ API
 
@@ -92,18 +66,10 @@ Below is an example of how to run SCF using the default (Microsoft) QDK/Chemistr
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-Configuring the :term:`SCF` calculation
----------------------------------------
+.. rubric:: Configuring settings
 
-The :class:`~qdk_chemistry.algorithms.ScfSolver` can be configured using the ``Settings`` object.
-QDK/Chemistry provides standard :term:`SCF` settings that apply to all solver implementations, as well as specialized settings for specific solvers or algorithms.
-
-QDK/Chemistry provides both standard settings that work across all :term:`SCF` solver implementations and specialized settings for specific algorithms or implementations.
-See the `Available Settings`_ section below for a complete list of configuration options.
-
-.. note::
-   For a complete list of available basis sets and their specifications, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
-   This reference provides detailed information about all pre-defined basis sets you can use with the ``basis_set`` setting.
+Settings can be modified using the ``settings()`` object.
+See `Available settings`_ below for a complete list of options.
 
 .. tab:: C++ API
 
@@ -119,14 +85,7 @@ See the `Available Settings`_ section below for a complete list of configuration
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-Running an :term:`SCF` calculation
-----------------------------------
-
-Once configured, the :term:`SCF` calculation can be executed on a molecular structure.
-The ``solve`` method returns two values:
-
-1. A scalar ``double`` value representing the converged SCF energy
-2. An :doc:`Orbitals <../data/orbitals>` object containing the optimized molecular orbitals
+.. rubric:: Running the calculation
 
 .. tab:: C++ API
 
@@ -142,19 +101,12 @@ The ``solve`` method returns two values:
       :start-after: # start-cell-run
       :end-before: # end-cell-run
 
+
 Available settings
 ------------------
 
 The :class:`~qdk_chemistry.algorithms.ScfSolver` accepts a range of settings to control its behavior.
-These settings are divided into base settings (common to all :term:`SCF` calculations) and specialized settings (specific to certain :term:`SCF` variants).
-
-Base settings
-~~~~~~~~~~~~~
-
-.. note::
-   This table is under construction.
-
-These settings apply to all :term:`SCF` calculations:
+All implementations share a common base set of settings from ``ElectronicStructureSettings``:
 
 .. list-table::
    :header-rows: 1
@@ -166,76 +118,203 @@ These settings apply to all :term:`SCF` calculations:
      - Description
    * - ``method``
      - string
-     - TODO
-     - The method to use for the calculation
-   * - ``basis_set``
-     - string
-     - TODO
-     - The basis set to use for the calculation
+     - ``"hf"``
+     - The method to use: ``"hf"`` for Hartree-Fock, or a :term:`DFT` functional name (e.g., ``"b3lyp"``, ``"pbe"``)
    * - ``convergence_threshold``
      - float
-     - TODO
-     - Energy convergence criterion for SCF iterations
+     - ``1e-7``
+     - Convergence tolerance for orbital gradient norm
    * - ``max_iterations``
      - int
-     - TODO
-     - Maximum number of SCF iterations
-   * - ``multiplicity``
-     - int
-     - 1
-     - Spin multiplicity of the system (🔧 **TODO**: move this to structure)
-   * - ``charge``
-     - int
-     - 0
-     - Total charge of the system (🔧 **TODO**: move this to structure)
+     - ``50``
+     - Maximum number of :term:`SCF` iterations (must be ≥ 1)
 
-Specialized settings
-~~~~~~~~~~~~~~~~~~~~
+See :doc:`Settings <settings>` for a more general treatment of settings in QDK/Chemistry.
 
-.. note::
-   This table is under construction.
+Available implementations
+-------------------------
 
-These settings apply only to specific variants of SCF calculations:
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.ScfSolver` provides a unified interface to :term:`SCF` calculations across various quantum chemistry packages.
+You can discover available implementations programmatically:
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
+      :language: cpp
+      :start-after: // start-cell-list-implementations
+      :end-before: // end-cell-list-implementations
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/scf_solver.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
+
+.. _qdk-scf-native:
+
+QDK (Native)
+~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk"`` (default)
+
+The native QDK/Chemistry implementation provides high-performance :term:`SCF` calculations using the built-in quantum chemistry engine.
+
+.. rubric:: Capabilities
+
+- Restricted Hartree-Fock (:term:`RHF`) and Unrestricted Hartree-Fock (:term:`UHF`)
+- Restricted Kohn-Sham (:term:`RKS`) and Unrestricted Kohn-Sham (:term:`UKS`) :term:`DFT`
+- Extensive library of :doc:`basis sets <../basis_functionals>` including Pople, Dunning, and Karlsruhe families
+- Full range of :doc:`exchange-correlation functionals <../basis_functionals>` for :term:`DFT`
+  - Optimization algorithms including the direct inversion in the iterative subspace (:term:`DIIS`) method :cite:`Pulay1982`, and the geometric direct minimization (:term:`GDM`) method :cite:`VanVoorhis2002`
+
+.. _scf-convergence-algorithms:
+
+SCF Convergence Algorithms in QDK
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Achieving stable :term:`SCF` convergence is a non-trivial problem in computational chemistry.
+QDK/Chemistry implements two complementary algorithms that can be used independently or in combination.
+
+.. rubric:: Direct Inversion in the Iterative Subspace (DIIS)
+
+:term:`DIIS` is an extrapolation technique that accelerates :term:`SCF` convergence by constructing an optimal linear combination of previous Fock matrices :cite:`Pulay1982`.
+:term:`DIIS` is highly effective for well-behaved systems, often achieving convergence in low number of  iterations.
+However, it can fail for challenging cases such as open-shell systems or molecules with near-degenerate orbitals, where the error surface is highly nonlinear.
+
+.. rubric:: Geometric Direct Minimization (GDM)
+
+When :term:`DIIS` encounters difficulties, the :term:`GDM` algorithm provides a robust alternative :cite:`VanVoorhis2002`.
+Rather than extrapolating Fock matrices, :term:`GDM` directly minimizes the energy with respect to orbital rotation parameters using a quasi-Newton optimization approach.
+
+The key insight of :term:`GDM` is to parameterize orbital changes through unitary rotations, which converts the constrained optimization problem of determining the energy-minimizing set of orthonormal orbitals into an unconstrained optimization over exponentials :cite:`Higham2005` of anti-Hermitian matrices.
+This allows the use of standard nonlinear optimization techniques while preserving orbital orthonormality.
+
+
+The :term:`GDM` algorithm then proceeds via a slightly modified :cite:`VanVoorhis2002` :term:`BFGS` optimization :cite:`Liu1989` which smoothly converges to a nearby energy minimum. If provided a guess close to the true minimum, :term:`GDM` can converge in a similar number of iterations as :term:`DIIS`, but it is more robust for difficult cases. However, if initialized further from the minimum, :term:`GDM` may converge to local minima, which may require additional strategies (e.g. :doc:`Stability analysis<stability_checker>`) to ensure the global minimum is found. This may be overcome in many cases by combining :term:`GDM` with :term:`DIIS` in a hybrid approach.
+
+.. rubric:: Hybrid DIIS-GDM Strategy
+
+By default, the native QDK implementation uses :term:`DIIS` alone (``enable_gdm=False``).
+When enabled, the hybrid strategy (``enable_gdm=True``) provides enhanced robustness:
+
+1. Start with :term:`DIIS` for rapid initial convergence
+2. Monitor energy changes; if the energy change exceeds ``energy_thresh_diis_switch`` (default: :math:`10^{-3}` Ha), switch to :term:`GDM`
+3. Once switched, continue with :term:`GDM` until convergence
+
+This hybrid approach combines the speed of :term:`DIIS` for typical systems with the robustness of :term:`GDM` for challenging cases.
+
+.. rubric:: Settings
 
 .. list-table::
    :header-rows: 1
-   :widths: 20 15 15 30 20
+   :widths: 25 15 15 45
 
    * - Setting
      - Type
      - Default
      - Description
-     - Applicable To
-   * - ``functional``
+   * - ``method``
      - string
-     - TODO
-     - Exchange-correlation functional for :term:`DFT` (empty for :term:`HF`); see :doc:`functionals documentation <../basis_functionals>`
-     - :term:`DFT` only
+     - ``"hf"``
+     - Method: ``"hf"`` for Hartree-Fock, or a :term:`DFT` functional name
+   * - ``convergence_threshold``
+     - float
+     - ``1e-7``
+     - Convergence tolerance for orbital gradient norm
+   * - ``max_iterations``
+     - int
+     - ``50``
+     - Maximum number of :term:`SCF` iterations
+   * - ``max_scf_steps``
+     - int
+     - ``100``
+     - Maximum number of overall :term:`SCF` steps
+   * - ``enable_gdm``
+     - bool
+     - ``False``
+     - Enable geometric direct minimization (:term:`GDM`) algorithm
+   * - ``gdm_max_diis_iteration``
+     - int
+     - ``50``
+     - Maximum :term:`DIIS` iterations in :term:`GDM`
+   * - ``gdm_bfgs_history_size_limit``
+     - int
+     - ``50``
+     - :term:`BFGS` history size limit for :term:`GDM`
+   * - ``energy_thresh_diis_switch``
+     - float
+     - ``0.001``
+     - Energy threshold for :term:`DIIS` switch
    * - ``level_shift``
      - float
-     - 0.0
-     - Energy level shifting for virtual orbitals to aid convergence
-     - All :term:`SCF` types
+     - ``-1.0``
+     - Level shift parameter (negative = auto)
+   * - ``eri_threshold``
+     - float
+     - ``-1.0``
+     - Electron repulsion integral threshold (negative = auto)
+   * - ``eri_use_atomics``
+     - bool
+     - ``False``
+     - Use atomic operations for :term:`ERI` computation
+   * - ``fock_reset_steps``
+     - int
+     - ``1073741824``
+     - Number of steps between Fock matrix resets
 
-Implemented interface
----------------------
+PySCF
+~~~~~
 
-QDK/Chemistry's :class:`~qdk_chemistry.algorithms.ScfSolver` provides a unified interface to SCF calculations across various quantum chemistry packages:
+.. rubric:: Factory name: ``"pyscf"``
 
-QDK/Chemistry implementations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The PySCF plugin provides access to the comprehensive `PySCF <https://pyscf.org/>`_ quantum chemistry package.
 
-- **qdk**: Native implementation with support for RHF, UHF, RKS and UKS
+.. rubric:: Capabilities
 
-Third-party interfaces
-~~~~~~~~~~~~~~~~~~~~~~
+- Full :term:`HF` support: :term:`RHF`, :term:`UHF`, :term:`ROHF`
+- Full :term:`DFT` support: :term:`RKS`, :term:`UKS`, :term:`ROKS` with extensive functional library
+- Automatic spin-restricted/unrestricted selection based on multiplicity
 
-- **pyscf**: Comprehensive Python-based quantum chemistry package with extensive DFT capabilities
+.. rubric:: Settings
 
-The factory pattern allows seamless selection between these implementations, with the most appropriate option chosen
-based on the calculation requirements and available packages.
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
 
-For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
+   * - Setting
+     - Type
+     - Default
+     - Description
+   * - ``method``
+     - string
+     - ``"hf"``
+     - Method: ``"hf"`` for Hartree-Fock, or a :term:`DFT` functional name
+   * - ``convergence_threshold``
+     - float
+     - ``1e-7``
+     - Convergence tolerance for orbital gradient norm
+   * - ``max_iterations``
+     - int
+     - ``50``
+     - Maximum number of :term:`SCF` iterations
+   * - ``scf_type``
+     - string
+     - ``"auto"``
+     - Type of :term:`SCF` calculation:
+
+       * ``"auto"``: Automatically detect based on spin
+       * ``"restricted"``: Force restricted calculation
+       * ``"unrestricted"``: Force unrestricted calculation
+
+.. rubric:: Example
+
+.. literalinclude:: ../../../_static/examples/python/scf_solver.py
+   :language: python
+   :start-after: # start-cell-pyscf-example
+   :end-before: # end-cell-pyscf-example
+
+For more details on how to extend QDK/Chemistry with additional implementations, see the :doc:`plugin system <../plugins>` documentation.
 
 Related classes
 ---------------
@@ -247,6 +326,6 @@ Further reading
 ---------------
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/scf_solver.py>`_ script or `C++ <../../../_static/examples/cpp/scf_solver.cpp>`_ source file.
-- :doc:`Settings <../design/settings>`: Configuration settings for algorithms
-- :doc:`Factory Pattern <../design/factory_pattern>`: Understanding algorithm creation
-- :doc:`../basis_functionals`: Exchange-correlation functionals for DFT calculations
+- :doc:`Settings <settings>`: Configuration settings for algorithms
+- :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation
+- :doc:`../basis_functionals`: Exchange-correlation functionals for :term:`DFT` calculations
