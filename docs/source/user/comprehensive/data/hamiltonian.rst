@@ -22,13 +22,26 @@ While setter methods are available for construction and initialization purposes,
 Properties
 ----------
 
-- **One-electron integrals**: Matrix of one-electron integrals (h₁)
-- **Two-electron integrals**: Vector of two-electron integrals (h₂) in physicist notation :math:`\left\langle ij|kl \right\rangle`
-- **Core energy**: Constant energy term combining nuclear repulsion and inactive orbital contributions
-- **Inactive Fock matrix**: Matrix representing interactions between active and inactive orbitals
-- **Orbitals**: Molecular orbital information for the system (see the :doc:`Orbitals <orbitals>` documentation for detailed information about orbital properties and representations)
-- **Selected orbital indices**: Indices defining the active space orbitals
-- **Number of electrons**: Count of electrons in the active space
+One-electron integrals
+   Matrix of one-electron integrals (h₁)
+
+Two-electron integrals
+   Vector of two-electron integrals (h₂) in physicist notation :math:`\left\langle ij|kl \right\rangle`
+
+Core energy
+   Constant energy term combining nuclear repulsion and inactive orbital contributions
+
+Inactive Fock matrix
+   Matrix representing interactions between active and inactive orbitals
+
+Orbitals
+   Molecular orbital information for the system (see the :doc:`Orbitals <orbitals>` documentation for detailed information about orbital properties and representations)
+
+Selected orbital indices
+   Indices defining the active space orbitals
+
+Number of electrons
+   Count of electrons in the active space
 
 Restricted vs. unrestricted Hamiltonians
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -81,13 +94,15 @@ Two-electron integral storage and notation
 Two-electron integrals in quantum chemistry can be represented using different notations and storage formats.
 QDK/Chemistry uses the physicist notation by default, but it's important to understand the different conventions:
 
-- **Physicist/Dirac notation** :math:`\left\langle ij|kl \right\rangle` or :math:`\left\langle ij|kl \right\rangle`: represents the Coulomb interaction where electron 1 occupies orbitals :math:`i` and :math:`k`, while electron 2 occupies orbitals :math:`j` and :math:`l`.
-  This is the default representation in QDK/Chemistry.
-  In this notation, the first index of each pair :math:`(i,k)` refers to electron 1, and the second index of each pair :math:`(j,l)` refers to electron 2, following a (1,2,1,2) electron indexing pattern.
+Physicist/Dirac notation :math:`\left\langle ij|kl \right\rangle` or :math:`\left\langle ij|kl \right\rangle`
+   Represents the Coulomb interaction where electron 1 occupies orbitals :math:`i` and :math:`k`, while electron 2 occupies orbitals :math:`j` and :math:`l`.
+   This is the default representation in QDK/Chemistry.
+   In this notation, the first index of each pair :math:`(i,k)` refers to electron 1, and the second index of each pair :math:`(j,l)` refers to electron 2, following a (1,2,1,2) electron indexing pattern.
 
-- **Chemist/Mulliken notation** :math:`(ij|kl)` or :math:`[ij|kl]`: represents the Coulomb interaction where electron 1 occupies orbitals :math:`i` and :math:`j`, while electron 2 occupies orbitals :math:`k` and :math:`l`.
-  In this notation, the first pair of indices :math:`(i,j)` refers to electron 1, and the second pair :math:`(k,l)` refers to electron 2, following a (1,1,2,2) electron indexing pattern.
-  The symbols differ (parentheses vs square brackets), but the indexing convention is the same.
+Chemist/Mulliken notation :math:`(ij|kl)` or :math:`[ij|kl]`
+   Represents the Coulomb interaction where electron 1 occupies orbitals :math:`i` and :math:`j`, while electron 2 occupies orbitals :math:`k` and :math:`l`.
+   In this notation, the first pair of indices :math:`(i,j)` refers to electron 1, and the second pair :math:`(k,l)` refers to electron 2, following a (1,1,2,2) electron indexing pattern.
+   The symbols differ (parentheses vs square brackets), but the indexing convention is the same.
 
 The relationship between physicist and chemist notation is:
 

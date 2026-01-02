@@ -37,6 +37,9 @@ Quick reference
    * - ``QubitHamiltonian``
      - Pauli operator representation
      - :doc:`QubitMapper <../algorithms/qubit_mapper>`
+   * - :doc:`PauliOperator <pauli_operator>`
+     - Pauli operator expressions with arithmetic
+     - User construction
 
 .. toctree::
    :maxdepth: 1
@@ -46,4 +49,5 @@ Quick reference
    basis_set
    hamiltonian
    orbitals
+   pauli_operator
    structure

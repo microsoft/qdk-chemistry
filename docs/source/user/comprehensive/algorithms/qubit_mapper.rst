@@ -28,7 +28,7 @@ Input requirements
 
 The :class:`~qdk_chemistry.algorithms.QubitMapper` requires the following input:
 
-**Hamiltonian**
+Hamiltonian
    A :doc:`Hamiltonian <../data/hamiltonian>` instance containing the fermionic one- and
    two-electron integrals. This is typically constructed using the
    :doc:`HamiltonianConstructor <hamiltonian_constructor>` algorithm.
@@ -43,7 +43,7 @@ The :class:`~qdk_chemistry.algorithms.QubitMapper` requires the following input:
    structures. The choice of encoding can affect circuit depth and measurement
    requirements on quantum hardware.
 
-**Creating a mapper:**
+.. rubric:: Creating a mapper
 
 .. tab:: Python API
 
@@ -52,7 +52,7 @@ The :class:`~qdk_chemistry.algorithms.QubitMapper` requires the following input:
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-**Configuring settings:**
+.. rubric:: Configuring settings
 
 Settings can be modified using the ``settings()`` object.
 See `Available implementations`_ below for implementation-specific options.
@@ -64,7 +64,7 @@ See `Available implementations`_ below for implementation-specific options.
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-**Running the calculation:**
+.. rubric:: Running the calculation
 
 .. tab:: Python API
 
@@ -89,15 +89,18 @@ You can discover available implementations programmatically:
 Qiskit
 ~~~~~~
 
-**Factory name:** ``"qiskit"``
+.. rubric:: Factory name: ``"qiskit"``
 
 Qubit mapping implementation integrated through the Qiskit plugin. This module supports multiple encoding strategies:
 
-- **Jordan-Wigner mapping** :cite:`Jordan-Wigner1928`: Encodes each fermionic mode in a single qubit whose state directly represents the orbital occupation.
-- **Parity mapping** :cite:`Love2012`: Encodes qubits with cumulative electron-number parities of the orbitals.
-- **Bravyi-Kitaev mapping** :cite:`Bravyi-Kitaev2002`: Distributes both occupation and parity information across qubits using a binary-tree (Fenwick tree) structure, reducing the average Pauli-string length to logarithmic scaling.
+Jordan-Wigner mapping** :cite:`Jordan-Wigner1928`
+   Encodes each fermionic mode in a single qubit whose state directly represents the orbital occupation.
+Parity mapping** :cite:`Love2012`
+   Encodes qubits with cumulative electron-number parities of the orbitals.
+Bravyi-Kitaev mapping** :cite:`Bravyi-Kitaev2002`
+   Distributes both occupation and parity information across qubits using a binary-tree (Fenwick tree) structure, reducing the average Pauli-string length to logarithmic scaling.
 
-**Settings:**
+.. rubric:: Settings
 
 .. list-table::
    :header-rows: 1
