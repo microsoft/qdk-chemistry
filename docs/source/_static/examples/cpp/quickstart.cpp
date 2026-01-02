@@ -72,16 +72,24 @@ int main() {
   // start-cell-structure
   // Define benzene diradical structure directly using coordinates
   Eigen::MatrixXd coords(10, 3);
-  coords << 0.000000, 1.396000, 0.000000, 1.209077, 0.698000, 0.000000,
-      1.209077, -0.698000, 0.000000, 0.000000, -1.396000, 0.000000, -1.209077,
-      -0.698000, 0.000000, -1.209077, 0.698000, 0.000000, 2.151000, 1.242000,
-      0.000000, 2.151000, -1.242000, 0.000000, -2.151000, -1.242000, 0.000000,
-      -2.151000, 1.242000, 0.000000;
+  coords.row(0) << 0.000000, 1.396000, 0.000000;
+  coords.row(1) << 1.209077, 0.698000, 0.000000;
+  coords.row(2) << 1.209077, -0.698000, 0.000000;
+  coords.row(3) << 0.000000, -1.396000, 0.000000;
+  coords.row(4) << -1.209077, -0.698000, 0.000000;
+  coords.row(5) << -1.209077, 0.698000, 0.000000;
+  coords.row(6) << 2.151000, 1.242000, 0.000000;
+  coords.row(7) << 2.151000, -1.242000, 0.000000;
+  coords.row(8) << -2.151000, -1.242000, 0.000000;
+  coords.row(9) << -2.151000, 1.242000, 0.000000;
 
   std::vector<std::string> elements = {"C", "C", "C", "C", "C",
                                        "C", "H", "H", "H", "H"};
 
   auto structure = std::make_shared<data::Structure>(coords, elements);
+
+  // Alternative: Load from XYZ file
+  // auto structure = data::Structure::from_xyz_file("benzene_diradical.xyz");
 
   std::cout << "Created structure with " << structure->get_num_atoms()
             << " atoms" << std::endl;
@@ -95,7 +103,7 @@ int main() {
 
   // ---------------------------------------------------------------------------
   // start-cell-scf
-  // Perform an SCF calculation
+  // Perform a SCF calculation
   auto scf_solver = algorithms::ScfSolverFactory::create();
   auto [E_hf, wfn_hf] = scf_solver->run(structure, 0, 1, "cc-pvdz");
   std::cout << "SCF energy is " << E_hf << " Hartree" << std::endl;
@@ -149,8 +157,12 @@ int main() {
   // start-cell-wfn-select-configs
   // Get top 2 determinants from the CASCI wavefunction
   auto top_configurations = get_top_determinants(wfn_cas, 2);
-  std::cout << "Selected " << top_configurations.size() << " top determinants"
-            << std::endl;
+
+  // Perform PMC calculation with selected configurations
+  auto pmc = algorithms::ProjectedMultiConfigurationCalculatorFactory::create();
+  auto [E_pmc, wfn_pmc] = pmc->run(hamiltonian, top_configurations);
+  std::cout << "Reference energy for top 2 determinants is " << E_pmc
+            << " Hartree" << std::endl;
   // end-cell-wfn-select-configs
   // ---------------------------------------------------------------------------
 
