@@ -107,7 +107,7 @@ jobs:
         git checkout Release_1_9_8
         mkdir build && cd build
 
-        cmake -DBISON_EXECUTABLE=/usr/local/Cellar/Bison/*/bin/bison \
+        cmake -DBISON_EXECUTABLE=/usr/local/Cellar/Bison/3.8.2/bin/bison \
         -DCMAKE_CXX_FLAGS="-Wno-missing-template-arg-list-after-template-kw $CMAKE_CXX_FLAGS" \
         -G "Unix Makefiles" ..
         make -j$(sysctl -n hw.ncpu)
