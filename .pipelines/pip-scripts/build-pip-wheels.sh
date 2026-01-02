@@ -78,7 +78,12 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     cmake --version
 fi
 
-export CFLAGS="-fPIC -Os"
+if [ "$MAC_BUILD" == "ON" ]; then
+    export CFLAGS="-fPIC -Os --ffloat-store"
+elif [ "$MAC_BUILD" == "OFF" ]; then
+    export CFLAGS="-fPIC -Os"
+fi
+
 echo "Downloading and installing BLIS..."
 bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} "${CFLAGS}" ${MAC_BUILD}
 
@@ -131,8 +136,13 @@ python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
 cd python
 
 # Build wheel with all necessary CMake flags
-export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
-export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
+if [ "$MAC_BUILD" == "OFF" ]; then
+    export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
+    export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
+elif [ "$MAC_BUILD" == "ON" ]; then
+    export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden -ffloat-store"
+    export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden -ffloat-store"
+fi
 
 if [ "$MAC_BUILD" == "OFF" ]; then
     export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
