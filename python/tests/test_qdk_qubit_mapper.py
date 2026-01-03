@@ -152,10 +152,9 @@ class TestQdkQubitMapperRealHamiltonians:
     def test_vs_qiskit(self, test_data_path: Path) -> None:
         """Cross-validate against Qiskit JordanWignerMapper."""
         pytest.importorskip("qiskit_nature")
-        from qiskit.quantum_info import SparsePauliOp
-        from qiskit_nature.second_q.operators import FermionicOp
-
-        from qdk_chemistry.algorithms import create
+        SparsePauliOp = pytest.importorskip("qiskit.quantum_info").SparsePauliOp  # noqa: N806
+        FermionicOp = pytest.importorskip("qiskit_nature.second_q.operators").FermionicOp  # noqa: N806
+        create = pytest.importorskip("qdk_chemistry.algorithms").create
 
         hamiltonian = Hamiltonian.from_json_file(test_data_path / "ethylene_4e4o_2det.hamiltonian.json")
         threshold = 1e-12

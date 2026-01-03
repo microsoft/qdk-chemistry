@@ -158,6 +158,7 @@ class QdkQubitMapper(QubitMapper):
         Args:
             hamiltonian: The fermionic Hamiltonian.
             threshold: Threshold for pruning small coefficients.
+            integral_threshold: Threshold for discarding small integrals.
 
         Returns:
             QubitHamiltonian: The transformed qubit Hamiltonian.
@@ -200,8 +201,8 @@ class QdkQubitMapper(QubitMapper):
 
         # Build ladder operators using Jordan-Wigner transformation
         # Pre-build all operators upfront to maximize cache benefit
-        _creation_cache = {}
-        _annihilation_cache = {}
+        _creation_cache: dict[int, PauliOperator] = {}
+        _annihilation_cache: dict[int, PauliOperator] = {}
 
         def creation_operator(p: int):
             """Build a_p^dagger using Jordan-Wigner."""
@@ -232,8 +233,8 @@ class QdkQubitMapper(QubitMapper):
             creation_operator(i)
             annihilation_operator(i)
 
-        # Cache for one-body excitation operators E_pq = a†_p a_q
-        _excitation_cache = {}
+        # Cache for one-body excitation operators E_pq = a^dag_p a_q
+        _excitation_cache: dict[tuple[int, int], PauliOperator] = {}
 
         def excitation_operator(p: int, q: int):
             """Build E_pq = a†_p a_q with caching and diagonal optimization."""
@@ -257,12 +258,12 @@ class QdkQubitMapper(QubitMapper):
             for j in range(n_spin_orbitals):
                 excitation_operator(i, j)
 
-        # Cache for spin-summed excitation operators E_pq = a†_pα a_qα + a†_pβ a_qβ
+        # Cache for spin-summed excitation operators E_pq = a_p_alpha^dag a_q_alpha + a_p_beta^dag a_q_beta
         # Indexed by spatial orbital indices (p, q)
-        _spin_summed_excitation_cache = {}
+        _spin_summed_excitation_cache: dict[tuple[int, int], PauliOperator] = {}
 
         def spin_summed_excitation(p: int, q: int):
-            """Build spin-summed E_pq = a†_pα a_qα + a†_pβ a_qβ with caching.
+            """Build spin-summed E_pq = a_p_alpha^dag a_q_alpha + a_p_beta^dag a_q_beta with caching.
 
             These are indexed by spatial orbitals and sum over both spin channels.
             The result is simplified and cached for reuse in two-body factorization.
@@ -272,9 +273,9 @@ class QdkQubitMapper(QubitMapper):
                 return _spin_summed_excitation_cache[key]
 
             # E_pq = E_pq_alpha + E_pq_beta (spin-orbital excitations)
-            E_alpha = excitation_operator(alpha_idx(p), alpha_idx(q))
-            E_beta = excitation_operator(beta_idx(p), beta_idx(q))
-            result = (E_alpha + E_beta).simplify()
+            e_alpha = excitation_operator(alpha_idx(p), alpha_idx(q))
+            e_beta = excitation_operator(beta_idx(p), beta_idx(q))
+            result = (e_alpha + e_beta).simplify()
 
             _spin_summed_excitation_cache[key] = result
             return result
@@ -316,18 +317,19 @@ class QdkQubitMapper(QubitMapper):
         qubit_expr = qubit_expr.simplify()
 
         # Two-body terms using chemist notation:
-        # H_2 = 1/2 sum_{pqrs,sigma,tau} (pq|rs) a†_{p,sigma} a†_{r,tau} a_{s,tau} a_{q,sigma}
+        # The two-body Hamiltonian is (1/2) sum over pqrs and spins sigma,tau of
+        # (pq|rs) times creation(p,sigma) creation(r,tau) annihilation(s,tau) annihilation(q,sigma)
         #
         # For spin-free Hamiltonians, use spin-summed factorization:
-        #   e_pqrs = E_pq * E_rs - δ_qr * E_ps
-        # where E_pq = a†_pα a_qα + a†_pβ a_qβ (spin-summed, already simplified and cached)
+        # e_pqrs becomes E_pq times E_rs minus delta(q,r) times E_ps
+        # where E_pq sums over alpha and beta spins (already simplified and cached)
         #
         # This reduces the loop from 4*n^4 to n^4 iterations and reuses cached operators.
         Logger.debug("Building two-body terms...")
 
         if is_spin_free:
             # Spin-free case: use spin-summed factorization
-            # H_2 = (1/2) Σ_{pqrs} g_pqrs [E_pq * E_rs - δ_qr * E_ps]
+            # Contribution is (1/2) sum over pqrs of g_pqrs times (E_pq E_rs minus delta(q,r) E_ps)
             # where E_pq are spin-summed and already simplified/cached
             for p in range(n_spatial):
                 # Build terms for this p value (n³ terms)
@@ -337,15 +339,15 @@ class QdkQubitMapper(QubitMapper):
                         for s in range(n_spatial):
                             eri = get_eri(p, q, r, s, "aaaa")  # All channels are equal
                             if abs(eri) > integral_threshold:
-                                # Use spin-summed factorization: E_pq * E_rs - δ_qr * E_ps
-                                E_pq = spin_summed_excitation(p, q)
-                                E_rs = spin_summed_excitation(r, s)
-                                product_term = E_pq * E_rs
+                                # Use spin-summed factorization: E_pq * E_rs - delta_qr * E_ps
+                                e_pq = spin_summed_excitation(p, q)
+                                e_rs = spin_summed_excitation(r, s)
+                                product_term = e_pq * e_rs
 
                                 if q == r:
                                     # Kronecker delta correction
-                                    E_ps = spin_summed_excitation(p, s)
-                                    term = 0.5 * eri * (product_term - E_ps)
+                                    e_ps = spin_summed_excitation(p, s)
+                                    term = 0.5 * eri * (product_term - e_ps)
                                 else:
                                     term = 0.5 * eri * product_term
 
@@ -377,13 +379,13 @@ class QdkQubitMapper(QubitMapper):
                                     continue
                                 eri = get_eri(p, q, r, s, channel_key)
                                 if abs(eri) > integral_threshold:
-                                    E_pq = excitation_operator(spin1_idx(p), spin1_idx(q))
-                                    E_rs = excitation_operator(spin2_idx(r), spin2_idx(s))
-                                    product_term = E_pq * E_rs
+                                    e_pq = excitation_operator(spin1_idx(p), spin1_idx(q))
+                                    e_rs = excitation_operator(spin2_idx(r), spin2_idx(s))
+                                    product_term = e_pq * e_rs
 
                                     if is_same_spin and q == r:
-                                        E_ps = excitation_operator(spin1_idx(p), spin1_idx(s))
-                                        term = 0.5 * eri * (product_term - E_ps)
+                                        e_ps = excitation_operator(spin1_idx(p), spin1_idx(s))
+                                        term = 0.5 * eri * (product_term - e_ps)
                                     else:
                                         term = 0.5 * eri * product_term
 

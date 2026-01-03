@@ -167,12 +167,10 @@ class QubitHamiltonian(DataClass):
             raise ValueError(f"Number of qubits ({n_qubits}) must be 2 * n_spatial ({2 * n_spatial}).")
 
         # Build permutation: blocked -> interleaved
-        # Blocked:      α₀, α₁, ..., αₙ₋₁, β₀, β₁, ..., βₙ₋₁
-        # Interleaved:  α₀, β₀, α₁, β₁, ..., αₙ₋₁, βₙ₋₁
-        #
-        # For blocked index i:
-        #   if i < n_spatial (alpha): new_index = 2 * i
-        #   if i >= n_spatial (beta): new_index = 2 * (i - n_spatial) + 1
+        # Blocked ordering:      a0, a1, ..., a(n-1), b0, b1, ..., b(n-1)
+        # Interleaved ordering:  a0, b0, a1, b1, ..., a(n-1), b(n-1)
+        # For blocked index i, alpha spin (i < n_spatial) maps to 2*i,
+        # and beta spin (i >= n_spatial) maps to 2*(i - n_spatial) + 1
         permutation = []
         for i in range(n_qubits):
             if i < n_spatial:
