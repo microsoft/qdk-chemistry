@@ -119,16 +119,10 @@ class QdkQubitMapper(QubitMapper):
         mapping_type = str(self.settings().get("mapping_type"))
         threshold = float(self.settings().get("threshold"))
 
-        if mapping_type not in _VALID_MAPPING_TYPES:
-            raise ValueError(
-                f"Unsupported mapping type: '{mapping_type}'. Valid options: {sorted(_VALID_MAPPING_TYPES)}"
-            )
-
         if mapping_type == "jordan_wigner":
             return self._jordan_wigner_transform(hamiltonian, threshold)
 
-        # This should not be reached due to validation above
-        raise ValueError(f"Mapping type '{mapping_type}' is not implemented.")  # pragma: no cover
+        raise ValueError(f"Unsupported mapping type: '{mapping_type}'.")
 
     def _jordan_wigner_transform(self, hamiltonian: Hamiltonian, threshold: float) -> QubitHamiltonian:
         """Perform Jordan-Wigner transformation.
