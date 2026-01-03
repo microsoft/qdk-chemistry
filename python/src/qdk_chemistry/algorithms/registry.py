@@ -263,7 +263,7 @@ def register(generator: Callable[[], Algorithm]) -> None:
     Args:
         generator (Callable[[], Algorithm]): A callable that returns a new instance.
 
-            Need to reurn an instance of the custom algorithm.
+            Need to return an instance of the custom algorithm.
             This will be called each time the algorithm is created
             from the factory.
 
