@@ -512,7 +512,12 @@ std::string ProductPauliOperatorExpression::to_canonical_string(
 std::vector<std::pair<std::complex<double>, std::string>>
 ProductPauliOperatorExpression::to_canonical_terms(
     std::uint64_t num_qubits) const {
-  return {{coefficient_, to_canonical_string(num_qubits)}};
+  // Simplify first to compute phase factors from Pauli multiplication
+  // simplify() already includes the original coefficient_ in the result
+  auto simplified = this->simplify();
+  auto* simplified_product = simplified->as_product_expression();
+  return {{simplified_product->get_coefficient(),
+           simplified_product->to_canonical_string(num_qubits)}};
 }
 
 std::vector<std::pair<std::complex<double>, std::string>>
@@ -790,22 +795,24 @@ SumPauliOperatorExpression::to_canonical_terms(std::uint64_t num_qubits) const {
   std::vector<std::pair<std::complex<double>, std::string>> result;
 
   for (const auto& term : terms_) {
-    std::complex<double> coeff(1.0, 0.0);
-    std::string term_str;
-
     if (auto* prod = term->as_product_expression()) {
-      coeff = prod->get_coefficient();
-      term_str = prod->to_canonical_string(num_qubits);
+      // Use the product's to_canonical_terms which handles phase computation
+      auto terms = prod->to_canonical_terms(num_qubits);
+      for (auto& t : terms) {
+        result.push_back(std::move(t));
+      }
     } else if (auto* pauli = term->as_pauli_operator()) {
       // Wrap in a product to get canonical string
       ProductPauliOperatorExpression temp_prod;
       temp_prod.add_factor(pauli->clone());
-      term_str = temp_prod.to_canonical_string(num_qubits);
+      auto terms = temp_prod.to_canonical_terms(num_qubits);
+      for (auto& t : terms) {
+        result.push_back(std::move(t));
+      }
     } else {
-      term_str = term->to_string();
+      // Fallback for other expression types
+      result.emplace_back(std::complex<double>(1.0, 0.0), term->to_string());
     }
-
-    result.emplace_back(coeff, term_str);
   }
 
   return result;
