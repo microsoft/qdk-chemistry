@@ -24,7 +24,8 @@ constexpr bool kEnableTiming = false;
 class ScopedTimer {
  public:
   ScopedTimer(const char* name, double& accumulator)
-      : name_(name), accumulator_(accumulator),
+      : name_(name),
+        accumulator_(accumulator),
         start_(std::chrono::high_resolution_clock::now()) {}
 
   ~ScopedTimer() {
@@ -273,36 +274,41 @@ std::unique_ptr<PauliOperatorExpression> ProductPauliOperatorExpression::clone()
 
 std::unique_ptr<SumPauliOperatorExpression>
 ProductPauliOperatorExpression::distribute() const {
-  // Short-circuit: if already distributed (all factors are Pauli or flat products),
-  // just wrap in a sum
+  // Short-circuit: if already distributed (all factors are Pauli or flat
+  // products), just wrap in a sum
   if (this->is_distributed()) {
     auto result = std::make_unique<SumPauliOperatorExpression>();
     result->add_term(this->clone());
     return result;
   }
 
-  // Use a flat representation during distribution: vector of (coefficient, factors)
-  // This avoids repeated unique_ptr allocations for intermediate results
-  using FlatTerm = std::pair<std::complex<double>,
-                             std::vector<std::pair<std::uint64_t, std::uint8_t>>>;
+  // Use a flat representation during distribution: vector of (coefficient,
+  // factors) This avoids repeated unique_ptr allocations for intermediate
+  // results
+  using FlatTerm =
+      std::pair<std::complex<double>,
+                std::vector<std::pair<std::uint64_t, std::uint8_t>>>;
   std::vector<FlatTerm> flat_terms;
-  flat_terms.emplace_back(coefficient_, std::vector<std::pair<std::uint64_t, std::uint8_t>>{});
+  flat_terms.emplace_back(
+      coefficient_, std::vector<std::pair<std::uint64_t, std::uint8_t>>{});
 
   // Helper to extract flat Pauli operators from an expression
   std::function<void(const PauliOperatorExpression*,
                      std::vector<std::pair<std::uint64_t, std::uint8_t>>&)>
       extract_paulis;
-  extract_paulis = [&extract_paulis](
-                       const PauliOperatorExpression* expr,
-                       std::vector<std::pair<std::uint64_t, std::uint8_t>>& out) {
-    if (const auto* pauli = expr->as_pauli_operator()) {
-      out.emplace_back(pauli->get_qubit_index(), pauli->get_operator_type());
-    } else if (const auto* prod = expr->as_product_expression()) {
-      for (const auto& f : prod->get_factors()) {
-        extract_paulis(f.get(), out);
-      }
-    }
-  };
+  extract_paulis =
+      [&extract_paulis](
+          const PauliOperatorExpression* expr,
+          std::vector<std::pair<std::uint64_t, std::uint8_t>>& out) {
+        if (const auto* pauli = expr->as_pauli_operator()) {
+          out.emplace_back(pauli->get_qubit_index(),
+                           pauli->get_operator_type());
+        } else if (const auto* prod = expr->as_product_expression()) {
+          for (const auto& f : prod->get_factors()) {
+            extract_paulis(f.get(), out);
+          }
+        }
+      };
 
   // For each factor, distribute it
   for (const auto& factor : factors_) {
@@ -315,14 +321,15 @@ ProductPauliOperatorExpression::distribute() const {
     for (const auto& existing : flat_terms) {
       for (const auto& factor_term : factor_terms) {
         FlatTerm new_term;
-        new_term.first = existing.first;  // Start with existing coefficient
+        new_term.first = existing.first;    // Start with existing coefficient
         new_term.second = existing.second;  // Copy existing factors
 
         // Extract from factor_term
         if (const auto* prod = factor_term->as_product_expression()) {
           new_term.first *= prod->get_coefficient();
           // Reserve space for new factors
-          new_term.second.reserve(new_term.second.size() + prod->get_factors().size());
+          new_term.second.reserve(new_term.second.size() +
+                                  prod->get_factors().size());
           extract_paulis(factor_term.get(), new_term.second);
         } else if (const auto* pauli = factor_term->as_pauli_operator()) {
           new_term.second.emplace_back(pauli->get_qubit_index(),
@@ -341,7 +348,8 @@ ProductPauliOperatorExpression::distribute() const {
   result->reserve_capacity(flat_terms.size());
 
   for (const auto& flat_term : flat_terms) {
-    auto prod = std::make_unique<ProductPauliOperatorExpression>(flat_term.first);
+    auto prod =
+        std::make_unique<ProductPauliOperatorExpression>(flat_term.first);
     prod->reserve_capacity(flat_term.second.size());
     for (const auto& [qubit, op_type] : flat_term.second) {
       prod->add_factor(std::make_unique<PauliOperator>(op_type, qubit));
@@ -663,7 +671,8 @@ SumPauliOperatorExpression::distribute() const {
   }
 
   auto result = std::make_unique<SumPauliOperatorExpression>();
-  // Reserve space to avoid reallocations (estimate: each term expands to ~1 term on average)
+  // Reserve space to avoid reallocations (estimate: each term expands to ~1
+  // term on average)
   result->reserve_capacity(terms_.size() * 2);
 
   for (const auto& term : terms_) {
@@ -730,7 +739,8 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
     }
   };
 
-  // Check if already distributed - if so, we can skip the expensive distribute() call
+  // Check if already distributed - if so, we can skip the expensive
+  // distribute() call
   const bool already_distributed = this->is_distributed();
 
   if (already_distributed) {
@@ -757,8 +767,9 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
     }
   }
 
-  // Collect like terms using a hash map for O(1) lookup instead of O(n) linear search
-  // Maps TermKey -> index into collected_terms vector (for preserving insertion order)
+  // Collect like terms using a hash map for O(1) lookup instead of O(n) linear
+  // search Maps TermKey -> index into collected_terms vector (for preserving
+  // insertion order)
   using TermKey = std::vector<std::pair<std::uint64_t, std::uint8_t>>;
   std::unordered_map<TermKey, std::size_t, TermKeyHash> term_index_map;
   std::vector<std::tuple<TermKey, std::complex<double>,
@@ -810,8 +821,10 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
               << "  simplify_terms:    " << g_simplify_terms_time << " s\n"
               << "  collect_like_terms: " << g_collect_like_terms_time << " s\n"
               << "  build_result:      " << g_build_result_time << " s\n"
-              << "  TOTAL:             " << (g_distribute_time + g_simplify_terms_time +
-                                              g_collect_like_terms_time + g_build_result_time) << " s\n";
+              << "  TOTAL:             "
+              << (g_distribute_time + g_simplify_terms_time +
+                  g_collect_like_terms_time + g_build_result_time)
+              << " s\n";
   }
 
   return simplified_sum;
