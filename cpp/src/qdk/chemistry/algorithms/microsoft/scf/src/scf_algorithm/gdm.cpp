@@ -852,9 +852,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
       for (int hist_idx = history_size_ - 1; hist_idx >= 0; hist_idx--) {
         // inverse_rho_values[hist_idx] is independent of pseudo-canonical
         // transformation. The previous inverse_rho_values are larger than
-        // nonpositive_threshold_. The latest_inverse_rho will be checked later:
-        // once it is less than nonpositive_threshold_, the history will be
-        // cleared and kappa will be recomputed using initial Hessian.
+        // nonpositive_threshold_. The latest_inverse_rho has been checked.
         double alpha =
             history_kappa_.row(hist_idx).dot(q) / inverse_rho_values[hist_idx];
         q = q - alpha * history_dgrad_.row(hist_idx).transpose();
