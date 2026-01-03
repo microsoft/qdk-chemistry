@@ -619,6 +619,12 @@ class ProductPauliOperatorExpression : public PauliOperatorExpression {
   void add_factor(std::unique_ptr<PauliOperatorExpression> factor);
 
   /**
+   * @brief Pre-allocates capacity for the factor list.
+   * @param capacity The number of factors to reserve space for.
+   */
+  void reserve_capacity(std::size_t capacity);
+
+  /**
    * @brief Returns a const reference to the internal factor list.
    * @return Vector of expression factors in multiplication order.
    */
@@ -803,6 +809,12 @@ class SumPauliOperatorExpression : public PauliOperatorExpression {
    * @param term The expression to add.
    */
   void add_term(std::unique_ptr<PauliOperatorExpression> term);
+
+  /**
+   * @brief Pre-allocates capacity for the term list.
+   * @param capacity The number of terms to reserve space for.
+   */
+  void reserve_capacity(std::size_t capacity);
 
   /**
    * @brief Returns a const reference to the internal term list.

@@ -273,50 +273,80 @@ std::unique_ptr<PauliOperatorExpression> ProductPauliOperatorExpression::clone()
 
 std::unique_ptr<SumPauliOperatorExpression>
 ProductPauliOperatorExpression::distribute() const {
-  // Start with a sum containing a single empty product
-  auto result = std::make_unique<SumPauliOperatorExpression>();
-  auto initial = std::make_unique<ProductPauliOperatorExpression>(coefficient_);
-  result->add_term(std::move(initial));
+  // Short-circuit: if already distributed (all factors are Pauli or flat products),
+  // just wrap in a sum
+  if (this->is_distributed()) {
+    auto result = std::make_unique<SumPauliOperatorExpression>();
+    result->add_term(this->clone());
+    return result;
+  }
 
-  // For each factor, distribute it across existing terms
+  // Use a flat representation during distribution: vector of (coefficient, factors)
+  // This avoids repeated unique_ptr allocations for intermediate results
+  using FlatTerm = std::pair<std::complex<double>,
+                             std::vector<std::pair<std::uint64_t, std::uint8_t>>>;
+  std::vector<FlatTerm> flat_terms;
+  flat_terms.emplace_back(coefficient_, std::vector<std::pair<std::uint64_t, std::uint8_t>>{});
+
+  // Helper to extract flat Pauli operators from an expression
+  std::function<void(const PauliOperatorExpression*,
+                     std::vector<std::pair<std::uint64_t, std::uint8_t>>&)>
+      extract_paulis;
+  extract_paulis = [&extract_paulis](
+                       const PauliOperatorExpression* expr,
+                       std::vector<std::pair<std::uint64_t, std::uint8_t>>& out) {
+    if (const auto* pauli = expr->as_pauli_operator()) {
+      out.emplace_back(pauli->get_qubit_index(), pauli->get_operator_type());
+    } else if (const auto* prod = expr->as_product_expression()) {
+      for (const auto& f : prod->get_factors()) {
+        extract_paulis(f.get(), out);
+      }
+    }
+  };
+
+  // For each factor, distribute it
   for (const auto& factor : factors_) {
     auto factor_dist = factor->distribute();
-    auto new_result = std::make_unique<SumPauliOperatorExpression>();
+    const auto& factor_terms = factor_dist->get_terms();
 
-    // Multiply each existing term with each term from factor distribution
-    for (const auto& existing_term : result->get_terms()) {
-      for (const auto& factor_term : factor_dist->get_terms()) {
-        auto new_product = std::make_unique<ProductPauliOperatorExpression>();
+    std::vector<FlatTerm> new_flat_terms;
+    new_flat_terms.reserve(flat_terms.size() * factor_terms.size());
 
-        // Get coefficient from existing term
-        std::complex<double> coeff(1.0);
-        if (auto* prod = existing_term->as_product_expression()) {
-          coeff = prod->get_coefficient();
-          // Copy factors from existing term
-          for (const auto& f : prod->get_factors()) {
-            new_product->add_factor(f->clone());
-          }
-        } else {
-          new_product->add_factor(existing_term->clone());
+    for (const auto& existing : flat_terms) {
+      for (const auto& factor_term : factor_terms) {
+        FlatTerm new_term;
+        new_term.first = existing.first;  // Start with existing coefficient
+        new_term.second = existing.second;  // Copy existing factors
+
+        // Extract from factor_term
+        if (const auto* prod = factor_term->as_product_expression()) {
+          new_term.first *= prod->get_coefficient();
+          // Reserve space for new factors
+          new_term.second.reserve(new_term.second.size() + prod->get_factors().size());
+          extract_paulis(factor_term.get(), new_term.second);
+        } else if (const auto* pauli = factor_term->as_pauli_operator()) {
+          new_term.second.emplace_back(pauli->get_qubit_index(),
+                                       pauli->get_operator_type());
         }
 
-        // Multiply coefficient from factor term
-        if (auto* prod = factor_term->as_product_expression()) {
-          coeff *= prod->get_coefficient();
-          // Add factors from factor term
-          for (const auto& f : prod->get_factors()) {
-            new_product->add_factor(f->clone());
-          }
-        } else {
-          new_product->add_factor(factor_term->clone());
-        }
-
-        new_product->set_coefficient(coeff);
-        new_result->add_term(std::move(new_product));
+        new_flat_terms.push_back(std::move(new_term));
       }
     }
 
-    result = std::move(new_result);
+    flat_terms = std::move(new_flat_terms);
+  }
+
+  // Convert flat representation back to expression tree
+  auto result = std::make_unique<SumPauliOperatorExpression>();
+  result->reserve_capacity(flat_terms.size());
+
+  for (const auto& flat_term : flat_terms) {
+    auto prod = std::make_unique<ProductPauliOperatorExpression>(flat_term.first);
+    prod->reserve_capacity(flat_term.second.size());
+    for (const auto& [qubit, op_type] : flat_term.second) {
+      prod->add_factor(std::make_unique<PauliOperator>(op_type, qubit));
+    }
+    result->add_term(std::move(prod));
   }
 
   return result;
@@ -464,6 +494,10 @@ void ProductPauliOperatorExpression::multiply_coefficient(
 void ProductPauliOperatorExpression::add_factor(
     std::unique_ptr<PauliOperatorExpression> factor) {
   factors_.push_back(std::move(factor));
+}
+
+void ProductPauliOperatorExpression::reserve_capacity(std::size_t capacity) {
+  factors_.reserve(capacity);
 }
 
 const std::vector<std::unique_ptr<PauliOperatorExpression>>&
@@ -623,10 +657,18 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::clone()
 
 std::unique_ptr<SumPauliOperatorExpression>
 SumPauliOperatorExpression::distribute() const {
+  // Short-circuit: if already distributed, just clone
+  if (this->is_distributed()) {
+    return std::make_unique<SumPauliOperatorExpression>(*this);
+  }
+
   auto result = std::make_unique<SumPauliOperatorExpression>();
+  // Reserve space to avoid reallocations (estimate: each term expands to ~1 term on average)
+  result->reserve_capacity(terms_.size() * 2);
+
   for (const auto& term : terms_) {
     auto distributed_term = term->distribute();
-    // Add all terms from the distributed result to our result
+    // Add terms from the distributed result to our result
     for (const auto& dist_term : distributed_term->get_terms()) {
       result->add_term(dist_term->clone());
     }
@@ -653,6 +695,7 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
   auto make_term_key = [](const ProductPauliOperatorExpression* prod)
       -> std::vector<std::pair<std::uint64_t, std::uint8_t>> {
     std::vector<std::pair<std::uint64_t, std::uint8_t>> key;
+    key.reserve(prod->get_factors().size());
     for (const auto& factor : prod->get_factors()) {
       if (auto* pauli = factor->as_pauli_operator()) {
         key.emplace_back(pauli->get_qubit_index(), pauli->get_operator_type());
@@ -664,6 +707,7 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
 
   // First simplify all terms individually
   std::vector<std::unique_ptr<ProductPauliOperatorExpression>> simplified_terms;
+  simplified_terms.reserve(terms_.size());
 
   // Helper function to add a simplified expression to simplified_terms
   std::function<void(std::unique_ptr<PauliOperatorExpression>)>
@@ -686,18 +730,30 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
     }
   };
 
-  // Distribute first to ensure all terms are products
-  std::unique_ptr<SumPauliOperatorExpression> distributed;
-  {
-    ScopedTimer timer("distribute", g_distribute_time);
-    distributed = this->distribute();
-  }
+  // Check if already distributed - if so, we can skip the expensive distribute() call
+  const bool already_distributed = this->is_distributed();
 
-  {
+  if (already_distributed) {
+    // Skip distribute(), simplify terms directly from this sum
     ScopedTimer timer("simplify_terms", g_simplify_terms_time);
-    for (const auto& term : distributed->get_terms()) {
+    for (const auto& term : terms_) {
       auto simplified_term = term->simplify();
       add_simplified_term(std::move(simplified_term));
+    }
+  } else {
+    // Distribute first to ensure all terms are products
+    std::unique_ptr<SumPauliOperatorExpression> distributed;
+    {
+      ScopedTimer timer("distribute", g_distribute_time);
+      distributed = this->distribute();
+    }
+
+    {
+      ScopedTimer timer("simplify_terms", g_simplify_terms_time);
+      for (const auto& term : distributed->get_terms()) {
+        auto simplified_term = term->simplify();
+        add_simplified_term(std::move(simplified_term));
+      }
     }
   }
 
@@ -797,6 +853,10 @@ SumPauliOperatorExpression::prune_threshold(double epsilon) const {
 void SumPauliOperatorExpression::add_term(
     std::unique_ptr<PauliOperatorExpression> term) {
   terms_.push_back(std::move(term));
+}
+
+void SumPauliOperatorExpression::reserve_capacity(std::size_t capacity) {
+  terms_.reserve(capacity);
 }
 
 const std::vector<std::unique_ptr<PauliOperatorExpression>>&

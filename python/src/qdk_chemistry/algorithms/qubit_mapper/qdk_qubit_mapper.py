@@ -178,23 +178,63 @@ class QdkQubitMapper(QubitMapper):
             return 0.0
 
         # Build ladder operators using Jordan-Wigner transformation
+        # Pre-build all operators upfront to maximize cache benefit
+        _creation_cache = {}
+        _annihilation_cache = {}
+
         def creation_operator(p: int):
             """Build a_p^dagger using Jordan-Wigner."""
+            if p in _creation_cache:
+                return _creation_cache[p]
             x_term = PauliOperator.X(p)
             y_term = PauliOperator.Y(p)
             result = 0.5 * (x_term - 1j * y_term)
             for j in range(p - 1, -1, -1):
                 result = result * PauliOperator.Z(j)
+            _creation_cache[p] = result
             return result
 
         def annihilation_operator(p: int):
             """Build a_p using Jordan-Wigner."""
+            if p in _annihilation_cache:
+                return _annihilation_cache[p]
             x_term = PauliOperator.X(p)
             y_term = PauliOperator.Y(p)
             result = 0.5 * (x_term + 1j * y_term)
             for j in range(p - 1, -1, -1):
                 result = result * PauliOperator.Z(j)
+            _annihilation_cache[p] = result
             return result
+
+        # Pre-populate caches for all spin-orbitals
+        for i in range(n_spin_orbitals):
+            creation_operator(i)
+            annihilation_operator(i)
+
+        # Cache for one-body excitation operators E_pq = a†_p a_q
+        _excitation_cache = {}
+
+        def excitation_operator(p: int, q: int):
+            """Build E_pq = a†_p a_q with caching and diagonal optimization."""
+            key = (p, q)
+            if key in _excitation_cache:
+                return _excitation_cache[key]
+
+            if p == q:
+                # Diagonal: n_p = a†_p a_p = (I - Z_p) / 2
+                # Direct construction avoids expression tree multiplication
+                result = 0.5 * PauliOperator.I(p) - 0.5 * PauliOperator.Z(p)
+            else:
+                # Off-diagonal: multiply cached ladder operators
+                result = creation_operator(p) * annihilation_operator(q)
+
+            _excitation_cache[key] = result
+            return result
+
+        # Pre-populate excitation cache for all spin-orbital pairs
+        for i in range(n_spin_orbitals):
+            for j in range(n_spin_orbitals):
+                excitation_operator(i, j)
 
         # One-body terms: sum_{pq,sigma} h_pq * a†_{p,sigma} * a_{q,sigma}
         Logger.debug("Building one-body terms...")
@@ -204,11 +244,11 @@ class QdkQubitMapper(QubitMapper):
                 h_pq_beta = float(h1_beta[p, q])
 
                 if h_pq_alpha != 0.0:
-                    term = h_pq_alpha * creation_operator(alpha_idx(p)) * annihilation_operator(alpha_idx(q))
+                    term = h_pq_alpha * excitation_operator(alpha_idx(p), alpha_idx(q))
                     qubit_expr = qubit_expr + term
 
                 if h_pq_beta != 0.0:
-                    term = h_pq_beta * creation_operator(beta_idx(p)) * annihilation_operator(beta_idx(q))
+                    term = h_pq_beta * excitation_operator(beta_idx(p), beta_idx(q))
                     qubit_expr = qubit_expr + term
 
         # Simplify one-body terms to keep expression tree flat
@@ -225,34 +265,48 @@ class QdkQubitMapper(QubitMapper):
 
         # Process each spin channel separately and simplify frequently to prevent
         # exponential growth of the expression tree during distribute()
-        # Simplify after each p-index batch (n³ terms) to keep expression tree small
-        for channel_name, get_indices, channel_key in [
-            ("aaaa", lambda p, q, r, s: (alpha_idx(p), alpha_idx(q), alpha_idx(r), alpha_idx(s)), "aaaa"),
-            ("bbbb", lambda p, q, r, s: (beta_idx(p), beta_idx(q), beta_idx(r), beta_idx(s)), "bbbb"),
-            ("aabb", lambda p, q, r, s: (alpha_idx(p), alpha_idx(q), beta_idx(r), beta_idx(s)), "aabb"),
-            ("bbaa", lambda p, q, r, s: (beta_idx(p), beta_idx(q), alpha_idx(r), alpha_idx(s)), "aabb"),
+        #
+        # Two-body term factorization (per spin channel):
+        # For same-spin (σ=τ): a†_pσ a†_rσ a_sσ a_qσ = E_pq_σ * E_rs_σ - δ_qr E_ps_σ
+        # For opposite-spin: a†_pα a†_rβ a_sβ a_qα = E_pq_α * E_rs_β (no δ correction)
+        #
+        # Using excitation operators instead of 4-operator products enables reuse of
+        # already-simplified cached operators and reduces expression tree complexity.
+        for channel_name, spin1_idx, spin2_idx, channel_key, is_same_spin in [
+            ("aaaa", alpha_idx, alpha_idx, "aaaa", True),
+            ("bbbb", beta_idx, beta_idx, "bbbb", True),
+            ("aabb", alpha_idx, beta_idx, "aabb", False),
+            ("bbaa", beta_idx, alpha_idx, "aabb", False),
         ]:
             Logger.debug(f"Processing {channel_name} channel...")
             channel_expr = 0.0 * PauliOperator.I(0)  # Start with zero expression
 
             for p in range(n_spatial):
-                # Build terms for this p value
+                # Build terms for this p value (n³ terms)
                 p_batch_expr = 0.0 * PauliOperator.I(0)
                 for q in range(n_spatial):
                     for r in range(n_spatial):
+                        # Skip same-spin Pauli exclusion: a†_p a†_r = 0 when p == r
+                        if is_same_spin and p == r:
+                            continue
                         for s in range(n_spatial):
+                            if is_same_spin and q == s:
+                                continue
                             eri = get_eri(p, q, r, s, channel_key)
                             if eri != 0.0:
-                                pi, qi, ri, si = get_indices(p, q, r, s)
-                                # a†_pi a†_ri a_si a_qi
-                                term = (
-                                    0.5
-                                    * eri
-                                    * creation_operator(pi)
-                                    * creation_operator(ri)
-                                    * annihilation_operator(si)
-                                    * annihilation_operator(qi)
-                                )
+                                # Use factorization: E_pq * E_rs - δ_qr E_ps (same-spin only)
+                                # spin1 is for (p,q), spin2 is for (r,s)
+                                E_pq = excitation_operator(spin1_idx(p), spin1_idx(q))
+                                E_rs = excitation_operator(spin2_idx(r), spin2_idx(s))
+                                product_term = E_pq * E_rs
+
+                                if is_same_spin and q == r:
+                                    # Kronecker delta correction
+                                    E_ps = excitation_operator(spin1_idx(p), spin1_idx(s))
+                                    term = 0.5 * eri * (product_term - E_ps)
+                                else:
+                                    term = 0.5 * eri * product_term
+
                                 p_batch_expr = p_batch_expr + term
 
                 # Simplify this p-batch and accumulate
