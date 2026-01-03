@@ -269,7 +269,8 @@ class GDMLineFunctor {
         num_density_matrices_(unrestricted ? 2 : 1),
         num_molecular_orbitals_(num_molecular_orbitals),
         unrestricted_(unrestricted),
-        cached_kappa_(Eigen::VectorXd()) {}
+        cached_kappa_(Eigen::VectorXd()),
+        cached_energy_(std::numeric_limits<double>::infinity()) {}
 
   /**
    * @brief Evaluate energy at given kappa vector x
@@ -822,13 +823,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
 
   double latest_inverse_rho = 1.0;
   // BFGS two-loop recursion on concatenated vectors (runs once for all spins)
-  if (history_size_ == 0) {
-    // No history available, use H_0^{-1} * gradient
-    QDK_LOGGER().info("No history available, using initial Hessian inverse");
-    for (int index = 0; index < total_rotation_size_; index++) {
-      kappa_(index) = -current_gradient_(index) / initial_hessian(index);
-    }
-  } else {
+  if (history_size_ > 0) {
     QDK_LOGGER().debug(
         "Applying BFGS two-loop recursion with {} historical records",
         history_size_);
@@ -841,98 +836,96 @@ void GDM::iterate(SCFImpl& scf_impl) {
     }
     latest_inverse_rho = inverse_rho_values[history_size_ - 1];
 
-    // BFGS two-loop recursion algorithm
-    Eigen::VectorXd q = current_gradient_;
-    std::vector<double> alpha_values;
+    if (latest_inverse_rho < nonpositive_threshold_) {
+      // The kappa_ from the last step almost orthogonal to dgrad, or violates
+      // curvature condition. Clear BFGS history.
+      QDK_LOGGER().warn(
+          "Invalid BFGS history curvature condition detected: latest inverse "
+          "rho = {:.6e} < 0.",
+          latest_inverse_rho);
+      history_size_ = 0;
+    } else {
+      // BFGS two-loop recursion algorithm
+      Eigen::VectorXd q = current_gradient_;
+      std::vector<double> alpha_values;
 
-    for (int hist_idx = history_size_ - 1; hist_idx >= 0; hist_idx--) {
-      // inverse_rho_values[hist_idx] is independent of pseudo-canonical
-      // transformation. The previous inverse_rho_values are larger than
-      // nonpositive_threshold_. The latest_inverse_rho will be checked later:
-      // once it is less than nonpositive_threshold_, the history will be
-      // cleared and kappa will be recomputed using initial Hessian.
-      double alpha =
-          history_kappa_.row(hist_idx).dot(q) / inverse_rho_values[hist_idx];
-      q = q - alpha * history_dgrad_.row(hist_idx).transpose();
-      alpha_values.push_back(alpha);
-    }
+      for (int hist_idx = history_size_ - 1; hist_idx >= 0; hist_idx--) {
+        // inverse_rho_values[hist_idx] is independent of pseudo-canonical
+        // transformation. The previous inverse_rho_values are larger than
+        // nonpositive_threshold_. The latest_inverse_rho will be checked later:
+        // once it is less than nonpositive_threshold_, the history will be
+        // cleared and kappa will be recomputed using initial Hessian.
+        double alpha =
+            history_kappa_.row(hist_idx).dot(q) / inverse_rho_values[hist_idx];
+        q = q - alpha * history_dgrad_.row(hist_idx).transpose();
+        alpha_values.push_back(alpha);
+      }
 
-    Eigen::VectorXd r = Eigen::VectorXd::Zero(total_rotation_size_);
-    for (int index = 0; index < total_rotation_size_; index++) {
-      r(index) = q(index) / initial_hessian(index);
-    }
+      Eigen::VectorXd r = Eigen::VectorXd::Zero(total_rotation_size_);
+      for (int index = 0; index < total_rotation_size_; index++) {
+        r(index) = q(index) / initial_hessian(index);
+      }
 
-    for (int j = 0; j < history_size_; j++) {
-      double beta_value = history_dgrad_.row(j).dot(r) / inverse_rho_values[j];
-      r = r + history_kappa_.row(j).transpose() *
-                  (alpha_values[history_size_ - j - 1] - beta_value);
-    }
+      for (int j = 0; j < history_size_; j++) {
+        double beta_value =
+            history_dgrad_.row(j).dot(r) / inverse_rho_values[j];
+        r = r + history_kappa_.row(j).transpose() *
+                    (alpha_values[history_size_ - j - 1] - beta_value);
+      }
 
-    // Log BFGS debug information (last 5 values only)
+      // Log BFGS debug information (last 5 values only)
 #ifndef NDEBUG
-    const int rho_size = static_cast<int>(inverse_rho_values.size());
-    const int rho_start = std::max(0, rho_size - 5);
-    const int rho_num_entries = rho_size - rho_start;
+      const int rho_size = static_cast<int>(inverse_rho_values.size());
+      const int rho_start = std::max(0, rho_size - 5);
+      const int rho_num_entries = rho_size - rho_start;
 
-    std::string rho_str;
-    rho_str.reserve(20 + 15 * rho_num_entries + 10);
-    rho_str = "inverse Rho values: ";
-    if (rho_start > 0) {
-      rho_str += "... ";
-    }
-    for (int j = rho_start; j < rho_size; j++) {
-      rho_str += fmt::format("{:.6e}; ", inverse_rho_values[j]);
-    }
-    QDK_LOGGER().debug(rho_str);
+      std::string rho_str;
+      rho_str.reserve(20 + 15 * rho_num_entries + 10);
+      rho_str = "inverse Rho values: ";
+      if (rho_start > 0) {
+        rho_str += "... ";
+      }
+      for (int j = rho_start; j < rho_size; j++) {
+        rho_str += fmt::format("{:.6e}; ", inverse_rho_values[j]);
+      }
+      QDK_LOGGER().debug(rho_str);
 
-    const int alpha_size = static_cast<int>(alpha_values.size());
-    const int alpha_start = std::max(0, alpha_size - 5);
-    const int alpha_num_entries = alpha_size - alpha_start;
+      const int alpha_size = static_cast<int>(alpha_values.size());
+      const int alpha_start = std::max(0, alpha_size - 5);
+      const int alpha_num_entries = alpha_size - alpha_start;
 
-    std::string alpha_str;
-    alpha_str.reserve(20 + 15 * alpha_num_entries + 10);
-    alpha_str = "alpha values: ";
-    if (alpha_start > 0) {
-      alpha_str += "... ";
-    }
-    for (int j = alpha_start; j < alpha_size; j++) {
-      alpha_str += fmt::format("{:.6e}; ", alpha_values[j]);
-    }
-    QDK_LOGGER().debug(alpha_str);
+      std::string alpha_str;
+      alpha_str.reserve(20 + 15 * alpha_num_entries + 10);
+      alpha_str = "alpha values: ";
+      if (alpha_start > 0) {
+        alpha_str += "... ";
+      }
+      for (int j = alpha_start; j < alpha_size; j++) {
+        alpha_str += fmt::format("{:.6e}; ", alpha_values[j]);
+      }
+      QDK_LOGGER().debug(alpha_str);
 #endif
 
-    kappa_ = -r;
+      kappa_ = -r;
+      double kappa_dot_grad = kappa_.dot(current_gradient_);
+      if (kappa_dot_grad > 0.0) {
+        // Non-descent direction detected. Clear BFGS history
+        QDK_LOGGER().warn(
+            "Invalid BFGS search direction detected: kappa·grad = {:.6e} > 0. "
+            "This indicates a non-descent direction.",
+            kappa_dot_grad);
+        history_size_ = 0;
+      }
+    }
   }
 
-  // Validate BFGS search direction
-  double kappa_dot_grad = kappa_.dot(current_gradient_);
-  if (kappa_dot_grad > 0.0) {
-    QDK_LOGGER().warn(
-        "Invalid BFGS search direction detected: kappa·grad = {:.6e} > 0. "
-        "This indicates a non-descent direction.",
-        kappa_dot_grad);
-  }
-  if (latest_inverse_rho < nonpositive_threshold_) {
-    QDK_LOGGER().warn(
-        "Invalid BFGS history curvature condition detected: latest inverse "
-        "rho = {:.6e} < 0.",
-        latest_inverse_rho);
-  }
-  if ((kappa_dot_grad > 0.0) || (latest_inverse_rho < nonpositive_threshold_)) {
-    // Bad direction detected. Clear BFGS history, then recompute kappa using
-    // initial Hessian
-    history_size_ = 0;
+  if (history_size_ == 0) {
+    // No history available, either first step or cleared history
+    // kappa_ =  -H_0^{-1} * gradient
+    QDK_LOGGER().info("No history available, using initial Hessian inverse");
     for (int index = 0; index < total_rotation_size_; index++) {
       kappa_(index) = -current_gradient_(index) / initial_hessian(index);
     }
-
-    QDK_LOGGER().info(
-        "BFGS history cleared and restarted with initial Hessian");
-  } else {
-    QDK_LOGGER().debug(
-        "BFGS search direction validated: kappa·grad = {:.6e} (descent "
-        "direction), inverse rho = {:.6e} (positive curvature).",
-        kappa_dot_grad, latest_inverse_rho);
   }
 
   // Save pseudo-canonical C for trials in the line search
@@ -957,7 +950,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
   Eigen::VectorXd searched_kappa = Eigen::VectorXd::Zero(kappa_.size());
   // Function value at new point, initialized to energy_at_start_point
   double energy_at_searched_kappa = energy_at_start_point;
-  // Function value at new point, initialized to grad_at_start_point
+  // Gradient vector value at new point, initialized to grad_at_start_point
   Eigen::VectorXd grad_at_searched_kappa = grad_at_start_point;
 
   try {
