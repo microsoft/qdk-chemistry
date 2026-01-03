@@ -236,20 +236,60 @@ class QdkQubitMapper(QubitMapper):
             for j in range(n_spin_orbitals):
                 excitation_operator(i, j)
 
-        # One-body terms: sum_{pq,sigma} h_pq * a†_{p,sigma} * a_{q,sigma}
+        # Cache for spin-summed excitation operators E_pq = a†_pα a_qα + a†_pβ a_qβ
+        # Indexed by spatial orbital indices (p, q)
+        _spin_summed_excitation_cache = {}
+
+        def spin_summed_excitation(p: int, q: int):
+            """Build spin-summed E_pq = a†_pα a_qα + a†_pβ a_qβ with caching.
+
+            These are indexed by spatial orbitals and sum over both spin channels.
+            The result is simplified and cached for reuse in two-body factorization.
+            """
+            key = (p, q)
+            if key in _spin_summed_excitation_cache:
+                return _spin_summed_excitation_cache[key]
+
+            # E_pq = E_pq_alpha + E_pq_beta (spin-orbital excitations)
+            E_alpha = excitation_operator(alpha_idx(p), alpha_idx(q))
+            E_beta = excitation_operator(beta_idx(p), beta_idx(q))
+            result = (E_alpha + E_beta).simplify()
+
+            _spin_summed_excitation_cache[key] = result
+            return result
+
+        # Pre-populate spin-summed excitation cache for all spatial orbital pairs
+        for i in range(n_spatial):
+            for j in range(n_spatial):
+                spin_summed_excitation(i, j)
+
+        # One-body terms: sum_{pq} h_pq * E_pq (using spin-summed operators for spin-free case)
+        # For spin-free Hamiltonians: h_pq_alpha == h_pq_beta, so we can use spin-summed E_pq
         Logger.debug("Building one-body terms...")
-        for p in range(n_spatial):
-            for q in range(n_spatial):
-                h_pq_alpha = float(h1_alpha[p, q])
-                h_pq_beta = float(h1_beta[p, q])
+        is_spin_free = np.allclose(h1_alpha, h1_beta) and np.allclose(h2_aaaa, h2_bbbb)
 
-                if h_pq_alpha != 0.0:
-                    term = h_pq_alpha * excitation_operator(alpha_idx(p), alpha_idx(q))
-                    qubit_expr = qubit_expr + term
+        if is_spin_free:
+            # Use spin-summed excitation operators for efficiency
+            for p in range(n_spatial):
+                for q in range(n_spatial):
+                    h_pq = float(h1_alpha[p, q])
+                    if h_pq != 0.0:
+                        term = h_pq * spin_summed_excitation(p, q)
+                        qubit_expr = qubit_expr + term
+        else:
+            # General case: handle alpha and beta separately
+            for p in range(n_spatial):
+                for q in range(n_spatial):
+                    h_pq_alpha = float(h1_alpha[p, q])
+                    h_pq_beta = float(h1_beta[p, q])
 
-                if h_pq_beta != 0.0:
-                    term = h_pq_beta * excitation_operator(beta_idx(p), beta_idx(q))
-                    qubit_expr = qubit_expr + term
+                    if h_pq_alpha != 0.0:
+                        term = h_pq_alpha * excitation_operator(alpha_idx(p), alpha_idx(q))
+                        qubit_expr = qubit_expr + term
+
+                    if h_pq_beta != 0.0:
+                        term = h_pq_beta * excitation_operator(beta_idx(p), beta_idx(q))
+                        qubit_expr = qubit_expr + term
 
         # Simplify one-body terms to keep expression tree flat
         qubit_expr = qubit_expr.simplify()
@@ -257,52 +297,33 @@ class QdkQubitMapper(QubitMapper):
         # Two-body terms using chemist notation:
         # H_2 = 1/2 sum_{pqrs,sigma,tau} (pq|rs) a†_{p,sigma} a†_{r,tau} a_{s,tau} a_{q,sigma}
         #
-        # For same-spin (sigma = tau):
-        #   1/2 sum_{pqrs} (pq|rs) [a†_{pa} a†_{ra} a_{sa} a_{qa} + a†_{pb} a†_{rb} a_{sb} a_{qb}]
-        # For opposite-spin (sigma != tau):
-        #   1/2 sum_{pqrs} (pq|rs) [a†_{pa} a†_{rb} a_{sb} a_{qa} + a†_{pb} a†_{ra} a_{sa} a_{qb}]
+        # For spin-free Hamiltonians, use spin-summed factorization:
+        #   e_pqrs = E_pq * E_rs - δ_qr * E_ps
+        # where E_pq = a†_pα a_qα + a†_pβ a_qβ (spin-summed, already simplified and cached)
+        #
+        # This reduces the loop from 4*n^4 to n^4 iterations and reuses cached operators.
         Logger.debug("Building two-body terms...")
 
-        # Process each spin channel separately and simplify frequently to prevent
-        # exponential growth of the expression tree during distribute()
-        #
-        # Two-body term factorization (per spin channel):
-        # For same-spin (σ=τ): a†_pσ a†_rσ a_sσ a_qσ = E_pq_σ * E_rs_σ - δ_qr E_ps_σ
-        # For opposite-spin: a†_pα a†_rβ a_sβ a_qα = E_pq_α * E_rs_β (no δ correction)
-        #
-        # Using excitation operators instead of 4-operator products enables reuse of
-        # already-simplified cached operators and reduces expression tree complexity.
-        for channel_name, spin1_idx, spin2_idx, channel_key, is_same_spin in [
-            ("aaaa", alpha_idx, alpha_idx, "aaaa", True),
-            ("bbbb", beta_idx, beta_idx, "bbbb", True),
-            ("aabb", alpha_idx, beta_idx, "aabb", False),
-            ("bbaa", beta_idx, alpha_idx, "aabb", False),
-        ]:
-            Logger.debug(f"Processing {channel_name} channel...")
-            channel_expr = 0.0 * PauliOperator.I(0)  # Start with zero expression
-
+        if is_spin_free:
+            # Spin-free case: use spin-summed factorization
+            # H_2 = (1/2) Σ_{pqrs} g_pqrs [E_pq * E_rs - δ_qr * E_ps]
+            # where E_pq are spin-summed and already simplified/cached
             for p in range(n_spatial):
                 # Build terms for this p value (n³ terms)
                 p_batch_expr = 0.0 * PauliOperator.I(0)
                 for q in range(n_spatial):
                     for r in range(n_spatial):
-                        # Skip same-spin Pauli exclusion: a†_p a†_r = 0 when p == r
-                        if is_same_spin and p == r:
-                            continue
                         for s in range(n_spatial):
-                            if is_same_spin and q == s:
-                                continue
-                            eri = get_eri(p, q, r, s, channel_key)
+                            eri = get_eri(p, q, r, s, "aaaa")  # All channels are equal
                             if eri != 0.0:
-                                # Use factorization: E_pq * E_rs - δ_qr E_ps (same-spin only)
-                                # spin1 is for (p,q), spin2 is for (r,s)
-                                E_pq = excitation_operator(spin1_idx(p), spin1_idx(q))
-                                E_rs = excitation_operator(spin2_idx(r), spin2_idx(s))
+                                # Use spin-summed factorization: E_pq * E_rs - δ_qr * E_ps
+                                E_pq = spin_summed_excitation(p, q)
+                                E_rs = spin_summed_excitation(r, s)
                                 product_term = E_pq * E_rs
 
-                                if is_same_spin and q == r:
+                                if q == r:
                                     # Kronecker delta correction
-                                    E_ps = excitation_operator(spin1_idx(p), spin1_idx(s))
+                                    E_ps = spin_summed_excitation(p, s)
                                     term = 0.5 * eri * (product_term - E_ps)
                                 else:
                                     term = 0.5 * eri * product_term
@@ -311,10 +332,46 @@ class QdkQubitMapper(QubitMapper):
 
                 # Simplify this p-batch and accumulate
                 p_batch_simplified = p_batch_expr.simplify()
-                channel_expr = channel_expr + p_batch_simplified
+                qubit_expr = qubit_expr + p_batch_simplified
 
-            # Add this channel to main expression
-            qubit_expr = qubit_expr + channel_expr
+        else:
+            # General case: process each spin channel separately
+            for channel_name, spin1_idx, spin2_idx, channel_key, is_same_spin in [
+                ("aaaa", alpha_idx, alpha_idx, "aaaa", True),
+                ("bbbb", beta_idx, beta_idx, "bbbb", True),
+                ("aabb", alpha_idx, beta_idx, "aabb", False),
+                ("bbaa", beta_idx, alpha_idx, "aabb", False),
+            ]:
+                Logger.debug(f"Processing {channel_name} channel...")
+                channel_expr = 0.0 * PauliOperator.I(0)
+
+                for p in range(n_spatial):
+                    p_batch_expr = 0.0 * PauliOperator.I(0)
+                    for q in range(n_spatial):
+                        for r in range(n_spatial):
+                            if is_same_spin and p == r:
+                                continue
+                            for s in range(n_spatial):
+                                if is_same_spin and q == s:
+                                    continue
+                                eri = get_eri(p, q, r, s, channel_key)
+                                if eri != 0.0:
+                                    E_pq = excitation_operator(spin1_idx(p), spin1_idx(q))
+                                    E_rs = excitation_operator(spin2_idx(r), spin2_idx(s))
+                                    product_term = E_pq * E_rs
+
+                                    if is_same_spin and q == r:
+                                        E_ps = excitation_operator(spin1_idx(p), spin1_idx(s))
+                                        term = 0.5 * eri * (product_term - E_ps)
+                                    else:
+                                        term = 0.5 * eri * product_term
+
+                                    p_batch_expr = p_batch_expr + term
+
+                    p_batch_simplified = p_batch_expr.simplify()
+                    channel_expr = channel_expr + p_batch_simplified
+
+                qubit_expr = qubit_expr + channel_expr
 
         # Simplify and prune the expression
         # Threshold is applied to final Pauli coefficients, not input fermionic coefficients
