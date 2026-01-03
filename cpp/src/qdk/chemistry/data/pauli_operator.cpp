@@ -3,10 +3,8 @@
 // license information.
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <functional>
-#include <iostream>
 #include <limits>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <stdexcept>
@@ -16,36 +14,6 @@
 namespace qdk::chemistry::data {
 
 namespace {
-
-// Timing instrumentation for profiling - set to true to enable
-constexpr bool kEnableTiming = false;
-
-// Timer helper for RAII-style timing
-class ScopedTimer {
- public:
-  ScopedTimer(const char* name, double& accumulator)
-      : name_(name),
-        accumulator_(accumulator),
-        start_(std::chrono::high_resolution_clock::now()) {}
-
-  ~ScopedTimer() {
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration<double>(end - start_).count();
-    accumulator_ += duration;
-  }
-
- private:
-  const char* name_;
-  double& accumulator_;
-  std::chrono::high_resolution_clock::time_point start_;
-};
-
-// Global timing accumulators
-thread_local double g_distribute_time = 0.0;
-thread_local double g_simplify_terms_time = 0.0;
-thread_local double g_collect_like_terms_time = 0.0;
-thread_local double g_build_result_time = 0.0;
-thread_local int g_simplify_call_count = 0;
 
 // Hash function for TermKey (vector of (qubit_index, operator_type) pairs)
 // Uses FNV-1a style hash combining
@@ -687,18 +655,6 @@ SumPauliOperatorExpression::distribute() const {
 
 std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
     const {
-  // Increment call counter for timing analysis
-  ++g_simplify_call_count;
-  bool is_top_level = (g_simplify_call_count == 1);
-
-  // Reset timers on first call
-  if (is_top_level) {
-    g_distribute_time = 0.0;
-    g_simplify_terms_time = 0.0;
-    g_collect_like_terms_time = 0.0;
-    g_build_result_time = 0.0;
-  }
-
   // Helper function to create a term key from a simplified product
   // The key is a sorted vector of (qubit_index, operator_type) pairs
   auto make_term_key = [](const ProductPauliOperatorExpression* prod)
@@ -745,25 +701,16 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
 
   if (already_distributed) {
     // Skip distribute(), simplify terms directly from this sum
-    ScopedTimer timer("simplify_terms", g_simplify_terms_time);
     for (const auto& term : terms_) {
       auto simplified_term = term->simplify();
       add_simplified_term(std::move(simplified_term));
     }
   } else {
     // Distribute first to ensure all terms are products
-    std::unique_ptr<SumPauliOperatorExpression> distributed;
-    {
-      ScopedTimer timer("distribute", g_distribute_time);
-      distributed = this->distribute();
-    }
-
-    {
-      ScopedTimer timer("simplify_terms", g_simplify_terms_time);
-      for (const auto& term : distributed->get_terms()) {
-        auto simplified_term = term->simplify();
-        add_simplified_term(std::move(simplified_term));
-      }
+    auto distributed = this->distribute();
+    for (const auto& term : distributed->get_terms()) {
+      auto simplified_term = term->simplify();
+      add_simplified_term(std::move(simplified_term));
     }
   }
 
@@ -776,55 +723,34 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
                          std::unique_ptr<ProductPauliOperatorExpression>>>
       collected_terms;
 
-  {
-    ScopedTimer timer("collect_like_terms", g_collect_like_terms_time);
-    for (auto& term : simplified_terms) {
-      auto key = make_term_key(term.get());
-      // O(1) hash map lookup instead of O(n) linear search
-      auto it = term_index_map.find(key);
+  for (auto& term : simplified_terms) {
+    auto key = make_term_key(term.get());
+    // O(1) hash map lookup instead of O(n) linear search
+    auto it = term_index_map.find(key);
 
-      if (it == term_index_map.end()) {
-        // First occurrence of this Pauli string
-        auto coeff = term->get_coefficient();
-        term->set_coefficient(1.0);  // Store with unit coefficient
-        std::size_t idx = collected_terms.size();
-        term_index_map.emplace(key, idx);
-        collected_terms.emplace_back(std::move(key), coeff, std::move(term));
-      } else {
-        // Add coefficient to existing term
-        std::get<1>(collected_terms[it->second]) += term->get_coefficient();
-      }
+    if (it == term_index_map.end()) {
+      // First occurrence of this Pauli string
+      auto coeff = term->get_coefficient();
+      term->set_coefficient(1.0);  // Store with unit coefficient
+      std::size_t idx = collected_terms.size();
+      term_index_map.emplace(key, idx);
+      collected_terms.emplace_back(std::move(key), coeff, std::move(term));
+    } else {
+      // Add coefficient to existing term
+      std::get<1>(collected_terms[it->second]) += term->get_coefficient();
     }
   }
 
   // Build the simplified sum, excluding exactly-zero coefficient terms
   // Only remove terms where coefficient is exactly zero
-  std::unique_ptr<SumPauliOperatorExpression> simplified_sum;
-  {
-    ScopedTimer timer("build_result", g_build_result_time);
-    simplified_sum = std::make_unique<SumPauliOperatorExpression>();
-    for (auto& [key, coeff, term] : collected_terms) {
-      // Skip only if coefficient is exactly zero
-      if (coeff == std::complex<double>(0.0, 0.0)) {
-        continue;
-      }
-      term->set_coefficient(coeff);
-      simplified_sum->add_term(std::move(term));
+  auto simplified_sum = std::make_unique<SumPauliOperatorExpression>();
+  for (auto& [key, coeff, term] : collected_terms) {
+    // Skip only if coefficient is exactly zero
+    if (coeff == std::complex<double>(0.0, 0.0)) {
+      continue;
     }
-  }
-
-  // Print timing summary on top-level call
-  --g_simplify_call_count;
-  if (g_simplify_call_count == 0 && kEnableTiming) {
-    std::cerr << "[TIMING] SumPauliOperatorExpression::simplify() breakdown:\n"
-              << "  distribute:        " << g_distribute_time << " s\n"
-              << "  simplify_terms:    " << g_simplify_terms_time << " s\n"
-              << "  collect_like_terms: " << g_collect_like_terms_time << " s\n"
-              << "  build_result:      " << g_build_result_time << " s\n"
-              << "  TOTAL:             "
-              << (g_distribute_time + g_simplify_terms_time +
-                  g_collect_like_terms_time + g_build_result_time)
-              << " s\n";
+    term->set_coefficient(coeff);
+    simplified_sum->add_term(std::move(term));
   }
 
   return simplified_sum;
