@@ -36,7 +36,11 @@ class QdkQubitMapperSettings(Settings):
         mapping_type (string, default="jordan_wigner"): Fermion-to-qubit encoding type.
             Valid options: "jordan_wigner"
 
-        threshold (double, default=1e-12): Threshold for pruning small coefficients.
+        threshold (double, default=1e-12): Threshold for pruning small Pauli coefficients.
+
+        integral_threshold (double, default=1e-12): Threshold for filtering small integrals.
+            Integrals with absolute value below this threshold are treated as zero.
+            This significantly improves performance when integrals contain floating-point noise.
 
     """
 
@@ -55,7 +59,13 @@ class QdkQubitMapperSettings(Settings):
             "threshold",
             "double",
             1e-12,
-            "Threshold for pruning small coefficients",
+            "Threshold for pruning small Pauli coefficients",
+        )
+        self._set_default(
+            "integral_threshold",
+            "double",
+            1e-12,
+            "Threshold for filtering small integrals (improves performance)",
         )
 
 
@@ -72,7 +82,8 @@ class QdkQubitMapper(QubitMapper):
 
     Attributes:
         mapping_type (str): The fermion-to-qubit encoding type. Default: "jordan_wigner".
-        threshold (float): Threshold for pruning small coefficients. Default: 1e-12.
+        threshold (float): Threshold for pruning small Pauli coefficients. Default: 1e-12.
+        integral_threshold (float): Threshold for filtering small integrals. Default: 1e-12.
 
     Examples:
         >>> from qdk_chemistry.algorithms import QdkQubitMapper
@@ -83,18 +94,25 @@ class QdkQubitMapper(QubitMapper):
 
     """
 
-    def __init__(self, mapping_type: str = "jordan_wigner", threshold: float = 1e-12) -> None:
+    def __init__(
+        self,
+        mapping_type: str = "jordan_wigner",
+        threshold: float = 1e-12,
+        integral_threshold: float = 1e-12,
+    ) -> None:
         """Initialize the QdkQubitMapper with default settings.
 
         Args:
             mapping_type: Fermion-to-qubit encoding type. Default: "jordan_wigner".
-            threshold: Threshold for pruning small coefficients. Default: 1e-12.
+            threshold: Threshold for pruning small Pauli coefficients. Default: 1e-12.
+            integral_threshold: Threshold for filtering small integrals. Default: 1e-12.
 
         """
         super().__init__()
         self._settings = QdkQubitMapperSettings()
         self._settings.set("mapping_type", mapping_type)
         self._settings.set("threshold", threshold)
+        self._settings.set("integral_threshold", integral_threshold)
 
     def name(self) -> str:
         """Return the algorithm name."""
@@ -118,13 +136,16 @@ class QdkQubitMapper(QubitMapper):
 
         mapping_type = str(self.settings().get("mapping_type"))
         threshold = float(self.settings().get("threshold"))
+        integral_threshold = float(self.settings().get("integral_threshold"))
 
         if mapping_type == "jordan_wigner":
-            return self._jordan_wigner_transform(hamiltonian, threshold)
+            return self._jordan_wigner_transform(hamiltonian, threshold, integral_threshold)
 
         raise ValueError(f"Unsupported mapping type: '{mapping_type}'.")
 
-    def _jordan_wigner_transform(self, hamiltonian: Hamiltonian, threshold: float) -> QubitHamiltonian:
+    def _jordan_wigner_transform(
+        self, hamiltonian: Hamiltonian, threshold: float, integral_threshold: float
+    ) -> QubitHamiltonian:
         """Perform Jordan-Wigner transformation.
 
         Uses blocked spin-orbital ordering: alpha orbitals first, then beta orbitals.
@@ -273,7 +294,7 @@ class QdkQubitMapper(QubitMapper):
             for p in range(n_spatial):
                 for q in range(n_spatial):
                     h_pq = float(h1_alpha[p, q])
-                    if h_pq != 0.0:
+                    if abs(h_pq) > integral_threshold:
                         term = h_pq * spin_summed_excitation(p, q)
                         qubit_expr = qubit_expr + term
         else:
@@ -283,11 +304,11 @@ class QdkQubitMapper(QubitMapper):
                     h_pq_alpha = float(h1_alpha[p, q])
                     h_pq_beta = float(h1_beta[p, q])
 
-                    if h_pq_alpha != 0.0:
+                    if abs(h_pq_alpha) > integral_threshold:
                         term = h_pq_alpha * excitation_operator(alpha_idx(p), alpha_idx(q))
                         qubit_expr = qubit_expr + term
 
-                    if h_pq_beta != 0.0:
+                    if abs(h_pq_beta) > integral_threshold:
                         term = h_pq_beta * excitation_operator(beta_idx(p), beta_idx(q))
                         qubit_expr = qubit_expr + term
 
@@ -315,7 +336,7 @@ class QdkQubitMapper(QubitMapper):
                     for r in range(n_spatial):
                         for s in range(n_spatial):
                             eri = get_eri(p, q, r, s, "aaaa")  # All channels are equal
-                            if eri != 0.0:
+                            if abs(eri) > integral_threshold:
                                 # Use spin-summed factorization: E_pq * E_rs - δ_qr * E_ps
                                 E_pq = spin_summed_excitation(p, q)
                                 E_rs = spin_summed_excitation(r, s)
@@ -355,7 +376,7 @@ class QdkQubitMapper(QubitMapper):
                                 if is_same_spin and q == s:
                                     continue
                                 eri = get_eri(p, q, r, s, channel_key)
-                                if eri != 0.0:
+                                if abs(eri) > integral_threshold:
                                     E_pq = excitation_operator(spin1_idx(p), spin1_idx(q))
                                     E_rs = excitation_operator(spin2_idx(r), spin2_idx(s))
                                     product_term = E_pq * E_rs
