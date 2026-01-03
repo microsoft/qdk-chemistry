@@ -211,6 +211,9 @@ class QdkQubitMapper(QubitMapper):
                     term = h_pq_beta * creation_operator(beta_idx(p)) * annihilation_operator(beta_idx(q))
                     qubit_expr = qubit_expr + term
 
+        # Simplify one-body terms to keep expression tree flat
+        qubit_expr = qubit_expr.simplify()
+
         # Two-body terms using chemist notation:
         # H_2 = 1/2 sum_{pqrs,sigma,tau} (pq|rs) a†_{p,sigma} a†_{r,tau} a_{s,tau} a_{q,sigma}
         #
@@ -219,73 +222,45 @@ class QdkQubitMapper(QubitMapper):
         # For opposite-spin (sigma != tau):
         #   1/2 sum_{pqrs} (pq|rs) [a†_{pa} a†_{rb} a_{sb} a_{qa} + a†_{pb} a†_{ra} a_{sa} a_{qb}]
         Logger.debug("Building two-body terms...")
-        for p in range(n_spatial):
-            for q in range(n_spatial):
-                for r in range(n_spatial):
-                    for s in range(n_spatial):
-                        # Alpha-alpha (aaaa)
-                        eri_aa = get_eri(p, q, r, s, "aaaa")
-                        if eri_aa != 0.0:
-                            pa, qa, ra, sa = alpha_idx(p), alpha_idx(q), alpha_idx(r), alpha_idx(s)
-                            # a†_pa a†_ra a_sa a_qa
-                            term = (
-                                0.5
-                                * eri_aa
-                                * creation_operator(pa)
-                                * creation_operator(ra)
-                                * annihilation_operator(sa)
-                                * annihilation_operator(qa)
-                            )
-                            qubit_expr = qubit_expr + term
 
-                        # Beta-beta (bbbb)
-                        eri_bb = get_eri(p, q, r, s, "bbbb")
-                        if eri_bb != 0.0:
-                            pb, qb, rb, sb = beta_idx(p), beta_idx(q), beta_idx(r), beta_idx(s)
-                            # a†_pb a†_rb a_sb a_qb
-                            term = (
-                                0.5
-                                * eri_bb
-                                * creation_operator(pb)
-                                * creation_operator(rb)
-                                * annihilation_operator(sb)
-                                * annihilation_operator(qb)
-                            )
-                            qubit_expr = qubit_expr + term
+        # Process each spin channel separately and simplify frequently to prevent
+        # exponential growth of the expression tree during distribute()
+        # Simplify after each p-index batch (n³ terms) to keep expression tree small
+        for channel_name, get_indices, channel_key in [
+            ("aaaa", lambda p, q, r, s: (alpha_idx(p), alpha_idx(q), alpha_idx(r), alpha_idx(s)), "aaaa"),
+            ("bbbb", lambda p, q, r, s: (beta_idx(p), beta_idx(q), beta_idx(r), beta_idx(s)), "bbbb"),
+            ("aabb", lambda p, q, r, s: (alpha_idx(p), alpha_idx(q), beta_idx(r), beta_idx(s)), "aabb"),
+            ("bbaa", lambda p, q, r, s: (beta_idx(p), beta_idx(q), alpha_idx(r), alpha_idx(s)), "aabb"),
+        ]:
+            Logger.debug(f"Processing {channel_name} channel...")
+            channel_expr = 0.0 * PauliOperator.I(0)  # Start with zero expression
 
-                        # Alpha-beta (aabb): sigma=alpha, tau=beta
-                        # (pq|rs) a†_{pa} a†_{rb} a_{sb} a_{qa}
-                        eri_ab = get_eri(p, q, r, s, "aabb")
-                        if eri_ab != 0.0:
-                            pa, qa = alpha_idx(p), alpha_idx(q)
-                            rb, sb = beta_idx(r), beta_idx(s)
-                            term = (
-                                0.5
-                                * eri_ab
-                                * creation_operator(pa)
-                                * creation_operator(rb)
-                                * annihilation_operator(sb)
-                                * annihilation_operator(qa)
-                            )
-                            qubit_expr = qubit_expr + term
+            for p in range(n_spatial):
+                # Build terms for this p value
+                p_batch_expr = 0.0 * PauliOperator.I(0)
+                for q in range(n_spatial):
+                    for r in range(n_spatial):
+                        for s in range(n_spatial):
+                            eri = get_eri(p, q, r, s, channel_key)
+                            if eri != 0.0:
+                                pi, qi, ri, si = get_indices(p, q, r, s)
+                                # a†_pi a†_ri a_si a_qi
+                                term = (
+                                    0.5
+                                    * eri
+                                    * creation_operator(pi)
+                                    * creation_operator(ri)
+                                    * annihilation_operator(si)
+                                    * annihilation_operator(qi)
+                                )
+                                p_batch_expr = p_batch_expr + term
 
-                        # Beta-alpha (bbaa): sigma=beta, tau=alpha
-                        # (pq|rs) a†_{pb} a†_{ra} a_{sa} a_{qb}
-                        # Note: Alpha-beta and beta-alpha are NOT equivalent after JW transform.
-                        # They differ in imaginary phase terms, so both must be included.
-                        eri_ba = get_eri(p, q, r, s, "aabb")  # Same integral, different operator
-                        if eri_ba != 0.0:
-                            pb, qb = beta_idx(p), beta_idx(q)
-                            ra, sa = alpha_idx(r), alpha_idx(s)
-                            term = (
-                                0.5
-                                * eri_ba
-                                * creation_operator(pb)
-                                * creation_operator(ra)
-                                * annihilation_operator(sa)
-                                * annihilation_operator(qb)
-                            )
-                            qubit_expr = qubit_expr + term
+                # Simplify this p-batch and accumulate
+                p_batch_simplified = p_batch_expr.simplify()
+                channel_expr = channel_expr + p_batch_simplified
+
+            # Add this channel to main expression
+            qubit_expr = qubit_expr + channel_expr
 
         # Simplify and prune the expression
         # Threshold is applied to final Pauli coefficients, not input fermionic coefficients
