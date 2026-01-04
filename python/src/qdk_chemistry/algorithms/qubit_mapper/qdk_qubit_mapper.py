@@ -21,12 +21,105 @@ from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from qdk_chemistry.data import Hamiltonian
 
 __all__ = ["QdkQubitMapper", "QdkQubitMapperSettings"]
 
 # Valid mapping types (extensible for future encodings)
-_VALID_MAPPING_TYPES = frozenset({"jordan_wigner"})
+_VALID_MAPPING_TYPES = frozenset({"jordan_wigner", "bravyi_kitaev"})
+
+
+def _bk_parity_set(j: int, n: int) -> frozenset[int]:
+    """Compute the Bravyi-Kitaev parity set P(j) using recursive binary tree structure.
+
+    Args:
+        j: Spin-orbital index.
+        n: Size of the binary superset (must be a power of 2).
+
+    Returns:
+        Frozenset of qubit indices in the parity set.
+
+    """
+    if n % 2 != 0:
+        return frozenset()
+    half = n // 2
+    if j < half:
+        return _bk_parity_set(j, half)
+    # Right half: recurse with offset, then add n/2-1
+    return frozenset(i + half for i in _bk_parity_set(j - half, half)) | frozenset({half - 1})
+
+
+def _bk_update_set(j: int, n: int) -> frozenset[int]:
+    """Compute the Bravyi-Kitaev update set U(j) using recursive binary tree structure.
+
+    The update set contains qubit indices that are ancestors of j in the
+    binary tree encoding. These qubits store parity information that includes
+    orbital j.
+
+    Args:
+        j: Spin-orbital index.
+        n: Size of the binary superset (must be a power of 2).
+
+    Returns:
+        Frozenset of qubit indices in the update set.
+
+    """
+    if n % 2 != 0:
+        return frozenset()
+    half = n // 2
+    if j < half:
+        # Left half: include n-1 and recurse
+        return frozenset({n - 1}) | _bk_update_set(j, half)
+    # Right half: recurse with offset
+    return frozenset(i + half for i in _bk_update_set(j - half, half))
+
+
+def _bk_flip_set(j: int, n: int) -> frozenset[int]:
+    """Compute the Bravyi-Kitaev flip set F(j) using recursive binary tree structure.
+
+    The flip set is used to compute the remainder set for the Y component
+    of the ladder operators.
+
+    Args:
+        j: Spin-orbital index.
+        n: Size of the binary superset (must be a power of 2).
+
+    Returns:
+        Frozenset of qubit indices in the flip set.
+
+    """
+    if n % 2 != 0:
+        return frozenset()
+    half = n // 2
+    if j < half:
+        # Left half: recurse
+        return _bk_flip_set(j, half)
+    if j < n - 1:
+        # Right half but not last: recurse with offset
+        return frozenset(i + half for i in _bk_flip_set(j - half, half))
+    # Last element (j == n-1): recurse with offset and add n/2-1
+    return frozenset(i + half for i in _bk_flip_set(j - half, half)) | frozenset({half - 1})
+
+
+def _bk_remainder_set(j: int, n: int) -> frozenset[int]:
+    """Compute the Bravyi-Kitaev remainder set R(j) for ladder operator Z strings.
+
+    The remainder set is defined as R(j) = P(j) - F(j) (set difference),
+    and is used for the Z operators in the Y component of BK ladder operators.
+
+    Args:
+        j: Spin-orbital index.
+        n: Size of the binary superset (must be a power of 2).
+
+    Returns:
+        Frozenset of qubit indices in the remainder set.
+
+    """
+    parity = _bk_parity_set(j, n)
+    flip = _bk_flip_set(j, n)
+    return parity - flip  # Set difference, not symmetric difference
 
 
 class QdkQubitMapperSettings(Settings):
@@ -34,7 +127,7 @@ class QdkQubitMapperSettings(Settings):
 
     QdkQubitMapper-specific settings:
         mapping_type (string, default="jordan_wigner"): Fermion-to-qubit encoding type.
-            Valid options: "jordan_wigner"
+            Valid options: "jordan_wigner", "bravyi_kitaev"
 
         threshold (double, default=1e-12): Threshold for pruning small Pauli coefficients.
 
@@ -53,7 +146,7 @@ class QdkQubitMapperSettings(Settings):
             "string",
             "jordan_wigner",
             "Fermion-to-qubit encoding type",
-            ["jordan_wigner"],
+            ["jordan_wigner", "bravyi_kitaev"],
         )
         self._set_default(
             "threshold",
@@ -73,7 +166,8 @@ class QdkQubitMapper(QubitMapper):
     """QDK native qubit mapper using the PauliOperator expression layer.
 
     This mapper transforms a fermionic Hamiltonian to a qubit Hamiltonian using
-    configurable fermion-to-qubit encodings. Currently supports Jordan-Wigner encoding.
+    configurable fermion-to-qubit encodings. Supports Jordan-Wigner and Bravyi-Kitaev
+    encodings.
 
     The mapper uses canonical blocked spin-orbital ordering internally:
     qubits 0..N-1 for alpha spin, qubits N..2N-1 for beta spin (where N is the
@@ -140,6 +234,8 @@ class QdkQubitMapper(QubitMapper):
 
         if mapping_type == "jordan_wigner":
             return self._jordan_wigner_transform(hamiltonian, threshold, integral_threshold)
+        if mapping_type == "bravyi_kitaev":
+            return self._bravyi_kitaev_transform(hamiltonian, threshold, integral_threshold)
 
         raise ValueError(f"Unsupported mapping type: '{mapping_type}'.")
 
@@ -151,6 +247,207 @@ class QdkQubitMapper(QubitMapper):
         Uses blocked spin-orbital ordering: alpha orbitals first, then beta orbitals.
         Spin-orbital index p = spatial_orbital for alpha, p = spatial_orbital + n_spatial for beta.
 
+        Args:
+            hamiltonian: The fermionic Hamiltonian.
+            threshold: Threshold for pruning small coefficients.
+            integral_threshold: Threshold for discarding small integrals.
+
+        Returns:
+            QubitHamiltonian: The transformed qubit Hamiltonian.
+
+        """
+        Logger.trace_entering()
+
+        # Get number of spin-orbitals for cache pre-population
+        h1_alpha, _ = hamiltonian.get_one_body_integrals()
+        n_spin_orbitals = 2 * h1_alpha.shape[0]
+
+        # Build ladder operators using Jordan-Wigner transformation
+        # Pre-build all operators upfront to maximize cache benefit
+        _creation_cache: dict[int, PauliOperator] = {}
+        _annihilation_cache: dict[int, PauliOperator] = {}
+
+        def creation_operator(p: int) -> PauliOperator:
+            """Build a_p^dagger using Jordan-Wigner."""
+            if p in _creation_cache:
+                return _creation_cache[p]
+            x_term = PauliOperator.X(p)
+            y_term = PauliOperator.Y(p)
+            result = 0.5 * (x_term - 1j * y_term)
+            for j in range(p - 1, -1, -1):
+                result = result * PauliOperator.Z(j)
+            _creation_cache[p] = result
+            return result
+
+        def annihilation_operator(p: int) -> PauliOperator:
+            """Build a_p using Jordan-Wigner."""
+            if p in _annihilation_cache:
+                return _annihilation_cache[p]
+            x_term = PauliOperator.X(p)
+            y_term = PauliOperator.Y(p)
+            result = 0.5 * (x_term + 1j * y_term)
+            for j in range(p - 1, -1, -1):
+                result = result * PauliOperator.Z(j)
+            _annihilation_cache[p] = result
+            return result
+
+        # Pre-populate caches for all spin-orbitals
+        for i in range(n_spin_orbitals):
+            creation_operator(i)
+            annihilation_operator(i)
+
+        return self._transform_with_ladder_ops(
+            hamiltonian, threshold, integral_threshold, creation_operator, annihilation_operator
+        )
+
+    def _bravyi_kitaev_transform(
+        self, hamiltonian: Hamiltonian, threshold: float, integral_threshold: float
+    ) -> QubitHamiltonian:
+        """Perform Bravyi-Kitaev transformation.
+
+        Uses blocked spin-orbital ordering: alpha orbitals first, then beta orbitals.
+        The Bravyi-Kitaev encoding uses a binary tree structure for more efficient
+        operator locality compared to Jordan-Wigner.
+
+        The BK ladder operators are constructed from a pauli_table where each entry
+        (real_pauli, imag_pauli) gives:
+            a†_j = 0.5 * (real_pauli - i * imag_pauli)
+            a_j  = 0.5 * (real_pauli + i * imag_pauli)
+
+        Where:
+            real_pauli = Z_{P(j)} * X_j * X_{U(j)}
+            imag_pauli = Z_{R(j)} * Y_j * X_{U(j)}
+
+        Args:
+            hamiltonian: The fermionic Hamiltonian.
+            threshold: Threshold for pruning small coefficients.
+            integral_threshold: Threshold for discarding small integrals.
+
+        Returns:
+            QubitHamiltonian: The transformed qubit Hamiltonian.
+
+        """
+        Logger.trace_entering()
+
+        # Get number of spin-orbitals for cache pre-population
+        h1_alpha, _ = hamiltonian.get_one_body_integrals()
+        n_spin_orbitals = 2 * h1_alpha.shape[0]
+
+        # Find binary superset size (next power of 2 >= n_spin_orbitals)
+        bin_sup = 1
+        while n_spin_orbitals > 2**bin_sup:
+            bin_sup += 1
+        n_binary = 2**bin_sup
+
+        # Pre-compute BK sets for all spin-orbitals using binary superset
+        # Then filter to indices < n_spin_orbitals
+        update_sets: dict[int, frozenset[int]] = {}
+        parity_sets: dict[int, frozenset[int]] = {}
+        remainder_sets: dict[int, frozenset[int]] = {}
+
+        for j in range(n_spin_orbitals):
+            update_sets[j] = frozenset(i for i in _bk_update_set(j, n_binary) if i < n_spin_orbitals)
+            parity_sets[j] = frozenset(i for i in _bk_parity_set(j, n_binary) if i < n_spin_orbitals)
+            remainder_sets[j] = frozenset(i for i in _bk_remainder_set(j, n_binary) if i < n_spin_orbitals)
+
+        def pauli_product(pauli_type: str, qubit_set: frozenset[int]) -> PauliOperator:
+            """Build product of same Pauli type on multiple qubits."""
+            if not qubit_set:
+                return PauliOperator.I(0)
+            sorted_qubits = sorted(qubit_set)
+            if pauli_type == "X":
+                factory = PauliOperator.X
+            elif pauli_type == "Y":
+                factory = PauliOperator.Y
+            else:
+                factory = PauliOperator.Z
+            result = factory(sorted_qubits[0])
+            for q in sorted_qubits[1:]:
+                result = result * factory(q)
+            return result
+
+        # Build ladder operators using Bravyi-Kitaev transformation.
+        # Formula: real_pauli is Z on P(j), X on j, X on U(j)
+        # Formula: imag_pauli is Z on R(j), Y on j, X on U(j)
+        # Creation: a†_j uses 0.5 times (real_pauli minus i times imag_pauli)
+        # Annihilation: a_j uses 0.5 times (real_pauli plus i times imag_pauli)
+
+        _creation_cache: dict[int, PauliOperator] = {}
+        _annihilation_cache: dict[int, PauliOperator] = {}
+
+        def creation_operator(p: int) -> PauliOperator:
+            """Build a_p^dagger using Bravyi-Kitaev."""
+            if p in _creation_cache:
+                return _creation_cache[p]
+
+            # Build real_pauli = Z_{P(p)} * X_p * X_{U(p)}
+            real_pauli = PauliOperator.X(p)
+            if parity_sets[p]:
+                real_pauli = pauli_product("Z", parity_sets[p]) * real_pauli
+            if update_sets[p]:
+                real_pauli = real_pauli * pauli_product("X", update_sets[p])
+
+            # Build imag_pauli = Z_{R(p)} * Y_p * X_{U(p)}
+            imag_pauli = PauliOperator.Y(p)
+            if remainder_sets[p]:
+                imag_pauli = pauli_product("Z", remainder_sets[p]) * imag_pauli
+            if update_sets[p]:
+                imag_pauli = imag_pauli * pauli_product("X", update_sets[p])
+
+            # a†_p = 0.5 * (real_pauli - i * imag_pauli)
+            result = 0.5 * real_pauli - 0.5j * imag_pauli
+
+            _creation_cache[p] = result
+            return result
+
+        def annihilation_operator(p: int) -> PauliOperator:
+            """Build a_p using Bravyi-Kitaev."""
+            if p in _annihilation_cache:
+                return _annihilation_cache[p]
+
+            # Build real_pauli = Z_{P(p)} * X_p * X_{U(p)}
+            real_pauli = PauliOperator.X(p)
+            if parity_sets[p]:
+                real_pauli = pauli_product("Z", parity_sets[p]) * real_pauli
+            if update_sets[p]:
+                real_pauli = real_pauli * pauli_product("X", update_sets[p])
+
+            # Build imag_pauli = Z_{R(p)} * Y_p * X_{U(p)}
+            imag_pauli = PauliOperator.Y(p)
+            if remainder_sets[p]:
+                imag_pauli = pauli_product("Z", remainder_sets[p]) * imag_pauli
+            if update_sets[p]:
+                imag_pauli = imag_pauli * pauli_product("X", update_sets[p])
+
+            # Annihilation: a_p uses 0.5 times (real_pauli plus i times imag_pauli)
+            result = 0.5 * real_pauli + 0.5j * imag_pauli
+
+            _annihilation_cache[p] = result
+            return result
+
+        # Pre-populate caches for all spin-orbitals
+        for i in range(n_spin_orbitals):
+            creation_operator(i)
+            annihilation_operator(i)
+
+        return self._transform_with_ladder_ops(
+            hamiltonian, threshold, integral_threshold, creation_operator, annihilation_operator
+        )
+
+    def _transform_with_ladder_ops(
+        self,
+        hamiltonian: Hamiltonian,
+        threshold: float,
+        integral_threshold: float,
+        creation_operator: Callable[[int], PauliOperator],
+        annihilation_operator: Callable[[int], PauliOperator],
+    ) -> QubitHamiltonian:
+        """Transform Hamiltonian to qubit representation using provided ladder operators.
+
+        This is the shared infrastructure for all fermion-to-qubit encodings.
+        It handles integral extraction, excitation operator construction,
+        spin-summed operators, one-body and two-body terms, and output processing.
+
         The second-quantized Hamiltonian in chemist notation is:
             H = sum_{pq,sigma} h_pq a†_{p,sigma} a_{q,sigma}
               + 1/2 sum_{pqrs,sigma,tau} (pq|rs) a†_{p,sigma} a†_{r,tau} a_{s,tau} a_{q,sigma}
@@ -159,6 +456,8 @@ class QdkQubitMapper(QubitMapper):
             hamiltonian: The fermionic Hamiltonian.
             threshold: Threshold for pruning small coefficients.
             integral_threshold: Threshold for discarding small integrals.
+            creation_operator: Callable that returns the creation operator for index p.
+            annihilation_operator: Callable that returns the annihilation operator for index p.
 
         Returns:
             QubitHamiltonian: The transformed qubit Hamiltonian.
@@ -199,56 +498,21 @@ class QdkQubitMapper(QubitMapper):
                 return float(h2_bbbb[idx])
             return 0.0
 
-        # Build ladder operators using Jordan-Wigner transformation
-        # Pre-build all operators upfront to maximize cache benefit
-        _creation_cache: dict[int, PauliOperator] = {}
-        _annihilation_cache: dict[int, PauliOperator] = {}
-
-        def creation_operator(p: int):
-            """Build a_p^dagger using Jordan-Wigner."""
-            if p in _creation_cache:
-                return _creation_cache[p]
-            x_term = PauliOperator.X(p)
-            y_term = PauliOperator.Y(p)
-            result = 0.5 * (x_term - 1j * y_term)
-            for j in range(p - 1, -1, -1):
-                result = result * PauliOperator.Z(j)
-            _creation_cache[p] = result
-            return result
-
-        def annihilation_operator(p: int):
-            """Build a_p using Jordan-Wigner."""
-            if p in _annihilation_cache:
-                return _annihilation_cache[p]
-            x_term = PauliOperator.X(p)
-            y_term = PauliOperator.Y(p)
-            result = 0.5 * (x_term + 1j * y_term)
-            for j in range(p - 1, -1, -1):
-                result = result * PauliOperator.Z(j)
-            _annihilation_cache[p] = result
-            return result
-
-        # Pre-populate caches for all spin-orbitals
-        for i in range(n_spin_orbitals):
-            creation_operator(i)
-            annihilation_operator(i)
-
         # Cache for one-body excitation operators E_pq = a^dag_p a_q
         _excitation_cache: dict[tuple[int, int], PauliOperator] = {}
 
-        def excitation_operator(p: int, q: int):
-            """Build E_pq = a†_p a_q with caching and diagonal optimization."""
+        def excitation_operator(p: int, q: int) -> PauliOperator:
+            """Build E_pq = a†_p a_q with caching."""
             key = (p, q)
             if key in _excitation_cache:
                 return _excitation_cache[key]
 
-            if p == q:
-                # Diagonal: n_p = a†_p a_p = (I - Z_p) / 2
-                # Direct construction avoids expression tree multiplication
-                result = 0.5 * PauliOperator.I(p) - 0.5 * PauliOperator.Z(p)
-            else:
-                # Off-diagonal: multiply cached ladder operators
-                result = creation_operator(p) * annihilation_operator(q)
+            # Always use ladder operator multiplication
+            # The diagonal n_p = a†_p a_p has different forms for different encodings:
+            # - Jordan-Wigner: n_p = (I - Z_p) / 2
+            # - Bravyi-Kitaev: n_p = (I - Z_p * prod_{k in F(p)} Z_k) / 2
+            # Using the general form ensures correctness for all encodings.
+            result = creation_operator(p) * annihilation_operator(q)
 
             _excitation_cache[key] = result
             return result
@@ -262,7 +526,7 @@ class QdkQubitMapper(QubitMapper):
         # Indexed by spatial orbital indices (p, q)
         _spin_summed_excitation_cache: dict[tuple[int, int], PauliOperator] = {}
 
-        def spin_summed_excitation(p: int, q: int):
+        def spin_summed_excitation(p: int, q: int) -> PauliOperator:
             """Build spin-summed E_pq = a_p_alpha^dag a_q_alpha + a_p_beta^dag a_q_beta with caching.
 
             These are indexed by spatial orbitals and sum over both spin channels.
