@@ -30,9 +30,37 @@ __all__ = ["QdkQubitMapper", "QdkQubitMapperSettings"]
 # Valid mapping types (extensible for future encodings)
 _VALID_MAPPING_TYPES = frozenset({"jordan_wigner", "bravyi_kitaev"})
 
+# =============================================================================
+# Bravyi-Kitaev Binary Tree Index Sets
+# =============================================================================
+# The following functions compute the qubit index sets for Bravyi-Kitaev encoding
+# as defined in the original paper:
+#
+#   Seeley, Richard, and Love. "The Bravyi-Kitaev transformation for quantum
+#   computation of electronic structure." J. Chem. Phys. 137, 224109 (2012).
+#   https://doi.org/10.1063/1.4768229
+#
+# The BK encoding maps fermionic operators to qubit operators using a binary
+# tree structure where:
+#   - Even-indexed qubits store occupation information
+#   - Odd-indexed qubits store partial parity sums
+#
+# Each ladder operator requires three index sets derived from the tree structure:
+#   - P(j): "parity set" - qubits encoding parity of orbitals < j
+#   - U(j): "update set" - ancestor qubits whose parity includes orbital j
+#   - F(j): "flip set" - subset of P(j) for the imaginary component
+#   - R(j): "remainder set" = P(j) \ F(j) - used for Z operators in Y component
+# =============================================================================
 
-def _bk_parity_set(j: int, n: int) -> frozenset[int]:
-    """Compute the Bravyi-Kitaev parity set P(j) using recursive binary tree structure.
+
+def _bk_compute_parity_indices(j: int, n: int) -> frozenset[int]:
+    """Compute qubit indices encoding cumulative parity for orbital j.
+
+    In the Bravyi-Kitaev binary tree, the parity set P(j) contains indices
+    of qubits that together encode the parity of all orbitals with index < j.
+    This is used to construct the Z-string in the real component of ladder operators.
+
+    Reference: Seeley et al., J. Chem. Phys. 137, 224109 (2012), Eq. (17).
 
     Args:
         j: Spin-orbital index.
@@ -46,24 +74,26 @@ def _bk_parity_set(j: int, n: int) -> frozenset[int]:
         return frozenset()
     half = n // 2
     if j < half:
-        return _bk_parity_set(j, half)
+        return _bk_compute_parity_indices(j, half)
     # Right half: recurse with offset, then add n/2-1
-    return frozenset(i + half for i in _bk_parity_set(j - half, half)) | frozenset({half - 1})
+    return frozenset(i + half for i in _bk_compute_parity_indices(j - half, half)) | frozenset({half - 1})
 
 
-def _bk_update_set(j: int, n: int) -> frozenset[int]:
-    """Compute the Bravyi-Kitaev update set U(j) using recursive binary tree structure.
+def _bk_compute_ancestor_indices(j: int, n: int) -> frozenset[int]:
+    """Compute qubit indices that are ancestors of orbital j in the binary tree.
 
-    The update set contains qubit indices that are ancestors of j in the
-    binary tree encoding. These qubits store parity information that includes
-    orbital j.
+    The update set U(j) contains indices of qubits whose stored parity value
+    must be flipped when orbital j is occupied. These correspond to ancestor
+    nodes in the binary tree representation.
+
+    Reference: Seeley et al., J. Chem. Phys. 137, 224109 (2012), Eq. (18).
 
     Args:
         j: Spin-orbital index.
         n: Size of the binary superset (must be a power of 2).
 
     Returns:
-        Frozenset of qubit indices in the update set.
+        Frozenset of qubit indices in the update (ancestor) set.
 
     """
     if n % 2 != 0:
@@ -71,23 +101,26 @@ def _bk_update_set(j: int, n: int) -> frozenset[int]:
     half = n // 2
     if j < half:
         # Left half: include n-1 and recurse
-        return frozenset({n - 1}) | _bk_update_set(j, half)
+        return frozenset({n - 1}) | _bk_compute_ancestor_indices(j, half)
     # Right half: recurse with offset
-    return frozenset(i + half for i in _bk_update_set(j - half, half))
+    return frozenset(i + half for i in _bk_compute_ancestor_indices(j - half, half))
 
 
-def _bk_flip_set(j: int, n: int) -> frozenset[int]:
-    """Compute the Bravyi-Kitaev flip set F(j) using recursive binary tree structure.
+def _bk_compute_children_indices(j: int, n: int) -> frozenset[int]:
+    """Compute qubit indices for the imaginary component parity subset.
 
-    The flip set is used to compute the remainder set for the Y component
-    of the ladder operators.
+    The flip set F(j) is used to partition the parity set when constructing
+    the Y-component of BK ladder operators. It identifies which parity qubits
+    contribute to the imaginary vs real components.
+
+    Reference: Seeley et al., J. Chem. Phys. 137, 224109 (2012), Eq. (19).
 
     Args:
         j: Spin-orbital index.
         n: Size of the binary superset (must be a power of 2).
 
     Returns:
-        Frozenset of qubit indices in the flip set.
+        Frozenset of qubit indices in the flip (children) set.
 
     """
     if n % 2 != 0:
@@ -95,30 +128,33 @@ def _bk_flip_set(j: int, n: int) -> frozenset[int]:
     half = n // 2
     if j < half:
         # Left half: recurse
-        return _bk_flip_set(j, half)
+        return _bk_compute_children_indices(j, half)
     if j < n - 1:
         # Right half but not last: recurse with offset
-        return frozenset(i + half for i in _bk_flip_set(j - half, half))
+        return frozenset(i + half for i in _bk_compute_children_indices(j - half, half))
     # Last element (j == n-1): recurse with offset and add n/2-1
-    return frozenset(i + half for i in _bk_flip_set(j - half, half)) | frozenset({half - 1})
+    return frozenset(i + half for i in _bk_compute_children_indices(j - half, half)) | frozenset({half - 1})
 
 
-def _bk_remainder_set(j: int, n: int) -> frozenset[int]:
-    """Compute the Bravyi-Kitaev remainder set R(j) for ladder operator Z strings.
+def _bk_compute_z_indices_for_y_component(j: int, n: int) -> frozenset[int]:
+    r"""Compute qubit indices for Z operators in the Y-component of ladder operators.
 
-    The remainder set is defined as R(j) = P(j) - F(j) (set difference),
-    and is used for the Z operators in the Y component of BK ladder operators.
+    The remainder set R(j) = P(j) \\ F(j) determines which qubits receive Z gates
+    in the imaginary (Y) component of BK ladder operators. This set difference
+    partitions the parity information between real and imaginary components.
+
+    Reference: Seeley et al., J. Chem. Phys. 137, 224109 (2012), Section II.B.
 
     Args:
         j: Spin-orbital index.
         n: Size of the binary superset (must be a power of 2).
 
     Returns:
-        Frozenset of qubit indices in the remainder set.
+        Frozenset of qubit indices for Z operators in Y-component.
 
     """
-    parity = _bk_parity_set(j, n)
-    flip = _bk_flip_set(j, n)
+    parity = _bk_compute_parity_indices(j, n)
+    flip = _bk_compute_children_indices(j, n)
     return parity - flip  # Set difference, not symmetric difference
 
 
@@ -303,20 +339,29 @@ class QdkQubitMapper(QubitMapper):
     def _bravyi_kitaev_transform(
         self, hamiltonian: Hamiltonian, threshold: float, integral_threshold: float
     ) -> QubitHamiltonian:
-        """Perform Bravyi-Kitaev transformation.
+        r"""Perform Bravyi-Kitaev transformation.
+
+        Implements the fermion-to-qubit encoding from Seeley, Richard, and Love,
+        "The Bravyi-Kitaev transformation for quantum computation of electronic
+        structure," J. Chem. Phys. 137, 224109 (2012).
 
         Uses blocked spin-orbital ordering: alpha orbitals first, then beta orbitals.
-        The Bravyi-Kitaev encoding uses a binary tree structure for more efficient
-        operator locality compared to Jordan-Wigner.
+        The Bravyi-Kitaev encoding uses a binary tree structure where even-indexed
+        qubits store occupation and odd-indexed qubits store partial parity sums,
+        achieving O(log n) operator weight compared to O(n) for Jordan-Wigner.
 
-        The BK ladder operators are constructed from a pauli_table where each entry
-        (real_pauli, imag_pauli) gives:
-            a†_j = 0.5 * (real_pauli - i * imag_pauli)
-            a_j  = 0.5 * (real_pauli + i * imag_pauli)
+        The ladder operators are decomposed into real and imaginary Pauli components:
 
-        Where:
-            real_pauli = Z_{P(j)} * X_j * X_{U(j)}
-            imag_pauli = Z_{R(j)} * Y_j * X_{U(j)}
+            Creation:     a†_j = (1/2) * (X_component - i * Y_component)
+            Annihilation: a_j  = (1/2) * (X_component + i * Y_component)
+
+        Where the Pauli components are constructed from binary tree index sets:
+
+            X_component = Z_{P(j)} · X_j · X_{U(j)}
+            Y_component = Z_{R(j)} · Y_j · X_{U(j)}
+
+        Here P(j) is the parity set, U(j) is the ancestor (update) set, and
+        R(j) = P(j) \\ F(j) is the remainder set for the Y-component Z-string.
 
         Args:
             hamiltonian: The fermionic Hamiltonian.
@@ -346,15 +391,21 @@ class QdkQubitMapper(QubitMapper):
         remainder_sets: dict[int, frozenset[int]] = {}
 
         for j in range(n_spin_orbitals):
-            update_sets[j] = frozenset(i for i in _bk_update_set(j, n_binary) if i < n_spin_orbitals)
-            parity_sets[j] = frozenset(i for i in _bk_parity_set(j, n_binary) if i < n_spin_orbitals)
-            remainder_sets[j] = frozenset(i for i in _bk_remainder_set(j, n_binary) if i < n_spin_orbitals)
+            update_sets[j] = frozenset(i for i in _bk_compute_ancestor_indices(j, n_binary) if i < n_spin_orbitals)
+            parity_sets[j] = frozenset(i for i in _bk_compute_parity_indices(j, n_binary) if i < n_spin_orbitals)
+            remainder_sets[j] = frozenset(
+                i for i in _bk_compute_z_indices_for_y_component(j, n_binary) if i < n_spin_orbitals
+            )
 
-        def pauli_product(pauli_type: str, qubit_set: frozenset[int]) -> PauliOperator:
-            """Build product of same Pauli type on multiple qubits."""
-            if not qubit_set:
+        def build_pauli_chain(pauli_type: str, qubit_indices: frozenset[int]) -> PauliOperator:
+            """Construct tensor product of identical Pauli operators on specified qubits.
+
+            For a set of qubit indices {i, j, k, ...}, builds P_i ⊗ P_j ⊗ P_k ⊗ ...
+            where P is X, Y, or Z. Returns identity if the set is empty.
+            """
+            if not qubit_indices:
                 return PauliOperator.I(0)
-            sorted_qubits = sorted(qubit_set)
+            sorted_qubits = sorted(qubit_indices)
             if pauli_type == "X":
                 factory = PauliOperator.X
             elif pauli_type == "Y":
@@ -366,61 +417,60 @@ class QdkQubitMapper(QubitMapper):
                 result = result * factory(q)
             return result
 
-        # Build ladder operators using Bravyi-Kitaev transformation.
-        # Formula: real_pauli is Z on P(j), X on j, X on U(j)
-        # Formula: imag_pauli is Z on R(j), Y on j, X on U(j)
-        # Creation: a†_j uses 0.5 times (real_pauli minus i times imag_pauli)
-        # Annihilation: a_j uses 0.5 times (real_pauli plus i times imag_pauli)
+        # Construct BK ladder operators from binary tree index sets.
+        # The decomposition into X and Y components follows from the requirement
+        # that creation/annihilation operators satisfy fermionic anticommutation.
+        # Reference: Seeley et al., J. Chem. Phys. 137, 224109 (2012), Eq. (20-21).
 
         _creation_cache: dict[int, PauliOperator] = {}
         _annihilation_cache: dict[int, PauliOperator] = {}
 
         def creation_operator(p: int) -> PauliOperator:
-            """Build a_p^dagger using Bravyi-Kitaev."""
+            """Build fermionic creation operator a†_p in Bravyi-Kitaev encoding."""
             if p in _creation_cache:
                 return _creation_cache[p]
 
-            # Build real_pauli = Z_{P(p)} * X_p * X_{U(p)}
-            real_pauli = PauliOperator.X(p)
+            # X-component: Z on parity qubits, X on orbital p, X on ancestor qubits
+            x_component = PauliOperator.X(p)
             if parity_sets[p]:
-                real_pauli = pauli_product("Z", parity_sets[p]) * real_pauli
+                x_component = build_pauli_chain("Z", parity_sets[p]) * x_component
             if update_sets[p]:
-                real_pauli = real_pauli * pauli_product("X", update_sets[p])
+                x_component = x_component * build_pauli_chain("X", update_sets[p])
 
-            # Build imag_pauli = Z_{R(p)} * Y_p * X_{U(p)}
-            imag_pauli = PauliOperator.Y(p)
+            # Y-component: Z on remainder qubits, Y on orbital p, X on ancestor qubits
+            y_component = PauliOperator.Y(p)
             if remainder_sets[p]:
-                imag_pauli = pauli_product("Z", remainder_sets[p]) * imag_pauli
+                y_component = build_pauli_chain("Z", remainder_sets[p]) * y_component
             if update_sets[p]:
-                imag_pauli = imag_pauli * pauli_product("X", update_sets[p])
+                y_component = y_component * build_pauli_chain("X", update_sets[p])
 
-            # a†_p = 0.5 * (real_pauli - i * imag_pauli)
-            result = 0.5 * real_pauli - 0.5j * imag_pauli
+            # Creation operator: a†_p = (1/2)(X_component - i·Y_component)
+            result = 0.5 * x_component - 0.5j * y_component
 
             _creation_cache[p] = result
             return result
 
         def annihilation_operator(p: int) -> PauliOperator:
-            """Build a_p using Bravyi-Kitaev."""
+            """Build fermionic annihilation operator a_p in Bravyi-Kitaev encoding."""
             if p in _annihilation_cache:
                 return _annihilation_cache[p]
 
-            # Build real_pauli = Z_{P(p)} * X_p * X_{U(p)}
-            real_pauli = PauliOperator.X(p)
+            # X-component: Z on parity qubits, X on orbital p, X on ancestor qubits
+            x_component = PauliOperator.X(p)
             if parity_sets[p]:
-                real_pauli = pauli_product("Z", parity_sets[p]) * real_pauli
+                x_component = build_pauli_chain("Z", parity_sets[p]) * x_component
             if update_sets[p]:
-                real_pauli = real_pauli * pauli_product("X", update_sets[p])
+                x_component = x_component * build_pauli_chain("X", update_sets[p])
 
-            # Build imag_pauli = Z_{R(p)} * Y_p * X_{U(p)}
-            imag_pauli = PauliOperator.Y(p)
+            # Y-component: Z on remainder qubits, Y on orbital p, X on ancestor qubits
+            y_component = PauliOperator.Y(p)
             if remainder_sets[p]:
-                imag_pauli = pauli_product("Z", remainder_sets[p]) * imag_pauli
+                y_component = build_pauli_chain("Z", remainder_sets[p]) * y_component
             if update_sets[p]:
-                imag_pauli = imag_pauli * pauli_product("X", update_sets[p])
+                y_component = y_component * build_pauli_chain("X", update_sets[p])
 
-            # Annihilation: a_p uses 0.5 times (real_pauli plus i times imag_pauli)
-            result = 0.5 * real_pauli + 0.5j * imag_pauli
+            # Annihilation operator: a_p = (1/2)(X_component + i·Y_component)
+            result = 0.5 * x_component + 0.5j * y_component
 
             _annihilation_cache[p] = result
             return result

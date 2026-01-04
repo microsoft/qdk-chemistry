@@ -12,10 +12,10 @@ import pytest
 
 from qdk_chemistry.algorithms import QdkQubitMapper, QubitMapper
 from qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper import (
-    _bk_flip_set,
-    _bk_parity_set,
-    _bk_remainder_set,
-    _bk_update_set,
+    _bk_compute_ancestor_indices,
+    _bk_compute_children_indices,
+    _bk_compute_parity_indices,
+    _bk_compute_z_indices_for_y_component,
 )
 from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
 
@@ -31,59 +31,59 @@ class TestBravyiKitaevSets:
     def test_update_set_4_qubits(self) -> None:
         """Test update set for 4 qubit system (n=4 is already power of 2)."""
         # U(0) = {1, 3} - qubit 0's occupation affects qubits 1 and 3
-        assert _bk_update_set(0, 4) == frozenset({1, 3})
+        assert _bk_compute_ancestor_indices(0, 4) == frozenset({1, 3})
         # U(1) = {3}
-        assert _bk_update_set(1, 4) == frozenset({3})
+        assert _bk_compute_ancestor_indices(1, 4) == frozenset({3})
         # U(2) = {3}
-        assert _bk_update_set(2, 4) == frozenset({3})
+        assert _bk_compute_ancestor_indices(2, 4) == frozenset({3})
         # U(3) = {} - qubit 3 is the root, no ancestors
-        assert _bk_update_set(3, 4) == frozenset()
+        assert _bk_compute_ancestor_indices(3, 4) == frozenset()
 
     def test_update_set_8_qubits(self) -> None:
         """Test update set for 8 qubit system."""
-        assert _bk_update_set(0, 8) == frozenset({1, 3, 7})
-        assert _bk_update_set(4, 8) == frozenset({5, 7})
-        assert _bk_update_set(7, 8) == frozenset()
+        assert _bk_compute_ancestor_indices(0, 8) == frozenset({1, 3, 7})
+        assert _bk_compute_ancestor_indices(4, 8) == frozenset({5, 7})
+        assert _bk_compute_ancestor_indices(7, 8) == frozenset()
 
     def test_parity_set_4_qubits(self) -> None:
         """Test parity set for 4 qubit system.
 
         P(j) follows the recursive binary tree structure.
         """
-        assert _bk_parity_set(0, 4) == frozenset()
-        assert _bk_parity_set(1, 4) == frozenset({0})
-        assert _bk_parity_set(2, 4) == frozenset({1})
-        assert _bk_parity_set(3, 4) == frozenset({1, 2})
+        assert _bk_compute_parity_indices(0, 4) == frozenset()
+        assert _bk_compute_parity_indices(1, 4) == frozenset({0})
+        assert _bk_compute_parity_indices(2, 4) == frozenset({1})
+        assert _bk_compute_parity_indices(3, 4) == frozenset({1, 2})
 
     def test_parity_set_8_qubits(self) -> None:
         """Test parity set for 8 qubit system."""
-        assert _bk_parity_set(0, 8) == frozenset()
-        assert _bk_parity_set(4, 8) == frozenset({3})
-        assert _bk_parity_set(5, 8) == frozenset({3, 4})
-        assert _bk_parity_set(6, 8) == frozenset({3, 5})
-        assert _bk_parity_set(7, 8) == frozenset({3, 5, 6})
+        assert _bk_compute_parity_indices(0, 8) == frozenset()
+        assert _bk_compute_parity_indices(4, 8) == frozenset({3})
+        assert _bk_compute_parity_indices(5, 8) == frozenset({3, 4})
+        assert _bk_compute_parity_indices(6, 8) == frozenset({3, 5})
+        assert _bk_compute_parity_indices(7, 8) == frozenset({3, 5, 6})
 
     def test_flip_set_4_qubits(self) -> None:
         """Test flip set for 4 qubit system."""
-        assert _bk_flip_set(0, 4) == frozenset()
-        assert _bk_flip_set(1, 4) == frozenset({0})
-        assert _bk_flip_set(2, 4) == frozenset()
-        assert _bk_flip_set(3, 4) == frozenset({1, 2})
+        assert _bk_compute_children_indices(0, 4) == frozenset()
+        assert _bk_compute_children_indices(1, 4) == frozenset({0})
+        assert _bk_compute_children_indices(2, 4) == frozenset()
+        assert _bk_compute_children_indices(3, 4) == frozenset({1, 2})
 
     def test_remainder_set_4_qubits(self) -> None:
         """Test remainder set R(j) = P(j) - F(j) for 4 qubit system."""
         # R(j) = P(j) - F(j) (set difference)
-        assert _bk_remainder_set(0, 4) == frozenset()  # {} - {} = {}
-        assert _bk_remainder_set(1, 4) == frozenset()  # {0} - {0} = {}
-        assert _bk_remainder_set(2, 4) == frozenset({1})  # {1} - {} = {1}
-        assert _bk_remainder_set(3, 4) == frozenset()  # {1,2} - {1,2} = {}
+        assert _bk_compute_z_indices_for_y_component(0, 4) == frozenset()  # {} - {} = {}
+        assert _bk_compute_z_indices_for_y_component(1, 4) == frozenset()  # {0} - {0} = {}
+        assert _bk_compute_z_indices_for_y_component(2, 4) == frozenset({1})  # {1} - {} = {1}
+        assert _bk_compute_z_indices_for_y_component(3, 4) == frozenset()  # {1,2} - {1,2} = {}
 
     def test_remainder_set_8_qubits(self) -> None:
         """Test remainder set for 8 qubit system."""
-        assert _bk_remainder_set(4, 8) == frozenset({3})  # {3} - {} = {3}
-        assert _bk_remainder_set(5, 8) == frozenset({3})  # {3,4} - {4} = {3}
-        assert _bk_remainder_set(6, 8) == frozenset({3, 5})  # {3,5} - {} = {3,5}
-        assert _bk_remainder_set(7, 8) == frozenset()  # {3,5,6} - {3,5,6} = {}
+        assert _bk_compute_z_indices_for_y_component(4, 8) == frozenset({3})  # {3} - {} = {3}
+        assert _bk_compute_z_indices_for_y_component(5, 8) == frozenset({3})  # {3,4} - {4} = {3}
+        assert _bk_compute_z_indices_for_y_component(6, 8) == frozenset({3, 5})  # {3,5} - {} = {3,5}
+        assert _bk_compute_z_indices_for_y_component(7, 8) == frozenset()  # {3,5,6} - {3,5,6} = {}
 
 
 class TestQdkQubitMapper:
