@@ -20,8 +20,6 @@ from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import (
 )
 
 __all__ = [
-    "QdkQubitMapper",
     "QdkQubitMapperSettings",
-    "QubitMapper",
     "QubitMapperFactory",
 ]
