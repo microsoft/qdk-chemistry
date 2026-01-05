@@ -104,7 +104,7 @@ class HamiltonianContainer {
    * @brief Create a deep copy of this container
    * @return Unique pointer to a cloned container
    */
-  virtual std::unique_ptr<HamiltonianContainer> clone() const = 0;
+  virtual std::unique_ptr<const HamiltonianContainer> clone() const = 0;
 
   /**
    * @brief Get the type of the underlying container
@@ -327,7 +327,7 @@ class Hamiltonian : public DataClass,
    * @brief Constructor for Hamiltonian with a HamiltonianContainer
    * @param container Unique pointer to HamiltonianContainer holding the data
    */
-  Hamiltonian(std::unique_ptr<HamiltonianContainer> container);
+  Hamiltonian(std::unique_ptr<const HamiltonianContainer> container);
 
   /**
    * @brief Copy constructor

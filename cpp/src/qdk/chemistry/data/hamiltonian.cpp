@@ -638,7 +638,7 @@ std::shared_ptr<Hamiltonian> Hamiltonian::_from_hdf5_file(
   }
 }
 
-Hamiltonian::Hamiltonian(std::unique_ptr<HamiltonianContainer> container)
+Hamiltonian::Hamiltonian(std::unique_ptr<const HamiltonianContainer> container)
     : _container(std::move(container)) {
   QDK_LOG_TRACE_ENTERING();
 }

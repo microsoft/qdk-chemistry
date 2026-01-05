@@ -67,8 +67,8 @@ CanonicalFourCenterHamiltonian::CanonicalFourCenterHamiltonian(
   }
 }
 
-std::unique_ptr<HamiltonianContainer> CanonicalFourCenterHamiltonian::clone()
-    const {
+std::unique_ptr<const HamiltonianContainer>
+CanonicalFourCenterHamiltonian::clone() const {
   QDK_LOG_TRACE_ENTERING();
   if (is_restricted()) {
     return std::make_unique<CanonicalFourCenterHamiltonian>(

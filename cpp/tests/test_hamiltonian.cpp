@@ -1611,7 +1611,7 @@ class DummyHamiltonianContainer : public HamiltonianContainer {
                             const Eigen::MatrixXd& inactive_fock)
       : HamiltonianContainer(one_body, orbitals, core_energy, inactive_fock) {}
 
-  std::unique_ptr<HamiltonianContainer> clone() const override {
+  std::unique_ptr<const HamiltonianContainer> clone() const override {
     return std::make_unique<DummyHamiltonianContainer>(*this);
   }
 

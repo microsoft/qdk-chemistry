@@ -98,13 +98,13 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
   /**
    * @brief Destructor
    */
-  ~CanonicalFourCenterHamiltonian() override final = default;
+  ~CanonicalFourCenterHamiltonian() = default;
 
   /**
    * @brief Create a deep copy of this container
    * @return Unique pointer to a cloned container
    */
-  std::unique_ptr<HamiltonianContainer> clone() const override final;
+  std::unique_ptr<const HamiltonianContainer> clone() const override final;
 
   /**
    * @brief Get the type of the underlying container

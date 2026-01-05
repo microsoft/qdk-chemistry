@@ -240,7 +240,7 @@ Returns:
   // ============================================================================
   py::class_<CanonicalFourCenterHamiltonian, HamiltonianContainer,
              py::smart_holder>
-      canonical_4_center(data, "CanonicalFourCenterHamiltonian", R"(
+      canonical_four_center(data, "CanonicalFourCenterHamiltonian", R"(
 Represents a molecular Hamiltonian with canonical 4-center two-electron integrals.
 
 This class stores molecular Hamiltonian data for quantum chemistry calculations,
@@ -268,7 +268,7 @@ Examples:
 )");
 
   // Restricted constructor
-  canonical_4_center.def(
+  canonical_four_center.def(
       py::init<const Eigen::MatrixXd&, const Eigen::VectorXd&,
                std::shared_ptr<Orbitals>, double, const Eigen::MatrixXd&,
                HamiltonianType>(),
@@ -298,7 +298,7 @@ Examples:
       py::arg("type") = HamiltonianType::Hermitian);
 
   // Unrestricted constructor
-  canonical_4_center.def(
+  canonical_four_center.def(
       py::init<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
                const Eigen::VectorXd&, const Eigen::VectorXd&,
                const Eigen::VectorXd&, std::shared_ptr<Orbitals>, double,
@@ -343,7 +343,7 @@ Examples:
 
   // Two-body integral access (specific to CanonicalFourCenterHamiltonian)
   bind_getter_as_property(
-      canonical_4_center, "get_two_body_integrals",
+      canonical_four_center, "get_two_body_integrals",
       &CanonicalFourCenterHamiltonian::get_two_body_integrals,
       R"(
 Get two-electron integrals in molecular orbital basis.
@@ -358,9 +358,10 @@ Notes:
 )",
       py::return_value_policy::reference_internal);
 
-  canonical_4_center.def("get_two_body_element",
-                         &CanonicalFourCenterHamiltonian::get_two_body_element,
-                         R"(
+  canonical_four_center.def(
+      "get_two_body_element",
+      &CanonicalFourCenterHamiltonian::get_two_body_element,
+      R"(
 Get specific two-electron integral element <ij|kl>.
 
 Args:
@@ -370,10 +371,10 @@ Args:
 Returns:
     float: Value of the two-electron integral <ij|kl>
 )",
-                         py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
-                         py::arg("channel") = SpinChannel::aaaa);
+      py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
+      py::arg("channel") = SpinChannel::aaaa);
 
-  canonical_4_center.def(
+  canonical_four_center.def(
       "has_two_body_integrals",
       &CanonicalFourCenterHamiltonian::has_two_body_integrals,
       R"(
@@ -383,24 +384,25 @@ Returns:
     bool: True if two-body integrals have been set
 )");
 
-  canonical_4_center.def("is_restricted",
-                         &CanonicalFourCenterHamiltonian::is_restricted,
-                         R"(
+  canonical_four_center.def("is_restricted",
+                            &CanonicalFourCenterHamiltonian::is_restricted,
+                            R"(
 Check if Hamiltonian is restricted (alpha == beta).
 
 Returns:
     bool: True if alpha and beta integrals are identical
 )");
 
-  canonical_4_center.def("is_valid", &CanonicalFourCenterHamiltonian::is_valid,
-                         R"(
+  canonical_four_center.def("is_valid",
+                            &CanonicalFourCenterHamiltonian::is_valid,
+                            R"(
 Check if the Hamiltonian data is complete and consistent.
 
 Returns:
     bool: True if all required data is set and dimensions are consistent
 )");
 
-  canonical_4_center.def(
+  canonical_four_center.def(
       "to_json",
       [](const CanonicalFourCenterHamiltonian& self) -> std::string {
         return self.to_json().dump();
@@ -412,7 +414,7 @@ Returns:
     str: JSON representation of the container
 )");
 
-  canonical_4_center.def(
+  canonical_four_center.def(
       "to_fcidump_file", &CanonicalFourCenterHamiltonian::to_fcidump_file,
       R"(
 Save Hamiltonian to FCIDUMP file.
