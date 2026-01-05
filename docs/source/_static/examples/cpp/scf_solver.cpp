@@ -32,13 +32,24 @@ int main() {
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
   std::vector<std::string> symbols = {"H", "H"};
 
-  Structure structure(coords, symbols);
+  auto structure = std::make_shared<Structure>(coords, symbols);
 
   // Run the SCF calculation
   auto [E_scf, wfn] = scf_solver->run(structure, 0, 1, "def2-tzvpp");
   auto scf_orbitals = wfn->get_orbitals();
   std::cout << "SCF Energy: " << E_scf << " Hartree" << std::endl;
   // end-cell-run
+  // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-alternative-run
+  // Run scf with an initial guess from previous orbitals
+  auto [E_scf2, wfn2] = scf_solver->run(structure, 0, 1, scf_orbitals);
+
+  // Run scf with a custom basis set
+  auto basis_set = BasisSet::from_basis_name("def2-tzvpp", structure);
+  auto [E_scf3, wfn3] = scf_solver->run(structure, 0, 1, basis_set);
+  // end-cell-alternative-run
   // --------------------------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------------------------

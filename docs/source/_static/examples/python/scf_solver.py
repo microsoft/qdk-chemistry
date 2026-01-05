@@ -9,7 +9,7 @@
 # start-cell-create
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Structure
+from qdk_chemistry.data import Structure, BasisSet
 
 # Create the default ScfSolver instance
 scf_solver = create("scf_solver")
@@ -40,6 +40,21 @@ scf_orbitals = wfn.get_orbitals()
 
 print(f"SCF Energy: {E_scf:.10f} Hartree")
 # end-cell-run
+################################################################################
+
+################################################################################
+# start-cell-alternative-run
+# Run scf with an initial guess from previous calculation
+E_scf2, wfn2 = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess=scf_orbitals
+)
+
+# Run scf with a custom basis set
+basis_set = BasisSet.from_basis_name("def2-tzvpp", structure)
+E_scf3, wfn3 = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess=basis_set
+)
+# end-cell-alternative-run
 ################################################################################
 
 ################################################################################
