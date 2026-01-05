@@ -41,6 +41,7 @@ class TestWavefunctionBasedActiveSpaceSelector:
 
         scf = algorithms.create("scf_solver")
         scf.settings().set("method", "hf")
+        scf.settings().set("max_iterations", 100)
         _, det = scf.run(mol, 0, 1, "cc-pvdz")
         val_cas_selector = algorithms.create("active_space_selector", "qdk_valence")
         val_cas_selector.settings().set("num_active_electrons", 10)
