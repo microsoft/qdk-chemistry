@@ -22,14 +22,14 @@ Input requirements
 
 The ``HamiltonianConstructor`` requires the following input:
 
-**Orbitals**
+Orbitals
    An :doc:`Orbitals <../data/orbitals>` instance describing the single orbital basis in which to express the many-body Hamiltonian. This object contains information about the molecular structure, basis set, and orbital coefficients.
 
 .. note::
 
    The Orbitals object carries all the information needed for integral transformation, including the basis set and molecular structure. Active space indices, if present, determine which orbitals are included in the output Hamiltonian.
 
-**Creating a constructor:**
+.. rubric:: Creating a constructor
 
 .. tab:: C++ API
 
@@ -45,7 +45,7 @@ The ``HamiltonianConstructor`` requires the following input:
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-**Configuring settings:**
+.. rubric:: Configuring settings
 
 Settings can be modified using the ``settings()`` object.
 See `Available implementations`_ below for implementation-specific options.
@@ -67,7 +67,7 @@ See `Available implementations`_ below for implementation-specific options.
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-**Running the calculation:**
+.. rubric:: Running the calculation
 
 .. tab:: C++ API
 
@@ -106,11 +106,11 @@ You can discover available implementations programmatically:
 QDK (Native)
 ~~~~~~~~~~~~
 
-**Factory name:** ``"qdk"`` (default)
+.. rubric:: Factory name: ``"qdk"`` (default)
 
 The native QDK/Chemistry implementation for Hamiltonian construction. Transforms molecular orbitals from :term:`AO` to :term:`MO` basis and computes one- and two-electron integrals.
 
-**Settings:**
+.. rubric:: Settings
 
 .. list-table::
    :header-rows: 1
