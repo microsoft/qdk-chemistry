@@ -183,13 +183,6 @@ class TestQdkQubitMapper:
             assert len(ps) == 4
             assert all(c in "IXYZ" for c in ps)
 
-        result = mapper.run(hamiltonian)
-
-        for ps in result.pauli_strings:
-            assert isinstance(ps, str)
-            assert len(ps) == 4
-            assert all(c in "IXYZ" for c in ps)
-
 
 class TestQdkQubitMapperRealHamiltonians:
     """Tests with real molecular Hamiltonians."""

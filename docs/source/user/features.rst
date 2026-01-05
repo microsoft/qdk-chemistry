@@ -190,7 +190,7 @@ Implementation Highlights
 
 Native QDK Qubit Mapper
    QDK/Chemistry includes a high-performance native implementation of fermion-to-qubit mappings built on the :doc:`PauliOperator <comprehensive/data/pauli_operator>` expression layer.
-   This implementation supports both Jordan-Wigner and Bravyi-Kitaev :cite:`Love2012` encodings with configurable coefficient thresholds for controlling numerical precision.
+   This implementation supports both Jordan-Wigner and Bravyi-Kitaev encodings :cite:`Bravyi-Kitaev2002,Love2012`, using the Seeley-Richard-Love algorithm for the Bravyi-Kitaev mapping, with configurable coefficient thresholds for controlling numerical precision.
    The native mapper applies thresholds after the complete transformation, ensuring mathematically consistent results across different molecular systems.
 
 
