@@ -54,10 +54,10 @@ class StabilityCheckerSettings : public qdk::chemistry::data::Settings {
 
 /**
  * @class StabilityChecker
- * @brief Internal implementation of the stability checker
+ * @brief Implementation of the stability checker
  *
  * This class provides a concrete implementation of the stability checker using
- * the internal backend. It inherits from the base `StabilityChecker` class and
+ * the backend. It inherits from the base `StabilityChecker` class and
  * implements the stability analysis method to check if a wavefunction
  * corresponds to a true minimum or saddle point and return corresponding
  * eigenvectors.

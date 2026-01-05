@@ -187,6 +187,7 @@ class PyscfStabilitySettings(Settings):
     - davidson_tolerance: Convergence threshold for the Davidson eigenvalue solver.
     - stability_tolerance: Threshold for determining stability from eigenvalues.
     - method: The electronic structure method ("hf" for Hartree-Fock or a DFT functional name).
+    - xc_grid: Integer DFT integration grid density level passed to PySCF (0=coarse, 9=very fine).
     - pyscf_verbose: PySCF verbosity level for lib.davidson logging (0=silent, 4=info, 5=debug).
 
     Examples:

@@ -9,13 +9,13 @@
 
 namespace qdk::chemistry::algorithms {
 
-std::unique_ptr<StabilityChecker> make_microsoft_stability_checker() {
+std::unique_ptr<StabilityChecker> make_qdk_stability_checker() {
   return std::make_unique<
       qdk::chemistry::algorithms::microsoft::StabilityChecker>();
 }
 
 void StabilityCheckerFactory::register_default_instances() {
-  StabilityCheckerFactory::register_instance(&make_microsoft_stability_checker);
+  StabilityCheckerFactory::register_instance(&make_qdk_stability_checker);
 }
 
 }  // namespace qdk::chemistry::algorithms
