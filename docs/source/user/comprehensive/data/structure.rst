@@ -44,7 +44,7 @@ It is used to define the molecular system before performing electronic structure
 Creating a structure object
 ---------------------------
 
-A :class:`~qdk_chemistry.data.Structure` object can be created manually as follows:
+A :class:`~qdk_chemistry.data.Structure` object can be created by specifying coordinates explicitly (in Bohr):
 
 .. tab:: C++ API
 
@@ -59,6 +59,27 @@ A :class:`~qdk_chemistry.data.Structure` object can be created manually as follo
       :language: python
       :start-after: # start-cell-create
       :end-before: # end-cell-create
+
+Loading a structure from file
+-----------------------------
+
+A :class:`~qdk_chemistry.data.Structure` object can also be loaded from a file.
+When loading from an XYZ file, coordinates are automatically converted from Angstrom to Bohr.
+When loading from a JSON file, coordinates are assumed to already be in Bohr.
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/structure.cpp
+      :language: cpp
+      :start-after: // start-cell-from-file
+      :end-before: // end-cell-from-file
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/structure.py
+      :language: python
+      :start-after: # start-cell-from-file
+      :end-before: # end-cell-from-file
 
 Accessing structure data
 ------------------------
@@ -108,7 +129,7 @@ XYZ format
     2
 
     H      0.000000    0.000000    0.000000
-    H      0.000000    0.000000    1.400000
+    H      0.000000    0.000000    0.740848
 
 Note that here the coordinates are in Angstrom, since this is the standard in xyz files.
 

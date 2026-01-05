@@ -8,21 +8,27 @@
 ################################################################################
 # start-cell-json
 import os
+from pathlib import Path
 
 import numpy as np
+
 from qdk_chemistry.data import Structure, Hamiltonian, ModelOrbitals
 
-# Structure data class example
-coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+# Load structure from XYZ file (the file uses Angstrom, which is converted to Bohr internally)
+structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+
+# For demonstration: create a structure with custom masses and charges
+# (requires explicit coordinates, here in Bohr)
+coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])  # Bohr
 symbols = ["H", "H"]
 custom_masses = [1.001, 0.999]
 custom_charges = [0.9, 1.1]
-structure = Structure(
+structure_custom = Structure(
     coords, symbols=symbols, masses=custom_masses, nuclear_charges=custom_charges
 )
 
 # Serialize to JSON object
-structure_data = structure.to_json()
+structure_data = structure_custom.to_json()
 
 # Deserialize from JSON object
 # "Structure" is the data type to de-serialize into (will throw, if it doesn't match)

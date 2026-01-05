@@ -7,20 +7,14 @@
 
 ################################################################################
 # start-cell-hamiltonian-creation
-import numpy as np
+from pathlib import Path
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure, SpinChannel
 
-# Create a structure object
-coords = np.array(
-    [
-        [0.00000000, 0.00000000, 0.00000000],
-        [2.70672414, 0.00000000, 0.00000000],
-        [-0.84290504, 2.07169023, 0.00000000],
-    ]
+# Load a structure from XYZ file
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/water.structure.xyz"
 )
-symbols = ["O", "H", "H"]
-structure = Structure(coords, symbols)
 
 # Run initial SCF to get orbitals
 scf_solver = create("scf_solver")

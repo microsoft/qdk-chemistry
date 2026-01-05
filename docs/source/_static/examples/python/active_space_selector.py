@@ -26,12 +26,13 @@ active_space_selector.settings().set("num_active_orbitals", 4)
 
 ################################################################################
 # start-cell-run
-import numpy as np  # noqa: E402
+from pathlib import Path  # noqa: E402
 from qdk_chemistry.data import Structure  # noqa: E402
 
-# Create a molecular structure (water molecule)
-coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.8897], [1.7802, 0.0, -0.4738]])
-structure = Structure(coords, symbols=["O", "H", "H"])
+# Load a molecular structure (water molecule) from XYZ file
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/water.structure.xyz"
+)
 
 # First, run SCF to get molecular orbitals
 scf_solver = create("scf_solver")

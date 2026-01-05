@@ -23,13 +23,12 @@ mc_calculator.settings().set("ci_residual_tolerance", 1.0e-6)
 
 ################################################################################
 # start-cell-run
-import numpy as np  # noqa: E402
+from pathlib import Path  # noqa: E402
 from qdk_chemistry.algorithms import create  # noqa: E402
 from qdk_chemistry.data import Structure  # noqa: E402
 
-# Create a structure (H2 molecule)
-coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
-structure = Structure(coords, ["H", "H"])
+# Load H2 structure from XYZ file
+structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
 
 # Run SCF to get orbitals
 scf_solver = create("scf_solver")
