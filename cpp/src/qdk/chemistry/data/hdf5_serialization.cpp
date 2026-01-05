@@ -69,7 +69,7 @@ VectorVariant load_vector_variant_from_group(H5::Group& grp,
       H5::DataType datatype = dataset.getDataType();
       if (datatype.getClass() != H5T_COMPOUND) {
         throw std::runtime_error(
-            "Expected complex compound type in HDF5 coefficients "
+            "Expected complex compound type in HDF5 "
             "dataset. Error reading dataset: " +
             name);
       }

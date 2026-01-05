@@ -123,8 +123,8 @@ VectorVariant load_vector_variant_from_group(H5::Group& grp,
  * @brief Load a matrix variant (real or complex) from an HDF5 group.
  *
  * Loads either a matrix (MatrixXd) or complex (MatrixXcd) Eigen matrix from
- * an HDF5 group dataset. For complex vectors, expects HDF5 compound type
- * with "real" and "imag" fields.
+ * an HDF5 group dataset. For complex matrices, expects HDF5 compound type
+ * with "r" (real) and "i" (imaginary) fields.
  *
  * @param grp HDF5 group handle
  * @param name Name of the dataset in the group

@@ -1304,20 +1304,6 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
         }
         one_rdm_aa = load_matrix_variant_from_group(rdm_group, "one_rdm_aa",
                                                     is_one_rdm_aa_complex);
-      } else {
-        // Only throw if metadata says one RDMs are expected
-        bool has_one_rdm_spin_dependent = false;
-        if (group.attrExists("has_one_rdm_spin_dependent")) {
-          H5::Attribute attr =
-              group.openAttribute("has_one_rdm_spin_dependent");
-          hbool_t flag;
-          attr.read(H5::PredType::NATIVE_HBOOL, &flag);
-          has_one_rdm_spin_dependent = (flag != 0);
-        }
-        if (has_one_rdm_spin_dependent) {
-          throw std::runtime_error(
-              "One rdms should be available but none were found in hdf5.");
-        }
       }
 
       // check if any two rdms were saved
