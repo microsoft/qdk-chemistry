@@ -1,13 +1,13 @@
-Design principles of QDK/Chemistry
-##################################
+High-level design
+#################
 
 This document outlines the core architectural design principles of QDK/Chemistry, explaining the conceptual framework that guides the library's organization and implementation.
-For a complete overview of QDK/Chemistry's documentation, see the :doc:`comprehensive documentation index <../index>`.
+For a complete overview of QDK/Chemistry's documentation, see the :doc:`in-depth documentation index <../index>`.
 
-QDK/Chemistry is designed with a clear separation between **data containers** and **algorithms**.
-This fundamental design choice enables flexibility, extensibility, and maintainability of the codebase, while providing users with a consistent and intuitive API.
+QDK/Chemistry is designed with a clear separation between **data classes** and **algorithms**.
+This design choice enables flexibility, extensibility, and maintainability of the codebase, while providing users with a consistent and intuitive API.
 
-Separation of data and algorithms
+Separation of Data and Algorithms
 =================================
 
 QDK/Chemistry follows a design pattern that strictly separates:
@@ -15,57 +15,71 @@ QDK/Chemistry follows a design pattern that strictly separates:
 1. **Data Classes**: Immutable containers that store and manage quantum chemical data
 2. **Algorithm Classes**: Processors that operate on data objects to produce new data objects
 
-This separation follows the principle of single responsibility and creates a clear flow of data through computational
-workflows.
+This separation follows the principle of single responsibility and creates a clear flow of data through computational workflows.
 
 .. graphviz:: /_static/diagrams/data_flow.dot
+
+|
+
+.. _hl_data_class:
 
 Data classes
 ------------
 
-Data classes in QDK/Chemistry are designed to be:
+Data classes in QDK/Chemistry concretely represent intermediate quantities commonly encountered in quantum applications workflows. These classes are designed to be:
 
-- Immutable: Once created, the core data cannot be modified
-- Self-contained: Include all information necessary to represent the concept
-- :doc:`Serializable <../data/serialization>`: Can be easily saved to and loaded from files
-- Language-agnostic: Accessible through identical APIs in both C++ and Python
+Immutable
+   Once created, the core data cannot be modified
 
-QDK/Chemistry includes the following data classes:
+Self-contained
+   Include all information necessary to represent the underlying quantum chemical quantity
 
-- :doc:`Structure <../data/structure>`: Molecular geometry and composition
-- :doc:`BasisSet <../data/basis_set>`: Quantum chemistry basis set definitions
-- :doc:`Orbitals <../data/orbitals>`: Molecular orbital coefficients and energies
-- :doc:`Hamiltonian <../data/hamiltonian>`: Molecular Hamiltonian
-- :class:`~qdk_chemistry.data.Wavefunction`: Wavefunction representation
+:doc:`Serializable <../data/serialization>`
+   Can be easily saved to and loaded from files
+
+Language-agnostic
+   Accessible through identical APIs in both C++ and Python
+
+See the :doc:`Data Classes <../data/index>` documentation for further details on the availability and usage of QDK/Chemistry's data classes.
+
+.. _hl_algorithm_class:
 
 Algorithm classes
 -----------------
 
-Algorithm classes in QDK/Chemistry are designed to be:
+Algorithm classes represent mutations on data, such as the execution of quantum chemical methods and generation of circuit components commonly found in quantum applications workflows.
+These classes are designed to be:
 
-- **Stateless**: Their behavior depends only on their input data and configuration
-- **Configurable**: Through a standardized ``Settings`` interface
-- **Factory-constructed**: Created through factory methods for flexibility and extensibility
-- **Consistent**: Follow a uniform interface pattern
-- **Interoperable**: Provide unified interfaces to both native implementations and third-party packages
+Stateless
+   Their behavior depends only on their input data and configuration
 
-QDK/Chemistry includes the following algorithm classes:
+Configurable
+   Through a standardized ``Settings`` interface
 
-- :doc:`ScfSolver <../algorithms/scf_solver>`: Self-consistent field calculations
-- :doc:`Localizer <../algorithms/localizer>`: Orbital localization methods
-- :doc:`ActiveSpaceSelector <../algorithms/active_space>`: Active space selection methods
-- :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`: Hamiltonian construction
-- :doc:`MCCalculator <../algorithms/mc_calculator>`: Multi-configuration calculations
+Conforming
+   Exposing a common interface for disparate implementations to enable a unified user experience.
 
-.. - :doc:`DynamicalCorrelation <../algorithms/dynamical_correlation>`: Dynamical correlation methods
+Extensible
+   Allowing new implementations to be added without modifying existing code
 
-Each algorithm class can leverage both Microsoft-developed implementations (developed within QDK/Chemistry) and :doc:`interfaces <interfaces>` to established third-party electronic structure packages.
-This design allows users to benefit from specialized capabilities of external software while maintaining a consistent API.
+Programmatically, Algorithms are specified as abstract interfaces which can be specialized downstream through concrete implementations.
+This allows QDK/Chemistry to be expressed as a :doc:`plugin architecture <../plugins>`, for which algorithm implementations may be specified either natively within QDK/Chemistry or through established third-party quantum chemistry packages:
+
+.. graphviz:: /_static/diagrams/plugin_architecture.dot
+
+|
+
+This design allows users to benefit from specialized capabilities of "best-in-breed" software while maintaining a consistent user experience.
+See the :doc:`Plugin System <../plugins>` documentation for further details on how to contribute new algorithm implementations.
+
+Further details on the availability and usage of QDK/Chemistry's algorithm implementations can be found in the :doc:`Algorithms <../algorithms/index>` documentation.
+
+.. _hl_factory_pattertn:
 
 Factory pattern
 ===============
 
-QDK/Chemistry implements the :doc:`factory pattern <factory_pattern>` for algorithm creation:
+QDK/Chemistry's :doc:`plugin architecture <../plugins>` leverages a :doc:`factory pattern <../algorithms/factory_pattern>` for algorithm creation:
 
 .. tab:: C++ API
 
@@ -83,16 +97,17 @@ QDK/Chemistry implements the :doc:`factory pattern <factory_pattern>` for algori
 
 This pattern allows:
 
-- Runtime selection of the most appropriate implementation
-- Extension with new implementations without changing client code
+- Extension of workflows by new Algorithm implementations without changing client code
 - Centralized management of dependencies and resources
 
-Read more in the :doc:`Factory Pattern <factory_pattern>` documentation.
+Read more on QDK/Chemistry's usage of this pattern in the :doc:`Factory Pattern <../algorithms/factory_pattern>` documentation.
 
-Settings pattern
-================
+.. _hl_settings:
 
-Algorithm configuration is managed through a consistent :doc:`Settings <settings>` interface:
+Runtime configuration with settings
+===================================
+
+Algorithm configuration is managed through instances of :doc:`Settings <../algorithms/settings>` objects, which contain a type-safe data store of configuration parameters consistent between the python and C++ APIs:
 
 .. tab:: C++ API
 
@@ -108,17 +123,13 @@ Algorithm configuration is managed through a consistent :doc:`Settings <settings
       :start-after: # start-cell-scf-settings
       :end-before: # end-cell-scf-settings
 
-This approach provides:
+Read more on how one can configure, discover, and extend instances of Settings objects in the
+:doc:`Settings <../algorithms/settings>` documentation.
 
-- Uniform configuration across all algorithms
-- Type safety and validation
-- Default values with explicit overrides
-- Documentation of available options
+.. _hl_dataflow_example:
 
-Read more in the :doc:`Settings <settings>` documentation.
-
-Data flow example
-=================
+A complete dataflow example
+===========================
 
 A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:
 
@@ -136,32 +147,10 @@ A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:
       :start-after: # start-cell-data-flow
       :end-before: # end-cell-data-flow
 
-Interface architecture (plugins)
-================================
-
-QDK/Chemistry is designed with a plugin architecture that allows for consistent :doc:`interfaces <interfaces>` to various external packages:
-
-.. graphviz:: /_static/diagrams/plugin_architecture.dot
-
-This design provides several advantages:
-
-1. **Unified API**: Users interact with a consistent interface regardless of the underlying implementation
-2. **Implementation Flexibility**: Algorithms can be implemented natively or delegate to specialized external packages
-3. **Best-of-Breed Approach**: Leverage strengths of different packages while maintaining consistent data structures
-4. **Future-Proofing**: New implementations can be added without changing the user-facing API
-
 Further reading
 ===============
 
 - The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/design_principles.cpp>`_ and `Python <../../../_static/examples/python/design_principles.py>`_ scripts.
-- :doc:`Factory Pattern <factory_pattern>`: Details on QDK/Chemistry's implementation of the factory pattern
-- :doc:`Settings <settings>`: How to configure algorithms through the Settings interface
-- :doc:`Interfaces <interfaces>`: QDK/Chemistry's interface system to external packages
-
-.. toctree::
-   :maxdepth: 1
-   :hidden:
-
-   factory_pattern
-   interfaces
-   settings
+- :doc:`Factory Pattern <../algorithms/factory_pattern>`: Details on QDK/Chemistry's implementation of the factory pattern
+- :doc:`Settings <../algorithms/settings>`: How to configure the execution behavior of algorithms through the Settings interface
+- :ref:`Plugin system <plugin-system>`: QDK/Chemistry's plugin system for extending functionality

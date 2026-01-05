@@ -19,29 +19,32 @@ auto scf_solver = ScfSolverFactory::create();
 int main() {
   // --------------------------------------------------------------------------------------------
   // start-cell-configure
-  // Standard settings that work with all solvers
   // Set the method
   // Note the following line is optional, since hf is the default method
   scf_solver->settings().set("method", "hf");
-  // Set the basis set
-  scf_solver->settings().set("basis_set", "def2-tzvpp");
 
   // end-cell-configure
   // --------------------------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------------------------
   // start-cell-run
-  // Specify a structure
-  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
-  std::vector<std::string> symbols = {"H", "H"};
-
-  Structure structure(coords, symbols);
+  // Load structure from XYZ file
+  auto structure = Structure::from_xyz_file("../data/h2.structure.xyz");
 
   // Run the SCF calculation
-  auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);
+  auto [E_scf, wfn] = scf_solver->run(structure, 0, 1, "def2-tzvpp");
   auto scf_orbitals = wfn->get_orbitals();
   std::cout << "SCF Energy: " << E_scf << " Hartree" << std::endl;
   // end-cell-run
+  // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-list-implementations
+  auto names = ScfSolverFactory::available();
+  for (const auto& name : names) {
+    std::cout << name << std::endl;
+  }
+  // end-cell-list-implementations
   // --------------------------------------------------------------------------------------------
   return 0;
 }

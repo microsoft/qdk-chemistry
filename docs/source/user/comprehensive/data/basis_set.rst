@@ -1,4 +1,4 @@
-Basis set
+BasisSet
 =========
 
 The :class:`~qdk_chemistry.data.BasisSet` class in QDK/Chemistry represents a collection of basis functions used to describe the electronic structure of molecules.
@@ -60,8 +60,11 @@ Basis types
 
 The :class:`~qdk_chemistry.data.BasisSet` class supports two types of basis functions:
 
-- **Spherical**: Uses spherical harmonics with :math:`2l+1` functions per shell
-- **Cartesian**: Uses Cartesian coordinates with :math:`(l+1)(l+2)/2` functions per shell
+Spherical
+   Uses spherical harmonics with :math:`2l+1` functions per shell
+
+Cartesian
+   Uses Cartesian coordinates with :math:`(l+1)(l+2)/2` functions per shell
 
 Creating a basis set
 --------------------
@@ -250,7 +253,7 @@ For a complete list of available basis sets and their specifications, see the :d
       :end-before: # end-cell-library
 
 .. note::
-   The basis set library includes popular basis sets such as STO-nG, Pople basis sets (3-21G, 6-31G, etc.), correlation-consistent basis sets (cc-pVDZ, cc-pVTZ, etc.), and more.
+   The basis set library includes popular basis sets such as :term:`STO`-nG, Pople basis sets (3-21G, 6-31G, etc.), correlation-consistent basis sets (cc-pVDZ, cc-pVTZ, etc.), and more.
    The availability may depend on your QDK/Chemistry installation.
 
 Related classes
@@ -264,6 +267,6 @@ Further reading
 ---------------
 
 - The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/basis_set.cpp>`_ and `Python <../../../_static/examples/python/basis_set.py>`_ scripts.
-- :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
-- :doc:`Settings <../design/settings>`: Configuration settings for algorithms
+- :doc:`Serialization <serialization>`: Data serialization and deserialization
+- :doc:`Settings <../algorithms/settings>`: Configuration settings for algorithms
 - :doc:`Supported basis sets <../basis_functionals>`: List of pre-defined basis sets available in QDK/Chemistry

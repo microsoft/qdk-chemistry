@@ -1,110 +1,319 @@
+.. _plugins:
+
 Plugins
 =======
 
-Besides the core functionality provided by QDK/Chemistry, included and compiled into the library by default, such :term:`MACIS`, there is also a plugin system that allows for extending the functionality of QDK/Chemistry by adding custom algorithms, data structures, and interfaces.
-Some plugins for popular quantum chemistry packages and quantum computing packages are provided with QDK/Chemistry, while others can be found in community repositories.
+QDK/Chemistry uses a plugin system to support multiple implementations of each of the available :doc:`algorithm <algorithms/index>` type.
+This allows switching between native QDK implementations and third-party packages (e.g., PySCF, Qiskit) without modifying application code.
 
-Core plugins
-------------
+.. _plugin-system:
 
-The following lists included plugins that are available in QDK/Chemistry, developed and maintained by the QDK/Chemistry team.
-These plugins are shipped and installed along with QDK/Chemistry and are enabled once the corresponding external packages are installed by the user.
+Plugin system
+-------------
 
-- `Qiskit <https://www.ibm.com/quantum/qiskit>`_
-- `PySCF <https://pyscf.org/>`_
+.. _algorithm-plugin-relationship:
 
-Community plugins
------------------
+Architecture
+~~~~~~~~~~~~
 
-We welcome the addition of community-developed plugins to enhance the capabilities of QDK/Chemistry.
+Each :doc:`algorithm <algorithms/index>` in QDK/Chemistry can have multiple implementations.
+All implementations inherit from the same base class and conform to the same interface:
 
-.. The following lists plugins that are available in addition to the above list, these plugins are developed and maintained by the community, for installation instructions please refer to the respective repositories and documentation.
-.. (Note: This is likely an incomplete list.
-.. If you are aware of other community plugins, please consider contributing to the documentation.)
+.. graphviz:: /_static/diagrams/interface_architecture.dot
 
-.. - t.b.d.
+This design supports several workflows:
 
-Making custom plugins
----------------------
+- Benchmarking native implementations against established packages
+- Mixing backends (e.g., PySCF for :term:`SCF`, :term:`MACIS` for multi-configurational methods)
+- Adding custom implementations
 
-QDK/Chemistry's plugin system allows you to extend its functionality by creating custom algorithms, data structures, and interfaces.
-The system is built around the factory pattern and a central registry that manages algorithm types and their implementations.
-
-Creating a custom algorithm type
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-To create a custom plugin, you need to:
-
-1. Define a new algorithm class that inherits from ``Algorithm``
-2. Create a factory class that inherits from ``AlgorithmFactory``, if your algorithm is of a new type
-3. Implement the algorithm's concrete implementation
-4. Register both the factory and implementation with the registry system
-
-Example: custom geometry optimizer
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Here is an example showing how to create a custom geometry optimizer and the corresponding algorithm type:
-
-.. code-block:: python
-
-    from qdk_chemistry.algorithms.base import AlgorithmFactory, Algorithm
-    import qdk_chemistry.algorithms.registry as registry
-    import qdk_chemistry.algorithms as algorithms
-    from qdk_chemistry.data import Structure
-
-    # Step 1: Define the custom algorithm type
-    class GeometryOptimizer(Algorithm):
-        def type_name(self) -> str:
-            return "geometry_optimizer"
-
-    # Step 2: Create a factory for this algorithm type
-    class GeometryOptimizerFactory(AlgorithmFactory):
-        def algorithm_type_name(self) -> str:
-            return "geometry_optimizer"
-
-        def default_algorithm_name(self) -> str:
-            return "bfgs"  # Default algorithm
-
-    # Step 3: Implement a concrete algorithm
-    class BfgsOptimizer(GeometryOptimizer):
-        def name(self) -> str:
-            return "bfgs"
-
-        def _run_impl(self, structure: Structure) -> Structure:
-            # Implementation here
-            ...
-            return new_structure  # Return optimized structure
-
-    # Step 4: Register the factory with the registry system.
-    #         (Done in the initialization phase of your plugin
-    #         when shipped as a package.)
-    factory = GeometryOptimizerFactory()
-    registry.register_factory(factory)
-
-    # Step 5: Register algorithm implementation
-    #         (Done in the initialization phase of your plugin
-    #         when shipped as a package.)
-    algorithms.register(lambda: BfgsOptimizer())
+The implementations for each algorithm type are managed by a :doc:`factory class <algorithms/factory_pattern>`, which provides a consistent interface for creating instances and listing available implementations.
+We refer the reader to the :doc:`factory pattern <algorithms/factory_pattern>` and :doc:`algorithm <algorithms/index>` documentation pages for more details on this design pattern.
 
 
-    # Now use via the top-level API
-    optimizer = algorithms.create("geometry_optimizer", "bfgs")
-    available_opts = algorithms.available("geometry_optimizer")
-    print(available_opts)
-    # Output: {'geometry_optimizer': ['bfgs']}
+Using plugins
+~~~~~~~~~~~~~
 
-Key components
-~~~~~~~~~~~~~~
+To select an implementation, specify it by name:
 
-**Algorithm Base Class**
-    Your custom algorithm must inherit from ``Algorithm`` and implement the ``type_name()`` method to identify the algorithm type.
+.. tab:: C++ API
 
-**Factory Class**
-    The factory manages creation and registration of algorithm instances.
-    It must implement ``algorithm_type_name()`` and ``default_algorithm_name()`` methods.
+   .. literalinclude:: ../../_static/examples/cpp/interfaces.cpp
+      :language: cpp
+      :start-after: // start-cell-scf
+      :end-before: // end-cell-scf
 
-**Registry System**
-    The registry (``qdk_chemistry.algorithms.registry``) maintains all available algorithm types and their implementations, enabling discovery and instantiation at runtime.
+.. tab:: Python API
 
-**Top-Level API**
-    Once registered, your custom algorithms are accessible through the standard ``algorithms.create()`` and ``algorithms.available()`` functions, maintaining consistency with built-in algorithms.
+   .. literalinclude:: ../../_static/examples/python/interfaces.py
+      :language: python
+      :start-after: # start-cell-scf
+      :end-before: # end-cell-scf
+
+.. _listing-implementations:
+
+To list available implementations:
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/interfaces.cpp
+      :language: cpp
+      :start-after: // start-cell-list-methods
+      :end-before: // end-cell-list-methods
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../_static/examples/python/interfaces.py
+      :language: python
+      :start-after: # start-cell-list-methods
+      :end-before: # end-cell-list-methods
+
+Documentation pertaining to the availability and configuration of each algorithm implementation provided within QDK/Chemistry can be found on the :doc:`algorithm <algorithms/index>` documentation pages.
+
+
+
+Included third-party plugins
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In addition to the native implementations packaged within QDK/Chemistry, plugins are included for the following packages:
+
+- `PySCF <https://pyscf.org/>`_ — Python-based quantum chemistry
+- `Qiskit <https://www.ibm.com/quantum/qiskit>`_ — Quantum computing
+
+These plugins are enabled automatically when the corresponding package is installed.
+
+.. _community-plugins:
+
+Community-developed plugins are also welcome. See :ref:`adding-plugins` for guidance on creating new plugins.
+
+.. _adding-plugins:
+
+Creating plugins
+----------------
+
+QDK/Chemistry supports two extension mechanisms:
+
+1. Implementing a new backend for an existing algorithm type (e.g., integrating an external quantum chemistry package)
+2. Defining an entirely new algorithm type with its own factory and implementations
+
+The following sections provide comprehensive examples of each approach.
+
+.. _adding-implementations:
+
+Implementing a new algorithm backend
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This section demonstrates how to integrate an external :term:`SCF` solver as a QDK/Chemistry plugin, enabling access through the standard API.
+
+.. rubric:: Interface requirements
+
+Each algorithm type in QDK/Chemistry defines an abstract base class specifying the interface that all implementations must satisfy:
+
+- A ``name()`` method that returns a unique identifier for the implementation
+- A ``_run_impl()`` method containing the computational logic
+- A ``settings()`` object for runtime configuration
+
+.. rubric:: Defining custom settings
+
+When an implementation requires configuration options beyond those provided by the base settings class, a derived settings class can be defined:
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-custom-settings
+      :end-before: // end-cell-custom-settings
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../_static/examples/python/custom_plugin.py
+      :language: python
+      :start-after: # start-cell-custom-settings
+      :end-before: # end-cell-custom-settings
+
+.. rubric:: Implementation structure
+
+The implementation class inherits from the algorithm base class and overrides the required methods.
+The ``_run_impl()`` method is responsible for:
+
+1. Converting QDK/Chemistry data structures to the external package's format
+2. Invoking the external computation
+3. Converting results back to QDK/Chemistry data structures
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-custom-scf-solver
+      :end-before: // end-cell-custom-scf-solver
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../_static/examples/python/custom_plugin.py
+      :language: python
+      :start-after: # start-cell-custom-scf-solver
+      :end-before: # end-cell-custom-scf-solver
+
+.. rubric:: Registration
+
+Implementations are registered with the algorithm factory to enable discovery and instantiation by name.
+Registration is typically performed during module initialization:
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-registration
+      :end-before: // end-cell-registration
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../_static/examples/python/custom_plugin.py
+      :language: python
+      :start-after: # start-cell-registration
+      :end-before: # end-cell-registration
+
+Following registration, the implementation is accessible through the standard API:
+
+.. literalinclude:: ../../_static/examples/python/custom_plugin.py
+   :language: python
+   :start-after: # start-cell-usage-after-registration
+   :end-before: # end-cell-usage-after-registration
+
+.. _custom-algorithm-types:
+
+Defining a new algorithm type
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When the required functionality does not correspond to an existing algorithm category, a new algorithm type can be defined.
+This section demonstrates the complete process using a geometry optimizer as an example.
+
+.. rubric:: Interface design
+
+The first step is to specify the algorithm's interface:
+
+Input type
+   The data the algorithm operates on (e.g., ``Structure``)
+Output type
+   The data the algorithm produces (e.g., optimized ``Structure``)
+Configuration
+   Required settings (e.g., convergence thresholds, iteration limits)
+
+.. rubric:: Settings class definition
+
+Define a settings class containing all configuration parameters:
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-geometry-settings
+      :end-before: // end-cell-geometry-settings
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../_static/examples/python/custom_plugin.py
+      :language: python
+      :start-after: # start-cell-geometry-settings
+      :end-before: # end-cell-geometry-settings
+
+.. rubric:: Base class definition
+
+Define an abstract base class specifying the interface for all implementations:
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-geometry-base-class
+      :end-before: // end-cell-geometry-base-class
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../_static/examples/python/custom_plugin.py
+      :language: python
+      :start-after: # start-cell-geometry-base-class
+      :end-before: # end-cell-geometry-base-class
+
+.. rubric:: Factory definition
+
+The factory manages implementation registration and provides instance creation:
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-geometry-factory
+      :end-before: // end-cell-geometry-factory
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../_static/examples/python/custom_plugin.py
+      :language: python
+      :start-after: # start-cell-geometry-factory
+      :end-before: # end-cell-geometry-factory
+
+.. rubric:: Concrete implementations
+
+Implement the algorithm by inheriting from the base class:
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-geometry-implementations
+      :end-before: // end-cell-geometry-implementations
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../_static/examples/python/custom_plugin.py
+      :language: python
+      :start-after: # start-cell-geometry-implementations
+      :end-before: # end-cell-geometry-implementations
+
+Additional implementations follow the same pattern:
+
+.. literalinclude:: ../../_static/examples/python/custom_plugin.py
+   :language: python
+   :start-after: # start-cell-steepest-descent
+   :end-before: # end-cell-steepest-descent
+
+.. rubric:: Registration
+
+Register the factory and all implementations:
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-geometry-registration
+      :end-before: // end-cell-geometry-registration
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../_static/examples/python/custom_plugin.py
+      :language: python
+      :start-after: # start-cell-geometry-registration
+      :end-before: # end-cell-geometry-registration
+
+.. rubric:: Usage
+
+Following registration, the new algorithm type is accessible through the standard API:
+
+.. literalinclude:: ../../_static/examples/python/custom_plugin.py
+   :language: python
+   :start-after: # start-cell-geometry-usage
+   :end-before: # end-cell-geometry-usage
+
+For additional information on the factory pattern and settings system, refer to the
+:doc:`factory pattern <algorithms/factory_pattern>` and :doc:`settings <algorithms/settings>` documentation.
+
+
+Further reading
+---------------
+
+- Custom plugin examples: `C++ source <../../_static/examples/cpp/custom_plugin.cpp>`__ | `Python source <../../_static/examples/python/custom_plugin.py>`__
+- Plugin usage examples: `C++ example <../../_static/examples/cpp/interfaces.cpp>`__ | `Python example <../../_static/examples/python/interfaces.py>`__
+- :doc:`Factory pattern <algorithms/factory_pattern>`
+- :doc:`Settings <algorithms/settings>`
+- :doc:`Serialization <data/serialization>`

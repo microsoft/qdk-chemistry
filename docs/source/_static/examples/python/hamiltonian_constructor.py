@@ -4,8 +4,9 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+from pathlib import Path
+
 from qdk_chemistry.algorithms import available, create
-import numpy as np
 from qdk_chemistry.data import Structure
 
 ################################################################################
@@ -31,15 +32,14 @@ hamiltonian_constructor.settings().set("eri_method", "direct")
 
 ################################################################################
 # start-cell-construct
-# Create a structure
-coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
-symbols = ["H", "H"]
-structure = Structure(coords, symbols)
+# Load a structure from XYZ file
+structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
 
-# Run an SCF to get orbitals
+# Run a SCF to get orbitals
 scf_solver = create("scf_solver")
-scf_solver.settings().set("basis_set", "sto-3g")
-E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+E_scf, wfn = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
 orbitals = wfn.get_orbitals()
 
 # Construct the Hamiltonian from orbitals
@@ -55,4 +55,13 @@ print(f"Two-body integrals shape: {h2_aaaa.shape}")
 print(f"Core energy: {core_energy:.10f} Hartree")
 print(hamiltonian.get_summary())
 # end-cell-construct
+################################################################################
+
+################################################################################
+# start-cell-list-implementations
+from qdk_chemistry.algorithms import registry  # noqa: E402
+
+print(registry.available("hamiltonian_constructor"))
+# ['qdk']
+# end-cell-list-implementations
 ################################################################################

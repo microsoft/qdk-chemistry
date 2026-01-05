@@ -7,20 +7,18 @@
 
 ################################################################################
 # start-cell-create
-import numpy as np
+from pathlib import Path
 from qdk_chemistry.data import Ansatz, Structure
 from qdk_chemistry.algorithms import create
 
-# Create a simple H2 molecule structure
-structure = Structure(
-    coordinates=np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]]),
-    symbols=["H", "H"],
-)
+# Load H2 molecule structure from XYZ file
+structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
 
 # SCF
 scf_solver = create("scf_solver")
-scf_solver.settings().set("basis_set", "sto-3g")
-E_scf, wfn_scf = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+E_scf, wfn_scf = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
 
 # Create Hamiltonian from SCF orbitals
 hamiltonian_constructor = create("hamiltonian_constructor")

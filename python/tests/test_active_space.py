@@ -40,9 +40,8 @@ class TestWavefunctionBasedActiveSpaceSelector:
         mol = data.Structure(coords, nuclear_charges)
 
         scf = algorithms.create("scf_solver")
-        scf.settings().set("basis_set", "cc-pvdz")
         scf.settings().set("method", "hf")
-        _, det = scf.run(mol, 0, 1)
+        _, det = scf.run(mol, 0, 1, "cc-pvdz")
         val_cas_selector = algorithms.create("active_space_selector", "qdk_valence")
         val_cas_selector.settings().set("num_active_electrons", 10)
         val_cas_selector.settings().set("num_active_orbitals", 8)

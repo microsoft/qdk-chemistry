@@ -23,6 +23,7 @@ from qdk_chemistry.algorithms import (
 )
 from qdk_chemistry.data import (
     Ansatz,
+    BasisSet,
     CasWavefunctionContainer,
     Configuration,
     CoupledClusterContainer,
@@ -175,12 +176,11 @@ class MockScfSolver(ScfSolver):
         # Define and set default settings
         self._settings._set_default("max_iterations", "int", 100)
         self._settings._set_default("convergence_threshold", "double", 1e-8)
-        self._settings._set_default("basis_set", "string", "def2-svp")
         self._settings._set_default("test_parameter", "string", "")
         self._settings._set_default("numeric_param", "double", 0.0)
         self._settings._set_default("list_param", "vector<int>", [])
 
-    def _run_impl(self, structure, charge: int, multiplicity: int, initial_guess: Orbitals | None = None):  # noqa: ARG002
+    def _run_impl(self, structure, charge: int, multiplicity: int, basis_or_guess: Orbitals | BasisSet | str):  # noqa: ARG002
         """A simple test implementation of the solve method."""
         # Simple test implementation - create valid orbitals
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])  # 2x2 identity
@@ -492,15 +492,15 @@ class TestAlgorithmClasses:
         assert settings["convergence_threshold"] == 1e-8
 
         # Test modifying settings
-        settings["basis_set"] = "STO-3G"
-        assert settings["basis_set"] == "STO-3G"
+        settings["max_iterations"] = 50
+        assert settings["max_iterations"] == 50
 
         # Test solve method with simple structure
         coords = np.array([[0.0, 0.0, 0.0]])
         symbols = ["H"]
         structure = Structure(coords, symbols)
 
-        energy, result = scf_solver.run(structure, 0, 1)
+        energy, result = scf_solver.run(structure, 0, 1, "STO-3G")
         assert isinstance(energy, float)
         assert isinstance(result, Wavefunction)
 

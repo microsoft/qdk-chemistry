@@ -8,6 +8,7 @@
 ################################################################################
 # start-cell-create
 import numpy as np
+from pathlib import Path
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
@@ -21,23 +22,46 @@ scf_solver = create("scf_solver")
 # Configure the SCF solver using the settings interface
 # Note that the following line is optional, since hf is the default method
 scf_solver.settings().set("method", "hf")
-# Set the basis set
-scf_solver.settings().set("basis_set", "def2-tzvpp")
 
 # end-cell-configure
 ################################################################################
 
 ################################################################################
 # start-cell-run
-# Specify a structure
-coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
-symbols = ["H", "H"]
-structure = Structure(coords, symbols=symbols)
+# Load structure from XYZ file
+structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
 
 # Run scf
-E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+E_scf, wfn = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="def2-tzvpp"
+)
 scf_orbitals = wfn.get_orbitals()
 
 print(f"SCF Energy: {E_scf:.10f} Hartree")
 # end-cell-run
+################################################################################
+
+################################################################################
+# start-cell-list-implementations
+from qdk_chemistry.algorithms import registry  # noqa: E402
+
+print(registry.available("scf_solver"))  # ['pyscf', 'qdk']
+# end-cell-list-implementations
+################################################################################
+
+################################################################################
+# start-cell-pyscf-example
+from qdk_chemistry.algorithms import create  # noqa: E402
+from qdk_chemistry.data import Structure  # noqa: E402
+
+# Create and configure the PySCF solver
+solver = create("scf_solver", "pyscf")
+solver.settings().set("method", "b3lyp")
+solver.settings().set("scf_type", "restricted")
+
+# Run with basis set specified as input parameter
+water_coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.76, 0.59], [0.0, -0.76, 0.59]])
+water = Structure(water_coords, symbols=["O", "H", "H"])
+energy, wfn = solver.run(water, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz")
+# end-cell-pyscf-example
 ################################################################################

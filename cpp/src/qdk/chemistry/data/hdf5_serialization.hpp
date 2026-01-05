@@ -13,7 +13,7 @@
 #include <vector>
 
 namespace qdk::chemistry::data {
-
+using MatrixVariant = std::variant<Eigen::MatrixXd, Eigen::MatrixXcd>;
 using VectorVariant = std::variant<Eigen::VectorXd, Eigen::VectorXcd>;
 
 /**
@@ -119,11 +119,30 @@ VectorVariant load_vector_variant_from_group(H5::Group& grp,
                                              const std::string& name,
                                              bool is_complex = false);
 
+/**
+ * @brief Load a matrix variant (real or complex) from an HDF5 group.
+ *
+ * Loads either a matrix (MatrixXd) or complex (MatrixXcd) Eigen matrix from
+ * an HDF5 group dataset. For complex matrices, expects HDF5 compound type
+ * with "r" (real) and "i" (imaginary) fields.
+ *
+ * @param grp HDF5 group handle
+ * @param name Name of the dataset in the group
+ * @param is_complex If true, loads as complex matrix; if false, loads as real
+ * matrix
+ * @return MatrixVariant containing either Eigen::MatrixXd or Eigen::MatrixXcd
+ * @throws std::runtime_error if dataset not found or has incorrect format
+ */
+MatrixVariant load_matrix_variant_from_group(H5::Group& grp,
+                                             const std::string& name,
+                                             bool is_complex);
+
 // STL container operations with files
 
 /**
  * @brief Save an STL vector to an HDF5 file as a dataset.
- * @tparam T Element type (must have corresponding h5_pred_type specialization)
+ * @tparam T Element type (must have corresponding h5_pred_type
+ * specialization)
  * @param file HDF5 file handle
  * @param dataset_name Name for the dataset in the HDF5 file
  * @param data STL vector to save
@@ -263,6 +282,30 @@ bool dataset_exists_in_group(H5::Group& group, const std::string& dataset_name);
  */
 bool group_exists_in_group(H5::Group& group, const std::string& group_name);
 
+/**
+ * @brief Save matrix variant to hdf5
+ * @param is_complex Whether or not matrix variant is complex (affects how
+ * stored)
+ * @param matrix_variant The matrix variant to store
+ * @param group Which hdf5 group to save to
+ * @param storage_name How to save in the dedicated group
+ */
+void save_matrix_variant_to_group(
+    bool is_complex, const std::shared_ptr<MatrixVariant>& matrix_variant,
+    H5::Group& group, const std::string& storage_name);
+
+/**
+ * @brief Save vector variant to hdf5 group
+ * @param is_vector_variant_complex Whether or not vector variant is complex
+ * (affects how it is stored)
+ * @param vector_variant The vector variant to store
+ * @param group Which hdf5 group to save to
+ * @param storage_name How to save in the dedicated group
+ */
+void save_vector_variant_to_group(
+    bool is_vector_variant_complex,
+    const std::shared_ptr<VectorVariant>& vector_variant, H5::Group& group,
+    const std::string& storage_name);
 // Template implementations
 
 // Save STL vector to HDF5 file

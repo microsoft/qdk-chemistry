@@ -5,12 +5,8 @@
 // Hamiltonian usage examples.
 // --------------------------------------------------------------------------------------------
 // start-cell-hamiltonian-creation
-// Create a structure object
-std::vector<Eigen::Vector3d> coords = {{0.00000000, 0.00000000, 0.00000000},
-                                       {2.70672414, 0.00000000, 0.00000000},
-                                       {-0.84290504, 2.07169023, 0.00000000}};
-std::vector<std::string> symbols = {"O", "H", "H"};
-Structure structure(coords, symbols);
+// Load structure from XYZ file
+auto structure = Structure::from_xyz_file("../data/water.structure.xyz");
 
 // Run initial SCF to get orbitals
 auto scf_solver = ScfSolverFactory::create();
