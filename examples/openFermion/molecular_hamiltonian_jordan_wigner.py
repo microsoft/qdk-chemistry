@@ -114,17 +114,16 @@ two_body_coefficients = np.zeros(
 # For those less familiar with vectorized notation:
 # one_body_coefficients[2 * p, 2 * q] = one_body_aa[p, q]
 # one_body_coefficients[2 * p + 1, 2 * q + 1] = one_body_bb[p, q]
-# two_body_coefficients[2 * p, 2 * q, 2 * r, 2 * s] = two_body_phys[ p, q, r, s ]
-# two_body_coefficients[2 * p + 1, 2 * q + 1, 2 * r + 1, 2 * s + 1] = two_body_phys[p, q, r, s]
-# two_body_coefficients[2 * p, 2 * q + 1, 2 * r + 1, 2 * s] = two_body_phys[ p, q, r, s ]
-# two_body_coefficients[2 * p + 1, 2 * q, 2 * r, 2 * s + 1] = two_body_phys[  p, q, r, s ]
+# two_body_coefficients[2 * p, 2 * r, 2 * s, 2 * q] = two_body_phys[ p, r, s, q ]
+# two_body_coefficients[2 * p + 1, 2 * r + 1, 2 * s + 1, 2 * q + 1] = two_body_phys[p, r, s, q]
+# two_body_coefficients[2 * p, 2 * r + 1, 2 * s + 1, 2 * q] = two_body_phys[ p, r, s, q ]
+# two_body_coefficients[2 * p + 1, 2 * r, 2 * s, 2 * q + 1] = two_body_phys[  p, r, s, q ]
 one_body_coefficients[0::2, 0::2] = one_body_aa
 one_body_coefficients[1::2, 1::2] = one_body_bb
 two_body_coefficients[0::2, 0::2, 0::2, 0::2] = two_body_phys
 two_body_coefficients[1::2, 1::2, 1::2, 1::2] = two_body_phys
-two_body_coefficients[0::2, 1::2, 1::2, 0::2] = (
-    two_body_phys  # note order of last two indices again
-)
+# note order of last two indices again
+two_body_coefficients[0::2, 1::2, 1::2, 0::2] = two_body_phys
 two_body_coefficients[1::2, 0::2, 0::2, 1::2] = two_body_phys
 
 core_energy = active_hamiltonian.get_core_energy()  # Core energy constant
@@ -149,35 +148,3 @@ sparse_hamiltonian = get_sparse_operator(qubit_hamiltonian)
 energy, state = get_ground_state(sparse_hamiltonian)
 Logger.info(f"Ground state energy before rotation is {energy: .15f} Hartree.")
 
-# Randomly rotate.
-n_orbitals = open_fermion_molecular_hamiltonian.n_qubits // 2
-n_variables = int(n_orbitals * (n_orbitals - 1) / 2)
-np.random.seed(1)
-random_angles = np.pi * (1.0 - 2.0 * np.random.rand(n_variables))
-kappa = np.zeros((n_orbitals, n_orbitals))
-index = 0
-for p in range(n_orbitals):
-    for q in range(p + 1, n_orbitals):
-        kappa[p, q] = random_angles[index]
-        kappa[q, p] = -np.conjugate(random_angles[index])
-        index += 1
-
-    # Build the unitary rotation matrix.
-    difference_matrix = kappa + kappa.transpose()
-    rotation_matrix = scipy.linalg.expm(kappa)
-
-    # Apply the unitary.
-    open_fermion_molecular_hamiltonian.rotate_basis(rotation_matrix)
-
-# Get qubit Hamiltonian in rotated basis.
-qubit_hamiltonian = jordan_wigner(open_fermion_molecular_hamiltonian)
-qubit_hamiltonian.compress()
-
-Logger.info("=== The Jordan-Wigner Hamiltonian in rotated basis : ===")
-message = str(qubit_hamiltonian)
-Logger.info(message)
-
-# Get sparse Hamiltonian and energy in rotated basis.
-sparse_hamiltonian = get_sparse_operator(qubit_hamiltonian)
-energy, state = get_ground_state(sparse_hamiltonian)
-Logger.info(f"Ground state energy after rotation is {energy: .15f} Hartree.")
