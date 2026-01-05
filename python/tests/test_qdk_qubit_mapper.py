@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms import QdkQubitMapper, QubitMapper
+from qdk_chemistry.algorithms import QubitMapper, available, create
 from qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper import (
     _bk_compute_ancestor_indices,
     _bk_compute_children_indices,
@@ -90,32 +90,33 @@ class TestQdkQubitMapper:
     """Tests for QdkQubitMapper."""
 
     def test_instantiation(self) -> None:
-        """Test basic instantiation and interface."""
-        mapper = QdkQubitMapper()
+        """Test basic instantiation via factory and interface."""
+        assert "qdk" in available("qubit_mapper")
+        mapper = create("qubit_mapper", "qdk")
         assert isinstance(mapper, QubitMapper)
         assert mapper.name() == "qdk"
         assert mapper.type_name() == "qubit_mapper"
 
     def test_default_settings(self) -> None:
         """Test default settings values."""
-        mapper = QdkQubitMapper()
+        mapper = create("qubit_mapper", "qdk")
         assert mapper.settings().get("mapping_type") == "jordan_wigner"
         assert mapper.settings().get("threshold") == 1e-12
 
     def test_custom_threshold(self) -> None:
-        """Test custom threshold can be set."""
-        mapper = QdkQubitMapper(threshold=1e-10)
+        """Test custom threshold can be set via factory kwargs."""
+        mapper = create("qubit_mapper", "qdk", threshold=1e-10)
         assert mapper.settings().get("threshold") == 1e-10
 
     def test_invalid_mapping_type_raises(self) -> None:
         """Test that invalid mapping type raises ValueError."""
-        mapper = QdkQubitMapper()
+        mapper = create("qubit_mapper", "qdk")
         with pytest.raises(ValueError, match="out of allowed options"):
             mapper.settings().set("mapping_type", "invalid_type")
 
     def test_simple_hamiltonian(self) -> None:
         """Test mapping a simple diagonal Hamiltonian."""
-        mapper = QdkQubitMapper()
+        mapper = create("qubit_mapper", "qdk")
         hamiltonian = create_test_hamiltonian(2)
 
         result = mapper.run(hamiltonian)
@@ -128,7 +129,7 @@ class TestQdkQubitMapper:
 
     def test_number_operator(self) -> None:
         """Test JW transform of number operator: a†a = (I - Z) / 2."""
-        mapper = QdkQubitMapper()
+        mapper = create("qubit_mapper", "qdk")
 
         # h_00 = 1 gives n_0 = (I - Z_0)/2 for each spin
         n_orbitals = 1
@@ -147,7 +148,7 @@ class TestQdkQubitMapper:
 
     def test_core_energy_as_identity(self) -> None:
         """Test that core energy appears as identity coefficient."""
-        mapper = QdkQubitMapper()
+        mapper = create("qubit_mapper", "qdk")
 
         n_orbitals = 1
         one_body = np.zeros((1, 1))
@@ -162,7 +163,7 @@ class TestQdkQubitMapper:
 
     def test_threshold_pruning(self) -> None:
         """Test that small coefficients are pruned."""
-        mapper = QdkQubitMapper(threshold=0.1)
+        mapper = create("qubit_mapper", "qdk", threshold=0.1)
         hamiltonian = create_test_hamiltonian(2)
 
         result = mapper.run(hamiltonian)
@@ -172,8 +173,15 @@ class TestQdkQubitMapper:
 
     def test_pauli_strings_format(self) -> None:
         """Test Pauli string format."""
-        mapper = QdkQubitMapper()
+        mapper = create("qubit_mapper", "qdk")
         hamiltonian = create_test_hamiltonian(2)
+
+        result = mapper.run(hamiltonian)
+
+        for ps in result.pauli_strings:
+            assert isinstance(ps, str)
+            assert len(ps) == 4
+            assert all(c in "IXYZ" for c in ps)
 
         result = mapper.run(hamiltonian)
 
@@ -195,7 +203,7 @@ class TestQdkQubitMapperRealHamiltonians:
         """Test ethylene 4e4o Hamiltonian mapping."""
         hamiltonian = Hamiltonian.from_json_file(test_data_path / "ethylene_4e4o_2det.hamiltonian.json")
 
-        mapper = QdkQubitMapper()
+        mapper = create("qubit_mapper", "qdk")
         result = mapper.run(hamiltonian)
 
         h1_alpha, _ = hamiltonian.get_one_body_integrals()
@@ -210,7 +218,7 @@ class TestQdkQubitMapperRealHamiltonians:
         """Test F2 10e6o Hamiltonian mapping."""
         hamiltonian = Hamiltonian.from_json_file(test_data_path / "f2_10e6o.hamiltonian.json")
 
-        mapper = QdkQubitMapper()
+        mapper = create("qubit_mapper", "qdk")
         result = mapper.run(hamiltonian)
 
         h1_alpha, _ = hamiltonian.get_one_body_integrals()
@@ -224,7 +232,6 @@ class TestQdkQubitMapperRealHamiltonians:
         pytest.importorskip("qiskit_nature")
         SparsePauliOp = pytest.importorskip("qiskit.quantum_info").SparsePauliOp  # noqa: N806
         FermionicOp = pytest.importorskip("qiskit_nature.second_q.operators").FermionicOp  # noqa: N806
-        create = pytest.importorskip("qdk_chemistry.algorithms").create
 
         hamiltonian = Hamiltonian.from_json_file(test_data_path / "ethylene_4e4o_2det.hamiltonian.json")
         threshold = 1e-12
@@ -236,7 +243,7 @@ class TestQdkQubitMapperRealHamiltonians:
             FermionicOp.atol = threshold
             SparsePauliOp.atol = threshold
 
-            qdk_result = QdkQubitMapper(threshold=threshold).run(hamiltonian)
+            qdk_result = create("qubit_mapper", "qdk", threshold=threshold).run(hamiltonian)
             qiskit_result = create("qubit_mapper", "qiskit", encoding="jordan-wigner").run(hamiltonian)
         finally:
             FermionicOp.atol = original_fermionic_atol
@@ -266,13 +273,13 @@ class TestBravyiKitaevMapper:
     """Tests for Bravyi-Kitaev mapping."""
 
     def test_bk_instantiation(self) -> None:
-        """Test BK mapping type is valid."""
-        mapper = QdkQubitMapper(mapping_type="bravyi_kitaev")
+        """Test BK mapping type is valid via factory."""
+        mapper = create("qubit_mapper", "qdk", mapping_type="bravyi_kitaev")
         assert mapper.settings().get("mapping_type") == "bravyi_kitaev"
 
     def test_bk_simple_hamiltonian(self) -> None:
         """Test BK mapping of simple Hamiltonian."""
-        mapper = QdkQubitMapper(mapping_type="bravyi_kitaev")
+        mapper = create("qubit_mapper", "qdk", mapping_type="bravyi_kitaev")
         hamiltonian = create_test_hamiltonian(2)
 
         result = mapper.run(hamiltonian)
@@ -294,7 +301,7 @@ class TestBravyiKitaevMapper:
         - n_1 (beta, j=1): F(1)={0}, so n_1 = 0.5*(I - Z_0*Z_1)
         Total with h_00=1: H = n_0 + n_1 = I - 0.5*Z_0 - 0.5*Z_0*Z_1
         """
-        mapper_bk = QdkQubitMapper(mapping_type="bravyi_kitaev")
+        mapper_bk = create("qubit_mapper", "qdk", mapping_type="bravyi_kitaev")
 
         # h_00 = 1 gives H = n_0_alpha + n_0_beta
         n_orbitals = 1
@@ -316,7 +323,7 @@ class TestBravyiKitaevMapper:
 
     def test_bk_core_energy(self) -> None:
         """Test that core energy appears as identity coefficient in BK."""
-        mapper = QdkQubitMapper(mapping_type="bravyi_kitaev")
+        mapper = create("qubit_mapper", "qdk", mapping_type="bravyi_kitaev")
 
         n_orbitals = 1
         one_body = np.zeros((1, 1))
@@ -339,7 +346,6 @@ class TestBravyiKitaevMapper:
         pytest.importorskip("qiskit_nature")
         SparsePauliOp = pytest.importorskip("qiskit.quantum_info").SparsePauliOp  # noqa: N806
         FermionicOp = pytest.importorskip("qiskit_nature.second_q.operators").FermionicOp  # noqa: N806
-        create = pytest.importorskip("qdk_chemistry.algorithms").create
 
         hamiltonian = Hamiltonian.from_json_file(test_data_path / "ethylene_4e4o_2det.hamiltonian.json")
         threshold = 1e-12
@@ -351,7 +357,9 @@ class TestBravyiKitaevMapper:
             FermionicOp.atol = threshold
             SparsePauliOp.atol = threshold
 
-            qdk_result = QdkQubitMapper(mapping_type="bravyi_kitaev", threshold=threshold).run(hamiltonian)
+            qdk_result = create("qubit_mapper", "qdk", mapping_type="bravyi_kitaev", threshold=threshold).run(
+                hamiltonian
+            )
             qiskit_result = create("qubit_mapper", "qiskit", encoding="bravyi-kitaev").run(hamiltonian)
         finally:
             FermionicOp.atol = original_fermionic_atol
