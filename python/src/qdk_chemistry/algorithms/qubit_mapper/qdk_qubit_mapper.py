@@ -27,9 +27,6 @@ if TYPE_CHECKING:
 
 __all__ = ["QdkQubitMapper", "QdkQubitMapperSettings"]
 
-# Valid mapping types (extensible for future encodings)
-_VALID_MAPPING_TYPES = frozenset({"jordan_wigner", "bravyi_kitaev"})
-
 # =============================================================================
 # Bravyi-Kitaev Binary Tree Index Sets
 # =============================================================================
@@ -294,12 +291,9 @@ class QdkQubitMapper(QubitMapper):
         """
         Logger.trace_entering()
 
-        # Get number of spin-orbitals for cache pre-population
         h1_alpha, _ = hamiltonian.get_one_body_integrals()
         n_spin_orbitals = 2 * h1_alpha.shape[0]
 
-        # Build ladder operators using Jordan-Wigner transformation
-        # Pre-build all operators upfront to maximize cache benefit
         _creation_cache: dict[int, PauliOperator] = {}
         _annihilation_cache: dict[int, PauliOperator] = {}
 
@@ -374,18 +368,15 @@ class QdkQubitMapper(QubitMapper):
         """
         Logger.trace_entering()
 
-        # Get number of spin-orbitals for cache pre-population
         h1_alpha, _ = hamiltonian.get_one_body_integrals()
         n_spin_orbitals = 2 * h1_alpha.shape[0]
 
-        # Find binary superset size (next power of 2 >= n_spin_orbitals)
+        # Binary superset size (next power of 2)
         bin_sup = 1
         while n_spin_orbitals > 2**bin_sup:
             bin_sup += 1
         n_binary = 2**bin_sup
 
-        # Pre-compute BK sets for all spin-orbitals using binary superset
-        # Then filter to indices < n_spin_orbitals
         update_sets: dict[int, frozenset[int]] = {}
         parity_sets: dict[int, frozenset[int]] = {}
         remainder_sets: dict[int, frozenset[int]] = {}
@@ -417,11 +408,6 @@ class QdkQubitMapper(QubitMapper):
                 result = result * factory(q)
             return result
 
-        # Construct BK ladder operators from binary tree index sets.
-        # The decomposition into X and Y components follows from the requirement
-        # that creation/annihilation operators satisfy fermionic anticommutation.
-        # Reference: Seeley et al., J. Chem. Phys. 137, 224109 (2012), Eq. (20-21).
-
         _creation_cache: dict[int, PauliOperator] = {}
         _annihilation_cache: dict[int, PauliOperator] = {}
 
@@ -430,23 +416,19 @@ class QdkQubitMapper(QubitMapper):
             if p in _creation_cache:
                 return _creation_cache[p]
 
-            # X-component: Z on parity qubits, X on orbital p, X on ancestor qubits
             x_component = PauliOperator.X(p)
             if parity_sets[p]:
                 x_component = build_pauli_chain("Z", parity_sets[p]) * x_component
             if update_sets[p]:
                 x_component = x_component * build_pauli_chain("X", update_sets[p])
 
-            # Y-component: Z on remainder qubits, Y on orbital p, X on ancestor qubits
             y_component = PauliOperator.Y(p)
             if remainder_sets[p]:
                 y_component = build_pauli_chain("Z", remainder_sets[p]) * y_component
             if update_sets[p]:
                 y_component = y_component * build_pauli_chain("X", update_sets[p])
 
-            # Creation operator: a†_p = (1/2)(X_component - i·Y_component)
             result = 0.5 * x_component - 0.5j * y_component
-
             _creation_cache[p] = result
             return result
 
@@ -455,27 +437,22 @@ class QdkQubitMapper(QubitMapper):
             if p in _annihilation_cache:
                 return _annihilation_cache[p]
 
-            # X-component: Z on parity qubits, X on orbital p, X on ancestor qubits
             x_component = PauliOperator.X(p)
             if parity_sets[p]:
                 x_component = build_pauli_chain("Z", parity_sets[p]) * x_component
             if update_sets[p]:
                 x_component = x_component * build_pauli_chain("X", update_sets[p])
 
-            # Y-component: Z on remainder qubits, Y on orbital p, X on ancestor qubits
             y_component = PauliOperator.Y(p)
             if remainder_sets[p]:
                 y_component = build_pauli_chain("Z", remainder_sets[p]) * y_component
             if update_sets[p]:
                 y_component = y_component * build_pauli_chain("X", update_sets[p])
 
-            # Annihilation operator: a_p = (1/2)(X_component + i·Y_component)
             result = 0.5 * x_component + 0.5j * y_component
-
             _annihilation_cache[p] = result
             return result
 
-        # Pre-populate caches for all spin-orbitals
         for i in range(n_spin_orbitals):
             creation_operator(i)
             annihilation_operator(i)
@@ -515,18 +492,13 @@ class QdkQubitMapper(QubitMapper):
         """
         Logger.trace_entering()
 
-        # Get integrals - using chemist notation (pq|rs)
         h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
         h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
         core_energy = hamiltonian.get_core_energy()
 
-        # Infer n_spatial from integral shape (not from orbitals which may include
-        # inactive/virtual orbitals outside the active space)
         n_spatial = h1_alpha.shape[0]
         n_spin_orbitals = 2 * n_spatial
 
-        # Build the qubit Hamiltonian expression
-        # Start with core energy as identity term
         qubit_expr = core_energy * PauliOperator.I(0)
 
         # Spin-orbital index functions (blocked ordering: alpha then beta)
@@ -536,7 +508,6 @@ class QdkQubitMapper(QubitMapper):
         def beta_idx(p: int) -> int:
             return p + n_spatial
 
-        # Get chemist integral (pq|rs)
         def get_eri(p: int, q: int, r: int, s: int, channel: str) -> float:
             """Get (pq|rs) integral in chemist notation."""
             idx = p + q * n_spatial + r * n_spatial**2 + s * n_spatial**3
@@ -556,14 +527,7 @@ class QdkQubitMapper(QubitMapper):
             key = (p, q)
             if key in _excitation_cache:
                 return _excitation_cache[key]
-
-            # Always use ladder operator multiplication
-            # The diagonal n_p = a†_p a_p has different forms for different encodings:
-            # - Jordan-Wigner: n_p = (I - Z_p) / 2
-            # - Bravyi-Kitaev: n_p = (I - Z_p * prod_{k in F(p)} Z_k) / 2
-            # Using the general form ensures correctness for all encodings.
             result = creation_operator(p) * annihilation_operator(q)
-
             _excitation_cache[key] = result
             return result
 
@@ -590,7 +554,6 @@ class QdkQubitMapper(QubitMapper):
             e_alpha = excitation_operator(alpha_idx(p), alpha_idx(q))
             e_beta = excitation_operator(beta_idx(p), beta_idx(q))
             result = (e_alpha + e_beta).simplify()
-
             _spin_summed_excitation_cache[key] = result
             return result
 
@@ -599,13 +562,10 @@ class QdkQubitMapper(QubitMapper):
             for j in range(n_spatial):
                 spin_summed_excitation(i, j)
 
-        # One-body terms: sum_{pq} h_pq * E_pq (using spin-summed operators for spin-free case)
-        # For spin-free Hamiltonians: h_pq_alpha == h_pq_beta, so we can use spin-summed E_pq
         Logger.debug("Building one-body terms...")
         is_spin_free = np.allclose(h1_alpha, h1_beta) and np.allclose(h2_aaaa, h2_bbbb)
 
         if is_spin_free:
-            # Use spin-summed excitation operators for efficiency
             for p in range(n_spatial):
                 for q in range(n_spatial):
                     h_pq = float(h1_alpha[p, q])
@@ -630,15 +590,6 @@ class QdkQubitMapper(QubitMapper):
         # Simplify one-body terms to keep expression tree flat
         qubit_expr = qubit_expr.simplify()
 
-        # Two-body terms using chemist notation:
-        # The two-body Hamiltonian is (1/2) sum over pqrs and spins sigma,tau of
-        # (pq|rs) times creation(p,sigma) creation(r,tau) annihilation(s,tau) annihilation(q,sigma)
-        #
-        # For spin-free Hamiltonians, use spin-summed factorization:
-        # e_pqrs becomes E_pq times E_rs minus delta(q,r) times E_ps
-        # where E_pq sums over alpha and beta spins (already simplified and cached)
-        #
-        # This reduces the loop from 4*n^4 to n^4 iterations and reuses cached operators.
         Logger.debug("Building two-body terms...")
 
         if is_spin_free:
@@ -646,20 +597,17 @@ class QdkQubitMapper(QubitMapper):
             # Contribution is (1/2) sum over pqrs of g_pqrs times (E_pq E_rs minus delta(q,r) E_ps)
             # where E_pq are spin-summed and already simplified/cached
             for p in range(n_spatial):
-                # Build terms for this p value (n³ terms)
                 p_batch_expr = 0.0 * PauliOperator.I(0)
                 for q in range(n_spatial):
                     for r in range(n_spatial):
                         for s in range(n_spatial):
-                            eri = get_eri(p, q, r, s, "aaaa")  # All channels are equal
+                            eri = get_eri(p, q, r, s, "aaaa")
                             if abs(eri) > integral_threshold:
-                                # Use spin-summed factorization: E_pq * E_rs - delta_qr * E_ps
                                 e_pq = spin_summed_excitation(p, q)
                                 e_rs = spin_summed_excitation(r, s)
                                 product_term = e_pq * e_rs
 
                                 if q == r:
-                                    # Kronecker delta correction
                                     e_ps = spin_summed_excitation(p, s)
                                     term = 0.5 * eri * (product_term - e_ps)
                                 else:
@@ -667,12 +615,9 @@ class QdkQubitMapper(QubitMapper):
 
                                 p_batch_expr = p_batch_expr + term
 
-                # Simplify this p-batch and accumulate
-                p_batch_simplified = p_batch_expr.simplify()
-                qubit_expr = qubit_expr + p_batch_simplified
+                qubit_expr = qubit_expr + p_batch_expr.simplify()
 
         else:
-            # General case: process each spin channel separately
             for channel_name, spin1_idx, spin2_idx, channel_key, is_same_spin in [
                 ("aaaa", alpha_idx, alpha_idx, "aaaa", True),
                 ("bbbb", beta_idx, beta_idx, "bbbb", True),
@@ -705,30 +650,23 @@ class QdkQubitMapper(QubitMapper):
 
                                     p_batch_expr = p_batch_expr + term
 
-                    p_batch_simplified = p_batch_expr.simplify()
-                    channel_expr = channel_expr + p_batch_simplified
+                    channel_expr = channel_expr + p_batch_expr.simplify()
 
                 qubit_expr = qubit_expr + channel_expr
 
-        # Simplify and prune the expression
-        # Threshold is applied to final Pauli coefficients, not input fermionic coefficients
         Logger.debug("Simplifying expression...")
         simplified = qubit_expr.simplify()
         pruned = simplified.prune_threshold(threshold)
 
-        # Extract canonical terms
         canonical_terms = pruned.to_canonical_terms(n_spin_orbitals)
 
-        # Build output arrays
-        # Note: PauliOperator uses big-endian ordering (qubit 0 at leftmost),
-        # but Qiskit convention is little-endian (qubit 0 at rightmost).
-        # We reverse the strings to match Qiskit convention.
+        # Reverse strings: PauliOperator is big-endian, Qiskit is little-endian
         pauli_strings = []
         coefficients = []
 
         for coeff, pauli_str in canonical_terms:
             if abs(coeff) > threshold:
-                # Reverse string to convert from big-endian to little-endian
+                # Convert to Qiskit-style little-endian ordering
                 pauli_strings.append(pauli_str[::-1])
                 coefficients.append(coeff)
 
