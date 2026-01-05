@@ -298,9 +298,12 @@ def test_sample_rdkit_geometry():
     assert any("Number of atoms" in line for line in lines), "Expected molecular summary not found in output."
 
     # Extract and validate the SCF energy
-    scf_energy = _extract_float(r"SCF Energy: ([+\-0-9.]+) Hartree", result.stdout)
+    output_text = "\n".join(lines)
+    scf_energy = _extract_float(r"SCF Energy: ([+\-0-9.]+) Hartree", output_text)
 
-    # Water SCF energy is expected to be bad because UFF is not expected to yield a high-quality geometry
+    # The UFF-derived water geometry is not a fully optimized, high-accuracy structure, but
+    # for this fixed approximate geometry the SCF energy is deterministic and used as a
+    # precise regression reference.
     # FYI: optimized geometry has energy -76.0270535 Hartree at this level of theory
     reference_scf_energy = -76.02319617
 
