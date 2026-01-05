@@ -84,7 +84,7 @@ std::unique_ptr<HamiltonianContainer> DensityFittedHamiltonian::clone() const {
 
 std::string DensityFittedHamiltonian::get_container_type() const {
   QDK_LOG_TRACE_ENTERING();
-  return "canonical_4_center";
+  return "denisity_fitted";
 }
 
 std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
