@@ -21,12 +21,12 @@ from .reference_tolerances import (
     sci_energy_tolerance,
 )
 from .test_sample_workflow_utils import (
+    _assert_warning_constraints,
     _collect_output_lines,
     _extract_sparse_ci_summary,
     _find_line,
     _run_workflow,
     _skip_for_mpi_failure,
-    _assert_warning_constraints,
 )
 
 

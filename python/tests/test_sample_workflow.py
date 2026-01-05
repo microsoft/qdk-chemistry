@@ -3,10 +3,11 @@
 This module contains tests for notebooks and interoperability samples
 (Pennylane, Q#) that are not covered by dedicated test modules.
 
-See also:
+See Also:
 - test_sample_workflow_sci.py - Sparse-CI workflow tests
 - test_sample_workflow_rdkit.py - RDKit geometry tests
 - test_sample_workflow_qiskit.py - Qiskit IQPE tests
+
 """
 
 # --------------------------------------------------------------------------------------------
@@ -15,7 +16,6 @@ See also:
 # --------------------------------------------------------------------------------------------
 
 import pytest
-
 
 ################################################################################
 # Sample notebook testing
@@ -58,4 +58,3 @@ def test_qsharp_iqpe_no_trotter():
     """Test the examples/qsharp/iqpe_no_trotter.qs script."""
     # TODO: Need to implement this test (see https://github.com/microsoft/qdk-chemistry/issues/200)
     raise NotImplementedError("TODO: add qsharp/iqpe_no_trotter.qs test.")
-
