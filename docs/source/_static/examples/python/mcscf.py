@@ -7,10 +7,7 @@
 
 ################################################################################
 # start-cell-create
-import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Structure
-from qdk_chemistry.utils import compute_valence_space_parameters
 
 # Create a HamiltonianConstructor
 ham_constructor = create("hamiltonian_constructor")
@@ -40,6 +37,10 @@ mcscf.settings().set("max_cycle_macro", 50)
 
 ################################################################################
 # start-cell-run
+import numpy as np  # noqa: E402
+from qdk_chemistry.data import Structure  # noqa: E402
+from qdk_chemistry.utils import compute_valence_space_parameters  # noqa: E402
+
 # Create a molecular structure (N2 molecule)
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 2.074]])
 structure = Structure(coords, symbols=["N", "N"])
@@ -72,7 +73,7 @@ print(f"Correlation energy: {E_mcscf - E_scf:.10f} Hartree")
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry
+from qdk_chemistry.algorithms import registry  # noqa: E402
 
 print(registry.available("multi_configuration_scf"))
 # ['pyscf']
