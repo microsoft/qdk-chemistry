@@ -52,6 +52,7 @@ elif [[ ${MARCH} == 'x86-64-v3' ]]; then
 fi
 
 make -j$(nproc)
+make check
 
 if [[ ${MAC_BUILD} == "ON" ]]; then
     sudo make install
