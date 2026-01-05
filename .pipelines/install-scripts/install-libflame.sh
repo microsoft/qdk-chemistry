@@ -52,7 +52,7 @@ export PYTHON=/usr/bin/python3
         --target=$LIBFLAME_ARCH
 elif [[ ${MAC_BUILD} == "ON" ]]; then
     export PYTHON=/usr/local/bin/python3
-    CFLAGS="${CFLAGS}" ./configure \
+    CFLAGS="${CFLAGS} -march=native" ./configure \
         --build=$LIBFLAME_BUILD \
         --enable-static-build \
         --prefix=${INSTALL_PREFIX} \
