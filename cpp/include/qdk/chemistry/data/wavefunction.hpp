@@ -147,25 +147,28 @@ transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
  *
  * This utility function merges duplicate determinants in a CI expansion by
  * summing their coefficients. Determinants with coefficients below the
- * threshold (1e-14) are removed.
+ * threshold are removed.
  *
  * @tparam T Coefficient type (double or std::complex<double>)
  * @param determinants Vector of determinants (modified in place)
  * @param coefficients Vector of coefficients (modified in place)
+ * @param threshold Coefficient magnitude threshold for pruning (default
+ *                  std::numeric_limits<double>::epsilon())
  */
 template <typename T>
-void consolidate_determinants(std::vector<Configuration>& determinants,
-                              std::vector<T>& coefficients);
+void consolidate_determinants(
+    std::vector<Configuration>& determinants, std::vector<T>& coefficients,
+    double threshold = std::numeric_limits<double>::epsilon());
 
 /// @cond DOXYGEN_SKIP
 // Explicit template declarations (hidden from Doxygen to avoid Sphinx parsing
 // issues)
 extern template void consolidate_determinants<double>(
-    std::vector<Configuration>& determinants,
-    std::vector<double>& coefficients);
+    std::vector<Configuration>& determinants, std::vector<double>& coefficients,
+    double threshold);
 extern template void consolidate_determinants<std::complex<double>>(
     std::vector<Configuration>& determinants,
-    std::vector<std::complex<double>>& coefficients);
+    std::vector<std::complex<double>>& coefficients, double threshold);
 /// @endcond
 
 }  // namespace detail

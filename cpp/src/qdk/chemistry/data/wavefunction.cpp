@@ -104,7 +104,7 @@ transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
 
 template <typename T>
 void consolidate_determinants(std::vector<Configuration>& determinants,
-                              std::vector<T>& coefficients) {
+                              std::vector<T>& coefficients, double threshold) {
   if (determinants.empty()) {
     return;
   }
@@ -126,7 +126,6 @@ void consolidate_determinants(std::vector<Configuration>& determinants,
   determinants.clear();
   coefficients.clear();
 
-  constexpr double threshold = 1e-14;
   for (const auto& [key, det_coef] : det_map) {
     if (std::abs(det_coef.second) > threshold) {
       determinants.push_back(det_coef.first);
@@ -137,11 +136,11 @@ void consolidate_determinants(std::vector<Configuration>& determinants,
 
 // Explicit template instantiations
 template void consolidate_determinants<double>(
-    std::vector<Configuration>& determinants,
-    std::vector<double>& coefficients);
+    std::vector<Configuration>& determinants, std::vector<double>& coefficients,
+    double threshold);
 template void consolidate_determinants<std::complex<double>>(
     std::vector<Configuration>& determinants,
-    std::vector<std::complex<double>>& coefficients);
+    std::vector<std::complex<double>>& coefficients, double threshold);
 
 }  // namespace detail
 

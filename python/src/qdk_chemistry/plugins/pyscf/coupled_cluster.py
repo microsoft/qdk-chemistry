@@ -137,7 +137,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                 - ket_wavefunction: Wavefunction containing T amplitudes (ket state).
                 - bra_wavefunction (optional): If compute_bra is True, a second Wavefunction
                   containing the lambda (gamma) amplitudes representing the bra state.
-                  When compute_bra is False, only (total_energy, ket_wavefunction) is returned.
+                  When compute_bra is False, only (total_energy, ket_wavefunction, None) is returned.
 
         Raises:
             RuntimeError: If the CCSD calculation does not converge.
