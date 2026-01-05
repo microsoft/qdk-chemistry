@@ -5,6 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from .first_order_trotter import FirstOrderTrotterConstructor, FirstOrderTrotterConstructorSettings
+from .first_order_trotter import FirstOrderTrotter, FirstOrderTrotterSettings
 
-__all__ = ["FirstOrderTrotterConstructor", "FirstOrderTrotterConstructorSettings"]
+__all__ = ["FirstOrderTrotter", "FirstOrderTrotterSettings"]

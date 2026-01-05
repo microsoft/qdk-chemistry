@@ -45,6 +45,15 @@ class TimeEvolutionUnitary(DataClass):
         """
         return self._container.type
 
+    def get_container(self) -> TimeEvolutionUnitaryContainer:
+        """Get the time evolution unitary container.
+
+        Returns:
+            The time evolution unitary container.
+
+        """
+        return self._container
+
     def get_num_qubits(self) -> int:
         """Get the number of qubits the time evolution unitary acts on.
 

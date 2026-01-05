@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.time_evolution.constructor.trotter.first_order_trotter import (
-    FirstOrderTrotterConstructor,
+    FirstOrderTrotter,
     _decompose_trotter_step,
     _pauli_label_to_map,
 )
@@ -80,18 +80,18 @@ class TestDecomposeTrotterStep:
             _decompose_trotter_step(hamiltonian, time=1.0)
 
 
-class TestFirstOrderTrotterConstructor:
-    """Tests for the FirstOrderTrotterConstructor class."""
+class TestFirstOrderTrotter:
+    """Tests for the FirstOrderTrotter class."""
 
     def test_name(self):
-        """Test the name method of FirstOrderTrotterConstructor."""
-        ctor = FirstOrderTrotterConstructor()
+        """Test the name method of FirstOrderTrotter."""
+        ctor = FirstOrderTrotter()
         assert ctor.name() == "first_order_trotter"
 
     def test_single_step_construction(self):
         """Test construction of time evolution unitary with a single Trotter step."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
-        ctor = FirstOrderTrotterConstructor(num_trotter_steps=1)
+        ctor = FirstOrderTrotter(num_trotter_steps=1)
         unitary = ctor.run(hamiltonian, time=0.2)
 
         assert isinstance(unitary, TimeEvolutionUnitary)
@@ -109,7 +109,7 @@ class TestFirstOrderTrotterConstructor:
             coefficients=[2.0, 1.0],
         )
 
-        ctor = FirstOrderTrotterConstructor(num_trotter_steps=4)
+        ctor = FirstOrderTrotter(num_trotter_steps=4)
         unitary = ctor.run(hamiltonian, time=0.2)
 
         container = unitary._container

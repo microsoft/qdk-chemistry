@@ -16,35 +16,35 @@ from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
 __all__: list[str] = []
 
 
-class FirstOrderTrotterConstructorSettings(Settings):
-    """Settings for first-order Trotterization unitary constructor.
-
-    Attributes:
-        num_trotter_steps (int): The number of Trotter steps to use in the construction.
-        tolerance (float): The absolute tolerance for filtering small coefficients.
-
-    """
+class FirstOrderTrotterSettings(Settings):
+    """Settings for first-order Trotterization unitary constructor."""
 
     def __init__(self):
-        """Initialize FirstOrderTrotterConstructorSettings with default values."""
-        super().__init__()
-        self._set_default("num_trotter_steps", "int", 1)
-        self._set_default("tolerance", "float", 1e-12)
+        """Initialize FirstOrderTrotterSettings with default values.
 
-
-class FirstOrderTrotterConstructor(TimeEvolutionConstructor):
-    """First-order Trotterization unitary constructor."""
-
-    def __init__(self, num_trotter_steps: int = 1, tolerance: float = 1e-12):
-        """Initialize FirstOrderTrotterConstructor with given settings.
-
-        Args:
-            num_trotter_steps (int): The number of Trotter steps to use in the construction.
-            tolerance (float): The absolute tolerance for filtering small coefficients.
+        Attributes:
+            num_trotter_steps: The number of Trotter steps to use in the construction.
+            tolerance: The absolute tolerance for filtering small coefficients.
 
         """
         super().__init__()
-        self._settings = FirstOrderTrotterConstructorSettings()
+        self._set_default("num_trotter_steps", "int", 1, "The number of Trotter steps.")
+        self._set_default("tolerance", "float", 1e-12, "The absolute tolerance for filtering small coefficients.")
+
+
+class FirstOrderTrotter(TimeEvolutionConstructor):
+    """First-order Trotterization unitary constructor."""
+
+    def __init__(self, num_trotter_steps: int = 1, tolerance: float = 1e-12):
+        """Initialize FirstOrderTrotter with given settings.
+
+        Args:
+            num_trotter_steps: The number of Trotter steps to use in the construction.
+            tolerance: The absolute tolerance for filtering small coefficients.
+
+        """
+        super().__init__()
+        self._settings = FirstOrderTrotterSettings()
         self._settings.set("num_trotter_steps", num_trotter_steps)
         self._settings.set("tolerance", tolerance)
 
@@ -52,8 +52,8 @@ class FirstOrderTrotterConstructor(TimeEvolutionConstructor):
         """Construct the time evolution unitary using first-order Trotterization.
 
         Args:
-            qubit_hamiltonian (QubitHamiltonian): The qubit Hamiltonian to be used in the construction.
-            time (float): The total evolution time.
+            qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
+            time: The total evolution time.
 
         Returns:
             TimeEvolutionUnitary: The constructed time evolution unitary.
@@ -79,6 +79,10 @@ class FirstOrderTrotterConstructor(TimeEvolutionConstructor):
     def name(self) -> str:
         """Return the name of the time evolution unitary constructor."""
         return "first_order_trotter"
+
+    def type_name(self) -> str:
+        """Return time_evolution_constructor as the algorithm type name."""
+        return "time_evolution_constructor"
 
 
 def _pauli_label_to_map(label: str) -> dict[int, str]:

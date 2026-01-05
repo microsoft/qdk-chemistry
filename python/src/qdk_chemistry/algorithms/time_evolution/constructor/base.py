@@ -20,17 +20,13 @@ class TimeEvolutionConstructor(Algorithm):
         """Initialize the TimeEvolutionConstructor."""
         super().__init__()
 
-    def type_name(self) -> str:
-        """Return time_evolution_constructor as the algorithm type name."""
-        return "time_evolution_constructor"
-
     @abstractmethod
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
         """Construct a TimeEvolutionUnitary representing the time evolution unitary for the given QubitHamiltonian.
 
         Args:
-            qubit_hamiltonian (QubitHamiltonian): The qubit Hamiltonian.
-            time (float): The evolution time.
+            qubit_hamiltonian: The qubit Hamiltonian.
+            time: The evolution time.
 
         Returns:
             TimeEvolutionUnitary: A TimeEvolutionUnitary representing the evolution of the given QubitHamiltonian.

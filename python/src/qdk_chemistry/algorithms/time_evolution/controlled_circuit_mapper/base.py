@@ -21,16 +21,12 @@ class ControlledEvolutionCircuitMapper(Algorithm):
         """Initialize the ControlledEvolutionCircuitMapper."""
         super().__init__()
 
-    def type_name(self) -> str:
-        """Return controlled_evolution_circuit_mapper as the algorithm type name."""
-        return "controlled_evolution_circuit_mapper"
-
     @abstractmethod
     def _run_impl(self, controlled_evolution: ControlledTimeEvolutionUnitary) -> Circuit:
         """Construct a Circuit representing the controlled unitary for the given ControlledTimeEvolutionUnitary.
 
         Args:
-            controlled_evolution (ControlledTimeEvolutionUnitary): The controlled time evolution unitary.
+            controlled_evolution: The controlled time evolution unitary.
 
         Returns:
             Circuit: A Circuit representing the controlled unitary for the given ControlledTimeEvolutionUnitary.

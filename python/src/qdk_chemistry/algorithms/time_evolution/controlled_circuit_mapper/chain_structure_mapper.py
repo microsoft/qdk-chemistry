@@ -25,24 +25,45 @@ __all__: list[str] = []
 
 
 class ChainStructureMapperSettings(Settings):
-    """Settings for ChainStructureMapper.
-
-    Attributes:
-        power (int): The power of the controlled unitary to be constructed.
-
-    """
+    """Settings for ChainStructureMapper."""
 
     def __init__(self):
-        """Initialize ChainStructureMapperSettings with default values."""
+        """Initialize ChainStructureMapperSettings with default values.
+
+        Attributes:
+            power: The power of the controlled unitary to be constructed. It controls
+                how many times the controlled evolution operator :math:`U` is repeated.
+
+        """
         super().__init__()
-        self._set_default("power", "int", 1)
+        self._set_default("power", "int", 1, "The power of the controlled unitary to be constructed.")
 
 
 class ChainStructureMapper(ControlledEvolutionCircuitMapper):
-    """Chain structure controlled evolution circuit mapper implementation."""
+    r"""Chain structure controlled evolution circuit mapper implementation.
+
+    Given a time-evolution operator expressed as a Pauli product formula
+    :math:`U(t) \approx \left[ U_{\mathrm{step}}(t / r) \right]^{r}`, this mapper constructs
+    a controlled version of :math:`U(t)` using the following pattern:
+
+    1. Each Pauli operator :math:`P_j` is basis-rotated into the :math:`Z` basis.
+    2. Qubits involved in :math:`P_j` are entangled into a linear chain using CNOT gates.
+    3. A controlled :math:`R_z` rotation implements
+        :math:`e^{-i\,\theta_j\,P_j} \;\rightarrow\; \text{CRZ}(2 \theta_j)`.
+    4. The basis rotations and entangling operations are uncomputed.
+
+    This process is repeated for each term in the product formula, and for the
+    specified number of repetitions (power).
+    """
 
     def __init__(self, power: int = 1):
-        """Initialize the ChainStructureMapper."""
+        """Initialize the ChainStructureMapper.
+
+        Args:
+            power: The power of the controlled unitary to be constructed. It controls
+                how many times the controlled evolution operator :math:`U` is repeated.
+
+        """
         super().__init__()
         self._settings = ChainStructureMapperSettings()
         self._settings.set("power", power)
@@ -51,21 +72,25 @@ class ChainStructureMapper(ControlledEvolutionCircuitMapper):
         """Return the algorithm name."""
         return "chain_structure"
 
+    def type_name(self) -> str:
+        """Return controlled_evolution_circuit_mapper as the algorithm type name."""
+        return "controlled_evolution_circuit_mapper"
+
     def _run_impl(
         self, controlled_evolution: ControlledTimeEvolutionUnitary, system_indices: Sequence[int] | None = None
     ) -> Circuit:
-        """Construct a Circuit representing the controlled unitary for the given ControlledTimeEvolutionUnitary.
+        """Construct a Circuit representing the controlled unitary for some power of ControlledTimeEvolutionUnitary.
 
         Args:
-            controlled_evolution (ControlledTimeEvolutionUnitary): The controlled time evolution unitary.
-            system_indices (Sequence[int] | None): The system qubit indices. If None, assumes system qubits are all
+            controlled_evolution: The controlled time evolution unitary.
+            system_indices: The system qubit indices. If None, assumes system qubits are all
                 qubits except the control qubit.
 
         Returns:
             Circuit: A Circuit representing the controlled unitary for the given ControlledTimeEvolutionUnitary.
 
         """
-        if not isinstance(controlled_evolution.time_evolution_unitary._container, PauliProductFormulaContainer):  # noqa: SLF001
+        if not isinstance(controlled_evolution.time_evolution_unitary.get_container(), PauliProductFormulaContainer):
             raise ValueError(
                 f"The {controlled_evolution.get_unitary_container_type()} container type is not supported. "
                 "ChainStructureMapper only supports PauliProductFormula container for time evolution unitary."
@@ -164,10 +189,12 @@ def append_controlled_time_evolution(
 
     """
     Logger.trace_entering()
-    if not isinstance(controlled_evolution.time_evolution_unitary._container, PauliProductFormulaContainer):  # noqa: SLF001
+
+    unitary_container = controlled_evolution.time_evolution_unitary.get_container()
+    if not isinstance(unitary_container, PauliProductFormulaContainer):
         raise ValueError(
-            f"The {controlled_evolution.get_unitary_container_type()} container type is not supported. "
-            "Only supports PauliProductFormula container for time evolution unitary."
+            f"The {unitary_container.type} container type is not supported. "
+            "ChainStructureMapper currently only supports PauliProductFormula container for time evolution unitary."
         )
 
     if power < 1:
@@ -176,8 +203,8 @@ def append_controlled_time_evolution(
     control_qubit = controlled_evolution.control_index
 
     for _ in range(power):
-        for _ in range(controlled_evolution.time_evolution_unitary._container.step_reps):  # noqa: SLF001
-            for term in controlled_evolution.time_evolution_unitary._container.step_terms:  # noqa: SLF001
+        for _ in range(unitary_container.step_reps):
+            for term in unitary_container.step_terms:
                 if np.isclose(term.angle, 0.0):
                     continue
                 _append_controlled_pauli_rotation(

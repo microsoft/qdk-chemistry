@@ -17,7 +17,12 @@ __all__ = ["EvolutionOrdering", "ExponentiatedPauliTerm"]
 
 @dataclass(frozen=True)
 class ExponentiatedPauliTerm:
-    """Dataclass for an exponentiated Pauli term."""
+    r"""Dataclass for an exponentiated Pauli term.
+
+    A single exponential factor of the form :math:`e^{-i \theta P}`, where:
+        * :math:`P` is a Pauli string (e.g., :math:`X_0 Z_2`)
+        * :math:`\theta` is rotation angle
+    """
 
     pauli_term: dict[int, str]
     """A dictionary mapping qubit indices to Pauli operators ('X', 'Y', 'Z')."""
@@ -51,7 +56,20 @@ class EvolutionOrdering:
 
 
 class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
-    """Data class for a Pauli product formula container."""
+    r"""Dataclass for a Pauli product formula container.
+
+    A Pauli Product Formula decomposes a time-evolution operator :math:`U(t) = e^{-i H t}`,
+    into a product of exponentials of Pauli strings. A single product-formula step is represented as
+    :math:`U_{\mathrm{step}}(t) = \prod_{j \in \pi} e^{-i \theta_j P_j}`, where:
+
+    * :math:`P_j` is a Pauli string
+    * :math:`\theta_j` is the rotation angle for that term
+    * :math:`\prod_{j \in \pi}` is a permutation defining the multiplication order
+
+    The full time-evolution unitary is:
+    :math:`U(t) \approx \left[ U_{\mathrm{step}}\!\left(\tfrac{t}{r}\right) \right]^{r}`,
+    where ``step_reps = r`` is the number of repeated steps.
+    """
 
     # Class attribute for filename validation
     _data_type_name = "pauli_product_formula_container"
