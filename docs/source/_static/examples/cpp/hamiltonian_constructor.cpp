@@ -26,11 +26,9 @@ hamiltonian_constructor->settings().set("eri_method", "direct");
 
 // --------------------------------------------------------------------------------------------
 // start-cell-construct
-// Create a structure
-std::vector<Eigen::Vector3d> coords = {Eigen::Vector3d{0.0, 0.0, 0.0},
-                                       Eigen::Vector3d{0.0, 0.0, 1.4}};
-std::vector<std::string> symbols = {"H", "H"};
-auto structure = std::make_shared<Structure>(coords, symbols);
+// Load structure from XYZ file
+auto structure = std::make_shared<Structure>(
+    Structure::from_xyz_file("../data/h2.structure.xyz"));
 
 // Run a SCF to get orbitals
 auto scf_solver = ScfSolverFactory::create();

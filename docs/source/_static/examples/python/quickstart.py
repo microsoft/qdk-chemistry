@@ -7,6 +7,7 @@
 
 ################################################################################
 # start-cell-structure
+from pathlib import Path
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
@@ -15,27 +16,10 @@ from qdk_chemistry.data.qubit_hamiltonian import (
 )
 from qdk_chemistry.utils.wavefunction import get_top_determinants
 
-# Define benzene diradical structure directly using numpy arrays
-coords = np.array(
-    [
-        [0.00000000, 2.63805767, 0.00000000],
-        [2.28482439, 1.31902883, 0.00000000],
-        [2.28482439, -1.31902883, 0.00000000],
-        [0.00000000, -2.63805767, 0.00000000],
-        [-2.28482439, -1.31902883, 0.00000000],
-        [-2.28482439, 1.31902883, 0.00000000],
-        [4.06480089, 2.34703985, 0.00000000],
-        [4.06480089, -2.34703985, 0.00000000],
-        [-4.06480089, -2.34703985, 0.00000000],
-        [-4.06480089, 2.34703985, 0.00000000],
-    ]
+# Load para-benzyne structure from XYZ file
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/para_benzyne.structure.xyz"
 )
-elements = ["C", "C", "C", "C", "C", "C", "H", "H", "H", "H"]
-structure = Structure(coords, elements)
-
-# Alternative: load from XYZ file
-# from pathlib import Path
-# structure = Structure.from_xyz_file(Path("benzene_diradical.structure.xyz"))
 
 print(f"Created structure with {structure.get_num_atoms()} atoms")
 print(f"Elements: {structure.get_elements()}")
@@ -58,7 +42,7 @@ print("SCF Orbitals:\n", wfn_hf.get_orbitals().get_summary())
 
 ################################################################################
 # start-cell-active-space
-# Select active space (6 electrons in 6 orbitals for the benzene diradical)
+# Select active space (6 electrons in 6 orbitals for para-benzyne)
 #   to choose most chemically relevant orbitals
 active_space_selector = create(
     "active_space_selector",
