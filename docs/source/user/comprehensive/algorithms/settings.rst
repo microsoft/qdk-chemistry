@@ -12,11 +12,11 @@ Discovering available settings
 When working with an algorithm, it is often necessary to determine which settings are available and their current values.
 QDK/Chemistry provides several methods for discovering this information:
 
-**Documentation**
+Documentation
    Each algorithm's documentation page includes an "Available settings" section that lists all supported parameters, their types, default values, and descriptions.
    For examples, see :doc:`ScfSolver <scf_solver>` or :doc:`MultiConfigurationCalculator <mc_calculator>`.
 
-**Runtime inspection**
+Runtime inspection
    Settings can be inspected programmatically using methods such as ``keys()``, ``items()``, or ``print_settings()``.
    This approach is particularly useful when exploring unfamiliar implementations or verifying configurations.
 
@@ -55,7 +55,7 @@ Settings are validated at execution time, allowing modifications at any point be
       :start-after: # start-cell-settings-locked
       :end-before: # end-cell-settings-locked
 
-**Accessing and modifying settings:**
+.. rubric:: Accessing and modifying settings
 
 .. tab:: C++ API
 
@@ -81,7 +81,7 @@ Settings are validated at execution time, allowing modifications at any point be
       :start-after: # start-cell-set-settings
       :end-before: # end-cell-set-settings
 
-**Passing settings at creation time (Python only):**
+.. rubric:: Passing settings at creation time (Python only)
 
 The Python registry's ``create()`` function accepts keyword arguments that are automatically applied to the algorithm's settings.
 This provides a convenient shorthand for configuring algorithms in a single line:
@@ -94,7 +94,7 @@ This provides a convenient shorthand for configuring algorithms in a single line
 This is equivalent to creating the algorithm and then calling ``settings().set()`` for each parameter, but is more concise for common use cases.
 The C++ API does not provide this shorthand; settings must be configured explicitly after algorithm creation.
 
-**Checking and retrieving values:**
+.. rubric:: Checking and retrieving values
 
 The :class:`~qdk_chemistry.data.Settings` class provides methods for safely checking and retrieving values.
 Use ``has()`` to verify existence, ``get()`` for direct access (raises an exception if the key is missing), or ``get_or_default()`` to specify a fallback value.
@@ -133,7 +133,7 @@ For additional information on data persistence, see :doc:`Serialization <../data
       :start-after: # start-cell-serialization
       :end-before: # end-cell-serialization
 
-**Example formats:**
+.. rubric:: Example formats
 
 .. code-block:: json
    :caption: JSON format
@@ -210,11 +210,11 @@ The following types are supported:
      - ``list[str]``
      - String arrays
 
-**C++ implementation:**
+.. rubric:: C++ implementation
 
 The C++ layer uses a ``std::variant``-based storage that provides compile-time type checking through templates.
 
-**Python implementation:**
+.. rubric:: Python implementation
 
 The Python bindings automatically convert between native Python types and the underlying C++ types.
 When setting values, Python objects are validated against the expected type and converted appropriately—for example, Python ``float`` values become C++ ``double``, and Python ``list`` objects become ``std::vector`` containers.
@@ -243,12 +243,12 @@ Constraints
 Settings can define constraints that specify valid ranges or allowed values.
 Constraints are established when algorithm developers define settings using ``set_default()``, and they serve two purposes: documentation and validation guidance.
 
-**Constraint types:**
+.. rubric:: Constraint types
 
 - **Bound constraints** — Define minimum and maximum values for numeric settings (e.g., ``max_iterations`` must be between 1 and 1000).
 - **List constraints** — Define an explicit set of allowed values for string or integer settings (e.g., ``method`` must be one of ``["hf", "dft"]``).
 
-**Inspecting constraints:**
+.. rubric:: Inspecting constraints
 
 Constraints can be queried using ``has_limits()`` and ``get_limits()``:
 
