@@ -1256,7 +1256,7 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
 
   auto uhf_ansatz =
       std::make_shared<Ansatz>(*uhf_hamiltonian, *uhf_wavefunction);
-  auto [ump2_total_energy, uhf_mp2_wavefunction, _dont_care] =
+  auto [ump2_total_energy, uhf_mp2_wavefunction, _] =
       mp2_calculator->run(uhf_ansatz);
   double ump2_correlation = ump2_total_energy - rhf_energy;
   double ump2_energy = rhf_energy + ump2_correlation;
