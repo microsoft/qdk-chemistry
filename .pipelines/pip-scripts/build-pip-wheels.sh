@@ -132,11 +132,11 @@ python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
 cd python
 
 # Build wheel with all necessary CMake flags
-export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
-export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
 
 
 if [ "$MAC_BUILD" == "OFF" ]; then
+    export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
+    export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
     export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
     python3 -m build --wheel \
         -C build-dir="build/{wheel_tag}" \
@@ -150,6 +150,8 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
 elif [ "$MAC_BUILD" == "ON" ]; then
     export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
+    export CMAKE_C_FLAGS="-fPIC -Os -fvisibility=hidden"
+    export CMAKE_CXX_FLAGS="-fPIC -Os -fvisibility=hidden"
     python3 -m build --wheel \
         -C build-dir="build/{wheel_tag}" \
         -C cmake.define.QDK_UARCH=native \
