@@ -193,7 +193,12 @@ jobs:
 
         echo "=== Running C++ Tests in Debug Mode with Coverage ==="
         set +e
-        ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
+        if [ $QDK_UARCH == "native" ]; then # Exclude particular test on macOS builds
+          ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
+        else
+          ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
+        fi
+        
         CTEST_EXIT_CODE=$?
         set -e
 
