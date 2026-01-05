@@ -1043,8 +1043,7 @@ TEST_F(ScfTest, AtomInitGuessEnergyConvergence) {
           scf_solver->run(structure, 0, 1, basis_custom);
 
       EXPECT_NEAR(energy, energy_cust, testing::scf_energy_tolerance)
-          << "Failed for element: " << element << " with basis: " <<
-          basis_name;
+          << "Failed for element: " << element << " with basis: " << basis_name;
     }
   }
 
@@ -1069,8 +1068,7 @@ TEST_F(ScfTest, AtomInitGuessEnergyConvergence) {
           scf_solver->run(structure, 0, 2, basis_custom);
 
       EXPECT_NEAR(energy, energy_cust, testing::scf_energy_tolerance)
-          << "Failed for element: " << element << " with basis: " <<
-          basis_name;
+          << "Failed for element: " << element << " with basis: " << basis_name;
     }
   }
 }
