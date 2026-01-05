@@ -26,7 +26,7 @@ shell1 = Shell(atom_index, orbital_type, exponents, coefficients)
 shell2 = Shell(1, OrbitalType.S, [0.5], [1.0])
 
 # Create a basis set from the shells
-basis_set = BasisSet("6-31G", [shell1, shell2], AOType.Spherical, structure)
+basis_set = BasisSet("6-31G", [shell1, shell2], structure, AOType.Spherical)
 # end-cell-create
 ################################################################################
 
@@ -67,7 +67,7 @@ all_shells = basis_set.get_shells()
 # Get shells for specific atom (returns list[Shell])
 shells_for_atom = basis_set.get_shells_for_atom(0)
 # Get specific shell by index (returns Shell)
-specific_shell = basis_set.get_shell(3)
+specific_shell = basis_set.get_shell(1)
 
 # Get counts
 num_shells = basis_set.get_num_shells()
@@ -75,8 +75,8 @@ num_atomic_orbitals = basis_set.get_num_atomic_orbitals()
 num_atoms = basis_set.get_num_atoms()
 
 # Get atomic orbital information (returns tuple[int, int])
-shell_index, m_quantum_number = basis_set.get_atomic_orbital_info(5)
-atom_index = basis_set.get_atom_index_for_atomic_orbital(5)
+shell_index, m_quantum_number = basis_set.get_atomic_orbital_info(2)
+atom_index = basis_set.get_atom_index_for_atomic_orbital(2)
 
 # Get indices for specific atoms or orbital types
 # Returns list[int]
@@ -88,9 +88,6 @@ shell_indices_specific = basis_set.get_shell_indices_for_atom_and_orbital_type(
     0, OrbitalType.D
 )
 
-# Validation
-is_valid = basis_set.is_valid()
-is_consistent = basis_set.is_consistent_with_structure()
 # end-cell-access
 ################################################################################
 
@@ -115,20 +112,19 @@ angular_momentum = shell.get_angular_momentum()
 ################################################################################
 # start-cell-serialization
 # Generic serialization with format specification
-basis_set.to_file("molecule.basis.json", "json")
-basis_set.from_file("molecule.basis.json", "json")
+basis_set.to_file("molecule.basis_set.json", "json")
+basis_set.from_file("molecule.basis_set.json", "json")
 
 # JSON serialization
-basis_set.to_json_file("molecule.basis.json")
-basis_set.from_json_file("molecule.basis.json")
-
+basis_set.to_json_file("molecule.basis_set.json")
+basis_set.from_json_file("molecule.basis_set.json")
 # Direct JSON conversion
 j = basis_set.to_json()
 basis_set.from_json(j)
 
 # HDF5 serialization
-basis_set.to_hdf5_file("molecule.basis.h5")
-basis_set.from_hdf5_file("molecule.basis.h5")
+basis_set.to_hdf5_file("molecule.basis_set.h5")
+basis_set.from_hdf5_file("molecule.basis_set.h5")
 # end-cell-serialization
 ################################################################################
 
