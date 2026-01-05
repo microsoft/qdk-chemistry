@@ -214,7 +214,6 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * @return Shared pointer to wavefunction
    */
   std::shared_ptr<Wavefunction> get_wavefunction() const;
-
   /**
    * @brief Not implemented for CC wavefunctions
    */

@@ -15,6 +15,7 @@
 #include <variant>
 #include <vector>
 
+#include "../hdf5_serialization.hpp"
 #include "../json_serialization.hpp"
 
 namespace qdk::chemistry::data {
@@ -355,6 +356,22 @@ bool SciWavefunctionContainer::is_complex() const {
   return detail::is_vector_variant_complex(_coefficients);
 }
 
+bool SciWavefunctionContainer::has_coefficients() const {
+  QDK_LOG_TRACE_ENTERING();
+  return true;
+}
+
+bool SciWavefunctionContainer::has_configuration_set() const {
+  QDK_LOG_TRACE_ENTERING();
+  return true;
+}
+
+const ConfigurationSet& SciWavefunctionContainer::get_configuration_set()
+    const {
+  QDK_LOG_TRACE_ENTERING();
+  return _configuration_set;
+}
+
 nlohmann::json SciWavefunctionContainer::to_json() const {
   QDK_LOG_TRACE_ENTERING();
 
@@ -469,170 +486,6 @@ std::unique_ptr<SciWavefunctionContainer> SciWavefunctionContainer::from_json(
     throw std::runtime_error(
         "Failed to parse SciWavefunctionContainer from JSON: " +
         std::string(e.what()));
-  }
-}
-
-void SciWavefunctionContainer::to_hdf5(H5::Group& group) const {
-  QDK_LOG_TRACE_ENTERING();
-
-  try {
-    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
-
-    // Add version attribute
-    H5::Attribute version_attr = group.createAttribute(
-        "version", string_type, H5::DataSpace(H5S_SCALAR));
-    std::string version_str(SERIALIZATION_VERSION);
-    version_attr.write(string_type, version_str);
-    version_attr.close();
-
-    // Store container type
-    std::string container_type = get_container_type();
-    H5::Attribute type_attr = group.createAttribute(
-        "container_type", string_type, H5::DataSpace(H5S_SCALAR));
-    type_attr.write(string_type, container_type);
-
-    // Store wavefunction type
-    std::string wf_type =
-        (_type == WavefunctionType::SelfDual) ? "self_dual" : "not_self_dual";
-    H5::Attribute wf_type_attr = group.createAttribute(
-        "wavefunction_type", string_type, H5::DataSpace(H5S_SCALAR));
-    wf_type_attr.write(string_type, wf_type);
-
-    // Store complexity flag
-    bool is_complex = detail::is_vector_variant_complex(_coefficients);
-    H5::Attribute complex_attr = group.createAttribute(
-        "is_complex", H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
-    hbool_t is_complex_flag = is_complex ? 1 : 0;
-    complex_attr.write(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
-
-    // Store coefficients
-    if (is_complex) {
-      const auto& coeffs_complex = std::get<Eigen::VectorXcd>(_coefficients);
-      hsize_t coeff_dims = coeffs_complex.size();
-      H5::DataSpace coeff_space(1, &coeff_dims);
-
-      // Use HDF5's native complex number support - no data copying
-      // Create compound type for complex numbers (real, imag)
-      H5::CompType complex_type(sizeof(std::complex<double>));
-      complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
-      complex_type.insertMember("imag", sizeof(double),
-                                H5::PredType::NATIVE_DOUBLE);
-
-      H5::DataSet complex_dataset =
-          group.createDataSet("coefficients", complex_type, coeff_space);
-      // Write directly from Eigen's memory layout without copying
-      complex_dataset.write(coeffs_complex.data(), complex_type);
-    } else {
-      const auto& coeffs_real = std::get<Eigen::VectorXd>(_coefficients);
-      hsize_t coeff_dims = coeffs_real.size();
-      H5::DataSpace coeff_space(1, &coeff_dims);
-      H5::DataSet coeff_dataset = group.createDataSet(
-          "coefficients", H5::PredType::NATIVE_DOUBLE, coeff_space);
-      // Write directly from Eigen's memory without copying
-      coeff_dataset.write(coeffs_real.data(), H5::PredType::NATIVE_DOUBLE);
-    }
-
-    // Store configuration set (delegates to ConfigurationSet serialization)
-    H5::Group config_set_group = group.createGroup("configuration_set");
-    _configuration_set.to_hdf5(config_set_group);
-
-  } catch (const H5::Exception& e) {
-    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
-  }
-}
-
-std::unique_ptr<SciWavefunctionContainer> SciWavefunctionContainer::from_hdf5(
-    H5::Group& group) {
-  QDK_LOG_TRACE_ENTERING();
-
-  try {
-    // Check version first
-    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
-    H5::Attribute version_attr = group.openAttribute("version");
-    std::string version;
-    version_attr.read(string_type, version);
-    validate_serialization_version(SERIALIZATION_VERSION, version);
-
-    // Load wavefunction type
-    WavefunctionType type = WavefunctionType::SelfDual;
-    if (group.attrExists("wavefunction_type")) {
-      H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
-      H5::Attribute wf_type_attr = group.openAttribute("wavefunction_type");
-      std::string type_str;
-      wf_type_attr.read(string_type, type_str);
-      type = (type_str == "self_dual") ? WavefunctionType::SelfDual
-                                       : WavefunctionType::NotSelfDual;
-    }
-
-    // Load complexity flag
-    bool is_complex = false;
-    if (group.attrExists("is_complex")) {
-      H5::Attribute complex_attr = group.openAttribute("is_complex");
-      hbool_t is_complex_flag;
-      complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
-      is_complex = (is_complex_flag != 0);
-    }
-
-    // Load coefficients
-    VectorVariant coefficients;
-    if (is_complex) {
-      if (!group.nameExists("coefficients")) {
-        throw std::runtime_error(
-            "HDF5 group missing required 'coefficients' dataset");
-      }
-
-      H5::DataSet coeff_dataset = group.openDataSet("coefficients");
-      H5::DataSpace coeff_space = coeff_dataset.getSpace();
-      hsize_t coeff_size = coeff_space.getSimpleExtentNpoints();
-
-      // Check if it's complex compound type
-      H5::DataType dtype = coeff_dataset.getDataType();
-      if (dtype.getClass() != H5T_COMPOUND) {
-        throw std::runtime_error(
-            "Expected complex compound type in HDF5 coefficients dataset");
-      }
-
-      // Native complex compound type
-      H5::CompType complex_type(sizeof(std::complex<double>));
-      complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
-      complex_type.insertMember("imag", sizeof(double),
-                                H5::PredType::NATIVE_DOUBLE);
-
-      Eigen::VectorXcd coeffs_complex(coeff_size);
-      // Read directly into Eigen's memory without intermediate copying
-      coeff_dataset.read(coeffs_complex.data(), complex_type);
-      coefficients = coeffs_complex;
-    } else {
-      if (!group.nameExists("coefficients")) {
-        throw std::runtime_error(
-            "HDF5 group missing required 'coefficients' dataset");
-      }
-      H5::DataSet coeff_dataset = group.openDataSet("coefficients");
-      H5::DataSpace coeff_space = coeff_dataset.getSpace();
-      hsize_t coeff_size = coeff_space.getSimpleExtentNpoints();
-
-      Eigen::VectorXd coeffs_real(coeff_size);
-      // Read directly into Eigen's memory without copying
-      coeff_dataset.read(coeffs_real.data(), H5::PredType::NATIVE_DOUBLE);
-      coefficients = coeffs_real;
-    }
-
-    // Load configuration set (delegates to ConfigurationSet deserialization)
-    // ConfigurationSet now deserializes orbitals internally
-    if (!group.nameExists("configuration_set")) {
-      throw std::runtime_error(
-          "HDF5 group missing required 'configuration_set' subgroup");
-    }
-    H5::Group config_set_group = group.openGroup("configuration_set");
-    auto config_set = ConfigurationSet::from_hdf5(config_set_group);
-    const auto& determinants = config_set.get_configurations();
-    auto orbitals = config_set.get_orbitals();
-
-    return std::make_unique<SciWavefunctionContainer>(
-        coefficients, determinants, orbitals, type);
-
-  } catch (const H5::Exception& e) {
-    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
 }
 
