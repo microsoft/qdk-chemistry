@@ -58,9 +58,9 @@ basis_from_index_ecp = BasisSet.from_index_map(
 ################################################################################
 # start-cell-access
 # Get basis set type and name (returns AOType)
-atomic_orbital_type = basis_set.get_atomic_orbital_type()
+basis_atomic_orbital_type = basis_set.get_atomic_orbital_type()
 # Get basis set name (returns str)
-name = basis_set.get_name()
+basis_name = basis_set.get_name()
 
 # Get all shells (returns list[Shell])
 all_shells = basis_set.get_shells()
@@ -87,7 +87,6 @@ shell_indices = basis_set.get_shell_indices_for_orbital_type(OrbitalType.P)
 shell_indices_specific = basis_set.get_shell_indices_for_atom_and_orbital_type(
     0, OrbitalType.D
 )
-
 # end-cell-access
 ################################################################################
 
@@ -104,7 +103,7 @@ coeffs = shell.coefficients
 
 # Get information from shell
 num_primitives = shell.get_num_primitives()
-num_atomic_orbitals = shell.get_num_atomic_orbitals(AOType.Spherical)
+num_aos = shell.get_num_atomic_orbitals(AOType.Spherical)
 angular_momentum = shell.get_angular_momentum()
 # end-cell-shells
 ################################################################################
@@ -151,10 +150,10 @@ atomic_orbital_type = BasisSet.string_to_atomic_orbital_type(
 
 ################################################################################
 # start-cell-library
-# Check supported basissets
+# Check supported basis sets
 supported_basis_sets = BasisSet.get_supported_basis_set_names()
 
-# Check supported elements for basisset
+# Check supported elements for basis set
 supported_elements = BasisSet.get_supported_elements_for_basis_set("sto-3g")
 # end-cell-library
 ################################################################################
