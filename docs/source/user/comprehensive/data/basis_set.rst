@@ -103,7 +103,7 @@ Each method also supports optional :term:`ECP` (Effective Core Potential) specif
 ECPs can be specified either uniformly for all atoms or selectively per element or atom index.
 
 .. note::
-   If no ECP is specified the default ECP for the chosen basis set will be used if available.
+   If no ECP is specified, the default ECP for the chosen basis set will be used if available.
 
 .. note::
    If an empty string is provided instead of an ECP name, no ECP will be applied even if the basis set has a default ECP.

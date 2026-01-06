@@ -113,18 +113,18 @@ angular_momentum = shell.get_angular_momentum()
 # start-cell-serialization
 # Generic serialization with format specification
 basis_set.to_file("molecule.basis_set.json", "json")
-basis_set.from_file("molecule.basis_set.json", "json")
+basis_set = BasisSet.from_file("molecule.basis_set.json", "json")
 
 # JSON serialization
 basis_set.to_json_file("molecule.basis_set.json")
-basis_set.from_json_file("molecule.basis_set.json")
+basis_set = BasisSet.from_json_file("molecule.basis_set.json")
 # Direct JSON conversion
 j = basis_set.to_json()
-basis_set.from_json(j)
+basis_set = BasisSet.from_json(j)
 
 # HDF5 serialization
 basis_set.to_hdf5_file("molecule.basis_set.h5")
-basis_set.from_hdf5_file("molecule.basis_set.h5")
+basis_set = BasisSet.from_hdf5_file("molecule.basis_set.h5")
 # end-cell-serialization
 ################################################################################
 

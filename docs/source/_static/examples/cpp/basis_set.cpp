@@ -122,19 +122,22 @@ int main() {
   // start-cell-serialization
   // Generic serialization with format specification
   basis_set.to_file("molecule.basis_set.json", "json");
-  basis_set.from_file("molecule.basis_set.json", "json");
+  auto basis_set_from_file =
+      BasisSet::from_file("molecule.basis_set.json", "json");
 
   // JSON serialization
   basis_set.to_json_file("molecule.basis_set.json");
-  basis_set.from_json_file("molecule.basis_set.json");
+  auto basis_set_from_json_file =
+      BasisSet::from_json_file("molecule.basis_set.json");
 
   // Direct JSON conversion
   nlohmann::json j = basis_set.to_json();
-  basis_set.from_json(j);
+  auto basis_set_from_json = BasisSet::from_json(j);
 
   // HDF5 serialization
   basis_set.to_hdf5_file("molecule.basis_set.h5");
-  basis_set.from_hdf5_file("molecule.basis_set.h5");
+  auto basis_set_from_hdf5 =
+      BasisSet::from_hdf5_file("molecule.basis_set.h5");
   // end-cell-serialization
   // --------------------------------------------------------------------------------------------
 
