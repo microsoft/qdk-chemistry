@@ -466,27 +466,31 @@ class WavefunctionContainer {
    * @brief Deserialize RDMs from HDF5 group for restricted case
    * @param rdm_group HDF5 group containing RDM data
    * @param orbitals Orbitals for computing derived quantities
-   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb, one_rdm_spin_traced, two_rdm_spin_traced)
+   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb,
+   * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb, one_rdm_spin_traced,
+   * two_rdm_spin_traced)
    */
   static std::tuple<std::optional<MatrixVariant>, std::optional<MatrixVariant>,
                     std::optional<VectorVariant>, std::optional<VectorVariant>,
                     std::optional<VectorVariant>, std::optional<MatrixVariant>,
                     std::optional<VectorVariant>>
-  _deserialize_rdms_from_hdf5_restricted(H5::Group& rdm_group,
-                                         const std::shared_ptr<Orbitals>& orbitals);
+  _deserialize_rdms_from_hdf5_restricted(
+      H5::Group& rdm_group, const std::shared_ptr<Orbitals>& orbitals);
 
   /**
    * @brief Deserialize RDMs from HDF5 group for unrestricted case
    * @param rdm_group HDF5 group containing RDM data
    * @param orbitals Orbitals for computing derived quantities
-   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb, one_rdm_spin_traced, two_rdm_spin_traced)
+   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb,
+   * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb, one_rdm_spin_traced,
+   * two_rdm_spin_traced)
    */
   static std::tuple<std::optional<MatrixVariant>, std::optional<MatrixVariant>,
                     std::optional<VectorVariant>, std::optional<VectorVariant>,
                     std::optional<VectorVariant>, std::optional<MatrixVariant>,
                     std::optional<VectorVariant>>
-  _deserialize_rdms_from_hdf5_unrestricted(H5::Group& rdm_group,
-                                           const std::shared_ptr<Orbitals>& orbitals);
+  _deserialize_rdms_from_hdf5_unrestricted(
+      H5::Group& rdm_group, const std::shared_ptr<Orbitals>& orbitals);
 
   /**
    * @brief Serialize RDMs to JSON if they are available
@@ -497,7 +501,8 @@ class WavefunctionContainer {
   /**
    * @brief Deserialize RDMs from JSON for restricted case
    * @param j JSON object containing RDM data
-   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
+   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb,
+   * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
    */
   static std::tuple<std::optional<MatrixVariant>, std::optional<MatrixVariant>,
                     std::optional<VectorVariant>, std::optional<VectorVariant>,
@@ -507,7 +512,8 @@ class WavefunctionContainer {
   /**
    * @brief Deserialize RDMs from JSON for unrestricted case
    * @param j JSON object containing RDM data
-   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
+   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb,
+   * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
    */
   static std::tuple<std::optional<MatrixVariant>, std::optional<MatrixVariant>,
                     std::optional<VectorVariant>, std::optional<VectorVariant>,

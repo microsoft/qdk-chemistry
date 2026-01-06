@@ -198,8 +198,6 @@ class CasWavefunctionContainer : public WavefunctionContainer {
    */
   nlohmann::json to_json() const override;
 
-
-
   /**
    * @brief Get container type identifier for serialization
    * @return String "cas"

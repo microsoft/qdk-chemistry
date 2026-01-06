@@ -4,9 +4,9 @@
  * license information.
  */
 
+#include <H5Cpp.h>
 #include <gtest/gtest.h>
 
-#include <H5Cpp.h>
 #include <Eigen/Dense>
 #include <filesystem>
 #include <fstream>

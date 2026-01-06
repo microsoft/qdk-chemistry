@@ -152,8 +152,7 @@ MatrixVariant json_to_matrix_variant(const nlohmann::json& j_mat,
     mat_var = mat;
   } else {
     if (!j_mat[0].is_array()) {
-      throw std::runtime_error(
-          "Invalid matrix format: expected array of rows");
+      throw std::runtime_error("Invalid matrix format: expected array of rows");
     }
     const int cols = static_cast<int>(j_mat[0].size());
     Eigen::MatrixXd mat(rows, cols);
