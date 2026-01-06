@@ -15,6 +15,7 @@
 namespace qdk::chemistry::data {
 
 using VectorVariant = std::variant<Eigen::VectorXd, Eigen::VectorXcd>;
+using MatrixVariant = std::variant<Eigen::MatrixXd, Eigen::MatrixXcd>;
 
 /**
  * @file json_serialization.hpp
@@ -66,6 +67,15 @@ nlohmann::json vector_variant_to_json(const VectorVariant& vec_var,
                                       bool is_complex);
 
 /**
+ * @brief Convert Matrix Variant to JSON array
+ * @param mat_var MatrixVariant to convert
+ * @param is_complex whether or not it is complex
+ * @return JSON array representation
+ */
+nlohmann::json matrix_variant_to_json(const MatrixVariant& mat_var,
+                                      bool is_complex);
+
+/**
  * @brief Convert JSON array to Eigen matrix
  * @param j JSON array to convert
  * @return Eigen matrix
@@ -82,9 +92,19 @@ Eigen::VectorXd json_to_vector(const nlohmann::json& j);
 /**
  * @brief Convert JSON array to VectorVariant
  * @param j JSON array to convert
+ * @param is_complex whether or not the data is complex
  * @return VectorVariant
  */
 VectorVariant json_to_vector_variant(const nlohmann::json& j_vec,
+                                     bool is_complex);
+
+/**
+ * @brief Convert JSON array to MatrixVariant
+ * @param j JSON array to convert
+ * @param is_complex whether or not the data is complex
+ * @return MatrixVariant
+ */
+MatrixVariant json_to_matrix_variant(const nlohmann::json& j_mat,
                                      bool is_complex);
 
 /**

@@ -199,15 +199,6 @@ class CasWavefunctionContainer : public WavefunctionContainer {
   nlohmann::json to_json() const override;
 
   /**
-   * @brief Load container from JSON format
-   * @param j JSON object containing container data
-   * @return Unique pointer to CAS container created from JSON data
-   * @throws std::runtime_error if JSON is malformed
-   */
-  static std::unique_ptr<CasWavefunctionContainer> from_json(
-      const nlohmann::json& j);
-
-  /**
    * @brief Get container type identifier for serialization
    * @return String "cas"
    */

@@ -4,6 +4,7 @@
  * license information.
  */
 
+#include <H5Cpp.h>
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
@@ -189,4 +190,288 @@ TEST_F(MP2Test, MP2Container) {
       << "T2 alpha-alpha amplitudes should be non-zero for MP2";
   EXPECT_TRUE(check_t2_nonzero(t2_bbbb))
       << "T2 beta-beta amplitudes should be non-zero for MP2";
+}
+
+TEST_F(MP2Test, JsonSerializationSpatial) {
+  // Test JSON serialization/deserialization for spatial MP2
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"O", "O"};
+  Structure o2_structure(coordinates, symbols);
+
+  // Restricted HF calculation (singlet O2, multiplicity = 1)
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("method", "hf");
+  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+  auto [hf_energy, hf_wavefunction] =
+      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
+  auto hf_orbitals = hf_wavefunction->get_orbitals();
+
+  // Create Hamiltonian
+  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+
+  // Create MP2Container and compute amplitudes
+  auto original =
+      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+
+  // Trigger amplitude computation
+  auto [t1_aa_orig, t1_bb_orig] = original->get_t1_amplitudes();
+  auto [t2_abab_orig, t2_aaaa_orig, t2_bbbb_orig] =
+      original->get_t2_amplitudes();
+
+  // Serialize to JSON
+  nlohmann::json j = original->to_json();
+
+  // Deserialize from JSON
+  auto restored = MP2Container::from_json(j);
+
+  // Verify amplitudes match
+  auto [t1_aa_rest, t1_bb_rest] = restored->get_t1_amplitudes();
+  auto [t2_abab_rest, t2_aaaa_rest, t2_bbbb_rest] =
+      restored->get_t2_amplitudes();
+
+  auto compare_amplitudes = [](const MP2Container::VectorVariant& orig,
+                               const MP2Container::VectorVariant& rest) {
+    return std::visit(
+        [](auto&& orig_vec, auto&& rest_vec) {
+          using T1 = std::decay_t<decltype(orig_vec)>;
+          using T2 = std::decay_t<decltype(rest_vec)>;
+          if constexpr (std::is_same_v<T1, T2>) {
+            return orig_vec.isApprox(rest_vec, testing::wf_tolerance);
+          } else {
+            return false;
+          }
+        },
+        orig, rest);
+  };
+
+  EXPECT_TRUE(compare_amplitudes(t1_aa_orig, t1_aa_rest))
+      << "T1 alpha amplitudes should match after JSON serialization";
+  EXPECT_TRUE(compare_amplitudes(t1_bb_orig, t1_bb_rest))
+      << "T1 beta amplitudes should match after JSON serialization";
+  EXPECT_TRUE(compare_amplitudes(t2_abab_orig, t2_abab_rest))
+      << "T2 alpha-beta amplitudes should match after JSON serialization";
+  EXPECT_TRUE(compare_amplitudes(t2_aaaa_orig, t2_aaaa_rest))
+      << "T2 alpha-alpha amplitudes should match after JSON serialization";
+  EXPECT_TRUE(compare_amplitudes(t2_bbbb_orig, t2_bbbb_rest))
+      << "T2 beta-beta amplitudes should match after JSON serialization";
+}
+
+TEST_F(MP2Test, JsonSerializationSpin) {
+  // Test JSON serialization/deserialization for unrestricted MP2
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"O", "O"};
+  Structure o2_structure(coordinates, symbols);
+
+  // Unrestricted HF calculation (triplet O2, multiplicity = 3)
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("method", "hf");
+  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+  auto [hf_energy, hf_wavefunction] =
+      scf_factory->run(o2_structure_ptr, 0, 3, "cc-pvdz");
+  auto hf_orbitals = hf_wavefunction->get_orbitals();
+
+  // Create Hamiltonian
+  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+
+  // Create MP2Container and compute amplitudes
+  auto original =
+      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+
+  // Trigger amplitude computation
+  auto [t1_aa_orig, t1_bb_orig] = original->get_t1_amplitudes();
+  auto [t2_abab_orig, t2_aaaa_orig, t2_bbbb_orig] =
+      original->get_t2_amplitudes();
+
+  // Serialize to JSON
+  nlohmann::json j = original->to_json();
+
+  // Deserialize from JSON
+  auto restored = MP2Container::from_json(j);
+
+  // Verify amplitudes match
+  auto [t1_aa_rest, t1_bb_rest] = restored->get_t1_amplitudes();
+  auto [t2_abab_rest, t2_aaaa_rest, t2_bbbb_rest] =
+      restored->get_t2_amplitudes();
+
+  auto compare_amplitudes = [](const MP2Container::VectorVariant& orig,
+                               const MP2Container::VectorVariant& rest) {
+    return std::visit(
+        [](auto&& orig_vec, auto&& rest_vec) {
+          using T1 = std::decay_t<decltype(orig_vec)>;
+          using T2 = std::decay_t<decltype(rest_vec)>;
+          if constexpr (std::is_same_v<T1, T2>) {
+            return orig_vec.isApprox(rest_vec, testing::wf_tolerance);
+          } else {
+            return false;
+          }
+        },
+        orig, rest);
+  };
+
+  EXPECT_TRUE(compare_amplitudes(t1_aa_orig, t1_aa_rest))
+      << "T1 alpha amplitudes should match after JSON serialization";
+  EXPECT_TRUE(compare_amplitudes(t1_bb_orig, t1_bb_rest))
+      << "T1 beta amplitudes should match after JSON serialization";
+  EXPECT_TRUE(compare_amplitudes(t2_abab_orig, t2_abab_rest))
+      << "T2 alpha-beta amplitudes should match after JSON serialization";
+  EXPECT_TRUE(compare_amplitudes(t2_aaaa_orig, t2_aaaa_rest))
+      << "T2 alpha-alpha amplitudes should match after JSON serialization";
+  EXPECT_TRUE(compare_amplitudes(t2_bbbb_orig, t2_bbbb_rest))
+      << "T2 beta-beta amplitudes should match after JSON serialization";
+}
+
+TEST_F(MP2Test, Hdf5SerializationSpatial) {
+  // Test HDF5 serialization/deserialization for spatial MP2
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"O", "O"};
+  Structure o2_structure(coordinates, symbols);
+
+  // Restricted HF calculation (singlet O2, multiplicity = 1)
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("method", "hf");
+  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+  auto [hf_energy, hf_wavefunction] =
+      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
+  auto hf_orbitals = hf_wavefunction->get_orbitals();
+
+  // Create Hamiltonian
+  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+
+  // Create MP2Container and compute amplitudes
+  auto original =
+      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+
+  // Trigger amplitude computation
+  auto [t1_aa_orig, t1_bb_orig] = original->get_t1_amplitudes();
+  auto [t2_abab_orig, t2_aaaa_orig, t2_bbbb_orig] =
+      original->get_t2_amplitudes();
+
+  std::string filename = "test_mp2_spatial_serialization.h5";
+  {
+    H5::H5File file(filename, H5F_ACC_TRUNC);
+    H5::Group root = file.openGroup("/");
+
+    // Serialize to HDF5
+    original->to_hdf5(root);
+
+    // Deserialize from HDF5
+    auto restored = MP2Container::from_hdf5(root);
+
+    // Verify amplitudes match
+    auto [t1_aa_rest, t1_bb_rest] = restored->get_t1_amplitudes();
+    auto [t2_abab_rest, t2_aaaa_rest, t2_bbbb_rest] =
+        restored->get_t2_amplitudes();
+
+    auto compare_amplitudes = [](const MP2Container::VectorVariant& orig,
+                                 const MP2Container::VectorVariant& rest) {
+      return std::visit(
+          [](auto&& orig_vec, auto&& rest_vec) {
+            using T1 = std::decay_t<decltype(orig_vec)>;
+            using T2 = std::decay_t<decltype(rest_vec)>;
+            if constexpr (std::is_same_v<T1, T2>) {
+              return orig_vec.isApprox(rest_vec, testing::wf_tolerance);
+            } else {
+              return false;
+            }
+          },
+          orig, rest);
+    };
+
+    EXPECT_TRUE(compare_amplitudes(t1_aa_orig, t1_aa_rest))
+        << "T1 alpha amplitudes should match after HDF5 serialization";
+    EXPECT_TRUE(compare_amplitudes(t1_bb_orig, t1_bb_rest))
+        << "T1 beta amplitudes should match after HDF5 serialization";
+    EXPECT_TRUE(compare_amplitudes(t2_abab_orig, t2_abab_rest))
+        << "T2 alpha-beta amplitudes should match after HDF5 serialization";
+    EXPECT_TRUE(compare_amplitudes(t2_aaaa_orig, t2_aaaa_rest))
+        << "T2 alpha-alpha amplitudes should match after HDF5 serialization";
+    EXPECT_TRUE(compare_amplitudes(t2_bbbb_orig, t2_bbbb_rest))
+        << "T2 beta-beta amplitudes should match after HDF5 serialization";
+
+    file.close();
+  }
+
+  std::remove(filename.c_str());
+}
+
+TEST_F(MP2Test, Hdf5SerializationSpin) {
+  // Test HDF5 serialization/deserialization for unrestricted MP2
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"O", "O"};
+  Structure o2_structure(coordinates, symbols);
+
+  // Unrestricted HF calculation (triplet O2, multiplicity = 3)
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("method", "hf");
+  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+  auto [hf_energy, hf_wavefunction] =
+      scf_factory->run(o2_structure_ptr, 0, 3, "cc-pvdz");
+  auto hf_orbitals = hf_wavefunction->get_orbitals();
+
+  // Create Hamiltonian
+  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+
+  // Create MP2Container and compute amplitudes
+  auto original =
+      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+
+  // Trigger amplitude computation
+  auto [t1_aa_orig, t1_bb_orig] = original->get_t1_amplitudes();
+  auto [t2_abab_orig, t2_aaaa_orig, t2_bbbb_orig] =
+      original->get_t2_amplitudes();
+
+  std::string filename = "test_mp2_spin_serialization.h5";
+  {
+    H5::H5File file(filename, H5F_ACC_TRUNC);
+    H5::Group root = file.openGroup("/");
+
+    // Serialize to HDF5
+    original->to_hdf5(root);
+
+    // Deserialize from HDF5
+    auto restored = MP2Container::from_hdf5(root);
+
+    // Verify amplitudes match
+    auto [t1_aa_rest, t1_bb_rest] = restored->get_t1_amplitudes();
+    auto [t2_abab_rest, t2_aaaa_rest, t2_bbbb_rest] =
+        restored->get_t2_amplitudes();
+
+    auto compare_amplitudes = [](const MP2Container::VectorVariant& orig,
+                                 const MP2Container::VectorVariant& rest) {
+      return std::visit(
+          [](auto&& orig_vec, auto&& rest_vec) {
+            using T1 = std::decay_t<decltype(orig_vec)>;
+            using T2 = std::decay_t<decltype(rest_vec)>;
+            if constexpr (std::is_same_v<T1, T2>) {
+              return orig_vec.isApprox(rest_vec, testing::wf_tolerance);
+            } else {
+              return false;
+            }
+          },
+          orig, rest);
+    };
+
+    EXPECT_TRUE(compare_amplitudes(t1_aa_orig, t1_aa_rest))
+        << "T1 alpha amplitudes should match after HDF5 serialization";
+    EXPECT_TRUE(compare_amplitudes(t1_bb_orig, t1_bb_rest))
+        << "T1 beta amplitudes should match after HDF5 serialization";
+    EXPECT_TRUE(compare_amplitudes(t2_abab_orig, t2_abab_rest))
+        << "T2 alpha-beta amplitudes should match after HDF5 serialization";
+    EXPECT_TRUE(compare_amplitudes(t2_aaaa_orig, t2_aaaa_rest))
+        << "T2 alpha-alpha amplitudes should match after HDF5 serialization";
+    EXPECT_TRUE(compare_amplitudes(t2_bbbb_orig, t2_bbbb_rest))
+        << "T2 beta-beta amplitudes should match after HDF5 serialization";
+
+    file.close();
+  }
+
+  std::remove(filename.c_str());
 }

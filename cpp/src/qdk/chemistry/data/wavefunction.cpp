@@ -469,24 +469,705 @@ void WavefunctionContainer::_clear_rdms() const {
   _two_rdm_spin_dependent_bbbb.reset();
 }
 
+void WavefunctionContainer::_serialize_rdms_to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
+
+  // If rdms are available, store them
+  if (has_one_rdm_spin_dependent() || has_two_rdm_spin_dependent()) {
+    H5::Group rdm_group = group.createGroup("rdms");
+
+    if (has_one_rdm_spin_dependent()) {
+      // For restricted systems, only store one spin component
+      if (get_orbitals()->is_restricted()) {
+        std::string storage_name = "one_rdm_aa";
+        H5::Attribute one_rdm_aa_complex_attr = rdm_group.createAttribute(
+            "is_one_rdm_aa_complex", H5::PredType::NATIVE_HBOOL,
+            H5::DataSpace(H5S_SCALAR));
+
+        if (_one_rdm_spin_dependent_aa != nullptr) {
+          bool is_one_rdm_complex =
+              detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
+          save_matrix_variant_to_group(is_one_rdm_complex,
+                                       _one_rdm_spin_dependent_aa, rdm_group,
+                                       storage_name);
+          hbool_t is_one_rdm_aa_complex_flag = is_one_rdm_complex ? 1 : 0;
+          one_rdm_aa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                        &is_one_rdm_aa_complex_flag);
+        } else if (_one_rdm_spin_dependent_bb != nullptr) {
+          bool is_one_rdm_complex =
+              detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
+          save_matrix_variant_to_group(is_one_rdm_complex,
+                                       _one_rdm_spin_dependent_bb, rdm_group,
+                                       storage_name);
+          hbool_t is_one_rdm_aa_complex_flag = is_one_rdm_complex ? 1 : 0;
+          one_rdm_aa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                        &is_one_rdm_aa_complex_flag);
+        } else if (_one_rdm_spin_traced != nullptr &&
+                   get_orbitals()->is_restricted()) {
+          auto derived_one_rdm_spin_dependent_aa =
+              detail::multiply_matrix_variant(*_one_rdm_spin_traced, 0.5);
+          bool is_one_rdm_complex = detail::is_matrix_variant_complex(
+              *derived_one_rdm_spin_dependent_aa);
+          save_matrix_variant_to_group(is_one_rdm_complex,
+                                       derived_one_rdm_spin_dependent_aa,
+                                       rdm_group, storage_name);
+          hbool_t is_one_rdm_aa_complex_flag = is_one_rdm_complex ? 1 : 0;
+          one_rdm_aa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                        &is_one_rdm_aa_complex_flag);
+        } else {
+          throw std::runtime_error(
+              "Spin-dependent one-body RDMs are supposedly available, but "
+              "could not be retrieved in the expected format");
+        }
+      } else {
+        // Unrestricted - store both spin components
+        std::string storage_name_aa = "one_rdm_aa";
+        H5::Attribute one_rdm_aa_complex_attr = rdm_group.createAttribute(
+            "is_one_rdm_aa_complex", H5::PredType::NATIVE_HBOOL,
+            H5::DataSpace(H5S_SCALAR));
+        H5::Attribute one_rdm_bb_complex_attr = rdm_group.createAttribute(
+            "is_one_rdm_bb_complex", H5::PredType::NATIVE_HBOOL,
+            H5::DataSpace(H5S_SCALAR));
+
+        if (_one_rdm_spin_dependent_aa != nullptr) {
+          bool is_aa_rdm_complex =
+              detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
+          save_matrix_variant_to_group(is_aa_rdm_complex,
+                                       _one_rdm_spin_dependent_aa, rdm_group,
+                                       storage_name_aa);
+          hbool_t is_one_rdm_aa_complex_flag = is_aa_rdm_complex ? 1 : 0;
+          one_rdm_aa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                        &is_one_rdm_aa_complex_flag);
+        } else {
+          throw std::runtime_error(
+              "Expected _one_rdm_spin_dependent_aa to point to something "
+              "other than nullptr");
+        }
+
+        if (_one_rdm_spin_dependent_bb != nullptr) {
+          std::string storage_name_bb = "one_rdm_bb";
+          bool is_bb_rdm_complex =
+              detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
+          save_matrix_variant_to_group(is_bb_rdm_complex,
+                                       _one_rdm_spin_dependent_bb, rdm_group,
+                                       storage_name_bb);
+          hbool_t is_one_rdm_bb_complex_flag = is_bb_rdm_complex ? 1 : 0;
+          one_rdm_bb_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                        &is_one_rdm_bb_complex_flag);
+        } else {
+          throw std::runtime_error(
+              "Expected _one_rdm_spin_dependent_bb to point to something "
+              "other than nullptr");
+        }
+      }
+    }
+
+    if (has_two_rdm_spin_dependent()) {
+      std::string storage_name_aabb = "two_rdm_aabb";
+      std::string storage_name_aaaa = "two_rdm_aaaa";
+      H5::Attribute two_rdm_aabb_complex_attr = rdm_group.createAttribute(
+          "is_two_rdm_aabb_complex", H5::PredType::NATIVE_HBOOL,
+          H5::DataSpace(H5S_SCALAR));
+      H5::Attribute two_rdm_aaaa_complex_attr = rdm_group.createAttribute(
+          "is_two_rdm_aaaa_complex", H5::PredType::NATIVE_HBOOL,
+          H5::DataSpace(H5S_SCALAR));
+
+      if (_two_rdm_spin_dependent_aabb != nullptr) {
+        bool is_aabb_rdm_complex =
+            detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aabb);
+        save_vector_variant_to_group(is_aabb_rdm_complex,
+                                     _two_rdm_spin_dependent_aabb, rdm_group,
+                                     storage_name_aabb);
+        hbool_t is_two_rdm_aabb_complex_flag = is_aabb_rdm_complex ? 1 : 0;
+        two_rdm_aabb_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                        &is_two_rdm_aabb_complex_flag);
+      } else {
+        throw std::runtime_error(
+            "Expected _two_rdm_spin_dependent_aabb to point to something "
+            "other than nullptr");
+      }
+
+      if (_two_rdm_spin_dependent_aaaa != nullptr) {
+        bool is_aaaa_rdm_complex =
+            detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aaaa);
+        save_vector_variant_to_group(is_aaaa_rdm_complex,
+                                     _two_rdm_spin_dependent_aaaa, rdm_group,
+                                     storage_name_aaaa);
+        hbool_t is_two_rdm_aaaa_complex_flag = is_aaaa_rdm_complex ? 1 : 0;
+        two_rdm_aaaa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                        &is_two_rdm_aaaa_complex_flag);
+      } else {
+        throw std::runtime_error(
+            "Expected _two_rdm_spin_dependent_aaaa to point to something "
+            "other than nullptr");
+      }
+
+      if (get_orbitals()->is_unrestricted()) {
+        if (_two_rdm_spin_dependent_bbbb != nullptr) {
+          std::string storage_name_bbbb = "two_rdm_bbbb";
+          H5::Attribute two_rdm_bbbb_complex_attr = rdm_group.createAttribute(
+              "is_two_rdm_bbbb_complex", H5::PredType::NATIVE_HBOOL,
+              H5::DataSpace(H5S_SCALAR));
+          bool is_bbbb_rdm_complex =
+              detail::is_vector_variant_complex(*_two_rdm_spin_dependent_bbbb);
+          save_vector_variant_to_group(is_bbbb_rdm_complex,
+                                       _two_rdm_spin_dependent_bbbb, rdm_group,
+                                       storage_name_bbbb);
+          hbool_t is_two_rdm_bbbb_complex_flag = is_bbbb_rdm_complex ? 1 : 0;
+          two_rdm_bbbb_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                          &is_two_rdm_bbbb_complex_flag);
+        } else {
+          throw std::runtime_error(
+              "Expected _two_rdm_spin_dependent_bbbb to point to something "
+              "other than nullptr");
+        }
+      }
+    }
+  }
+}
+
+std::tuple<std::optional<ContainerTypes::MatrixVariant>,
+           std::optional<ContainerTypes::MatrixVariant>,
+           std::optional<ContainerTypes::VectorVariant>,
+           std::optional<ContainerTypes::VectorVariant>,
+           std::optional<ContainerTypes::VectorVariant>,
+           std::optional<ContainerTypes::MatrixVariant>,
+           std::optional<ContainerTypes::VectorVariant>>
+WavefunctionContainer::_deserialize_rdms_from_hdf5_restricted(
+    H5::Group& rdm_group, const std::shared_ptr<Orbitals>& orbitals) {
+  QDK_LOG_TRACE_ENTERING();
+
+  std::optional<MatrixVariant> one_rdm_aa;
+  std::optional<MatrixVariant> one_rdm_bb;
+  std::optional<VectorVariant> two_rdm_aabb;
+  std::optional<VectorVariant> two_rdm_aaaa;
+  std::optional<VectorVariant> two_rdm_bbbb;
+  std::optional<MatrixVariant> one_rdm_spin_traced;
+  std::optional<VectorVariant> two_rdm_spin_traced;
+
+  // Load one-RDMs if available
+  if (rdm_group.nameExists("one_rdm_aa")) {
+    bool is_one_rdm_aa_complex = false;
+    if (rdm_group.attrExists("is_one_rdm_aa_complex")) {
+      H5::Attribute complex_attr =
+          rdm_group.openAttribute("is_one_rdm_aa_complex");
+      hbool_t is_complex_flag;
+      complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
+      is_one_rdm_aa_complex = (is_complex_flag != 0);
+    }
+    one_rdm_aa = load_matrix_variant_from_group(rdm_group, "one_rdm_aa",
+                                                is_one_rdm_aa_complex);
+    one_rdm_bb = one_rdm_aa;  // For restricted, both spins are the same
+
+    // Compute spin-traced RDM
+    auto spin_traced_result = detail::multiply_matrix_variant(*one_rdm_aa, 2.0);
+    if (spin_traced_result != nullptr) {
+      one_rdm_spin_traced = *spin_traced_result;
+    }
+  }
+
+  // Load two-RDMs if available
+  if (rdm_group.nameExists("two_rdm_aabb") &&
+      rdm_group.nameExists("two_rdm_aaaa")) {
+    bool is_two_rdm_aabb_complex = false;
+    if (rdm_group.attrExists("is_two_rdm_aabb_complex")) {
+      H5::Attribute complex_attr =
+          rdm_group.openAttribute("is_two_rdm_aabb_complex");
+      hbool_t is_complex_flag;
+      complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
+      is_two_rdm_aabb_complex = (is_complex_flag != 0);
+    }
+    bool is_two_rdm_aaaa_complex = false;
+    if (rdm_group.attrExists("is_two_rdm_aaaa_complex")) {
+      H5::Attribute complex_attr =
+          rdm_group.openAttribute("is_two_rdm_aaaa_complex");
+      hbool_t is_complex_flag;
+      complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
+      is_two_rdm_aaaa_complex = (is_complex_flag != 0);
+    }
+    two_rdm_aabb = load_vector_variant_from_group(rdm_group, "two_rdm_aabb",
+                                                  is_two_rdm_aabb_complex);
+    two_rdm_aaaa = load_vector_variant_from_group(rdm_group, "two_rdm_aaaa",
+                                                  is_two_rdm_aaaa_complex);
+    two_rdm_bbbb = two_rdm_aaaa;  // For restricted, bbbb is the same as aaaa
+
+    // Compute spin-traced two-RDM
+    auto two_rdm_ss_result =
+        detail::multiply_vector_variant(*two_rdm_aaaa, 2.0);
+    auto two_rdm_bbaa_result = detail::transpose_ijkl_klij_vector_variant(
+        *two_rdm_aabb, orbitals->get_active_space_indices().first.size());
+
+    if (two_rdm_ss_result != nullptr && two_rdm_bbaa_result != nullptr) {
+      auto two_rdm_os_result =
+          detail::add_vector_variants(*two_rdm_aabb, *two_rdm_bbaa_result);
+      if (two_rdm_os_result != nullptr) {
+        auto final_result =
+            detail::add_vector_variants(*two_rdm_ss_result, *two_rdm_os_result);
+        if (final_result != nullptr) {
+          two_rdm_spin_traced = *final_result;
+        }
+      }
+    }
+  }
+
+  return std::make_tuple(one_rdm_aa, one_rdm_bb, two_rdm_aabb, two_rdm_aaaa,
+                         two_rdm_bbbb, one_rdm_spin_traced,
+                         two_rdm_spin_traced);
+}
+
+std::tuple<std::optional<ContainerTypes::MatrixVariant>,
+           std::optional<ContainerTypes::MatrixVariant>,
+           std::optional<ContainerTypes::VectorVariant>,
+           std::optional<ContainerTypes::VectorVariant>,
+           std::optional<ContainerTypes::VectorVariant>,
+           std::optional<ContainerTypes::MatrixVariant>,
+           std::optional<ContainerTypes::VectorVariant>>
+WavefunctionContainer::_deserialize_rdms_from_hdf5_unrestricted(
+    H5::Group& rdm_group, const std::shared_ptr<Orbitals>& orbitals) {
+  QDK_LOG_TRACE_ENTERING();
+
+  std::optional<MatrixVariant> one_rdm_aa;
+  std::optional<MatrixVariant> one_rdm_bb;
+  std::optional<VectorVariant> two_rdm_aabb;
+  std::optional<VectorVariant> two_rdm_aaaa;
+  std::optional<VectorVariant> two_rdm_bbbb;
+  std::optional<MatrixVariant> one_rdm_spin_traced;
+  std::optional<VectorVariant> two_rdm_spin_traced;
+
+  // Load one-RDMs (both aa and bb for unrestricted)
+  if (rdm_group.nameExists("one_rdm_aa")) {
+    bool is_one_rdm_aa_complex = false;
+    if (rdm_group.attrExists("is_one_rdm_aa_complex")) {
+      H5::Attribute complex_attr =
+          rdm_group.openAttribute("is_one_rdm_aa_complex");
+      hbool_t is_complex_flag;
+      complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
+      is_one_rdm_aa_complex = (is_complex_flag != 0);
+    }
+    one_rdm_aa = load_matrix_variant_from_group(rdm_group, "one_rdm_aa",
+                                                is_one_rdm_aa_complex);
+  }
+
+  if (rdm_group.nameExists("one_rdm_bb")) {
+    bool is_one_rdm_bb_complex = false;
+    if (rdm_group.attrExists("is_one_rdm_bb_complex")) {
+      H5::Attribute complex_attr =
+          rdm_group.openAttribute("is_one_rdm_bb_complex");
+      hbool_t is_complex_flag;
+      complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
+      is_one_rdm_bb_complex = (is_complex_flag != 0);
+    }
+    one_rdm_bb = load_matrix_variant_from_group(rdm_group, "one_rdm_bb",
+                                                is_one_rdm_bb_complex);
+
+    // Compute spin-traced one-RDM
+    if (one_rdm_aa.has_value()) {
+      auto spin_traced_result =
+          detail::add_matrix_variants(*one_rdm_aa, *one_rdm_bb);
+      if (spin_traced_result != nullptr) {
+        one_rdm_spin_traced = *spin_traced_result;
+      }
+    }
+  }
+
+  // Load two-RDMs
+  if (rdm_group.nameExists("two_rdm_aabb") &&
+      rdm_group.nameExists("two_rdm_aaaa")) {
+    bool is_two_rdm_aabb_complex = false;
+    if (rdm_group.attrExists("is_two_rdm_aabb_complex")) {
+      H5::Attribute complex_attr =
+          rdm_group.openAttribute("is_two_rdm_aabb_complex");
+      hbool_t is_complex_flag;
+      complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
+      is_two_rdm_aabb_complex = (is_complex_flag != 0);
+    }
+    bool is_two_rdm_aaaa_complex = false;
+    if (rdm_group.attrExists("is_two_rdm_aaaa_complex")) {
+      H5::Attribute complex_attr =
+          rdm_group.openAttribute("is_two_rdm_aaaa_complex");
+      hbool_t is_complex_flag;
+      complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
+      is_two_rdm_aaaa_complex = (is_complex_flag != 0);
+    }
+    two_rdm_aabb = load_vector_variant_from_group(rdm_group, "two_rdm_aabb",
+                                                  is_two_rdm_aabb_complex);
+    two_rdm_aaaa = load_vector_variant_from_group(rdm_group, "two_rdm_aaaa",
+                                                  is_two_rdm_aaaa_complex);
+  }
+
+  if (rdm_group.nameExists("two_rdm_bbbb")) {
+    bool is_two_rdm_bbbb_complex = false;
+    if (rdm_group.attrExists("is_two_rdm_bbbb_complex")) {
+      H5::Attribute complex_attr =
+          rdm_group.openAttribute("is_two_rdm_bbbb_complex");
+      hbool_t is_complex_flag;
+      complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
+      is_two_rdm_bbbb_complex = (is_complex_flag != 0);
+    }
+    two_rdm_bbbb = load_vector_variant_from_group(rdm_group, "two_rdm_bbbb",
+                                                  is_two_rdm_bbbb_complex);
+
+    // Compute spin-traced two-RDM
+    if (two_rdm_aabb.has_value() && two_rdm_aaaa.has_value()) {
+      auto two_rdm_ss_result =
+          detail::add_vector_variants(*two_rdm_aaaa, *two_rdm_bbbb);
+      auto two_rdm_bbaa_result = detail::transpose_ijkl_klij_vector_variant(
+          *two_rdm_aabb, orbitals->get_active_space_indices().first.size());
+
+      if (two_rdm_ss_result != nullptr && two_rdm_bbaa_result != nullptr) {
+        auto two_rdm_os_result =
+            detail::add_vector_variants(*two_rdm_aabb, *two_rdm_bbaa_result);
+        if (two_rdm_os_result != nullptr) {
+          auto final_result = detail::add_vector_variants(*two_rdm_ss_result,
+                                                          *two_rdm_os_result);
+          if (final_result != nullptr) {
+            two_rdm_spin_traced = *final_result;
+          }
+        }
+      }
+    }
+  }
+
+  return std::make_tuple(one_rdm_aa, one_rdm_bb, two_rdm_aabb, two_rdm_aaaa,
+                         two_rdm_bbbb, one_rdm_spin_traced,
+                         two_rdm_spin_traced);
+}
+
+void WavefunctionContainer::_serialize_rdms_to_json(nlohmann::json& j) const {
+  QDK_LOG_TRACE_ENTERING();
+
+  // If rdms are available, store them
+  if (has_one_rdm_spin_dependent() || has_two_rdm_spin_dependent()) {
+    nlohmann::json rdm_json;
+
+    if (has_one_rdm_spin_dependent()) {
+      // For restricted systems, only store one spin component
+      if (get_orbitals()->is_restricted()) {
+        if (_one_rdm_spin_dependent_aa != nullptr) {
+          bool is_one_rdm_complex =
+              detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
+          rdm_json["is_one_rdm_aa_complex"] = is_one_rdm_complex;
+          rdm_json["one_rdm_aa"] = matrix_variant_to_json(
+              *_one_rdm_spin_dependent_aa, is_one_rdm_complex);
+        } else if (_one_rdm_spin_dependent_bb != nullptr) {
+          bool is_one_rdm_complex =
+              detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
+          rdm_json["is_one_rdm_aa_complex"] = is_one_rdm_complex;
+          rdm_json["one_rdm_aa"] = matrix_variant_to_json(
+              *_one_rdm_spin_dependent_bb, is_one_rdm_complex);
+        } else if (_one_rdm_spin_traced != nullptr) {
+          // Only spin-traced RDM available - derive spin component
+          auto derived_one_rdm_aa =
+              detail::multiply_matrix_variant(*_one_rdm_spin_traced, 0.5);
+          bool is_one_rdm_complex =
+              detail::is_matrix_variant_complex(*derived_one_rdm_aa);
+          rdm_json["is_one_rdm_aa_complex"] = is_one_rdm_complex;
+          rdm_json["one_rdm_aa"] =
+              matrix_variant_to_json(*derived_one_rdm_aa, is_one_rdm_complex);
+        }
+      } else {
+        // Unrestricted - store both spin components
+        if (_one_rdm_spin_dependent_aa != nullptr) {
+          bool is_aa_complex =
+              detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
+          rdm_json["is_one_rdm_aa_complex"] = is_aa_complex;
+          rdm_json["one_rdm_aa"] = matrix_variant_to_json(
+              *_one_rdm_spin_dependent_aa, is_aa_complex);
+        }
+        if (_one_rdm_spin_dependent_bb != nullptr) {
+          bool is_bb_complex =
+              detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
+          rdm_json["is_one_rdm_bb_complex"] = is_bb_complex;
+          rdm_json["one_rdm_bb"] = matrix_variant_to_json(
+              *_one_rdm_spin_dependent_bb, is_bb_complex);
+        }
+      }
+    }
+
+    if (has_two_rdm_spin_dependent()) {
+      // Store aabb and aaaa for both restricted and unrestricted
+      if (_two_rdm_spin_dependent_aabb != nullptr) {
+        bool is_aabb_complex =
+            detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aabb);
+        rdm_json["is_two_rdm_aabb_complex"] = is_aabb_complex;
+        rdm_json["two_rdm_aabb"] = vector_variant_to_json(
+            *_two_rdm_spin_dependent_aabb, is_aabb_complex);
+      }
+      if (_two_rdm_spin_dependent_aaaa != nullptr) {
+        bool is_aaaa_complex =
+            detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aaaa);
+        rdm_json["is_two_rdm_aaaa_complex"] = is_aaaa_complex;
+        rdm_json["two_rdm_aaaa"] = vector_variant_to_json(
+            *_two_rdm_spin_dependent_aaaa, is_aaaa_complex);
+      }
+
+      // For unrestricted, also store bbbb
+      if (get_orbitals()->is_unrestricted() &&
+          _two_rdm_spin_dependent_bbbb != nullptr) {
+        bool is_bbbb_complex =
+            detail::is_vector_variant_complex(*_two_rdm_spin_dependent_bbbb);
+        rdm_json["is_two_rdm_bbbb_complex"] = is_bbbb_complex;
+        rdm_json["two_rdm_bbbb"] = vector_variant_to_json(
+            *_two_rdm_spin_dependent_bbbb, is_bbbb_complex);
+      }
+    }
+
+    j["rdms"] = rdm_json;
+  }
+}
+
+std::tuple<std::optional<ContainerTypes::MatrixVariant>,
+           std::optional<ContainerTypes::MatrixVariant>,
+           std::optional<ContainerTypes::VectorVariant>,
+           std::optional<ContainerTypes::VectorVariant>,
+           std::optional<ContainerTypes::VectorVariant>>
+WavefunctionContainer::_deserialize_rdms_from_json_restricted(
+    const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
+
+  std::optional<MatrixVariant> one_rdm_aa;
+  std::optional<MatrixVariant> one_rdm_bb;
+  std::optional<VectorVariant> two_rdm_aabb;
+  std::optional<VectorVariant> two_rdm_aaaa;
+  std::optional<VectorVariant> two_rdm_bbbb;
+
+  if (j.contains("rdms")) {
+    const auto& rdm_json = j["rdms"];
+
+    // Load one-RDMs if available
+    if (rdm_json.contains("one_rdm_aa")) {
+      bool is_complex = rdm_json.value("is_one_rdm_aa_complex", false);
+      one_rdm_aa = json_to_matrix_variant(rdm_json["one_rdm_aa"], is_complex);
+      // For restricted, both spins are the same
+      one_rdm_bb = one_rdm_aa;
+    }
+
+    // Load two-RDMs if available
+    if (rdm_json.contains("two_rdm_aabb")) {
+      bool is_aabb_complex = rdm_json.value("is_two_rdm_aabb_complex", false);
+      two_rdm_aabb =
+          json_to_vector_variant(rdm_json["two_rdm_aabb"], is_aabb_complex);
+    }
+    if (rdm_json.contains("two_rdm_aaaa")) {
+      bool is_aaaa_complex = rdm_json.value("is_two_rdm_aaaa_complex", false);
+      two_rdm_aaaa =
+          json_to_vector_variant(rdm_json["two_rdm_aaaa"], is_aaaa_complex);
+      // For restricted, bbbb is the same as aaaa
+      two_rdm_bbbb = two_rdm_aaaa;
+    }
+  }
+
+  return std::make_tuple(one_rdm_aa, one_rdm_bb, two_rdm_aabb, two_rdm_aaaa,
+                         two_rdm_bbbb);
+}
+
+std::tuple<std::optional<ContainerTypes::MatrixVariant>,
+           std::optional<ContainerTypes::MatrixVariant>,
+           std::optional<ContainerTypes::VectorVariant>,
+           std::optional<ContainerTypes::VectorVariant>,
+           std::optional<ContainerTypes::VectorVariant>>
+WavefunctionContainer::_deserialize_rdms_from_json_unrestricted(
+    const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
+
+  std::optional<MatrixVariant> one_rdm_aa;
+  std::optional<MatrixVariant> one_rdm_bb;
+  std::optional<VectorVariant> two_rdm_aabb;
+  std::optional<VectorVariant> two_rdm_aaaa;
+  std::optional<VectorVariant> two_rdm_bbbb;
+
+  if (j.contains("rdms")) {
+    const auto& rdm_json = j["rdms"];
+
+    if (rdm_json.contains("one_rdm_aa")) {
+      bool is_aa_complex = rdm_json.value("is_one_rdm_aa_complex", false);
+      one_rdm_aa =
+          json_to_matrix_variant(rdm_json["one_rdm_aa"], is_aa_complex);
+    }
+    if (rdm_json.contains("one_rdm_bb")) {
+      bool is_bb_complex = rdm_json.value("is_one_rdm_bb_complex", false);
+      one_rdm_bb =
+          json_to_matrix_variant(rdm_json["one_rdm_bb"], is_bb_complex);
+    }
+    if (rdm_json.contains("two_rdm_aabb")) {
+      bool is_aabb_complex = rdm_json.value("is_two_rdm_aabb_complex", false);
+      two_rdm_aabb =
+          json_to_vector_variant(rdm_json["two_rdm_aabb"], is_aabb_complex);
+    }
+    if (rdm_json.contains("two_rdm_aaaa")) {
+      bool is_aaaa_complex = rdm_json.value("is_two_rdm_aaaa_complex", false);
+      two_rdm_aaaa =
+          json_to_vector_variant(rdm_json["two_rdm_aaaa"], is_aaaa_complex);
+    }
+    if (rdm_json.contains("two_rdm_bbbb")) {
+      bool is_bbbb_complex = rdm_json.value("is_two_rdm_bbbb_complex", false);
+      two_rdm_bbbb =
+          json_to_vector_variant(rdm_json["two_rdm_bbbb"], is_bbbb_complex);
+    }
+  }
+
+  return std::make_tuple(one_rdm_aa, one_rdm_bb, two_rdm_aabb, two_rdm_aaaa,
+                         two_rdm_bbbb);
+}
+
 std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
     const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
-  if (!j.contains("container_type")) {
-    throw std::runtime_error("JSON missing required 'container_type' field");
-  }
 
-  std::string container_type = j["container_type"];
+  try {
+    // Check version first
+    if (!j.contains("version")) {
+      throw std::runtime_error("Invalid JSON: missing version field");
+    }
+    validate_serialization_version(SERIALIZATION_VERSION, j["version"]);
 
-  // Forward to appropriate container implementation
-  if (container_type == "cas") {
-    return CasWavefunctionContainer::from_json(j);
-  } else if (container_type == "sci") {
-    return SciWavefunctionContainer::from_json(j);
-  } else if (container_type == "sd") {
-    return SlaterDeterminantContainer::from_json(j);
-  } else {
-    throw std::runtime_error("Unknown container type: " + container_type);
+    // Load wavefunction type
+    WavefunctionType type = WavefunctionType::SelfDual;
+    if (j.contains("wavefunction_type")) {
+      std::string type_str = j["wavefunction_type"];
+      type = (type_str == "self_dual") ? WavefunctionType::SelfDual
+                                       : WavefunctionType::NotSelfDual;
+    }
+
+    // Load container type
+    if (!j.contains("container_type")) {
+      throw std::runtime_error("JSON missing 'container_type' field");
+    }
+    std::string container_type = j["container_type"];
+
+    // Load restrictedness flag (may be overridden by orbitals later)
+    bool is_restricted = j.value("is_restricted", false);
+
+    // Load coefficients if they exist
+    VectorVariant coefficients;
+    if (j.contains("coefficients")) {
+      bool is_complex = j.value("is_complex", false);
+      const auto& coeffs_json = j["coefficients"];
+
+      if (is_complex) {
+        if (!coeffs_json.is_array() || coeffs_json.empty() ||
+            !coeffs_json[0].is_array()) {
+          throw std::runtime_error(
+              "Invalid complex coefficient format: expected array of [real, "
+              "imag] pairs");
+        }
+        Eigen::VectorXcd coeffs_complex(coeffs_json.size());
+        for (size_t i = 0; i < coeffs_json.size(); ++i) {
+          if (coeffs_json[i].size() != 2) {
+            throw std::runtime_error(
+                "Invalid complex coefficient format: expected [real, imag] "
+                "pairs");
+          }
+          coeffs_complex(i) =
+              std::complex<double>(coeffs_json[i][0], coeffs_json[i][1]);
+        }
+        coefficients = coeffs_complex;
+      } else {
+        std::vector<double> coeff_data = coeffs_json;
+        Eigen::VectorXd coeffs_real =
+            Eigen::Map<Eigen::VectorXd>(coeff_data.data(), coeff_data.size());
+        coefficients = coeffs_real;
+      }
+    }
+
+    // Load configuration set (delegates to ConfigurationSet deserialization)
+    DeterminantVector determinants;
+    std::shared_ptr<Orbitals> orbitals;
+    if (j.contains("configuration_set")) {
+      auto config_set = ConfigurationSet::from_json(j["configuration_set"]);
+      determinants = config_set.get_configurations();
+      orbitals = config_set.get_orbitals();
+    } else {
+      determinants = {};
+      orbitals = nullptr;
+    }
+
+    // Load RDMs if they are available
+    if (j.contains("rdms")) {
+      if (orbitals != nullptr) {
+        // Determine if we're dealing with restricted or unrestricted orbitals
+        is_restricted = orbitals->is_restricted();
+      }
+
+      // Deserialize RDMs using helper functions
+      std::optional<MatrixVariant> one_rdm_aa;
+      std::optional<MatrixVariant> one_rdm_bb;
+      std::optional<VectorVariant> two_rdm_aabb;
+      std::optional<VectorVariant> two_rdm_aaaa;
+      std::optional<VectorVariant> two_rdm_bbbb;
+
+      if (is_restricted) {
+        std::tie(one_rdm_aa, one_rdm_bb, two_rdm_aabb, two_rdm_aaaa,
+                 two_rdm_bbbb) = _deserialize_rdms_from_json_restricted(j);
+      } else {
+        std::tie(one_rdm_aa, one_rdm_bb, two_rdm_aabb, two_rdm_aaaa,
+                 two_rdm_bbbb) = _deserialize_rdms_from_json_unrestricted(j);
+      }
+
+      // Return appropriate container with RDMs
+      bool has_one_rdm = one_rdm_aa.has_value();
+      bool has_two_rdm = two_rdm_aabb.has_value() && two_rdm_aaaa.has_value();
+
+      if (has_one_rdm && !has_two_rdm) {
+        if (container_type == "cas") {
+          return std::make_unique<CasWavefunctionContainer>(
+              coefficients, determinants, orbitals, std::nullopt, one_rdm_aa,
+              one_rdm_bb, std::nullopt, std::nullopt, std::nullopt,
+              std::nullopt, type);
+        } else if (container_type == "sci") {
+          return std::make_unique<SciWavefunctionContainer>(
+              coefficients, determinants, orbitals, std::nullopt, one_rdm_aa,
+              one_rdm_bb, std::nullopt, std::nullopt, std::nullopt,
+              std::nullopt, type);
+        }
+      } else if (!has_one_rdm && has_two_rdm) {
+        if (container_type == "cas") {
+          return std::make_unique<CasWavefunctionContainer>(
+              coefficients, determinants, orbitals, std::nullopt, std::nullopt,
+              std::nullopt, std::nullopt, two_rdm_aabb, two_rdm_aaaa,
+              two_rdm_bbbb, type);
+        } else if (container_type == "sci") {
+          return std::make_unique<SciWavefunctionContainer>(
+              coefficients, determinants, orbitals, std::nullopt, std::nullopt,
+              std::nullopt, std::nullopt, two_rdm_aabb, two_rdm_aaaa,
+              two_rdm_bbbb, type);
+        }
+      } else if (has_one_rdm && has_two_rdm) {
+        if (container_type == "cas") {
+          return std::make_unique<CasWavefunctionContainer>(
+              coefficients, determinants, orbitals, std::nullopt, one_rdm_aa,
+              one_rdm_bb, std::nullopt, two_rdm_aabb, two_rdm_aaaa,
+              two_rdm_bbbb, type);
+        } else if (container_type == "sci") {
+          return std::make_unique<SciWavefunctionContainer>(
+              coefficients, determinants, orbitals, std::nullopt, one_rdm_aa,
+              one_rdm_bb, std::nullopt, two_rdm_aabb, two_rdm_aaaa,
+              two_rdm_bbbb, type);
+        }
+      }
+      // Throw if RDMs are present but the container type is not supported
+      if ((has_one_rdm || has_two_rdm) &&
+          (container_type != "cas" && container_type != "sci")) {
+        throw std::runtime_error(
+            "RDMs are only supported for CAS and SCI containers in "
+            "WavefunctionContainer::from_json. Container type: " +
+            container_type);
+      }
+    }
+
+    if (container_type == "cas") {
+      return std::make_unique<CasWavefunctionContainer>(
+          coefficients, determinants, orbitals, type);
+    } else if (container_type == "sci") {
+      return std::make_unique<SciWavefunctionContainer>(
+          coefficients, determinants, orbitals, type);
+    } else {
+      throw std::runtime_error(
+          "Did not expect to get here for containers other than cas/sci. "
+          "Expected delegation to container-specific methods.");
+    }
+  } catch (const std::exception& e) {
+    throw std::runtime_error("JSON error: " + std::string(e.what()));
   }
 }
 
@@ -769,12 +1450,33 @@ std::shared_ptr<Wavefunction> Wavefunction::from_json(const nlohmann::json& j) {
     }
     validate_serialization_version(SERIALIZATION_VERSION, j["version"]);
 
+    // Load container type identifier
+    if (!j.contains("container_type")) {
+      throw std::runtime_error("JSON missing required 'container_type' field");
+    }
+    std::string container_type = j["container_type"];
+
     // Load container using factory method (orbitals are loaded internally by
     // the container)
     if (!j.contains("container")) {
       throw std::runtime_error("JSON missing required 'container' field");
     }
-    auto container = WavefunctionContainer::from_json(j["container"]);
+
+    // Dispatch to appropriate container implementation
+    std::unique_ptr<WavefunctionContainer> container;
+    if (container_type == "cas") {
+      container = CasWavefunctionContainer::from_json(j["container"]);
+    } else if (container_type == "sci") {
+      container = SciWavefunctionContainer::from_json(j["container"]);
+    } else if (container_type == "sd") {
+      container = SlaterDeterminantContainer::from_json(j["container"]);
+    } else if (container_type == "cc") {
+      container = CoupledClusterContainer::from_json(j["container"]);
+    } else if (container_type == "mp2") {
+      container = MP2Container::from_json(j["container"]);
+    } else {
+      throw std::runtime_error("Unknown container type: " + container_type);
+    }
 
     return std::make_shared<Wavefunction>(std::move(container));
 
@@ -998,175 +1700,8 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
       get_configuration_set().to_hdf5(config_set_group);
     }
 
-    // If rdms are available, store
-    if (has_one_rdm_spin_dependent() || has_two_rdm_spin_dependent()) {
-      H5::Group rdm_group = group.createGroup("rdms");
-
-      if (has_one_rdm_spin_dependent()) {
-        // restricted only
-        if (get_orbitals()->is_restricted()) {
-          std::string storage_name = "one_rdm_aa";
-          H5::Attribute one_rdm_aa_complex_attr = rdm_group.createAttribute(
-              "is_one_rdm_aa_complex", H5::PredType::NATIVE_HBOOL,
-              H5::DataSpace(H5S_SCALAR));
-
-          if (_one_rdm_spin_dependent_aa != nullptr) {
-            // check if real or complex
-            bool is_one_rdm_complex =
-                detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
-            save_matrix_variant_to_group(is_one_rdm_complex,
-                                         _one_rdm_spin_dependent_aa, rdm_group,
-                                         storage_name);
-
-            // store complexity flag
-            hbool_t is_one_rdm_aa_complex_flag = is_one_rdm_complex ? 1 : 0;
-            one_rdm_aa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
-                                          &is_one_rdm_aa_complex_flag);
-
-            // if we dont have aa, save bb (same for restricted)
-          } else if (_one_rdm_spin_dependent_bb != nullptr) {
-            // check if real or complex
-            bool is_one_rdm_complex =
-                detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
-            save_matrix_variant_to_group(is_one_rdm_complex,
-                                         _one_rdm_spin_dependent_bb, rdm_group,
-                                         storage_name);
-
-            // store complexity flag
-            hbool_t is_one_rdm_aa_complex_flag = is_one_rdm_complex ? 1 : 0;
-            one_rdm_aa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
-                                          &is_one_rdm_aa_complex_flag);
-          } else if (_one_rdm_spin_traced != nullptr &&
-                     get_orbitals()->is_restricted()) {
-            // only spin traced
-            auto derived_one_rdm_spin_dependent_aa =
-                detail::multiply_matrix_variant(*_one_rdm_spin_traced, 0.5);
-            // check if real or complex
-            bool is_one_rdm_complex = detail::is_matrix_variant_complex(
-                *derived_one_rdm_spin_dependent_aa);
-            save_matrix_variant_to_group(is_one_rdm_complex,
-                                         derived_one_rdm_spin_dependent_aa,
-                                         rdm_group, storage_name);
-
-            // store complexity flag
-            hbool_t is_one_rdm_aa_complex_flag = is_one_rdm_complex ? 1 : 0;
-            one_rdm_aa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
-                                          &is_one_rdm_aa_complex_flag);
-
-          } else {
-            throw std::runtime_error(
-                "Spin-dependent one-body RDMs are supposedly available, but "
-                "could not be retrieved in the expected format");
-          }
-        } else {
-          // unrestricted - want to store both
-          std::string storage_name_aa = "one_rdm_aa";
-          H5::Attribute one_rdm_aa_complex_attr = rdm_group.createAttribute(
-              "is_one_rdm_aa_complex", H5::PredType::NATIVE_HBOOL,
-              H5::DataSpace(H5S_SCALAR));
-          H5::Attribute one_rdm_bb_complex_attr = rdm_group.createAttribute(
-              "is_one_rdm_bb_complex", H5::PredType::NATIVE_HBOOL,
-              H5::DataSpace(H5S_SCALAR));
-
-          if (_one_rdm_spin_dependent_aa != nullptr) {
-            bool is_aa_rdm_complex =
-                detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
-            save_matrix_variant_to_group(is_aa_rdm_complex,
-                                         _one_rdm_spin_dependent_aa, rdm_group,
-                                         storage_name_aa);
-
-            hbool_t is_one_rdm_aa_complex_flag = is_aa_rdm_complex ? 1 : 0;
-            one_rdm_aa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
-                                          &is_one_rdm_aa_complex_flag);
-          } else {
-            throw std::runtime_error(
-                "Expected _one_rdm_spin_dependent_aa to point to something "
-                "other than nullptr");
-          }
-
-          if (_one_rdm_spin_dependent_bb != nullptr) {
-            std::string storage_name_bb = "one_rdm_bb";
-            bool is_bb_rdm_complex =
-                detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
-            save_matrix_variant_to_group(is_bb_rdm_complex,
-                                         _one_rdm_spin_dependent_bb, rdm_group,
-                                         storage_name_bb);
-
-            hbool_t is_one_rdm_bb_complex_flag = is_bb_rdm_complex ? 1 : 0;
-            one_rdm_bb_complex_attr.write(H5::PredType::NATIVE_HBOOL,
-                                          &is_one_rdm_bb_complex_flag);
-          } else {
-            throw std::runtime_error(
-                "Expected _one_rdm_spin_dependent_bb to point to something "
-                "other than nullptr");
-          }
-        }
-      }
-
-      if (has_two_rdm_spin_dependent()) {
-        std::string storage_name_aabb = "two_rdm_aabb";
-        std::string storage_name_aaaa = "two_rdm_aaaa";
-        H5::Attribute two_rdm_aabb_complex_attr = rdm_group.createAttribute(
-            "is_two_rdm_aabb_complex", H5::PredType::NATIVE_HBOOL,
-            H5::DataSpace(H5S_SCALAR));
-        H5::Attribute two_rdm_aaaa_complex_attr = rdm_group.createAttribute(
-            "is_two_rdm_aaaa_complex", H5::PredType::NATIVE_HBOOL,
-            H5::DataSpace(H5S_SCALAR));
-        // we need aabb and aaaa for both restricted and unrestricted
-        if (_two_rdm_spin_dependent_aabb != nullptr) {
-          bool is_aabb_rdm_complex =
-              detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aabb);
-          save_vector_variant_to_group(is_aabb_rdm_complex,
-                                       _two_rdm_spin_dependent_aabb, rdm_group,
-                                       storage_name_aabb);
-
-          hbool_t is_two_rdm_aabb_complex_flag = is_aabb_rdm_complex ? 1 : 0;
-          two_rdm_aabb_complex_attr.write(H5::PredType::NATIVE_HBOOL,
-                                          &is_two_rdm_aabb_complex_flag);
-        } else {
-          throw std::runtime_error(
-              "Expected _two_rdm_spin_dependent_aabb to point to something "
-              "other than nullptr");
-        }
-        if (_two_rdm_spin_dependent_aaaa != nullptr) {
-          bool is_aaaa_rdm_complex =
-              detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aaaa);
-          save_vector_variant_to_group(is_aaaa_rdm_complex,
-                                       _two_rdm_spin_dependent_aaaa, rdm_group,
-                                       storage_name_aaaa);
-
-          hbool_t is_two_rdm_aaaa_complex_flag = is_aaaa_rdm_complex ? 1 : 0;
-          two_rdm_aaaa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
-                                          &is_two_rdm_aaaa_complex_flag);
-        } else {
-          throw std::runtime_error(
-              "Expected _two_rdm_spin_dependent_aaaa to point to something "
-              "other than nullptr");
-        }
-
-        if (get_orbitals()->is_unrestricted()) {
-          // also save bbbb
-          if (_two_rdm_spin_dependent_bbbb != nullptr) {
-            std::string storage_name_bbbb = "two_rdm_bbbb";
-            H5::Attribute two_rdm_bbbb_complex_attr = rdm_group.createAttribute(
-                "is_two_rdm_bbbb_complex", H5::PredType::NATIVE_HBOOL,
-                H5::DataSpace(H5S_SCALAR));
-            bool is_bbbb_rdm_complex = detail::is_vector_variant_complex(
-                *_two_rdm_spin_dependent_bbbb);
-            save_vector_variant_to_group(is_bbbb_rdm_complex,
-                                         _two_rdm_spin_dependent_bbbb,
-                                         rdm_group, storage_name_bbbb);
-            hbool_t is_two_rdm_bbbb_complex_flag = is_bbbb_rdm_complex ? 1 : 0;
-            two_rdm_bbbb_complex_attr.write(H5::PredType::NATIVE_HBOOL,
-                                            &is_two_rdm_bbbb_complex_flag);
-          } else {
-            throw std::runtime_error(
-                "Expected _two_rdm_spin_dependent_bbbb to point to something "
-                "other than nullptr");
-          }
-        }
-      }
-    }
+    // Serialize RDMs if available
+    _serialize_rdms_to_hdf5(group);
 
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
@@ -1278,9 +1813,16 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
       orbitals = nullptr;
     }
 
-    // load rdms if they are available
+    // Load RDMs if they are available
     if (group.nameExists("rdms")) {
-      // initialize variables
+      H5::Group rdm_group = group.openGroup("rdms");
+
+      if (orbitals != nullptr) {
+        // Determine if we're dealing with restricted or unrestricted orbitals
+        is_restricted = orbitals->is_restricted();
+      }
+
+      // Deserialize RDMs using helper functions
       std::optional<MatrixVariant> one_rdm_aa;
       std::optional<MatrixVariant> one_rdm_bb;
       std::optional<VectorVariant> two_rdm_aabb;
@@ -1289,276 +1831,55 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
       std::optional<MatrixVariant> one_rdm_spin_traced;
       std::optional<VectorVariant> two_rdm_spin_traced;
 
-      H5::Group rdm_group = group.openGroup("rdms");
-
-      // check if any one rdms were saved
-      if (rdm_group.nameExists("one_rdm_aa")) {
-        // check complexity
-        bool is_one_rdm_aa_complex = false;
-        if (rdm_group.attrExists("is_one_rdm_aa_complex")) {
-          H5::Attribute complex_attr =
-              rdm_group.openAttribute("is_one_rdm_aa_complex");
-          hbool_t is_complex_flag;
-          complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
-          is_one_rdm_aa_complex = (is_complex_flag != 0);
-        }
-        one_rdm_aa = load_matrix_variant_from_group(rdm_group, "one_rdm_aa",
-                                                    is_one_rdm_aa_complex);
-      }
-
-      // check if any two rdms were saved
-      if (rdm_group.nameExists("two_rdm_aabb") &&
-          rdm_group.nameExists("two_rdm_aaaa")) {
-        // check complexity
-        bool is_two_rdm_aabb_complex = false;
-        if (rdm_group.attrExists("is_two_rdm_aabb_complex")) {
-          H5::Attribute complex_attr =
-              rdm_group.openAttribute("is_two_rdm_aabb_complex");
-          hbool_t is_complex_flag;
-          complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
-          is_two_rdm_aabb_complex = (is_complex_flag != 0);
-        }
-        bool is_two_rdm_aaaa_complex = false;
-        if (rdm_group.attrExists("is_two_rdm_aaaa_complex")) {
-          H5::Attribute complex_attr =
-              rdm_group.openAttribute("is_two_rdm_aaaa_complex");
-          hbool_t is_complex_flag;
-          complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
-          is_two_rdm_aaaa_complex = (is_complex_flag != 0);
-        }
-        two_rdm_aabb = load_vector_variant_from_group(rdm_group, "two_rdm_aabb",
-                                                      is_two_rdm_aabb_complex);
-        two_rdm_aaaa = load_vector_variant_from_group(rdm_group, "two_rdm_aaaa",
-                                                      is_two_rdm_aaaa_complex);
-      }
-
-      if (orbitals != nullptr) {
-        // Determine if we're dealing with restricted or unrestricted orbitals
-        is_restricted = orbitals->is_restricted();
-      }
-      // Otherwise we default to the value read from hdf5, if any (default is
-      // false)
-
-      // return restricted object with rdms
       if (is_restricted) {
-        if (one_rdm_aa.has_value()) {
-          // get one rdm spin traced
-          auto spin_traced_result =
-              detail::multiply_matrix_variant(*one_rdm_aa, 2.0);
-          if (spin_traced_result != nullptr) {
-            one_rdm_spin_traced = *spin_traced_result;
-          }
-        }
-
-        if (two_rdm_aabb.has_value() && two_rdm_aaaa.has_value()) {
-          // get two rdm spin traced
-          auto two_rdm_ss_result =
-              detail::multiply_vector_variant(*two_rdm_aaaa, 2.0);
-          auto two_rdm_bbaa_result = detail::transpose_ijkl_klij_vector_variant(
-              *two_rdm_aabb, orbitals->get_active_space_indices().first.size());
-
-          if (two_rdm_ss_result != nullptr && two_rdm_bbaa_result != nullptr) {
-            auto two_rdm_os_result = detail::add_vector_variants(
-                *two_rdm_aabb, *two_rdm_bbaa_result);
-            if (two_rdm_os_result != nullptr) {
-              auto final_result = detail::add_vector_variants(
-                  *two_rdm_ss_result, *two_rdm_os_result);
-              if (final_result != nullptr) {
-                two_rdm_spin_traced = *final_result;
-              }
-            }
-          }
-        }
-
-        // return based on whether stuff is available
-        // only one rdms
-        if (one_rdm_aa.has_value() && !two_rdm_aabb.has_value()) {
-          if (container_type == "cas") {
-            return std::make_unique<CasWavefunctionContainer>(
-                coefficients, determinants, orbitals, one_rdm_spin_traced,
-                one_rdm_aa,
-                one_rdm_aa,  // bb is aa
-                std::nullopt, std::nullopt, std::nullopt, std::nullopt, type);
-          } else if (container_type == "sci") {
-            return std::make_unique<SciWavefunctionContainer>(
-                coefficients, determinants, orbitals, one_rdm_spin_traced,
-                one_rdm_aa,
-                one_rdm_aa,  // bb is aa
-                std::nullopt, std::nullopt, std::nullopt, std::nullopt, type);
-          } else {
-            throw std::runtime_error(
-                "Did not expect to get here for containers other than cas/sci. "
-                "Expected delegation to container-specific methods.");
-          }
-        }
-
-        // only two rdms
-        else if (!one_rdm_aa.has_value() && two_rdm_aabb.has_value()) {
-          if (container_type == "cas") {
-            return std::make_unique<CasWavefunctionContainer>(
-                coefficients, determinants, orbitals, std::nullopt,
-                std::nullopt, std::nullopt, two_rdm_spin_traced, two_rdm_aabb,
-                two_rdm_aaaa,
-                two_rdm_aaaa,  // two_rdm_bbbb is two_rdm_aaaa
-                type);
-          } else if (container_type == "sci") {
-            return std::make_unique<SciWavefunctionContainer>(
-                coefficients, determinants, orbitals, std::nullopt,
-                std::nullopt, std::nullopt, two_rdm_spin_traced, two_rdm_aabb,
-                two_rdm_aaaa,
-                two_rdm_aaaa,  // two_rdm_bbbb is two_rdm_aaaa
-                type);
-          } else {
-            throw std::runtime_error(
-                "Did not expect to get here for containers other than cas/sci. "
-                "Expected delegation to container-specific methods.");
-          }
-        }
-        // both
-        else if (one_rdm_aa.has_value() && two_rdm_aabb.has_value()) {
-          if (container_type == "cas") {
-            return std::make_unique<CasWavefunctionContainer>(
-                coefficients, determinants, orbitals, one_rdm_spin_traced,
-                one_rdm_aa,
-                one_rdm_aa,  // bb is aa
-                two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
-                two_rdm_aaaa,  // two_rdm_bbbb is two_rdm_aaaa
-                type);
-          } else if (container_type == "sci") {
-            return std::make_unique<SciWavefunctionContainer>(
-                coefficients, determinants, orbitals, one_rdm_spin_traced,
-                one_rdm_aa,
-                one_rdm_aa,  // bb is aa
-                two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
-                two_rdm_aaaa,  // two_rdm_bbbb is two_rdm_aaaa
-                type);
-          } else {
-            throw std::runtime_error(
-                "Did not expect to get here for containers other than cas/sci. "
-                "Expected delegation to container-specific methods.");
-          }
-        } else {
-          throw std::runtime_error(
-              "Unexpected combination of rdms are available.");
-        }
+        std::tie(one_rdm_aa, one_rdm_bb, two_rdm_aabb, two_rdm_aaaa,
+                 two_rdm_bbbb, one_rdm_spin_traced, two_rdm_spin_traced) =
+            _deserialize_rdms_from_hdf5_restricted(rdm_group, orbitals);
       } else {
-        // Unrestricted
-        // check if one rdms are available
-        if (rdm_group.nameExists("one_rdm_bb")) {
-          // check complexity
-          bool is_one_rdm_bb_complex = false;
-          if (rdm_group.attrExists("is_one_rdm_bb_complex")) {
-            H5::Attribute complex_attr =
-                rdm_group.openAttribute("is_one_rdm_bb_complex");
-            hbool_t is_complex_flag;
-            complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
-            is_one_rdm_bb_complex = (is_complex_flag != 0);
-          }
-          one_rdm_bb = load_matrix_variant_from_group(rdm_group, "one_rdm_bb",
-                                                      is_one_rdm_bb_complex);
+        std::tie(one_rdm_aa, one_rdm_bb, two_rdm_aabb, two_rdm_aaaa,
+                 two_rdm_bbbb, one_rdm_spin_traced, two_rdm_spin_traced) =
+            _deserialize_rdms_from_hdf5_unrestricted(rdm_group, orbitals);
+      }
 
-          // get one rdm spin traced
-          auto spin_traced_result =
-              detail::add_matrix_variants(*one_rdm_aa, *one_rdm_bb);
-          if (spin_traced_result != nullptr) {
-            one_rdm_spin_traced = *spin_traced_result;
-          }
-        } else {
-          throw std::runtime_error("Expected aa and bb rdms for unrestricted.");
-        }
-        // also get two rdms bbbb
-        if (rdm_group.nameExists("two_rdm_bbbb")) {
-          bool is_two_rdm_bbbb_complex = false;
-          if (rdm_group.attrExists("is_two_rdm_bbbb_complex")) {
-            H5::Attribute complex_attr =
-                rdm_group.openAttribute("is_two_rdm_bbbb_complex");
-            hbool_t is_complex_flag;
-            complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
-            is_two_rdm_bbbb_complex = (is_complex_flag != 0);
-          }
-          two_rdm_bbbb = load_vector_variant_from_group(
-              rdm_group, "two_rdm_bbbb", is_two_rdm_bbbb_complex);
+      // Return appropriate container with RDMs
+      bool has_one_rdm = one_rdm_aa.has_value();
+      bool has_two_rdm = two_rdm_aabb.has_value() && two_rdm_aaaa.has_value();
 
-          // get two rdm spin traced
-          auto two_rdm_ss_result =
-              detail::add_vector_variants(*two_rdm_aaaa, *two_rdm_bbbb);
-          auto two_rdm_bbaa_result = detail::transpose_ijkl_klij_vector_variant(
-              *two_rdm_aabb, orbitals->get_active_space_indices().first.size());
-
-          if (two_rdm_ss_result != nullptr && two_rdm_bbaa_result != nullptr) {
-            auto two_rdm_os_result = detail::add_vector_variants(
-                *two_rdm_aabb, *two_rdm_bbaa_result);
-            if (two_rdm_os_result != nullptr) {
-              auto final_result = detail::add_vector_variants(
-                  *two_rdm_ss_result, *two_rdm_os_result);
-              if (final_result != nullptr) {
-                two_rdm_spin_traced = *final_result;
-              }
-            }
-          }
+      if (has_one_rdm && !has_two_rdm) {
+        if (container_type == "cas") {
+          return std::make_unique<CasWavefunctionContainer>(
+              coefficients, determinants, orbitals, one_rdm_spin_traced,
+              one_rdm_aa, one_rdm_bb, std::nullopt, std::nullopt, std::nullopt,
+              std::nullopt, type);
+        } else if (container_type == "sci") {
+          return std::make_unique<SciWavefunctionContainer>(
+              coefficients, determinants, orbitals, one_rdm_spin_traced,
+              one_rdm_aa, one_rdm_bb, std::nullopt, std::nullopt, std::nullopt,
+              std::nullopt, type);
         }
-
-        // return based on whether stuff is available
-        // only one rdms
-        if (one_rdm_aa.has_value() && one_rdm_bb.has_value() &&
-            !two_rdm_aabb.has_value()) {
-          if (container_type == "cas") {
-            return std::make_unique<CasWavefunctionContainer>(
-                coefficients, determinants, orbitals, one_rdm_spin_traced,
-                one_rdm_aa, one_rdm_bb, std::nullopt, std::nullopt,
-                std::nullopt, std::nullopt, type);
-          } else if (container_type == "sci") {
-            return std::make_unique<SciWavefunctionContainer>(
-                coefficients, determinants, orbitals, one_rdm_spin_traced,
-                one_rdm_aa, one_rdm_bb, std::nullopt, std::nullopt,
-                std::nullopt, std::nullopt, type);
-          } else {
-            throw std::runtime_error(
-                "Did not expect to get here for containers other than cas/sci. "
-                "Expected delegation to container-specific methods.");
-          }
+      } else if (!has_one_rdm && has_two_rdm) {
+        if (container_type == "cas") {
+          return std::make_unique<CasWavefunctionContainer>(
+              coefficients, determinants, orbitals, std::nullopt, std::nullopt,
+              std::nullopt, two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
+              two_rdm_bbbb, type);
+        } else if (container_type == "sci") {
+          return std::make_unique<SciWavefunctionContainer>(
+              coefficients, determinants, orbitals, std::nullopt, std::nullopt,
+              std::nullopt, two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
+              two_rdm_bbbb, type);
         }
-        // only two rdms
-        else if (!one_rdm_aa.has_value() && two_rdm_aabb.has_value() &&
-                 two_rdm_aaaa.has_value() && two_rdm_bbbb.has_value()) {
-          if (container_type == "cas") {
-            return std::make_unique<CasWavefunctionContainer>(
-                coefficients, determinants, orbitals, std::nullopt,
-                std::nullopt, std::nullopt, two_rdm_spin_traced, two_rdm_aabb,
-                two_rdm_aaaa, two_rdm_bbbb, type);
-          } else if (container_type == "sci") {
-            return std::make_unique<SciWavefunctionContainer>(
-                coefficients, determinants, orbitals, std::nullopt,
-                std::nullopt, std::nullopt, two_rdm_spin_traced, two_rdm_aabb,
-                two_rdm_aaaa, two_rdm_bbbb, type);
-          } else {
-            throw std::runtime_error(
-                "Did not expect to get here for containers other than cas/sci. "
-                "Expected delegation to container-specific methods.");
-          }
-        }
-        // both
-        else if (one_rdm_aa.has_value() && one_rdm_bb.has_value() &&
-                 two_rdm_aabb.has_value() && two_rdm_aaaa.has_value() &&
-                 two_rdm_bbbb.has_value()) {
-          if (container_type == "cas") {
-            return std::make_unique<CasWavefunctionContainer>(
-                coefficients, determinants, orbitals, one_rdm_spin_traced,
-                one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-                two_rdm_aaaa, two_rdm_bbbb, type);
-          } else if (container_type == "sci") {
-            return std::make_unique<SciWavefunctionContainer>(
-                coefficients, determinants, orbitals, one_rdm_spin_traced,
-                one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-                two_rdm_aaaa, two_rdm_bbbb, type);
-          } else {
-            throw std::runtime_error(
-                "Did not expect to get here for containers other than cas/sci. "
-                "Expected delegation to container-specific methods.");
-          }
-        } else {
-          throw std::runtime_error(
-              "Unexpected combination of rdms are available.");
+      } else if (has_one_rdm && has_two_rdm) {
+        if (container_type == "cas") {
+          return std::make_unique<CasWavefunctionContainer>(
+              coefficients, determinants, orbitals, one_rdm_spin_traced,
+              one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
+              two_rdm_aaaa, two_rdm_bbbb, type);
+        } else if (container_type == "sci") {
+          return std::make_unique<SciWavefunctionContainer>(
+              coefficients, determinants, orbitals, one_rdm_spin_traced,
+              one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
+              two_rdm_aaaa, two_rdm_bbbb, type);
         }
       }
     }
