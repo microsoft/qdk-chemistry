@@ -135,10 +135,8 @@ int main() {
       break;
     }
 
-    // Get electron counts
-    auto [num_alpha, num_beta] = wavefunction->get_total_num_electrons();
-
     // Rotate orbitals along the instability direction
+    auto [num_alpha, num_beta] = wavefunction->get_total_num_electrons();
     auto orbitals = wavefunction->get_orbitals();
     auto rotated_orbitals = rotate_orbitals(orbitals, rotation_vector,
                                             num_alpha, num_beta, do_external);

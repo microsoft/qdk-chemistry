@@ -79,6 +79,9 @@ class PyscfScfSettings(ElectronicStructureSettings):
     "restricted": Force restricted calculation (RHF/ROHF for HF, RKS/ROKS for DFT)
     "unrestricted": Force unrestricted calculation (UHF for HF, UKS for DFT)
 
+    PySCF specific setting:
+    - xc_grid: Integer DFT integration grid density level passed to PySCF (0=coarse, 9=very fine).
+
     Examples:
         >>> settings = PyscfScfSettings()
         >>> settings.get("max_iterations")
@@ -97,7 +100,9 @@ class PyscfScfSettings(ElectronicStructureSettings):
         """Initialize the settings with default values from ElectronicStructureSettings plus PySCF-specific defaults."""
         Logger.trace_entering()
         super().__init__()  # This sets up all the base class defaults
-        self._set_default("xc_grid", "int", 3)
+        self._set_default(
+            "xc_grid", "int", 3, "Density functional integration grid level (0=coarse, 9=very fine)", list(range(10))
+        )
 
 
 class PyscfScfSolver(ScfSolver):
