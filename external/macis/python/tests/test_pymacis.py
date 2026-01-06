@@ -18,10 +18,17 @@ except ImportError:
     pytest.skip("pymacis not found, skipping tests", allow_module_level=True)
 
 # Paths to FCIDUMP files for different molecules and active spaces
-FCIDUMP_2E2O_PATH = Path(__file__).parent / "data" / "h2_valence_2e2o.hamiltonian.fcidump"
-FCIDUMP_6E6O_PATH = Path(__file__).parent / "data" / "n2_selected_6e6o.hamiltonian.fcidump"
-FCIDUMP_14E18O_PATH = Path(__file__).parent / "data" / "n2_full_14e18o.hamiltonian.fcidump"
+FCIDUMP_2E2O_PATH = (
+    Path(__file__).parent / "data" / "h2_valence_2e2o.hamiltonian.fcidump"
+)
+FCIDUMP_6E6O_PATH = (
+    Path(__file__).parent / "data" / "n2_selected_6e6o.hamiltonian.fcidump"
+)
+FCIDUMP_14E18O_PATH = (
+    Path(__file__).parent / "data" / "n2_full_14e18o.hamiltonian.fcidump"
+)
 TEST_WFN = Path(__file__).parent.parent.parent / "tests" / "ref_data" / "ch4.wfn.dat"
+
 
 def test_read_fcidump():
     """
@@ -116,7 +123,7 @@ def test_casci_default():
 
     assert "energy" in result, "CASCI energy not found in result"
     assert "determinants" not in result, "CASCI determinants not found in result"
-    assert np.isclose(result["energy"], -9.155573e+00), "CASCI energy mismatch"
+    assert np.isclose(result["energy"], -9.155573e00), "CASCI energy mismatch"
 
 
 def test_casci_with_determinants():
@@ -132,7 +139,7 @@ def test_casci_with_determinants():
     assert "energy" in result, "CASCI energy not found in result"
     assert "determinants" in result, "CASCI determinants not found in result"
     assert len(result["determinants"]) == 400, "No determinants found in CASCI result"
-    assert np.isclose(result["energy"], -9.155573e+00), "CASCI energy mismatch"
+    assert np.isclose(result["energy"], -9.155573e00), "CASCI energy mismatch"
 
 
 def test_canonical_hf_determinant():
@@ -173,7 +180,7 @@ def test_asci():
     assert "determinants" in res, "ASCI determinants not found in result"
     assert "coefficients" in res, "ASCI coefficients not found in result"
 
-    assert np.isclose(res["energy"], -1.205187165264e+02), "ASCI energy mismatch"
+    assert np.isclose(res["energy"], -1.205187165264e02), "ASCI energy mismatch"
     assert len(res["determinants"]) == 2000, "No determinants found in ASCI result"
     assert np.isclose(np.linalg.norm(res["coefficients"]), 1.0), (
         "ASCI coefficients do not normalize to 1"
