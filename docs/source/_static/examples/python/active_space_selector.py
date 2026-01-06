@@ -64,7 +64,7 @@ print(registry.available("active_space_selector"))
 from qdk_chemistry.utils import compute_valence_space_parameters  # noqa: E402
 
 # Create a valence space active space selector
-valence_selector = create("active_space_selector", "qdk_valence_space")
+valence_selector = create("active_space_selector", "qdk_valence")
 # Automatically select valence parameters based on the input structure
 num_electrons, num_orbitals = compute_valence_space_parameters(scf_wavefunction, charge)
 valence_selector.settings().set("num_active_electrons", num_electrons)
@@ -77,7 +77,7 @@ active_hamiltonian = active_hamiltonian_generator.run(active_valence_wfn.get_orb
 
 # Run Active Space Calculation with Selected CI
 mc_calculator = create("multi_configuration_calculator", "macis_asci")
-mc_calculator.settings().set("num_determinants", 50000)
+mc_calculator.settings().set("ntdets_max", 50000)
 mc_calculator.settings().set("calculate_one_rdm", True)
 mc_calculator.settings().set("calculate_two_rdm", True)
 mc_energy, mc_wavefunction = mc_calculator.run(

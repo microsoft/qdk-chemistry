@@ -59,8 +59,7 @@ int main() {
   // --------------------------------------------------------------------------------------------
   // start-cell-autocas
   // create an valence space active space selector
-  auto valence_selector =
-      ActiveSpaceSelectorFactory::create("qdk_valence_space");
+  auto valence_selector = ActiveSpaceSelectorFactory::create("qdk_valence");
   // automatically select valence parameters based on the input structure
   auto [num_electrons, num_orbitals] =
       qdk::chemistry::utils::compute_valence_space_parameters(scf_wavefunction,
@@ -77,7 +76,7 @@ int main() {
   // Run Active Space Calculation with Selected CI
   auto mc_calculator =
       MultiConfigurationCalculatorFactory::create("macis_asci");
-  mc_calculator->settings().set("num_determinants", 50000);
+  mc_calculator->settings().set("ntdets_max", 50000);
   mc_calculator->settings().set("calculate_one_rdm", true);
   mc_calculator->settings().set("calculate_two_rdm", true);
   auto [mc_energy, mc_wavefunction] = mc_calculator->run(
