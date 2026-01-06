@@ -75,8 +75,6 @@ nlohmann::json vector_variant_to_json(const VectorVariant& vec_var,
 nlohmann::json matrix_variant_to_json(const MatrixVariant& mat_var,
                                       bool is_complex);
 
-using MatrixVariant = std::variant<Eigen::MatrixXd, Eigen::MatrixXcd>;
-
 /**
  * @brief Convert JSON array to Eigen matrix
  * @param j JSON array to convert

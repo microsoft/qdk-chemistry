@@ -1145,6 +1145,14 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
               two_rdm_bbbb, type);
         }
       }
+      // Throw if RDMs are present but the container type is not supported
+      if ((has_one_rdm || has_two_rdm) &&
+          (container_type != "cas" && container_type != "sci")) {
+        throw std::runtime_error(
+            "RDMs are only supported for CAS and SCI containers in "
+            "WavefunctionContainer::from_json. Container type: " +
+            container_type);
+      }
     }
 
     if (container_type == "cas") {
