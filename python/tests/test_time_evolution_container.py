@@ -10,7 +10,6 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
-    EvolutionOrdering,
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
@@ -29,17 +28,10 @@ def step_terms():
 
 
 @pytest.fixture
-def valid_ordering():
-    """Create a valid EvolutionOrdering instance for testing."""
-    return EvolutionOrdering(indices=[2, 0, 1])
-
-
-@pytest.fixture
-def container(step_terms, valid_ordering):
+def container(step_terms):
     """Create a PauliProductFormulaContainer instance for testing."""
     return PauliProductFormulaContainer(
         step_terms=step_terms,
-        evolution_ordering=valid_ordering,
         step_reps=4,
         num_qubits=2,
     )
@@ -64,27 +56,6 @@ class TestExponentiatedPauliTerm:
             term.angle = 0.2
 
 
-class TestEvolutionOrdering:
-    """Tests for the EvolutionOrdering dataclass."""
-
-    def test_valid_ordering(self):
-        """Test a valid evolution ordering."""
-        ordering = EvolutionOrdering(indices=[1, 0, 2])
-        ordering.validate_ordering(num_terms=3)
-
-    def test_invalid_length(self):
-        """Test an evolution ordering with invalid length."""
-        ordering = EvolutionOrdering(indices=[0, 1])
-        with pytest.raises(ValueError, match="length must match"):
-            ordering.validate_ordering(num_terms=3)
-
-    def test_invalid_permutation(self):
-        """Test an evolution ordering that is not a valid permutation."""
-        ordering = EvolutionOrdering(indices=[0, 0, 2])
-        with pytest.raises(ValueError, match="permutation"):
-            ordering.validate_ordering(num_terms=3)
-
-
 class TestPauliProductFormulaContainer:
     """Tests for the PauliProductFormulaContainer class."""
 
@@ -94,20 +65,22 @@ class TestPauliProductFormulaContainer:
         assert container.num_qubits == 2
         assert container.step_reps == 4
         assert len(container.step_terms) == 3
-        assert container.evolution_ordering.indices == [2, 0, 1]
 
     def test_update_ordering(self, container):
         """Test setting a new valid evolution ordering."""
-        new_ordering = EvolutionOrdering(indices=[1, 2, 0])
-        updated_container = container.update_ordering(new_ordering)
+        updated_container = container.reorder_terms([1, 2, 0])
 
-        assert updated_container.evolution_ordering.indices == [1, 2, 0]
+        assert updated_container.step_terms[0] == container.step_terms[1]
+        assert updated_container.step_terms[1] == container.step_terms[2]
+        assert updated_container.step_terms[2] == container.step_terms[0]
 
     def test_update_ordering_invalid(self, container):
         """Test setting an invalid evolution ordering."""
-        bad_ordering = EvolutionOrdering(indices=[0, 1])
-        with pytest.raises(ValueError, match="length must match"):
-            container.update_ordering(bad_ordering)
+        with pytest.raises(ValueError, match="must match number of terms"):
+            container.reorder_terms([0, 1])
+
+        with pytest.raises(ValueError, match="Invalid permutation"):
+            container.reorder_terms([0, 1, 3])
 
     def test_to_json_roundtrip(self, container):
         """Test JSON serialization and deserialization roundtrip."""
@@ -117,7 +90,6 @@ class TestPauliProductFormulaContainer:
         assert restored.type == container.type
         assert restored.num_qubits == container.num_qubits
         assert restored.step_reps == container.step_reps
-        assert restored.evolution_ordering.indices == container.evolution_ordering.indices
 
         for t1, t2 in zip(restored.step_terms, container.step_terms, strict=False):
             assert t1.pauli_term == t2.pauli_term
@@ -139,7 +111,6 @@ class TestPauliProductFormulaContainer:
         assert restored.type == container.type
         assert restored.num_qubits == container.num_qubits
         assert restored.step_reps == container.step_reps
-        assert restored.evolution_ordering.indices == container.evolution_ordering.indices
         assert len(restored.step_terms) == len(container.step_terms)
 
     def test_summary(self, container):

@@ -18,7 +18,6 @@ from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.chain_str
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
-    EvolutionOrdering,
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
@@ -34,11 +33,9 @@ def simple_ppf_container():
         ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.5),
         ExponentiatedPauliTerm(pauli_term={1: "Z"}, angle=0.25),
     ]
-    ordering = EvolutionOrdering(indices=[0, 1])
 
     return PauliProductFormulaContainer(
         step_terms=terms,
-        evolution_ordering=ordering,
         step_reps=1,
         num_qubits=2,
     )
@@ -137,7 +134,6 @@ class TestAppendControlledTimeEvolution:
             step_terms=[
                 ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.0),
             ],
-            evolution_ordering=EvolutionOrdering(indices=[0]),
             step_reps=1,
             num_qubits=1,
         )

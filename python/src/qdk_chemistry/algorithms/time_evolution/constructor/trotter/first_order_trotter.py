@@ -8,7 +8,6 @@
 from qdk_chemistry.algorithms.time_evolution.constructor.base import TimeEvolutionConstructor
 from qdk_chemistry.data import QubitHamiltonian, Settings, TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
-    EvolutionOrdering,
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
@@ -69,7 +68,6 @@ class FirstOrderTrotter(TimeEvolutionConstructor):
 
         container = PauliProductFormulaContainer(
             step_terms=terms,
-            evolution_ordering=ordering,
             step_reps=self._settings.get("num_trotter_steps"),
             num_qubits=num_qubits,
         )
@@ -104,7 +102,7 @@ def _pauli_label_to_map(label: str) -> dict[int, str]:
 
 def _decompose_trotter_step(
     qubit_hamiltonian: QubitHamiltonian, time: float, *, atol: float = 1e-12
-) -> tuple[list[ExponentiatedPauliTerm], EvolutionOrdering]:
+) -> list[ExponentiatedPauliTerm]:
     """Decompose a single Trotter step into exponentiated Pauli terms.
 
     Args:
@@ -113,9 +111,7 @@ def _decompose_trotter_step(
         atol: Absolute tolerance for filtering small coefficients.
 
     Returns:
-        A tuple containing:
-            - A list of ``ExponentiatedPauliTerm`` representing the decomposed terms.
-            - An ``EvolutionOrdering`` representing the sequence of evolution.
+        A list of ``ExponentiatedPauliTerm`` representing the decomposed terms.
 
     """
     terms: list[ExponentiatedPauliTerm] = []
@@ -128,7 +124,8 @@ def _decompose_trotter_step(
         if abs(coeff) < atol:
             continue
 
-        if abs(coeff.imag) > atol:
+        coeff_complex = complex(coeff)
+        if abs(coeff_complex.imag) > atol:
             raise ValueError(
                 f"Non-Hermitian Hamiltonian: coefficient {coeff} for term "
                 f"{pauli.to_label()} has nonzero imaginary part."
@@ -136,9 +133,7 @@ def _decompose_trotter_step(
 
         mapping = _pauli_label_to_map(pauli.to_label())
 
-        angle = float(coeff.real) * time
+        angle = coeff_complex.real * time
         terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
 
-    ordering = EvolutionOrdering(indices=list(range(len(terms))))
-
-    return terms, ordering
+    return terms

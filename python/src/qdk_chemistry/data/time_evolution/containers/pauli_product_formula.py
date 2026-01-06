@@ -12,7 +12,7 @@ import h5py
 
 from .base import TimeEvolutionUnitaryContainer
 
-__all__ = ["EvolutionOrdering", "ExponentiatedPauliTerm"]
+__all__ = ["ExponentiatedPauliTerm"]
 
 
 @dataclass(frozen=True)
@@ -29,30 +29,6 @@ class ExponentiatedPauliTerm:
 
     angle: float
     """The rotation angle for the exponentiation."""
-
-
-@dataclass(frozen=True)
-class EvolutionOrdering:
-    """Data class for evolution ordering."""
-
-    indices: list[int]
-    """List of indices representing the order of evolution."""
-
-    def validate_ordering(self, num_terms: int) -> None:
-        """Validate the evolution ordering.
-
-        Args:
-            num_terms: The total number of terms to be ordered.
-
-        Raises:
-            ValueError: If the ordering is invalid.
-
-        """
-        if len(self.indices) != num_terms:
-            raise ValueError("Evolution ordering length must match the number of terms.")
-
-        if sorted(self.indices) != list(range(num_terms)):
-            raise ValueError("Evolution ordering must be a permutation of term indices.")
 
 
 class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
@@ -80,7 +56,6 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
     def __init__(
         self,
         step_terms: list[ExponentiatedPauliTerm],
-        evolution_ordering: EvolutionOrdering,
         step_reps: int,
         num_qubits: int,
     ) -> None:
@@ -88,14 +63,11 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
 
         Args:
             step_terms: The list of exponentiated Pauli terms in a single step.
-            evolution_ordering: A list of indices representing the order of evolution terms.
             step_reps: The number of repetitions of the single step.
             num_qubits: The number of qubits the unitary acts on.
 
         """
         self.step_terms = step_terms
-        evolution_ordering.validate_ordering(len(step_terms))
-        self.evolution_ordering = evolution_ordering
         self.step_reps = step_reps
         self._num_qubits = num_qubits
         super().__init__()
@@ -120,21 +92,30 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
         """
         return self._num_qubits
 
-    def update_ordering(self, evolution_ordering: EvolutionOrdering) -> "PauliProductFormulaContainer":
-        """Update the evolution ordering.
+    def reorder_terms(self, permutation: list[int]) -> "PauliProductFormulaContainer":
+        """Reorder the Pauli terms according to a given permutation.
 
         Args:
-            evolution_ordering: A list of indices representing the order of evolution terms.
+            permutation: A permutation mapping old Pauli term indices to new indices.
 
         Returns:
             PauliProductFormulaContainer: A new container with the updated ordering.
 
         """
-        evolution_ordering.validate_ordering(len(self.step_terms))
+        # Validate permutation
+        if len(permutation) != len(self.step_terms):
+            raise ValueError(
+                f"Permutation length ({len(permutation)}) must match number of terms ({len(self.step_terms)})."
+            )
+        if sorted(permutation) != list(range(len(self.step_terms))):
+            raise ValueError(f"Invalid permutation: must be a permutation of [0, 1, ..., {len(self.step_terms) - 1}].")
+
+        reordered_step_terms: list[ExponentiatedPauliTerm] = []
+        for i in permutation:
+            reordered_step_terms.append(self.step_terms[i])
 
         return PauliProductFormulaContainer(
-            step_terms=self.step_terms,
-            evolution_ordering=evolution_ordering,
+            step_terms=reordered_step_terms,
             step_reps=self.step_reps,
             num_qubits=self._num_qubits,
         )
@@ -149,7 +130,6 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
         data: dict[str, Any] = {
             "container_type": self.type,
             "step_terms": [{"pauli_term": term.pauli_term, "angle": term.angle} for term in self.step_terms],
-            "evolution_ordering": self.evolution_ordering.indices,
             "step_reps": self.step_reps,
             "num_qubits": self.num_qubits,
         }
@@ -175,8 +155,6 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
             for qubit_index, pauli_operator in term.pauli_term.items():
                 pauli_term_group.attrs[str(qubit_index)] = pauli_operator
 
-        group.attrs["evolution_ordering"] = self.evolution_ordering.indices
-
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> "PauliProductFormulaContainer":
         """Create PauliProductFormulaContainer from a JSON dictionary.
@@ -196,12 +174,10 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
             )
             for term_data in json_data["step_terms"]
         ]
-        evolution_ordering = EvolutionOrdering(indices=json_data["evolution_ordering"])
         step_reps = json_data["step_reps"]
         num_qubits = json_data["num_qubits"]
         return cls(
             step_terms=step_terms,
-            evolution_ordering=evolution_ordering,
             step_reps=step_reps,
             num_qubits=num_qubits,
         )
@@ -234,12 +210,8 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
                 pauli_term[qubit_index] = pauli_operator
             step_terms.append(ExponentiatedPauliTerm(pauli_term=pauli_term, angle=angle))
 
-        evolution_ordering_indices = list(group.attrs["evolution_ordering"])
-        evolution_ordering = EvolutionOrdering(indices=evolution_ordering_indices)
-
         return cls(
             step_terms=step_terms,
-            evolution_ordering=evolution_ordering,
             step_reps=step_reps,
             num_qubits=num_qubits,
         )
