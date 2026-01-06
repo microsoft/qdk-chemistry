@@ -136,8 +136,7 @@ int main() {
 
   // HDF5 serialization
   basis_set.to_hdf5_file("molecule.basis_set.h5");
-  auto basis_set_from_hdf5 =
-      BasisSet::from_hdf5_file("molecule.basis_set.h5");
+  auto basis_set_from_hdf5 = BasisSet::from_hdf5_file("molecule.basis_set.h5");
   // end-cell-serialization
   // --------------------------------------------------------------------------------------------
 
