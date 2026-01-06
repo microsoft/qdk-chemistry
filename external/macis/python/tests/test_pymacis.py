@@ -7,6 +7,7 @@ import sys
 
 import numpy as np
 import pytest
+from pathlib import Path
 
 # Add the directory containing pymacis to Python's path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -15,6 +16,123 @@ try:
     import pymacis
 except ImportError:
     pytest.skip("pymacis not found, skipping tests", allow_module_level=True)
+
+# Paths to FCIDUMP files for different molecules and active spaces
+FCIDUMP_2E2O_PATH = Path(__file__).parent / "data" / "h2_valence_2e2o.hamiltonian.fcidump"
+FCIDUMP_6E6O_PATH = Path(__file__).parent / "data" / "n2_selected_6e6o.hamiltonian.fcidump"
+FCIDUMP_14E18O_PATH = Path(__file__).parent / "data" / "n2_full_14e18o.hamiltonian.fcidump"
+TEST_WFN = Path(__file__).parent.parent.parent / "tests" / "ref_data" / "ch4.wfn.dat"
+
+def test_read_fcidump():
+    """
+    Test reading an FCIDUMP file and verifying the Hamiltonian structure
+    """
+    fcidump_path = str(FCIDUMP_2E2O_PATH)
+    H = pymacis.read_fcidump(fcidump_path)
+    assert H is not None, "Failed to read FCIDUMP file"
+    assert H.T.shape == (2, 2), "Incorrect shape for 1-body integrals"
+    assert H.V.shape == (2, 2, 2, 2), "Incorrect shape for 2-body integrals"
+
+    ref_V = np.zeros((2, 2, 2, 2))
+    ref_T = np.zeros((2, 2))
+
+    ref_V[0, 0, 0, 0] = 4.0473778090034601e-01
+
+    ref_V[0, 0, 1, 1] = 3.8938965704645029e-01
+    ref_V[1, 1, 0, 0] = 3.8938965704645029e-01
+
+    ref_V[0, 1, 0, 1] = 1.5674348492425350e-01
+    ref_V[0, 1, 1, 0] = 1.5674348492425350e-01
+    ref_V[1, 0, 0, 1] = 1.5674348492425350e-01
+    ref_V[1, 0, 1, 0] = 1.5674348492425350e-01
+
+    ref_V[1, 1, 1, 1] = 3.8881092186477084e-01
+
+    ref_T[0, 0] = -7.8075940673562072e-01
+    ref_T[1, 1] = -6.7135629843446021e-01
+
+    ref_core = 2.5000000000000000e-01
+
+    assert np.allclose(H.T, ref_T), "1-body integrals do not match reference"
+    assert np.allclose(H.V, ref_V), "2-body integrals do not match reference"
+    assert np.isclose(H.core_energy, ref_core), "Core energy does not match reference"
+
+
+def test_active_hamiltonian_noop():
+    """
+    Test that compute_active_hamiltonian returns the same Hamiltonian when full active space is specified
+    """
+    fcidump_path = str(FCIDUMP_2E2O_PATH)
+    H = pymacis.read_fcidump(fcidump_path)
+
+    # Compute active Hamiltonian for 2 electrons in 2 orbitals
+    H_active = pymacis.compute_active_hamiltonian(2, 0, H)
+
+    assert H_active is not None, "Failed to compute active Hamiltonian"
+    assert np.allclose(H_active.T, H.T), (
+        "1-body integrals do not match in active Hamiltonian"
+    )
+    assert np.allclose(H_active.V, H.V), (
+        "2-body integrals do not match in active Hamiltonian"
+    )
+    assert np.allclose(H_active.F_inactive, H.F_inactive), (
+        "Inactive Fock matrix does not match"
+    )
+    assert np.isclose(H_active.core_energy, H.core_energy), (
+        "Core energy mismatch in active Hamiltonian"
+    )
+
+
+def test_active_hamiltonian_2e2o_nitrogen():
+    """
+    Test the 2e2o active Hamiltonian for nitrogen (from 6e6o)
+    """
+    fcidump_path = str(FCIDUMP_6E6O_PATH)
+    H = pymacis.read_fcidump(fcidump_path)
+
+    H_active = pymacis.compute_active_hamiltonian(2, 2, H)
+
+    assert H_active is not None, "Failed to compute active Hamiltonian"
+    assert H_active.T.shape == (2, 2), (
+        "Active Hamiltonian 1-body integrals shape mismatch"
+    )
+    assert H_active.V.shape == (2, 2, 2, 2), (
+        "Active Hamiltonian 2-body integrals shape mismatch"
+    )
+    assert np.isclose(H_active.core_energy, -107.05494530230706), (
+        "Core energy mismatch in active Hamiltonian"
+    )
+
+
+def test_casci_default():
+    """
+    Test CASCI calculation with default parameters (no determinants)
+    """
+    fcidump_path = str(FCIDUMP_6E6O_PATH)
+    H = pymacis.read_fcidump(fcidump_path)
+
+    # Perform CASCI calculation
+    result = pymacis.casci(3, 3, H)
+
+    assert "energy" in result, "CASCI energy not found in result"
+    assert "determinants" not in result, "CASCI determinants not found in result"
+    assert np.isclose(result["energy"], -9.155573e+00), "CASCI energy mismatch"
+
+
+def test_casci_with_determinants():
+    """
+    Test CASCI calculation with determinants in output
+    """
+    fcidump_path = str(FCIDUMP_6E6O_PATH)
+    H = pymacis.read_fcidump(fcidump_path)
+
+    # Perform CASCI calculation with determinants
+    result = pymacis.casci(3, 3, H, {"return_determinants": True})
+
+    assert "energy" in result, "CASCI energy not found in result"
+    assert "determinants" in result, "CASCI determinants not found in result"
+    assert len(result["determinants"]) == 400, "No determinants found in CASCI result"
+    assert np.isclose(result["energy"], -9.155573e+00), "CASCI energy mismatch"
 
 
 def test_canonical_hf_determinant():
@@ -28,6 +146,67 @@ def test_canonical_hf_determinant():
 
     # Check determinant properties
     assert det == "2200"
+
+
+def test_asci():
+    """
+    Test the ASCI calculation with a specific problem
+    """
+    fcidump_path = str(FCIDUMP_14E18O_PATH)
+    H = pymacis.read_fcidump(fcidump_path)
+
+    initial_guess = [pymacis.canonical_hf_determinant(7, 7, 18)]
+    C0 = [1.0]
+    E0 = pymacis.compute_wfn_energy(initial_guess, C0, H)
+
+    res = pymacis.asci(
+        initial_guess,
+        C0,
+        E0,
+        H,
+        {
+            "ci": {"max_subspace": 1000},
+            "asci": {"grow_factor": 2, "ntdets_max": 2000, "max_refine_iter": 15},
+        },
+    )
+    assert "energy" in res, "ASCI energy not found in result"
+    assert "determinants" in res, "ASCI determinants not found in result"
+    assert "coefficients" in res, "ASCI coefficients not found in result"
+
+    assert np.isclose(res["energy"], -1.205187165264e+02), "ASCI energy mismatch"
+    assert len(res["determinants"]) == 2000, "No determinants found in ASCI result"
+    assert np.isclose(np.linalg.norm(res["coefficients"]), 1.0), (
+        "ASCI coefficients do not normalize to 1"
+    )
+
+
+def test_read_write_wavefunction(tmp_path):
+    """Test that pymacis.write_wavefunction writes a valid wavefunction file"""
+    wfn_path = str(TEST_WFN)
+
+    # Read using pymacis.read_wavefunction
+    pymacis_result = pymacis.read_wavefunction(wfn_path)
+
+    # Write to a temporary file
+    temp_wfn_path = str(tmp_path / "temp_test.wfn")
+    pymacis.write_wavefunction(
+        temp_wfn_path,
+        pymacis_result["norbitals"],
+        pymacis_result["determinants"],
+        pymacis_result["coefficients"],
+    )
+
+    # Read back the written wavefunction
+    written_result = pymacis.read_wavefunction(temp_wfn_path)
+
+    # Compare coefficients
+    np.testing.assert_allclose(
+        written_result["coefficients"],
+        pymacis_result["coefficients"],
+        rtol=1e-10,
+        atol=1e-12,
+        err_msg="Coefficients do not match after writing and reading",
+    )
 
 
 def test_fcidump_header_creation():
@@ -54,6 +233,19 @@ def test_fcidump_header_creation():
     assert header.ms2 == 0
     assert header.isym == 1
     assert header.orbsym == [1, 1, 1, 1]
+
+
+def test_read_fcidump_header():
+    """Test reading FCIDUMP header information"""
+    fcidump_path = str(FCIDUMP_2E2O_PATH)
+
+    header = pymacis.read_fcidump_header(fcidump_path)
+
+    assert header.norb == 2
+    assert header.nelec == 2
+    assert header.ms2 == 0  # Singlet
+    assert header.isym == 1
+    assert len(header.orbsym) == header.norb
 
 
 def test_write_fcidump_with_header(tmp_path):
@@ -151,6 +343,42 @@ def test_write_fcidump_with_threshold(tmp_path):
     # Both should have large integrals
     assert "1.00000000000000e+00" in content_tight
     assert "1.00000000000000e+00" in content_loose
+
+
+def test_write_fcidump_round_trip(tmp_path):
+    """Test reading and writing back an FCIDUMP file preserves data"""
+    # Read existing FCIDUMP
+    original_path = str(FCIDUMP_2E2O_PATH)
+
+    # Read header and Hamiltonian
+    original_header = pymacis.read_fcidump_header(original_path)
+    original_H = pymacis.read_fcidump(original_path)
+
+    # Write to new file
+    output_path = tmp_path / "roundtrip.fcidump"
+    pymacis.write_fcidump(
+        str(output_path),
+        original_header,
+        original_H.T,
+        original_H.V,
+        original_H.core_energy,
+    )
+
+    # Read back
+    new_header = pymacis.read_fcidump_header(str(output_path))
+    new_H = pymacis.read_fcidump(str(output_path))
+
+    # Verify header preservation
+    assert new_header.norb == original_header.norb
+    assert new_header.nelec == original_header.nelec
+    assert new_header.ms2 == original_header.ms2
+    assert new_header.isym == original_header.isym
+    assert new_header.orbsym == original_header.orbsym
+
+    # Verify integral preservation
+    assert np.allclose(new_H.T, original_H.T, atol=1e-14)
+    assert np.allclose(new_H.V, original_H.V, atol=1e-14)
+    assert np.isclose(new_H.core_energy, original_H.core_energy, atol=1e-14)
 
 
 def test_write_fcidump_input_validation():
