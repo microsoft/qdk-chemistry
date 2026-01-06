@@ -22,10 +22,12 @@ stability_checker = create("stability_checker", "qdk")
 # start-cell-configure
 # Configure stability checker settings
 stability_checker.settings().set("internal", True)
-stability_checker.settings().set("external", True)  # Will be adjusted based on calculation type
+# Will be adjusted based on calculation type
+stability_checker.settings().set("external", True)
 stability_checker.settings().set("stability_tolerance", -1e-4)
 stability_checker.settings().set("davidson_tolerance", 1e-4)
-stability_checker.settings().set("max_subspace", 30)  # Maximum subspace size for Davidson solver
+# Maximum subspace size for Davidson solver
+stability_checker.settings().set("max_subspace", 30)
 stability_checker.settings().set("method", "hf")
 
 # end-cell-configure
@@ -46,7 +48,9 @@ scf_solver.settings().set("method", "hf")
 
 # Run initial SCF calculation
 spin_multiplicity = 1
-energy, wavefunction = scf_solver.run(n2, charge=0, spin_multiplicity=1, basis_or_guess="def2-svp")
+energy, wavefunction = scf_solver.run(
+    n2, charge=0, spin_multiplicity=1, basis_or_guess="def2-svp"
+)
 print(f"Initial SCF Energy: {energy:.10f} Hartree")
 
 # Determine if calculation is restricted and configure stability checker accordingly
@@ -66,7 +70,7 @@ while iteration < max_iterations:
     iteration += 1
     print(f"--- Iteration {iteration} ---")
     print(f"Current Energy: {energy:.10f} Hartree")
-    
+
     # Check stability - handle potential Davidson convergence failure
     try:
         is_stable, result = stability_checker.run(wavefunction)
@@ -77,54 +81,64 @@ while iteration < max_iterations:
         else:
             print(f"Stability check failed: {e}")
         break
-    
+
     if is_stable:
         print("\nConverged to stable wavefunction!")
         break
-    
+
     # Determine rotation type based on which instability is present
     do_external = False
     if not result.is_internal_stable():
-        smallest_eigenvalue, rotation_vector = result.get_smallest_internal_eigenvalue_and_vector()
-        print(f"Internal instability detected. Smallest eigenvalue: {smallest_eigenvalue:.6f}")
+        smallest_eigenvalue, rotation_vector = (
+            result.get_smallest_internal_eigenvalue_and_vector()
+        )
+        print(
+            f"Internal instability detected. Smallest eigenvalue: {smallest_eigenvalue:.6f}"
+        )
     elif not result.is_external_stable() and result.has_external_result():
-        smallest_eigenvalue, rotation_vector = result.get_smallest_external_eigenvalue_and_vector()
-        print(f"External instability detected. Smallest eigenvalue: {smallest_eigenvalue:.6f}")
+        smallest_eigenvalue, rotation_vector = (
+            result.get_smallest_external_eigenvalue_and_vector()
+        )
+        print(
+            f"External instability detected. Smallest eigenvalue: {smallest_eigenvalue:.6f}"
+        )
         do_external = True
     else:
         print("Unexpected state: neither internal nor external instability detected")
         break
-    
-    # Get electron counts
-    num_alpha, num_beta = wavefunction.get_total_num_electrons()
-    
+
     # Rotate orbitals along the instability direction
+    num_alpha, num_beta = wavefunction.get_total_num_electrons()
     orbitals = wavefunction.get_orbitals()
-    rotated_orbitals = rotate_orbitals(orbitals, rotation_vector, num_alpha, num_beta, do_external)
-    
+    rotated_orbitals = rotate_orbitals(
+        orbitals, rotation_vector, num_alpha, num_beta, do_external
+    )
+
     # If external instability detected, switch to unrestricted calculation
     if do_external:
         print("Switching to unrestricted calculation due to external instability")
         # Create new solver instances with updated settings
         scf_solver_name = scf_solver.name()
         stability_checker_name = stability_checker.name()
-        
+
         # Copy settings and update for unrestricted calculation
         scf_settings_map = scf_solver.settings().to_dict()
         scf_settings_map["scf_type"] = "unrestricted"
         new_scf_solver = create("scf_solver", scf_solver_name)
         new_scf_solver.settings().from_dict(scf_settings_map)
-        
+
         stability_settings_map = stability_checker.settings().to_dict()
         stability_settings_map["external"] = False
         new_stability_checker = create("stability_checker", stability_checker_name)
         new_stability_checker.settings().from_dict(stability_settings_map)
-        
+
         scf_solver = new_scf_solver
         stability_checker = new_stability_checker
-    
+
     # Re-run SCF with rotated orbitals as initial guess
-    energy, wavefunction = scf_solver.run(n2, charge=0, spin_multiplicity=1, basis_or_guess=rotated_orbitals)
+    energy, wavefunction = scf_solver.run(
+        n2, charge=0, spin_multiplicity=1, basis_or_guess=rotated_orbitals
+    )
     print(f"New Energy after rotation: {energy:.10f} Hartree")
     print()
 
