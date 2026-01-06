@@ -38,12 +38,14 @@ mcscf.settings().set("max_cycle_macro", 50)
 ################################################################################
 # start-cell-run
 import numpy as np  # noqa: E402
+from pathlib import Path  # noqa: E402
 from qdk_chemistry.data import Structure  # noqa: E402
 from qdk_chemistry.utils import compute_valence_space_parameters  # noqa: E402
 
-# Create a molecular structure (N2 molecule)
-coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 2.074]])
-structure = Structure(coords, symbols=["N", "N"])
+# Load nitrogen molecule structure
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/n2.structure.xyz"
+)
 charge = 0
 
 # First, run SCF to get molecular orbitals
