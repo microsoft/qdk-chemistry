@@ -84,6 +84,7 @@ class TestChainStructureMapper:
         class MockContainer:
             """Mock container class."""
 
+            @property
             def type(self):
                 """Return mock container type."""
                 return "mock_container"

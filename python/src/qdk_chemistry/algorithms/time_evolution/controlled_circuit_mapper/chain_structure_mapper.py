@@ -21,7 +21,7 @@ from qdk_chemistry.utils import Logger
 
 from .base import ControlledEvolutionCircuitMapper
 
-__all__: list[str] = []
+__all__: list[str] = ["ChainStructureMapper", "ChainStructureMapperSettings"]
 
 
 class ChainStructureMapperSettings(Settings):
@@ -79,15 +79,17 @@ class ChainStructureMapper(ControlledEvolutionCircuitMapper):
     def _run_impl(
         self, controlled_evolution: ControlledTimeEvolutionUnitary, system_indices: Sequence[int] | None = None
     ) -> Circuit:
-        """Construct a Circuit representing the controlled unitary for some power of ControlledTimeEvolutionUnitary.
+        r"""Construct a quantum circuit implementing the controlled time evolution unitary.
 
         Args:
-            controlled_evolution: The controlled time evolution unitary.
-            system_indices: The system qubit indices. If None, assumes system qubits are all
-                qubits except the control qubit.
+            controlled_evolution: The controlled time evolution unitary containing the Hamiltonian
+            and evolution parameters.
+            system_indices: Indices of the system qubits in the circuit. If None, defaults to all
+            qubits except the control qubit at controlled_evolution.control_index.
 
         Returns:
-            Circuit: A Circuit representing the controlled unitary for the given ControlledTimeEvolutionUnitary.
+            Circuit: A quantum circuit implementing the controlled unitary :math:`U^{\text{power}}`
+            where :math:`U` is the time evolution operator :math:`\exp(-i H t)`.
 
         """
         if not isinstance(controlled_evolution.time_evolution_unitary.get_container(), PauliProductFormulaContainer):
@@ -97,7 +99,7 @@ class ChainStructureMapper(ControlledEvolutionCircuitMapper):
             )
 
         num_system_qubits = controlled_evolution.get_num_system_qubits()
-        total_qubits = num_system_qubits + len([controlled_evolution.control_index])
+        total_qubits = num_system_qubits + 1  # +1 for the control qubit
 
         if system_indices is None:
             system_indices = [i for i in range(total_qubits) if i != controlled_evolution.control_index]

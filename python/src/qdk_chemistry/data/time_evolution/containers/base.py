@@ -12,7 +12,7 @@ import h5py
 
 from qdk_chemistry.data.base import DataClass
 
-__all__: list[str] = []
+__all__: list[str] = ["TimeEvolutionUnitaryContainer"]
 
 
 class TimeEvolutionUnitaryContainer(DataClass):

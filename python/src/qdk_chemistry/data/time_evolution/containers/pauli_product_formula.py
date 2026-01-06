@@ -12,7 +12,7 @@ import h5py
 
 from .base import TimeEvolutionUnitaryContainer
 
-__all__ = ["ExponentiatedPauliTerm"]
+__all__ = ["ExponentiatedPauliTerm", "PauliProductFormulaContainer"]
 
 
 @dataclass(frozen=True)

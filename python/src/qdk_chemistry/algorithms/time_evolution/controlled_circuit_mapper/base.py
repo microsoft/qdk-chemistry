@@ -11,7 +11,7 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.data.time_evolution.controlled_time_evolution import ControlledTimeEvolutionUnitary
 
-__all__: list[str] = []
+__all__: list[str] = ["ControlledEvolutionCircuitMapper", "ControlledEvolutionCircuitMapperFactory"]
 
 
 class ControlledEvolutionCircuitMapper(Algorithm):

@@ -8,11 +8,7 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms.time_evolution.constructor.trotter.first_order_trotter import (
-    FirstOrderTrotter,
-    _decompose_trotter_step,
-    _pauli_label_to_map,
-)
+from qdk_chemistry.algorithms.time_evolution.constructor.trotter.first_order_trotter import FirstOrderTrotter
 from qdk_chemistry.data import QubitHamiltonian, TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
@@ -27,57 +23,25 @@ class TestPauliLabelToMap:
 
     def test_identity_only(self):
         """Test that identity-only labels return an empty mapping."""
-        assert _pauli_label_to_map("III") == {}
+        constructor = FirstOrderTrotter()
+        assert constructor._pauli_label_to_map("III") == {}
 
     def test_single_pauli(self):
         """Test labels with a single non-identity Pauli."""
-        assert _pauli_label_to_map("X") == {0: "X"}
-        assert _pauli_label_to_map("IZ") == {0: "Z"}
+        constructor = FirstOrderTrotter()
+        assert constructor._pauli_label_to_map("X") == {0: "X"}
+        assert constructor._pauli_label_to_map("IZ") == {0: "Z"}
 
     def test_multiple_paulis(self):
         """Test labels with multiple non-identity Paulis."""
         # label is little-endian: rightmost char -> qubit 0
-        mapping = _pauli_label_to_map("XYZ")
+        constructor = FirstOrderTrotter()
+        mapping = constructor._pauli_label_to_map("XYZ")
         assert mapping == {0: "Z", 1: "Y", 2: "X"}
 
 
 class TestDecomposeTrotterStep:
     """Tests for the _decompose_trotter_step helper function."""
-
-    def test_basic_decomposition(self):
-        """Test basic decomposition of a qubit Hamiltonian."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
-
-        terms, ordering = _decompose_trotter_step(hamiltonian, time=2.0)
-
-        assert len(terms) == 2
-        assert ordering.indices == [0, 1]
-
-        assert terms[0] == ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=2.0)
-        assert terms[1] == ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=1.0)
-
-    def test_filters_small_coefficients(self):
-        """Test that terms with small coefficients are filtered out."""
-        hamiltonian = QubitHamiltonian(
-            pauli_strings=["X", "Z"],
-            coefficients=[1e-15, 1.0],
-        )
-
-        terms, ordering = _decompose_trotter_step(hamiltonian, time=1.0, atol=1e-12)
-
-        assert len(terms) == 1
-        assert ordering.indices == [0]
-        assert terms[0].pauli_term == {0: "Z"}
-
-    def test_rejects_non_hermitian(self):
-        """Test that non-Hermitian Hamiltonians raise a ValueError."""
-        hamiltonian = QubitHamiltonian(
-            pauli_strings=["X"],
-            coefficients=[1.0 + 1.0j],
-        )
-
-        with pytest.raises(ValueError, match="Non-Hermitian"):
-            _decompose_trotter_step(hamiltonian, time=1.0)
 
 
 class TestFirstOrderTrotter:
@@ -95,7 +59,7 @@ class TestFirstOrderTrotter:
         unitary = ctor.run(hamiltonian, time=0.2)
 
         assert isinstance(unitary, TimeEvolutionUnitary)
-        container = unitary._container
+        container = unitary.get_container()
 
         assert isinstance(container, PauliProductFormulaContainer)
         assert container.num_qubits == 1
@@ -112,7 +76,7 @@ class TestFirstOrderTrotter:
         ctor = FirstOrderTrotter(num_trotter_steps=4)
         unitary = ctor.run(hamiltonian, time=0.2)
 
-        container = unitary._container
+        container = unitary.get_container()
 
         # dt = 0.2 / 4 = 0.05
         assert container.step_reps == 4
@@ -128,3 +92,39 @@ class TestFirstOrderTrotter:
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
         )
+
+    def test_basic_decomposition(self):
+        """Test basic decomposition of a qubit Hamiltonian."""
+        ctor = FirstOrderTrotter()
+        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+
+        terms = ctor._decompose_trotter_step(hamiltonian, time=2.0)
+
+        assert len(terms) == 2
+
+        assert terms[0] == ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=2.0)
+        assert terms[1] == ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=1.0)
+
+    def test_filters_small_coefficients(self):
+        """Test that terms with small coefficients are filtered out."""
+        ctor = FirstOrderTrotter()
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["X", "Z"],
+            coefficients=[1e-15, 1.0],
+        )
+
+        terms = ctor._decompose_trotter_step(hamiltonian, time=1.0, atol=1e-12)
+
+        assert len(terms) == 1
+        assert terms[0].pauli_term == {0: "Z"}
+
+    def test_rejects_non_hermitian(self):
+        """Test that non-Hermitian Hamiltonians raise a ValueError."""
+        ctor = FirstOrderTrotter()
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["X"],
+            coefficients=[1.0 + 1.0j],
+        )
+
+        with pytest.raises(ValueError, match="Non-Hermitian"):
+            ctor._decompose_trotter_step(hamiltonian, time=1.0)

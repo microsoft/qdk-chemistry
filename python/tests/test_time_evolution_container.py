@@ -91,7 +91,7 @@ class TestPauliProductFormulaContainer:
         assert restored.num_qubits == container.num_qubits
         assert restored.step_reps == container.step_reps
 
-        for t1, t2 in zip(restored.step_terms, container.step_terms, strict=False):
+        for t1, t2 in zip(restored.step_terms, container.step_terms, strict=True):
             assert t1.pauli_term == t2.pauli_term
             assert np.isclose(
                 t1.angle, t2.angle, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance

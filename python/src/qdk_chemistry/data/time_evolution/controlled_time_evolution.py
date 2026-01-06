@@ -13,7 +13,7 @@ from qdk_chemistry.data.base import DataClass
 
 from .base import TimeEvolutionUnitary
 
-__all__: list[str] = []
+__all__: list[str] = ["ControlledTimeEvolutionUnitary"]
 
 
 class ControlledTimeEvolutionUnitary(DataClass):
@@ -30,7 +30,7 @@ class ControlledTimeEvolutionUnitary(DataClass):
 
         Args:
             time_evolution_unitary: The time evolution unitary to be controlled.
-            control_index: The control bit index.
+            control_index: The control qubit index.
 
         """
         self.time_evolution_unitary = time_evolution_unitary

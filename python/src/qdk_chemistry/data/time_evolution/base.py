@@ -14,7 +14,7 @@ from qdk_chemistry.data.base import DataClass
 from .containers.base import TimeEvolutionUnitaryContainer
 from .containers.pauli_product_formula import PauliProductFormulaContainer
 
-__all__: list[str] = []
+__all__: list[str] = ["TimeEvolutionUnitary"]
 
 
 class TimeEvolutionUnitary(DataClass):
