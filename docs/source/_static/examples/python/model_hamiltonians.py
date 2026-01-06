@@ -11,7 +11,7 @@ import numpy as np
 import qdk_chemistry.algorithms as algorithms
 from qdk_chemistry.data import (
     Hamiltonian,
-    CanonicalFourCenterHamiltonian,
+    CanonicalFourCenterHamiltonianContainer,
     ModelOrbitals,
 )
 
@@ -47,7 +47,7 @@ inactive_fock = np.zeros((0, 0))
 
 # Create the Hamiltonian
 hamiltonian = Hamiltonian(
-    CanonicalFourCenterHamiltonian(
+    CanonicalFourCenterHamiltonianContainer(
         one_body, two_body, model_orbitals, core_energy, inactive_fock
     )
 )
