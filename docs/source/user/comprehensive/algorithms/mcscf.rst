@@ -35,23 +35,23 @@ Input requirements
 
 The :class:`~qdk_chemistry.algorithms.MultiConfigurationScf` requires the following inputs:
 
-**Orbitals**
+Orbitals
    Initial :doc:`Orbitals <../data/orbitals>` containing orbital coefficients and active space information.
 
-**HamiltonianConstructor**
+HamiltonianConstructor
    A :doc:`HamiltonianConstructor <hamiltonian_constructor>` instance that builds the Hamiltonian for the :term:`CI` step.
 
-**MultiConfigurationCalculator**
+MultiConfigurationCalculator
    A :doc:`MultiConfigurationCalculator <mc_calculator>` for solving the :term:`CI` problem in the active space.
 
-**Number of alpha electrons**
+Number of alpha electrons
    The number of alpha (spin-up) electrons in the active space.
 
-**Number of beta electrons**
+Number of beta electrons
    The number of beta (spin-down) electrons in the active space.
 
 
-**Creating an :term:`MCSCF` solver:**
+.. rubric:: Creating an :term:`MCSCF` solver
 
 The :class:`~qdk_chemistry.algorithms.MultiConfigurationScf` is created using the :doc:`factory pattern <factory_pattern>`.
 
@@ -62,7 +62,7 @@ The :class:`~qdk_chemistry.algorithms.MultiConfigurationScf` is created using th
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-**Configuring settings:**
+.. rubric:: Configuring settings
 
 Each of the required algorithms can be configured through its settings which can be modified using the ``settings()`` object.
 See `Available implementations`_ below for implementation-specific options.
@@ -74,7 +74,7 @@ See `Available implementations`_ below for implementation-specific options.
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-**Running the calculation:**
+.. rubric:: Running the calculation
 
 .. tab:: Python API
 
@@ -146,7 +146,9 @@ Key features of the PySCF implementation:
    The current implementation in QDK/Chemistry uses PySCF's :term:`CASSCF` framework as the underlying engine for the :term:`MCSCF` procedure.
    This implementation does not yet utilize the provided Hamiltonian constructor, and uses the integrals directly from PySCF.
 
-**Settings:** This implementation uses only the common settings described above.
+.. rubric:: Settings
+
+This implementation uses only the common settings described above.
 
 Related classes
 ---------------
