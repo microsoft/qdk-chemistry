@@ -56,7 +56,7 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`MultiConfigurationCalculator <mc_calculator>`
      - Many-body wavefunction calculations
      - Hamiltonian → Wavefunction
-   * - :doc:`ProjectedMultiConfiguration <pmc>`
+   * - :doc:`ProjectedMultiConfigurationCalculator <pmc>`
      - Projected many-body wavefunction calculations
      - Hamiltonian → Wavefunction
    * - :doc:`MultiConfigurationScf <mcscf>`
