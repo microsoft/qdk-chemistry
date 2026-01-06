@@ -80,11 +80,13 @@ fi
 
 export CFLAGS="-fPIC -Os"
 
-echo "Downloading and installing BLIS..."
-bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} "${CFLAGS}" ${MAC_BUILD}
+if [ "$MAC_BUILD" == "OFF" ]; then
+    echo "Downloading and installing BLIS..."
+    bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} "${CFLAGS}" ${MAC_BUILD}
 
-echo "Downloading and installing libflame..."
-bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} "${CFLAGS}" ${MAC_BUILD}
+    echo "Downloading and installing libflame..."
+    bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} "${CFLAGS}" ${MAC_BUILD}
+fi
 
 echo "Downloading HDF5 $HDF5_VERSION..."
 export HDF5_CHECKSUM=1826e198df8dac679f0d3dc703aba02af4c614fd6b7ec936cf4a55e6aa0646ec
@@ -162,9 +164,9 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
         -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
         -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
-        -C cmake.define.CMAKE_PREFIX_PATH="/opt/homebrew" \
-        -C cmake.define.BLAS_LIBRARIES="/usr/local/lib/libblis.a;m" \
-        -C cmake.define.LAPACK_LIBRARIES="/usr/local/lib/libflame.a;/usr/local/lib/libblis.a;m"
+        -C cmake.define.CMAKE_PREFIX_PATH="/opt/homebrew"
+        # -C cmake.define.BLAS_LIBRARIES="/usr/local/lib/libblis.a;m" \
+        # -C cmake.define.LAPACK_LIBRARIES="/usr/local/lib/libflame.a;/usr/local/lib/libblis.a;m"
 fi
 
 if [ "$MAC_BUILD" == "OFF" ]; then
