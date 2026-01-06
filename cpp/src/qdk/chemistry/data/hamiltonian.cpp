@@ -507,11 +507,6 @@ nlohmann::json Hamiltonian::to_json() const {
   // Store version first
   j["version"] = SERIALIZATION_VERSION;
 
-  j["container_type"] = _container->get_container_type();
-
-  j["type"] =
-      (get_type() == HamiltonianType::Hermitian) ? "Hermitian" : "NonHermitian";
-
   // Delegate to container serialization (orbitals are included within the
   // container)
   j["container"] = _container->to_json();

@@ -384,17 +384,18 @@ CanonicalFourCenterHamiltonian::from_json(const nlohmann::json& j) {
     auto load_matrix =
         [](const nlohmann::json& matrix_json) -> Eigen::MatrixXd {
       auto matrix_vec = matrix_json.get<std::vector<std::vector<double>>>();
-      int rows = matrix_vec.size();
-      int cols = rows > 0 ? matrix_vec[0].size() : 0;
-      Eigen::MatrixXd matrix(rows, cols);
-      for (int i = 0; i < rows; ++i) {
-        if (static_cast<int>(matrix_vec[i].size()) != cols) {
+      if (matrix_vec.empty()) {
+        return Eigen::MatrixXd(0, 0);
+      }
+
+      Eigen::MatrixXd matrix(matrix_vec.size(), matrix_vec[0].size());
+      for (Eigen::Index i = 0; i < matrix.rows(); ++i) {
+        if (static_cast<Eigen::Index>(matrix_vec[i].size()) != matrix.cols()) {
           throw std::runtime_error(
               "Matrix rows have inconsistent column counts");
         }
-        for (int j_idx = 0; j_idx < cols; ++j_idx) {
-          matrix(i, j_idx) = matrix_vec[i][j_idx];
-        }
+        matrix.row(i) =
+            Eigen::VectorXd::Map(matrix_vec[i].data(), matrix.cols());
       }
       return matrix;
     };
