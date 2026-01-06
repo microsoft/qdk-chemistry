@@ -1,6 +1,6 @@
 {
   "container": {
-    "container_type": "canonical_4_center",
+    "container_type": "canonical_four_center",
     "core_energy": -165.21558176572384,
     "has_inactive_fock_matrix": true,
     "has_one_body_integrals": true,
@@ -7618,7 +7618,7 @@
     "type": "Hermitian",
     "version": "0.1.0"
   },
-  "container_type": "canonical_4_center",
+  "container_type": "canonical_four_center",
   "type": "Hermitian",
   "version": "0.1.0"
 }

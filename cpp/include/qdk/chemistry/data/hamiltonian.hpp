@@ -104,12 +104,12 @@ class HamiltonianContainer {
    * @brief Create a deep copy of this container
    * @return Unique pointer to a cloned container
    */
-  virtual std::unique_ptr<const HamiltonianContainer> clone() const = 0;
+  virtual std::unique_ptr<HamiltonianContainer> clone() const = 0;
 
   /**
    * @brief Get the type of the underlying container
-   * @return String identifying the container type (e.g., "canonical_4_center",
-   * "density_fitted")
+   * @return String identifying the container type (e.g.,
+   * "canonical_four_center", "density_fitted")
    */
   virtual std::string get_container_type() const = 0;
 
@@ -124,7 +124,7 @@ class HamiltonianContainer {
    * @param i First orbital index
    * @param j Second orbital index
    * @param channel Spin channel to query (aa, or bb), defaults to aa
-   * @return One-electron integral &lt;ij&gt;
+   * @return One-electron integral (i|h|j)
    * @throws std::out_of_range if indices are invalid
    */
   double get_one_body_element(unsigned i, unsigned j,
@@ -156,7 +156,7 @@ class HamiltonianContainer {
    * @param l Fourth orbital index
    * @param channel Spin channel to query (aaaa, aabb, or bbbb), defaults to
    * aaaa
-   * @return Two-electron integral <ij|kl>
+   * @return Two-electron integral (ij|kl)
    * @throws std::out_of_range if indices are invalid
    */
   virtual double get_two_body_element(
@@ -327,7 +327,7 @@ class Hamiltonian : public DataClass,
    * @brief Constructor for Hamiltonian with a HamiltonianContainer
    * @param container Unique pointer to HamiltonianContainer holding the data
    */
-  Hamiltonian(std::unique_ptr<const HamiltonianContainer> container);
+  Hamiltonian(std::unique_ptr<HamiltonianContainer> container);
 
   /**
    * @brief Copy constructor
@@ -397,7 +397,7 @@ class Hamiltonian : public DataClass,
    * @param l Fourth orbital index
    * @param channel Spin channel to query (aaaa, aabb, or bbbb), defaults to
    * aaaa
-   * @return Two-electron integral <ij|kl>
+   * @return Two-electron integral (ij|kl)
    * @throws std::out_of_range if indices are invalid
    */
   double get_two_body_element(unsigned i, unsigned j, unsigned k, unsigned l,
@@ -451,8 +451,8 @@ class Hamiltonian : public DataClass,
 
   /**
    * @brief Get the type of the underlying container
-   * @return String identifying the container type (e.g., "canonical_4_center",
-   * "density_fitted")
+   * @return String identifying the container type (e.g.,
+   * "canonical_four_center", "density_fitted")
    */
   std::string get_container_type() const;
 

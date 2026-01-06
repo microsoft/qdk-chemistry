@@ -13,7 +13,7 @@
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/canonical_4_center.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
@@ -56,7 +56,7 @@ class AnsatzSerializationTest : public ::testing::Test {
     Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
 
     hamiltonian = std::make_shared<Hamiltonian>(
-        std::make_unique<CanonicalFourCenterHamiltonian>(
+        std::make_unique<CanonicalFourCenterHamiltonianContainer>(
             one_body, two_body, orbitals, core_energy, inactive_fock));
 
     // Create test ansatz

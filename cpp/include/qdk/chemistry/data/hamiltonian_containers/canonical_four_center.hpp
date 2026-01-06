@@ -17,7 +17,7 @@
 namespace qdk::chemistry::data {
 
 /**
- * @class CanonicalFourCenterHamiltonian
+ * @class CanonicalFourCenterHamiltonianContainer
  * @brief Contains a molecular Hamiltonian using canonical four center
  * integrals, implemented as a subclass of HamiltonianContainer.
  *
@@ -37,7 +37,7 @@ namespace qdk::chemistry::data {
  * integrates with the broader quantum chemistry framework for active space
  * methods.
  */
-class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
+class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
    * @brief Constructor for active space Hamiltonian with four center integrals
@@ -54,7 +54,7 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
-  CanonicalFourCenterHamiltonian(
+  CanonicalFourCenterHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals,
       const Eigen::VectorXd& two_body_integrals,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
@@ -84,7 +84,7 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
-  CanonicalFourCenterHamiltonian(
+  CanonicalFourCenterHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals_alpha,
       const Eigen::MatrixXd& one_body_integrals_beta,
       const Eigen::VectorXd& two_body_integrals_aaaa,
@@ -98,18 +98,18 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
   /**
    * @brief Destructor
    */
-  ~CanonicalFourCenterHamiltonian() = default;
+  ~CanonicalFourCenterHamiltonianContainer() = default;
 
   /**
    * @brief Create a deep copy of this container
    * @return Unique pointer to a cloned container
    */
-  std::unique_ptr<const HamiltonianContainer> clone() const override final;
+  std::unique_ptr<HamiltonianContainer> clone() const override final;
 
   /**
    * @brief Get the type of the underlying container
-   * @return String identifying the container type (e.g., "canonical_4_center",
-   * "density_fitted")
+   * @return String identifying the container type (e.g.,
+   * "canonical_four_center", "density_fitted")
    */
   std::string get_container_type() const override final;
 
@@ -131,7 +131,7 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
    * @param l Fourth orbital index
    * @param channel Spin channel to query (aaaa, aabb, or bbbb), defaults to
    * aaaa
-   * @return Two-electron integral <ij|kl>
+   * @return Two-electron integral (ij|kl)
    * @throws std::out_of_range if indices are invalid
    */
   double get_two_body_element(
@@ -169,7 +169,7 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
    * @return Unique pointer to const Hamiltonian loaded from group
    * @throws std::runtime_error if I/O error occurs
    */
-  static std::unique_ptr<CanonicalFourCenterHamiltonian> from_hdf5(
+  static std::unique_ptr<CanonicalFourCenterHamiltonianContainer> from_hdf5(
       H5::Group& group);
 
   /**
@@ -178,7 +178,7 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
    * @return Shared pointer to const Hamiltonian loaded from JSON
    * @throws std::runtime_error if JSON is malformed
    */
-  static std::unique_ptr<CanonicalFourCenterHamiltonian> from_json(
+  static std::unique_ptr<CanonicalFourCenterHamiltonianContainer> from_json(
       const nlohmann::json& j);
 
   /**
@@ -199,7 +199,7 @@ class CanonicalFourCenterHamiltonian : public HamiltonianContainer {
 
  private:
   /// Two-electron integrals in MO basis, stored as flattened arrays [norb^4]
-  /// Access pattern: V[i*norb^3 + j*norb^2 + k*norb + l] = <ij|kl>
+  /// Access pattern: V[i*norb^3 + j*norb^2 + k*norb + l] = (ij|kl)
   const std::tuple<std::shared_ptr<Eigen::VectorXd>,
                    std::shared_ptr<Eigen::VectorXd>,
                    std::shared_ptr<Eigen::VectorXd>>
