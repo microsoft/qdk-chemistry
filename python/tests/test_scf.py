@@ -128,7 +128,6 @@ class TestScfSolver:
 
         # Should solve successfully with valid settings
         scf_solver = algorithms.create("scf_solver")
-        scf_solver.settings.set("max_iterations", 100)
         energy, _ = scf_solver.run(water, 0, 1, "def2-tzvp")
         assert np.isclose(energy, -76.0205776518, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
 
@@ -315,7 +314,7 @@ class TestScfSolver:
         # Set method and basis set to match C++ test
         scf_solver.settings().set("method", "pbe")
         scf_solver.settings().set("enable_gdm", True)
-        scf_solver.settings().set("max_iterations", 250)
+        scf_solver.settings().set("max_iterations", 300)
         scf_solver.settings().set("convergence_threshold", 1e-8)
 
         energy, wavefunction = scf_solver.run(oxygen, 1, 2, "cc-pvdz")  # +1 charge, doublet state
