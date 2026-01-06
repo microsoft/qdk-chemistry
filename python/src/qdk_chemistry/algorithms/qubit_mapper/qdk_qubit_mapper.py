@@ -1,4 +1,4 @@
-"""QDK native qubit mapper using PauliOperator expression layer.
+"""QDK native qubit mapper using an optimized expression layer.
 
 This module provides the QdkQubitMapper class for transforming electronic structure
 Hamiltonians to qubit Hamiltonians using various fermion-to-qubit encodings.
@@ -16,14 +16,21 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper
-from qdk_chemistry.data import PauliOperator, Settings
+from qdk_chemistry.data import PauliTermAccumulator, Settings
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from qdk_chemistry.data import Hamiltonian
+
+# Type alias for sparse Pauli word: list of (qubit_index, op_type)
+# op_type: 1=X, 2=Y, 3=Z (identity is implicit/omitted)
+SparsePauliWord = list[tuple[int, int]]
+
+# Pauli operator type constants
+_X = 1
+_Y = 2
+_Z = 3
 
 __all__ = ["QdkQubitMapper", "QdkQubitMapperSettings"]
 
@@ -196,7 +203,7 @@ class QdkQubitMapperSettings(Settings):
 
 
 class QdkQubitMapper(QubitMapper):
-    """QDK native qubit mapper using the PauliOperator expression layer.
+    """QDK native qubit mapper using PauliTermAccumulator.
 
     This mapper transforms a fermionic Hamiltonian to a qubit Hamiltonian using
     configurable fermion-to-qubit encodings. Supports Jordan-Wigner and Bravyi-Kitaev
@@ -294,40 +301,12 @@ class QdkQubitMapper(QubitMapper):
         h1_alpha, _ = hamiltonian.get_one_body_integrals()
         n_spin_orbitals = 2 * h1_alpha.shape[0]
 
-        _creation_cache: dict[int, PauliOperator] = {}
-        _annihilation_cache: dict[int, PauliOperator] = {}
+        # Use C++ to compute all N² excitation terms in one call
+        Logger.debug("Computing all JW excitation terms in C++...")
+        all_excitation_terms = PauliTermAccumulator.compute_all_jw_excitation_terms(n_spin_orbitals)
 
-        def creation_operator(p: int) -> PauliOperator:
-            """Build a_p^dagger using Jordan-Wigner."""
-            if p in _creation_cache:
-                return _creation_cache[p]
-            x_term = PauliOperator.X(p)
-            y_term = PauliOperator.Y(p)
-            result = 0.5 * (x_term - 1j * y_term)
-            for j in range(p - 1, -1, -1):
-                result = result * PauliOperator.Z(j)
-            _creation_cache[p] = result
-            return result
-
-        def annihilation_operator(p: int) -> PauliOperator:
-            """Build a_p using Jordan-Wigner."""
-            if p in _annihilation_cache:
-                return _annihilation_cache[p]
-            x_term = PauliOperator.X(p)
-            y_term = PauliOperator.Y(p)
-            result = 0.5 * (x_term + 1j * y_term)
-            for j in range(p - 1, -1, -1):
-                result = result * PauliOperator.Z(j)
-            _annihilation_cache[p] = result
-            return result
-
-        # Pre-populate caches for all spin-orbitals
-        for i in range(n_spin_orbitals):
-            creation_operator(i)
-            annihilation_operator(i)
-
-        return self._transform_with_ladder_ops(
-            hamiltonian, threshold, integral_threshold, creation_operator, annihilation_operator
+        return self._transform_with_excitation_terms_dict(
+            hamiltonian, threshold, integral_threshold, n_spin_orbitals, all_excitation_terms
         )
 
     def _bravyi_kitaev_transform(
@@ -343,19 +322,6 @@ class QdkQubitMapper(QubitMapper):
         The Bravyi-Kitaev encoding uses a binary tree structure where even-indexed
         qubits store occupation and odd-indexed qubits store partial parity sums,
         achieving O(log n) operator weight compared to O(n) for Jordan-Wigner.
-
-        The ladder operators are decomposed into real and imaginary Pauli components:
-
-            Creation:     a†_j = (1/2) * (X_component - i * Y_component)
-            Annihilation: a_j  = (1/2) * (X_component + i * Y_component)
-
-        Where the Pauli components are constructed from binary tree index sets:
-
-            X_component = Z_{P(j)} · X_j · X_{U(j)}
-            Y_component = Z_{R(j)} · Y_j · X_{U(j)}
-
-        Here P(j) is the parity set, U(j) is the ancestor (update) set, and
-        R(j) = P(j) \\ F(j) is the remainder set for the Y-component Z-string.
 
         Args:
             hamiltonian: The fermionic Hamiltonian.
@@ -377,99 +343,37 @@ class QdkQubitMapper(QubitMapper):
             bin_sup += 1
         n_binary = 2**bin_sup
 
-        update_sets: dict[int, frozenset[int]] = {}
-        parity_sets: dict[int, frozenset[int]] = {}
-        remainder_sets: dict[int, frozenset[int]] = {}
+        # Precompute BK index sets for all orbitals (as dict[int, list[int]] for C++)
+        update_sets: dict[int, list[int]] = {}
+        parity_sets: dict[int, list[int]] = {}
+        remainder_sets: dict[int, list[int]] = {}
 
         for j in range(n_spin_orbitals):
-            update_sets[j] = frozenset(i for i in _bk_compute_ancestor_indices(j, n_binary) if i < n_spin_orbitals)
-            parity_sets[j] = frozenset(i for i in _bk_compute_parity_indices(j, n_binary) if i < n_spin_orbitals)
-            remainder_sets[j] = frozenset(
+            update_sets[j] = sorted(i for i in _bk_compute_ancestor_indices(j, n_binary) if i < n_spin_orbitals)
+            parity_sets[j] = sorted(i for i in _bk_compute_parity_indices(j, n_binary) if i < n_spin_orbitals)
+            remainder_sets[j] = sorted(
                 i for i in _bk_compute_z_indices_for_y_component(j, n_binary) if i < n_spin_orbitals
             )
 
-        def build_pauli_chain(pauli_type: str, qubit_indices: frozenset[int]) -> PauliOperator:
-            """Construct tensor product of identical Pauli operators on specified qubits.
-
-            For a set of qubit indices {i, j, k, ...}, builds P_i ⊗ P_j ⊗ P_k ⊗ ...
-            where P is X, Y, or Z. Returns identity if the set is empty.
-            """
-            if not qubit_indices:
-                return PauliOperator.I(0)
-            sorted_qubits = sorted(qubit_indices)
-            if pauli_type == "X":
-                factory = PauliOperator.X
-            elif pauli_type == "Y":
-                factory = PauliOperator.Y
-            else:
-                factory = PauliOperator.Z
-            result = factory(sorted_qubits[0])
-            for q in sorted_qubits[1:]:
-                result = result * factory(q)
-            return result
-
-        _creation_cache: dict[int, PauliOperator] = {}
-        _annihilation_cache: dict[int, PauliOperator] = {}
-
-        def creation_operator(p: int) -> PauliOperator:
-            """Build fermionic creation operator a†_p in Bravyi-Kitaev encoding."""
-            if p in _creation_cache:
-                return _creation_cache[p]
-
-            x_component = PauliOperator.X(p)
-            if parity_sets[p]:
-                x_component = build_pauli_chain("Z", parity_sets[p]) * x_component
-            if update_sets[p]:
-                x_component = x_component * build_pauli_chain("X", update_sets[p])
-
-            y_component = PauliOperator.Y(p)
-            if remainder_sets[p]:
-                y_component = build_pauli_chain("Z", remainder_sets[p]) * y_component
-            if update_sets[p]:
-                y_component = y_component * build_pauli_chain("X", update_sets[p])
-
-            result = 0.5 * x_component - 0.5j * y_component
-            _creation_cache[p] = result
-            return result
-
-        def annihilation_operator(p: int) -> PauliOperator:
-            """Build fermionic annihilation operator a_p in Bravyi-Kitaev encoding."""
-            if p in _annihilation_cache:
-                return _annihilation_cache[p]
-
-            x_component = PauliOperator.X(p)
-            if parity_sets[p]:
-                x_component = build_pauli_chain("Z", parity_sets[p]) * x_component
-            if update_sets[p]:
-                x_component = x_component * build_pauli_chain("X", update_sets[p])
-
-            y_component = PauliOperator.Y(p)
-            if remainder_sets[p]:
-                y_component = build_pauli_chain("Z", remainder_sets[p]) * y_component
-            if update_sets[p]:
-                y_component = y_component * build_pauli_chain("X", update_sets[p])
-
-            result = 0.5 * x_component + 0.5j * y_component
-            _annihilation_cache[p] = result
-            return result
-
-        for i in range(n_spin_orbitals):
-            creation_operator(i)
-            annihilation_operator(i)
-
-        return self._transform_with_ladder_ops(
-            hamiltonian, threshold, integral_threshold, creation_operator, annihilation_operator
+        # Use C++ to compute all N² excitation terms in one call
+        Logger.debug("Computing all BK excitation terms in C++...")
+        all_excitation_terms = PauliTermAccumulator.compute_all_bk_excitation_terms(
+            n_spin_orbitals, parity_sets, update_sets, remainder_sets
         )
 
-    def _transform_with_ladder_ops(
+        return self._transform_with_excitation_terms_dict(
+            hamiltonian, threshold, integral_threshold, n_spin_orbitals, all_excitation_terms
+        )
+
+    def _transform_with_excitation_terms_dict(
         self,
         hamiltonian: Hamiltonian,
         threshold: float,
         integral_threshold: float,
-        creation_operator: Callable[[int], PauliOperator],
-        annihilation_operator: Callable[[int], PauliOperator],
+        n_spin_orbitals: int,
+        excitation_terms_dict: dict[tuple[int, int], list[tuple[complex, SparsePauliWord]]],
     ) -> QubitHamiltonian:
-        """Transform Hamiltonian to qubit representation using provided ladder operators.
+        """Transform Hamiltonian to qubit representation using precomputed excitation terms.
 
         This is the shared infrastructure for all fermion-to-qubit encodings.
         It handles integral extraction, excitation operator construction,
@@ -483,8 +387,9 @@ class QdkQubitMapper(QubitMapper):
             hamiltonian: The fermionic Hamiltonian.
             threshold: Threshold for pruning small coefficients.
             integral_threshold: Threshold for discarding small integrals.
-            creation_operator: Callable that returns the creation operator for index p.
-            annihilation_operator: Callable that returns the annihilation operator for index p.
+            n_spin_orbitals: Total number of spin orbitals.
+            excitation_terms_dict: Pre-computed dictionary mapping (p, q) to
+                E_pq = a†_p a_q terms in sparse format.
 
         Returns:
             QubitHamiltonian: The transformed qubit Hamiltonian.
@@ -497,9 +402,12 @@ class QdkQubitMapper(QubitMapper):
         core_energy = hamiltonian.get_core_energy()
 
         n_spatial = h1_alpha.shape[0]
-        n_spin_orbitals = 2 * n_spatial
 
-        qubit_expr = core_energy * PauliOperator.I(0)
+        # Use C++ PauliTermAccumulator for efficient term accumulation
+        accumulator = PauliTermAccumulator()
+
+        # Add core energy as identity term (empty sparse word = identity)
+        accumulator.accumulate([], complex(core_energy))
 
         # Spin-orbital index functions (blocked ordering: alpha then beta)
         def alpha_idx(p: int) -> int:
@@ -519,48 +427,59 @@ class QdkQubitMapper(QubitMapper):
                 return float(h2_bbbb[idx])
             return 0.0
 
-        # Cache for one-body excitation operators E_pq = a^dag_p a_q
-        _excitation_cache: dict[tuple[int, int], PauliOperator] = {}
+        def get_excitation_terms(p: int, q: int) -> list[tuple[complex, SparsePauliWord]]:
+            """Get excitation terms E_pq = a†_p a_q from precomputed dictionary."""
+            return excitation_terms_dict[(p, q)]
 
-        def excitation_operator(p: int, q: int) -> PauliOperator:
-            """Build E_pq = a†_p a_q with caching."""
+        # Cache for spin-summed excitation operator terms
+        # E_pq = E_pq_alpha + E_pq_beta (indexed by spatial orbitals)
+        _spin_summed_terms_cache: dict[tuple[int, int], list[tuple[complex, SparsePauliWord]]] = {}
+
+        def get_spin_summed_terms(p: int, q: int) -> list[tuple[complex, SparsePauliWord]]:
+            """Get sparse terms for spin-summed E_pq with caching."""
             key = (p, q)
-            if key in _excitation_cache:
-                return _excitation_cache[key]
-            result = creation_operator(p) * annihilation_operator(q)
-            _excitation_cache[key] = result
-            return result
+            if key in _spin_summed_terms_cache:
+                return _spin_summed_terms_cache[key]
+            # Combine alpha and beta excitation terms
+            alpha_terms = get_excitation_terms(alpha_idx(p), alpha_idx(q))
+            beta_terms = get_excitation_terms(beta_idx(p), beta_idx(q))
+            # Merge terms with same sparse word
+            combined: dict[tuple[tuple[int, int], ...], complex] = {}
+            for coeff, word in alpha_terms:
+                key_tuple = tuple(word)
+                combined[key_tuple] = combined.get(key_tuple, 0) + coeff
+            for coeff, word in beta_terms:
+                key_tuple = tuple(word)
+                combined[key_tuple] = combined.get(key_tuple, 0) + coeff
+            # Filter using machine epsilon for numerical stability (not user threshold)
+            terms = [
+                (coeff, list(word_tuple))
+                for word_tuple, coeff in combined.items()
+                if abs(coeff) > np.finfo(np.float64).eps
+            ]
+            _spin_summed_terms_cache[key] = terms
+            return terms
 
-        # Pre-populate excitation cache for all spin-orbital pairs
-        for i in range(n_spin_orbitals):
-            for j in range(n_spin_orbitals):
-                excitation_operator(i, j)
-
-        # Cache for spin-summed excitation operators E_pq = a_p_alpha^dag a_q_alpha + a_p_beta^dag a_q_beta
-        # Indexed by spatial orbital indices (p, q)
-        _spin_summed_excitation_cache: dict[tuple[int, int], PauliOperator] = {}
-
-        def spin_summed_excitation(p: int, q: int) -> PauliOperator:
-            """Build spin-summed E_pq = a_p_alpha^dag a_q_alpha + a_p_beta^dag a_q_beta with caching.
-
-            These are indexed by spatial orbitals and sum over both spin channels.
-            The result is simplified and cached for reuse in two-body factorization.
-            """
-            key = (p, q)
-            if key in _spin_summed_excitation_cache:
-                return _spin_summed_excitation_cache[key]
-
-            # E_pq = E_pq_alpha + E_pq_beta (spin-orbital excitations)
-            e_alpha = excitation_operator(alpha_idx(p), alpha_idx(q))
-            e_beta = excitation_operator(beta_idx(p), beta_idx(q))
-            result = (e_alpha + e_beta).simplify()
-            _spin_summed_excitation_cache[key] = result
-            return result
-
-        # Pre-populate spin-summed excitation cache for all spatial orbital pairs
+        # Pre-populate spin-summed terms cache
+        Logger.debug("Pre-computing spin-summed excitation terms...")
         for i in range(n_spatial):
             for j in range(n_spatial):
-                spin_summed_excitation(i, j)
+                get_spin_summed_terms(i, j)
+
+        def accumulate_terms(terms: list[tuple[complex, SparsePauliWord]], scale: complex) -> None:
+            """Accumulate a list of (coeff, sparse_word) terms with a scale factor."""
+            for coeff, word in terms:
+                accumulator.accumulate(word, scale * coeff)
+
+        def accumulate_product_terms(
+            terms1: list[tuple[complex, SparsePauliWord]],
+            terms2: list[tuple[complex, SparsePauliWord]],
+            scale: complex,
+        ) -> None:
+            """Accumulate the product of two term lists with a scale factor."""
+            for coeff1, word1 in terms1:
+                for coeff2, word2 in terms2:
+                    accumulator.accumulate_product(word1, word2, scale * coeff1 * coeff2)
 
         Logger.debug("Building one-body terms...")
         is_spin_free = np.allclose(h1_alpha, h1_beta) and np.allclose(h2_aaaa, h2_bbbb)
@@ -570,8 +489,8 @@ class QdkQubitMapper(QubitMapper):
                 for q in range(n_spatial):
                     h_pq = float(h1_alpha[p, q])
                     if abs(h_pq) > integral_threshold:
-                        term = h_pq * spin_summed_excitation(p, q)
-                        qubit_expr = qubit_expr + term
+                        terms = get_spin_summed_terms(p, q)
+                        accumulate_terms(terms, complex(h_pq))
         else:
             # General case: handle alpha and beta separately
             for p in range(n_spatial):
@@ -580,43 +499,30 @@ class QdkQubitMapper(QubitMapper):
                     h_pq_beta = float(h1_beta[p, q])
 
                     if abs(h_pq_alpha) > integral_threshold:
-                        term = h_pq_alpha * excitation_operator(alpha_idx(p), alpha_idx(q))
-                        qubit_expr = qubit_expr + term
+                        terms = get_excitation_terms(alpha_idx(p), alpha_idx(q))
+                        accumulate_terms(terms, complex(h_pq_alpha))
 
                     if abs(h_pq_beta) > integral_threshold:
-                        term = h_pq_beta * excitation_operator(beta_idx(p), beta_idx(q))
-                        qubit_expr = qubit_expr + term
-
-        # Simplify one-body terms to keep expression tree flat
-        qubit_expr = qubit_expr.simplify()
+                        terms = get_excitation_terms(beta_idx(p), beta_idx(q))
+                        accumulate_terms(terms, complex(h_pq_beta))
 
         Logger.debug("Building two-body terms...")
 
         if is_spin_free:
             # Spin-free case: use spin-summed factorization
-            # Contribution is (1/2) sum over pqrs of g_pqrs times (E_pq E_rs minus delta(q,r) E_ps)
-            # where E_pq are spin-summed and already simplified/cached
             for p in range(n_spatial):
-                p_batch_expr = 0.0 * PauliOperator.I(0)
                 for q in range(n_spatial):
                     for r in range(n_spatial):
                         for s in range(n_spatial):
                             eri = get_eri(p, q, r, s, "aaaa")
                             if abs(eri) > integral_threshold:
-                                e_pq = spin_summed_excitation(p, q)
-                                e_rs = spin_summed_excitation(r, s)
-                                product_term = e_pq * e_rs
+                                e_pq_terms = get_spin_summed_terms(p, q)
+                                e_rs_terms = get_spin_summed_terms(r, s)
+                                accumulate_product_terms(e_pq_terms, e_rs_terms, complex(0.5 * eri))
 
                                 if q == r:
-                                    e_ps = spin_summed_excitation(p, s)
-                                    term = 0.5 * eri * (product_term - e_ps)
-                                else:
-                                    term = 0.5 * eri * product_term
-
-                                p_batch_expr = p_batch_expr + term
-
-                qubit_expr = qubit_expr + p_batch_expr.simplify()
-
+                                    e_ps_terms = get_spin_summed_terms(p, s)
+                                    accumulate_terms(e_ps_terms, complex(-0.5 * eri))
         else:
             for channel_name, spin1_idx, spin2_idx, channel_key, is_same_spin in [
                 ("aaaa", alpha_idx, alpha_idx, "aaaa", True),
@@ -625,10 +531,8 @@ class QdkQubitMapper(QubitMapper):
                 ("bbaa", beta_idx, alpha_idx, "aabb", False),
             ]:
                 Logger.debug(f"Processing {channel_name} channel...")
-                channel_expr = 0.0 * PauliOperator.I(0)
 
                 for p in range(n_spatial):
-                    p_batch_expr = 0.0 * PauliOperator.I(0)
                     for q in range(n_spatial):
                         for r in range(n_spatial):
                             if is_same_spin and p == r:
@@ -638,37 +542,26 @@ class QdkQubitMapper(QubitMapper):
                                     continue
                                 eri = get_eri(p, q, r, s, channel_key)
                                 if abs(eri) > integral_threshold:
-                                    e_pq = excitation_operator(spin1_idx(p), spin1_idx(q))
-                                    e_rs = excitation_operator(spin2_idx(r), spin2_idx(s))
-                                    product_term = e_pq * e_rs
+                                    e_pq_terms = get_excitation_terms(spin1_idx(p), spin1_idx(q))
+                                    e_rs_terms = get_excitation_terms(spin2_idx(r), spin2_idx(s))
+                                    accumulate_product_terms(e_pq_terms, e_rs_terms, complex(0.5 * eri))
 
                                     if is_same_spin and q == r:
-                                        e_ps = excitation_operator(spin1_idx(p), spin1_idx(s))
-                                        term = 0.5 * eri * (product_term - e_ps)
-                                    else:
-                                        term = 0.5 * eri * product_term
+                                        e_ps_terms = get_excitation_terms(spin1_idx(p), spin1_idx(s))
+                                        accumulate_terms(e_ps_terms, complex(-0.5 * eri))
 
-                                    p_batch_expr = p_batch_expr + term
+        Logger.debug("Finalizing Pauli terms...")
 
-                    channel_expr = channel_expr + p_batch_expr.simplify()
+        # Get terms from C++ accumulator as canonical strings (only place we use strings)
+        canonical_terms = accumulator.get_terms_as_strings(n_spin_orbitals, threshold)
 
-                qubit_expr = qubit_expr + channel_expr
-
-        Logger.debug("Simplifying expression...")
-        simplified = qubit_expr.simplify()
-        pruned = simplified.prune_threshold(threshold)
-
-        canonical_terms = pruned.to_canonical_terms(n_spin_orbitals)
-
-        # Reverse strings: PauliOperator is big-endian, Qiskit is little-endian
         pauli_strings = []
         coefficients = []
 
         for coeff, pauli_str in canonical_terms:
-            if abs(coeff) > threshold:
-                # Convert to Qiskit-style little-endian ordering
-                pauli_strings.append(pauli_str[::-1])
-                coefficients.append(coeff)
+            # Convert to Qiskit-style little-endian ordering
+            pauli_strings.append(pauli_str[::-1])
+            coefficients.append(coeff)
 
         Logger.debug(f"Generated {len(pauli_strings)} Pauli terms for {n_spin_orbitals} qubits")
 
