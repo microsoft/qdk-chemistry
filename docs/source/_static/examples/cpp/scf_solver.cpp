@@ -28,11 +28,8 @@ int main() {
 
   // --------------------------------------------------------------------------------------------
   // start-cell-run
-  // Specify a structure
-  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
-  std::vector<std::string> symbols = {"H", "H"};
-
-  auto structure = std::make_shared<Structure>(coords, symbols);
+  // Load structure from XYZ file
+  auto structure = Structure::from_xyz_file("../data/h2.structure.xyz");
 
   // Run the SCF calculation
   auto [E_scf, wfn] = scf_solver->run(structure, 0, 1, "def2-tzvpp");

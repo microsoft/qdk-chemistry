@@ -27,11 +27,8 @@ active_space_selector->settings().set("num_active_orbitals", 4);
 
 // --------------------------------------------------------------------------------------------
 // start-cell-run
-// Create a molecular structure (water molecule)
-std::vector<Eigen::Vector3d> coords = {
-    {0.0, 0.0, 0.0}, {0.0, 0.0, 1.8897}, {1.7802, 0.0, -0.4738}};
-std::vector<std::string> symbols = {"O", "H", "H"};
-Structure structure(coords, symbols);
+// Load a molecular structure (water molecule) from XYZ file
+auto structure = Structure::from_xyz_file("../data/water.structure.xyz");
 
 // First, run SCF to get molecular orbitals
 auto scf_solver = ScfSolverFactory::create();

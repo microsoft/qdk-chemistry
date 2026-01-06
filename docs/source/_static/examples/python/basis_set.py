@@ -8,12 +8,13 @@
 ################################################################################
 # start-cell-create
 import numpy as np
+from pathlib import Path
 from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell, Structure
 
-# Create a water molecule structure for examples
-coords = np.array([[0.0, 0.0, 0.0], [0.757, 0.586, 0.0], [-0.757, 0.586, 0.0]])
-symbols = ["O", "H", "H"]
-structure = Structure(coords, symbols)
+# Load a water molecule structure from XYZ file
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/water.structure.xyz"
+)
 
 # Create a shell with multiple primitives
 atom_index = 0  # First atom

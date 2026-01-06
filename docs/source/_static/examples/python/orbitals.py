@@ -5,16 +5,14 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import numpy as np
+from pathlib import Path
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure, ModelOrbitals
 
 ################################################################################
 # start-cell-create
-# Create H2 molecule
-coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
-symbols = ["H", "H"]
-structure = Structure(coords, symbols=symbols)
+# Load H2 molecule from XYZ file
+structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
 
 # Obtain orbitals from a SCF calculation
 scf_solver = create("scf_solver")

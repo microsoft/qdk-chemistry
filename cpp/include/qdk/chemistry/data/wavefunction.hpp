@@ -10,6 +10,7 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/configuration.hpp>
+#include <qdk/chemistry/data/configuration_set.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <string>
@@ -379,7 +380,7 @@ class WavefunctionContainer {
    * @param group HDF5 group to write container data to
    * @throws std::runtime_error if HDF5 I/O error occurs
    */
-  virtual void to_hdf5(H5::Group& group) const = 0;
+  virtual void to_hdf5(H5::Group& group) const;
 
   /**
    * @brief Load container from HDF5 group
@@ -413,9 +414,35 @@ class WavefunctionContainer {
    */
   virtual bool is_complex() const = 0;
 
+  /**
+   * @brief Check if this container has coefficients data
+   * @return True if coefficients are available, false otherwise
+   */
+  virtual bool has_coefficients() const { return false; }
+
+  /**
+   * @brief Check if this container has configuration set data
+   * @return True if configuration set is available, false otherwise
+   */
+  virtual bool has_configuration_set() const { return false; }
+
+  /**
+   * @brief Get the configuration set for this wavefunction
+   * @return Reference to the configuration set containing determinants and
+   * orbitals
+   * @throws std::runtime_error if configuration set is not available
+   */
+  virtual const ConfigurationSet& get_configuration_set() const {
+    throw std::runtime_error(
+        "Configuration set not available for this container type");
+  }
+
  protected:
   /// Wavefunction type (SelfDual or NotSelfDual)
   WavefunctionType _type;
+  /// Serialization version
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+
   // spin-traced RDMs
   mutable std::shared_ptr<MatrixVariant> _one_rdm_spin_traced = nullptr;
   mutable std::shared_ptr<VectorVariant> _two_rdm_spin_traced = nullptr;
@@ -725,7 +752,9 @@ class Wavefunction : public DataClass,
   void to_hdf5(H5::Group& group) const override;
 
   /**
-   * @brief Load wavefunction from HDF5 group
+   * @brief Load wavefunction from HDF5 group. Note that due to significant code
+   * duplication in the cas and sci containers, their common logic is shared in
+   * this base class, and not re-implemented in the cas and sci containers.
    * @param group HDF5 group containing wavefunction data
    * @return Shared pointer to Wavefunction object created from HDF5 group
    * @throws std::runtime_error if HDF5 data is malformed or I/O error occurs
