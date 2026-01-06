@@ -78,7 +78,7 @@ jobs:
           gcovr
 
     - name: Install macOS system packages
-      if: runner.os == 'macOS'
+      if: matrix.os-name ==
       run: |
         brew update
         brew upgrade
@@ -193,12 +193,12 @@ jobs:
 
         echo "=== Running C++ Tests in Debug Mode with Coverage ==="
         set +e
-        if [ $QDK_UARCH == "native" ]; then # Exclude particular test on macOS builds
+        if [ $"QDK_UARCH" == "native" ]; then # Exclude particular test on macOS builds
           ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
         else
           ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
         fi
-        
+
         CTEST_EXIT_CODE=$?
         set -e
 
