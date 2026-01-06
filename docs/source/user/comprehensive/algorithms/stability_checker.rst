@@ -6,8 +6,7 @@ Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, 
 Its primary purpose is to identify directions in orbital space where the energy can be further lowered, which is crucial for ensuring the reliability of quantum chemistry calculations.
 
 Unstable :term:`SCF` solutions can occur in challenging cases such as stretched molecular geometries, open-shell systems, and molecules with near-degenerate orbitals.
-When an instability is detected, the stability analysis provides eigenvectors that can be used to rotate the orbitals toward a lower-energy solution.
-This iterative process of checking stability, rotating orbitals, and re-running :term:`SCF` continues until a stable minimum is reached.
+This iterative stability analysis of checking stability, rotating orbitals, and re-running :term:`SCF` continues until a stable minimum is reached.
 
 Overview
 --------
@@ -195,39 +194,6 @@ The native QDK/Chemistry implementation provides high-performance stability anal
 The QDK implementation uses the common base settings listed in the `Available settings`_ section above.
 The default value for ``external`` is ``False`` for this implementation.
 
-.. list-table::
-   :header-rows: 1
-   :widths: 25 15 15 45
-
-   * - Setting
-     - Type
-     - Default
-     - Description
-   * - ``internal``
-     - bool
-     - ``True``
-     - Check internal stability
-   * - ``external``
-     - bool
-     - ``False``
-     - Check external stability (:term:`RHF` → :term:`UHF`)
-   * - ``method``
-     - string
-     - ``"hf"``
-     - Method: ``"hf"`` for Hartree-Fock, or a :term:`DFT` functional name
-   * - ``stability_tolerance``
-     - float
-     - ``-1e-4``
-     - Eigenvalue threshold for stability determination
-   * - ``davidson_tolerance``
-     - float
-     - ``1e-4``
-     - Davidson solver convergence tolerance
-   * - ``max_subspace``
-     - int
-     - ``30``
-     - Maximum Davidson subspace size
-
 PySCF
 ~~~~~
 
@@ -245,7 +211,7 @@ The PySCF plugin provides access to stability analysis through the `PySCF <https
 
 .. rubric:: Settings
 
-The PySCF implementation provides additional settings beyond the common base settings:
+The PySCF implementation supports all common base settings. The following table shows settings that differ from or extend the base implementation:
 
 .. list-table::
    :header-rows: 1
@@ -255,26 +221,10 @@ The PySCF implementation provides additional settings beyond the common base set
      - Type
      - Default
      - Description
-   * - ``internal``
-     - bool
-     - ``True``
-     - Check internal stability
    * - ``external``
      - bool
      - ``True``
-     - Check external stability (:term:`RHF` → :term:`UHF`). Only valid for :term:`RHF`
-   * - ``method``
-     - string
-     - ``"hf"``
-     - Method: ``"hf"`` for Hartree-Fock, or a :term:`DFT` functional name
-   * - ``stability_tolerance``
-     - float
-     - ``-1e-4``
-     - Eigenvalue threshold for stability determination
-   * - ``davidson_tolerance``
-     - float
-     - ``1e-4``
-     - Davidson solver convergence tolerance
+     - Check external stability (differs from QDK default of ``False``)
    * - ``with_symmetry``
      - bool
      - ``False``
