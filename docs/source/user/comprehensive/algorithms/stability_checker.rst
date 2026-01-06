@@ -281,7 +281,6 @@ Related classes
 
 - :doc:`ScfSolver <scf_solver>`: Performs :term:`SCF` calculations that produce wavefunctions for stability analysis
 - :doc:`Wavefunction <../data/wavefunction>`: Input wavefunction to analyze
-- :doc:`StabilityResult <../data/stability_result>`: Output containing detailed stability information
 - :doc:`Orbitals <../data/orbitals>`: Can be rotated based on stability analysis results
 
 Further reading
