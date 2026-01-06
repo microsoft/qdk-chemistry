@@ -608,7 +608,7 @@ Args:
 Get all accumulated terms as sparse Pauli words.
 
 Args:
-    threshold: Terms with |coefficient| < threshold are excluded.
+    threshold: Terms with abs(coefficient) < threshold are excluded.
 
 Returns:
     List of (coefficient, sparse_word) tuples.
@@ -625,7 +625,7 @@ Get all accumulated terms as canonical Pauli strings.
 
 Args:
     num_qubits: Total number of qubits for string representation.
-    threshold: Terms with |coefficient| < threshold are excluded.
+    threshold: Terms with abs(coefficient) < threshold are excluded.
 
 Returns:
     List of (coefficient, canonical_string) tuples.
@@ -764,9 +764,10 @@ This computes all N² one-body excitation terms in a single C++ call,
 avoiding the overhead of many pybind11 boundary crossings.
 
 The Bravyi-Kitaev transformation uses parity, update, and remainder sets
-to encode fermionic operators efficiently. The ladder operators are:
-  a†_j = (1/2)(Z_{P(j)} X_j X_{U(j)} - i Z_{R(j)} Y_j X_{U(j)})
-  a_j  = (1/2)(Z_{P(j)} X_j X_{U(j)} + i Z_{R(j)} Y_j X_{U(j)})
+to encode fermionic operators efficiently. The ladder operators are::
+
+    a†_j = (1/2)(Z_{P(j)} X_j X_{U(j)} - i Z_{R(j)} Y_j X_{U(j)})
+    a_j  = (1/2)(Z_{P(j)} X_j X_{U(j)} + i Z_{R(j)} Y_j X_{U(j)})
 
 Args:
     n_spin_orbitals: Number of spin orbitals (qubits).
