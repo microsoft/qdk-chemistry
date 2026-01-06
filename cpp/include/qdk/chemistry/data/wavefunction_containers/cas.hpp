@@ -29,7 +29,7 @@ class CasWavefunctionContainer : public WavefunctionContainer {
   using CoeffContainer = ContainerTypes::VectorVariant;
 
   /**
-   * @brief Constructs a wavefunction with full reduced density matrix data
+   * @brief Constructs a wavefunction without reduced density matrices (RDMs)
    *
    * @param coeffs The vector of CI coefficients (can be real or complex)
    * @param dets The vector of determinants
@@ -117,13 +117,21 @@ class CasWavefunctionContainer : public WavefunctionContainer {
    * @brief Get all determinants in the wavefunction
    * @return Vector of all configurations/determinants
    */
-  const VectorVariant& get_coefficients() const;
+  const VectorVariant& get_coefficients() const override;
 
   /**
    * @brief Get all determinants in the wavefunction
    * @return Vector of all configurations/determinants
    */
   const DeterminantVector& get_active_determinants() const override;
+
+  /**
+   * @brief Get the configuration set for this wavefunction
+   * @return Reference to the configuration set containing determinants and
+   * orbitals
+   * @throws std::runtime_error if configuration set is not available
+   */
+  const ConfigurationSet& get_configuration_set() const override;
 
   /**
    * @brief Get number of determinants
@@ -200,21 +208,6 @@ class CasWavefunctionContainer : public WavefunctionContainer {
       const nlohmann::json& j);
 
   /**
-   * @brief Convert container to HDF5 group
-   * @param group HDF5 group to write container data to
-   * @throws std::runtime_error if HDF5 I/O error occurs
-   */
-  void to_hdf5(H5::Group& group) const override;
-
-  /**
-   * @brief Load container from HDF5 group
-   * @param group HDF5 group containing container data
-   * @return Unique pointer to CAS container created from HDF5 group
-   * @throws std::runtime_error if HDF5 data is malformed or I/O error occurs
-   */
-  static std::unique_ptr<CasWavefunctionContainer> from_hdf5(H5::Group& group);
-
-  /**
    * @brief Get container type identifier for serialization
    * @return String "cas"
    */
@@ -225,6 +218,18 @@ class CasWavefunctionContainer : public WavefunctionContainer {
    * @return True if coefficients are complex, false if real
    */
   bool is_complex() const override;
+
+  /**
+   * @brief Check if this container has coefficients data
+   * @return True if coefficients are available, false otherwise
+   */
+  bool has_coefficients() const override;
+
+  /**
+   * @brief Check if this container has configuration set data
+   * @return True if configuration set is available, false otherwise
+   */
+  bool has_configuration_set() const override;
 
  private:
   /// Serialization version

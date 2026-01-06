@@ -953,6 +953,113 @@ class TestWavefunctionRdmIntegraion:
             atol=scf_orbital_tolerance,
         )
 
+    def test_sci_hdf5_roundtrip(self, tmp_path):
+        symbols = ["C", "C", "H", "H", "H", "H"]
+        coords = np.array(
+            [
+                [0.0, 0.0, 0.6695],
+                [0.0, 0.0, -0.6695],
+                [0.0, 0.9289, 1.2321],
+                [0.0, -0.9289, 1.2321],
+                [0.0, 0.9289, -1.2321],
+                [0.0, -0.9289, -1.2321],
+            ]
+        )
+
+        structure = Structure(coords, symbols)
+
+        # Run SCF
+        scf = algorithms.create("scf_solver")
+        _, wfn_scf = scf.run(structure, 0, 1, "sto-3g")
+
+        # Build Hamiltonian (12e/12o active space)
+        as_selector = algorithms.create("active_space_selector", "qdk_valence")
+        as_selector.settings().set("num_active_electrons", 12)
+        as_selector.settings().set("num_active_orbitals", 12)
+        orbitals = as_selector.run(wfn_scf).get_orbitals()
+
+        ham_constructor = algorithms.create("hamiltonian_constructor")
+        hamiltonian = ham_constructor.run(orbitals)
+
+        # Run ASCI with RDM calculation (minimal settings)
+        mc = algorithms.create("multi_configuration_calculator", "macis_asci")
+        mc.settings().set("calculate_one_rdm", True)
+        mc.settings().set("calculate_two_rdm", True)
+        mc.settings().set("ntdets_max", 10)
+        mc.settings().set("ntdets_min", 1)
+        mc.settings().set("grow_factor", 2)
+        mc.settings().set("max_refine_iter", 0)
+        _, wfn_sci = mc.run(hamiltonian, 6, 6)
+
+        assert wfn_sci.has_one_rdm_spin_dependent(), "one rdm is not available"
+
+        # Verify RDMs exist before save
+        original_1rdm_aa, _ = wfn_sci.get_active_one_rdm_spin_dependent()
+        original_2rdm_aabb, original_2rdm_aaaa, _ = wfn_sci.get_active_two_rdm_spin_dependent()
+
+        # Save and reload using tmp_path
+        h5_file = tmp_path / "test_wavefunction.h5"
+        wfn_sci.to_hdf5_file(str(h5_file))
+        wfn_loaded = Wavefunction.from_hdf5_file(str(h5_file))
+
+        # Check RDMs after load
+        assert wfn_loaded.has_one_rdm_spin_dependent(), "one rdm is not available"
+        after_1rdm_aa, _ = wfn_loaded.get_active_one_rdm_spin_dependent()
+
+        assert wfn_loaded.has_two_rdm_spin_dependent(), "two rdm is not available"
+        after_2rdm_aabb, after_2rdm_aaaa, _ = wfn_loaded.get_active_two_rdm_spin_dependent()
+
+        assert np.allclose(original_1rdm_aa, after_1rdm_aa, atol=rdm_tolerance)
+        assert np.allclose(original_2rdm_aaaa, after_2rdm_aaaa, atol=rdm_tolerance)
+        assert np.allclose(original_2rdm_aabb, after_2rdm_aabb, atol=rdm_tolerance)
+
+    def test_cas_hdf5_roundtrip(self, tmp_path):
+        symbols = ["H", "H"]
+        coords = np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [1.4, 0.0, 0.0],
+            ]
+        )
+
+        structure = Structure(coords, symbols)
+
+        # Run SCF
+        scf = algorithms.create("scf_solver")
+        _, wfn_scf = scf.run(structure, 0, 1, "def2-svp")
+
+        # Build Hamiltonian
+        ham_constructor = algorithms.create("hamiltonian_constructor")
+        hamiltonian = ham_constructor.run(wfn_scf.get_orbitals())
+
+        # Run CAS with RDM calculation
+        mc = algorithms.create("multi_configuration_calculator", "macis_cas")
+        mc.settings().set("calculate_one_rdm", True)
+        mc.settings().set("calculate_two_rdm", True)
+        _, wfn_cas = mc.run(hamiltonian, 2, 2)
+
+        assert wfn_cas.has_one_rdm_spin_dependent(), "one rdm is not available"
+
+        # Verify RDMs exist before save
+        original_1rdm_aa, _ = wfn_cas.get_active_one_rdm_spin_dependent()
+        original_2rdm_aabb, original_2rdm_aaaa, _ = wfn_cas.get_active_two_rdm_spin_dependent()
+
+        # Save and reload using tmp_path
+        h5_file = tmp_path / "test_wavefunction.h5"
+        wfn_cas.to_hdf5_file(str(h5_file))
+        wfn_loaded = Wavefunction.from_hdf5_file(str(h5_file))
+
+        # Check RDMs after load
+        assert wfn_loaded.has_one_rdm_spin_dependent(), "one rdm is not available"
+        after_1rdm_aa, _ = wfn_loaded.get_active_one_rdm_spin_dependent()
+
+        assert wfn_loaded.has_two_rdm_spin_dependent(), "two rdm is not available"
+        after_2rdm_aabb, after_2rdm_aaaa, _ = wfn_loaded.get_active_two_rdm_spin_dependent()
+
+        assert np.allclose(original_1rdm_aa, after_1rdm_aa, atol=rdm_tolerance)
+        assert np.allclose(original_2rdm_aaaa, after_2rdm_aaaa, atol=rdm_tolerance)
+        assert np.allclose(original_2rdm_aabb, after_2rdm_aabb, atol=rdm_tolerance)
+
     @pytest.fixture
     def basic_orbitals(self):
         """Create basic orbitals for testing."""
