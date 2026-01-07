@@ -58,7 +58,7 @@ int main() {
 
   // --------------------------------------------------------------------------------------------
   // start-cell-autocas
-  // create an valence space active space selector
+  // create a valence space active space selector
   auto valence_selector = ActiveSpaceSelectorFactory::create("qdk_valence");
   // automatically select valence parameters based on the input structure
   auto [num_electrons, num_orbitals] =
