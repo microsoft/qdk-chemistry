@@ -10,7 +10,13 @@
 using namespace qdk::chemistry::data;
 
 int main() {
-  // Structure data class example
+  // Load structure from XYZ file (the file uses Angstrom, converted to Bohr
+  // internally)
+  Structure structure_from_file =
+      Structure::from_xyz_file("../data/h2.structure.xyz");
+
+  // For demonstration: create a structure with custom masses and charges
+  // (requires explicit coordinates, here in Bohr)
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
   std::vector<std::string> symbols = {"H", "H"};
   std::vector<double> custom_masses{1.001, 0.999};
