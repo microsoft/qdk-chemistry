@@ -230,8 +230,18 @@ TEST_F(SlaterdeterminantTest, JsonSerialization) {
   // Serialize to JSON
   nlohmann::json j = original.to_json();
 
-  // Deserialize from JSON
+  // Deserialize from JSON using container-specific method
   auto restored = SlaterDeterminantContainer::from_json(j);
+
+  // Also test base Wavefunction::from_json() by wrapping container in
+  // Wavefunction
+  auto original_wf = std::make_shared<Wavefunction>(
+      std::make_unique<SlaterDeterminantContainer>(det, orbitals));
+  nlohmann::json wf_j = original_wf->to_json();
+  auto wf_restored = Wavefunction::from_json(wf_j);
+  EXPECT_EQ(wf_restored->get_container_type(), "sd");
+  auto& wf_restored_container =
+      wf_restored->get_container<SlaterDeterminantContainer>();
 
   // Verify key properties match
   EXPECT_EQ(original.size(), restored->size());
@@ -239,6 +249,13 @@ TEST_F(SlaterdeterminantTest, JsonSerialization) {
             restored->get_active_determinants().size());
   EXPECT_EQ(original.get_active_determinants()[0],
             restored->get_active_determinants()[0]);
+
+  // Verify that base Wavefunction::from_json gives the same result
+  EXPECT_EQ(restored->size(), wf_restored_container.size());
+  EXPECT_EQ(restored->get_active_determinants().size(),
+            wf_restored_container.get_active_determinants().size());
+  EXPECT_EQ(restored->get_active_determinants()[0],
+            wf_restored_container.get_active_determinants()[0]);
 }
 
 // Test HDF5 serialization/deserialization
@@ -256,7 +273,7 @@ TEST_F(SlaterdeterminantTest, Hdf5Serialization) {
     // Serialize to HDF5
     original.to_hdf5(root);
 
-    // Deserialize from HDF5
+    // Deserialize from HDF5 using container-specific method
     auto restored = SlaterDeterminantContainer::from_hdf5(root);
 
     // Verify key properties match
@@ -269,7 +286,44 @@ TEST_F(SlaterdeterminantTest, Hdf5Serialization) {
     file.close();
   }
 
+  // Also test base Wavefunction::from_hdf5() by creating a separate file with
+  // Wavefunction wrapper
+  std::string wf_filename = "test_sd_wavefunction_serialization.h5";
+  {
+    // Create and serialize a Wavefunction wrapping the container
+    auto original_wf = std::make_shared<Wavefunction>(
+        std::make_unique<SlaterDeterminantContainer>(det, orbitals));
+    H5::H5File file(wf_filename, H5F_ACC_TRUNC);
+    H5::Group root = file.openGroup("/");
+    original_wf->to_hdf5(root);
+    file.close();
+  }
+  {
+    // Deserialize using Wavefunction::from_hdf5
+    H5::H5File file(wf_filename, H5F_ACC_RDONLY);
+    H5::Group root = file.openGroup("/");
+    auto wf_restored = Wavefunction::from_hdf5(root);
+    EXPECT_EQ(wf_restored->get_container_type(), "sd");
+    auto& wf_restored_container =
+        wf_restored->get_container<SlaterDeterminantContainer>();
+
+    // Get the restored container from container-specific method for comparison
+    H5::H5File file2(filename, H5F_ACC_RDONLY);
+    H5::Group root2 = file2.openGroup("/");
+    auto restored = SlaterDeterminantContainer::from_hdf5(root2);
+
+    EXPECT_EQ(restored->size(), wf_restored_container.size());
+    EXPECT_EQ(restored->get_active_determinants().size(),
+              wf_restored_container.get_active_determinants().size());
+    EXPECT_EQ(restored->get_active_determinants()[0],
+              wf_restored_container.get_active_determinants()[0]);
+
+    file.close();
+    file2.close();
+  }
+
   std::remove(filename.c_str());
+  std::remove(wf_filename.c_str());
 }
 
 // Test 1- and 2-RDM for closed-shell system

@@ -1470,7 +1470,7 @@ std::shared_ptr<Wavefunction> Wavefunction::from_json(const nlohmann::json& j) {
       container = SciWavefunctionContainer::from_json(j["container"]);
     } else if (container_type == "sd") {
       container = SlaterDeterminantContainer::from_json(j["container"]);
-    } else if (container_type == "cc") {
+    } else if (container_type == "coupled_cluster") {
       container = CoupledClusterContainer::from_json(j["container"]);
     } else if (container_type == "mp2") {
       container = MP2Container::from_json(j["container"]);
@@ -1561,7 +1561,7 @@ std::shared_ptr<Wavefunction> Wavefunction::from_hdf5(H5::Group& group) {
       container = SciWavefunctionContainer::from_hdf5(container_group);
     } else if (container_type == "sd") {
       container = SlaterDeterminantContainer::from_hdf5(container_group);
-    } else if (container_type == "cc") {
+    } else if (container_type == "coupled_cluster") {
       container = CoupledClusterContainer::from_hdf5(container_group);
     } else if (container_type == "mp2") {
       container = MP2Container::from_hdf5(container_group);

@@ -131,8 +131,19 @@ TEST_F(CoupledClusterContainerTest, JsonSerializationSpatial) {
   // Serialize to JSON
   nlohmann::json j = original.to_json();
 
-  // Deserialize from JSON
+  // Deserialize from JSON using container-specific method
   auto restored = CoupledClusterContainer::from_json(j);
+
+  // Also test base Wavefunction::from_json() by wrapping container in
+  // Wavefunction
+  auto original_wf =
+      std::make_shared<Wavefunction>(std::make_unique<CoupledClusterContainer>(
+          orbitals, wavefunction, t1_amplitudes, t2_amplitudes));
+  nlohmann::json wf_j = original_wf->to_json();
+  auto wf_restored = Wavefunction::from_json(wf_j);
+  EXPECT_EQ(wf_restored->get_container_type(), "coupled_cluster");
+  auto& wf_restored_container =
+      wf_restored->get_container<CoupledClusterContainer>();
 
   // check amplitudes
   auto [t1_alpha_orig, t1_beta_orig] = original.get_t1_amplitudes();
@@ -155,6 +166,26 @@ TEST_F(CoupledClusterContainerTest, JsonSerializationSpatial) {
                             testing::wf_tolerance));
   EXPECT_TRUE(std::get<Eigen::VectorXd>(t2_bbbb_orig)
                   .isApprox(std::get<Eigen::VectorXd>(t2_bbbb_rest),
+                            testing::wf_tolerance));
+
+  // Verify that base Wavefunction::from_json gives the same result
+  auto [t1_alpha_wf, t1_beta_wf] = wf_restored_container.get_t1_amplitudes();
+  auto [t2_abab_wf, t2_aaaa_wf, t2_bbbb_wf] =
+      wf_restored_container.get_t2_amplitudes();
+  EXPECT_TRUE(std::get<Eigen::VectorXd>(t1_alpha_rest)
+                  .isApprox(std::get<Eigen::VectorXd>(t1_alpha_wf),
+                            testing::wf_tolerance));
+  EXPECT_TRUE(std::get<Eigen::VectorXd>(t1_beta_rest)
+                  .isApprox(std::get<Eigen::VectorXd>(t1_beta_wf),
+                            testing::wf_tolerance));
+  EXPECT_TRUE(std::get<Eigen::VectorXd>(t2_abab_rest)
+                  .isApprox(std::get<Eigen::VectorXd>(t2_abab_wf),
+                            testing::wf_tolerance));
+  EXPECT_TRUE(std::get<Eigen::VectorXd>(t2_aaaa_rest)
+                  .isApprox(std::get<Eigen::VectorXd>(t2_aaaa_wf),
+                            testing::wf_tolerance));
+  EXPECT_TRUE(std::get<Eigen::VectorXd>(t2_bbbb_rest)
+                  .isApprox(std::get<Eigen::VectorXd>(t2_bbbb_wf),
                             testing::wf_tolerance));
 }
 
@@ -234,7 +265,7 @@ TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpatial) {
     // Serialize to HDF5
     original.to_hdf5(root);
 
-    // Deserialize from HDF5
+    // Deserialize from HDF5 using container-specific method
     auto restored = CoupledClusterContainer::from_hdf5(root);
 
     // check amplitudes
@@ -263,7 +294,62 @@ TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpatial) {
     file.close();
   }
 
+  // Also test base Wavefunction::from_hdf5() by creating a separate file with
+  // Wavefunction wrapper
+  std::string wf_filename = "test_cc_wavefunction_serialization.h5";
+  {
+    // Create and serialize a Wavefunction wrapping the container
+    auto original_wf = std::make_shared<Wavefunction>(
+        std::make_unique<CoupledClusterContainer>(
+            orbitals, wavefunction, t1_amplitudes, t2_amplitudes));
+    H5::H5File file(wf_filename, H5F_ACC_TRUNC);
+    H5::Group root = file.openGroup("/");
+    original_wf->to_hdf5(root);
+    file.close();
+  }
+  {
+    // Deserialize using Wavefunction::from_hdf5
+    H5::H5File file(wf_filename, H5F_ACC_RDONLY);
+    H5::Group root = file.openGroup("/");
+    auto wf_restored = Wavefunction::from_hdf5(root);
+    EXPECT_EQ(wf_restored->get_container_type(), "coupled_cluster");
+    auto& wf_restored_container =
+        wf_restored->get_container<CoupledClusterContainer>();
+
+    // Get the restored amplitudes from container-specific method for comparison
+    H5::H5File file2(filename, H5F_ACC_RDONLY);
+    H5::Group root2 = file2.openGroup("/");
+    auto restored = CoupledClusterContainer::from_hdf5(root2);
+
+    auto [t1_alpha_rest, t1_beta_rest] = restored->get_t1_amplitudes();
+    auto [t2_abab_rest, t2_aaaa_rest, t2_bbbb_rest] =
+        restored->get_t2_amplitudes();
+    auto [t1_alpha_wf, t1_beta_wf] = wf_restored_container.get_t1_amplitudes();
+    auto [t2_abab_wf, t2_aaaa_wf, t2_bbbb_wf] =
+        wf_restored_container.get_t2_amplitudes();
+
+    EXPECT_TRUE(std::get<Eigen::VectorXd>(t1_alpha_rest)
+                    .isApprox(std::get<Eigen::VectorXd>(t1_alpha_wf),
+                              testing::wf_tolerance));
+    EXPECT_TRUE(std::get<Eigen::VectorXd>(t1_beta_rest)
+                    .isApprox(std::get<Eigen::VectorXd>(t1_beta_wf),
+                              testing::wf_tolerance));
+    EXPECT_TRUE(std::get<Eigen::VectorXd>(t2_abab_rest)
+                    .isApprox(std::get<Eigen::VectorXd>(t2_abab_wf),
+                              testing::wf_tolerance));
+    EXPECT_TRUE(std::get<Eigen::VectorXd>(t2_aaaa_rest)
+                    .isApprox(std::get<Eigen::VectorXd>(t2_aaaa_wf),
+                              testing::wf_tolerance));
+    EXPECT_TRUE(std::get<Eigen::VectorXd>(t2_bbbb_rest)
+                    .isApprox(std::get<Eigen::VectorXd>(t2_bbbb_wf),
+                              testing::wf_tolerance));
+
+    file.close();
+    file2.close();
+  }
+
   std::remove(filename.c_str());
+  std::remove(wf_filename.c_str());
 }
 
 // Test HDF5 serialization/deserialization

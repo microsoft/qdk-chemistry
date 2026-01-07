@@ -1451,6 +1451,267 @@ class TestPyscfPlugin:
         assert t1_alpha_array.shape[0] == nocc_alpha * nvirt_alpha, "T1 alpha shape mismatch"
         assert t1_beta_array.shape[0] == nocc_beta * nvirt_beta, "T1 beta shape mismatch"
 
+    def test_pyscf_uccsd_wavefunction_serialization_roundtrip(self, tmp_path):
+        """Test that UCCSD wavefunction can be serialized and deserialized via JSON and HDF5."""
+        o2 = create_o2_structure()
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, wavefunction = scf_solver.run(o2, 0, 3, "sto-3g")
+
+        ham_calculator = algorithms.create("hamiltonian_constructor", "qdk")
+        hamiltonian = ham_calculator.run(wavefunction.get_orbitals())
+
+        # Compute UCCSD energy with amplitudes stored
+        cc_calculator = algorithms.create("dynamical_correlation_calculator", "pyscf_coupled_cluster")
+        cc_calculator.settings().set("store_amplitudes", True)
+        ansatz_object = Ansatz(hamiltonian, wavefunction)
+        _, cc_wavefunction = cc_calculator.run(ansatz_object)
+
+        # Verify original wavefunction properties
+        assert cc_wavefunction.get_container_type() == "coupled_cluster"
+
+        # Get original container and check it has amplitudes
+        original_container = cc_wavefunction.get_container()
+        assert original_container.has_t1_amplitudes()
+        assert original_container.has_t2_amplitudes()
+
+        # Get original amplitudes - unrestricted has separate alpha/beta
+        orig_t1_alpha, orig_t1_beta = original_container.get_t1_amplitudes()
+        orig_t2_abab, orig_t2_aaaa, orig_t2_bbbb = original_container.get_t2_amplitudes()
+
+        # Verify all amplitudes are present
+        assert orig_t1_alpha is not None
+        assert orig_t1_beta is not None
+        assert orig_t2_abab is not None
+        assert orig_t2_aaaa is not None
+        assert orig_t2_bbbb is not None
+
+        # Get original orbitals properties
+        orig_orbitals = cc_wavefunction.get_orbitals()
+        orig_num_orbs = orig_orbitals.get_num_molecular_orbitals()
+        orig_is_unrestricted = orig_orbitals.is_unrestricted()
+
+        orig_num_elec = cc_wavefunction.get_total_num_electrons()
+
+        # Test 1: JSON serialization
+        wf_json = cc_wavefunction.to_json()
+        restored_json = data.Wavefunction.from_json(wf_json)
+
+        # Verify JSON restored wavefunction
+        assert restored_json.get_container_type() == "coupled_cluster"
+
+        json_container = restored_json.get_container()
+        assert json_container.has_t1_amplitudes()
+        assert json_container.has_t2_amplitudes()
+
+        # Verify amplitudes are preserved - unrestricted version
+        json_t1_alpha, json_t1_beta = json_container.get_t1_amplitudes()
+        json_t2_abab, json_t2_aaaa, json_t2_bbbb = json_container.get_t2_amplitudes()
+
+        assert np.allclose(
+            np.array(orig_t1_alpha),
+            np.array(json_t1_alpha),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            np.array(orig_t1_beta),
+            np.array(json_t1_beta),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            np.array(orig_t2_abab),
+            np.array(json_t2_abab),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            np.array(orig_t2_aaaa),
+            np.array(json_t2_aaaa),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            np.array(orig_t2_bbbb),
+            np.array(json_t2_bbbb),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
+        # Verify orbitals properties preserved
+        json_orbitals = restored_json.get_orbitals()
+        assert json_orbitals.get_num_molecular_orbitals() == orig_num_orbs
+        assert json_orbitals.is_unrestricted() == orig_is_unrestricted
+
+        # Verify electron count preserved
+        json_num_elec = restored_json.get_total_num_electrons()
+        assert json_num_elec == orig_num_elec
+
+        # Test 2: HDF5 serialization
+        filename = tmp_path / "uccsd_wf.hdf5"
+        cc_wavefunction.to_hdf5_file(str(filename))
+        restored_hdf5 = data.Wavefunction.from_hdf5_file(str(filename))
+
+        # Verify HDF5 restored wavefunction
+        assert restored_hdf5.get_container_type() == "coupled_cluster"
+
+        hdf5_container = restored_hdf5.get_container()
+        assert hdf5_container.has_t1_amplitudes()
+        assert hdf5_container.has_t2_amplitudes()
+
+        # Verify amplitudes are preserved - unrestricted version
+        hdf5_t1_alpha, hdf5_t1_beta = hdf5_container.get_t1_amplitudes()
+        hdf5_t2_abab, hdf5_t2_aaaa, hdf5_t2_bbbb = hdf5_container.get_t2_amplitudes()
+
+        assert np.allclose(
+            np.array(orig_t1_alpha),
+            np.array(hdf5_t1_alpha),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            np.array(orig_t1_beta),
+            np.array(hdf5_t1_beta),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            np.array(orig_t2_abab),
+            np.array(hdf5_t2_abab),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            np.array(orig_t2_aaaa),
+            np.array(hdf5_t2_aaaa),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            np.array(orig_t2_bbbb),
+            np.array(hdf5_t2_bbbb),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
+        # Verify orbitals properties preserved
+        hdf5_orbitals = restored_hdf5.get_orbitals()
+        assert hdf5_orbitals.get_num_molecular_orbitals() == orig_num_orbs
+        assert hdf5_orbitals.is_unrestricted() == orig_is_unrestricted
+
+        # Verify electron count preserved
+        hdf5_num_elec = restored_hdf5.get_total_num_electrons()
+        assert hdf5_num_elec == orig_num_elec
+
+    def test_pyscf_ccsd_wavefunction_serialization_roundtrip(self, tmp_path):
+        """Test that CCSD wavefunction can be serialized and deserialized with json and hdf5."""
+        water = create_water_structure()
+        scf_solver = algorithms.create("scf_solver")
+        _, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
+
+        ham_calculator = algorithms.create("hamiltonian_constructor", "qdk")
+        hamiltonian = ham_calculator.run(wavefunction.get_orbitals())
+
+        # Compute CC energy with amplitudes stored
+        cc_calculator = algorithms.create("dynamical_correlation_calculator", "pyscf_coupled_cluster")
+        cc_calculator.settings().set("store_amplitudes", True)
+        ansatz_object = Ansatz(hamiltonian, wavefunction)
+        _, cc_wavefunction = cc_calculator.run(ansatz_object)
+
+        # Verify original wavefunction properties
+        assert cc_wavefunction.get_container_type() == "coupled_cluster"
+
+        # Get original container and check it has amplitudes
+        original_container = cc_wavefunction.get_container()
+        assert original_container.has_t1_amplitudes()
+        assert original_container.has_t2_amplitudes()
+
+        # Get original amplitudes
+        orig_t1 = original_container.get_t1_amplitudes()
+        orig_t2 = original_container.get_t2_amplitudes()
+        assert orig_t1 is not None
+        assert orig_t2 is not None
+
+        # Get original orbitals properties
+        orig_orbitals = cc_wavefunction.get_orbitals()
+        orig_num_orbs = orig_orbitals.get_num_molecular_orbitals()
+        orig_is_restricted = orig_orbitals.is_restricted()
+
+        orig_num_elec = cc_wavefunction.get_total_num_electrons()
+
+        # Test 1: JSON serialization
+        wf_json = cc_wavefunction.to_json()
+        restored_json = data.Wavefunction.from_json(wf_json)
+
+        # Verify JSON restored wavefunction
+        assert restored_json.get_container_type() == "coupled_cluster"
+
+        json_container = restored_json.get_container()
+        assert json_container.has_t1_amplitudes()
+        assert json_container.has_t2_amplitudes()
+
+        # Verify amplitudes are preserved
+        json_t1 = json_container.get_t1_amplitudes()
+        json_t2 = json_container.get_t2_amplitudes()
+        assert np.allclose(
+            np.array(orig_t1),
+            np.array(json_t1),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            np.array(orig_t2),
+            np.array(json_t2),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
+        # Verify orbitals properties preserved
+        json_orbitals = restored_json.get_orbitals()
+        assert json_orbitals.get_num_molecular_orbitals() == orig_num_orbs
+        assert json_orbitals.is_restricted() == orig_is_restricted
+
+        # Verify electron count preserved
+        json_num_elec = restored_json.get_total_num_electrons()
+        assert json_num_elec == orig_num_elec
+
+        # Test 2: HDF5 serialization
+        filename = tmp_path / "cc_wf.hdf5"
+        cc_wavefunction.to_hdf5_file(str(filename))
+        restored_hdf5 = data.Wavefunction.from_hdf5_file(str(filename))
+
+        # Verify HDF5 restored wavefunction
+        assert restored_hdf5.get_container_type() == "coupled_cluster"
+
+        hdf5_container = restored_hdf5.get_container()
+        assert hdf5_container.has_t1_amplitudes()
+        assert hdf5_container.has_t2_amplitudes()
+
+        # Verify amplitudes are preserved
+        hdf5_t1 = hdf5_container.get_t1_amplitudes()
+        hdf5_t2 = hdf5_container.get_t2_amplitudes()
+        assert np.allclose(
+            np.array(orig_t1),
+            np.array(hdf5_t1),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            np.array(orig_t2),
+            np.array(hdf5_t2),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
+        # Verify orbitals properties preserved
+        hdf5_orbitals = restored_hdf5.get_orbitals()
+        assert hdf5_orbitals.get_num_molecular_orbitals() == orig_num_orbs
+        assert hdf5_orbitals.is_restricted() == orig_is_restricted
+
+        # Verify electron count preserved
+        hdf5_num_elec = restored_hdf5.get_total_num_electrons()
+        assert hdf5_num_elec == orig_num_elec
+
     def test_pyscf_mcscf_singlet(self):
         """Test PySCF MCSCF for n2 with cc-pvdz basis and CAS(6,6)."""
         # Create N2 structure
