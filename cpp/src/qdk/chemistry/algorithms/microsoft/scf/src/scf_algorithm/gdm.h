@@ -53,11 +53,13 @@ class GDM : public SCFAlgorithm {
   void iterate(SCFImpl& scf_impl) override;
 
   /**
-   * @brief Set the energy change from last two DIIS cycles for GDM algorithm
+   * @brief Initialize GDM state when switching from DIIS
    *
    * @param[in] delta_energy_diis Energy change from DIIS algorithm
+   * @param[in] total_energy Current SCF total energy
    */
-  void set_delta_energy_diis(const double delta_energy_diis);
+  void initialize_from_diis(const double delta_energy_diis,
+                            const double total_energy);
 
  private:
   /// PIMPL pointer to implementation

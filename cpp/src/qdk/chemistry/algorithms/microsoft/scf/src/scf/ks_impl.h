@@ -6,6 +6,8 @@
 
 #include <qdk/chemistry/scf/core/exc.h>
 
+#include <source_location>
+
 #include "scf/scf_impl.h"
 
 namespace qdk::chemistry::scf {
@@ -74,6 +76,23 @@ class KSImpl : public SCFImpl {
    * @note Energy components are stored in ctx.result for later access
    */
   double total_energy_() override;
+
+  /**
+   * @brief Evaluate total energy and Fock matrix for a trial density matrix.
+   * This is a const method that does not modify any member variables, but it
+   * reads from existing state (e.g., H_, ctx_, eri_), so the SCFImpl instance
+   * must be fully initialized before calling it.
+   *
+   * @param P_matrix Trial density matrix
+   * @param loc Source location of the caller (automatically captured)
+   * @return std::pair containing:
+   *   - first: total energy including XC in Hartree
+   *   - second: Fock matrix in AO basis
+   */
+  std::pair<double, RowMajorMatrix> evaluate_trial_density_energy_and_fock(
+      const RowMajorMatrix& P_matrix,
+      const std::source_location& loc =
+          std::source_location::current()) const override;
 
   /**
    * @brief Get hybridization coefficients for range-separated functionals
