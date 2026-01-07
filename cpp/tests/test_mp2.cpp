@@ -475,3 +475,96 @@ TEST_F(MP2Test, Hdf5SerializationSpin) {
 
   std::remove(filename.c_str());
 }
+
+// Test (base) Wavefunction-level JSON serialization/deserialization
+// The other tests test the MP2Container directly
+TEST_F(MP2Test, WavefunctionJsonSerializationSpatial) {
+  // Test JSON serialization/deserialization for MP2 via
+  // Wavefunction::from_json()
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"O", "O"};
+  Structure o2_structure(coordinates, symbols);
+
+  // Restricted HF calculation (singlet O2, multiplicity = 1)
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("method", "hf");
+  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+  auto [hf_energy, hf_wavefunction] =
+      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
+  auto hf_orbitals = hf_wavefunction->get_orbitals();
+
+  // Create Hamiltonian
+  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+
+  // Create MP2Container
+  auto mp2_container =
+      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+
+  // Trigger amplitude computation before wrapping in Wavefunction
+  mp2_container->get_t2_amplitudes();
+
+  auto original_wavefunction =
+      std::make_shared<Wavefunction>(std::move(mp2_container));
+
+  // Verify container type
+  EXPECT_EQ(original_wavefunction->get_container_type(), "mp2");
+
+  // Serialize to JSON using Wavefunction::to_json()
+  nlohmann::json j = original_wavefunction->to_json();
+
+  // Verify JSON contains container_type field
+  EXPECT_TRUE(j.contains("container_type"));
+  EXPECT_EQ(j["container_type"], "mp2");
+
+  // Deserialize from JSON using Wavefunction::from_json()
+  auto restored_wavefunction = Wavefunction::from_json(j);
+
+  // Verify restored wavefunction has correct container type
+  EXPECT_EQ(restored_wavefunction->get_container_type(), "mp2");
+}
+
+// Test (base-) Wavefunction-level HDF5 serialization/deserialization
+TEST_F(MP2Test, WavefunctionHdf5SerializationSpatial) {
+  // Test HDF5 serialization/deserialization for MP2 via
+  // Wavefunction::from_hdf5()
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"O", "O"};
+  Structure o2_structure(coordinates, symbols);
+
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("method", "hf");
+  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+  auto [hf_energy, hf_wavefunction] =
+      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
+  auto hf_orbitals = hf_wavefunction->get_orbitals();
+
+  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+
+  auto mp2_container =
+      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+  mp2_container->get_t2_amplitudes();
+
+  auto original_wavefunction =
+      std::make_shared<Wavefunction>(std::move(mp2_container));
+
+  EXPECT_EQ(original_wavefunction->get_container_type(), "mp2");
+
+  std::string filename = "test_mp2_wavefunction_hdf5_serialization.h5";
+  {
+    H5::H5File file(filename, H5F_ACC_TRUNC);
+    H5::Group root = file.openGroup("/");
+
+    original_wavefunction->to_hdf5(root);
+    auto restored_wavefunction = Wavefunction::from_hdf5(root);
+
+    EXPECT_EQ(restored_wavefunction->get_container_type(), "mp2");
+
+    file.close();
+  }
+
+  std::remove(filename.c_str());
+}
