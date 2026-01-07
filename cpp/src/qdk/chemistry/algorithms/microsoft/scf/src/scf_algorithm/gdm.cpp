@@ -3,7 +3,6 @@
 // license information.
 
 #include "gdm.h"
-#include "line_search.h"
 
 #include <math.h>
 
@@ -16,6 +15,7 @@
 #include <vector>
 
 #include "../scf/scf_impl.h"
+#include "line_search.h"
 #include "qdk/chemistry/scf/core/scf.h"
 #include "qdk/chemistry/scf/core/types.h"
 #include "util/matrix_exp.h"
@@ -79,7 +79,6 @@ static void apply_orbital_rotation(RowMajorMatrix& C, const int spin_index,
  */
 class GDMLineFunctor {
  public:
-  // Type definitions required by MACIS line search interface
   using argument_type = Eigen::VectorXd;
   using return_type = double;
 
