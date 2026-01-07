@@ -1,4 +1,4 @@
-"""Example for using RDKit to build a structure that is recognized by QDK/Chemistry.
+"""Example for using RDKit to build a QDK Structure object.
 
 This script builds a structure from RDKit and optimizes it with the UFF force field, converts the
 format to construct a Structure object for QDK Chemistry, then QDK Chemistry performs an SCF
