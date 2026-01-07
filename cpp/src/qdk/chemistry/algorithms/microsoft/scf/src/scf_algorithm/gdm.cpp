@@ -84,7 +84,7 @@ class GDMLineFunctor {
 
   /**
    * @brief Bind functor to a specific SCF state for line search evaluations.
-   * @param scf_impl Owning `SCFImpl` used to evaluate trial densities.
+   * @param scf_impl reference to `SCFImpl` used to evaluate trial densities.
    * @param C_pseudo_canonical Molecular orbitals in pseudo-canonical basis.
    * @param num_electrons Occupied orbital counts per spin component.
    * @param rotation_offset Starting index for each spin's rotation slice.
@@ -385,9 +385,6 @@ class GDM {
 
   Eigen::VectorXd kappa_;  // vertical rotation matrix of this step
 
-  // Fallback gradient step length used when the line search cannot find an
-  // acceptable step size.
-  const double fallback_step_length_ = 1e-4;
   /// Energy of the last accepted step, used to decide if we rescale the kappa
   /// vector in this step
   double last_accepted_energy_;
@@ -628,7 +625,6 @@ void GDM::iterate(SCFImpl& scf_impl) {
   Eigen::VectorXd initial_hessian = Eigen::VectorXd::Zero(total_rotation_size_);
 
   for (int i = 0; i < num_density_matrices; ++i) {
-    // Create block references for this spin
     const int num_occupied_orbitals = num_electrons_[i];
     const int num_virtual_orbitals =
         num_molecular_orbitals - num_occupied_orbitals;
@@ -810,18 +806,14 @@ void GDM::iterate(SCFImpl& scf_impl) {
           line_functor, start_kappa, kappa_dir, step_size, searched_kappa,
           energy_at_searched_kappa, grad_at_searched_kappa);
     } catch (const std::exception& e2) {
-      // Even steepest descent line search failed
+      // Even steepest descent line search failed; fall back to gradient norm
       QDK_LOGGER().warn(
-          "Steepest descent line search also failed: {}. Taking fixed 1e-4 "
-          "step in steepest descent direction.",
+          "Steepest descent line search also failed: {}. Checking gradient "
+          "norm for convergence.",
           e2.what());
 
-      // Take very small step in steepest descent direction
-      searched_kappa = -fallback_step_length_ * current_gradient_;
-      energy_at_searched_kappa = line_functor.eval(searched_kappa);
-      grad_at_searched_kappa = line_functor.grad(searched_kappa);
-
-      double grad_norm = grad_at_searched_kappa.norm() / num_molecular_orbitals;
+      const double grad_norm =
+          current_gradient_.norm() / num_molecular_orbitals;
       const double og_threshold = ctx_.cfg->scf_algorithm.og_threshold;
 
       // grad_norm condition is to make the step acceptable when it meets the
@@ -829,19 +821,21 @@ void GDM::iterate(SCFImpl& scf_impl) {
       // consistent with |FPS - SPF| criterion in SCFImpl::check_convergence(),
       // |FPS-SPF|^2 / 2 = |grad / 4|^2 for restricted case and
       // |FPS-SPF|^2 / 2 = |grad / 2|^2 for unrestricted case.
-      double grad_norm_coeff =
+      const double grad_norm_coeff =
           cfg->unrestricted ? std::sqrt(2.0) : std::sqrt(8.0);
-      if (energy_at_searched_kappa < last_accepted_energy_ ||
-          grad_norm < og_threshold * grad_norm_coeff) {
+      if (grad_norm < og_threshold * grad_norm_coeff) {
         QDK_LOGGER().warn(
-            "Accepted small fixed step in steepest descent direction with "
-            "energy {:.12e}.",
-            energy_at_searched_kappa);
+            "Gradient norm {:.6e} below threshold; accepting zero orbital "
+            "rotation.",
+            grad_norm);
+        searched_kappa.setZero();
+        energy_at_searched_kappa = last_accepted_energy_;
+        grad_at_searched_kappa = current_gradient_;
       } else {
         QDK_LOGGER().error(
-            "Small fixed step in steepest descent direction did not lower "
-            "energy (energy {:.12e}). SCF iteration aborted.",
-            energy_at_searched_kappa);
+            "Line search failed and gradient norm {:.6e} exceeds threshold. "
+            "SCF iteration aborted.",
+            grad_norm);
         throw std::runtime_error(
             "GDM SCF optimization failed: unable to find acceptable step; "
             "aborting SCF procedure.");
@@ -850,8 +844,10 @@ void GDM::iterate(SCFImpl& scf_impl) {
   }
 
   // Add optimal kappa to history and update previous gradient
-  scf_impl.orbitals_matrix() = line_functor.get_cached_C();
-  scf_impl.density_matrix() = line_functor.get_cached_P();
+  if (searched_kappa.norm() > nonpositive_threshold_) {
+    scf_impl.orbitals_matrix() = line_functor.get_cached_C();
+    scf_impl.density_matrix() = line_functor.get_cached_P();
+  }
 
   delta_energy_ = energy_at_searched_kappa - last_accepted_energy_;
   last_accepted_energy_ = energy_at_searched_kappa;
