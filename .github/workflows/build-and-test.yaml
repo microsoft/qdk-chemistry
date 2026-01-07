@@ -127,7 +127,6 @@ jobs:
         python -m pip install --prefix=${{ github.workspace }}/install coverage pytest pytest-cov
 
     - name: Configure C++ Release build
-      if: matrix.os-name == 'Linux'
       run: |
         cmake -S cpp -B "$BUILD_DIR" \
           -GNinja \
