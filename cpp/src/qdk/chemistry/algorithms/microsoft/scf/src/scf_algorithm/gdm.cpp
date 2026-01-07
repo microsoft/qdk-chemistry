@@ -116,11 +116,11 @@ void nocedal_wright_line_search(Functor& op,
   using arg_type = typename Functor::argument_type;
   using ret_type = typename Functor::return_type;
 
-  const auto fx0 = fx;  // Starting function value
-  const auto init_grad_dot_p = Functor::dot(p, gfx);
+  const auto fx0 = fx;                    // Starting function value
+  const auto dgi = Functor::dot(p, gfx);  // Initial directional derivative
 
   // Validate inputs
-  if (init_grad_dot_p > 0)
+  if (dgi > 0)
     throw std::logic_error(
         "the moving direction increases the objective function value");
   if (step <= 0.0) throw std::runtime_error("Step must be positive");
@@ -131,13 +131,12 @@ void nocedal_wright_line_search(Functor& op,
   constexpr auto expansion = 2.0;  // Step expansion factor in bracketing phase
 
   // Precompute test values
-  const auto armijo_test_val = c1 * init_grad_dot_p;  // Armijo threshold
-  const auto wolfe_test_curv =
-      -c2 * init_grad_dot_p;  // Wolfe curvature threshold
+  const auto armijo_test_val = c1 * dgi;   // Armijo threshold
+  const auto wolfe_test_curv = -c2 * dgi;  // Wolfe curvature threshold
 
   // Initialize bracketing variables
-  ret_type step_hi, step_lo = 0, fx_hi, fx_lo = fx0, grad_dot_p_hi,
-                    grad_dot_p_lo = init_grad_dot_p;
+  ret_type step_hi, step_lo = 0, fx_hi, fx_lo = fx0, dg_hi, dg_lo = dgi;
+
   int iter = 0;
   const size_t max_iter = 100;
   bool converged = false;
@@ -153,20 +152,19 @@ void nocedal_wright_line_search(Functor& op,
     gfx = op.grad(x);
 
     if (iter++ >= max_iter) break;
-    auto grad_dot_p =
-        Functor::dot(gfx, p);  // Directional derivative at current point
+    auto dg = Functor::dot(gfx, p);  // Directional derivative at current point
 
     // Check if current step violates Armijo condition or function increased
-    if (fx - fx0 > step * armijo_test_val || (step_lo > 0 && fx >= fx_lo)) {
+    if (fx - fx0 > step * armijo_test_val || (0 < step_lo and fx >= fx_lo)) {
       // Set upper bracket - current step is too large
       step_hi = step;
       fx_hi = fx;
-      grad_dot_p_hi = grad_dot_p;
+      dg_hi = dg;
       break;  // Exit to zoom phase
     }
 
     // Check if strong Wolfe conditions are satisfied
-    if (std::abs(grad_dot_p) <= wolfe_test_curv) {
+    if (std::abs(dg) <= wolfe_test_curv) {
       converged = true;  // Found acceptable step
       break;
     }
@@ -174,13 +172,14 @@ void nocedal_wright_line_search(Functor& op,
     // Update bracketing interval - current step becomes lower bound
     step_hi = step_lo;
     fx_hi = fx_lo;
-    grad_dot_p_hi = grad_dot_p_lo;
+    dg_hi = dg_lo;
 
     step_lo = step;
     fx_lo = fx;
-    grad_dot_p_lo = grad_dot_p;
-    if (grad_dot_p >= 0) break;  // Gradient sign change indicates bracket found
-    step *= expansion;           // Expand step size for next trial
+    dg_lo = dg;
+
+    if (dg >= 0) break;  // Gradient sign change indicates bracket found
+    step *= expansion;   // Expand step size for next trial
   }
   if (converged) return;  // Early termination if conditions satisfied
 
@@ -189,8 +188,8 @@ void nocedal_wright_line_search(Functor& op,
   for (;;) {
     // Compute new trial step using quadratic interpolation
     step = (fx_hi - fx_lo) * step_lo -
-           (step_hi * step_hi - step_lo * step_lo) * grad_dot_p_lo / 2;
-    step /= (fx_hi - fx_lo) - (step_hi - step_lo) * grad_dot_p_lo;
+           (step_hi * step_hi - step_lo * step_lo) * dg_lo / 2;
+    step /= (fx_hi - fx_lo) - (step_hi - step_lo) * dg_lo;
 
     // Safeguard: use bisection if interpolation gives point outside interval
     if (step <= std::min(step_lo, step_hi) ||
@@ -205,41 +204,32 @@ void nocedal_wright_line_search(Functor& op,
     gfx = op.grad(x);
 
     if (iter++ >= max_iter) break;
-    auto grad_dot_p = Functor::dot(gfx, p);
+    auto dg = Functor::dot(gfx, p);
 
     // Check if Armijo condition is violated
-    if (fx - fx0 > step * armijo_test_val || fx >= fx_lo) {
-      if (step == step_hi) {
-        QDK_LOGGER().error(
-            "Armijo condition not met, step value {}, fx value {}", step, fx);
-        throw std::runtime_error("Line Search Failed");
-      }
+    if (fx - fx0 > step * armijo_test_val or fx >= fx_lo) {
+      if (step == step_hi) throw std::runtime_error("Line Search Failed");
       // Update upper bracket
       step_hi = step;
       fx_hi = fx;
-      grad_dot_p_hi = grad_dot_p;
+      dg_hi = dg;
     } else {
       // Check if strong Wolfe conditions are satisfied
-      if (std::abs(grad_dot_p) <= wolfe_test_curv) {
+      if (std::abs(dg) <= wolfe_test_curv) {
         converged = true;
         break;  // Found acceptable step
       }
       // Update bracket based on gradient sign
-      if (grad_dot_p * (step_hi - step_lo) >= 0) {
+      if (dg * (step_hi - step_lo) >= 0) {
         step_hi = step_lo;
         fx_hi = fx_lo;
-        grad_dot_p_hi = grad_dot_p_lo;
+        dg_hi = dg_lo;
       }
-      if (step == step_lo) {
-        QDK_LOGGER().error(
-            "Strong Wolfe condition not met, step value {}, fx value {}", step,
-            fx);
-        throw std::runtime_error("Line Search Failed");
-      }
+      if (step == step_lo) throw std::runtime_error("Line Search Failed");
       // Update lower bracket
       step_lo = step;
       fx_lo = fx;
-      grad_dot_p_lo = grad_dot_p;
+      dg_lo = dg;
     }
   }
 
@@ -255,6 +245,16 @@ class GDMLineFunctor {
   using argument_type = Eigen::VectorXd;
   using return_type = double;
 
+  /**
+   * @brief Bind functor to a specific SCF state for line search evaluations.
+   * @param scf_impl Owning `SCFImpl` used to evaluate trial densities.
+   * @param C_pseudo_canonical Molecular orbitals in pseudo-canonical basis.
+   * @param num_electrons Occupied orbital counts per spin component.
+   * @param rotation_offset Starting index for each spin's rotation slice.
+   * @param rotation_size Number of rotation parameters per spin (n_occ*n_virt).
+   * @param num_molecular_orbitals Total molecular orbitals in the system.
+   * @param unrestricted Whether alpha/beta densities are treated separately.
+   */
   GDMLineFunctor(const SCFImpl& scf_impl,
                  const RowMajorMatrix& C_pseudo_canonical,
                  const std::vector<int>& num_electrons,
