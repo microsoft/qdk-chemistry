@@ -480,9 +480,13 @@ StabilityChecker::_run_impl(
   // Note Davidson algorithm is highly sensitive to the choice of initial
   // vector. The mix of two initialization here is to avoid Davidson unconverged
   // Note 1e4 and 1e-4 here is just to avoid division by zero.
-  Eigen::VectorXd eigenvector = Eigen::VectorXd::Constant(eigensize, 1e4);
+  double min_abs_eigen_diff = 1e-4;
+  Eigen::VectorXd eigenvector =
+      Eigen::VectorXd::Constant(eigensize, 1.0 / min_abs_eigen_diff);
   for (int i = 0; i < eigen_diff.size(); ++i) {
-    if (std::abs(eigen_diff(i)) > 1e-4) eigenvector(i) = 1.0 / eigen_diff(i);
+    if (std::abs(eigen_diff(i)) > min_abs_eigen_diff) {
+      eigenvector(i) = 1.0 / eigen_diff(i);
+    }
   }
   eigenvector.normalize();
   eigenvector((n_alpha_electrons - 1) * num_virtual_alpha_orbitals) = 1.0;

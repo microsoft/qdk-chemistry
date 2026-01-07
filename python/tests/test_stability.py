@@ -957,8 +957,8 @@ class TestStabilityWorkflow:
         # Run workflow - should detect external instability and switch to UHF
         energy, wfn, is_stable, result = self._run_scf_with_stability_workflow(n2, 0, 1, scf_solver, stability_checker)
 
-        # Final wavefunction should be unrestricted (switched from RHF to UHF) for HF
-        # DFT may not have RKS external stability here
+        # The resultant wavefunction is unrestricted when calculated by HF method, but restricted when calculated by PBE
+        # Because the wavefunction calculated by PBE keeps externally stable
         if method == "hf":
             assert not wfn.get_orbitals().is_restricted(), (
                 "Final wavefunction should be unrestricted after external instability"
