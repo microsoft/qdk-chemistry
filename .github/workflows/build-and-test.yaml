@@ -88,8 +88,6 @@ jobs:
           eigen \
           boost \
           hdf5 \
-          openblas \
-          lapack \
           graphviz \
           gcovr \
           nlohmann-json \
@@ -128,7 +126,7 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install --prefix=${{ github.workspace }}/install coverage pytest pytest-cov
 
-    - name: Configure C++ Linux Release build
+    - name: Configure C++ Release build
       if: matrix.os-name == 'Linux'
       run: |
         cmake -S cpp -B "$BUILD_DIR" \
@@ -137,21 +135,10 @@ jobs:
           -DQDK_UARCH="$QDK_UARCH" \
           -DBUILD_TESTING=ON
 
-    - name: Configure C++ MacOS Release build
-      if: matrix.os-name == 'macOS'
-      run: |
-        cmake -S cpp -B "$BUILD_DIR" \
-          -GNinja \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DQDK_UARCH="$QDK_UARCH" \
-          -DBUILD_TESTING=ON \
-          -DQDK_CHEMISTRY_ENABLE_OPENMP=OFF \
-          -DQDK_CHEMISTRY_ENABLE_MPI=OFF
-
     - name: Build C++ Release library
       run: cmake --build "$BUILD_DIR"
 
-    - name: Run C++ tests in Release mode
+    - name: Run C++ tests in Release mode (Linux)
       if: matrix.os-name == 'Linux'
       env:
         OMP_NUM_THREADS: 16
@@ -160,7 +147,7 @@ jobs:
         echo "=== Running C++ Tests in Release Mode ==="
         ctest --output-on-failure --verbose --timeout 300
 
-    - name: Run C++ tests in Release mode
+    - name: Run C++ tests in Release mode (macOS)
       if: matrix.os-name == 'macOS'
       env:
         OMP_NUM_THREADS: 1
