@@ -1,5 +1,14 @@
-"""Example for using RDKit to build structures."""
+"""Example for using RDKit to build a QDK Structure object.
 
+This script builds a structure from RDKit and optimizes it with the UFF force field, converts the
+format to construct a Structure object for QDK Chemistry, then QDK Chemistry performs an SCF
+calculation to obtain the energy. User can extract the function create_structure_from_rdkit to
+build other molecules from RDKit. Note that the UFF optimization may not yield high-quality
+geometries. Quantum chemistry based geometry optimization algorithms are strongly recommended
+for practical calculations.
+
+RDKit must be installed to run this sample.
+"""
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
@@ -83,12 +92,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     ########################################################################################
     # 2. Run the SCF stage to obtain the reference wavefunction.
     ########################################################################################
-    nuclear_repulsion = water.calculate_nuclear_repulsion_energy()
     scf_solver = create("scf_solver")
-    scf_solver.settings().set("basis_set", args.basis)
-    e_scf, scf_wavefunction = scf_solver.run(water, args.charge, args.spin)
-    total_scf_energy = e_scf + nuclear_repulsion
-    Logger.info(f"SCF Energy: {total_scf_energy:.8f} Hartree")
+    e_scf, scf_wavefunction = scf_solver.run(water, args.charge, args.spin, args.basis)
+    Logger.info(f"SCF Energy: {e_scf:.8f} Hartree")
 
 
 if __name__ == "__main__":
