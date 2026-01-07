@@ -346,9 +346,11 @@ TEST_F(CasWavefunctionTest, JsonSerialization) {
       dynamic_cast<CasWavefunctionContainer*>(
           WavefunctionContainer::from_json(j).release()));
 
-  // Also test base Wavefunction::from_json() by wrapping container in Wavefunction
-  auto original_wf = std::make_shared<Wavefunction>(
-      std::make_unique<CasWavefunctionContainer>(coeffs, dets, orbitals, one_rdm, std::nullopt));
+  // Also test base Wavefunction::from_json() by wrapping container in
+  // Wavefunction
+  auto original_wf =
+      std::make_shared<Wavefunction>(std::make_unique<CasWavefunctionContainer>(
+          coeffs, dets, orbitals, one_rdm, std::nullopt));
   nlohmann::json wf_j = original_wf->to_json();
   auto wf_restored = Wavefunction::from_json(wf_j);
   EXPECT_EQ(wf_restored->get_container_type(), "cas");
@@ -431,12 +433,14 @@ TEST_F(CasWavefunctionTest, Hdf5Serialization) {
     file.close();
   }
 
-  // Also test base Wavefunction::from_hdf5() by creating a separate file with Wavefunction wrapper
+  // Also test base Wavefunction::from_hdf5() by creating a separate file with
+  // Wavefunction wrapper
   std::string wf_filename = "test_cas_wavefunction_serialization.h5";
   {
     // Create and serialize a Wavefunction wrapping the container
     auto original_wf = std::make_shared<Wavefunction>(
-        std::make_unique<CasWavefunctionContainer>(coeffs, dets, orbitals, one_rdm, std::nullopt));
+        std::make_unique<CasWavefunctionContainer>(coeffs, dets, orbitals,
+                                                   one_rdm, std::nullopt));
     H5::H5File file(wf_filename, H5F_ACC_TRUNC);
     H5::Group root = file.openGroup("/");
     original_wf->to_hdf5(root);
