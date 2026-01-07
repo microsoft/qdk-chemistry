@@ -223,7 +223,7 @@ extends:
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.11
           - input: pipelineArtifact
             artifactName: linux-aarch64-wheels-python3.12
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.12
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.12
           - input: pipelineArtifact
             artifactName: linux-aarch64-wheels-python3.13
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.13
@@ -244,7 +244,7 @@ extends:
           displayName: Collect Python Artifacts for Release
 
         # Setting the contenttype to the wrong value will allow us to do a dry run of this task without
-        # publishing anything, according to the ESRP docs
+        # publishing anything, according to the ESRP docs. When debugging, set contenttype: NPM to prevent publishing to PyPI.
         - task: EsrpRelease@9
           condition: succeeded()
           displayName: Publish Python Packages
