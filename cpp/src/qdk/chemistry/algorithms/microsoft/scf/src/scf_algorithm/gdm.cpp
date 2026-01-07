@@ -641,15 +641,22 @@ void GDM::iterate(SCFImpl& scf_impl) {
         F, C, i, history_kappa_spin, history_dgrad_spin, current_gradient_spin);
 
     // Build this spin's segment of initial Hessian
+    // Reference: Helgaker, T., Jørgensen, P., & Olsen, J. (2000). Molecular
+    // electronic-structure theory, Eq. 10.8.56 (2013 reprint edition)
+    // 4.0 is for restricted closed-shell system. For unrestricted systems, the
+    // gradient is computed separately for each spin component, in that case the
+    // coefficient should be 2.0
+    double initial_hessian_coeff = cfg->unrestricted ? 2.0 : 4.0;
     for (int j = 0; j < num_occupied_orbitals; j++) {
       for (int v = 0; v < num_virtual_orbitals; v++) {
         int index = rotation_offset_[i] + j * num_virtual_orbitals + v;
         double pseudo_canonical_energy_diff =
             std::abs(pseudo_canonical_eigenvalues_(num_occupied_orbitals + v) -
                      pseudo_canonical_eigenvalues_(j));
-        initial_hessian(index) = std::max(
-            2.0 * (std::abs(delta_energy_) + pseudo_canonical_energy_diff),
-            nonpositive_threshold_);
+        initial_hessian(index) =
+            std::max(initial_hessian_coeff * (std::abs(delta_energy_) +
+                                              pseudo_canonical_energy_diff),
+                     nonpositive_threshold_);
       }
     }
   }
