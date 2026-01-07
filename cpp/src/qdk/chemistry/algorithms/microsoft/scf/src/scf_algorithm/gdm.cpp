@@ -84,13 +84,13 @@ class GDMLineFunctor {
 
   /**
    * @brief Bind functor to a specific SCF state for line search evaluations.
-   * @param scf_impl reference to `SCFImpl` used to evaluate trial densities.
-   * @param C_pseudo_canonical Molecular orbitals in pseudo-canonical basis.
-   * @param num_electrons Occupied orbital counts per spin component.
-   * @param rotation_offset Starting index for each spin's rotation slice.
-   * @param rotation_size Number of rotation parameters per spin (n_occ*n_virt).
-   * @param num_molecular_orbitals Total molecular orbitals in the system.
-   * @param unrestricted Whether alpha/beta densities are treated separately.
+   * @param scf_impl Reference to `SCFImpl` used to evaluate trial densities
+   * @param C_pseudo_canonical Molecular orbitals in pseudo-canonical basis
+   * @param num_electrons Occupied orbital counts per spin component
+   * @param rotation_offset Starting index for each spin's rotation slice
+   * @param rotation_size Number of rotation parameters per spin (n_occ*n_virt)
+   * @param num_molecular_orbitals Total molecular orbitals in the system
+   * @param unrestricted Whether alpha/beta densities are treated separately
    */
   GDMLineFunctor(const SCFImpl& scf_impl,
                  const RowMajorMatrix& C_pseudo_canonical,
