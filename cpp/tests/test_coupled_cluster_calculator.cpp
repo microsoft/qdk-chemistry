@@ -9,6 +9,7 @@
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/data/structure.hpp>
@@ -99,8 +100,9 @@ TEST(CoupledClusterCalculatorTest, Calculate) {
   Eigen::MatrixXd empty_one_body = Eigen::MatrixXd::Zero(2, 2);
   Eigen::VectorXd empty_two_body = Eigen::VectorXd::Zero(16);
   Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
-  Hamiltonian hamiltonian(empty_one_body, empty_two_body, dummy_orbitals, 0.0,
-                          empty_fock);
+  Hamiltonian hamiltonian(
+      std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          empty_one_body, empty_two_body, dummy_orbitals, 0.0, empty_fock));
 
   // Perform calculation with electron counts
   Wavefunction wfn(std::make_unique<SlaterDeterminantContainer>(

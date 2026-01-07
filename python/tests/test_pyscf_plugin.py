@@ -2001,15 +2001,17 @@ class TestPyscfPlugin:
         two_body_aabb = np.zeros(4**4)
         two_body_bbbb = np.zeros(4**4)
         h_unrestricted_model = data.Hamiltonian(
-            one_body_alpha,
-            one_body_beta,
-            two_body_aaaa,
-            two_body_aabb,
-            two_body_bbbb,
-            model_orbitals_unrestricted,
-            0.0,
-            np.eye(4),
-            np.eye(4),
+            data.CanonicalFourCenterHamiltonianContainer(
+                one_body_alpha,
+                one_body_beta,
+                two_body_aaaa,
+                two_body_aabb,
+                two_body_bbbb,
+                model_orbitals_unrestricted,
+                0.0,
+                np.eye(4),
+                np.eye(4),
+            )
         )
 
         occupation_alpha_test = np.array([1.0, 1.0, 0.0, 0.0])
@@ -2024,7 +2026,11 @@ class TestPyscfPlugin:
         model_orbitals_proper = data.ModelOrbitals(4, True)  # All orbitals are active by default
         one_body_model = np.eye(4) * 0.5
         two_body_model = np.zeros(4**4)
-        h_model = data.Hamiltonian(one_body_model, two_body_model, model_orbitals_proper, 0.5, np.eye(4))
+        h_model = data.Hamiltonian(
+            data.CanonicalFourCenterHamiltonianContainer(
+                one_body_model, two_body_model, model_orbitals_proper, 0.5, np.eye(4)
+            )
+        )
 
         # Closed-shell occupations
         occupation_alpha_closed = np.array([1.0, 1.0, 0.0, 0.0])

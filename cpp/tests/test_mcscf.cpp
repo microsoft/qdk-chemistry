@@ -10,6 +10,7 @@
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/mcscf.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
 
 #include "ut_common.hpp"
@@ -219,7 +220,8 @@ TEST_F(MultiConfigurationScfTest, SolverInterface) {
       std::move(HamiltonianConstructorFactory::create()));
 
   auto dummy_ham = std::make_shared<Hamiltonian>(
-      one_body, two_body, test_orbitals, core_energy, inactive_fock);
+      std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          one_body, two_body, test_orbitals, core_energy, inactive_fock));
 
   // Create a mock MC calculator
   auto mc_calculator = std::make_shared<MockMCCalculator>();

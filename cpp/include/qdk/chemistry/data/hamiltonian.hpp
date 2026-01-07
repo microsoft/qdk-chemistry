@@ -6,8 +6,6 @@
 #include <H5Cpp.h>
 
 #include <Eigen/Dense>
-#include <complex>
-#include <iostream>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
@@ -30,16 +28,20 @@ enum class HamiltonianType { Hermitian, NonHermitian };
 enum class SpinChannel { aa, bb, aaaa, aabb, bbbb };
 
 /**
- * @class Hamiltonian
- * @brief Represents an molecular Hamiltonian in the molecular orbital
- * basis
+ * @class HamiltonianContainer
+ * @brief Pure virtual base class for a molecular Hamiltonian implementation in
+ * the molecular orbital basis. Concrete subclasses must provide an
+ * implementation that defines the underlying storage and/or computation
+ * mechanism for two-electron integrals.
  *
  * This class stores molecular Hamiltonian data for quantum chemistry
  * calculations, specifically designed for active space methods. It contains:
  * - One-electron integrals (kinetic + nuclear attraction) in MO representation
- * - Two-electron integrals (electron-electron repulsion) in MO representation
  * - Molecular orbital information for the active space
  * - Core energy contributions from inactive orbitals and nuclear repulsion
+ *
+ * Note that this class does not store two-electron integrals; derived classes
+ * are expected to implement storage and access for these integrals.
  *
  * This class implies that all inactive orbitals are fully occupied for the
  * purpose of computing the core energy and inactive Fock matrix.
@@ -50,15 +52,12 @@ enum class SpinChannel { aa, bb, aaaa, aabb, bbbb };
  * integrates with the broader quantum chemistry framework for active space
  * methods.
  */
-class Hamiltonian : public DataClass,
-                    public std::enable_shared_from_this<Hamiltonian> {
+class HamiltonianContainer {
  public:
   /**
    * @brief Constructor for active space Hamiltonian with shared_ptr orbitals
    * and inactive Fock matrix
    * @param one_body_integrals One-electron integrals in MO basis [norb x norb]
-   * @param two_body_integrals Two-electron integrals in MO basis [norb x norb x
-   * norb x norb]
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital
    * energy)
@@ -67,11 +66,10 @@ class Hamiltonian : public DataClass,
    * @param type Type of Hamiltonian (Hermitian by default)
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
-  Hamiltonian(const Eigen::MatrixXd& one_body_integrals,
-              const Eigen::VectorXd& two_body_integrals,
-              std::shared_ptr<Orbitals> orbitals, double core_energy,
-              const Eigen::MatrixXd& inactive_fock_matrix,
-              HamiltonianType type = HamiltonianType::Hermitian);
+  HamiltonianContainer(const Eigen::MatrixXd& one_body_integrals,
+                       std::shared_ptr<Orbitals> orbitals, double core_energy,
+                       const Eigen::MatrixXd& inactive_fock_matrix,
+                       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
    * @brief Constructor for unrestricted active space Hamiltonian with separate
@@ -80,10 +78,6 @@ class Hamiltonian : public DataClass,
    * basis
    * @param one_body_integrals_beta One-electron integrals for beta spin in MO
    * basis
-   * @param two_body_integrals_aaaa Two-electron alpha-alpha-alpha-alpha
-   * integrals
-   * @param two_body_integrals_aabb Two-electron alpha-beta-alpha-beta integrals
-   * @param two_body_integrals_bbbb Two-electron beta-beta-beta-beta integrals
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital
    * energy)
@@ -94,15 +88,246 @@ class Hamiltonian : public DataClass,
    * @param type Type of Hamiltonian (Hermitian by default)
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
-  Hamiltonian(const Eigen::MatrixXd& one_body_integrals_alpha,
-              const Eigen::MatrixXd& one_body_integrals_beta,
-              const Eigen::VectorXd& two_body_integrals_aaaa,
-              const Eigen::VectorXd& two_body_integrals_aabb,
-              const Eigen::VectorXd& two_body_integrals_bbbb,
-              std::shared_ptr<Orbitals> orbitals, double core_energy,
-              const Eigen::MatrixXd& inactive_fock_matrix_alpha,
-              const Eigen::MatrixXd& inactive_fock_matrix_beta,
-              HamiltonianType type = HamiltonianType::Hermitian);
+  HamiltonianContainer(const Eigen::MatrixXd& one_body_integrals_alpha,
+                       const Eigen::MatrixXd& one_body_integrals_beta,
+                       std::shared_ptr<Orbitals> orbitals, double core_energy,
+                       const Eigen::MatrixXd& inactive_fock_matrix_alpha,
+                       const Eigen::MatrixXd& inactive_fock_matrix_beta,
+                       HamiltonianType type = HamiltonianType::Hermitian);
+
+  /**
+   * @brief Destructor
+   */
+  virtual ~HamiltonianContainer() = default;
+
+  /**
+   * @brief Create a deep copy of this container
+   * @return Unique pointer to a cloned container
+   */
+  virtual std::unique_ptr<HamiltonianContainer> clone() const = 0;
+
+  /**
+   * @brief Get the type of the underlying container
+   * @return String identifying the container type (e.g.,
+   * "canonical_four_center", "density_fitted")
+   */
+  virtual std::string get_container_type() const = 0;
+
+  /**
+   * @brief Check if one-body integrals are available
+   * @return True if one-body integrals are set
+   */
+  bool has_one_body_integrals() const;
+
+  /**
+   * @brief Get specific one-electron integral element
+   * @param i First orbital index
+   * @param j Second orbital index
+   * @param channel Spin channel to query (aa, or bb), defaults to aa
+   * @return One-electron integral (i|h|j)
+   * @throws std::out_of_range if indices are invalid
+   */
+  double get_one_body_element(unsigned i, unsigned j,
+                              SpinChannel channel = SpinChannel::aa) const;
+
+  /**
+   * @brief Get tuple of alpha, beta one-electron integrals in MO basis
+   * @return Reference to alpha, beta one-electron integrals matrices
+   * @throws std::runtime_error if integrals are not set
+   */
+  std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
+  get_one_body_integrals() const;
+
+  /**
+   * @brief Get two-electron integrals in MO basis for all spin channels
+   * @return Tuple of references to (aaaa, aabb, bbbb) two-electron integrals
+   * vectors
+   * @throws std::runtime_error if integrals are not set
+   */
+  virtual std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
+                     const Eigen::VectorXd&>
+  get_two_body_integrals() const = 0;
+
+  /**
+   * @brief Get specific two-electron integral element
+   * @param i First orbital index
+   * @param j Second orbital index
+   * @param k Third orbital index
+   * @param l Fourth orbital index
+   * @param channel Spin channel to query (aaaa, aabb, or bbbb), defaults to
+   * aaaa
+   * @return Two-electron integral (ij|kl)
+   * @throws std::out_of_range if indices are invalid
+   */
+  virtual double get_two_body_element(
+      unsigned i, unsigned j, unsigned k, unsigned l,
+      SpinChannel channel = SpinChannel::aaaa) const = 0;
+
+  /**
+   * @brief Check if two-body integrals are available
+   * @return True if two-body integrals are set
+   */
+  virtual bool has_two_body_integrals() const = 0;
+
+  /**
+   * @brief Get inactive Fock matrix for the selected active space
+   * @return Reference to the inactive Fock matrix
+   * @throws std::runtime_error if inactive Fock matrix is not set
+   */
+  std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
+  get_inactive_fock_matrix() const;
+
+  /**
+   * @brief Check if inactive Fock matrix is available
+   * @return True if inactive Fock matrix is set
+   */
+  bool has_inactive_fock_matrix() const;
+
+  /**
+   * @brief Get molecular orbital data
+   * @return Reference to the orbitals object
+   * @throws std::runtime_error if orbitals are not set
+   */
+  const std::shared_ptr<Orbitals> get_orbitals() const;
+
+  /**
+   * @brief Check if orbital data is available
+   * @return True if orbitals are set
+   */
+  bool has_orbitals() const;
+
+  /**
+   * @brief Get core energy
+   * @return Core energy in atomic units
+   */
+  double get_core_energy() const;
+
+  /**
+   * @brief Get the type of Hamiltonian (Hermitian or NonHermitian)
+   * @return HamiltonianType enum value
+   */
+  HamiltonianType get_type() const;
+
+  /**
+   * @brief Check if the Hamiltonian is Hermitian
+   * @return True if the Hamiltonian type is Hermitian
+   */
+  bool is_hermitian() const;
+
+  /**
+   * @brief Check if the Hamiltonian is restricted
+   * @return True if alpha and beta integrals are identical
+   */
+  virtual bool is_restricted() const = 0;
+
+  /**
+   * @brief Check if the Hamiltonian is unrestricted
+   * @return True if alpha and beta integrals are different
+   */
+  bool is_unrestricted() const;
+
+  /**
+   * @brief Convert Hamiltonian to JSON
+   * @return JSON object containing Hamiltonian data
+   */
+  virtual nlohmann::json to_json() const = 0;
+
+  /**
+   * @brief Serialize Hamiltonian data to HDF5 group
+   * @param group HDF5 group to write data to
+   * @throws std::runtime_error if I/O error occurs
+   */
+  virtual void to_hdf5(H5::Group& group) const = 0;
+
+  /**
+   * @brief Deserialize Hamiltonian data from HDF5 group
+   * @param group HDF5 group to read data from
+   * @return Unique pointer to Hamiltonian loaded from group
+   * @throws std::runtime_error if I/O error occurs
+   */
+  static std::unique_ptr<HamiltonianContainer> from_hdf5(H5::Group& group);
+
+  /**
+   * @brief Load Hamiltonian from JSON
+   * @param j JSON object containing Hamiltonian data
+   * @return Unique pointer to Hamiltonian loaded from JSON
+   * @throws std::runtime_error if JSON is malformed
+   */
+  static std::unique_ptr<HamiltonianContainer> from_json(
+      const nlohmann::json& j);
+
+  /**
+   * @brief Save Hamiltonian to an FCIDUMP file
+   * @param filename Path to FCIDUMP file to create/overwrite
+   * @param nalpha Number of alpha electrons
+   * @param nbeta Number of beta electrons
+   * @throws std::runtime_error if I/O error occurs
+   */
+  virtual void to_fcidump_file(const std::string& filename, size_t nalpha,
+                               size_t nbeta) const = 0;
+
+  /**
+   * @brief Check if the Hamiltonian data is complete and consistent
+   * @return True if all required data is set and dimensions are consistent
+   */
+  virtual bool is_valid() const = 0;
+
+ protected:
+  /// One-electron integrals in MO basis [norb x norb]
+  const std::pair<std::shared_ptr<Eigen::MatrixXd>,
+                  std::shared_ptr<Eigen::MatrixXd>>
+      _one_body_integrals;
+
+  /// @brief The inactive Fock matrix for the selected active space
+  const std::pair<std::shared_ptr<Eigen::MatrixXd>,
+                  std::shared_ptr<Eigen::MatrixXd>>
+      _inactive_fock_matrix;
+
+  /// Molecular orbital data (coefficients, energies, occupations)
+  const std::shared_ptr<Orbitals> _orbitals;
+
+  /// Core energy (nuclear repulsion + inactive orbital contributions)
+  const double _core_energy;
+
+  /// Type of Hamiltonian (Hermitian or NonHermitian)
+  const HamiltonianType _type;
+
+  /// Validation helpers
+  virtual void validate_integral_dimensions() const;
+  void validate_restrictedness_consistency() const;
+  void validate_active_space_dimensions() const;
+
+  /// Helper functions for constructor initialization
+  static std::pair<std::shared_ptr<Eigen::MatrixXd>,
+                   std::shared_ptr<Eigen::MatrixXd>>
+  make_restricted_one_body_integrals(const Eigen::MatrixXd& integrals);
+
+  static std::pair<std::shared_ptr<Eigen::MatrixXd>,
+                   std::shared_ptr<Eigen::MatrixXd>>
+  make_restricted_inactive_fock_matrix(const Eigen::MatrixXd& matrix);
+};
+
+/**
+ * @class Hamiltonian
+ * @brief Provides an interface to a molecular Hamiltonian in the molecular
+ * orbital basis by wrapping an implementation from @ref HamiltonianContainer.
+ *
+ * This class provides an interface to molecular Hamiltonian data for quantum
+ * chemistry calculations, specifically designed for active space methods. It
+ * interfaces with a HamiltonianContainer that stores:
+ * - One-electron integrals (kinetic + nuclear attraction) in MO representation
+ * - Two-electron integrals (electron-electron repulsion) in MO representation
+ * - Molecular orbital information for the active space
+ * - Core energy contributions from inactive orbitals and nuclear repulsion
+ */
+class Hamiltonian : public DataClass,
+                    public std::enable_shared_from_this<Hamiltonian> {
+ public:
+  /**
+   * @brief Constructor for Hamiltonian with a HamiltonianContainer
+   * @param container Unique pointer to HamiltonianContainer holding the data
+   */
+  Hamiltonian(std::unique_ptr<HamiltonianContainer> container);
 
   /**
    * @brief Copy constructor
@@ -127,7 +352,7 @@ class Hamiltonian : public DataClass,
   /**
    * @brief Destructor
    */
-  virtual ~Hamiltonian() = default;
+  ~Hamiltonian() = default;
 
   /**
    * @brief Get tuple of alpha, beta one-electron integrals in MO basis
@@ -148,7 +373,7 @@ class Hamiltonian : public DataClass,
    * @param i First orbital index
    * @param j Second orbital index
    * @param channel Spin channel to query (aa, or bb), defaults to aa
-   * @return One-electron integral &lt;ij&gt;
+   * @return One-electron integral (i|h|j);
    * @throws std::out_of_range if indices are invalid
    */
   double get_one_body_element(unsigned i, unsigned j,
@@ -172,7 +397,7 @@ class Hamiltonian : public DataClass,
    * @param l Fourth orbital index
    * @param channel Spin channel to query (aaaa, aabb, or bbbb), defaults to
    * aaaa
-   * @return Two-electron integral <ij|kl>
+   * @return Two-electron integral (ij|kl)
    * @throws std::out_of_range if indices are invalid
    */
   double get_two_body_element(unsigned i, unsigned j, unsigned k, unsigned l,
@@ -225,6 +450,38 @@ class Hamiltonian : public DataClass,
   HamiltonianType get_type() const;
 
   /**
+   * @brief Get the type of the underlying container
+   * @return String identifying the container type (e.g.,
+   * "canonical_four_center", "density_fitted")
+   */
+  std::string get_container_type() const;
+
+  /**
+   * @brief Get typed reference to the underlying container
+   * @tparam T Container type to cast to
+   * @return Reference to container as type T
+   * @throws std::bad_cast if container is not of type T
+   */
+  template <typename T>
+  const T& get_container() const {
+    const T* ptr = dynamic_cast<const T*>(_container.get());
+    if (!ptr) {
+      throw std::bad_cast();
+    }
+    return *ptr;
+  }
+
+  /**
+   * @brief Check if container is of specific type
+   * @tparam T Container type to check
+   * @return True if container is of type T
+   */
+  template <typename T>
+  bool has_container_type() const {
+    return dynamic_cast<const T*>(_container.get()) != nullptr;
+  }
+
+  /**
    * @brief Check if the Hamiltonian is Hermitian
    * @return True if the Hamiltonian type is Hermitian
    */
@@ -246,7 +503,6 @@ class Hamiltonian : public DataClass,
    * @brief Get summary string of Hamiltonian information
    * @return String describing the Hamiltonian
    */
-
   std::string get_summary() const override;
 
   /**
@@ -255,7 +511,6 @@ class Hamiltonian : public DataClass,
    * @param type File format type ("json" or "hdf5")
    * @throws std::runtime_error if unsupported type or I/O error occurs
    */
-
   void to_file(const std::string& filename,
                const std::string& type) const override;
 
@@ -342,60 +597,11 @@ class Hamiltonian : public DataClass,
                        size_t nbeta) const;
 
  private:
-  /// One-electron integrals in MO basis [norb x norb]
-  const std::pair<std::shared_ptr<Eigen::MatrixXd>,
-                  std::shared_ptr<Eigen::MatrixXd>>
-      _one_body_integrals;
-
-  /// Two-electron integrals in MO basis, stored as flattened arrays [norb^4]
-  /// Access pattern: V[i*norb^3 + j*norb^2 + k*norb + l] = <ij|kl>
-  const std::tuple<std::shared_ptr<Eigen::VectorXd>,
-                   std::shared_ptr<Eigen::VectorXd>,
-                   std::shared_ptr<Eigen::VectorXd>>
-      _two_body_integrals;
-
-  /// @brief The inactive Fock matrix for the selected active space
-  const std::pair<std::shared_ptr<Eigen::MatrixXd>,
-                  std::shared_ptr<Eigen::MatrixXd>>
-      _inactive_fock_matrix;
-
-  /// Molecular orbital data (coefficients, energies, occupations)
-  const std::shared_ptr<Orbitals> _orbitals;
-
-  /// Core energy (nuclear repulsion + inactive orbital contributions)
-  const double _core_energy;
-
-  /// Type of Hamiltonian (Hermitian or NonHermitian)
-  const HamiltonianType _type;
+  /// Container holding the Hamiltonian implementation
+  std::unique_ptr<const HamiltonianContainer> _container;
 
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
-
-  /// Validation helpers
-  void validate_integral_dimensions() const;
-  void validate_restrictedness_consistency() const;
-  void validate_active_space_dimensions() const;
-  size_t get_two_body_index(size_t i, size_t j, size_t k, size_t l) const;
-
-  /// Helper functions for constructor initialization
-  static std::pair<std::shared_ptr<Eigen::MatrixXd>,
-                   std::shared_ptr<Eigen::MatrixXd>>
-  make_restricted_one_body_integrals(const Eigen::MatrixXd& integrals);
-
-  static std::tuple<std::shared_ptr<Eigen::VectorXd>,
-                    std::shared_ptr<Eigen::VectorXd>,
-                    std::shared_ptr<Eigen::VectorXd>>
-  make_restricted_two_body_integrals(const Eigen::VectorXd& integrals);
-
-  static std::pair<std::shared_ptr<Eigen::MatrixXd>,
-                   std::shared_ptr<Eigen::MatrixXd>>
-  make_restricted_inactive_fock_matrix(const Eigen::MatrixXd& matrix);
-
-  /**
-   * @brief Check if the Hamiltonian data is complete and consistent
-   * @return True if all required data is set and dimensions are consistent
-   */
-  bool _is_valid() const;
 
   /**
    * @brief Save to JSON file without filename validation (internal use)

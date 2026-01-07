@@ -11,8 +11,12 @@ import os
 from pathlib import Path
 
 import numpy as np
-
-from qdk_chemistry.data import Structure, Hamiltonian, ModelOrbitals
+from qdk_chemistry.data import (
+    Structure,
+    Hamiltonian,
+    CanonicalFourCenterHamiltonianContainer,
+    ModelOrbitals,
+)
 
 # Load structure from XYZ file (the file uses Angstrom, which is converted to Bohr internally)
 structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
@@ -55,7 +59,11 @@ orbitals = ModelOrbitals(2, True)  # 2 orbitals, restricted
 core_energy = 1.5
 inactive_fock = np.zeros((0, 0))
 
-h2_example = Hamiltonian(one_body, two_body, orbitals, core_energy, inactive_fock)
+h2_example = Hamiltonian(
+    CanonicalFourCenterHamiltonianContainer(
+        one_body, two_body, orbitals, core_energy, inactive_fock
+    )
+)
 
 h2_example.to_hdf5_file("h2_example.hamiltonian.h5")
 
