@@ -290,8 +290,8 @@ void save_matrix_variant_to_group(
   // real
   else {
     const auto& matrix_real = std::get<Eigen::MatrixXd>(*matrix_variant);
-    hsize_t matrix_dims[2] = {(static_cast<hsize_t>(matrix_real.rows())),
-                              (static_cast<hsize_t>(matrix_real.cols()))};
+    hsize_t matrix_dims[2] = {static_cast<hsize_t>(matrix_real.rows()),
+                              static_cast<hsize_t>(matrix_real.cols())};
     H5::DataSpace matrix_space(2, matrix_dims);
     H5::DataSet real_dataset = group.createDataSet(
         storage_name, H5::PredType::NATIVE_DOUBLE, matrix_space);
