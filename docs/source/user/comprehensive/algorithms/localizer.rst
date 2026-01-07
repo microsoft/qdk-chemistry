@@ -254,7 +254,7 @@ The :term:`VVHV` separation is particularly valuable for multi-configuration cal
 By localizing only the valence-virtual orbitals, which are the chemically relevant virtual orbitals for active space construction, the :term:`VVHV` procedure ensures:
 
 - Orbitals that track smoothly as bonds stretch and form
-- Numerically stable and reproducable results
+- Numerically stable and reproducible results
 - Well-defined orbital character that aids chemical interpretation
 
 For details on using localized orbitals in active space selection, see :doc:`ActiveSpaceSelector <active_space>`.

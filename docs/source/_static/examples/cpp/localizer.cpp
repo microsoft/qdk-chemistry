@@ -29,12 +29,8 @@ int main() {
 
   // --------------------------------------------------------------------------------------------
   // start-cell-localize
-  // Create H2O molecule
-  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0},
-                                         {0.0, 1.43052268, 1.10926924},
-                                         {0.0, -1.43052268, 1.10926924}};
-  std::vector<std::string> symbols = {"O", "H", "H"};
-  Structure structure(coords, symbols);
+  // Load H2O molecule from XYZ file
+  auto structure = Structure::from_xyz_file("../data/water.structure.xyz");
 
   // Obtain orbitals from SCF calculation
   auto scf_solver = ScfSolverFactory::create();
