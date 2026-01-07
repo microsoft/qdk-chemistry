@@ -17,59 +17,19 @@ namespace qdk::chemistry::data {
 namespace detail {
 
 /**
- * @brief Internal implementation of Pauli algebra with LRU-cached
- * multiplication.
+ * @brief Internal implementation of Pauli algebra.
  *
  * This class provides the core Pauli multiplication logic shared between
- * PauliTermAccumulator and ProductPauliOperatorExpression::simplify().
+ * PauliTermAccumulator and excitation term computation.
  */
 class PauliAlgebraImpl {
  public:
-  /// Default cache capacity
-  static constexpr std::size_t kDefaultCacheCapacity = 10000;
-
   /**
    * @brief Multiply two SparsePauliWords, returning phase and result.
    *
-   * Uses LRU cache for efficiency. Thread-safety: NOT thread-safe.
-   */
-  static std::pair<std::complex<double>, SparsePauliWord> multiply(
-      const SparsePauliWord& word1, const SparsePauliWord& word2) {
-    // Check cache first
-    auto key = std::make_pair(word1, word2);
-    auto it = cache_map_.find(key);
-    if (it != cache_map_.end()) {
-      // Move to front of LRU list (most recently used)
-      lru_list_.splice(lru_list_.begin(), lru_list_, it->second.second);
-      return it->second.first;
-    }
-
-    // Compute multiplication
-    auto result = multiply_uncached(word1, word2);
-
-    // Add to cache with LRU eviction
-    if (cache_capacity_ > 0) {
-      // Evict if at capacity
-      while (cache_map_.size() >= cache_capacity_ && !lru_list_.empty()) {
-        auto oldest = lru_list_.back();
-        cache_map_.erase(oldest);
-        lru_list_.pop_back();
-      }
-
-      // Insert new entry
-      lru_list_.push_front(key);
-      cache_map_[key] = {result, lru_list_.begin()};
-    }
-
-    return result;
-  }
-
-  /**
-   * @brief Multiply two SparsePauliWords without caching.
-   *
    * This is the core Pauli algebra implementation using merge-style algorithm.
    */
-  static std::pair<std::complex<double>, SparsePauliWord> multiply_uncached(
+  static std::pair<std::complex<double>, SparsePauliWord> multiply(
       const SparsePauliWord& word1, const SparsePauliWord& word2) {
     const std::complex<double> imag_unit(0.0, 1.0);
     std::complex<double> phase(1.0, 0.0);
@@ -134,35 +94,6 @@ class PauliAlgebraImpl {
 
     return {phase, result};
   }
-
-  static void set_cache_capacity(std::size_t capacity) {
-    cache_capacity_ = capacity;
-    // Evict excess entries
-    while (cache_map_.size() > capacity && !lru_list_.empty()) {
-      auto oldest = lru_list_.back();
-      cache_map_.erase(oldest);
-      lru_list_.pop_back();
-    }
-  }
-
-  static void clear_cache() {
-    cache_map_.clear();
-    lru_list_.clear();
-  }
-
-  static std::size_t cache_size() { return cache_map_.size(); }
-
- private:
-  using CacheKey = std::pair<SparsePauliWord, SparsePauliWord>;
-  using CacheValue = std::pair<std::complex<double>, SparsePauliWord>;
-  using LRUIterator = std::list<CacheKey>::iterator;
-
-  // Static cache members
-  static inline std::unordered_map<CacheKey, std::pair<CacheValue, LRUIterator>,
-                                   SparsePauliWordPairHash>
-      cache_map_;
-  static inline std::list<CacheKey> lru_list_;
-  static inline std::size_t cache_capacity_ = kDefaultCacheCapacity;
 };
 
 std::string pauli_operator_scalar_to_string(std::complex<double> coefficient) {
@@ -1152,7 +1083,7 @@ std::pair<std::complex<double>, SparsePauliWord> PauliTermAccumulator::multiply(
 std::pair<std::complex<double>, SparsePauliWord>
 PauliTermAccumulator::multiply_uncached(const SparsePauliWord& word1,
                                         const SparsePauliWord& word2) {
-  return detail::PauliAlgebraImpl::multiply_uncached(word1, word2);
+  return detail::PauliAlgebraImpl::multiply(word1, word2);
 }
 
 // ============================================================================
