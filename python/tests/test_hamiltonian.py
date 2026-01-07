@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import Hamiltonian, ModelOrbitals, Orbitals
+from qdk_chemistry.data import CanonicalFourCenterHamiltonianContainer, Hamiltonian, ModelOrbitals, Orbitals
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
@@ -39,7 +39,7 @@ class TestHamiltonian:
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
 
-        h = Hamiltonian(one_body, two_body, orbitals, 1.5, np.array([]))
+        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([])))
         assert h.has_one_body_integrals()
         assert h.has_two_body_integrals()
         assert h.has_orbitals()
@@ -59,7 +59,7 @@ class TestHamiltonian:
         one_body = np.array([[1.0, 0.2], [0.2, 1.5]])
         two_body = np.zeros(2**4)
         orbitals = create_test_orbitals(2)
-        h = Hamiltonian(one_body, two_body, orbitals, 0.0, np.array([]))
+        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 0.0, np.array([])))
         assert h.has_one_body_integrals()
         assert np.array_equal(h.get_one_body_integrals()[0], one_body)
 
@@ -68,7 +68,7 @@ class TestHamiltonian:
         rng = np.random.default_rng(1)
         two_body = rng.random(2**4)
         orbitals = create_test_orbitals(2)
-        h = Hamiltonian(one_body, two_body, orbitals, 0.0, np.array([]))
+        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 0.0, np.array([])))
         assert h.has_two_body_integrals()
         # get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
         aaaa, aabb, bbbb = h.get_two_body_integrals()
@@ -86,7 +86,7 @@ class TestHamiltonian:
         one_body = np.eye(3)
         two_body = np.zeros(3**4)
         orbitals = create_test_orbitals(3)
-        h = Hamiltonian(one_body, two_body, orbitals, 2.5, np.array([]))
+        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 2.5, np.array([])))
         assert h.get_core_energy() == 2.5
 
     def test_json_serialization(self):
@@ -95,14 +95,14 @@ class TestHamiltonian:
         two_body = rng.random(2**4)
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(one_body, two_body, orbitals, 1.5, np.array([]))
+        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([])))
 
         data = json.loads(h.to_json())
         assert isinstance(data, dict)
-        assert data["core_energy"] == 1.5
-        assert data["has_one_body_integrals"] is True
-        assert data["has_two_body_integrals"] is True
-        assert data["has_orbitals"] is True
+        assert data["container"]["core_energy"] == 1.5
+        assert data["container"]["has_one_body_integrals"] is True
+        assert data["container"]["has_two_body_integrals"] is True
+        assert data["container"]["has_orbitals"] is True
 
         h2 = Hamiltonian.from_json(json.dumps(data))
         assert h2.get_orbitals().get_num_molecular_orbitals() == 2
@@ -150,7 +150,7 @@ class TestHamiltonian:
         two_body = rng.random(2**4)
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(one_body, two_body, orbitals, 1.5, np.array([]))
+        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([])))
 
         with tempfile.NamedTemporaryFile(suffix=".hamiltonian.json", delete=False) as f:
             filename = f.name
@@ -205,7 +205,7 @@ class TestHamiltonian:
         two_body = rng.random(2**4)
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(one_body, two_body, orbitals, 1.5, np.array([]))
+        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([])))
 
         with tempfile.NamedTemporaryFile(suffix=".hamiltonian.h5", delete=False) as f:
             filename = f.name
@@ -260,7 +260,7 @@ class TestHamiltonian:
         two_body = rng.random(2**4)
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(one_body, two_body, orbitals, 1.5, np.array([]))
+        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([])))
 
         with tempfile.NamedTemporaryFile(suffix=".hamiltonian.json", delete=False) as f:
             json_filename = f.name
@@ -320,10 +320,10 @@ class TestHamiltonian:
     def test_minimal_hamiltonian_json_roundtrip(self):
         h = create_test_hamiltonian(1)
         data = json.loads(h.to_json())
-        assert data["core_energy"] == 0.0
-        assert data["has_one_body_integrals"] is True
-        assert data["has_two_body_integrals"] is True
-        assert data["has_orbitals"] is True
+        assert data["container"]["core_energy"] == 0.0
+        assert data["container"]["has_one_body_integrals"] is True
+        assert data["container"]["has_two_body_integrals"] is True
+        assert data["container"]["has_orbitals"] is True
         h2 = Hamiltonian.from_json(json.dumps(data))
         assert h2.get_orbitals().get_num_molecular_orbitals() == 1
         assert h2.get_core_energy() == 0.0
@@ -338,7 +338,7 @@ class TestHamiltonian:
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
         fock = np.array([])
-        h = Hamiltonian(one_body, two_body, orbitals, 1.5, fock)
+        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.5, fock))
 
         with tempfile.NamedTemporaryFile(suffix=".hamiltonian.h5", delete=False) as f:
             filename = f.name
@@ -414,7 +414,7 @@ class TestHamiltonian:
         two_body = rng.random(3**4)
         inactive_fock = rng.random((3, 3))
 
-        h = Hamiltonian(one_body, two_body, orbitals, 1.0, inactive_fock)
+        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.0, inactive_fock))
 
         # Verify Hamiltonian properties
         assert h.is_restricted()
@@ -456,15 +456,17 @@ class TestHamiltonian:
         inactive_fock_beta = np.array([[0.6, 0.2], [0.2, 0.8]])
 
         h = Hamiltonian(
-            one_body_alpha,
-            one_body_beta,
-            two_body_aaaa,
-            two_body_aabb,
-            two_body_bbbb,
-            orbitals,
-            2.0,
-            inactive_fock_alpha,
-            inactive_fock_beta,
+            CanonicalFourCenterHamiltonianContainer(
+                one_body_alpha,
+                one_body_beta,
+                two_body_aaaa,
+                two_body_aabb,
+                two_body_bbbb,
+                orbitals,
+                2.0,
+                inactive_fock_alpha,
+                inactive_fock_beta,
+            )
         )
 
         # Verify Hamiltonian properties
@@ -492,7 +494,9 @@ class TestHamiltonian:
 
         one_body = np.array([[1.0, 0.1], [0.1, 1.0]])
         two_body = np.ones(16) * 0.5
-        h_restricted = Hamiltonian(one_body, two_body, orbitals_restricted, 1.0, np.eye(2))
+        h_restricted = Hamiltonian(
+            CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals_restricted, 1.0, np.eye(2))
+        )
 
         # Test unrestricted Hamiltonian
         coeffs_alpha = np.eye(2)
@@ -505,15 +509,17 @@ class TestHamiltonian:
         two_body_aabb = np.ones(16) * 2.0
         two_body_bbbb = np.ones(16) * 3.0
         h_unrestricted = Hamiltonian(
-            one_body_alpha,
-            one_body_beta,
-            two_body_aaaa,
-            two_body_aabb,
-            two_body_bbbb,
-            orbitals_unrestricted,
-            2.0,
-            np.eye(2),
-            np.eye(2),
+            CanonicalFourCenterHamiltonianContainer(
+                one_body_alpha,
+                one_body_beta,
+                two_body_aaaa,
+                two_body_aabb,
+                two_body_bbbb,
+                orbitals_unrestricted,
+                2.0,
+                np.eye(2),
+                np.eye(2),
+            )
         )
 
         # Test JSON serialization preserves restricted/unrestricted nature
@@ -545,7 +551,9 @@ class TestHamiltonian:
         # Create restricted Hamiltonian
         one_body = np.eye(4)
         two_body = np.zeros(4**4)
-        h_restricted = Hamiltonian(one_body, two_body, model_orbitals_restricted, 0.0, np.eye(4))
+        h_restricted = Hamiltonian(
+            CanonicalFourCenterHamiltonianContainer(one_body, two_body, model_orbitals_restricted, 0.0, np.eye(4))
+        )
         assert h_restricted.is_restricted()
 
         # Test unrestricted case with active space
@@ -561,15 +569,17 @@ class TestHamiltonian:
         two_body_aabb = np.zeros(4**4)
         two_body_bbbb = np.zeros(4**4)
         h_unrestricted = Hamiltonian(
-            one_body_alpha,
-            one_body_beta,
-            two_body_aaaa,
-            two_body_aabb,
-            two_body_bbbb,
-            model_orbitals_unrestricted,
-            0.0,
-            np.eye(4),
-            np.eye(4),
+            CanonicalFourCenterHamiltonianContainer(
+                one_body_alpha,
+                one_body_beta,
+                two_body_aaaa,
+                two_body_aabb,
+                two_body_bbbb,
+                model_orbitals_unrestricted,
+                0.0,
+                np.eye(4),
+                np.eye(4),
+            )
         )
         assert h_unrestricted.is_unrestricted()
 
