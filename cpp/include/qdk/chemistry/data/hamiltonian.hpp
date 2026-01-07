@@ -242,7 +242,7 @@ class HamiltonianContainer {
   /**
    * @brief Deserialize Hamiltonian data from HDF5 group
    * @param group HDF5 group to read data from
-   * @return Unique pointer to const Hamiltonian loaded from group
+   * @return Unique pointer to Hamiltonian loaded from group
    * @throws std::runtime_error if I/O error occurs
    */
   static std::unique_ptr<HamiltonianContainer> from_hdf5(H5::Group& group);
@@ -250,7 +250,7 @@ class HamiltonianContainer {
   /**
    * @brief Load Hamiltonian from JSON
    * @param j JSON object containing Hamiltonian data
-   * @return Unique pointer to const Hamiltonian loaded from JSON
+   * @return Unique pointer to Hamiltonian loaded from JSON
    * @throws std::runtime_error if JSON is malformed
    */
   static std::unique_ptr<HamiltonianContainer> from_json(

@@ -566,7 +566,6 @@ void Hamiltonian::to_hdf5(H5::Group& group) const {
         "version", string_type, H5::DataSpace(H5S_SCALAR));
     std::string version_str(SERIALIZATION_VERSION);
     version_attr.write(string_type, version_str);
-    version_attr.close();
 
     // Delegate to container serialization (orbitals are included within the
     // container)

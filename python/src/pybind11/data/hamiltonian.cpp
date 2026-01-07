@@ -112,7 +112,7 @@ for quantum chemistry calculations. It contains:
 * Core energy contributions from inactive orbitals and nuclear repulsion
 
 Derived classes implement specific storage formats for two-electron integrals
-(e.g., canonical 4-center, density-fitted, tensor hypercontraction).
+(e.g., canonical 4-center, density-fitted, etc.).
 
 Note:
     This class cannot be instantiated directly. Use a derived class like
