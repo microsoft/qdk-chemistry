@@ -14,11 +14,7 @@
 
 namespace qdk::chemistry::data {
 
-namespace {
-
-// ============================================================================
-// PauliAlgebraImpl: Shared implementation for Pauli algebra operations
-// ============================================================================
+namespace detail {
 
 /**
  * @brief Internal implementation of Pauli algebra with LRU-cached
@@ -168,10 +164,6 @@ class PauliAlgebraImpl {
   static inline std::list<CacheKey> lru_list_;
   static inline std::size_t cache_capacity_ = kDefaultCacheCapacity;
 };
-
-}  // namespace
-
-namespace detail {
 
 std::string pauli_operator_scalar_to_string(std::complex<double> coefficient) {
   constexpr double zero_tolerance = std::numeric_limits<double>::epsilon();
@@ -1160,7 +1152,7 @@ std::pair<std::complex<double>, SparsePauliWord> PauliTermAccumulator::multiply(
 std::pair<std::complex<double>, SparsePauliWord>
 PauliTermAccumulator::multiply_uncached(const SparsePauliWord& word1,
                                         const SparsePauliWord& word2) {
-  return PauliAlgebraImpl::multiply_uncached(word1, word2);
+  return detail::PauliAlgebraImpl::multiply_uncached(word1, word2);
 }
 
 // ============================================================================
@@ -1318,10 +1310,10 @@ compute_bk_excitation_terms_single(
   // a†_p = (1/2)(X_p - i*Y_p), a_q = (1/2)(X_q + i*Y_q)
   // a†_p * a_q = (1/4)(X_p*X_q + i*X_p*Y_q - i*Y_p*X_q + Y_p*Y_q)
 
-  auto [phase_xx, word_xx] = PauliAlgebraImpl::multiply(x_p, x_q);
-  auto [phase_xy, word_xy] = PauliAlgebraImpl::multiply(x_p, y_q);
-  auto [phase_yx, word_yx] = PauliAlgebraImpl::multiply(y_p, x_q);
-  auto [phase_yy, word_yy] = PauliAlgebraImpl::multiply(y_p, y_q);
+  auto [phase_xx, word_xx] = detail::PauliAlgebraImpl::multiply(x_p, x_q);
+  auto [phase_xy, word_xy] = detail::PauliAlgebraImpl::multiply(x_p, y_q);
+  auto [phase_yx, word_yx] = detail::PauliAlgebraImpl::multiply(y_p, x_q);
+  auto [phase_yy, word_yy] = detail::PauliAlgebraImpl::multiply(y_p, y_q);
 
   // Combine terms with same word
   std::unordered_map<SparsePauliWord, std::complex<double>, SparsePauliWordHash>

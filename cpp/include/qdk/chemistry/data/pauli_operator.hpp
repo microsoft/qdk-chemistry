@@ -15,10 +15,6 @@
 
 namespace qdk::chemistry::data {
 
-// ============================================================================
-// SparsePauliWord: Sparse representation of a Pauli string
-// ============================================================================
-
 /**
  * @brief A sparse representation of a Pauli string (tensor product of Pauli
  * operators).
@@ -955,10 +951,6 @@ class SumPauliOperatorExpression : public PauliOperatorExpression {
   std::vector<std::unique_ptr<PauliOperatorExpression>> terms_;
 };
 
-// ============================================================================
-// PauliTermAccumulator: High-performance Pauli term accumulation
-// ============================================================================
-
 /**
  * @brief High-performance accumulator for Pauli terms with coefficient
  * combining.
@@ -967,11 +959,6 @@ class SumPauliOperatorExpression : public PauliOperatorExpression {
  * sparse format, with automatic coefficient combination for identical terms.
  * It is optimized for use cases like fermion-to-qubit mappings where many
  * term products are accumulated.
- *
- * Key features:
- * - O(1) amortized insertion and coefficient combining via hash map
- * - Cached Pauli string multiplication with LRU eviction
- * - Static cache shared across all instances for reuse across mappings
  *
  * Example usage:
  * @code
@@ -1101,7 +1088,7 @@ class PauliTermAccumulator {
    *
    * Computes E_pq = a†_p a_q for all (p, q) pairs in sparse format.
    * This is optimized to compute all N² terms in one call, avoiding
-   * repeated pybind11 boundary crossings.
+   * repeated pybind11 boundary crossings when invoked from Python.
    *
    * @param n_spin_orbitals Total number of spin orbitals (N).
    * @return Map from (p, q) indices to list of (coefficient, SparsePauliWord)
