@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import platform
+
 import numpy as np
 import pytest
 
@@ -306,6 +308,11 @@ class TestScfSolver:
         # Check that orbitals are unrestricted (not restricted)
         assert not orbitals.is_restricted()
 
+    @pytest.mark.skipif(
+        platform.system() == "Darwin",
+        reason="""This test is skipped on macOS due to an upstream problem in Accelerate's
+        handling of single precision complex numbers.""",
+    )
     def test_scf_solver_oxygen_atom_charged_doublet_gdm(self):
         """Test SCF solver on charged oxygen atom doublet with GDM enabled."""
         oxygen = create_oxygen_structure()
@@ -314,7 +321,6 @@ class TestScfSolver:
         # Set method and basis set to match C++ test
         scf_solver.settings().set("method", "pbe")
         scf_solver.settings().set("enable_gdm", True)
-        scf_solver.settings().set("max_iterations", 500)
         scf_solver.settings().set("convergence_threshold", 1e-8)
 
         energy, wavefunction = scf_solver.run(oxygen, 1, 2, "cc-pvdz")  # +1 charge, doublet state

@@ -46,7 +46,6 @@ print(f"Elements: {structure.get_elements()}")
 # start-cell-scf
 # Perform an SCF calculation, returning the energy and wavefunction
 scf_solver = create("scf_solver")
-scf_solver.settings().set("max_iterations", 100)
 E_hf, wfn_hf = scf_solver.run(
     structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
 )

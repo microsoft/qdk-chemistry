@@ -5,28 +5,17 @@ INSTALL_PREFIX=${1:-/usr/local}
 MARCH=${2:-x86-64-v3}
 LIBFLAME_VERSION=${3:-5.2.0}
 CFLAGS=${4:-"-fPIC -O3"}
-MAC_BUILD=${5:-"OFF"}
 
 # Select architectures to build libflame for
 if [[ ${MARCH} == 'armv8-a' ]]; then
-    if [[ "$MAC_BUILD" == "OFF" ]]; then
-        # Compile for armsve, firestorm, thunderx2, cortexa57, cortexa53, and generic architectures
-        export LIBFLAME_ARCH=arm64
-        export LIBFLAME_BUILD=aarch64-unknown-linux-gnu
-    elif [[ "$MAC_BUILD" == "ON" ]]; then
-        # Let libflame autodetect the build type on macOS
-        export LIBFLAME_ARCH=arm64
-    fi
+    # Compile for armsve, firestorm, thunderx2, cortexa57, cortexa53, and generic architectures
+    export LIBFLAME_ARCH=arm64
+    export LIBFLAME_BUILD=aarch64-unknown-linux-gnu
 elif [[ ${MARCH} == 'x86-64-v3' ]]; then
     # Compile for intel64, amd64, and amd64_legacy architectures
     export LIBFLAME_BUILD=x86_64-unknown-linux-gnu
     export LIBFLAME_ARCH=x86_64
 fi
-
-echo "Build with march: ${MARCH}"
-echo "Building with CFLAGS: ${CFLAGS}"
-echo "Building libflame for architecture: ${LIBFLAME_ARCH}"
-echo "Build type: ${LIBFLAME_BUILD}"
 
 # Download libflame
 echo "Downloading libflame ${LIBFLAME_VERSION}..."
@@ -40,33 +29,16 @@ mv libflame-${LIBFLAME_VERSION} libflame
 # Configure and build libflame
 cd libflame
 
-if [[ ${MAC_BUILD} == "OFF" ]]; then
 export PYTHON=/usr/bin/python3
-    CFLAGS="${CFLAGS}" ./configure \
-        --build=$LIBFLAME_BUILD \
-        --enable-static-build \
-        --prefix=${INSTALL_PREFIX} \
-        --enable-lapack2flame \
-        --enable-legacy-lapack \
-        --enable-max-arg-list-hack \
-        --target=$LIBFLAME_ARCH
-elif [[ ${MAC_BUILD} == "ON" ]]; then
-    export PYTHON=/usr/local/bin/python3
-    CFLAGS="${CFLAGS} -march=native" ./configure \
-        --build=$LIBFLAME_BUILD \
-        --enable-static-build \
-        --prefix=${INSTALL_PREFIX} \
-        --enable-lapack2flame \
-        --enable-legacy-lapack \
-        --enable-max-arg-list-hack \
-        --target=$LIBFLAME_ARCH
-fi
+CFLAGS="${CFLAGS}" ./configure \
+    --build=$LIBFLAME_BUILD \
+    --enable-static-build \
+    --prefix=${INSTALL_PREFIX} \
+    --enable-lapack2flame \
+    --enable-legacy-lapack \
+    --enable-max-arg-list-hack \
+    --target=$LIBFLAME_ARCH
 make -j$(nproc)
-
-if [[ "$MAC_BUILD" == "ON" ]]; then
-    sudo make install
-elif [[ "$MAC_BUILD" == "OFF" ]]; then
-    make install
-fi
+make install
 
 cd ..

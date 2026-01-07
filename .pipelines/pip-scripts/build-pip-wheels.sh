@@ -13,8 +13,9 @@ LIBFLAME_VERSION=${9:-5.2.0}
 PYENV_VERSION=${10:-2.6.15}
 MAC_BUILD=${11:-OFF}
 
-export DEBIAN_FRONTEND=noninteractive
-if [ "$MAC_BUILD" == "OFF" ]; then
+export CFLAGS="-fPIC -Os"
+if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
+    export DEBIAN_FRONTEND=noninteractive
     # Try to prevent stochastic segfault from libc-bin
     echo "Reinstalling libc-bin..."
     rm /var/lib/dpkg/info/libc-bin.*
@@ -45,24 +46,10 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         unzip \
         patchelf \
         build-essential \
-        libpugixml-dev
-elif [ "$MAC_BUILD" == "ON" ]; then
-    brew update
-    brew upgrade
-    arch -arm64 brew install \
-        ninja \
-        eigen \
-        wget \
-        curl \
-        cmake \
-        gcc \
-        boost \
-        pybind11
-    export CMAKE_PREFIX_PATH="/opt/homebrew"
-fi
+        libpugixml-dev \
+        python3-pybind11 pybind11-dev
 
-# Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
-if [ "$MAC_BUILD" == "OFF" ]; then
+    # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
     echo "Downloading and installing CMake ${CMAKE_VERSION}..."
     export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
     wget -q https://cmake.org/files/v3.28/cmake-${CMAKE_VERSION}.tar.gz -O cmake-${CMAKE_VERSION}.tar.gz
@@ -76,16 +63,30 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     cd ..
     rm -r cmake-${CMAKE_VERSION}
     cmake --version
-fi
 
-export CFLAGS="-fPIC -Os"
-
-if [ "$MAC_BUILD" == "OFF" ]; then
+    # We use BLIS/libflame as the BLAS/LAPACK vendors to prevent symbol collisions
+    # with qiskit's shared OpenBLAS
     echo "Downloading and installing BLIS..."
-    bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} "${CFLAGS}" ${MAC_BUILD}
+    bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} "${CFLAGS}"
 
     echo "Downloading and installing libflame..."
-    bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} "${CFLAGS}" ${MAC_BUILD}
+    bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} "${CFLAGS}"
+
+    export PYENV_ROOT="/workspace/.pyenv"
+elif [ "$MAC_BUILD" == "ON" ]; then
+    brew update
+    brew upgrade
+    arch -arm64 brew install \
+        ninja \
+        eigen \
+        wget \
+        curl \
+        cmake \
+        gcc \
+        boost \
+        pybind11
+    export CMAKE_PREFIX_PATH="/opt/homebrew"
+    export PYENV_ROOT="$PWD/.pyenv"
 fi
 
 echo "Downloading HDF5 $HDF5_VERSION..."
@@ -105,14 +106,6 @@ bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} 
 # when building with a non-system Python version.
 echo "Installing pyenv ${PYENV_VERSION}..."
 export PYENV_CHECKSUM=95187d6ad9bc8310662b5b805a88506e5cbbe038f88890e5aabe3021711bf3c8
-# Root directory varies depending on whether we are building in a container or in the
-# native runner VM
-if [ "$MAC_BUILD" == "OFF" ]; then
-    export PYENV_ROOT="/workspace/.pyenv"
-elif [ "$MAC_BUILD" == "ON" ]; then
-    export PYENV_ROOT="$PWD/.pyenv"
-fi
-
 wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v${PYENV_VERSION}.zip -O pyenv.zip
 echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -a 256 -c || exit 1
 unzip -q pyenv.zip
@@ -134,8 +127,6 @@ python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
 cd python
 
 # Build wheel with all necessary CMake flags
-
-
 if [ "$MAC_BUILD" == "OFF" ]; then
     export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
     export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
@@ -150,26 +141,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
         -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
         -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
-elif [ "$MAC_BUILD" == "ON" ]; then
-    export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
-    export CMAKE_C_FLAGS="-fPIC -Os -fvisibility=hidden"
-    export CMAKE_CXX_FLAGS="-fPIC -Os -fvisibility=hidden"
-    python3 -m build --wheel \
-        -C build-dir="build/{wheel_tag}" \
-        -C cmake.define.QDK_UARCH=native \
-        -C cmake.define.BUILD_SHARED_LIBS=OFF \
-        -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \
-        -C cmake.define.QDK_ENABLE_OPENMP=OFF \
-        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
-        -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
-        -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
-        -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
-        -C cmake.define.CMAKE_PREFIX_PATH="/opt/homebrew"
-        # -C cmake.define.BLAS_LIBRARIES="/usr/local/lib/libblis.a;m" \
-        # -C cmake.define.LAPACK_LIBRARIES="/usr/local/lib/libflame.a;/usr/local/lib/libblis.a;m"
-fi
 
-if [ "$MAC_BUILD" == "OFF" ]; then
     echo "Checking shared dependencies..."
     ldd build/cp*/_core.*.so
 
@@ -195,7 +167,22 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     rm "$WHEEL_FILE"
     (cd "$TEMP_DIR" && python3 -m zipfile -c "$FULL_WHEEL_PATH" .)
     rm -rf "$TEMP_DIR"
+
 elif [ "$MAC_BUILD" == "ON" ]; then
+    export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
+    export CMAKE_C_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin"
+    export CMAKE_CXX_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin"
+    python3 -m build --wheel \
+        -C build-dir="build/{wheel_tag}" \
+        -C cmake.define.QDK_UARCH=native \
+        -C cmake.define.BUILD_SHARED_LIBS=OFF \
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \
+        -C cmake.define.QDK_ENABLE_OPENMP=OFF \
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
+        -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
+        -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
+        -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
+        -C cmake.define.CMAKE_PREFIX_PATH="/opt/homebrew"
     echo "Repairing wheel for macOS..."
     pip install delocate
     WHEEL_FILE=$(ls dist/qdk_chemistry-*.whl)
