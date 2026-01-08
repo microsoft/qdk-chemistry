@@ -706,27 +706,31 @@ void MP2Container::_generate_ci_expansion() const {
     }
 
     // Consolidate duplicates (shouldn't be any, but for safety)
-    detail::consolidate_determinants(determinants, coefficients);
+    // Convert to VectorVariant for consolidate_determinants
+    Eigen::VectorXcd coef_vec(coefficients.size());
+    for (size_t i = 0; i < coefficients.size(); ++i) {
+      coef_vec[i] = coefficients[i];
+    }
+    VectorVariant coef_variant(std::move(coef_vec));
+    detail::consolidate_determinants(determinants, coef_variant);
 
     // Normalize the wavefunction: |Ψ⟩ = |Φ₀⟩ + Σ t_{ijab} |Φ_{ij}^{ab}⟩
     // Norm² = 1 + Σ |t_{ijab}|², so we divide by sqrt(norm²)
+    auto& final_coefs = std::get<Eigen::VectorXcd>(coef_variant);
     double norm_sq = 0.0;
-    for (const auto& c : coefficients) {
-      norm_sq += std::norm(c);  // |c|² for complex
+    for (Eigen::Index i = 0; i < final_coefs.size(); ++i) {
+      norm_sq += std::norm(final_coefs[i]);  // |c|² for complex
     }
     double norm = std::sqrt(norm_sq);
-    for (auto& c : coefficients) {
-      c /= norm;
+    for (Eigen::Index i = 0; i < final_coefs.size(); ++i) {
+      final_coefs[i] /= norm;
     }
 
     // Store results
     _determinant_vector_cache =
         std::make_unique<DeterminantVector>(std::move(determinants));
-    Eigen::VectorXcd coef_vec(coefficients.size());
-    for (size_t i = 0; i < coefficients.size(); ++i) {
-      coef_vec[i] = coefficients[i];
-    }
-    _coefficients_cache = std::make_unique<VectorVariant>(std::move(coef_vec));
+    _coefficients_cache =
+        std::make_unique<VectorVariant>(std::move(coef_variant));
 
   } else {
     // Real case
@@ -816,27 +820,31 @@ void MP2Container::_generate_ci_expansion() const {
     }
 
     // Consolidate duplicates (shouldn't be any, but for safety)
-    detail::consolidate_determinants(determinants, coefficients);
+    // Convert to VectorVariant for consolidate_determinants
+    Eigen::VectorXd coef_vec(coefficients.size());
+    for (size_t i = 0; i < coefficients.size(); ++i) {
+      coef_vec[i] = coefficients[i];
+    }
+    VectorVariant coef_variant(std::move(coef_vec));
+    detail::consolidate_determinants(determinants, coef_variant);
 
     // Normalize the wavefunction: |Ψ⟩ = |Φ₀⟩ + Σ t_{ijab} |Φ_{ij}^{ab}⟩
     // Norm² = 1 + Σ |t_{ijab}|², so we divide by sqrt(norm²)
+    auto& final_coefs = std::get<Eigen::VectorXd>(coef_variant);
     double norm_sq = 0.0;
-    for (const auto& c : coefficients) {
-      norm_sq += c * c;
+    for (Eigen::Index i = 0; i < final_coefs.size(); ++i) {
+      norm_sq += final_coefs[i] * final_coefs[i];
     }
     double norm = std::sqrt(norm_sq);
-    for (auto& c : coefficients) {
-      c /= norm;
+    for (Eigen::Index i = 0; i < final_coefs.size(); ++i) {
+      final_coefs[i] /= norm;
     }
 
     // Store results
     _determinant_vector_cache =
         std::make_unique<DeterminantVector>(std::move(determinants));
-    Eigen::VectorXd coef_vec(coefficients.size());
-    for (size_t i = 0; i < coefficients.size(); ++i) {
-      coef_vec[i] = coefficients[i];
-    }
-    _coefficients_cache = std::make_unique<VectorVariant>(std::move(coef_vec));
+    _coefficients_cache =
+        std::make_unique<VectorVariant>(std::move(coef_variant));
   }
 }
 

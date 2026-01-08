@@ -1334,45 +1334,53 @@ void CoupledClusterContainer::_generate_ci_expansion() const {
 
   // Consolidate duplicate determinants
   if (use_complex) {
-    detail::consolidate_determinants(determinants, coefficients_complex);
-
-    // Normalize
-    double norm_sq = 0.0;
-    for (const auto& c : coefficients_complex) {
-      norm_sq += std::norm(c);
-    }
-    double norm = std::sqrt(norm_sq);
-    // Division by 0 should not be possible here since ref coef = 1.0
-    for (auto& c : coefficients_complex) {
-      c /= norm;
-    }
-
-    // Store in cache
+    // Convert to VectorVariant for consolidate_determinants
     Eigen::VectorXcd coef_vec(coefficients_complex.size());
     for (size_t i = 0; i < coefficients_complex.size(); ++i) {
       coef_vec(i) = coefficients_complex[i];
     }
-    _coefficients_cache = std::make_unique<VectorVariant>(std::move(coef_vec));
-  } else {
-    detail::consolidate_determinants(determinants, coefficients_real);
+    VectorVariant coef_variant(std::move(coef_vec));
+    detail::consolidate_determinants(determinants, coef_variant);
 
     // Normalize
+    auto& final_coefs = std::get<Eigen::VectorXcd>(coef_variant);
     double norm_sq = 0.0;
-    for (const auto& c : coefficients_real) {
-      norm_sq += c * c;
+    for (Eigen::Index i = 0; i < final_coefs.size(); ++i) {
+      norm_sq += std::norm(final_coefs[i]);
     }
     double norm = std::sqrt(norm_sq);
     // Division by 0 should not be possible here since ref coef = 1.0
-    for (auto& c : coefficients_real) {
-      c /= norm;
+    for (Eigen::Index i = 0; i < final_coefs.size(); ++i) {
+      final_coefs[i] /= norm;
     }
 
     // Store in cache
+    _coefficients_cache =
+        std::make_unique<VectorVariant>(std::move(coef_variant));
+  } else {
+    // Convert to VectorVariant for consolidate_determinants
     Eigen::VectorXd coef_vec(coefficients_real.size());
     for (size_t i = 0; i < coefficients_real.size(); ++i) {
       coef_vec(i) = coefficients_real[i];
     }
-    _coefficients_cache = std::make_unique<VectorVariant>(std::move(coef_vec));
+    VectorVariant coef_variant(std::move(coef_vec));
+    detail::consolidate_determinants(determinants, coef_variant);
+
+    // Normalize
+    auto& final_coefs = std::get<Eigen::VectorXd>(coef_variant);
+    double norm_sq = 0.0;
+    for (Eigen::Index i = 0; i < final_coefs.size(); ++i) {
+      norm_sq += final_coefs[i] * final_coefs[i];
+    }
+    double norm = std::sqrt(norm_sq);
+    // Division by 0 should not be possible here since ref coef = 1.0
+    for (Eigen::Index i = 0; i < final_coefs.size(); ++i) {
+      final_coefs[i] /= norm;
+    }
+
+    // Store in cache
+    _coefficients_cache =
+        std::make_unique<VectorVariant>(std::move(coef_variant));
   }
 
   _determinant_vector_cache =

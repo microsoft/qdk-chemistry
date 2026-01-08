@@ -102,45 +102,50 @@ transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
       variant);
 }
 
-template <typename T>
 void consolidate_determinants(std::vector<Configuration>& determinants,
-                              std::vector<T>& coefficients, double threshold) {
+                              ContainerTypes::VectorVariant& coefficients,
+                              double threshold) {
   if (determinants.empty()) {
     return;
   }
 
-  // Use a map with string keys to consolidate determinants
-  std::map<std::string, std::pair<Configuration, T>> det_map;
+  std::visit(
+      [&determinants, threshold](auto& coef_vec) {
+        using VecType = std::decay_t<decltype(coef_vec)>;
+        using ScalarType = typename VecType::Scalar;
 
-  for (size_t i = 0; i < determinants.size(); ++i) {
-    std::string key = determinants[i].to_string();
-    auto it = det_map.find(key);
-    if (it == det_map.end()) {
-      det_map[key] = std::make_pair(determinants[i], coefficients[i]);
-    } else {
-      it->second.second += coefficients[i];
-    }
-  }
+        // Use a map with string keys to consolidate determinants
+        std::map<std::string, std::pair<Configuration, ScalarType>> det_map;
 
-  // Rebuild vectors, filtering out near-zero coefficients
-  determinants.clear();
-  coefficients.clear();
+        for (Eigen::Index i = 0; i < coef_vec.size(); ++i) {
+          std::string key = determinants[i].to_string();
+          auto it = det_map.find(key);
+          if (it == det_map.end()) {
+            det_map[key] = std::make_pair(determinants[i], coef_vec[i]);
+          } else {
+            it->second.second += coef_vec[i];
+          }
+        }
 
-  for (const auto& [key, det_coef] : det_map) {
-    if (std::abs(det_coef.second) > threshold) {
-      determinants.push_back(det_coef.first);
-      coefficients.push_back(det_coef.second);
-    }
-  }
+        // Rebuild vectors, filtering out near-zero coefficients
+        determinants.clear();
+        std::vector<ScalarType> new_coeffs;
+
+        for (const auto& [key, det_coef] : det_map) {
+          if (std::abs(det_coef.second) > threshold) {
+            determinants.push_back(det_coef.first);
+            new_coeffs.push_back(det_coef.second);
+          }
+        }
+
+        // Resize and copy back to the Eigen vector
+        coef_vec.resize(new_coeffs.size());
+        for (size_t i = 0; i < new_coeffs.size(); ++i) {
+          coef_vec[i] = new_coeffs[i];
+        }
+      },
+      coefficients);
 }
-
-// Explicit template instantiations
-template void consolidate_determinants<double>(
-    std::vector<Configuration>& determinants, std::vector<double>& coefficients,
-    double threshold);
-template void consolidate_determinants<std::complex<double>>(
-    std::vector<Configuration>& determinants,
-    std::vector<std::complex<double>>& coefficients, double threshold);
 
 }  // namespace detail
 

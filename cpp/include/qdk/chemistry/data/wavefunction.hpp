@@ -149,26 +149,15 @@ transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
  * summing their coefficients. Determinants with coefficients below the
  * threshold are removed.
  *
- * @tparam T Coefficient type (double or std::complex<double>)
  * @param determinants Vector of determinants (modified in place)
- * @param coefficients Vector of coefficients (modified in place)
+ * @param coefficients VectorVariant of coefficients (modified in place)
  * @param threshold Coefficient magnitude threshold for pruning (default
  *                  std::numeric_limits<double>::epsilon())
  */
-template <typename T>
 void consolidate_determinants(
-    std::vector<Configuration>& determinants, std::vector<T>& coefficients,
-    double threshold = std::numeric_limits<double>::epsilon());
-
-/// @cond DOXYGEN_SKIP
-// Explicit template declarations (hidden from Doxygen to avoid Sphinx parsing
-// issues)
-extern template void consolidate_determinants<double>(
-    std::vector<Configuration>& determinants, std::vector<double>& coefficients,
-    double threshold);
-extern template void consolidate_determinants<std::complex<double>>(
     std::vector<Configuration>& determinants,
-    std::vector<std::complex<double>>& coefficients, double threshold);
+    ContainerTypes::VectorVariant& coefficients,
+    double threshold = std::numeric_limits<double>::epsilon());
 /// @endcond
 
 }  // namespace detail

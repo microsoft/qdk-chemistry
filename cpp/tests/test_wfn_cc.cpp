@@ -424,7 +424,6 @@ TEST_F(CoupledClusterContainerTest, CICoefficientsGeneration) {
       << "size() should return the number of determinants";
 }
 
-// Test that CI coefficients and determinants are consistent
 TEST_F(CoupledClusterContainerTest, CIExpansionConsistency) {
   size_t nocc = 2;
   size_t nvirt = 2;
@@ -465,9 +464,6 @@ TEST_F(CoupledClusterContainerTest, CIExpansionConsistency) {
   }
 }
 
-// Test that RDMs require the adjoint wavefunction for computation
-// RDMs cannot be computed from ket amplitudes alone - they require lambda
-// amplitudes
 TEST_F(CoupledClusterContainerTest, RDMsRequireAdjointWavefunction) {
   size_t nocc = 2;
   size_t nvirt = 2;
