@@ -23,7 +23,7 @@ from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
 
 if TELEMETRY_ENABLED:
     telemetry_events.on_qdk_chemistry_import()
-    
+
 _DOCS_MODE = os.getenv("QDK_CHEMISTRY_DOCS", "0") == "1"
 
 

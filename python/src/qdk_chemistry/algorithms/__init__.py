@@ -168,4 +168,3 @@ if TELEMETRY_ENABLED:
     apply_telemetry_to_classes()
     # Delete the function to avoid namespace pollution
     del apply_telemetry_to_classes
-    
