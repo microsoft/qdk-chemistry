@@ -319,8 +319,20 @@ TEST_F(SciWavefunctionTest, JsonSerialization) {
   // Serialize to JSON
   nlohmann::json j = original.to_json();
 
-  // Deserialize from JSON
-  auto restored = SciWavefunctionContainer::from_json(j);
+  // Deserialize from JSON using container-specific method
+  auto restored = std::unique_ptr<SciWavefunctionContainer>(
+      dynamic_cast<SciWavefunctionContainer*>(
+          WavefunctionContainer::from_json(j).release()));
+
+  // Also test base Wavefunction::from_json() by wrapping container in
+  // Wavefunction
+  auto original_wf = std::make_shared<Wavefunction>(
+      std::make_unique<SciWavefunctionContainer>(coeffs, dets, orbitals));
+  nlohmann::json wf_j = original_wf->to_json();
+  auto wf_restored = Wavefunction::from_json(wf_j);
+  EXPECT_EQ(wf_restored->get_container_type(), "sci");
+  auto& wf_restored_container =
+      wf_restored->get_container<SciWavefunctionContainer>();
 
   // Verify key properties match
   EXPECT_EQ(original.size(), restored->size());
@@ -338,6 +350,16 @@ TEST_F(SciWavefunctionTest, JsonSerialization) {
   for (size_t i = 0; i < original.get_active_determinants().size(); ++i) {
     EXPECT_EQ(original.get_active_determinants()[i],
               restored->get_active_determinants()[i]);
+  }
+
+  // Verify that base Wavefunction::from_json gives the same result
+  EXPECT_EQ(restored->size(), wf_restored_container.size());
+  const auto& wf_rest_coeffs =
+      std::get<Eigen::VectorXd>(wf_restored_container.get_coefficients());
+  EXPECT_TRUE(rest_coeffs.isApprox(wf_rest_coeffs, testing::wf_tolerance));
+  for (size_t i = 0; i < restored->get_active_determinants().size(); ++i) {
+    EXPECT_EQ(restored->get_active_determinants()[i],
+              wf_restored_container.get_active_determinants()[i]);
   }
 }
 
@@ -359,7 +381,7 @@ TEST_F(SciWavefunctionTest, Hdf5Serialization) {
     // Serialize to HDF5
     original.to_hdf5(root);
 
-    // Deserialize from HDF5
+    // Deserialize from HDF5 using container-specific method
     auto restored = SciWavefunctionContainer::from_hdf5(root);
 
     // Verify key properties match
@@ -383,11 +405,53 @@ TEST_F(SciWavefunctionTest, Hdf5Serialization) {
     file.close();
   }
 
+  // Also test base Wavefunction::from_hdf5() by creating a separate file with
+  // Wavefunction wrapper
+  std::string wf_filename = "test_sci_wavefunction_serialization.h5";
+  {
+    // Create and serialize a Wavefunction wrapping the container
+    auto original_wf = std::make_shared<Wavefunction>(
+        std::make_unique<SciWavefunctionContainer>(coeffs, dets, orbitals));
+    H5::H5File file(wf_filename, H5F_ACC_TRUNC);
+    H5::Group root = file.openGroup("/");
+    original_wf->to_hdf5(root);
+    file.close();
+  }
+  {
+    // Deserialize using Wavefunction::from_hdf5
+    H5::H5File file(wf_filename, H5F_ACC_RDONLY);
+    H5::Group root = file.openGroup("/");
+    auto wf_restored = Wavefunction::from_hdf5(root);
+    EXPECT_EQ(wf_restored->get_container_type(), "sci");
+    auto& wf_restored_container =
+        wf_restored->get_container<SciWavefunctionContainer>();
+
+    // Get the restored container from container-specific method for comparison
+    H5::H5File file2(filename, H5F_ACC_RDONLY);
+    H5::Group root2 = file2.openGroup("/");
+    auto restored = SciWavefunctionContainer::from_hdf5(root2);
+
+    EXPECT_EQ(restored->size(), wf_restored_container.size());
+    const auto& rest_coeffs =
+        std::get<Eigen::VectorXd>(restored->get_coefficients());
+    const auto& wf_rest_coeffs =
+        std::get<Eigen::VectorXd>(wf_restored_container.get_coefficients());
+    EXPECT_TRUE(rest_coeffs.isApprox(wf_rest_coeffs, testing::wf_tolerance));
+    for (size_t i = 0; i < restored->get_active_determinants().size(); ++i) {
+      EXPECT_EQ(restored->get_active_determinants()[i],
+                wf_restored_container.get_active_determinants()[i]);
+    }
+
+    file.close();
+    file2.close();
+  }
+
   std::remove(filename.c_str());
+  std::remove(wf_filename.c_str());
 }
 
 // Test serialization with RDMs
-TEST_F(SciWavefunctionTest, SerializationRDMs) {
+TEST_F(SciWavefunctionTest, Hdf5SerializationRDMs) {
   // create H4 linear chain structure
   std::vector<Eigen::Vector3d> coords = {
       {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {2.0, 0.0, 0.0}, {3.0, 0.0, 0.0}};
@@ -507,8 +571,210 @@ TEST_F(SciWavefunctionTest, SerializationRDMs) {
   std::remove(filename.c_str());
 }
 
+// Test JSON serialization with RDMs
+TEST_F(SciWavefunctionTest, JsonSerializationRDMs) {
+  auto orbitals = testing::create_test_orbitals(4, 4, true);
+  std::vector<Configuration> dets = {
+      Configuration("2200"), Configuration("2020"), Configuration("2002")};
+  Eigen::VectorXd coeffs(3);
+  coeffs << 0.5, 0.5, 1.0 / sqrt(2);
+
+  // Create one-RDM
+  Eigen::MatrixXd one_rdm_aa(4, 4);
+  one_rdm_aa.setIdentity();
+  one_rdm_aa *= 2.0;
+  one_rdm_aa(2, 2) = 0.0;
+  one_rdm_aa(3, 3) = 0.0;
+
+  // Create two-RDM
+  size_t two_rdm_size = 4 * 4 * 4 * 4;
+  Eigen::VectorXd two_rdm_aabb(two_rdm_size);
+  two_rdm_aabb.setOnes();
+  two_rdm_aabb *= 0.5;
+
+  Eigen::VectorXd two_rdm_aaaa(two_rdm_size);
+  two_rdm_aaaa.setOnes();
+  two_rdm_aaaa *= 0.25;
+
+  SciWavefunctionContainer original(coeffs, dets, orbitals, std::nullopt,
+                                    one_rdm_aa, one_rdm_aa, std::nullopt,
+                                    two_rdm_aabb, two_rdm_aaaa, two_rdm_aaaa);
+
+  // Serialize to JSON
+  nlohmann::json j = original.to_json();
+
+  // Verify RDMs are in JSON
+  EXPECT_TRUE(j.contains("rdms"));
+  EXPECT_TRUE(j["rdms"].contains("one_rdm_aa"));
+  EXPECT_TRUE(j["rdms"].contains("two_rdm_aabb"));
+  EXPECT_TRUE(j["rdms"].contains("two_rdm_aaaa"));
+
+  // Deserialize from JSON
+  auto restored = std::unique_ptr<SciWavefunctionContainer>(
+      dynamic_cast<SciWavefunctionContainer*>(
+          WavefunctionContainer::from_json(j).release()));
+
+  // Verify RDMs are available after deserialization
+  EXPECT_TRUE(restored->has_one_rdm_spin_dependent());
+  EXPECT_TRUE(restored->has_two_rdm_spin_dependent());
+
+  // Verify RDM values match
+  auto [orig_one_aa, orig_one_bb] =
+      original.get_active_one_rdm_spin_dependent();
+  auto [rest_one_aa, rest_one_bb] =
+      restored->get_active_one_rdm_spin_dependent();
+
+  EXPECT_TRUE(std::get<Eigen::MatrixXd>(orig_one_aa)
+                  .isApprox(std::get<Eigen::MatrixXd>(rest_one_aa),
+                            testing::wf_tolerance));
+
+  auto [orig_two_aabb, orig_two_aaaa, orig_two_bbbb] =
+      original.get_active_two_rdm_spin_dependent();
+  auto [rest_two_aabb, rest_two_aaaa, rest_two_bbbb] =
+      restored->get_active_two_rdm_spin_dependent();
+
+  EXPECT_TRUE(std::get<Eigen::VectorXd>(orig_two_aabb)
+                  .isApprox(std::get<Eigen::VectorXd>(rest_two_aabb),
+                            testing::wf_tolerance));
+  EXPECT_TRUE(std::get<Eigen::VectorXd>(orig_two_aaaa)
+                  .isApprox(std::get<Eigen::VectorXd>(rest_two_aaaa),
+                            testing::wf_tolerance));
+}
+
+// Test JSON serialization with RDMs for unrestricted system
+TEST_F(SciWavefunctionTest, JsonSerializationRDMsUnrestricted) {
+  // create Li atom structure
+  std::vector<Eigen::Vector3d> coords = {{0., 0., 0.}};
+  std::vector<std::string> symbols = {"Li"};
+  auto structure = std::make_shared<Structure>(coords, symbols);
+
+  // scf with multiplicity = 2 (doublet state for Li)
+  auto scf_solver = ScfSolverFactory::create();
+  const char* basis_set = "sto-3g";
+
+  auto [E_default, wfn_default] = scf_solver->run(structure, 0, 2, basis_set);
+
+  // build hamiltonian
+  auto ham_gen = HamiltonianConstructorFactory::create();
+  auto H = ham_gen->run(wfn_default->get_orbitals());
+
+  // run SCI with RDM calculation
+  auto mc = MultiConfigurationCalculatorFactory::create("macis_asci");
+  mc->settings().set("calculate_one_rdm", true);
+  mc->settings().set("calculate_two_rdm", true);
+  mc->settings().set("ntdets_max", 1);
+  mc->settings().set("max_refine_iter", 0);
+  mc->settings().set("grow_factor", 2);
+  auto [E_sci, wfn_sci] = mc->run(H, 3, 5);  // 3 electrons in 5 orbitals
+
+  const auto& original = wfn_sci->get_container<SciWavefunctionContainer>();
+
+  EXPECT_TRUE(original.has_one_rdm_spin_dependent());
+  EXPECT_TRUE(original.has_one_rdm_spin_traced());
+  EXPECT_TRUE(original.has_two_rdm_spin_dependent());
+  EXPECT_TRUE(original.has_two_rdm_spin_traced());
+
+  // Verify it's unrestricted
+  EXPECT_FALSE(original.get_orbitals()->is_restricted());
+
+  // Serialize to JSON
+  nlohmann::json j = original.to_json();
+
+  // Verify RDMs are in JSON
+  EXPECT_TRUE(j.contains("rdms"));
+  EXPECT_TRUE(j["rdms"].contains("one_rdm_aa"));
+  EXPECT_TRUE(j["rdms"].contains("one_rdm_bb"));
+  EXPECT_TRUE(j["rdms"].contains("two_rdm_aabb"));
+  EXPECT_TRUE(j["rdms"].contains("two_rdm_aaaa"));
+  EXPECT_TRUE(j["rdms"].contains("two_rdm_bbbb"));
+
+  // Deserialize from JSON
+  auto restored = std::unique_ptr<SciWavefunctionContainer>(
+      dynamic_cast<SciWavefunctionContainer*>(
+          WavefunctionContainer::from_json(j).release()));
+
+  // Verify rdms are still there
+  EXPECT_TRUE(restored->has_one_rdm_spin_dependent());
+  EXPECT_TRUE(restored->has_one_rdm_spin_traced());
+  EXPECT_TRUE(restored->has_two_rdm_spin_dependent());
+  EXPECT_TRUE(restored->has_two_rdm_spin_traced());
+
+  // Verify it's still unrestricted
+  EXPECT_FALSE(restored->get_orbitals()->is_restricted());
+
+  // Verify that alpha and beta RDMs match
+  auto [restored_aa_rdm, restored_bb_rdm] =
+      restored->get_active_one_rdm_spin_dependent();
+  auto [original_aa_rdm, original_bb_rdm] =
+      original.get_active_one_rdm_spin_dependent();
+
+  // extract data from variants
+  const auto& restored_aa_rdm_r = std::get<Eigen::MatrixXd>(restored_aa_rdm);
+  const auto& restored_bb_rdm_r = std::get<Eigen::MatrixXd>(restored_bb_rdm);
+  const auto& original_aa_rdm_r = std::get<Eigen::MatrixXd>(original_aa_rdm);
+  const auto& original_bb_rdm_r = std::get<Eigen::MatrixXd>(original_bb_rdm);
+
+  EXPECT_TRUE(
+      restored_aa_rdm_r.isApprox(original_aa_rdm_r, testing::rdm_tolerance));
+  EXPECT_TRUE(
+      restored_bb_rdm_r.isApprox(original_bb_rdm_r, testing::rdm_tolerance));
+
+  // alpha and beta RDMs should be different for Li (unpaired electron)
+  EXPECT_FALSE(
+      restored_aa_rdm_r.isApprox(restored_bb_rdm_r, testing::rdm_tolerance));
+
+  auto restored_one_rdm = restored->get_active_one_rdm_spin_traced();
+  auto original_one_rdm = original.get_active_one_rdm_spin_traced();
+
+  // extract data from variants
+  const auto& restored_one_rdm_r = std::get<Eigen::MatrixXd>(restored_one_rdm);
+  const auto& original_one_rdm_r = std::get<Eigen::MatrixXd>(original_one_rdm);
+
+  EXPECT_TRUE(
+      restored_one_rdm_r.isApprox(original_one_rdm_r, testing::rdm_tolerance));
+
+  auto [restored_aabb_rdm, restored_aaaa_rdm, restored_bbbb_rdm] =
+      restored->get_active_two_rdm_spin_dependent();
+  auto [original_aabb_rdm, original_aaaa_rdm, original_bbbb_rdm] =
+      original.get_active_two_rdm_spin_dependent();
+
+  // extract data from variants
+  const auto& restored_aabb_rdm_r =
+      std::get<Eigen::VectorXd>(restored_aabb_rdm);
+  const auto& restored_aaaa_rdm_r =
+      std::get<Eigen::VectorXd>(restored_aaaa_rdm);
+  const auto& restored_bbbb_rdm_r =
+      std::get<Eigen::VectorXd>(restored_bbbb_rdm);
+  const auto& original_aabb_rdm_r =
+      std::get<Eigen::VectorXd>(original_aabb_rdm);
+  const auto& original_aaaa_rdm_r =
+      std::get<Eigen::VectorXd>(original_aaaa_rdm);
+  const auto& original_bbbb_rdm_r =
+      std::get<Eigen::VectorXd>(original_bbbb_rdm);
+
+  EXPECT_TRUE(restored_aabb_rdm_r.isApprox(original_aabb_rdm_r,
+                                           testing::rdm_tolerance));
+  EXPECT_TRUE(restored_aaaa_rdm_r.isApprox(original_aaaa_rdm_r,
+                                           testing::rdm_tolerance));
+  EXPECT_TRUE(restored_bbbb_rdm_r.isApprox(original_bbbb_rdm_r,
+                                           testing::rdm_tolerance));
+
+  // aaaa and bbbb 2-RDMs should be different
+  EXPECT_FALSE(restored_aaaa_rdm_r.isApprox(restored_bbbb_rdm_r,
+                                            testing::rdm_tolerance));
+
+  auto restored_two_rdm = restored->get_active_two_rdm_spin_traced();
+  auto original_two_rdm = original.get_active_two_rdm_spin_traced();
+
+  // extract data from variants
+  const auto& restored_two_rdm_r = std::get<Eigen::VectorXd>(restored_two_rdm);
+  const auto& original_two_rdm_r = std::get<Eigen::VectorXd>(original_two_rdm);
+  EXPECT_TRUE(
+      restored_two_rdm_r.isApprox(original_two_rdm_r, testing::rdm_tolerance));
+}
+
 // Test serialization with RDMs for unrestricted system
-TEST_F(SciWavefunctionTest, SerializationRDMsUnrestricted) {
+TEST_F(SciWavefunctionTest, Hdf5SerializationRDMsUnrestricted) {
   // create Li atom structure
   std::vector<Eigen::Vector3d> coords = {{0., 0., 0.}};
   std::vector<std::string> symbols = {"Li"};
