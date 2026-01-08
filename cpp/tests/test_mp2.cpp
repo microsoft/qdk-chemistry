@@ -500,17 +500,18 @@ TEST_F(MP2Test, CICoefficientsGeneration) {
   // Test that CI coefficients can be retrieved (lazy evaluation)
   const auto& coefficients = mp2_container->get_coefficients();
 
-  // Verify coefficients are non-empty
+  // Verify number of coefficients matches expected for MP2 expansion
   std::visit(
       [](const auto& vec) {
-        EXPECT_GT(vec.size(), 0) << "CI coefficients should not be empty";
+        EXPECT_EQ(vec.size(), 8071)
+            << "8071 coefficients should be generated for MP2 expansion";
       },
       coefficients);
 
-  // Test that determinants can be retrieved
+  // Test that determinants can be retrieved and count matches
   const auto& determinants = mp2_container->get_active_determinants();
-  EXPECT_GT(determinants.size(), 0)
-      << "Active determinants should not be empty";
+  EXPECT_EQ(determinants.size(), 8071)
+      << "8071 determinants should be generated for MP2 expansion";
 
   // The number of coefficients should match the number of determinants
   std::visit(

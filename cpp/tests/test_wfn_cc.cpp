@@ -485,12 +485,12 @@ TEST_F(CoupledClusterContainerTest, RDMsRequireAdjointWavefunction) {
   const auto& coefficients = cc.get_coefficients();
   std::visit(
       [](const auto& vec) {
-        EXPECT_GT(vec.size(), 0) << "CI coefficients should be available";
+        EXPECT_EQ(vec.size(), 36) << "36 CI coefficients should be available";
       },
       coefficients);
 
   const auto& determinants = cc.get_active_determinants();
-  EXPECT_GT(determinants.size(), 0) << "Determinants should be available";
+  EXPECT_EQ(determinants.size(), 36) << "36 determinants should be available";
 
   // RDMs should NOT be available without the adjoint wavefunction
   EXPECT_FALSE(cc.has_one_rdm_spin_traced())
