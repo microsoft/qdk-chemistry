@@ -12,6 +12,7 @@
 #include <qdk/chemistry/scf/util/int1e.h>
 
 #include <memory>
+#include <source_location>
 
 #ifdef QDK_CHEMISTRY_ENABLE_PCM
 #include "pcm/pcm.h"
@@ -181,6 +182,23 @@ class SCFImpl {
    * @return Mutable reference to eigenvalues
    */
   RowMajorMatrix& eigenvalues() { return eigenvalues_; }
+
+  /**
+   * @brief Evaluate total energy and Fock matrix for a trial density matrix.
+   * This is a const method that does not modify any member variables, but it
+   * reads from existing state (e.g., H_, ctx_, eri_), so the SCFImpl instance
+   * must be fully initialized before calling it.
+   *
+   * @param P_matrix Trial density matrix
+   * @param loc Source location of the caller (automatically captured)
+   * @return std::pair containing:
+   *   - first: total energy in Hartree
+   *   - second: Fock matrix in AO basis
+   */
+  virtual std::pair<double, RowMajorMatrix>
+  evaluate_trial_density_energy_and_fock(
+      const RowMajorMatrix& P_matrix,
+      const std::source_location& loc = std::source_location::current()) const;
 
  protected:
   /**
