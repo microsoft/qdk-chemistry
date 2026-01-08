@@ -58,9 +58,9 @@ int main() {
 
   // --------------------------------------------------------------------------------------------
   // start-cell-autocas
-  // create a valence space active space selector
+  // Create a valence space active space selector
   auto valence_selector = ActiveSpaceSelectorFactory::create("qdk_valence");
-  // automatically select valence parameters based on the input structure
+  // Automatically select valence parameters based on the input structure
   auto [num_electrons, num_orbitals] =
       qdk::chemistry::utils::compute_valence_space_parameters(scf_wavefunction,
                                                               charge);
@@ -68,7 +68,7 @@ int main() {
   valence_selector->settings().set("num_active_orbitals", num_orbitals);
   auto active_valence_wfn = valence_selector->run(scf_wavefunction);
 
-  // create active Hamiltonian
+  // Create active Hamiltonian
   auto active_hamiltonian_generator = HamiltonianConstructorFactory::create();
   auto active_hamiltonian =
       active_hamiltonian_generator->run(active_valence_wfn->get_orbitals());
