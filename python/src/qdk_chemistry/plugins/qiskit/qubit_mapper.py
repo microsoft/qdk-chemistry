@@ -89,11 +89,9 @@ class QiskitQubitMapper(QubitMapper):
             )
 
         (h1_a, _) = hamiltonian.get_one_body_integrals()
-        (h2_aa, _, _) = hamiltonian.get_two_body_integrals()
+        h2_aa = hamiltonian.get_two_body_array_aaaa()
         num_orbs = len(hamiltonian.get_orbitals().get_active_space_indices()[0])
-        electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(
-            h1_a=h1_a, h2_aa=h2_aa.reshape(num_orbs, num_orbs, num_orbs, num_orbs)
-        )
+        electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(h1_a=h1_a, h2_aa=h2_aa)
         fermionic_op = electronic_hamiltonian.second_q_op()
         qubit_mapper = self.QubitMappers[encoding]()
         qubit_op = qubit_mapper.map(fermionic_op)

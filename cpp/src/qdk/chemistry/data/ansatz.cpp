@@ -6,6 +6,7 @@
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/tensor_span.hpp>
 #include <sstream>
 #include <stdexcept>
 
@@ -131,12 +132,13 @@ double Ansatz::calculate_energy() const {
 
     // get integrals from hamiltonian
     const auto& [h1_a, h1_b] = _hamiltonian->get_one_body_integrals();
-    // get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
-    const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
-        _hamiltonian->get_two_body_integrals();
-    // For restricted case, all components are the same; use a and aaaa
+    // Get ERI span and create Eigen map for linear indexing
+    auto [h2_aaaa, h2_aabb, h2_bbbb] = _hamiltonian->get_two_body_integrals();
+    size_t eri_size = h2_aaaa.extent(0) * h2_aaaa.extent(1) *
+                      h2_aaaa.extent(2) * h2_aaaa.extent(3);
+    Eigen::Map<const Eigen::VectorXd> h2(h2_aaaa.data_handle(), eri_size);
+    // For restricted case, all components are the same; use a
     const auto& h1 = h1_a;
-    const auto& h2 = h2_aaaa;
 
     // check that active space indices are consistent
     auto active_space_indices =
@@ -193,9 +195,17 @@ double Ansatz::calculate_energy() const {
     // get one body integrals from hamiltonian
     const auto& [h1_alpha, h1_beta] = _hamiltonian->get_one_body_integrals();
 
-    // get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
-    const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+    // Get ERI spans and create Eigen maps for linear indexing
+    auto [aaaa_span, aabb_span, bbbb_span] =
         _hamiltonian->get_two_body_integrals();
+    size_t eri_size = aaaa_span.extent(0) * aaaa_span.extent(1) *
+                      aaaa_span.extent(2) * aaaa_span.extent(3);
+    Eigen::Map<const Eigen::VectorXd> h2_aaaa(aaaa_span.data_handle(),
+                                              eri_size);
+    Eigen::Map<const Eigen::VectorXd> h2_aabb(aabb_span.data_handle(),
+                                              eri_size);
+    Eigen::Map<const Eigen::VectorXd> h2_bbbb(bbbb_span.data_handle(),
+                                              eri_size);
 
     // check that active space indices are consistent
     auto active_space_indices =
@@ -530,11 +540,12 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
         fock_matrix = Eigen::MatrixXd(0, 0);
       }
 
-      const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+      // Get ERI spans and pass directly to constructor
+      auto [aaaa_span, aabb_span, bbbb_span] =
           original_hamiltonian->get_two_body_integrals();
       const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          h_aa, h2_aaaa, wavefunction_orbitals,
+          h_aa, aaaa_span, wavefunction_orbitals,
           original_hamiltonian->get_core_energy(), fock_matrix,
           original_hamiltonian->get_type());
     } else {
@@ -549,12 +560,13 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
         fock_matrix_beta = Eigen::MatrixXd(0, 0);
       }
 
-      const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+      // Get ERI spans and pass directly to constructor
+      auto [aaaa_span, aabb_span, bbbb_span] =
           original_hamiltonian->get_two_body_integrals();
       const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
 
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          h_aa, h_bb, h2_aaaa, h2_aabb, h2_bbbb, wavefunction_orbitals,
+          h_aa, h_bb, aaaa_span, aabb_span, bbbb_span, wavefunction_orbitals,
           original_hamiltonian->get_core_energy(), fock_matrix_alpha,
           fock_matrix_beta, original_hamiltonian->get_type());
     }
@@ -712,11 +724,12 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
         fock_matrix = Eigen::MatrixXd(0, 0);
       }
 
-      const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+      // Get ERI spans and pass directly to constructor
+      auto [aaaa_span, aabb_span, bbbb_span] =
           original_hamiltonian->get_two_body_integrals();
       const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          h_aa, h2_aaaa, wavefunction_orbitals,
+          h_aa, aaaa_span, wavefunction_orbitals,
           original_hamiltonian->get_core_energy(), fock_matrix,
           original_hamiltonian->get_type());
     } else {
@@ -731,12 +744,13 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
         fock_matrix_beta = Eigen::MatrixXd(0, 0);
       }
 
-      const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+      // Get ERI spans and pass directly to constructor
+      auto [aaaa_span, aabb_span, bbbb_span] =
           original_hamiltonian->get_two_body_integrals();
       const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
 
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          h_aa, h_bb, h2_aaaa, h2_aabb, h2_bbbb, wavefunction_orbitals,
+          h_aa, h_bb, aaaa_span, aabb_span, bbbb_span, wavefunction_orbitals,
           original_hamiltonian->get_core_energy(), fock_matrix_alpha,
           fock_matrix_beta, original_hamiltonian->get_type());
     }

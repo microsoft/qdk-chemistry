@@ -74,9 +74,13 @@ std::shared_ptr<Hamiltonian> make_minimal_hamiltonian(
   // Inactive Fock matrix (empty for minimal example)
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(2, 2);
 
+  // Get norb for creating span
+  size_t norb = orbitals->get_active_space_indices().first.size();
+
   // Create Hamiltonian
-  return std::make_shared<Hamiltonian>(h_core, eri, orbitals, core_energy,
-                                       inactive_fock);
+  return std::make_shared<Hamiltonian>(
+      h_core, qdk::chemistry::make_rank4_span(eri.data(), norb), orbitals,
+      core_energy, inactive_fock);
 }
 
 int main() {

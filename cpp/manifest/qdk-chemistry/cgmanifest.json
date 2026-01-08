@@ -197,6 +197,17 @@
         }
       },
       "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/kokkos/mdspan.git",
+          "commitHash": "9ceface91483775a6c74d06ebf717bbb2768452f",
+          "tag": "mdspan-0.6.0"
+        }
+      },
+      "developmentDependency": false
     }
   ]
 }

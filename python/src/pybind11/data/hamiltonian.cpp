@@ -10,9 +10,11 @@
 
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/utils/tensor_span.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
+#include "tensor_conversion.hpp"
 
 namespace py = pybind11;
 
@@ -112,11 +114,37 @@ calculations, specifically designed for active space methods. It contains:
 * Core energy contributions from inactive orbitals and nuclear repulsion
 )");
 
-  // Constructors
+  // Constructors - wrap numpy arrays as rank4_span for the C++ API
+  // Restricted Hamiltonian constructor: accepts 4D array or flattened 1D array
   hamiltonian.def(
-      py::init<const Eigen::MatrixXd&, const Eigen::VectorXd&,
-               std::shared_ptr<qdk::chemistry::data::Orbitals>, double,
-               const Eigen::MatrixXd&, qdk::chemistry::data::HamiltonianType>(),
+      py::init([](const Eigen::MatrixXd& one_body,
+                  py::array_t<double, py::array::f_style | py::array::forcecast>
+                      two_body,
+                  std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals,
+                  double core_energy, const Eigen::MatrixXd& inactive_fock,
+                  qdk::chemistry::data::HamiltonianType type) {
+        // Get buffer info to determine dimensions
+        py::buffer_info buf = two_body.request();
+
+        // Determine norb from one-body integrals
+        size_t norb = static_cast<size_t>(one_body.rows());
+
+        // Validate and create span
+        size_t expected_size = norb * norb * norb * norb;
+        if (static_cast<size_t>(buf.size) != expected_size) {
+          throw std::invalid_argument("two_body_integrals size (" +
+                                      std::to_string(buf.size) +
+                                      ") does not match norb^4 (" +
+                                      std::to_string(expected_size) + ")");
+        }
+
+        // Create span from the data
+        auto span = qdk::chemistry::make_rank4_span(
+            static_cast<const double*>(buf.ptr), norb);
+
+        return std::make_shared<Hamiltonian>(one_body, span, orbitals,
+                                             core_energy, inactive_fock, type);
+      }),
       R"(
 Constructor for restricted active space Hamiltonian.
 
@@ -124,7 +152,8 @@ Constructor for restricted active space Hamiltonian.
 
 Args:
     one_body_integrals (numpy.ndarray): One-electron integrals matrix [norb x norb]
-    two_body_integrals (numpy.ndarray): Two-electron integrals vector [norb^4]
+    two_body_integrals (numpy.ndarray): Two-electron integrals as 4D array [norb, norb, norb, norb]
+        or flattened 1D array [norb^4] in Fortran (column-major) order.
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix for the selected active space
@@ -133,7 +162,7 @@ Args:
 Examples:
     >>> import numpy as np
     >>> one_body = np.random.rand(4, 4)  # 4 orbitals
-    >>> two_body = np.random.rand(256)   # 4^4 elements
+    >>> two_body = np.random.rand(4, 4, 4, 4)  # 4D tensor
     >>> fock_matrix = np.random.rand(4, 4)
     >>> hamiltonian = Hamiltonian(one_body, two_body, orbitals, 10.5, fock_matrix)
 )",
@@ -142,13 +171,52 @@ Examples:
       py::arg("inactive_fock_matrix"),
       py::arg("type") = qdk::chemistry::data::HamiltonianType::Hermitian);
 
+  // Unrestricted Hamiltonian constructor
   hamiltonian.def(
-      py::init<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
-               const Eigen::VectorXd&, const Eigen::VectorXd&,
-               const Eigen::VectorXd&,
-               std::shared_ptr<qdk::chemistry::data::Orbitals>, double,
-               const Eigen::MatrixXd&, const Eigen::MatrixXd&,
-               qdk::chemistry::data::HamiltonianType>(),
+      py::init([](const Eigen::MatrixXd& one_body_alpha,
+                  const Eigen::MatrixXd& one_body_beta,
+                  py::array_t<double, py::array::f_style | py::array::forcecast>
+                      two_body_aaaa,
+                  py::array_t<double, py::array::f_style | py::array::forcecast>
+                      two_body_aabb,
+                  py::array_t<double, py::array::f_style | py::array::forcecast>
+                      two_body_bbbb,
+                  std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals,
+                  double core_energy,
+                  const Eigen::MatrixXd& inactive_fock_alpha,
+                  const Eigen::MatrixXd& inactive_fock_beta,
+                  qdk::chemistry::data::HamiltonianType type) {
+        // Get buffer info
+        py::buffer_info buf_aaaa = two_body_aaaa.request();
+        py::buffer_info buf_aabb = two_body_aabb.request();
+        py::buffer_info buf_bbbb = two_body_bbbb.request();
+
+        // Determine norb from one-body integrals
+        size_t norb = static_cast<size_t>(one_body_alpha.rows());
+        size_t expected_size = norb * norb * norb * norb;
+
+        // Validate sizes
+        if (static_cast<size_t>(buf_aaaa.size) != expected_size ||
+            static_cast<size_t>(buf_aabb.size) != expected_size ||
+            static_cast<size_t>(buf_bbbb.size) != expected_size) {
+          throw std::invalid_argument(
+              "two_body_integrals sizes must all equal norb^4 (" +
+              std::to_string(expected_size) + ")");
+        }
+
+        // Create spans from the data
+        auto span_aaaa = qdk::chemistry::make_rank4_span(
+            static_cast<const double*>(buf_aaaa.ptr), norb);
+        auto span_aabb = qdk::chemistry::make_rank4_span(
+            static_cast<const double*>(buf_aabb.ptr), norb);
+        auto span_bbbb = qdk::chemistry::make_rank4_span(
+            static_cast<const double*>(buf_bbbb.ptr), norb);
+
+        return std::make_shared<Hamiltonian>(
+            one_body_alpha, one_body_beta, span_aaaa, span_aabb, span_bbbb,
+            orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta,
+            type);
+      }),
       R"(
 Constructor for unrestricted active space Hamiltonian.
 
@@ -157,9 +225,9 @@ Constructor for unrestricted active space Hamiltonian.
 Args:
     one_body_integrals_alpha (numpy.ndarray): Alpha one-electron integrals matrix [norb x norb]
     one_body_integrals_beta (numpy.ndarray): Beta one-electron integrals matrix [norb x norb]
-    two_body_integrals_aaaa (numpy.ndarray): Alpha-alpha-alpha-alpha two-electron integrals vector
-    two_body_integrals_aabb (numpy.ndarray): Alpha/beta/alpha/beta two-electron integrals vector
-    two_body_integrals_bbbb (numpy.ndarray): Beta-beta-beta-beta two-electron integrals vector
+    two_body_integrals_aaaa (numpy.ndarray): Alpha-alpha-alpha-alpha two-electron integrals 4D array or flattened
+    two_body_integrals_aabb (numpy.ndarray): Alpha/beta/alpha/beta two-electron integrals 4D array or flattened
+    two_body_integrals_bbbb (numpy.ndarray): Beta-beta-beta-beta two-electron integrals 4D array or flattened
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix for the selected active space
@@ -170,9 +238,9 @@ Examples:
     >>> import numpy as np
     >>> one_body_a = np.random.rand(4, 4)
     >>> one_body_b = np.random.rand(4, 4)
-    >>> two_body_aaaa = np.random.rand(256)
-    >>> two_body_aabb = np.random.rand(256)
-    >>> two_body_bbbb = np.random.rand(256)
+    >>> two_body_aaaa = np.random.rand(4, 4, 4, 4)
+    >>> two_body_aabb = np.random.rand(4, 4, 4, 4)
+    >>> two_body_bbbb = np.random.rand(4, 4, 4, 4)
     >>> fock_a = np.random.rand(4, 4)
     >>> fock_b = np.random.rand(4, 4)
     >>> hamiltonian = Hamiltonian(one_body_a, one_body_b, two_body_aaaa, two_body_aabb, two_body_bbbb, orbitals, 10.5, fock_a, fock_b)
@@ -238,52 +306,182 @@ Examples:
                   py::arg("i"), py::arg("j"),
                   py::arg("channel") = SpinChannel::aa);
 
-  // Two-body integral access
-  bind_getter_as_property(hamiltonian, "get_two_body_integrals",
-                          &Hamiltonian::get_two_body_integrals,
-                          R"(
-Get two-electron integrals in molecular orbital basis.
+  // Two-body integral access - 4D tensor views (zero-copy)
+  // These return NumPy array views that share memory with the Hamiltonian.
+  // The Hamiltonian must remain alive while the view is in use.
+  hamiltonian.def(
+      "get_two_body_view_aaaa",
+      [](std::shared_ptr<Hamiltonian> self) {
+        auto [aaaa, aabb, bbbb] = self->get_two_body_integrals();
+        return qdk::chemistry::python::utils::span_to_numpy_view(aaaa, self);
+      },
+      R"(
+Get alpha-alpha-alpha-alpha two-electron integrals as a 4D array view.
+
+Returns a zero-copy view of the internal storage. The Hamiltonian must remain
+alive while the returned array is in use.
 
 Returns:
-    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
-    integral vectors [norb^4] containing electron-electron repulsion integrals
-    aaaa, aabb and bbbb
+    numpy.ndarray: 4D array of shape (norb, norb, norb, norb) in Fortran order.
+    Element [i,j,k,l] contains the integral <ij|kl>.
 
 Raises:
     RuntimeError: If two-body integrals have not been set
 
-Notes:
-    Each of the integrals are stored as a flattened vector in chemist notation
-    <ij|kl> where the indices are ordered as i + j*norb + k*norb^2 + l*norb^3
-
 Examples:
-    >>> (h2, _, _) = hamiltonian.get_two_body_integrals()
-    >>> print(f"Two-body vector length: {len(h2)}")
-    >>> norb = hamiltonian.get_num_orbitals()
-    >>> print(f"Expected length: {norb**4}")
-        )",
-                          py::return_value_policy::reference_internal);
+    >>> eri_aaaa = hamiltonian.get_two_body_view_aaaa()
+    >>> print(f"Shape: {eri_aaaa.shape}")
+    >>> integral = eri_aaaa[0, 1, 2, 3]
+)");
 
-  hamiltonian.def("get_two_body_element", &Hamiltonian::get_two_body_element,
-                  R"(
-Get specific two-electron integral element <ij|kl>.
+  hamiltonian.def(
+      "get_two_body_view_aabb",
+      [](std::shared_ptr<Hamiltonian> self) {
+        auto [aaaa, aabb, bbbb] = self->get_two_body_integrals();
+        return qdk::chemistry::python::utils::span_to_numpy_view(aabb, self);
+      },
+      R"(
+Get alpha-alpha-beta-beta two-electron integrals as a 4D array view.
 
-Args:
-    i, j, k, l (int): Orbital indices for the two-electron integral
-
-    channel (SpinChannel) : Which spin channel to check, aaaa, aabb, bbbb
-        (default is aaaa)
+Returns a zero-copy view of the internal storage. The Hamiltonian must remain
+alive while the returned array is in use.
 
 Returns:
-    float: Value of the two-electron integral <ij|kl>
+    numpy.ndarray: 4D array of shape (norb, norb, norb, norb) in Fortran order.
+    Element [i,j,k,l] contains the integral <ij|kl>.
+
+Raises:
+    RuntimeError: If two-body integrals have not been set
 
 Examples:
-    >>> integral = hamiltonian.get_two_body_element(0, 1, 2, 3)
-    >>> print(f"<01|23> = {integral}")
+    >>> eri_aabb = hamiltonian.get_two_body_view_aabb()
+    >>> integral = eri_aabb[0, 1, 2, 3]
+)");
 
-)",
-                  py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
-                  py::arg("channel") = SpinChannel::aaaa);
+  hamiltonian.def(
+      "get_two_body_view_bbbb",
+      [](std::shared_ptr<Hamiltonian> self) {
+        auto [aaaa, aabb, bbbb] = self->get_two_body_integrals();
+        return qdk::chemistry::python::utils::span_to_numpy_view(bbbb, self);
+      },
+      R"(
+Get beta-beta-beta-beta two-electron integrals as a 4D array view.
+
+Returns a zero-copy view of the internal storage. The Hamiltonian must remain
+alive while the returned array is in use.
+
+Returns:
+    numpy.ndarray: 4D array of shape (norb, norb, norb, norb) in Fortran order.
+    Element [i,j,k,l] contains the integral <ij|kl>.
+
+Raises:
+    RuntimeError: If two-body integrals have not been set
+
+Examples:
+    >>> eri_bbbb = hamiltonian.get_two_body_view_bbbb()
+    >>> integral = eri_bbbb[0, 1, 2, 3]
+)");
+
+  // Two-body integral access - 4D tensor copies (safe)
+  // These return independent NumPy arrays that can outlive the Hamiltonian.
+  hamiltonian.def(
+      "get_two_body_array_aaaa",
+      [](const Hamiltonian& self) {
+        auto [aaaa, aabb, bbbb] = self.get_two_body_integrals();
+        return qdk::chemistry::python::utils::span_to_numpy_copy(aaaa);
+      },
+      R"(
+Get alpha-alpha-alpha-alpha two-electron integrals as a 4D array copy.
+
+Returns an independent copy of the integrals. Safe to use after the
+Hamiltonian is destroyed, but uses more memory.
+
+Returns:
+    numpy.ndarray: 4D array of shape (norb, norb, norb, norb) in Fortran order.
+    Element [i,j,k,l] contains the integral <ij|kl>.
+
+Raises:
+    RuntimeError: If two-body integrals have not been set
+
+Examples:
+    >>> eri_aaaa = hamiltonian.get_two_body_array_aaaa()
+    >>> print(f"Shape: {eri_aaaa.shape}")
+)");
+
+  hamiltonian.def(
+      "get_two_body_array_aabb",
+      [](const Hamiltonian& self) {
+        auto [aaaa, aabb, bbbb] = self.get_two_body_integrals();
+        return qdk::chemistry::python::utils::span_to_numpy_copy(aabb);
+      },
+      R"(
+Get alpha-alpha-beta-beta two-electron integrals as a 4D array copy.
+
+Returns an independent copy of the integrals. Safe to use after the
+Hamiltonian is destroyed, but uses more memory.
+
+Returns:
+    numpy.ndarray: 4D array of shape (norb, norb, norb, norb) in Fortran order.
+    Element [i,j,k,l] contains the integral <ij|kl>.
+
+Raises:
+    RuntimeError: If two-body integrals have not been set
+
+Examples:
+    >>> eri_aabb = hamiltonian.get_two_body_array_aabb()
+)");
+
+  hamiltonian.def(
+      "get_two_body_array_bbbb",
+      [](const Hamiltonian& self) {
+        auto [aaaa, aabb, bbbb] = self.get_two_body_integrals();
+        return qdk::chemistry::python::utils::span_to_numpy_copy(bbbb);
+      },
+      R"(
+Get beta-beta-beta-beta two-electron integrals as a 4D array copy.
+
+Returns an independent copy of the integrals. Safe to use after the
+Hamiltonian is destroyed, but uses more memory.
+
+Returns:
+    numpy.ndarray: 4D array of shape (norb, norb, norb, norb) in Fortran order.
+    Element [i,j,k,l] contains the integral <ij|kl>.
+
+Raises:
+    RuntimeError: If two-body integrals have not been set
+
+Examples:
+    >>> eri_bbbb = hamiltonian.get_two_body_array_bbbb()
+)");
+
+  // Convenience method to get all three spin channels at once
+  hamiltonian.def(
+      "get_two_body_integrals",
+      [](const Hamiltonian& self) {
+        auto [aaaa, aabb, bbbb] = self.get_two_body_integrals();
+        return py::make_tuple(
+            qdk::chemistry::python::utils::span_to_numpy_copy(aaaa),
+            qdk::chemistry::python::utils::span_to_numpy_copy(aabb),
+            qdk::chemistry::python::utils::span_to_numpy_copy(bbbb));
+      },
+      R"(
+Get all two-electron integrals as a tuple of 4D arrays.
+
+Returns copies of all three spin channels (aaaa, aabb, bbbb) at once.
+For restricted Hamiltonians, all three arrays contain the same data.
+
+Returns:
+    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of 4D arrays
+    (aaaa, aabb, bbbb), each with shape (norb, norb, norb, norb) in Fortran order.
+
+Raises:
+    RuntimeError: If two-body integrals have not been set
+
+Examples:
+    >>> aaaa, aabb, bbbb = hamiltonian.get_two_body_integrals()
+    >>> print(f"Shape: {aaaa.shape}")
+    >>> integral = aaaa[0, 1, 2, 3]
+)");
 
   hamiltonian.def("has_two_body_integrals",
                   &Hamiltonian::has_two_body_integrals,

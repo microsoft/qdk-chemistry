@@ -51,7 +51,7 @@ struct cas_helper {
     const size_t num_molecular_orbitals = active_indices.size();
 
     const auto& [T_a, T_b] = hamiltonian.get_one_body_integrals();
-    const auto& [V_aaaa, V_aabb, V_bbbb] = hamiltonian.get_two_body_integrals();
+    auto [V_aaaa, V_aabb, V_bbbb] = hamiltonian.get_two_body_integrals();
 
     // get settings
     macis::MCSCFSettings mcscf_settings = get_mcscf_settings_(settings_);
@@ -61,10 +61,12 @@ struct cas_helper {
     std::vector<wfn_type> dets;
     double E_casci = 0.0;
 
+    // Note: MACIS expects non-const data but only reads from it.
+    // The const_cast is safe as MACIS copies data internally for modifications.
     E_casci = macis::CASRDMFunctor<generator_t>::rdms(
         mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
         nbeta, const_cast<double*>(T_a.data()),
-        const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
+        const_cast<double*>(V_aaaa.data_handle()), nullptr, nullptr, C_casci);
     // Generate determinant basis for RDM calculation
     dets = macis::generate_hilbert_space<typename generator_t::full_det_t>(
         num_molecular_orbitals, nalpha, nbeta);
@@ -75,7 +77,7 @@ struct cas_helper {
                             const_cast<double*>(T_a.data()),
                             num_molecular_orbitals, num_molecular_orbitals),
                         macis::rank4_span<double>(
-                            const_cast<double*>(V_aaaa.data()),
+                            const_cast<double*>(V_aaaa.data_handle()),
                             num_molecular_orbitals, num_molecular_orbitals,
                             num_molecular_orbitals, num_molecular_orbitals));
 

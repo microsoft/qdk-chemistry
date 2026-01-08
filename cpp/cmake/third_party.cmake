@@ -4,6 +4,17 @@ include(DependencyManager)
 # Extract QDK_UARCH FLAGS
 set(DEPENDENCY_BUILD_FLAGS BUILD_ARGS "${QDK_UARCH_FLAGS} -fPIC")
 
+# MDSPAN for multi-dimensional array views
+set(MDSPAN_CXX_STANDARD 20 CACHE STRING "C++ standard for mdspan" FORCE)
+handle_dependency(mdspan
+  GIT_REPOSITORY https://github.com/kokkos/mdspan.git
+  GIT_TAG mdspan-0.6.0
+  BUILD_TARGET std::mdspan
+  INSTALL_TARGET std::mdspan
+  ${DEPENDENCY_BUILD_FLAGS}
+  REQUIRED
+)
+
 # Save current warning settings
 get_property(_old_warn_deprecated CACHE CMAKE_WARN_DEPRECATED PROPERTY VALUE)
 get_property(_old_suppress_dev CACHE CMAKE_SUPPRESS_DEVELOPER_WARNINGS PROPERTY VALUE)

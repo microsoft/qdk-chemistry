@@ -72,7 +72,7 @@ target_link_libraries(macis PUBLIC mdspan)
 # Installation
 include( GNUInstallDirs )
 add_library(macis::macis ALIAS macis)
-install( TARGETS macis lobpcgxx sparsexx ${MACIS_SPDLOG_EXPORT}
+install( TARGETS macis lobpcgxx sparsexx ${MACIS_SPDLOG_EXPORT} ${MACIS_MDSPAN_EXPORT}
   EXPORT macis-targets
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}

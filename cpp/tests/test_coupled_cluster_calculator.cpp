@@ -15,6 +15,7 @@
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/utils/tensor_span.hpp>
 
 #include "ut_common.hpp"
 
@@ -99,8 +100,9 @@ TEST(CoupledClusterCalculatorTest, Calculate) {
   Eigen::MatrixXd empty_one_body = Eigen::MatrixXd::Zero(2, 2);
   Eigen::VectorXd empty_two_body = Eigen::VectorXd::Zero(16);
   Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
-  Hamiltonian hamiltonian(empty_one_body, empty_two_body, dummy_orbitals, 0.0,
-                          empty_fock);
+  Hamiltonian hamiltonian(
+      empty_one_body, qdk::chemistry::make_rank4_span(empty_two_body.data(), 2),
+      dummy_orbitals, 0.0, empty_fock);
 
   // Perform calculation with electron counts
   Wavefunction wfn(std::make_unique<SlaterDeterminantContainer>(

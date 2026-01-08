@@ -9,6 +9,7 @@
 #include <optional>
 #include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/tensor_span.hpp>
 #include <stdexcept>
 #include <variant>
 
@@ -140,8 +141,12 @@ void MP2Container::_compute_t2_amplitudes() const {
     const size_t n_vir_alpha = active_space_size - n_alpha;
     const size_t n_vir_beta = active_space_size - n_beta;
 
-    const auto& [moeri_aaaa, moeri_aabb, moeri_bbbb] =
-        _hamiltonian->get_two_body_integrals();
+    auto [aaaa, aabb, bbbb] = _hamiltonian->get_two_body_integrals();
+    size_t eri_size =
+        aaaa.extent(0) * aaaa.extent(1) * aaaa.extent(2) * aaaa.extent(3);
+    Eigen::Map<const Eigen::VectorXd> moeri_aaaa(aaaa.data_handle(), eri_size);
+    Eigen::Map<const Eigen::VectorXd> moeri_aabb(aabb.data_handle(), eri_size);
+    Eigen::Map<const Eigen::VectorXd> moeri_bbbb(bbbb.data_handle(), eri_size);
 
     // Initialize T2 amplitudes storage
     size_t t2_aa_size = n_alpha * n_alpha * n_vir_alpha * n_vir_alpha;
@@ -190,10 +195,11 @@ void MP2Container::_compute_t2_amplitudes() const {
     const size_t n_occ = n_alpha;
     const size_t n_vir = active_space_size - n_occ;
 
-    const auto& [moeri_aaaa, moeri_aabb, moeri_bbbb] =
-        _hamiltonian->get_two_body_integrals();
-    // For restricted case, all components are the same; use aaaa
-    const auto& moeri = moeri_aaaa;
+    // Get ERI span and create Eigen map for linear indexing
+    auto [aaaa, aabb, bbbb] = _hamiltonian->get_two_body_integrals();
+    size_t eri_size =
+        aaaa.extent(0) * aaaa.extent(1) * aaaa.extent(2) * aaaa.extent(3);
+    Eigen::Map<const Eigen::VectorXd> moeri(aaaa.data_handle(), eri_size);
 
     size_t t2_size = n_occ * n_occ * n_vir * n_vir;
     Eigen::VectorXd t2_amplitudes(t2_size);

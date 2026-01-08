@@ -54,8 +54,9 @@ class AnsatzSerializationTest : public ::testing::Test {
     double core_energy = 1.5;
     Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
 
-    hamiltonian = std::make_shared<Hamiltonian>(one_body, two_body, orbitals,
-                                                core_energy, inactive_fock);
+    hamiltonian = std::make_shared<Hamiltonian>(
+        one_body, qdk::chemistry::make_rank4_span(two_body.data(), 2), orbitals,
+        core_energy, inactive_fock);
 
     // Create test ansatz
     ansatz = std::make_shared<Ansatz>(hamiltonian, wavefunction);

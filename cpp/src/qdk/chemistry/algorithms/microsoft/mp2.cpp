@@ -13,6 +13,7 @@
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/tensor_span.hpp>
 #include <stdexcept>
 #include <tuple>
 
@@ -109,7 +110,10 @@ double MP2Calculator::calculate_restricted_mp2_energy(
   const size_t n_vir = active_space_size - n_occ;
 
   // Get two-electron integrals
-  const auto& [moeri, moeri_aabb, moeri_bbbb] = ham->get_two_body_integrals();
+  auto [aaaa, aabb, bbbb] = ham->get_two_body_integrals();
+  size_t eri_size =
+      aaaa.extent(0) * aaaa.extent(1) * aaaa.extent(2) * aaaa.extent(3);
+  Eigen::Map<const Eigen::VectorXd> moeri(aaaa.data_handle(), eri_size);
 
   double E_MP2 = 0.0;
 
@@ -171,8 +175,12 @@ double MP2Calculator::calculate_unrestricted_mp2_energy(
   const size_t n_vir_alpha = active_space_size - n_alpha;
   const size_t n_vir_beta = active_space_size - n_beta;
 
-  const auto& [moeri_aaaa, moeri_aabb, moeri_bbbb] =
-      ham->get_two_body_integrals();
+  auto [aaaa, aabb, bbbb] = ham->get_two_body_integrals();
+  size_t eri_size =
+      aaaa.extent(0) * aaaa.extent(1) * aaaa.extent(2) * aaaa.extent(3);
+  Eigen::Map<const Eigen::VectorXd> moeri_aaaa(aaaa.data_handle(), eri_size);
+  Eigen::Map<const Eigen::VectorXd> moeri_aabb(aabb.data_handle(), eri_size);
+  Eigen::Map<const Eigen::VectorXd> moeri_bbbb(bbbb.data_handle(), eri_size);
 
   double E_MP2_AA = 0.0, E_MP2_BB = 0.0, E_MP2_AB = 0.0;
 

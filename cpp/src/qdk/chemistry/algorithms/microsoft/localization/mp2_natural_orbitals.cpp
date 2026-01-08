@@ -129,7 +129,7 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
   // use alpha channel (alpha/beta same for restricted)
   const auto& [one_body_int, one_body_int_b] = H->get_one_body_integrals();
   // use the aaaa spin channel - all the same for restricted
-  const auto& [two_body_int, two_body_aabb, two_body_bbbb] =
+  auto [two_body_int, two_body_aabb, two_body_bbbb] =
       H->get_two_body_integrals();
 
   Eigen::MatrixXd mp2_natural_orbitals(num_orbitals, num_orbitals);
@@ -139,7 +139,7 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
                               macis::NumCanonicalOccupied(num_occupied),
                               macis::NumCanonicalVirtual(num_virtual),
                               one_body_int.data(), num_orbitals,
-                              two_body_int.data(), num_orbitals,
+                              two_body_int.data_handle(), num_orbitals,
                               mp2_natural_orbital_occupations.data(),
                               mp2_natural_orbitals.data(), num_orbitals);
 

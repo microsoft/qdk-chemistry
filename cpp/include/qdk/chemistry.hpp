@@ -16,3 +16,4 @@
 #include <qdk/chemistry/data/stability_result.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
+#include <qdk/chemistry/utils/tensor_span.hpp>

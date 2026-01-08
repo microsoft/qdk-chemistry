@@ -45,16 +45,17 @@ i_int, j_int, k_int, l_int = 0, 1, 2, 3
 # Access one-electron integrals (both spin channels)
 h1_a, h1_b = hamiltonian.get_one_body_integrals()
 
-# Access two-electron integrals (both spin channels)
-h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
+# Access two-electron integrals as 4D arrays (all spin channels)
+# Returns arrays of shape (norb, norb, norb, norb) in Fortran order
+h2_aaaa = hamiltonian.get_two_body_array_aaaa()  # alpha-alpha-alpha-alpha
+h2_aabb = hamiltonian.get_two_body_array_aabb()  # alpha-alpha-beta-beta
+h2_bbbb = hamiltonian.get_two_body_array_bbbb()  # beta-beta-beta-beta
 
 # Access a specific one-electron integral <ij> (for aa spin channel)
 one_body_element = hamiltonian.get_one_body_element(i_int, j_int, SpinChannel.aa)
 
-# Access a specific two-electron integral <ij|kl> (for aaaa spin channel)
-two_body_element = hamiltonian.get_two_body_element(
-    i_int, j_int, k_int, l_int, SpinChannel.aaaa
-)
+# Access a specific two-electron integral <ij|kl> directly from the 4D array
+two_body_element = h2_aaaa[i_int, j_int, k_int, l_int]
 
 # Get core energy (nuclear repulsion + inactive orbital energy)
 core_energy = hamiltonian.get_core_energy()

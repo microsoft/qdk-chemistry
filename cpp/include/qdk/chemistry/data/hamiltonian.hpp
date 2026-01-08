@@ -11,6 +11,8 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/utils/tensor.hpp>
+#include <qdk/chemistry/utils/tensor_span.hpp>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -57,8 +59,8 @@ class Hamiltonian : public DataClass,
    * @brief Constructor for active space Hamiltonian with shared_ptr orbitals
    * and inactive Fock matrix
    * @param one_body_integrals One-electron integrals in MO basis [norb x norb]
-   * @param two_body_integrals Two-electron integrals in MO basis [norb x norb x
-   * norb x norb]
+   * @param two_body_integrals Two-electron integrals as 4D tensor span
+   *        [norb x norb x norb x norb] in column-major order
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital
    * energy)
@@ -68,7 +70,27 @@ class Hamiltonian : public DataClass,
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
   Hamiltonian(const Eigen::MatrixXd& one_body_integrals,
-              const Eigen::VectorXd& two_body_integrals,
+              qdk::chemistry::rank4_span<const double> two_body_integrals,
+              std::shared_ptr<Orbitals> orbitals, double core_energy,
+              const Eigen::MatrixXd& inactive_fock_matrix,
+              HamiltonianType type = HamiltonianType::Hermitian);
+
+  /**
+   * @brief Constructor for active space Hamiltonian with move semantics for
+   * ERI tensor
+   * @param one_body_integrals One-electron integrals in MO basis [norb x norb]
+   * @param two_body_integrals Two-electron integrals as owning 4D tensor
+   *        [norb x norb x norb x norb]
+   * @param orbitals Shared pointer to molecular orbital data for the system
+   * @param core_energy Core energy (nuclear repulsion + inactive orbital
+   * energy)
+   * @param inactive_fock_matrix Inactive Fock matrix for the selected active
+   * space
+   * @param type Type of Hamiltonian (Hermitian by default)
+   * @throws std::invalid_argument if orbitals pointer is nullptr
+   */
+  Hamiltonian(const Eigen::MatrixXd& one_body_integrals,
+              qdk::chemistry::rank4_tensor<double>&& two_body_integrals,
               std::shared_ptr<Orbitals> orbitals, double core_energy,
               const Eigen::MatrixXd& inactive_fock_matrix,
               HamiltonianType type = HamiltonianType::Hermitian);
@@ -76,6 +98,39 @@ class Hamiltonian : public DataClass,
   /**
    * @brief Constructor for unrestricted active space Hamiltonian with separate
    * spin components
+   * @param one_body_integrals_alpha One-electron integrals for alpha spin in MO
+   * basis
+   * @param one_body_integrals_beta One-electron integrals for beta spin in MO
+   * basis
+   * @param two_body_integrals_aaaa Two-electron alpha-alpha-alpha-alpha
+   * integrals as 4D tensor span
+   * @param two_body_integrals_aabb Two-electron alpha-beta-alpha-beta integrals
+   * as 4D tensor span
+   * @param two_body_integrals_bbbb Two-electron beta-beta-beta-beta integrals
+   * as 4D tensor span
+   * @param orbitals Shared pointer to molecular orbital data for the system
+   * @param core_energy Core energy (nuclear repulsion + inactive orbital
+   * energy)
+   * @param inactive_fock_matrix_alpha Inactive Fock matrix for alpha spin in
+   * the selected active space
+   * @param inactive_fock_matrix_beta Inactive Fock matrix for beta spin in the
+   * selected active space
+   * @param type Type of Hamiltonian (Hermitian by default)
+   * @throws std::invalid_argument if orbitals pointer is nullptr
+   */
+  Hamiltonian(const Eigen::MatrixXd& one_body_integrals_alpha,
+              const Eigen::MatrixXd& one_body_integrals_beta,
+              qdk::chemistry::rank4_span<const double> two_body_integrals_aaaa,
+              qdk::chemistry::rank4_span<const double> two_body_integrals_aabb,
+              qdk::chemistry::rank4_span<const double> two_body_integrals_bbbb,
+              std::shared_ptr<Orbitals> orbitals, double core_energy,
+              const Eigen::MatrixXd& inactive_fock_matrix_alpha,
+              const Eigen::MatrixXd& inactive_fock_matrix_beta,
+              HamiltonianType type = HamiltonianType::Hermitian);
+
+  /**
+   * @brief Constructor for unrestricted active space Hamiltonian with move
+   * semantics for ERI tensors
    * @param one_body_integrals_alpha One-electron integrals for alpha spin in MO
    * basis
    * @param one_body_integrals_beta One-electron integrals for beta spin in MO
@@ -96,9 +151,9 @@ class Hamiltonian : public DataClass,
    */
   Hamiltonian(const Eigen::MatrixXd& one_body_integrals_alpha,
               const Eigen::MatrixXd& one_body_integrals_beta,
-              const Eigen::VectorXd& two_body_integrals_aaaa,
-              const Eigen::VectorXd& two_body_integrals_aabb,
-              const Eigen::VectorXd& two_body_integrals_bbbb,
+              qdk::chemistry::rank4_tensor<double>&& two_body_integrals_aaaa,
+              qdk::chemistry::rank4_tensor<double>&& two_body_integrals_aabb,
+              qdk::chemistry::rank4_tensor<double>&& two_body_integrals_bbbb,
               std::shared_ptr<Orbitals> orbitals, double core_energy,
               const Eigen::MatrixXd& inactive_fock_matrix_alpha,
               const Eigen::MatrixXd& inactive_fock_matrix_beta,
@@ -155,28 +210,26 @@ class Hamiltonian : public DataClass,
                               SpinChannel channel = SpinChannel::aa) const;
 
   /**
-   * @brief Get two-electron integrals in MO basis for all spin channels
-   * @return Tuple of references to (aaaa, aabb, bbbb) two-electron integrals
-   * vectors
+   * @brief Get all two-electron integral channels as 4D spans
+   * @return Tuple of (aaaa, aabb, bbbb) rank-4 spans
    * @throws std::runtime_error if integrals are not set
+   *
+   * Returns read-only views into the internal ERI storage for all three
+   * spin channels. For restricted Hamiltonians, all three spans view the
+   * same underlying data.
+   *
+   * Access pattern: span(i, j, k, l) returns <ij|kl> in chemist notation.
+   * The spans are valid for the lifetime of this Hamiltonian object.
+   *
+   * @code
+   * auto [aaaa, aabb, bbbb] = hamiltonian.get_two_body_integrals();
+   * double integral = aaaa(i, j, k, l);  // Access <ij|kl>
+   * @endcode
    */
-  std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
-             const Eigen::VectorXd&>
+  std::tuple<qdk::chemistry::rank4_span<const double>,
+             qdk::chemistry::rank4_span<const double>,
+             qdk::chemistry::rank4_span<const double>>
   get_two_body_integrals() const;
-
-  /**
-   * @brief Get specific two-electron integral element
-   * @param i First orbital index
-   * @param j Second orbital index
-   * @param k Third orbital index
-   * @param l Fourth orbital index
-   * @param channel Spin channel to query (aaaa, aabb, or bbbb), defaults to
-   * aaaa
-   * @return Two-electron integral <ij|kl>
-   * @throws std::out_of_range if indices are invalid
-   */
-  double get_two_body_element(unsigned i, unsigned j, unsigned k, unsigned l,
-                              SpinChannel channel = SpinChannel::aaaa) const;
 
   /**
    * @brief Check if two-body integrals are available
@@ -347,11 +400,13 @@ class Hamiltonian : public DataClass,
                   std::shared_ptr<Eigen::MatrixXd>>
       _one_body_integrals;
 
-  /// Two-electron integrals in MO basis, stored as flattened arrays [norb^4]
-  /// Access pattern: V[i*norb^3 + j*norb^2 + k*norb + l] = <ij|kl>
-  const std::tuple<std::shared_ptr<Eigen::VectorXd>,
-                   std::shared_ptr<Eigen::VectorXd>,
-                   std::shared_ptr<Eigen::VectorXd>>
+  /// Two-electron integrals in MO basis, stored as 4D tensors [norb x norb x
+  /// norb x norb] Access pattern: tensor(i, j, k, l) = <ij|kl> in chemist
+  /// notation For restricted Hamiltonians, all three shared_ptrs point to the
+  /// same tensor.
+  const std::tuple<std::shared_ptr<qdk::chemistry::rank4_tensor<double>>,
+                   std::shared_ptr<qdk::chemistry::rank4_tensor<double>>,
+                   std::shared_ptr<qdk::chemistry::rank4_tensor<double>>>
       _two_body_integrals;
 
   /// @brief The inactive Fock matrix for the selected active space
@@ -375,17 +430,17 @@ class Hamiltonian : public DataClass,
   void validate_integral_dimensions() const;
   void validate_restrictedness_consistency() const;
   void validate_active_space_dimensions() const;
-  size_t get_two_body_index(size_t i, size_t j, size_t k, size_t l) const;
 
   /// Helper functions for constructor initialization
   static std::pair<std::shared_ptr<Eigen::MatrixXd>,
                    std::shared_ptr<Eigen::MatrixXd>>
   make_restricted_one_body_integrals(const Eigen::MatrixXd& integrals);
 
-  static std::tuple<std::shared_ptr<Eigen::VectorXd>,
-                    std::shared_ptr<Eigen::VectorXd>,
-                    std::shared_ptr<Eigen::VectorXd>>
-  make_restricted_two_body_integrals(const Eigen::VectorXd& integrals);
+  static std::tuple<std::shared_ptr<qdk::chemistry::rank4_tensor<double>>,
+                    std::shared_ptr<qdk::chemistry::rank4_tensor<double>>,
+                    std::shared_ptr<qdk::chemistry::rank4_tensor<double>>>
+  make_restricted_two_body_integrals(
+      std::shared_ptr<qdk::chemistry::rank4_tensor<double>> tensor);
 
   static std::pair<std::shared_ptr<Eigen::MatrixXd>,
                    std::shared_ptr<Eigen::MatrixXd>>

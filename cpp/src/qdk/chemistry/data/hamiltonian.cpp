@@ -10,6 +10,7 @@
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/tensor.hpp>
 #include <sstream>
 #include <stdexcept>
 
@@ -34,15 +35,16 @@ Hamiltonian::Hamiltonian(const Hamiltonian& other)
   }
 }
 
-Hamiltonian::Hamiltonian(const Eigen::MatrixXd& one_body_integrals,
-                         const Eigen::VectorXd& two_body_integrals,
-                         std::shared_ptr<Orbitals> orbitals, double core_energy,
-                         const Eigen::MatrixXd& inactive_fock_matrix,
-                         HamiltonianType type)
+Hamiltonian::Hamiltonian(
+    const Eigen::MatrixXd& one_body_integrals,
+    qdk::chemistry::rank4_span<const double> two_body_integrals,
+    std::shared_ptr<Orbitals> orbitals, double core_energy,
+    const Eigen::MatrixXd& inactive_fock_matrix, HamiltonianType type)
     : _one_body_integrals(
           make_restricted_one_body_integrals(one_body_integrals)),
-      _two_body_integrals(
-          make_restricted_two_body_integrals(two_body_integrals)),
+      _two_body_integrals(make_restricted_two_body_integrals(
+          std::make_shared<qdk::chemistry::rank4_tensor<double>>(
+              qdk::chemistry::make_rank4_tensor(two_body_integrals)))),
       _inactive_fock_matrix(
           make_restricted_inactive_fock_matrix(inactive_fock_matrix)),
       _orbitals(orbitals),
@@ -68,22 +70,25 @@ Hamiltonian::Hamiltonian(const Eigen::MatrixXd& one_body_integrals,
   }
 }
 
-Hamiltonian::Hamiltonian(const Eigen::MatrixXd& one_body_integrals_alpha,
-                         const Eigen::MatrixXd& one_body_integrals_beta,
-                         const Eigen::VectorXd& two_body_integrals_aaaa,
-                         const Eigen::VectorXd& two_body_integrals_aabb,
-                         const Eigen::VectorXd& two_body_integrals_bbbb,
-                         std::shared_ptr<Orbitals> orbitals, double core_energy,
-                         const Eigen::MatrixXd& inactive_fock_matrix_alpha,
-                         const Eigen::MatrixXd& inactive_fock_matrix_beta,
-                         HamiltonianType type)
+Hamiltonian::Hamiltonian(
+    const Eigen::MatrixXd& one_body_integrals_alpha,
+    const Eigen::MatrixXd& one_body_integrals_beta,
+    qdk::chemistry::rank4_span<const double> two_body_integrals_aaaa,
+    qdk::chemistry::rank4_span<const double> two_body_integrals_aabb,
+    qdk::chemistry::rank4_span<const double> two_body_integrals_bbbb,
+    std::shared_ptr<Orbitals> orbitals, double core_energy,
+    const Eigen::MatrixXd& inactive_fock_matrix_alpha,
+    const Eigen::MatrixXd& inactive_fock_matrix_beta, HamiltonianType type)
     : _one_body_integrals(
           std::make_unique<Eigen::MatrixXd>(one_body_integrals_alpha),
           std::make_unique<Eigen::MatrixXd>(one_body_integrals_beta)),
       _two_body_integrals(
-          std::make_unique<Eigen::VectorXd>(two_body_integrals_aaaa),
-          std::make_unique<Eigen::VectorXd>(two_body_integrals_aabb),
-          std::make_unique<Eigen::VectorXd>(two_body_integrals_bbbb)),
+          std::make_shared<qdk::chemistry::rank4_tensor<double>>(
+              qdk::chemistry::make_rank4_tensor(two_body_integrals_aaaa)),
+          std::make_shared<qdk::chemistry::rank4_tensor<double>>(
+              qdk::chemistry::make_rank4_tensor(two_body_integrals_aabb)),
+          std::make_shared<qdk::chemistry::rank4_tensor<double>>(
+              qdk::chemistry::make_rank4_tensor(two_body_integrals_bbbb))),
       _inactive_fock_matrix(
           std::make_unique<Eigen::MatrixXd>(inactive_fock_matrix_alpha),
           std::make_unique<Eigen::MatrixXd>(inactive_fock_matrix_beta)),
@@ -100,6 +105,84 @@ Hamiltonian::Hamiltonian(const Eigen::MatrixXd& one_body_integrals_alpha,
   validate_active_space_dimensions();
 
   // Validate that orbitals have the necessary data
+  if (!orbitals->has_active_space()) {
+    throw std::runtime_error(
+        "Orbitals must have an active space set for Hamiltonian");
+  }
+  if (!_is_valid()) {
+    throw std::invalid_argument(
+        "Tried to generate invalid Hamiltonian object.");
+  }
+}
+
+Hamiltonian::Hamiltonian(
+    const Eigen::MatrixXd& one_body_integrals,
+    qdk::chemistry::rank4_tensor<double>&& two_body_integrals,
+    std::shared_ptr<Orbitals> orbitals, double core_energy,
+    const Eigen::MatrixXd& inactive_fock_matrix, HamiltonianType type)
+    : _one_body_integrals(
+          make_restricted_one_body_integrals(one_body_integrals)),
+      _two_body_integrals(make_restricted_two_body_integrals(
+          std::make_shared<qdk::chemistry::rank4_tensor<double>>(
+              std::move(two_body_integrals)))),
+      _inactive_fock_matrix(
+          make_restricted_inactive_fock_matrix(inactive_fock_matrix)),
+      _orbitals(orbitals),
+      _core_energy(core_energy),
+      _type(type) {
+  QDK_LOG_TRACE_ENTERING();
+  if (!orbitals) {
+    throw std::invalid_argument("Orbitals pointer cannot be nullptr");
+  }
+
+  validate_integral_dimensions();
+  validate_restrictedness_consistency();
+  validate_active_space_dimensions();
+
+  if (!orbitals->has_active_space()) {
+    throw std::runtime_error(
+        "Orbitals must have an active space set for Hamiltonian");
+  }
+  if (!_is_valid()) {
+    throw std::invalid_argument(
+        "Tried to generate invalid Hamiltonian object.");
+  }
+}
+
+Hamiltonian::Hamiltonian(
+    const Eigen::MatrixXd& one_body_integrals_alpha,
+    const Eigen::MatrixXd& one_body_integrals_beta,
+    qdk::chemistry::rank4_tensor<double>&& two_body_integrals_aaaa,
+    qdk::chemistry::rank4_tensor<double>&& two_body_integrals_aabb,
+    qdk::chemistry::rank4_tensor<double>&& two_body_integrals_bbbb,
+    std::shared_ptr<Orbitals> orbitals, double core_energy,
+    const Eigen::MatrixXd& inactive_fock_matrix_alpha,
+    const Eigen::MatrixXd& inactive_fock_matrix_beta, HamiltonianType type)
+    : _one_body_integrals(
+          std::make_unique<Eigen::MatrixXd>(one_body_integrals_alpha),
+          std::make_unique<Eigen::MatrixXd>(one_body_integrals_beta)),
+      _two_body_integrals(
+          std::make_shared<qdk::chemistry::rank4_tensor<double>>(
+              std::move(two_body_integrals_aaaa)),
+          std::make_shared<qdk::chemistry::rank4_tensor<double>>(
+              std::move(two_body_integrals_aabb)),
+          std::make_shared<qdk::chemistry::rank4_tensor<double>>(
+              std::move(two_body_integrals_bbbb))),
+      _inactive_fock_matrix(
+          std::make_unique<Eigen::MatrixXd>(inactive_fock_matrix_alpha),
+          std::make_unique<Eigen::MatrixXd>(inactive_fock_matrix_beta)),
+      _orbitals(orbitals),
+      _core_energy(core_energy),
+      _type(type) {
+  QDK_LOG_TRACE_ENTERING();
+  if (!orbitals) {
+    throw std::invalid_argument("Orbitals pointer cannot be nullptr");
+  }
+
+  validate_integral_dimensions();
+  validate_restrictedness_consistency();
+  validate_active_space_dimensions();
+
   if (!orbitals->has_active_space()) {
     throw std::runtime_error(
         "Orbitals must have an active space set for Hamiltonian");
@@ -161,16 +244,18 @@ double Hamiltonian::get_one_body_element(unsigned i, unsigned j,
   }
 }
 
-std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
-           const Eigen::VectorXd&>
+std::tuple<qdk::chemistry::rank4_span<const double>,
+           qdk::chemistry::rank4_span<const double>,
+           qdk::chemistry::rank4_span<const double>>
 Hamiltonian::get_two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_two_body_integrals()) {
     throw std::runtime_error("Two-body integrals are not set");
   }
-  return std::make_tuple(std::cref(*std::get<0>(_two_body_integrals)),
-                         std::cref(*std::get<1>(_two_body_integrals)),
-                         std::cref(*std::get<2>(_two_body_integrals)));
+  // mdarray provides implicit conversion to mdspan
+  return {std::get<0>(_two_body_integrals)->to_mdspan(),
+          std::get<1>(_two_body_integrals)->to_mdspan(),
+          std::get<2>(_two_body_integrals)->to_mdspan()};
 }
 
 bool Hamiltonian::has_inactive_fock_matrix() const {
@@ -180,34 +265,6 @@ bool Hamiltonian::has_inactive_fock_matrix() const {
   bool has_beta = _inactive_fock_matrix.second != nullptr &&
                   _inactive_fock_matrix.second->size() > 0;
   return has_alpha && has_beta;
-}
-
-double Hamiltonian::get_two_body_element(unsigned i, unsigned j, unsigned k,
-                                         unsigned l,
-                                         SpinChannel channel) const {
-  QDK_LOG_TRACE_ENTERING();
-  if (!has_two_body_integrals()) {
-    throw std::runtime_error("Two-body integrals are not set");
-  }
-
-  size_t norb = _orbitals->get_active_space_indices().first.size();
-  if (i >= norb || j >= norb || k >= norb || l >= norb) {
-    throw std::out_of_range("Orbital index out of range");
-  }
-
-  size_t index = get_two_body_index(i, j, k, l);
-
-  // Select the appropriate integral based on spin channel
-  switch (channel) {
-    case SpinChannel::aaaa:
-      return (*std::get<0>(_two_body_integrals))[index];
-    case SpinChannel::aabb:
-      return (*std::get<1>(_two_body_integrals))[index];
-    case SpinChannel::bbbb:
-      return (*std::get<2>(_two_body_integrals))[index];
-    default:
-      throw std::invalid_argument("Invalid spin channel");
-  }
 }
 
 bool Hamiltonian::has_two_body_integrals() const {
@@ -400,13 +457,6 @@ void Hamiltonian::validate_active_space_dimensions() const {
   }
 }
 
-size_t Hamiltonian::get_two_body_index(size_t i, size_t j, size_t k,
-                                       size_t l) const {
-  QDK_LOG_TRACE_ENTERING();
-  size_t norb = _orbitals->get_active_space_indices().first.size();
-  return i * norb * norb * norb + j * norb * norb + k * norb + l;
-}
-
 std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
 Hamiltonian::make_restricted_one_body_integrals(
     const Eigen::MatrixXd& integrals) {
@@ -417,15 +467,14 @@ Hamiltonian::make_restricted_one_body_integrals(
       shared_integrals);  // Both alpha and beta point to same data
 }
 
-std::tuple<std::shared_ptr<Eigen::VectorXd>, std::shared_ptr<Eigen::VectorXd>,
-           std::shared_ptr<Eigen::VectorXd>>
+std::tuple<std::shared_ptr<qdk::chemistry::rank4_tensor<double>>,
+           std::shared_ptr<qdk::chemistry::rank4_tensor<double>>,
+           std::shared_ptr<qdk::chemistry::rank4_tensor<double>>>
 Hamiltonian::make_restricted_two_body_integrals(
-    const Eigen::VectorXd& integrals) {
+    std::shared_ptr<qdk::chemistry::rank4_tensor<double>> tensor) {
   QDK_LOG_TRACE_ENTERING();
-  auto shared_integrals = std::make_shared<Eigen::VectorXd>(integrals);
-  return std::make_tuple(
-      shared_integrals, shared_integrals,
-      shared_integrals);  // aaaa, aabb, bbbb all point to same data
+  return std::make_tuple(tensor, tensor,
+                         tensor);  // aaaa, aabb, bbbb all point to same data
 }
 
 std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
@@ -482,7 +531,7 @@ std::string Hamiltonian::get_summary() const {
   }
 
   // Two-body integrals - aaaa
-  const auto& two_body_aaaa = std::get<0>(get_two_body_integrals());
+  const auto& two_body_aaaa = *std::get<0>(_two_body_integrals);
   const size_t non_negligible_two_body_aaaa = std::count_if(
       two_body_aaaa.data(), two_body_aaaa.data() + two_body_aaaa.size(),
       [threshold](double val) { return std::abs(val) > threshold; });
@@ -494,7 +543,7 @@ std::string Hamiltonian::get_summary() const {
 
   // Two-body integrals - aabb and bbbb (if unrestricted)
   if (is_unrestricted()) {
-    const auto& two_body_aabb = std::get<1>(get_two_body_integrals());
+    const auto& two_body_aabb = *std::get<1>(_two_body_integrals);
     const size_t non_negligible_two_body_aabb = std::count_if(
         two_body_aabb.data(), two_body_aabb.data() + two_body_aabb.size(),
         [threshold](double val) { return std::abs(val) > threshold; });
@@ -504,7 +553,7 @@ std::string Hamiltonian::get_summary() const {
                std::to_string(threshold) + ": " +
                std::to_string(non_negligible_two_body_aabb) + ")\n";
 
-    const auto& two_body_bbbb = std::get<2>(get_two_body_integrals());
+    const auto& two_body_bbbb = *std::get<2>(_two_body_integrals);
     const size_t non_negligible_two_body_bbbb = std::count_if(
         two_body_bbbb.data(), two_body_bbbb.data() + two_body_bbbb.size(),
         [threshold](double val) { return std::abs(val) > threshold; });
@@ -679,28 +728,30 @@ nlohmann::json Hamiltonian::to_json() const {
     j["has_two_body_integrals"] = true;
 
     // Store as object {"aaaa": [...], "aabb": [...], "bbbb": [...]}
+    // Use container() to access underlying std::vector for linear serialization
     nlohmann::json two_body_obj;
 
     // Store aaaa
-    std::vector<double> two_body_aaaa_vec;
-    for (int i = 0; i < std::get<0>(_two_body_integrals)->size(); ++i) {
-      two_body_aaaa_vec.push_back((*std::get<0>(_two_body_integrals))(i));
-    }
-    two_body_obj["aaaa"] = two_body_aaaa_vec;
+    const auto& aaaa_container = std::get<0>(_two_body_integrals)->container();
+    two_body_obj["aaaa"] =
+        std::vector<double>(aaaa_container.begin(), aaaa_container.end());
 
     // Store aabb
-    std::vector<double> two_body_aabb_vec;
-    for (int i = 0; i < std::get<1>(_two_body_integrals)->size(); ++i) {
-      two_body_aabb_vec.push_back((*std::get<1>(_two_body_integrals))(i));
-    }
-    two_body_obj["aabb"] = two_body_aabb_vec;
+    const auto& aabb_container = std::get<1>(_two_body_integrals)->container();
+    two_body_obj["aabb"] =
+        std::vector<double>(aabb_container.begin(), aabb_container.end());
 
     // Store bbbb
-    std::vector<double> two_body_bbbb_vec;
-    for (int i = 0; i < std::get<2>(_two_body_integrals)->size(); ++i) {
-      two_body_bbbb_vec.push_back((*std::get<2>(_two_body_integrals))(i));
-    }
-    two_body_obj["bbbb"] = two_body_bbbb_vec;
+    const auto& bbbb_container = std::get<2>(_two_body_integrals)->container();
+    two_body_obj["bbbb"] =
+        std::vector<double>(bbbb_container.begin(), bbbb_container.end());
+
+    // Store extents for proper reconstruction
+    two_body_obj["extents"] =
+        std::vector<size_t>{std::get<0>(_two_body_integrals)->extent(0),
+                            std::get<0>(_two_body_integrals)->extent(1),
+                            std::get<0>(_two_body_integrals)->extent(2),
+                            std::get<0>(_two_body_integrals)->extent(3)};
 
     j["two_body_integrals"] = two_body_obj;
   } else {
@@ -792,13 +843,8 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_json(const nlohmann::json& j) {
 
     // Helper function to load vector from JSON
     auto load_vector =
-        [](const nlohmann::json& vector_json) -> Eigen::VectorXd {
-      auto vector_vec = vector_json.get<std::vector<double>>();
-      Eigen::VectorXd vector(vector_vec.size());
-      for (size_t i = 0; i < vector_vec.size(); ++i) {
-        vector(i) = vector_vec[i];
-      }
-      return vector;
+        [](const nlohmann::json& vector_json) -> std::vector<double> {
+      return vector_json.get<std::vector<double>>();
     };
 
     // Load one-body integrals
@@ -818,7 +864,8 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_json(const nlohmann::json& j) {
     }
 
     // Load two-body integrals
-    Eigen::VectorXd two_body_aaaa, two_body_aabb, two_body_bbbb;
+    std::vector<double> two_body_aaaa, two_body_aabb, two_body_bbbb;
+    std::vector<size_t> extents;
     bool has_two_body = j.value("has_two_body_integrals", false);
     if (has_two_body) {
       if (!j.contains("two_body_integrals")) {
@@ -840,6 +887,11 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_json(const nlohmann::json& j) {
       two_body_aaaa = load_vector(two_body_obj["aaaa"]);
       two_body_aabb = load_vector(two_body_obj["aabb"]);
       two_body_bbbb = load_vector(two_body_obj["bbbb"]);
+
+      // Load extents if available, otherwise infer from norb
+      if (two_body_obj.contains("extents")) {
+        extents = two_body_obj["extents"].get<std::vector<size_t>>();
+      }
     }
 
     // Load inactive Fock matrix
@@ -888,18 +940,32 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_json(const nlohmann::json& j) {
     }
 
     // Create and return appropriate Hamiltonian using the correct constructor
+    // Get norb for creating tensors from the active space indices or stored
+    // extents
+    size_t norb = orbitals->get_active_space_indices().first.size();
+    size_t n0 = extents.size() >= 4 ? extents[0] : norb;
+    size_t n1 = extents.size() >= 4 ? extents[1] : norb;
+    size_t n2 = extents.size() >= 4 ? extents[2] : norb;
+    size_t n3 = extents.size() >= 4 ? extents[3] : norb;
+
     if (is_restricted_data) {
-      // Use restricted constructor - it will create shared pointers internally
-      // so alpha and beta point to the same data
-      return std::make_shared<Hamiltonian>(one_body_alpha, two_body_aaaa,
-                                           orbitals, core_energy,
-                                           inactive_fock_alpha, type);
-    } else {
-      // Use unrestricted constructor with separate alpha and beta data
+      // Use restricted constructor
       return std::make_shared<Hamiltonian>(
-          one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
-          two_body_bbbb, orbitals, core_energy, inactive_fock_alpha,
-          inactive_fock_beta, type);
+          one_body_alpha,
+          qdk::chemistry::make_rank4_tensor(std::move(two_body_aaaa), n0, n1,
+                                            n2, n3),
+          orbitals, core_energy, inactive_fock_alpha, type);
+    } else {
+      // Use unrestricted constructor with
+      return std::make_shared<Hamiltonian>(
+          one_body_alpha, one_body_beta,
+          qdk::chemistry::make_rank4_tensor(std::move(two_body_aaaa), n0, n1,
+                                            n2, n3),
+          qdk::chemistry::make_rank4_tensor(std::move(two_body_aabb), n0, n1,
+                                            n2, n3),
+          qdk::chemistry::make_rank4_tensor(std::move(two_body_bbbb), n0, n1,
+                                            n2, n3),
+          orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta, type);
     }
 
   } catch (const std::exception& e) {
@@ -971,13 +1037,44 @@ void Hamiltonian::to_hdf5(H5::Group& group) const {
     }
 
     if (has_two_body_integrals()) {
-      save_vector_to_group(group, "two_body_integrals_aaaa",
-                           *std::get<0>(_two_body_integrals));
+      // Get the underlying containers and save them as datasets
+      // We save as std::vector<double> and store extents for reconstruction
+      const auto& aaaa_container =
+          std::get<0>(_two_body_integrals)->container();
+      hsize_t aaaa_dims[1] = {aaaa_container.size()};
+      H5::DataSpace aaaa_space(1, aaaa_dims);
+      H5::DataSet aaaa_dataset = group.createDataSet(
+          "two_body_integrals_aaaa", H5::PredType::NATIVE_DOUBLE, aaaa_space);
+      aaaa_dataset.write(aaaa_container.data(), H5::PredType::NATIVE_DOUBLE);
+
+      // Save extents as attribute
+      hsize_t extent_dims[1] = {4};
+      H5::DataSpace extent_space(1, extent_dims);
+      std::vector<hsize_t> extents = {
+          static_cast<hsize_t>(std::get<0>(_two_body_integrals)->extent(0)),
+          static_cast<hsize_t>(std::get<0>(_two_body_integrals)->extent(1)),
+          static_cast<hsize_t>(std::get<0>(_two_body_integrals)->extent(2)),
+          static_cast<hsize_t>(std::get<0>(_two_body_integrals)->extent(3))};
+      H5::Attribute extent_attr = aaaa_dataset.createAttribute(
+          "extents", H5::PredType::NATIVE_HSIZE, extent_space);
+      extent_attr.write(H5::PredType::NATIVE_HSIZE, extents.data());
+
       if (is_unrestricted()) {
-        save_vector_to_group(group, "two_body_integrals_aabb",
-                             *std::get<1>(_two_body_integrals));
-        save_vector_to_group(group, "two_body_integrals_bbbb",
-                             *std::get<2>(_two_body_integrals));
+        const auto& aabb_container =
+            std::get<1>(_two_body_integrals)->container();
+        hsize_t aabb_dims[1] = {aabb_container.size()};
+        H5::DataSpace aabb_space(1, aabb_dims);
+        H5::DataSet aabb_dataset = group.createDataSet(
+            "two_body_integrals_aabb", H5::PredType::NATIVE_DOUBLE, aabb_space);
+        aabb_dataset.write(aabb_container.data(), H5::PredType::NATIVE_DOUBLE);
+
+        const auto& bbbb_container =
+            std::get<2>(_two_body_integrals)->container();
+        hsize_t bbbb_dims[1] = {bbbb_container.size()};
+        H5::DataSpace bbbb_space(1, bbbb_dims);
+        H5::DataSet bbbb_dataset = group.createDataSet(
+            "two_body_integrals_bbbb", H5::PredType::NATIVE_DOUBLE, bbbb_space);
+        bbbb_dataset.write(bbbb_container.data(), H5::PredType::NATIVE_DOUBLE);
       }
     }
 
@@ -1090,7 +1187,8 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_hdf5(H5::Group& group) {
 
     // Load integral data based on restrictedness
     Eigen::MatrixXd one_body_alpha, one_body_beta;
-    Eigen::VectorXd two_body_aaaa, two_body_aabb, two_body_bbbb;
+    std::vector<double> two_body_aaaa_vec, two_body_aabb_vec, two_body_bbbb_vec;
+    std::vector<hsize_t> extents(4, 0);
     Eigen::MatrixXd inactive_fock_alpha, inactive_fock_beta;
 
     // Load one-body integrals
@@ -1107,18 +1205,39 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_hdf5(H5::Group& group) {
 
     // Load two-body integrals
     if (dataset_exists_in_group(group, "two_body_integrals_aaaa")) {
-      two_body_aaaa = load_vector_from_group(group, "two_body_integrals_aaaa");
+      H5::DataSet aaaa_dataset = group.openDataSet("two_body_integrals_aaaa");
+      H5::DataSpace aaaa_space = aaaa_dataset.getSpace();
+      hsize_t aaaa_dims[1];
+      aaaa_space.getSimpleExtentDims(aaaa_dims);
+      two_body_aaaa_vec.resize(aaaa_dims[0]);
+      aaaa_dataset.read(two_body_aaaa_vec.data(), H5::PredType::NATIVE_DOUBLE);
+
+      // Try to load extents attribute
+      if (aaaa_dataset.attrExists("extents")) {
+        H5::Attribute extent_attr = aaaa_dataset.openAttribute("extents");
+        extent_attr.read(H5::PredType::NATIVE_HSIZE, extents.data());
+      }
     }
 
     // For unrestricted, load aabb and bbbb separately
     if (!is_restricted_data) {
       if (dataset_exists_in_group(group, "two_body_integrals_aabb")) {
-        two_body_aabb =
-            load_vector_from_group(group, "two_body_integrals_aabb");
+        H5::DataSet aabb_dataset = group.openDataSet("two_body_integrals_aabb");
+        H5::DataSpace aabb_space = aabb_dataset.getSpace();
+        hsize_t aabb_dims[1];
+        aabb_space.getSimpleExtentDims(aabb_dims);
+        two_body_aabb_vec.resize(aabb_dims[0]);
+        aabb_dataset.read(two_body_aabb_vec.data(),
+                          H5::PredType::NATIVE_DOUBLE);
       }
       if (dataset_exists_in_group(group, "two_body_integrals_bbbb")) {
-        two_body_bbbb =
-            load_vector_from_group(group, "two_body_integrals_bbbb");
+        H5::DataSet bbbb_dataset = group.openDataSet("two_body_integrals_bbbb");
+        H5::DataSpace bbbb_space = bbbb_dataset.getSpace();
+        hsize_t bbbb_dims[1];
+        bbbb_space.getSimpleExtentDims(bbbb_dims);
+        two_body_bbbb_vec.resize(bbbb_dims[0]);
+        bbbb_dataset.read(two_body_bbbb_vec.data(),
+                          H5::PredType::NATIVE_DOUBLE);
       }
     }
 
@@ -1136,17 +1255,32 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_hdf5(H5::Group& group) {
     }
 
     // Create and return appropriate Hamiltonian using the correct constructor
+    // Get norb for creating tensors from the active space indices or stored
+    // extents
+    size_t norb = orbitals->get_active_space_indices().first.size();
+    size_t n0 = extents[0] > 0 ? static_cast<size_t>(extents[0]) : norb;
+    size_t n1 = extents[1] > 0 ? static_cast<size_t>(extents[1]) : norb;
+    size_t n2 = extents[2] > 0 ? static_cast<size_t>(extents[2]) : norb;
+    size_t n3 = extents[3] > 0 ? static_cast<size_t>(extents[3]) : norb;
+
     if (is_restricted_data) {
-      // Use restricted constructor - it will create shared pointers internally
-      return std::make_shared<Hamiltonian>(one_body_alpha, two_body_aaaa,
-                                           orbitals, core_energy,
-                                           inactive_fock_alpha, type);
-    } else {
-      // Use unrestricted constructor with separate alpha and beta data
+      // Use restricted constructor
       return std::make_shared<Hamiltonian>(
-          one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
-          two_body_bbbb, orbitals, core_energy, inactive_fock_alpha,
-          inactive_fock_beta, type);
+          one_body_alpha,
+          qdk::chemistry::make_rank4_tensor(std::move(two_body_aaaa_vec), n0,
+                                            n1, n2, n3),
+          orbitals, core_energy, inactive_fock_alpha, type);
+    } else {
+      // Use unrestricted constructor
+      return std::make_shared<Hamiltonian>(
+          one_body_alpha, one_body_beta,
+          qdk::chemistry::make_rank4_tensor(std::move(two_body_aaaa_vec), n0,
+                                            n1, n2, n3),
+          qdk::chemistry::make_rank4_tensor(std::move(two_body_aabb_vec), n0,
+                                            n1, n2, n3),
+          qdk::chemistry::make_rank4_tensor(std::move(two_body_bbbb_vec), n0,
+                                            n1, n2, n3),
+          orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta, type);
     }
 
   } catch (const H5::Exception& e) {
@@ -1228,9 +1362,8 @@ void Hamiltonian::_to_fcidump_file(const std::string& filename, size_t nalpha,
   };
 
   auto write_eri = [&](size_t i, size_t j, size_t k, size_t l) {
-    auto eri = (*std::get<0>(_two_body_integrals))(
-        i * num_molecular_orbitals3 + j * num_molecular_orbitals2 +
-        k * num_molecular_orbitals + l);
+    // Use 4D indexing on the tensor
+    auto eri = (*std::get<0>(_two_body_integrals))(i, j, k, l);
 
     formatted_line(i + 1, j + 1, k + 1, l + 1, eri);
     file << "\n";

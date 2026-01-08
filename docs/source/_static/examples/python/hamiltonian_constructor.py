@@ -48,7 +48,10 @@ hamiltonian = hamiltonian_constructor.run(orbitals)
 
 # Access the resulting integrals
 h1_a, h1_b = hamiltonian.get_one_body_integrals()
-h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
+# Two-body integrals are now returned as 4D arrays of shape (norb, norb, norb, norb)
+h2_aaaa = hamiltonian.get_two_body_array_aaaa()
+h2_aabb = hamiltonian.get_two_body_array_aabb()
+h2_bbbb = hamiltonian.get_two_body_array_bbbb()
 core_energy = hamiltonian.get_core_energy()
 
 print(f"One-body integrals shape: {h1_a.shape}")

@@ -12,12 +12,16 @@
 
 #include <bit>
 #include <bitset>
-#include <mdspan/mdspan.hpp>
+#include <experimental/mdspan>
 #include <vector>
 
 namespace macis {
 
-/// @brief Namespace alias for Kokkos extensions
+// NOTE: When migrating to C++23, replace std::experimental with std
+// and remove this namespace alias. See: P0009R18
+namespace Kokkos = std::experimental;
+
+/// @brief Namespace alias for Kokkos extensions (for compatibility)
 namespace KokkosEx = Kokkos;
 
 /**

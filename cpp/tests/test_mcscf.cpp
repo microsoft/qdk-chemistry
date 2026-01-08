@@ -11,6 +11,7 @@
 #include <qdk/chemistry/algorithms/mcscf.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
+#include <qdk/chemistry/utils/tensor_span.hpp>
 
 #include "ut_common.hpp"
 
@@ -211,6 +212,7 @@ TEST_F(MultiConfigurationScfTest, SolverInterface) {
   Eigen::VectorXd two_body(16);
   two_body.setZero();
   two_body(0) = 0.5;  // <00|00> element
+  size_t norb = 2;
 
   double core_energy = 1.0;
   auto inactive_fock = Eigen::MatrixXd::Zero(0, 0);
@@ -219,7 +221,8 @@ TEST_F(MultiConfigurationScfTest, SolverInterface) {
       std::move(HamiltonianConstructorFactory::create()));
 
   auto dummy_ham = std::make_shared<Hamiltonian>(
-      one_body, two_body, test_orbitals, core_energy, inactive_fock);
+      one_body, qdk::chemistry::make_rank4_span(two_body.data(), norb),
+      test_orbitals, core_energy, inactive_fock);
 
   // Create a mock MC calculator
   auto mc_calculator = std::make_shared<MockMCCalculator>();

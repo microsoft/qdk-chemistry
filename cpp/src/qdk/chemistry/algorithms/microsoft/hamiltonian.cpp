@@ -6,6 +6,8 @@
 
 // STL Headers
 #include <filesystem>
+#include <qdk/chemistry/utils/tensor.hpp>
+#include <qdk/chemistry/utils/tensor_span.hpp>
 #include <set>
 
 // MACIS Headers
@@ -230,23 +232,22 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   // Compute integrals (same size for alpha and beta)
   const size_t nactive = nactive_alpha;
 
-  // Declare MOERI vectors
-  Eigen::VectorXd moeri_aaaa;
-  Eigen::VectorXd moeri_aabb;
-  Eigen::VectorXd moeri_bbbb;
-
-  const size_t moeri_size = nactive * nactive * nactive * nactive;
+  // Declare MOERI tensors - use rank4_tensor for zero-copy move into
+  // Hamiltonian
+  qdk::chemistry::rank4_tensor<double> moeri_aaaa;
+  qdk::chemistry::rank4_tensor<double> moeri_aabb;
+  qdk::chemistry::rank4_tensor<double> moeri_bbbb;
 
   if (is_restricted_calc) {
     // Only allocate and compute (αα|αα) integrals - the others are identical
-    moeri_aaaa.resize(moeri_size);
+    moeri_aaaa = qdk::chemistry::make_rank4_tensor<double>(nactive);
     moeri_c.compute(num_atomic_orbitals, nactive, Ca_active_rm.data(),
                     moeri_aaaa.data());
   } else {
     // Unrestricted case - allocate and compute all three types of integrals
-    moeri_aaaa.resize(moeri_size);
-    moeri_aabb.resize(moeri_size);
-    moeri_bbbb.resize(moeri_size);
+    moeri_aaaa = qdk::chemistry::make_rank4_tensor<double>(nactive);
+    moeri_aabb = qdk::chemistry::make_rank4_tensor<double>(nactive);
+    moeri_bbbb = qdk::chemistry::make_rank4_tensor<double>(nactive);
 
     // (αα|αα) integrals
     moeri_c.compute(num_atomic_orbitals, nactive,
@@ -297,7 +298,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
       H_active = Ca_active.transpose() * H_full * Ca_active;
       Eigen::MatrixXd dummy_fock = Eigen::MatrixXd::Zero(0, 0);
       return std::make_shared<data::Hamiltonian>(
-          H_active, moeri_aaaa, orbitals,
+          H_active, std::move(moeri_aaaa), orbitals,
           structure->calculate_nuclear_repulsion_energy(), dummy_fock);
     } else {
       // Use unrestricted constructor
@@ -308,9 +309,10 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
       Eigen::MatrixXd dummy_fock_alpha = Eigen::MatrixXd::Zero(0, 0);
       Eigen::MatrixXd dummy_fock_beta = Eigen::MatrixXd::Zero(0, 0);
       return std::make_shared<data::Hamiltonian>(
-          H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
-          orbitals, structure->calculate_nuclear_repulsion_energy(),
-          dummy_fock_alpha, dummy_fock_beta);
+          H_active_alpha, H_active_beta, std::move(moeri_aaaa),
+          std::move(moeri_aabb), std::move(moeri_bbbb), orbitals,
+          structure->calculate_nuclear_repulsion_energy(), dummy_fock_alpha,
+          dummy_fock_beta);
     }
   }
 
@@ -369,7 +371,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     }
 
     return std::make_shared<data::Hamiltonian>(
-        H_active, moeri_aaaa, orbitals,
+        H_active, std::move(moeri_aaaa), orbitals,
         E_inactive + structure->calculate_nuclear_repulsion_energy(),
         F_inactive);
 
@@ -476,8 +478,9 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     }
 
     return std::make_shared<data::Hamiltonian>(
-        H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
-        orbitals, E_inactive + structure->calculate_nuclear_repulsion_energy(),
+        H_active_alpha, H_active_beta, std::move(moeri_aaaa),
+        std::move(moeri_aabb), std::move(moeri_bbbb), orbitals,
+        E_inactive + structure->calculate_nuclear_repulsion_energy(),
         F_inactive_alpha, F_inactive_beta);
   }
 }
