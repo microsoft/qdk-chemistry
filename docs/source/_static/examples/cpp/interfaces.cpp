@@ -11,11 +11,11 @@
 auto scf = ScfSolverFactory::create();
 
 // Configure it using the standard settings interface
-scf->settings().set("basis_set", "cc-pvdz");
 scf->settings().set("method", "hf");
 
 // Run calculation with the same API as native implementations
-auto [energy, orbitals] = scf->solve(structure);
+auto [energy, orbitals] =
+    scf->solve(structure, charge, spin_multiplicity, basis_set_name);
 // end-cell-scf
 // -----------------------------------------------------------------------------
 
@@ -53,7 +53,6 @@ auto solver = qdk::chemistry::algorithms::ScfSolver::create("pyscf");
 // -----------------------------------------------------------------------------
 // start-cell-settings
 // Set general options that work across all backends
-scf->settings().set("basis_set", "cc-pvdz");
 scf->settings().set("max_iterations", 100);
 // end-cell-settings
 // -----------------------------------------------------------------------------

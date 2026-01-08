@@ -201,10 +201,10 @@ TEST_F(MP2Test, CICoefficientsGeneration) {
 
   // Restricted HF calculation (singlet O2, multiplicity = 1)
   auto scf_factory = ScfSolverFactory::create("qdk");
-  scf_factory->settings().set("basis_set", "cc-pvdz");
   scf_factory->settings().set("method", "hf");
   auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
-  auto [hf_energy, hf_wavefunction] = scf_factory->run(o2_structure_ptr, 0, 1);
+  auto [hf_energy, hf_wavefunction] =
+      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
   auto hf_orbitals = hf_wavefunction->get_orbitals();
 
   // Create Hamiltonian
@@ -253,10 +253,10 @@ TEST_F(MP2Test, CIExpansionConsistency) {
 
   // Restricted HF calculation (singlet O2, multiplicity = 1)
   auto scf_factory = ScfSolverFactory::create("qdk");
-  scf_factory->settings().set("basis_set", "cc-pvdz");
   scf_factory->settings().set("method", "hf");
   auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
-  auto [hf_energy, hf_wavefunction] = scf_factory->run(o2_structure_ptr, 0, 1);
+  auto [hf_energy, hf_wavefunction] =
+      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
   auto hf_orbitals = hf_wavefunction->get_orbitals();
 
   // Create Hamiltonian
@@ -304,10 +304,10 @@ TEST_F(MP2Test, ReferenceInExpansion) {
 
   // Restricted HF calculation (singlet O2, multiplicity = 1)
   auto scf_factory = ScfSolverFactory::create("qdk");
-  scf_factory->settings().set("basis_set", "cc-pvdz");
   scf_factory->settings().set("method", "hf");
   auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
-  auto [hf_energy, hf_wavefunction] = scf_factory->run(o2_structure_ptr, 0, 1);
+  auto [hf_energy, hf_wavefunction] =
+      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
   auto hf_orbitals = hf_wavefunction->get_orbitals();
 
   // Create Hamiltonian
@@ -363,10 +363,10 @@ TEST_F(MP2Test, LazyRDMComputationFromAmplitudes) {
 
   // Restricted HF calculation (singlet O2, multiplicity = 1)
   auto scf_factory = ScfSolverFactory::create("qdk");
-  scf_factory->settings().set("basis_set", "cc-pvdz");
   scf_factory->settings().set("method", "hf");
   auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
-  auto [hf_energy, hf_wavefunction] = scf_factory->run(o2_structure_ptr, 0, 1);
+  auto [hf_energy, hf_wavefunction] =
+      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
   auto hf_orbitals = hf_wavefunction->get_orbitals();
 
   // Create Hamiltonian
@@ -437,10 +437,10 @@ TEST_F(MP2Test, AmplitudesAndCICoefficientsAvailable) {
 
   // Restricted HF calculation
   auto scf_factory = ScfSolverFactory::create("qdk");
-  scf_factory->settings().set("basis_set", "cc-pvdz");
   scf_factory->settings().set("method", "hf");
   auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
-  auto [hf_energy, hf_wavefunction] = scf_factory->run(o2_structure_ptr, 0, 1);
+  auto [hf_energy, hf_wavefunction] =
+      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
   auto hf_orbitals = hf_wavefunction->get_orbitals();
 
   auto ham_factory = HamiltonianConstructorFactory::create("qdk");
@@ -491,10 +491,10 @@ TEST_F(MP2Test, RDMTracesAreCorrect) {
 
   // Restricted HF calculation (singlet O2, multiplicity = 1)
   auto scf_factory = ScfSolverFactory::create("qdk");
-  scf_factory->settings().set("basis_set", "cc-pvdz");
   scf_factory->settings().set("method", "hf");
   auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
-  auto [hf_energy, hf_wavefunction] = scf_factory->run(o2_structure_ptr, 0, 1);
+  auto [hf_energy, hf_wavefunction] =
+      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
   auto hf_orbitals = hf_wavefunction->get_orbitals();
 
   // Create Hamiltonian

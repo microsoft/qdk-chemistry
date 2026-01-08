@@ -5,18 +5,15 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from collections.abc import Sequence
 import argparse
+from collections.abc import Sequence
 
 from qdk_chemistry.algorithms import create
+from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
-
+from qdk_chemistry.utils import Logger
 from rdkit import Chem
 from rdkit.Chem import AllChem, Mol
-
-from qdk_chemistry.constants import ANGSTROM_TO_BOHR
-
-from qdk_chemistry.utils import Logger
 
 
 def create_structure_from_rdkit(molecule: Mol) -> Structure:
@@ -85,8 +82,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     ########################################################################################
     nuclear_repulsion = water.calculate_nuclear_repulsion_energy()
     scf_solver = create("scf_solver")
-    scf_solver.settings().set("basis_set", args.basis)
-    e_scf, scf_wavefunction = scf_solver.run(water, args.charge, args.spin)
+    e_scf, scf_wavefunction = scf_solver.run(water, args.charge, args.spin, args.basis)
     total_scf_energy = e_scf + nuclear_repulsion
     Logger.info(f"SCF Energy: {total_scf_energy:.8f} Hartree")
 
