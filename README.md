@@ -41,6 +41,20 @@ qdk-chemistry/
 
 Detailed instructions for installing QDK/Chemistry can be found in [INSTALL.md](./INSTALL.md)
 
+## Telemetry
+
+This library collects anonymous usage and performance data by default to help improve the product. The telemetry implementation can be found in [telemetry.py](./python/src/qdk_chemistry/utils/telemetry.py) and all telemetry events are defined in [telemetry_events.py](./python/src/qdk_chemistry/utils/telemetry_events.py).
+
+To disable telemetry via bash, set the environment variable `QDK_CHEMISTRY_PYTHON_TELEMETRY` to one of the following values: `none`, `disabled`, `false`, or `0`. For example: 
+```bash
+export QDK_CHEMISTRY_PYTHON_TELEMETRY='false'
+```
+Alternatively, telemetry can be disabled within a python script by including the following at the top of the `.py` file: 
+```python 
+import os
+os.environ["QDK_CHEMISTRY_PYTHON_TELEMETRY"] = "disabled" 
+```
+
 ## Contributing
 
 There are many ways in which you can participate in this project, for example:

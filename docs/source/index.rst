@@ -9,6 +9,9 @@ Welcome to QDK/Chemistry
 QDK/Chemistry tackles this problem holistically, by recognizing that a significant portion of the quantum applications pipeline heavily relies on the quality, robustness, and efficiency of the classical data preparation and post-processing steps.
 QDK/Chemistry also serves as a platform for innovation, by providing a unified interface to a variety of quantum chemistry methods and packages, allowing researchers to focus on their areas of interest while integrating with a vast community of existing tools to accelerate development.
 
+.. note::
+   QDK/Chemistry collects anonymous usage and performance telemetry by default (for production builds) to help improve the product. The implemented telemetry events capture algorithm name and type, calculation execution duration, and number of basis functions (aggregated into buckets to protect sensitive information). Users can disable telemetry by setting the environment variable ``QDK_CHEMISTRY_PYTHON_TELEMETRY=False`` to one of the following: ``none``, ``disabled``, ``false``, or ``0``.
+   
 Key Features
 ============
 
