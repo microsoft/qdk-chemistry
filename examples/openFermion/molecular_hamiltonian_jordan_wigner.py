@@ -82,7 +82,7 @@ one_body = np.array(
 
 norb = one_body.shape[0]  # Number of spatial orbitals
 
-# Obtain a rank-4 tensor in chemists' notation (pq|rs) from QDK
+# Obtain a rank-4 tensor in chemist's notation (pq|rs) from QDK
 two_body_aaaa, two_body_aabb, two_body_bbbb = (
     active_hamiltonian.get_two_body_integrals()
 )
