@@ -38,9 +38,7 @@ class StabilityCheckerSettings : public qdk::chemistry::data::Settings {
   /**
    * @brief Constructor that initializes default stability checker settings
    *
-   * Creates a stability checker settings object with the following defaults:
-   * - internal: Check internal stability
-   * - external: Check external stability
+   * Creates a stability checker settings object with the following defaults
    */
   StabilityCheckerSettings() : qdk::chemistry::data::Settings() {
     set_default("internal", true);

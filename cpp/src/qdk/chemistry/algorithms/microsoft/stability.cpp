@@ -385,7 +385,7 @@ StabilityChecker::_run_impl(
   // Throw error if the scf is ROHF/ROKS
   if (!unrestricted && n_alpha_electrons != n_beta_electrons) {
     throw std::runtime_error(
-        "ROHF/ROKS is currently not supported in internal-backended stability "
+        "ROHF/ROKS is currently not supported in internal backend stability "
         "checker. Please use pySCF instead.");
   }
 
