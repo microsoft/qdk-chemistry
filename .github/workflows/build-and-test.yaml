@@ -207,6 +207,7 @@ jobs:
           --html-details ${{ github.workspace }}/coverage-reports/cpp_coverage.html \
           --xml ${{ github.workspace }}/coverage-reports/cpp_coverage.xml \
           --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt \
+          --merge-mode-functions=separate \
           --gcov-ignore-parse-errors
 
         echo "C++ Coverage Summary:"
