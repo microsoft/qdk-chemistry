@@ -74,11 +74,9 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
     constructor = create("hamiltonian_constructor")
     active_hamiltonian = constructor.run(active_orbitals)
 
-    assert "qiskit" in available("qubit_mapper")
-    qubit_mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
-
     # Obtain qubit Hamiltonian assuming block ordering - spin up first then spin down
-    # Note if printed directly, the Pauli operators will not match with OpenFermion output
+    # Note if printed directly, the Pauli operators will not match with openFermion output
+    qubit_mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
     qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
 
     # Obtain the ground state energy by diagonalizing the qubit Hamiltonian matrix
