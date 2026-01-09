@@ -403,83 +403,40 @@ class QdkQubitMapper(QubitMapper):
 
         n_spatial = h1_alpha.shape[0]
 
+        # Reshape two-body integrals to 4D tensors for direct indexing (zero-copy view)
+        eri_aaaa = h2_aaaa.reshape((n_spatial, n_spatial, n_spatial, n_spatial))
+        eri_aabb = h2_aabb.reshape((n_spatial, n_spatial, n_spatial, n_spatial))
+        eri_bbbb = h2_bbbb.reshape((n_spatial, n_spatial, n_spatial, n_spatial))
+
         # Use C++ PauliTermAccumulator for efficient term accumulation
         accumulator = PauliTermAccumulator()
 
         # Add core energy as identity term (empty sparse word = identity)
         accumulator.accumulate([], complex(core_energy))
 
-        # Spin-orbital index functions (blocked ordering: alpha then beta)
-        def alpha_idx(p: int) -> int:
-            return p
-
-        def beta_idx(p: int) -> int:
-            return p + n_spatial
-
-        def get_eri(p: int, q: int, r: int, s: int, channel: str) -> float:
-            """Get (pq|rs) integral in chemist notation."""
-            idx = p + q * n_spatial + r * n_spatial**2 + s * n_spatial**3
-            if channel == "aaaa":
-                return float(h2_aaaa[idx])
-            if channel == "aabb":
-                return float(h2_aabb[idx])
-            if channel == "bbbb":
-                return float(h2_bbbb[idx])
-            return 0.0
-
-        def get_excitation_terms(p: int, q: int) -> list[tuple[complex, SparsePauliWord]]:
-            """Get excitation terms E_pq = a†_p a_q from precomputed dictionary."""
-            return excitation_terms_dict[(p, q)]
-
-        # Cache for spin-summed excitation operator terms
-        # E_pq = E_pq_alpha + E_pq_beta (indexed by spatial orbitals)
-        _spin_summed_terms_cache: dict[tuple[int, int], list[tuple[complex, SparsePauliWord]]] = {}
-
-        def get_spin_summed_terms(p: int, q: int) -> list[tuple[complex, SparsePauliWord]]:
-            """Get sparse terms for spin-summed E_pq with caching."""
-            key = (p, q)
-            if key in _spin_summed_terms_cache:
-                return _spin_summed_terms_cache[key]
-            # Combine alpha and beta excitation terms
-            alpha_terms = get_excitation_terms(alpha_idx(p), alpha_idx(q))
-            beta_terms = get_excitation_terms(beta_idx(p), beta_idx(q))
-            # Merge terms with same sparse word
-            combined: dict[tuple[tuple[int, int], ...], complex] = {}
-            for coeff, word in alpha_terms:
-                key_tuple = tuple(word)
-                combined[key_tuple] = combined.get(key_tuple, 0) + coeff
-            for coeff, word in beta_terms:
-                key_tuple = tuple(word)
-                combined[key_tuple] = combined.get(key_tuple, 0) + coeff
-            # Filter using machine epsilon for numerical stability (not user threshold)
-            terms = [
-                (coeff, list(word_tuple))
-                for word_tuple, coeff in combined.items()
-                if abs(coeff) > np.finfo(np.float64).eps
-            ]
-            _spin_summed_terms_cache[key] = terms
-            return terms
-
-        # Pre-populate spin-summed terms cache
+        # Eagerly precompute spin-summed excitation terms: E_pq = E_pq_alpha + E_pq_beta
+        # (indexed by spatial orbitals p, q)
         Logger.debug("Pre-computing spin-summed excitation terms...")
-        for i in range(n_spatial):
-            for j in range(n_spatial):
-                get_spin_summed_terms(i, j)
-
-        def accumulate_terms(terms: list[tuple[complex, SparsePauliWord]], scale: complex) -> None:
-            """Accumulate a list of (coeff, sparse_word) terms with a scale factor."""
-            for coeff, word in terms:
-                accumulator.accumulate(word, scale * coeff)
-
-        def accumulate_product_terms(
-            terms1: list[tuple[complex, SparsePauliWord]],
-            terms2: list[tuple[complex, SparsePauliWord]],
-            scale: complex,
-        ) -> None:
-            """Accumulate the product of two term lists with a scale factor."""
-            for coeff1, word1 in terms1:
-                for coeff2, word2 in terms2:
-                    accumulator.accumulate_product(word1, word2, scale * coeff1 * coeff2)
+        spin_summed_terms: dict[tuple[int, int], list[tuple[complex, SparsePauliWord]]] = {}
+        for p in range(n_spatial):
+            for q in range(n_spatial):
+                # Get alpha and beta excitation terms (inline index computation)
+                alpha_terms = excitation_terms_dict[(p, q)]
+                beta_terms = excitation_terms_dict[(p + n_spatial, q + n_spatial)]
+                # Merge terms with same sparse word
+                combined: dict[tuple[tuple[int, int], ...], complex] = {}
+                for coeff, word in alpha_terms:
+                    key_tuple = tuple(word)
+                    combined[key_tuple] = combined.get(key_tuple, 0) + coeff
+                for coeff, word in beta_terms:
+                    key_tuple = tuple(word)
+                    combined[key_tuple] = combined.get(key_tuple, 0) + coeff
+                # Filter using machine epsilon for numerical stability
+                spin_summed_terms[(p, q)] = [
+                    (coeff, list(word_tuple))
+                    for word_tuple, coeff in combined.items()
+                    if abs(coeff) > np.finfo(np.float64).eps
+                ]
 
         Logger.debug("Building one-body terms...")
         is_spin_free = np.allclose(h1_alpha, h1_beta) and np.allclose(h2_aaaa, h2_bbbb)
@@ -489,8 +446,8 @@ class QdkQubitMapper(QubitMapper):
                 for q in range(n_spatial):
                     h_pq = float(h1_alpha[p, q])
                     if abs(h_pq) > integral_threshold:
-                        terms = get_spin_summed_terms(p, q)
-                        accumulate_terms(terms, complex(h_pq))
+                        for coeff, word in spin_summed_terms[(p, q)]:
+                            accumulator.accumulate(word, complex(h_pq) * coeff)
         else:
             # General case: handle alpha and beta separately
             for p in range(n_spatial):
@@ -499,12 +456,12 @@ class QdkQubitMapper(QubitMapper):
                     h_pq_beta = float(h1_beta[p, q])
 
                     if abs(h_pq_alpha) > integral_threshold:
-                        terms = get_excitation_terms(alpha_idx(p), alpha_idx(q))
-                        accumulate_terms(terms, complex(h_pq_alpha))
+                        for coeff, word in excitation_terms_dict[(p, q)]:
+                            accumulator.accumulate(word, complex(h_pq_alpha) * coeff)
 
                     if abs(h_pq_beta) > integral_threshold:
-                        terms = get_excitation_terms(beta_idx(p), beta_idx(q))
-                        accumulate_terms(terms, complex(h_pq_beta))
+                        for coeff, word in excitation_terms_dict[(p + n_spatial, q + n_spatial)]:
+                            accumulator.accumulate(word, complex(h_pq_beta) * coeff)
 
         Logger.debug("Building two-body terms...")
 
@@ -514,41 +471,96 @@ class QdkQubitMapper(QubitMapper):
                 for q in range(n_spatial):
                     for r in range(n_spatial):
                         for s in range(n_spatial):
-                            eri = get_eri(p, q, r, s, "aaaa")
+                            eri = float(eri_aaaa[p, q, r, s])
                             if abs(eri) > integral_threshold:
-                                e_pq_terms = get_spin_summed_terms(p, q)
-                                e_rs_terms = get_spin_summed_terms(r, s)
-                                accumulate_product_terms(e_pq_terms, e_rs_terms, complex(0.5 * eri))
+                                e_pq_terms = spin_summed_terms[(p, q)]
+                                e_rs_terms = spin_summed_terms[(r, s)]
+                                scale = complex(0.5 * eri)
+                                for c1, w1 in e_pq_terms:
+                                    for c2, w2 in e_rs_terms:
+                                        accumulator.accumulate_product(w1, w2, scale * c1 * c2)
 
                                 if q == r:
-                                    e_ps_terms = get_spin_summed_terms(p, s)
-                                    accumulate_terms(e_ps_terms, complex(-0.5 * eri))
+                                    for coeff, word in spin_summed_terms[(p, s)]:
+                                        accumulator.accumulate(word, complex(-0.5 * eri) * coeff)
         else:
-            for channel_name, spin1_idx, spin2_idx, channel_key, is_same_spin in [
-                ("aaaa", alpha_idx, alpha_idx, "aaaa", True),
-                ("bbbb", beta_idx, beta_idx, "bbbb", True),
-                ("aabb", alpha_idx, beta_idx, "aabb", False),
-                ("bbaa", beta_idx, alpha_idx, "aabb", False),
-            ]:
-                Logger.debug(f"Processing {channel_name} channel...")
+            # Spin-polarized case: explicit channel blocks
 
-                for p in range(n_spatial):
-                    for q in range(n_spatial):
-                        for r in range(n_spatial):
-                            if is_same_spin and p == r:
+            # aaaa channel (same-spin alpha-alpha)
+            Logger.debug("Processing aaaa channel...")
+            for p in range(n_spatial):
+                for q in range(n_spatial):
+                    for r in range(n_spatial):
+                        if p == r:
+                            continue
+                        for s in range(n_spatial):
+                            if q == s:
                                 continue
-                            for s in range(n_spatial):
-                                if is_same_spin and q == s:
-                                    continue
-                                eri = get_eri(p, q, r, s, channel_key)
-                                if abs(eri) > integral_threshold:
-                                    e_pq_terms = get_excitation_terms(spin1_idx(p), spin1_idx(q))
-                                    e_rs_terms = get_excitation_terms(spin2_idx(r), spin2_idx(s))
-                                    accumulate_product_terms(e_pq_terms, e_rs_terms, complex(0.5 * eri))
+                            eri = float(eri_aaaa[p, q, r, s])
+                            if abs(eri) > integral_threshold:
+                                e_pq_terms = excitation_terms_dict[(p, q)]
+                                e_rs_terms = excitation_terms_dict[(r, s)]
+                                scale = complex(0.5 * eri)
+                                for c1, w1 in e_pq_terms:
+                                    for c2, w2 in e_rs_terms:
+                                        accumulator.accumulate_product(w1, w2, scale * c1 * c2)
 
-                                    if is_same_spin and q == r:
-                                        e_ps_terms = get_excitation_terms(spin1_idx(p), spin1_idx(s))
-                                        accumulate_terms(e_ps_terms, complex(-0.5 * eri))
+                                if q == r:
+                                    for coeff, word in excitation_terms_dict[(p, s)]:
+                                        accumulator.accumulate(word, complex(-0.5 * eri) * coeff)
+
+            # bbbb channel (same-spin beta-beta)
+            Logger.debug("Processing bbbb channel...")
+            for p in range(n_spatial):
+                for q in range(n_spatial):
+                    for r in range(n_spatial):
+                        if p == r:
+                            continue
+                        for s in range(n_spatial):
+                            if q == s:
+                                continue
+                            eri = float(eri_bbbb[p, q, r, s])
+                            if abs(eri) > integral_threshold:
+                                e_pq_terms = excitation_terms_dict[(p + n_spatial, q + n_spatial)]
+                                e_rs_terms = excitation_terms_dict[(r + n_spatial, s + n_spatial)]
+                                scale = complex(0.5 * eri)
+                                for c1, w1 in e_pq_terms:
+                                    for c2, w2 in e_rs_terms:
+                                        accumulator.accumulate_product(w1, w2, scale * c1 * c2)
+
+                                if q == r:
+                                    for coeff, word in excitation_terms_dict[(p + n_spatial, s + n_spatial)]:
+                                        accumulator.accumulate(word, complex(-0.5 * eri) * coeff)
+
+            # aabb channel (mixed alpha-beta)
+            Logger.debug("Processing aabb channel...")
+            for p in range(n_spatial):
+                for q in range(n_spatial):
+                    for r in range(n_spatial):
+                        for s in range(n_spatial):
+                            eri = float(eri_aabb[p, q, r, s])
+                            if abs(eri) > integral_threshold:
+                                e_pq_terms = excitation_terms_dict[(p, q)]
+                                e_rs_terms = excitation_terms_dict[(r + n_spatial, s + n_spatial)]
+                                scale = complex(0.5 * eri)
+                                for c1, w1 in e_pq_terms:
+                                    for c2, w2 in e_rs_terms:
+                                        accumulator.accumulate_product(w1, w2, scale * c1 * c2)
+
+            # bbaa channel (mixed beta-alpha)
+            Logger.debug("Processing bbaa channel...")
+            for p in range(n_spatial):
+                for q in range(n_spatial):
+                    for r in range(n_spatial):
+                        for s in range(n_spatial):
+                            eri = float(eri_aabb[p, q, r, s])
+                            if abs(eri) > integral_threshold:
+                                e_pq_terms = excitation_terms_dict[(p + n_spatial, q + n_spatial)]
+                                e_rs_terms = excitation_terms_dict[(r, s)]
+                                scale = complex(0.5 * eri)
+                                for c1, w1 in e_pq_terms:
+                                    for c2, w2 in e_rs_terms:
+                                        accumulator.accumulate_product(w1, w2, scale * c1 * c2)
 
         Logger.debug("Finalizing Pauli terms...")
 
