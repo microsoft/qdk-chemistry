@@ -20,10 +20,7 @@ namespace mdspan_ns = std::experimental;
 namespace qdk::chemistry {
 
 /**
- * @brief Column-major (Fortran-order) multidimensional span.
- *
- * Uses layout_left for column-major storage order, which is compatible with
- * Fortran-ordered data and Eigen's default storage order.
+ * @brief Row-major (C-order) multidimensional span.
  *
  * @tparam T Element type
  * @tparam Rank Number of dimensions
@@ -31,7 +28,7 @@ namespace qdk::chemistry {
 template <typename T, size_t Rank>
 using tensor_span =
     detail::mdspan_ns::mdspan<T, detail::mdspan_ns::dextents<size_t, Rank>,
-                              detail::mdspan_ns::layout_left>;
+                              detail::mdspan_ns::layout_right>;
 
 /**
  * @brief Four-dimensional tensor span with column-major layout.
@@ -44,8 +41,8 @@ using rank4_span = tensor_span<T, 4>;
  * @brief Create a rank-4 span from flattened storage with uniform dimensions.
  *
  * Constructs a 4D view over linearly-stored data with shape [n, n, n, n].
- * The data must be in column-major order matching the index pattern
- * data[i + n*j + n*n*k + n*n*n*l] = tensor(i,j,k,l).
+ * The data must be in row-major order matching the index pattern
+ * data[i*n*n*n + j*n*n + k*n + l] = tensor(i,j,k,l).
  *
  * @tparam T Element type
  * @param data Pointer to the first element of the flattened storage

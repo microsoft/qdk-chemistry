@@ -18,6 +18,7 @@
 #include <qdk/chemistry/data/configuration_set.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
+#include <qdk/chemistry/utils/tensor.hpp>
 #include <tuple>
 #include <variant>
 #include <vector>
@@ -38,6 +39,7 @@ class MP2Container : public WavefunctionContainer {
   using VectorVariant = ContainerTypes::VectorVariant;
   using ScalarVariant = ContainerTypes::ScalarVariant;
   using DeterminantVector = ContainerTypes::DeterminantVector;
+  using TensorVariant = ContainerTypes::TensorVariant;
 
   /**
    * @brief Constructs an MP2 wavefunction.
@@ -95,9 +97,10 @@ class MP2Container : public WavefunctionContainer {
 
   /**
    * @brief Get T1 amplitudes
-   * @return Pair of (alpha, beta) T1 amplitudes
+   * @return Pair of (alpha, beta) T1 amplitude matrices
+   * @note Returns MatrixVariant to support both real and complex amplitudes
    */
-  std::pair<const VectorVariant&, const VectorVariant&> get_t1_amplitudes()
+  std::pair<const MatrixVariant&, const MatrixVariant&> get_t1_amplitudes()
       const;
 
   /**
@@ -105,7 +108,7 @@ class MP2Container : public WavefunctionContainer {
    *
    * @return Tuple of (alpha-beta, alpha-alpha, beta-beta) T2 amplitudes
    */
-  std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
+  std::tuple<const TensorVariant&, const TensorVariant&, const TensorVariant&>
   get_t2_amplitudes() const;
 
   /**
@@ -228,12 +231,14 @@ class MP2Container : public WavefunctionContainer {
   /** @brief Shared pointer to Hamiltonian */
   std::shared_ptr<Hamiltonian> _hamiltonian;
 
-  // Amplitude storage
-  mutable std::shared_ptr<VectorVariant> _t1_amplitudes_aa = nullptr;
-  mutable std::shared_ptr<VectorVariant> _t1_amplitudes_bb = nullptr;
-  mutable std::shared_ptr<VectorVariant> _t2_amplitudes_abab = nullptr;
-  mutable std::shared_ptr<VectorVariant> _t2_amplitudes_aaaa = nullptr;
-  mutable std::shared_ptr<VectorVariant> _t2_amplitudes_bbbb = nullptr;
+  // T1 amplitude storage
+  mutable std::shared_ptr<MatrixVariant> _t1_amplitudes_aa = nullptr;
+  mutable std::shared_ptr<MatrixVariant> _t1_amplitudes_bb = nullptr;
+
+  // T2 amplitude storage
+  mutable std::shared_ptr<TensorVariant> _t2_amplitudes_abab = nullptr;
+  mutable std::shared_ptr<TensorVariant> _t2_amplitudes_aaaa = nullptr;
+  mutable std::shared_ptr<TensorVariant> _t2_amplitudes_bbbb = nullptr;
 
   /** @brief Serialization version */
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";

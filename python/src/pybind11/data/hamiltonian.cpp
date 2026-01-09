@@ -323,7 +323,7 @@ alive while the returned array is in use.
 
 Returns:
     numpy.ndarray: 4D array of shape (norb, norb, norb, norb) in Fortran order.
-    Element [i,j,k,l] contains the integral <ij|kl>.
+    Element [i,j,k,l] contains the integral (ij|kl).
 
 Raises:
     RuntimeError: If two-body integrals have not been set
@@ -348,7 +348,7 @@ alive while the returned array is in use.
 
 Returns:
     numpy.ndarray: 4D array of shape (norb, norb, norb, norb) in Fortran order.
-    Element [i,j,k,l] contains the integral <ij|kl>.
+    Element [i,j,k,l] contains the integral (ij|kl).
 
 Raises:
     RuntimeError: If two-body integrals have not been set
@@ -372,7 +372,7 @@ alive while the returned array is in use.
 
 Returns:
     numpy.ndarray: 4D array of shape (norb, norb, norb, norb) in Fortran order.
-    Element [i,j,k,l] contains the integral <ij|kl>.
+    Element [i,j,k,l] contains the integral (ij|kl).
 
 Raises:
     RuntimeError: If two-body integrals have not been set
@@ -398,7 +398,7 @@ Hamiltonian is destroyed, but uses more memory.
 
 Returns:
     numpy.ndarray: 4D array of shape (norb, norb, norb, norb) in Fortran order.
-    Element [i,j,k,l] contains the integral <ij|kl>.
+    Element [i,j,k,l] contains the integral (ij|kl).
 
 Raises:
     RuntimeError: If two-body integrals have not been set
@@ -422,7 +422,7 @@ Hamiltonian is destroyed, but uses more memory.
 
 Returns:
     numpy.ndarray: 4D array of shape (norb, norb, norb, norb) in Fortran order.
-    Element [i,j,k,l] contains the integral <ij|kl>.
+    Element [i,j,k,l] contains the integral (ij|kl).
 
 Raises:
     RuntimeError: If two-body integrals have not been set
@@ -445,7 +445,7 @@ Hamiltonian is destroyed, but uses more memory.
 
 Returns:
     numpy.ndarray: 4D array of shape (norb, norb, norb, norb) in Fortran order.
-    Element [i,j,k,l] contains the integral <ij|kl>.
+    Element [i,j,k,l] contains the integral (ij|kl).
 
 Raises:
     RuntimeError: If two-body integrals have not been set

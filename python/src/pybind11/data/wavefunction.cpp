@@ -43,6 +43,26 @@ py::object variant_to_python(
       [](const auto& value) -> py::object { return py::cast(value); }, var);
 }
 
+py::object variant_to_python(
+    const qdk::chemistry::data::ContainerTypes::TensorVariant& var) {
+  return std::visit(
+      [](const auto& value) -> py::object {
+        // Convert mdarray to numpy array
+        // Get the data pointer and extents
+        const auto* data = value.data();
+        std::vector<ssize_t> shape = {static_cast<ssize_t>(value.extent(0)),
+                                      static_cast<ssize_t>(value.extent(1)),
+                                      static_cast<ssize_t>(value.extent(2)),
+                                      static_cast<ssize_t>(value.extent(3))};
+        // Create numpy array from data (row-major layout)
+        return py::array(
+            py::dtype::of<
+                typename std::remove_cvref_t<decltype(value)>::value_type>(),
+            shape, data);
+      },
+      var);
+}
+
 void bind_wavefunction(pybind11::module& data) {
   using namespace qdk::chemistry::algorithms;
   using namespace qdk::chemistry::data;

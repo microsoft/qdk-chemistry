@@ -14,7 +14,7 @@
 namespace qdk::chemistry {
 
 /**
- * @brief Owning multidimensional array with column-major (Fortran) layout.
+ * @brief Owning multidimensional array with row-major (C) layout.
  *
  * Uses mdarray from the Kokkos implementation with std::vector as the
  * underlying container. Provides implicit conversion to tensor_span for
@@ -26,10 +26,10 @@ namespace qdk::chemistry {
 template <typename T, size_t Rank>
 using tensor =
     detail::mdspan_ns::mdarray<T, detail::mdspan_ns::dextents<size_t, Rank>,
-                               detail::mdspan_ns::layout_left, std::vector<T>>;
+                               detail::mdspan_ns::layout_right, std::vector<T>>;
 
 /**
- * @brief Four-dimensional owning tensor with column-major layout.
+ * @brief Four-dimensional owning tensor with row-major layout.
  * @tparam T Element type
  *
  * Implicit conversion to rank4_span<T> and rank4_span<const T> is provided

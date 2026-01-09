@@ -18,6 +18,7 @@
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/utils/tensor.hpp>
 #include <qdk/chemistry/utils/tensor_span.hpp>
 
 #include "ut_common.hpp"
@@ -255,21 +256,18 @@ TEST_F(HamiltonianTest, CopyConstructorAndAssignment) {
 TEST_F(HamiltonianTest, TwoBodySpanAccess) {
   // Create a Hamiltonian with known two-body integrals
   Eigen::MatrixXd test_one_body = Eigen::MatrixXd::Identity(2, 2);
-  Eigen::VectorXd test_two_body = Eigen::VectorXd::Zero(16);  // 2^4 = 16
 
-  // Set specific values we can test - using column-major (Fortran) order
-  // Index for (i,j,k,l) in 2x2x2x2 tensor is i + j*2 + k*4 + l*8
-  test_two_body[0] = 1.0;   // (0,0,0,0) -> index 0 + 0*2 + 0*4 + 0*8 = 0
-  test_two_body[8] = 2.0;   // (0,0,0,1) -> index 0 + 0*2 + 0*4 + 1*8 = 8
-  test_two_body[10] = 3.0;  // (0,1,0,1) -> index 0 + 1*2 + 0*4 + 1*8 = 10
-  test_two_body[15] = 4.0;  // (1,1,1,1) -> index 1 + 1*2 + 1*4 + 1*8 = 15
-  test_two_body[5] = 5.0;   // (1,0,1,0) -> index 1 + 0*2 + 1*4 + 0*8 = 5
-  test_two_body[14] = 6.0;  // (0,1,1,1) -> index 0 + 1*2 + 1*4 + 1*8 = 14
+  // Create a rank4_tensor and set values we can test 
+  auto test_two_body = qdk::chemistry::make_rank4_tensor<double>(2);
+  test_two_body(0, 0, 0, 0) = 1.0;
+  test_two_body(0, 0, 0, 1) = 2.0;
+  test_two_body(0, 1, 0, 1) = 3.0;
+  test_two_body(1, 1, 1, 1) = 4.0;
+  test_two_body(1, 0, 1, 0) = 5.0;
+  test_two_body(0, 1, 1, 1) = 6.0;
 
-  Hamiltonian h(
-      test_one_body,
-      qdk::chemistry::make_rank4_span(test_two_body.data(), size_t(2)),
-      orbitals, core_energy, inactive_fock);
+  Hamiltonian h(test_one_body, qdk::chemistry::as_span(test_two_body), orbitals,
+                core_energy, inactive_fock);
 
   // Get the 4D span for the aaaa channel
   auto [span, span_aabb, span_bbbb] = h.get_two_body_integrals();
@@ -295,22 +293,18 @@ TEST_F(HamiltonianTest, TwoBodySpanAccess) {
   // Test with larger system to verify indexing scales correctly
   Eigen::MatrixXd large_inact_f = Eigen::MatrixXd::Identity(0, 0);
   Eigen::MatrixXd large_one_body = Eigen::MatrixXd::Identity(3, 3);
-  Eigen::VectorXd large_two_body = Eigen::VectorXd::Zero(81);  // 3^4 = 81
 
-  // Test specific indices using column-major order: i + j*3 + k*9 + l*27
-  // (2,1,0,2) -> index 2 + 1*3 + 0*9 + 2*27 = 2 + 3 + 0 + 54 = 59
-  large_two_body[59] = 7.0;
-  // (1,2,2,1) -> index 1 + 2*3 + 2*9 + 1*27 = 1 + 6 + 18 + 27 = 52
-  large_two_body[52] = 8.0;
+  // Create a rank4_tensor for the larger system and set values
+  auto large_two_body = qdk::chemistry::make_rank4_tensor<double>(3);
+  large_two_body(2, 1, 0, 2) = 7.0;
+  large_two_body(1, 2, 2, 1) = 8.0;
 
   // Create orbitals for the larger system
   auto large_orbitals =
       std::make_shared<ModelOrbitals>(3, true);  // 3 orbitals, restricted
 
-  Hamiltonian h_large(
-      large_one_body,
-      qdk::chemistry::make_rank4_span(large_two_body.data(), size_t(3)),
-      large_orbitals, 0.0, large_inact_f);
+  Hamiltonian h_large(large_one_body, qdk::chemistry::as_span(large_two_body),
+                      large_orbitals, 0.0, large_inact_f);
 
   auto [large_span, large_span_aabb, large_span_bbbb] =
       h_large.get_two_body_integrals();
@@ -1007,10 +1001,10 @@ TEST_F(HamiltonianTest, UnrestrictedSpinChannelAccess) {
   Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Zero(16);
 
   // Set specific values for each spin channel
-  two_body_aaaa[0] = 1.0;  // (0,0,0,0) in aaaa channel
-  two_body_aabb[10] =
-      2.0;  // (0,1,0,1) in aabb channel = 0 + 1*2 + 0*4 + 1*8 = 10
-  two_body_bbbb[15] = 3.0;  // (1,1,1,1) in bbbb channel
+  // Row-major indexing: index = i*n^3 + j*n^2 + k*n + l, where n=2
+  two_body_aaaa[0] = 1.0;   // (0,0,0,0): 0*8 + 0*4 + 0*2 + 0 = 0
+  two_body_aabb[5] = 2.0;   // (0,1,0,1): 0*8 + 1*4 + 0*2 + 1 = 5 (row-major)
+  two_body_bbbb[15] = 3.0;  // (1,1,1,1): 1*8 + 1*4 + 1*2 + 1 = 15
 
   Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
   size_t norb = 2;

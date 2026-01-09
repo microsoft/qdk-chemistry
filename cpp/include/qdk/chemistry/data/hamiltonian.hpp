@@ -218,12 +218,12 @@ class Hamiltonian : public DataClass,
    * spin channels. For restricted Hamiltonians, all three spans view the
    * same underlying data.
    *
-   * Access pattern: span(i, j, k, l) returns <ij|kl> in chemist notation.
+   * Access pattern: span(i, j, k, l) returns (ij|kl) in chemist notation.
    * The spans are valid for the lifetime of this Hamiltonian object.
    *
    * @code
    * auto [aaaa, aabb, bbbb] = hamiltonian.get_two_body_integrals();
-   * double integral = aaaa(i, j, k, l);  // Access <ij|kl>
+   * double integral = aaaa(i, j, k, l);  // Access (ij|kl)
    * @endcode
    */
   std::tuple<qdk::chemistry::rank4_span<const double>,
@@ -401,7 +401,7 @@ class Hamiltonian : public DataClass,
       _one_body_integrals;
 
   /// Two-electron integrals in MO basis, stored as 4D tensors [norb x norb x
-  /// norb x norb] Access pattern: tensor(i, j, k, l) = <ij|kl> in chemist
+  /// norb x norb] Access pattern: tensor(i, j, k, l) = (ij|kl) in chemist
   /// notation For restricted Hamiltonians, all three shared_ptrs point to the
   /// same tensor.
   const std::tuple<std::shared_ptr<qdk::chemistry::rank4_tensor<double>>,

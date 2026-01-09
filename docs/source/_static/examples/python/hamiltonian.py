@@ -9,7 +9,7 @@
 # start-cell-hamiltonian-creation
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Structure, SpinChannel
+from qdk_chemistry.data import SpinChannel, Structure
 
 # Create a structure object
 coords = np.array(
@@ -51,10 +51,10 @@ h2_aaaa = hamiltonian.get_two_body_array_aaaa()  # alpha-alpha-alpha-alpha
 h2_aabb = hamiltonian.get_two_body_array_aabb()  # alpha-alpha-beta-beta
 h2_bbbb = hamiltonian.get_two_body_array_bbbb()  # beta-beta-beta-beta
 
-# Access a specific one-electron integral <ij> (for aa spin channel)
+# Access a specific one-electron integral (ij) (for aa spin channel)
 one_body_element = hamiltonian.get_one_body_element(i_int, j_int, SpinChannel.aa)
 
-# Access a specific two-electron integral <ij|kl> directly from the 4D array
+# Access a specific two-electron integral (ij|kl) directly from the 4D array
 two_body_element = h2_aaaa[i_int, j_int, k_int, l_int]
 
 # Get core energy (nuclear repulsion + inactive orbital energy)

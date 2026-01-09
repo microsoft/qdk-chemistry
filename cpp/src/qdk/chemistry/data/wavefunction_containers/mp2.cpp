@@ -9,9 +9,9 @@
 #include <optional>
 #include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/tensor.hpp>
 #include <qdk/chemistry/utils/tensor_span.hpp>
 #include <stdexcept>
-#include <variant>
 
 #include "../json_serialization.hpp"
 
@@ -100,12 +100,11 @@ void MP2Container::_compute_t1_amplitudes() const {
   const size_t n_vir_alpha = active_space_size - n_alpha;
   const size_t n_vir_beta = active_space_size - n_beta;
 
-  // For MP2, T1 amplitudes are always zero
-  Eigen::VectorXd t1_aa_vec = Eigen::VectorXd::Zero(n_alpha * n_vir_alpha);
-  Eigen::VectorXd t1_bb_vec = Eigen::VectorXd::Zero(n_beta * n_vir_beta);
-
-  _t1_amplitudes_aa = std::make_shared<VectorVariant>(t1_aa_vec);
-  _t1_amplitudes_bb = std::make_shared<VectorVariant>(t1_bb_vec);
+  // For MP2, T1 amplitudes are always zero 
+  Eigen::MatrixXd t1_aa = Eigen::MatrixXd::Zero(n_alpha, n_vir_alpha);
+  Eigen::MatrixXd t1_bb = Eigen::MatrixXd::Zero(n_beta, n_vir_beta);
+  _t1_amplitudes_aa = std::make_shared<MatrixVariant>(std::move(t1_aa));
+  _t1_amplitudes_bb = std::make_shared<MatrixVariant>(std::move(t1_bb));
 }
 
 void MP2Container::_compute_t2_amplitudes() const {
@@ -141,49 +140,38 @@ void MP2Container::_compute_t2_amplitudes() const {
     const size_t n_vir_alpha = active_space_size - n_alpha;
     const size_t n_vir_beta = active_space_size - n_beta;
 
-    auto [aaaa, aabb, bbbb] = _hamiltonian->get_two_body_integrals();
-    size_t eri_size =
-        aaaa.extent(0) * aaaa.extent(1) * aaaa.extent(2) * aaaa.extent(3);
-    Eigen::Map<const Eigen::VectorXd> moeri_aaaa(aaaa.data_handle(), eri_size);
-    Eigen::Map<const Eigen::VectorXd> moeri_aabb(aabb.data_handle(), eri_size);
-    Eigen::Map<const Eigen::VectorXd> moeri_bbbb(bbbb.data_handle(), eri_size);
+    // Get two-electron integrals as 4D tensor views
+    auto [mo_aaaa, mo_aabb, mo_bbbb] = _hamiltonian->get_two_body_integrals();
 
-    // Initialize T2 amplitudes storage
-    size_t t2_aa_size = n_alpha * n_alpha * n_vir_alpha * n_vir_alpha;
-    size_t t2_ab_size = n_alpha * n_beta * n_vir_alpha * n_vir_beta;
-    size_t t2_bb_size = n_beta * n_beta * n_vir_beta * n_vir_beta;
-
-    Eigen::VectorXd t2_aa(t2_aa_size);
-    Eigen::VectorXd t2_ab(t2_ab_size);
-    Eigen::VectorXd t2_bb(t2_bb_size);
-    t2_aa.setZero();
-    t2_ab.setZero();
-    t2_bb.setZero();
-
-    // Pre-compute strides for tensor indexing
-    const size_t stride_k = active_space_size;
-    const size_t stride_j = active_space_size * active_space_size;
-    const size_t stride_i =
-        active_space_size * active_space_size * active_space_size;
+    // Initialize T2 amplitudes as 4D tensors
+    auto t2_aa = std::make_shared<TensorVariant>(
+        qdk::chemistry::make_rank4_tensor<double>(n_alpha, n_alpha, n_vir_alpha,
+                                                  n_vir_alpha));
+    auto t2_ab = std::make_shared<TensorVariant>(
+        qdk::chemistry::make_rank4_tensor<double>(n_alpha, n_beta, n_vir_alpha,
+                                                  n_vir_beta));
+    auto t2_bb = std::make_shared<TensorVariant>(
+        qdk::chemistry::make_rank4_tensor<double>(n_beta, n_beta, n_vir_beta,
+                                                  n_vir_beta));
 
     // Alpha-Alpha contribution
     algorithms::microsoft::MP2Calculator::compute_same_spin_t2(
-        eps_alpha, moeri_aaaa, n_alpha, n_vir_alpha, stride_i, stride_j,
-        stride_k, t2_aa);
+        eps_alpha, mo_aaaa, n_alpha, n_vir_alpha,
+        std::get<qdk::chemistry::rank4_tensor<double>>(*t2_aa));
 
     // Alpha-Beta contribution
     algorithms::microsoft::MP2Calculator::compute_opposite_spin_t2(
-        eps_alpha, eps_beta, moeri_aabb, n_alpha, n_beta, n_vir_alpha,
-        n_vir_beta, stride_i, stride_j, stride_k, t2_ab);
+        eps_alpha, eps_beta, mo_aabb, n_alpha, n_beta, n_vir_alpha, n_vir_beta,
+        std::get<qdk::chemistry::rank4_tensor<double>>(*t2_ab));
 
     // Beta-Beta contribution
     algorithms::microsoft::MP2Calculator::compute_same_spin_t2(
-        eps_beta, moeri_bbbb, n_beta, n_vir_beta, stride_i, stride_j, stride_k,
-        t2_bb);
+        eps_beta, mo_bbbb, n_beta, n_vir_beta,
+        std::get<qdk::chemistry::rank4_tensor<double>>(*t2_bb));
 
-    _t2_amplitudes_abab = std::make_shared<VectorVariant>(t2_ab);
-    _t2_amplitudes_aaaa = std::make_shared<VectorVariant>(t2_aa);
-    _t2_amplitudes_bbbb = std::make_shared<VectorVariant>(t2_bb);
+    _t2_amplitudes_abab = t2_ab;
+    _t2_amplitudes_aaaa = t2_aa;
+    _t2_amplitudes_bbbb = t2_bb;
   } else {
     // Restricted MP2
     if (n_alpha != n_beta) {
@@ -195,35 +183,26 @@ void MP2Container::_compute_t2_amplitudes() const {
     const size_t n_occ = n_alpha;
     const size_t n_vir = active_space_size - n_occ;
 
-    // Get ERI span and create Eigen map for linear indexing
-    auto [aaaa, aabb, bbbb] = _hamiltonian->get_two_body_integrals();
-    size_t eri_size =
-        aaaa.extent(0) * aaaa.extent(1) * aaaa.extent(2) * aaaa.extent(3);
-    Eigen::Map<const Eigen::VectorXd> moeri(aaaa.data_handle(), eri_size);
+    // Get two-electron integrals as 4D tensor view
+    auto [mo_aaaa, mo_aabb, mo_bbbb] = _hamiltonian->get_two_body_integrals();
 
-    size_t t2_size = n_occ * n_occ * n_vir * n_vir;
-    Eigen::VectorXd t2_amplitudes(t2_size);
-    t2_amplitudes.setZero();
-
-    // Pre-compute strides for tensor indexing
-    const size_t stride_k = active_space_size;
-    const size_t stride_j = active_space_size * active_space_size;
-    const size_t stride_i =
-        active_space_size * active_space_size * active_space_size;
+    // Initialize T2 amplitudes as 4D tensor wrapped in TensorVariant
+    auto t2_amplitudes = std::make_shared<TensorVariant>(
+        qdk::chemistry::make_rank4_tensor<double>(n_occ, n_occ, n_vir, n_vir));
 
     // Compute T2 amplitudes
     algorithms::microsoft::MP2Calculator::compute_restricted_t2(
-        eps_alpha, moeri, n_occ, n_vir, stride_i, stride_j, stride_k,
-        t2_amplitudes);
+        eps_alpha, mo_aaaa, n_occ, n_vir,
+        std::get<qdk::chemistry::rank4_tensor<double>>(*t2_amplitudes));
 
-    _t2_amplitudes_abab = std::make_shared<VectorVariant>(t2_amplitudes);
-    _t2_amplitudes_aaaa = std::make_shared<VectorVariant>(t2_amplitudes);
-    _t2_amplitudes_bbbb = std::make_shared<VectorVariant>(t2_amplitudes);
+    _t2_amplitudes_abab = t2_amplitudes;
+    _t2_amplitudes_aaaa = t2_amplitudes;
+    _t2_amplitudes_bbbb = t2_amplitudes;
   }
 }
 
-std::pair<const MP2Container::VectorVariant&,
-          const MP2Container::VectorVariant&>
+std::pair<const MP2Container::MatrixVariant&,
+          const MP2Container::MatrixVariant&>
 MP2Container::get_t1_amplitudes() const {
   QDK_LOG_TRACE_ENTERING();
   if (!_t1_amplitudes_aa) {
@@ -234,9 +213,9 @@ MP2Container::get_t1_amplitudes() const {
                         std::cref(*_t1_amplitudes_bb));
 }
 
-std::tuple<const MP2Container::VectorVariant&,
-           const MP2Container::VectorVariant&,
-           const MP2Container::VectorVariant&>
+std::tuple<const MP2Container::TensorVariant&,
+           const MP2Container::TensorVariant&,
+           const MP2Container::TensorVariant&>
 MP2Container::get_t2_amplitudes() const {
   QDK_LOG_TRACE_ENTERING();
   if (!_t2_amplitudes_abab) {
@@ -456,16 +435,7 @@ std::string MP2Container::get_container_type() const {
 
 bool MP2Container::is_complex() const {
   QDK_LOG_TRACE_ENTERING();
-  if (_t1_amplitudes_aa) {
-    if (std::holds_alternative<Eigen::VectorXcd>(*_t1_amplitudes_aa)) {
-      return true;
-    }
-  }
-  if (_t2_amplitudes_abab) {
-    if (std::holds_alternative<Eigen::VectorXcd>(*_t2_amplitudes_abab)) {
-      return true;
-    }
-  }
+  // MP2 amplitudes are always real (Eigen::MatrixXd and rank4_tensor<double>)
   return false;
 }
 

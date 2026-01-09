@@ -13,6 +13,7 @@
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/tensor.hpp>
 #include <qdk/chemistry/utils/tensor_span.hpp>
 #include <stdexcept>
 #include <tuple>
@@ -109,29 +110,17 @@ double MP2Calculator::calculate_restricted_mp2_energy(
   // Calculate virtual orbital count
   const size_t n_vir = active_space_size - n_occ;
 
-  // Get two-electron integrals
-  auto [aaaa, aabb, bbbb] = ham->get_two_body_integrals();
-  size_t eri_size =
-      aaaa.extent(0) * aaaa.extent(1) * aaaa.extent(2) * aaaa.extent(3);
-  Eigen::Map<const Eigen::VectorXd> moeri(aaaa.data_handle(), eri_size);
+  // Get two-electron integrals as 4D tensor view
+  auto [mo_aaaa, mo_aabb, mo_bbbb] = ham->get_two_body_integrals();
 
   double E_MP2 = 0.0;
 
-  // Initialize T2 amplitudes storage (only for energy calculation, discarded
-  // after)
-  size_t t2_size = n_occ * n_occ * n_vir * n_vir;
-  Eigen::VectorXd t2_amplitudes(t2_size);
-  t2_amplitudes.setZero();
-
-  // Pre-compute strides for tensor indexing
-  const size_t stride_k = active_space_size;
-  const size_t stride_j = active_space_size * active_space_size;
-  const size_t stride_i =
-      active_space_size * active_space_size * active_space_size;
+  // Initialize T2 amplitudes as 4D tensor
+  auto t2_amplitudes = make_rank4_tensor<double>(n_occ, n_occ, n_vir, n_vir);
 
   // Sum over all occupied and virtual orbital pairs
-  compute_restricted_t2(eps_alpha, moeri, n_occ, n_vir, stride_i, stride_j,
-                        stride_k, t2_amplitudes, &E_MP2);
+  compute_restricted_t2(eps_alpha, mo_aaaa, n_occ, n_vir, t2_amplitudes,
+                        &E_MP2);
 
   return E_MP2;
 }
@@ -175,46 +164,29 @@ double MP2Calculator::calculate_unrestricted_mp2_energy(
   const size_t n_vir_alpha = active_space_size - n_alpha;
   const size_t n_vir_beta = active_space_size - n_beta;
 
-  auto [aaaa, aabb, bbbb] = ham->get_two_body_integrals();
-  size_t eri_size =
-      aaaa.extent(0) * aaaa.extent(1) * aaaa.extent(2) * aaaa.extent(3);
-  Eigen::Map<const Eigen::VectorXd> moeri_aaaa(aaaa.data_handle(), eri_size);
-  Eigen::Map<const Eigen::VectorXd> moeri_aabb(aabb.data_handle(), eri_size);
-  Eigen::Map<const Eigen::VectorXd> moeri_bbbb(bbbb.data_handle(), eri_size);
+  // Get two-electron integrals as 4D tensor views
+  auto [mo_aaaa, mo_aabb, mo_bbbb] = ham->get_two_body_integrals();
 
   double E_MP2_AA = 0.0, E_MP2_BB = 0.0, E_MP2_AB = 0.0;
 
-  // Initialize T2 amplitudes storage (only for energy calculation, discarded
-  // after)
-  size_t t2_aa_size = n_alpha * n_alpha * n_vir_alpha * n_vir_alpha;
-  size_t t2_ab_size = n_alpha * n_beta * n_vir_alpha * n_vir_beta;
-  size_t t2_bb_size = n_beta * n_beta * n_vir_beta * n_vir_beta;
-
-  Eigen::VectorXd t2_aa(t2_aa_size);
-  Eigen::VectorXd t2_ab(t2_ab_size);
-  Eigen::VectorXd t2_bb(t2_bb_size);
-  t2_aa.setZero();
-  t2_ab.setZero();
-  t2_bb.setZero();
-
-  // Pre-compute strides for tensor indexing
-  const size_t stride_k = active_space_size;
-  const size_t stride_j = active_space_size * active_space_size;
-  const size_t stride_i =
-      active_space_size * active_space_size * active_space_size;
+  // Initialize T2 amplitudes as 4D tensors
+  auto t2_aa =
+      make_rank4_tensor<double>(n_alpha, n_alpha, n_vir_alpha, n_vir_alpha);
+  auto t2_ab =
+      make_rank4_tensor<double>(n_alpha, n_beta, n_vir_alpha, n_vir_beta);
+  auto t2_bb =
+      make_rank4_tensor<double>(n_beta, n_beta, n_vir_beta, n_vir_beta);
 
   // Alpha-Alpha contribution
-  compute_same_spin_t2(eps_alpha, moeri_aaaa, n_alpha, n_vir_alpha, stride_i,
-                       stride_j, stride_k, t2_aa, &E_MP2_AA);
+  compute_same_spin_t2(eps_alpha, mo_aaaa, n_alpha, n_vir_alpha, t2_aa,
+                       &E_MP2_AA);
 
   // Alpha-Beta contribution
-  compute_opposite_spin_t2(eps_alpha, eps_beta, moeri_aabb, n_alpha, n_beta,
-                           n_vir_alpha, n_vir_beta, stride_i, stride_j,
-                           stride_k, t2_ab, &E_MP2_AB);
+  compute_opposite_spin_t2(eps_alpha, eps_beta, mo_aabb, n_alpha, n_beta,
+                           n_vir_alpha, n_vir_beta, t2_ab, &E_MP2_AB);
 
   // Beta-Beta contribution
-  compute_same_spin_t2(eps_beta, moeri_bbbb, n_beta, n_vir_beta, stride_i,
-                       stride_j, stride_k, t2_bb, &E_MP2_BB);
+  compute_same_spin_t2(eps_beta, mo_bbbb, n_beta, n_vir_beta, t2_bb, &E_MP2_BB);
 
   double total_energy = E_MP2_AA + E_MP2_BB + E_MP2_AB;
   return total_energy;
@@ -222,43 +194,32 @@ double MP2Calculator::calculate_unrestricted_mp2_energy(
 
 void MP2Calculator::compute_opposite_spin_t2(
     const Eigen::VectorXd& eps_i_spin, const Eigen::VectorXd& eps_j_spin,
-    const Eigen::VectorXd& moeri, size_t n_occ_i, size_t n_occ_j,
-    size_t n_vir_i, size_t n_vir_j, size_t stride_i, size_t stride_j,
-    size_t stride_k, Eigen::VectorXd& t2, double* energy) {
+    rank4_span<const double> mo_aabb, size_t n_occ_i, size_t n_occ_j,
+    size_t n_vir_i, size_t n_vir_j, rank4_tensor<double>& t2, double* energy) {
   QDK_LOG_TRACE_ENTERING();
-  // Precompute T2 tensor strides for flattened indexing
-  const size_t t2_stride_i = n_occ_j * n_vir_i * n_vir_j;
-  const size_t t2_stride_j = n_vir_i * n_vir_j;
-  const size_t t2_stride_a = n_vir_j;
 
   for (size_t i = 0; i < n_occ_i; ++i) {
     const double eps_i = eps_i_spin[i];
-    const size_t t2_i_base = i * t2_stride_i;
 
     for (size_t a = 0; a < n_vir_i; ++a) {
       const size_t a_idx = a + n_occ_i;
       const double eps_ia = eps_i - eps_i_spin[a_idx];
-      const size_t t2_ia_base = t2_i_base + a * t2_stride_a;
 
       for (size_t j = 0; j < n_occ_j; ++j) {
         const double eps_ija = eps_ia + eps_j_spin[j];
-        const size_t t2_ija_base = t2_ia_base + j * t2_stride_j;
 
         for (size_t b = 0; b < n_vir_j; ++b) {
           const size_t b_idx = b + n_occ_j;
 
-          const size_t idx_iajb =
-              i * stride_i + a_idx * stride_j + j * stride_k + b_idx;
-
-          const double eri_iajb = moeri[idx_iajb];
+          // Access integral directly using tensor indexing: (ia|jb)
+          const double eri_iajb = mo_aabb(i, a_idx, j, b_idx);
           const double denom = eps_ija - eps_j_spin[b_idx];
 
           // T2 amplitude
           const double t2_iajb = eri_iajb / denom;
 
           // Store T2 amplitude
-          const size_t t2_flat_idx = t2_ija_base + b;
-          t2[t2_flat_idx] = t2_iajb;
+          t2(i, j, a, b) = t2_iajb;
 
           // Energy contribution (if requested)
           if (energy) {
@@ -271,54 +232,39 @@ void MP2Calculator::compute_opposite_spin_t2(
 }
 
 void MP2Calculator::compute_restricted_t2(const Eigen::VectorXd& eps,
-                                          const Eigen::VectorXd& moeri,
+                                          rank4_span<const double> mo_aaaa,
                                           size_t n_occ, size_t n_vir,
-                                          size_t stride_i, size_t stride_j,
-                                          size_t stride_k, Eigen::VectorXd& t2,
+                                          rank4_tensor<double>& t2,
                                           double* energy) {
   QDK_LOG_TRACE_ENTERING();
-  // Precompute T2 tensor strides for flattened indexing
-  const size_t t2_stride_i = n_occ * n_vir * n_vir;
-  const size_t t2_stride_j = n_vir * n_vir;
-  const size_t t2_stride_a = n_vir;
 
   for (size_t i = 0; i < n_occ; ++i) {
-    const size_t i_base = i * stride_i;
-    const size_t t2_i_base = i * t2_stride_i;
-
     for (size_t j = 0; j < n_occ; ++j) {
       const double eps_ij = eps[i] + eps[j];
-      const size_t t2_ij_base = t2_i_base + j * t2_stride_j;
 
       for (size_t a = 0; a < n_vir; ++a) {
         const size_t a_idx = a + n_occ;
-        const size_t ia_base = i_base + a_idx * stride_j;
         const double eps_ija = eps_ij - eps[a_idx];
-        const size_t t2_ija_base = t2_ij_base + a * t2_stride_a;
 
         for (size_t b = 0; b < n_vir; ++b) {
           const size_t b_idx = b + n_occ;
 
           // Get integrals (ia|jb) and (ib|ja) in Mulliken notation
-          const size_t idx_iajb = ia_base + j * stride_k + b_idx;
-          const double eri_iajb = moeri[idx_iajb];
+          const double eri_iajb = mo_aaaa(i, a_idx, j, b_idx);
 
           // Energy denominator
           const double denom = eps_ija - eps[b_idx];
 
-          // T2 amplitude: T_iajb = (ia|jb) / denominator
-          const double t2_iajb = eri_iajb / denom;
+          // T2 amplitude: T_ijab = (ia|jb) / denominator
+          const double t2_ijab = eri_iajb / denom;
 
-          // Store T2 amplitude
-          const size_t t2_flat_idx = t2_ija_base + b;
-          t2[t2_flat_idx] = t2_iajb;
+          // Store T2 amplitude using tensor indexing
+          t2(i, j, a, b) = t2_ijab;
 
-          // MP2 energy: E_MP2 += T_iajb * (2*(ia|jb) - (ib|ja))
+          // MP2 energy: E_MP2 += T_ijab * (2*(ia|jb) - (ib|ja))
           if (energy) {
-            const size_t idx_ibja =
-                i_base + b_idx * stride_j + j * stride_k + a_idx;
-            const double eri_ibja = moeri[idx_ibja];
-            *energy += t2_iajb * (2.0 * eri_iajb - eri_ibja);
+            const double eri_ibja = mo_aaaa(i, b_idx, j, a_idx);
+            *energy += t2_ijab * (2.0 * eri_iajb - eri_ibja);
           }
         }
       }
@@ -327,53 +273,38 @@ void MP2Calculator::compute_restricted_t2(const Eigen::VectorXd& eps,
 }
 
 void MP2Calculator::compute_same_spin_t2(const Eigen::VectorXd& eps,
-                                         const Eigen::VectorXd& moeri,
+                                         rank4_span<const double> mo_aaaa,
                                          size_t n_occ, size_t n_vir,
-                                         size_t stride_i, size_t stride_j,
-                                         size_t stride_k, Eigen::VectorXd& t2,
+                                         rank4_tensor<double>& t2,
                                          double* energy) {
   QDK_LOG_TRACE_ENTERING();
-  // Precompute T2 tensor strides for flattened indexing
-  const size_t t2_stride_i = n_occ * n_vir * n_vir;
-  const size_t t2_stride_j = n_vir * n_vir;
-  const size_t t2_stride_a = n_vir;
 
   for (size_t i = 0; i < n_occ; ++i) {
-    const size_t i_base = i * stride_i;
-    const size_t t2_i_base = i * t2_stride_i;
-
     for (size_t a = 0; a < n_vir; ++a) {
       const size_t a_idx = a + n_occ;
-      const size_t ia_base = i_base + a_idx * stride_j;
       const double eps_ia = eps[i] - eps[a_idx];
-      const size_t t2_ia_base = t2_i_base + a * t2_stride_a;
 
       for (size_t j = i + 1; j < n_occ; ++j) {
         const double eps_ija = eps_ia + eps[j];
-        const size_t t2_ija_base = t2_ia_base + j * t2_stride_j;
 
         for (size_t b = a + 1; b < n_vir; ++b) {
           const size_t b_idx = b + n_occ;
 
-          const size_t idx_iajb = ia_base + j * stride_k + b_idx;
-          const size_t idx_ibja =
-              i_base + b_idx * stride_j + j * stride_k + a_idx;
-
-          const double eri_iajb = moeri[idx_iajb];
-          const double eri_ibja = moeri[idx_ibja];
+          // Access integrals directly using tensor indexing
+          const double eri_iajb = mo_aaaa(i, a_idx, j, b_idx);
+          const double eri_ibja = mo_aaaa(i, b_idx, j, a_idx);
           const double antisym_integral = eri_iajb - eri_ibja;
           const double denom = eps_ija - eps[b_idx];
 
           // T2 amplitude
-          const double t2_iajb = antisym_integral / denom;
+          const double t2_ijab = antisym_integral / denom;
 
-          // Store T2 amplitude
-          const size_t t2_flat_idx = t2_ija_base + b;
-          t2[t2_flat_idx] = t2_iajb;
+          // Store T2 amplitude using tensor indexing
+          t2(i, j, a, b) = t2_ijab;
 
           // Energy contribution (if requested)
           if (energy) {
-            *energy += t2_iajb * antisym_integral;
+            *energy += t2_ijab * antisym_integral;
           }
         }
       }

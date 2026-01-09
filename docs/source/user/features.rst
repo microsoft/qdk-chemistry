@@ -250,6 +250,15 @@ MACIS :cite:`Williams-Young2023`
    The Many-body Adaptive Configuration Interaction Solver powers QDK/Chemistry's selected CI capabilities. :term:`MACIS` implements the :term:`ASCI` algorithm with distributed-memory parallelism, enabling treatment of active spaces far beyond the reach of conventional exact diagonalization.
 
 
+Multidimensional Array Support
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Kokkos mdspan/mdarray
+   QDK/Chemistry uses the `Kokkos <https://github.com/kokkos/mdspan>`_ reference implementation of C++ mdspan (P0009) and mdarray (P1684) for efficient multidimensional array views and storage.
+   These types provide zero-overhead abstractions for accessing tensor data such as two-electron integrals and coupled cluster amplitudes with intuitive multi-index syntax (e.g., ``tensor(i, j, k, l)``).
+   The Kokkos implementation is header-only and is bundled with QDK/Chemistry.
+
+
 Plugins
 ^^^^^^^
 

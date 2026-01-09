@@ -9,6 +9,8 @@
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
+#include <qdk/chemistry/utils/tensor.hpp>
+#include <qdk/chemistry/utils/tensor_span.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -68,20 +70,16 @@ class MP2Calculator : public DynamicalCorrelationCalculator {
    * (alpha-alpha or beta-beta), which have antisymmetric exchange integrals.
    *
    * @param eps Orbital energies
-   * @param moeri Two-electron repulsion integrals (MO basis)
+   * @param mo_aaaa Two-electron integrals in MO basis 
    * @param n_occ Number of occupied orbitals
    * @param n_vir Number of virtual orbitals
-   * @param stride_i Stride for first index in 4D integral array
-   * @param stride_j Stride for second index in 4D integral array
-   * @param stride_k Stride for third index in 4D integral array
-   * @param t2 Output vector for T2 amplitudes (will be filled)
+   * @param t2 Output tensor for T2 amplitudes
    * @param energy Optional pointer to accumulate energy contribution
    */
   static void compute_same_spin_t2(const Eigen::VectorXd& eps,
-                                   const Eigen::VectorXd& moeri, size_t n_occ,
-                                   size_t n_vir, size_t stride_i,
-                                   size_t stride_j, size_t stride_k,
-                                   Eigen::VectorXd& t2,
+                                   rank4_span<const double> mo_aaaa,
+                                   size_t n_occ, size_t n_vir,
+                                   rank4_tensor<double>& t2,
                                    double* energy = nullptr);
 
   /**
@@ -92,22 +90,21 @@ class MP2Calculator : public DynamicalCorrelationCalculator {
    *
    * @param eps_i_spin Orbital energies for i,a indices
    * @param eps_j_spin Orbital energies for j,b indices
-   * @param moeri Two-electron repulsion integrals (MO basis)
+   * @param mo_aabb Two-electron integrals in MO basis
    * @param n_occ_i Number of occupied orbitals (i spin)
    * @param n_occ_j Number of occupied orbitals (j spin)
    * @param n_vir_i Number of virtual orbitals (i spin)
    * @param n_vir_j Number of virtual orbitals (j spin)
-   * @param stride_i Stride for first index in 4D integral array
-   * @param stride_j Stride for second index in 4D integral array
-   * @param stride_k Stride for third index in 4D integral array
-   * @param t2 Output vector for T2 amplitudes (will be filled)
+   * @param t2 Output tensor for T2 amplitudes
    * @param energy Optional pointer to accumulate energy contribution
    */
-  static void compute_opposite_spin_t2(
-      const Eigen::VectorXd& eps_i_spin, const Eigen::VectorXd& eps_j_spin,
-      const Eigen::VectorXd& moeri, size_t n_occ_i, size_t n_occ_j,
-      size_t n_vir_i, size_t n_vir_j, size_t stride_i, size_t stride_j,
-      size_t stride_k, Eigen::VectorXd& t2, double* energy = nullptr);
+  static void compute_opposite_spin_t2(const Eigen::VectorXd& eps_i_spin,
+                                       const Eigen::VectorXd& eps_j_spin,
+                                       rank4_span<const double> mo_aabb,
+                                       size_t n_occ_i, size_t n_occ_j,
+                                       size_t n_vir_i, size_t n_vir_j,
+                                       rank4_tensor<double>& t2,
+                                       double* energy = nullptr);
 
   /**
    * @brief Compute restricted T2 amplitudes
@@ -115,20 +112,16 @@ class MP2Calculator : public DynamicalCorrelationCalculator {
    * This helper computes T2 amplitudes for restricted (closed-shell) systems.
    *
    * @param eps Orbital energies
-   * @param moeri Two-electron repulsion integrals (MO basis)
+   * @param mo_aaaa Two-electron integrals in MO basis 
    * @param n_occ Number of occupied orbitals
    * @param n_vir Number of virtual orbitals
-   * @param stride_i Stride for first index in 4D integral array
-   * @param stride_j Stride for second index in 4D integral array
-   * @param stride_k Stride for third index in 4D integral array
-   * @param t2 Output vector for T2 amplitudes (will be filled)
+   * @param t2 Output tensor for T2 amplitudes
    * @param energy Optional pointer to accumulate energy contribution
    */
   static void compute_restricted_t2(const Eigen::VectorXd& eps,
-                                    const Eigen::VectorXd& moeri, size_t n_occ,
-                                    size_t n_vir, size_t stride_i,
-                                    size_t stride_j, size_t stride_k,
-                                    Eigen::VectorXd& t2,
+                                    rank4_span<const double> mo_aaaa,
+                                    size_t n_occ, size_t n_vir,
+                                    rank4_tensor<double>& t2,
                                     double* energy = nullptr);
 
   /**

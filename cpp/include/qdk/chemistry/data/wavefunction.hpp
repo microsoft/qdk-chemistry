@@ -12,6 +12,7 @@
 #include <qdk/chemistry/data/configuration.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/utils/tensor.hpp>
 #include <string>
 #include <tuple>
 #include <variant>
@@ -46,6 +47,15 @@ using VectorVariant = std::variant<Eigen::VectorXd, Eigen::VectorXcd>;
 
 // Matrix types
 using MatrixVariant = std::variant<Eigen::MatrixXd, Eigen::MatrixXcd>;
+
+// Rank-4 tensor types (e.g., for two-electron integrals or T2 amplitudes)
+using Rank4TensorVariant =
+    std::variant<qdk::chemistry::rank4_tensor<double>,
+                 qdk::chemistry::rank4_tensor<std::complex<double>>>;
+
+// Type alias for generic tensor data (real or complex)
+// This is the preferred type for tensor storage in wavefunction containers
+using TensorVariant = Rank4TensorVariant;
 
 // Common types
 using DeterminantVector = std::vector<Configuration>;

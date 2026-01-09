@@ -7,6 +7,8 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
+#include <cmath>
+#include <complex>
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -169,24 +171,51 @@ TEST_F(MP2Test, MP2Container) {
       << "T2 amplitudes should be cached after first access";
 
   // Verify T1 amplitudes are zero for MP2
-  auto check_t1_zero = [](const MP2Container::VectorVariant& t1) {
-    return std::visit([](auto&& vec) { return vec.isZero(1e-10); }, t1);
+  std::visit(
+      [](const auto& mat) {
+        EXPECT_TRUE(mat.isZero(1e-10))
+            << "T1 alpha amplitudes should be zero for MP2";
+      },
+      t1_aa);
+  std::visit(
+      [](const auto& mat) {
+        EXPECT_TRUE(mat.isZero(1e-10))
+            << "T1 beta amplitudes should be zero for MP2";
+      },
+      t1_bb);
+
+  // Verify T2 amplitudes are non-zero 
+  auto compute_tensor_norm = [](const auto& t) {
+    double sum = 0.0;
+    const auto* data = t.data();
+    size_t size = t.extent(0) * t.extent(1) * t.extent(2) * t.extent(3);
+    for (size_t i = 0; i < size; ++i) {
+      if constexpr (std::is_same_v<std::remove_cvref_t<decltype(data[i])>,
+                                   std::complex<double>>) {
+        sum += std::norm(data[i]);  // |z|^2 for complex
+      } else {
+        sum += data[i] * data[i];
+      }
+    }
+    return std::sqrt(sum);
   };
 
-  EXPECT_TRUE(check_t1_zero(t1_aa))
-      << "T1 alpha amplitudes should be zero for MP2";
-  EXPECT_TRUE(check_t1_zero(t1_bb))
-      << "T1 beta amplitudes should be zero for MP2";
-
-  // Verify T2 amplitudes are non-zero
-  auto check_t2_nonzero = [](const MP2Container::VectorVariant& t2) {
-    return std::visit([](auto&& vec) { return vec.norm() > 1e-10; }, t2);
-  };
-
-  EXPECT_TRUE(check_t2_nonzero(t2_abab))
-      << "T2 alpha-beta amplitudes should be non-zero for MP2";
-  EXPECT_TRUE(check_t2_nonzero(t2_aaaa))
-      << "T2 alpha-alpha amplitudes should be non-zero for MP2";
-  EXPECT_TRUE(check_t2_nonzero(t2_bbbb))
-      << "T2 beta-beta amplitudes should be non-zero for MP2";
+  std::visit(
+      [&compute_tensor_norm](const auto& t) {
+        EXPECT_GT(compute_tensor_norm(t), 1e-10)
+            << "T2 alpha-beta amplitudes should be non-zero for MP2";
+      },
+      t2_abab);
+  std::visit(
+      [&compute_tensor_norm](const auto& t) {
+        EXPECT_GT(compute_tensor_norm(t), 1e-10)
+            << "T2 alpha-alpha amplitudes should be non-zero for MP2";
+      },
+      t2_aaaa);
+  std::visit(
+      [&compute_tensor_norm](const auto& t) {
+        EXPECT_GT(compute_tensor_norm(t), 1e-10)
+            << "T2 beta-beta amplitudes should be non-zero for MP2";
+      },
+      t2_bbbb);
 }

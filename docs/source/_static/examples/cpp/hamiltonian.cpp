@@ -40,11 +40,11 @@ auto [h1_a, h1_b] = hamiltonian.get_one_body_integrals();
 // Access two-electron integrals, returns triple of const Eigen::VectorXd&
 auto [h2_aaaa, h2_aabb, h2_bbbb] = hamiltonian.get_two_body_integrals();
 
-// Access a specific one-electron integral <ij> (for aa spin channel)
+// Access a specific one-electron integral (ij) (for aa spin channel)
 double one_body_element =
     hamiltonian.get_one_body_element(i, j, SpinChannel::aa);
 
-// Access a specific two-electron integral <ij|kl> (for aaaa spin channel)
+// Access a specific two-electron integral (ij|kl) (for aaaa spin channel)
 double two_body_element =
     hamiltonian.get_two_body_element(i, j, k, l, SpinChannel::aaaa);
 
