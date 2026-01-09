@@ -845,4 +845,7 @@ Examples:
         // __setstate__ - deserialize from JSON string
         return *Hamiltonian::from_json(nlohmann::json::parse(json_str));
       }));
+
+  // Data type name
+  hamiltonian.attr("_data_type_name") = "hamiltonian";
 }

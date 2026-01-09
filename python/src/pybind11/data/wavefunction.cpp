@@ -752,6 +752,9 @@ Examples:
         return *wf_ptr;
       }));
 
+  // Data type name
+  wavefunction.attr("_data_type_name") = "wavefunction";
+
   // Bind SciWavefunctionContainer
   py::class_<SciWavefunctionContainer, WavefunctionContainer, py::smart_holder>(
       data, "SciWavefunctionContainer",

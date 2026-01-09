@@ -665,4 +665,7 @@ Examples:
             StabilityResult::from_json(nlohmann::json::parse(json_str));
         return *result;
       }));
+
+  // Data type name for serialization filename validation
+  stability_result.attr("_data_type_name") = "stability_result";
 }

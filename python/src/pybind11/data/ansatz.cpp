@@ -383,4 +383,7 @@ Raises:
         // __setstate__ - deserialize from JSON string
         return *Ansatz::from_json(nlohmann::json::parse(json_str));
       }));
+
+  // Data type name
+  ansatz.attr("_data_type_name") = "ansatz";
 }

@@ -818,6 +818,9 @@ Examples:
             return *Orbitals::from_json(nlohmann::json::parse(json_str));
           }));
 
+  // Data type name
+  orbitals.attr("_data_type_name") = "orbitals";
+
   // Bind ModelOrbitals
   bind_model_orbitals(data);
 }
