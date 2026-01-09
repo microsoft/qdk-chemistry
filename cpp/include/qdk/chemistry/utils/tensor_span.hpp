@@ -1,5 +1,8 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See LICENSE.txt in the project root for
+ * license information.
+ */
 
 #pragma once
 
@@ -31,7 +34,7 @@ using tensor_span =
                               detail::mdspan_ns::layout_right>;
 
 /**
- * @brief Four-dimensional tensor span with column-major layout.
+ * @brief Four-dimensional tensor span with row-major layout.
  * @tparam T Element type
  */
 template <typename T>

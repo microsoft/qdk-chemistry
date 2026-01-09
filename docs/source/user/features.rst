@@ -254,7 +254,7 @@ Multidimensional Array Support
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Kokkos mdspan/mdarray
-   QDK/Chemistry uses the `Kokkos <https://github.com/kokkos/mdspan>`_ reference implementation of C++ mdspan (P0009) and mdarray (P1684) for efficient multidimensional array views and storage.
+   QDK/Chemistry uses the `Kokkos <https://github.com/kokkos/mdspan>`_ reference implementation of C++ mdspan (`P0009 <https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p0009r18.html>`_) and mdarray (`P1684 <https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1684r4.html>`_) for efficient multidimensional array views and storage.
    These types provide zero-overhead abstractions for accessing tensor data such as two-electron integrals and coupled cluster amplitudes with intuitive multi-index syntax (e.g., ``tensor(i, j, k, l)``).
    The Kokkos implementation is header-only and is bundled with QDK/Chemistry.
 

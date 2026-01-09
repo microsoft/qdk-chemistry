@@ -69,18 +69,23 @@ class MP2Calculator : public DynamicalCorrelationCalculator {
    * This helper computes T2 amplitudes for same-spin electron pairs
    * (alpha-alpha or beta-beta), which have antisymmetric exchange integrals.
    *
+   * @note Tensor dimensions are deduced from the output tensor `t2`:
+   * - `n_occ = t2.extent(0) = t2.extent(1)` (number of occupied orbitals)
+   * - `n_vir = t2.extent(2) = t2.extent(3)` (number of virtual orbitals)
+   *
+   * The caller must allocate `t2` with the correct shape before calling.
+   *
+   * @tparam Scalar Numeric type
    * @param eps Orbital energies
-   * @param mo_aaaa Two-electron integrals in MO basis 
-   * @param n_occ Number of occupied orbitals
-   * @param n_vir Number of virtual orbitals
+   * @param mo_aaaa Two-electron integrals in MO basis
    * @param t2 Output tensor for T2 amplitudes
    * @param energy Optional pointer to accumulate energy contribution
    */
+  template <typename Scalar>
   static void compute_same_spin_t2(const Eigen::VectorXd& eps,
-                                   rank4_span<const double> mo_aaaa,
-                                   size_t n_occ, size_t n_vir,
-                                   rank4_tensor<double>& t2,
-                                   double* energy = nullptr);
+                                   rank4_span<const Scalar> mo_aaaa,
+                                   rank4_tensor<Scalar>& t2,
+                                   Scalar* energy = nullptr);
 
   /**
    * @brief Compute opposite-spin T2 amplitudes
@@ -88,41 +93,50 @@ class MP2Calculator : public DynamicalCorrelationCalculator {
    * This helper computes T2 amplitudes for opposite-spin electron pairs
    * (alpha-beta), which don't have antisymmetric exchange.
    *
+   * @note Tensor dimensions are deduced from the output tensor `t2`:
+   * - `n_occ_i = t2.extent(0)` (occupied orbitals for spin i)
+   * - `n_occ_j = t2.extent(1)` (occupied orbitals for spin j)
+   * - `n_vir_i = t2.extent(2)` (virtual orbitals for spin i)
+   * - `n_vir_j = t2.extent(3)` (virtual orbitals for spin j)
+   *
+   * The caller must allocate `t2` with the correct shape before calling.
+   *
+   * @tparam Scalar Numeric type
    * @param eps_i_spin Orbital energies for i,a indices
    * @param eps_j_spin Orbital energies for j,b indices
    * @param mo_aabb Two-electron integrals in MO basis
-   * @param n_occ_i Number of occupied orbitals (i spin)
-   * @param n_occ_j Number of occupied orbitals (j spin)
-   * @param n_vir_i Number of virtual orbitals (i spin)
-   * @param n_vir_j Number of virtual orbitals (j spin)
    * @param t2 Output tensor for T2 amplitudes
    * @param energy Optional pointer to accumulate energy contribution
    */
+  template <typename Scalar>
   static void compute_opposite_spin_t2(const Eigen::VectorXd& eps_i_spin,
                                        const Eigen::VectorXd& eps_j_spin,
-                                       rank4_span<const double> mo_aabb,
-                                       size_t n_occ_i, size_t n_occ_j,
-                                       size_t n_vir_i, size_t n_vir_j,
-                                       rank4_tensor<double>& t2,
-                                       double* energy = nullptr);
+                                       rank4_span<const Scalar> mo_aabb,
+                                       rank4_tensor<Scalar>& t2,
+                                       Scalar* energy = nullptr);
 
   /**
    * @brief Compute restricted T2 amplitudes
    *
    * This helper computes T2 amplitudes for restricted (closed-shell) systems.
    *
+   * @note Tensor dimensions are deduced from the output tensor `t2`:
+   * - `n_occ = t2.extent(0) = t2.extent(1)` (number of occupied orbitals)
+   * - `n_vir = t2.extent(2) = t2.extent(3)` (number of virtual orbitals)
+   *
+   * The caller must allocate `t2` with the correct shape before calling.
+   *
+   * @tparam Scalar Numeric type
    * @param eps Orbital energies
-   * @param mo_aaaa Two-electron integrals in MO basis 
-   * @param n_occ Number of occupied orbitals
-   * @param n_vir Number of virtual orbitals
+   * @param mo_aaaa Two-electron integrals in MO basis
    * @param t2 Output tensor for T2 amplitudes
    * @param energy Optional pointer to accumulate energy contribution
    */
+  template <typename Scalar>
   static void compute_restricted_t2(const Eigen::VectorXd& eps,
-                                    rank4_span<const double> mo_aaaa,
-                                    size_t n_occ, size_t n_vir,
-                                    rank4_tensor<double>& t2,
-                                    double* energy = nullptr);
+                                    rank4_span<const Scalar> mo_aaaa,
+                                    rank4_tensor<Scalar>& t2,
+                                    Scalar* energy = nullptr);
 
   /**
    * @brief Calculate restricted MP2 correlation energy

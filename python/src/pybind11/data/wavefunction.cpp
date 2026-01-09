@@ -47,13 +47,19 @@ py::object variant_to_python(
     const qdk::chemistry::data::ContainerTypes::TensorVariant& var) {
   return std::visit(
       [](const auto& value) -> py::object {
-        // Convert mdarray to numpy array
-        // Get the data pointer and extents
+        // Convert mdarray to numpy array with dynamic rank support (up to 6)
+        // Get the data pointer
         const auto* data = value.data();
-        std::vector<ssize_t> shape = {static_cast<ssize_t>(value.extent(0)),
-                                      static_cast<ssize_t>(value.extent(1)),
-                                      static_cast<ssize_t>(value.extent(2)),
-                                      static_cast<ssize_t>(value.extent(3))};
+
+        // Build shape vector dynamically based on the tensor's rank
+        std::vector<ssize_t> shape;
+        constexpr size_t rank = std::remove_cvref_t<decltype(value)>::rank();
+        static_assert(rank <= 6,
+                      "variant_to_python supports tensors up to rank 6");
+        for (size_t i = 0; i < rank; ++i) {
+          shape.push_back(static_cast<ssize_t>(value.extent(i)));
+        }
+
         // Create numpy array from data (row-major layout)
         return py::array(
             py::dtype::of<

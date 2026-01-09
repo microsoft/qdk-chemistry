@@ -100,7 +100,7 @@ void MP2Container::_compute_t1_amplitudes() const {
   const size_t n_vir_alpha = active_space_size - n_alpha;
   const size_t n_vir_beta = active_space_size - n_beta;
 
-  // For MP2, T1 amplitudes are always zero 
+  // For MP2, T1 amplitudes are always zero
   Eigen::MatrixXd t1_aa = Eigen::MatrixXd::Zero(n_alpha, n_vir_alpha);
   Eigen::MatrixXd t1_bb = Eigen::MatrixXd::Zero(n_beta, n_vir_beta);
   _t1_amplitudes_aa = std::make_shared<MatrixVariant>(std::move(t1_aa));
@@ -156,17 +156,17 @@ void MP2Container::_compute_t2_amplitudes() const {
 
     // Alpha-Alpha contribution
     algorithms::microsoft::MP2Calculator::compute_same_spin_t2(
-        eps_alpha, mo_aaaa, n_alpha, n_vir_alpha,
+        eps_alpha, mo_aaaa,
         std::get<qdk::chemistry::rank4_tensor<double>>(*t2_aa));
 
     // Alpha-Beta contribution
     algorithms::microsoft::MP2Calculator::compute_opposite_spin_t2(
-        eps_alpha, eps_beta, mo_aabb, n_alpha, n_beta, n_vir_alpha, n_vir_beta,
+        eps_alpha, eps_beta, mo_aabb,
         std::get<qdk::chemistry::rank4_tensor<double>>(*t2_ab));
 
     // Beta-Beta contribution
     algorithms::microsoft::MP2Calculator::compute_same_spin_t2(
-        eps_beta, mo_bbbb, n_beta, n_vir_beta,
+        eps_beta, mo_bbbb,
         std::get<qdk::chemistry::rank4_tensor<double>>(*t2_bb));
 
     _t2_amplitudes_abab = t2_ab;
@@ -192,7 +192,7 @@ void MP2Container::_compute_t2_amplitudes() const {
 
     // Compute T2 amplitudes
     algorithms::microsoft::MP2Calculator::compute_restricted_t2(
-        eps_alpha, mo_aaaa, n_occ, n_vir,
+        eps_alpha, mo_aaaa,
         std::get<qdk::chemistry::rank4_tensor<double>>(*t2_amplitudes));
 
     _t2_amplitudes_abab = t2_amplitudes;

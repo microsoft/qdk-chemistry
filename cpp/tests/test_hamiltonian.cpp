@@ -20,19 +20,55 @@
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <qdk/chemistry/utils/tensor.hpp>
 #include <qdk/chemistry/utils/tensor_span.hpp>
+#include <random>
 
 #include "ut_common.hpp"
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
-// Local helper to convert a rank4_span to Eigen::VectorXd for test comparisons
+// Random number generator for tests
+std::mt19937& get_test_rng() {
+  static std::mt19937 rng{std::random_device{}()};
+  return rng;
+}
+
+// Helper to compare two rank4_spans for approximate equality
+template <typename T1, typename T2>
+bool spans_approx_equal(const qdk::chemistry::rank4_span<T1>& a,
+                        const qdk::chemistry::rank4_span<T2>& b,
+                        double tol = 1e-10) {
+  if (a.extent(0) != b.extent(0) || a.extent(1) != b.extent(1) ||
+      a.extent(2) != b.extent(2) || a.extent(3) != b.extent(3)) {
+    return false;
+  }
+  const size_t size = a.extent(0) * a.extent(1) * a.extent(2) * a.extent(3);
+  for (size_t i = 0; i < size; ++i) {
+    if (std::abs(a.data_handle()[i] - b.data_handle()[i]) > tol) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Helper to fill a rank4_tensor with random values
 template <typename T>
-Eigen::VectorXd span_to_vector(const qdk::chemistry::rank4_span<T>& span) {
-  size_t size =
-      span.extent(0) * span.extent(1) * span.extent(2) * span.extent(3);
-  Eigen::VectorXd result(static_cast<Eigen::Index>(size));
-  std::copy(span.data_handle(), span.data_handle() + size, result.data());
-  return result;
+void random_fill_tensor(qdk::chemistry::rank4_tensor<T>& tensor) {
+  std::uniform_real_distribution<T> dist(0.0, 1.0);
+  const size_t size =
+      tensor.extent(0) * tensor.extent(1) * tensor.extent(2) * tensor.extent(3);
+  for (size_t i = 0; i < size; ++i) {
+    tensor.data()[i] = dist(get_test_rng());
+  }
+}
+
+// Helper to fill a rank4_tensor with a constant value
+template <typename T>
+void constant_fill_tensor(qdk::chemistry::rank4_tensor<T>& tensor, T value) {
+  const size_t size =
+      tensor.extent(0) * tensor.extent(1) * tensor.extent(2) * tensor.extent(3);
+  for (size_t i = 0; i < size; ++i) {
+    tensor.data()[i] = value;
+  }
 }
 
 class HamiltonianTest : public ::testing::Test {
@@ -43,8 +79,9 @@ class HamiltonianTest : public ::testing::Test {
     one_body(0, 1) = 0.5;
     one_body(1, 0) = 0.5;
 
-    two_body = 2 * Eigen::VectorXd::Ones(16);
     norb = 2;
+    two_body_tensor = qdk::chemistry::make_rank4_tensor<double>(norb);
+    constant_fill_tensor(two_body_tensor, 2.0);
 
     // Create a test Orbitals object using ModelOrbitals for model systems
     orbitals =
@@ -57,9 +94,10 @@ class HamiltonianTest : public ::testing::Test {
     inactive_fock = Eigen::MatrixXd::Zero(0, 0);
   }
 
-  // Helper to create rank4_span from two_body VectorXd
+  // Helper to create rank4_span from two_body tensor
   qdk::chemistry::rank4_span<const double> two_body_span() const {
-    return qdk::chemistry::make_rank4_span(two_body.data(), norb);
+    return qdk::chemistry::rank4_span<const double>(two_body_tensor.data(),
+                                                    two_body_tensor.mapping());
   }
 
   void TearDown() override {
@@ -70,7 +108,7 @@ class HamiltonianTest : public ::testing::Test {
   }
 
   Eigen::MatrixXd one_body;
-  Eigen::VectorXd two_body;
+  qdk::chemistry::rank4_tensor<double> two_body_tensor;
   size_t norb;
   std::shared_ptr<Orbitals> orbitals;
   unsigned num_electrons;
@@ -134,11 +172,13 @@ class TestHamiltonianConstructor : public HamiltonianConstructor {
       std::shared_ptr<Orbitals> orbitals) const override {
     // Dummy implementation for testing
     Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(3, 3);
-    Eigen::VectorXd two_body = Eigen::VectorXd::Random(81);
+    auto two_body = qdk::chemistry::make_rank4_tensor<double>(3);
+    random_fill_tensor(two_body);
     Eigen::MatrixXd f_inact = Eigen::MatrixXd::Identity(0, 0);
-    return std::make_shared<Hamiltonian>(
-        one_body, qdk::chemistry::make_rank4_span(two_body.data(), 3), orbitals,
-        0.0, f_inact);
+    qdk::chemistry::rank4_span<const double> two_body_span(two_body.data(),
+                                                           two_body.mapping());
+    return std::make_shared<Hamiltonian>(one_body, two_body_span, orbitals, 0.0,
+                                         f_inact);
   }
 };
 
@@ -213,16 +253,10 @@ TEST_F(HamiltonianTest, CopyConstructorAndAssignment) {
 
   // Compare each component of the two-body integrals using span accessors
   auto [h1_span_aaaa, h1_span_aabb, h1_span_bbbb] = h1.get_two_body_integrals();
-  auto h1_two_aaaa = span_to_vector(h1_span_aaaa);
-  auto h1_two_aabb = span_to_vector(h1_span_aabb);
-  auto h1_two_bbbb = span_to_vector(h1_span_bbbb);
   auto [h2_span_aaaa, h2_span_aabb, h2_span_bbbb] = h2.get_two_body_integrals();
-  auto h2_two_aaaa = span_to_vector(h2_span_aaaa);
-  auto h2_two_aabb = span_to_vector(h2_span_aabb);
-  auto h2_two_bbbb = span_to_vector(h2_span_bbbb);
-  EXPECT_TRUE(h1_two_aaaa.isApprox(h2_two_aaaa));
-  EXPECT_TRUE(h1_two_aabb.isApprox(h2_two_aabb));
-  EXPECT_TRUE(h1_two_bbbb.isApprox(h2_two_bbbb));
+  EXPECT_TRUE(spans_approx_equal(h1_span_aaaa, h2_span_aaaa));
+  EXPECT_TRUE(spans_approx_equal(h1_span_aabb, h2_span_aabb));
+  EXPECT_TRUE(spans_approx_equal(h1_span_bbbb, h2_span_bbbb));
   EXPECT_TRUE(h1.get_inactive_fock_matrix().first.isApprox(
       h2.get_inactive_fock_matrix().first));
 
@@ -257,7 +291,7 @@ TEST_F(HamiltonianTest, TwoBodySpanAccess) {
   // Create a Hamiltonian with known two-body integrals
   Eigen::MatrixXd test_one_body = Eigen::MatrixXd::Identity(2, 2);
 
-  // Create a rank4_tensor and set values we can test 
+  // Create a rank4_tensor and set values we can test
   auto test_two_body = qdk::chemistry::make_rank4_tensor<double>(2);
   test_two_body(0, 0, 0, 0) = 1.0;
   test_two_body(0, 0, 0, 1) = 2.0;
@@ -342,17 +376,11 @@ TEST_F(HamiltonianTest, JSONSerialization) {
 
   // Check two body
   auto [h_span_aaaa, h_span_aabb, h_span_bbbb] = h.get_two_body_integrals();
-  auto h_two_aaaa = span_to_vector(h_span_aaaa);
-  auto h_two_aabb = span_to_vector(h_span_aabb);
-  auto h_two_bbbb = span_to_vector(h_span_bbbb);
   auto [h2_span_aaaa, h2_span_aabb, h2_span_bbbb] =
       h2->get_two_body_integrals();
-  auto h2_two_aaaa = span_to_vector(h2_span_aaaa);
-  auto h2_two_aabb = span_to_vector(h2_span_aabb);
-  auto h2_two_bbbb = span_to_vector(h2_span_bbbb);
-  EXPECT_TRUE(h_two_aaaa.isApprox(h2_two_aaaa));
-  EXPECT_TRUE(h_two_aabb.isApprox(h2_two_aabb));
-  EXPECT_TRUE(h_two_bbbb.isApprox(h2_two_bbbb));
+  EXPECT_TRUE(spans_approx_equal(h_span_aaaa, h2_span_aaaa));
+  EXPECT_TRUE(spans_approx_equal(h_span_aabb, h2_span_aabb));
+  EXPECT_TRUE(spans_approx_equal(h_span_bbbb, h2_span_bbbb));
 
   // Check they are still restricted
   EXPECT_TRUE(h2->is_restricted());
@@ -385,17 +413,11 @@ TEST_F(HamiltonianTest, JSONFileIO) {
   EXPECT_TRUE(h_one_beta.isApprox(h2_one_beta));
 
   auto [h_span_aaaa, h_span_aabb, h_span_bbbb] = h.get_two_body_integrals();
-  auto h_two_aaaa = span_to_vector(h_span_aaaa);
-  auto h_two_aabb = span_to_vector(h_span_aabb);
-  auto h_two_bbbb = span_to_vector(h_span_bbbb);
   auto [h2_span_aaaa, h2_span_aabb, h2_span_bbbb] =
       h2->get_two_body_integrals();
-  auto h2_two_aaaa = span_to_vector(h2_span_aaaa);
-  auto h2_two_aabb = span_to_vector(h2_span_aabb);
-  auto h2_two_bbbb = span_to_vector(h2_span_bbbb);
-  EXPECT_TRUE(h_two_aaaa.isApprox(h2_two_aaaa));
-  EXPECT_TRUE(h_two_aabb.isApprox(h2_two_aabb));
-  EXPECT_TRUE(h_two_bbbb.isApprox(h2_two_bbbb));
+  EXPECT_TRUE(spans_approx_equal(h_span_aaaa, h2_span_aaaa));
+  EXPECT_TRUE(spans_approx_equal(h_span_aabb, h2_span_aabb));
+  EXPECT_TRUE(spans_approx_equal(h_span_bbbb, h2_span_bbbb));
 
   // Check still restricted
   EXPECT_TRUE(h2->is_restricted());
@@ -428,17 +450,11 @@ TEST_F(HamiltonianTest, HDF5FileIO) {
   EXPECT_TRUE(h_one_beta.isApprox(h2_one_beta));
 
   auto [h_span_aaaa, h_span_aabb, h_span_bbbb] = h.get_two_body_integrals();
-  auto h_two_aaaa = span_to_vector(h_span_aaaa);
-  auto h_two_aabb = span_to_vector(h_span_aabb);
-  auto h_two_bbbb = span_to_vector(h_span_bbbb);
   auto [h2_span_aaaa, h2_span_aabb, h2_span_bbbb] =
       h2->get_two_body_integrals();
-  auto h2_two_aaaa = span_to_vector(h2_span_aaaa);
-  auto h2_two_aabb = span_to_vector(h2_span_aabb);
-  auto h2_two_bbbb = span_to_vector(h2_span_bbbb);
-  EXPECT_TRUE(h_two_aaaa.isApprox(h2_two_aaaa));
-  EXPECT_TRUE(h_two_aabb.isApprox(h2_two_aabb));
-  EXPECT_TRUE(h_two_bbbb.isApprox(h2_two_bbbb));
+  EXPECT_TRUE(spans_approx_equal(h_span_aaaa, h2_span_aaaa));
+  EXPECT_TRUE(spans_approx_equal(h_span_aabb, h2_span_aabb));
+  EXPECT_TRUE(spans_approx_equal(h_span_bbbb, h2_span_bbbb));
 }
 
 TEST_F(HamiltonianTest, GenericFileIO) {
@@ -489,35 +505,37 @@ TEST_F(HamiltonianTest, ValidationTests) {
   // Test validation of integral dimensions during construction
   // Mismatched dimensions should throw during construction
   Eigen::MatrixXd bad_one_body = Eigen::MatrixXd::Identity(3, 3);
-  Eigen::VectorXd bad_two_body =
-      Eigen::VectorXd::Random(16);  // Should be 81 for 3x3
+  auto bad_two_body =
+      qdk::chemistry::make_rank4_tensor<double>(2);  // 2^4=16, mismatches 3x3
+  random_fill_tensor(bad_two_body);
 
-  EXPECT_THROW(Hamiltonian(bad_one_body,
-                           qdk::chemistry::make_rank4_span(bad_two_body.data(),
-                                                           size_t(2)),
-                           orbitals, core_energy, inactive_fock),
-               std::invalid_argument);
+  qdk::chemistry::rank4_span<const double> bad_span(bad_two_body.data(),
+                                                    bad_two_body.mapping());
+  EXPECT_THROW(
+      Hamiltonian(bad_one_body, bad_span, orbitals, core_energy, inactive_fock),
+      std::invalid_argument);
 
   // Test validation with non-square one-body matrix
   Eigen::MatrixXd non_square_one_body(2, 3);  // 2x3 non-square matrix
   non_square_one_body.setRandom();
-  Eigen::VectorXd any_two_body = Eigen::VectorXd::Random(36);
-  size_t any_norb = 2;
+  auto any_two_body = qdk::chemistry::make_rank4_tensor<double>(2);
+  random_fill_tensor(any_two_body);
 
-  EXPECT_THROW(Hamiltonian(non_square_one_body,
-                           qdk::chemistry::make_rank4_span(any_two_body.data(),
-                                                           any_norb),
-                           orbitals, core_energy, inactive_fock),
+  qdk::chemistry::rank4_span<const double> any_span(any_two_body.data(),
+                                                    any_two_body.mapping());
+  EXPECT_THROW(Hamiltonian(non_square_one_body, any_span, orbitals, core_energy,
+                           inactive_fock),
                std::invalid_argument);
 
   // Test validation passes with correct dimensions
   Eigen::MatrixXd correct_one_body = Eigen::MatrixXd::Identity(2, 2);
-  Eigen::VectorXd correct_two_body = Eigen::VectorXd::Random(16);  // 2^4 = 16
+  auto correct_two_body = qdk::chemistry::make_rank4_tensor<double>(2);
+  random_fill_tensor(correct_two_body);
 
-  EXPECT_NO_THROW(Hamiltonian(
-      correct_one_body,
-      qdk::chemistry::make_rank4_span(correct_two_body.data(), size_t(2)),
-      orbitals, core_energy, inactive_fock));
+  qdk::chemistry::rank4_span<const double> correct_span(
+      correct_two_body.data(), correct_two_body.mapping());
+  EXPECT_NO_THROW(Hamiltonian(correct_one_body, correct_span, orbitals,
+                              core_energy, inactive_fock));
 }
 
 TEST_F(HamiltonianTest, ValidationEdgeCases) {
@@ -525,23 +543,21 @@ TEST_F(HamiltonianTest, ValidationEdgeCases) {
 
   // Test with 1x1 matrices (smallest valid case)
   Eigen::MatrixXd tiny_one_body = Eigen::MatrixXd::Identity(1, 1);
-  Eigen::VectorXd tiny_two_body = Eigen::VectorXd::Random(1);  // 1^4 = 1
+  auto tiny_two_body = qdk::chemistry::make_rank4_tensor<double>(1);
+  random_fill_tensor(tiny_two_body);
   auto tiny_orbitals =
       std::make_shared<ModelOrbitals>(1, true);  // 1 orbital, restricted
   Eigen::MatrixXd tiny_inactive_fock = Eigen::MatrixXd::Zero(1, 1);
 
-  EXPECT_NO_THROW(Hamiltonian(
-      tiny_one_body,
-      qdk::chemistry::make_rank4_span(tiny_two_body.data(), size_t(1)),
-      tiny_orbitals, core_energy, tiny_inactive_fock));
+  qdk::chemistry::rank4_span<const double> tiny_span(tiny_two_body.data(),
+                                                     tiny_two_body.mapping());
+  EXPECT_NO_THROW(Hamiltonian(tiny_one_body, tiny_span, tiny_orbitals,
+                              core_energy, tiny_inactive_fock));
 
   // Test with large matrices (stress test)
   Eigen::MatrixXd large_one_body = Eigen::MatrixXd::Identity(10, 10);
-  Eigen::VectorXd large_two_body =
-      Eigen::VectorXd::Random(10000);  // 10^4 = 10000
-
-  // Need orbitals that match the 10x10 size
-  Eigen::MatrixXd large_coeffs = Eigen::MatrixXd::Identity(10, 10);
+  auto large_two_body = qdk::chemistry::make_rank4_tensor<double>(10);
+  random_fill_tensor(large_two_body);
 
   auto large_orbitals =
       std::make_shared<ModelOrbitals>(10, true);  // 10 orbitals, restricted
@@ -549,21 +565,23 @@ TEST_F(HamiltonianTest, ValidationEdgeCases) {
   // Create a larger inactive_fock matrix for this test
   Eigen::MatrixXd large_inactive_fock = Eigen::MatrixXd::Zero(0, 0);
 
-  EXPECT_NO_THROW(Hamiltonian(
-      large_one_body,
-      qdk::chemistry::make_rank4_span(large_two_body.data(), size_t(10)),
-      large_orbitals, core_energy, large_inactive_fock));
+  qdk::chemistry::rank4_span<const double> large_span(large_two_body.data(),
+                                                      large_two_body.mapping());
+  EXPECT_NO_THROW(Hamiltonian(large_one_body, large_span, large_orbitals,
+                              core_energy, large_inactive_fock));
 
-  // Test wrong size by one element
+  // Test wrong size by one element - use mismatched tensor size vs one-body
   Eigen::MatrixXd three_by_three = Eigen::MatrixXd::Identity(3, 3);
-  Eigen::VectorXd off_by_one =
-      Eigen::VectorXd::Random(80);  // Should be 81 for 3x3
+  // Create a tensor with different dimensions than expected by one-body
+  auto off_by_one =
+      qdk::chemistry::make_rank4_tensor<double>(2);  // 2^4=16, not 3^4=81
+  random_fill_tensor(off_by_one);
 
-  EXPECT_THROW(
-      Hamiltonian(three_by_three,
-                  qdk::chemistry::make_rank4_span(off_by_one.data(), size_t(3)),
-                  orbitals, core_energy, inactive_fock),
-      std::invalid_argument);
+  qdk::chemistry::rank4_span<const double> off_span(off_by_one.data(),
+                                                    off_by_one.mapping());
+  EXPECT_THROW(Hamiltonian(three_by_three, off_span, orbitals, core_energy,
+                           inactive_fock),
+               std::invalid_argument);
 }
 
 TEST_F(HamiltonianConstructorTest, Factory) {
@@ -884,22 +902,28 @@ TEST_F(HamiltonianTest, UnrestrictedConstructor) {
   Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Random(2, 2);
   Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Random(2, 2);
 
-  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Random(16);
-  Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Random(16);
-  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Random(16);
+  auto two_body_aaaa = qdk::chemistry::make_rank4_tensor<double>(2);
+  auto two_body_aabb = qdk::chemistry::make_rank4_tensor<double>(2);
+  auto two_body_bbbb = qdk::chemistry::make_rank4_tensor<double>(2);
+  random_fill_tensor(two_body_aaaa);
+  random_fill_tensor(two_body_aabb);
+  random_fill_tensor(two_body_bbbb);
 
   Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Random(2, 2);
   Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Random(2, 2);
-  size_t norb = 2;
+
+  qdk::chemistry::rank4_span<const double> span_aaaa(two_body_aaaa.data(),
+                                                     two_body_aaaa.mapping());
+  qdk::chemistry::rank4_span<const double> span_aabb(two_body_aabb.data(),
+                                                     two_body_aabb.mapping());
+  qdk::chemistry::rank4_span<const double> span_bbbb(two_body_bbbb.data(),
+                                                     two_body_bbbb.mapping());
 
   // Create unrestricted Hamiltonian
-  Hamiltonian h_unrestricted(
-      one_body_alpha, one_body_beta,
-      qdk::chemistry::make_rank4_span(two_body_aaaa.data(), norb),
-      qdk::chemistry::make_rank4_span(two_body_aabb.data(), norb),
-      qdk::chemistry::make_rank4_span(two_body_bbbb.data(), norb),
-      unrestricted_orbitals, core_energy, inactive_fock_alpha,
-      inactive_fock_beta);
+  Hamiltonian h_unrestricted(one_body_alpha, one_body_beta, span_aaaa,
+                             span_aabb, span_bbbb, unrestricted_orbitals,
+                             core_energy, inactive_fock_alpha,
+                             inactive_fock_beta);
 
   // Verify the unrestricted Hamiltonian was created successfully
   EXPECT_TRUE(h_unrestricted.has_one_body_integrals());
@@ -919,18 +943,24 @@ TEST_F(HamiltonianTest, UnrestrictedAccessorMethods) {
   Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Identity(2, 2);
   Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Ones(2, 2);
 
-  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Constant(16, 1.0);
-  Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Constant(16, 2.0);
-  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Constant(16, 3.0);
+  auto two_body_aaaa = qdk::chemistry::make_rank4_tensor<double>(2);
+  auto two_body_aabb = qdk::chemistry::make_rank4_tensor<double>(2);
+  auto two_body_bbbb = qdk::chemistry::make_rank4_tensor<double>(2);
+  constant_fill_tensor(two_body_aaaa, 1.0);
+  constant_fill_tensor(two_body_aabb, 2.0);
+  constant_fill_tensor(two_body_bbbb, 3.0);
 
   Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Constant(2, 2, 4.0);
   Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Constant(2, 2, 5.0);
-  size_t norb = 2;
 
-  Hamiltonian h(one_body_alpha, one_body_beta,
-                qdk::chemistry::make_rank4_span(two_body_aaaa.data(), norb),
-                qdk::chemistry::make_rank4_span(two_body_aabb.data(), norb),
-                qdk::chemistry::make_rank4_span(two_body_bbbb.data(), norb),
+  qdk::chemistry::rank4_span<const double> span_aaaa(two_body_aaaa.data(),
+                                                     two_body_aaaa.mapping());
+  qdk::chemistry::rank4_span<const double> span_aabb(two_body_aabb.data(),
+                                                     two_body_aabb.mapping());
+  qdk::chemistry::rank4_span<const double> span_bbbb(two_body_bbbb.data(),
+                                                     two_body_bbbb.mapping());
+
+  Hamiltonian h(one_body_alpha, one_body_beta, span_aaaa, span_aabb, span_bbbb,
                 unrestricted_orbitals, core_energy, inactive_fock_alpha,
                 inactive_fock_beta);
 
@@ -940,13 +970,11 @@ TEST_F(HamiltonianTest, UnrestrictedAccessorMethods) {
   EXPECT_TRUE(h_one_beta.isApprox(one_body_beta));
 
   // Test tuple access for two-body integrals
-  auto [span_aaaa, span_aabb, span_bbbb] = h.get_two_body_integrals();
-  auto aaaa = span_to_vector(span_aaaa);
-  auto aabb = span_to_vector(span_aabb);
-  auto bbbb = span_to_vector(span_bbbb);
-  EXPECT_TRUE(aaaa.isApprox(two_body_aaaa));
-  EXPECT_TRUE(aabb.isApprox(two_body_aabb));
-  EXPECT_TRUE(bbbb.isApprox(two_body_bbbb));
+  auto [ret_span_aaaa, ret_span_aabb, ret_span_bbbb] =
+      h.get_two_body_integrals();
+  EXPECT_TRUE(spans_approx_equal(ret_span_aaaa, span_aaaa));
+  EXPECT_TRUE(spans_approx_equal(ret_span_aabb, span_aabb));
+  EXPECT_TRUE(spans_approx_equal(ret_span_bbbb, span_bbbb));
   // Test alpha/beta inactive Fock matrix access
   auto fock_matrices = h.get_inactive_fock_matrix();
   EXPECT_TRUE(fock_matrices.first.isApprox(inactive_fock_alpha));
@@ -964,20 +992,26 @@ TEST_F(HamiltonianTest, RestrictedVsUnrestrictedDetection) {
   // Create unrestricted Hamiltonian with different alpha/beta data
   Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Identity(2, 2);
   Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Ones(2, 2);
-  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Constant(16, 1.0);
-  Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Constant(16, 2.0);
-  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Constant(16, 3.0);
+  auto two_body_aaaa = qdk::chemistry::make_rank4_tensor<double>(2);
+  auto two_body_aabb = qdk::chemistry::make_rank4_tensor<double>(2);
+  auto two_body_bbbb = qdk::chemistry::make_rank4_tensor<double>(2);
+  constant_fill_tensor(two_body_aaaa, 1.0);
+  constant_fill_tensor(two_body_aabb, 2.0);
+  constant_fill_tensor(two_body_bbbb, 3.0);
   Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Identity(2, 2);
   Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Ones(2, 2);
-  size_t norb = 2;
 
-  Hamiltonian h_unrestricted(
-      one_body_alpha, one_body_beta,
-      qdk::chemistry::make_rank4_span(two_body_aaaa.data(), norb),
-      qdk::chemistry::make_rank4_span(two_body_aabb.data(), norb),
-      qdk::chemistry::make_rank4_span(two_body_bbbb.data(), norb),
-      unrestricted_orbitals, core_energy, inactive_fock_alpha,
-      inactive_fock_beta);
+  qdk::chemistry::rank4_span<const double> span_aaaa(two_body_aaaa.data(),
+                                                     two_body_aaaa.mapping());
+  qdk::chemistry::rank4_span<const double> span_aabb(two_body_aabb.data(),
+                                                     two_body_aabb.mapping());
+  qdk::chemistry::rank4_span<const double> span_bbbb(two_body_bbbb.data(),
+                                                     two_body_bbbb.mapping());
+
+  Hamiltonian h_unrestricted(one_body_alpha, one_body_beta, span_aaaa,
+                             span_aabb, span_bbbb, unrestricted_orbitals,
+                             core_energy, inactive_fock_alpha,
+                             inactive_fock_beta);
 
   // Test restricted detection
   EXPECT_TRUE(h_restricted.is_restricted());
@@ -996,36 +1030,43 @@ TEST_F(HamiltonianTest, UnrestrictedSpinChannelAccess) {
   Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Identity(2, 2);
   Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Identity(2, 2);
 
-  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Zero(16);
-  Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Zero(16);
-  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Zero(16);
+  auto two_body_aaaa = qdk::chemistry::make_rank4_tensor<double>(2);
+  auto two_body_aabb = qdk::chemistry::make_rank4_tensor<double>(2);
+  auto two_body_bbbb = qdk::chemistry::make_rank4_tensor<double>(2);
+  // Initialize to zero
+  constant_fill_tensor(two_body_aaaa, 0.0);
+  constant_fill_tensor(two_body_aabb, 0.0);
+  constant_fill_tensor(two_body_bbbb, 0.0);
 
-  // Set specific values for each spin channel
-  // Row-major indexing: index = i*n^3 + j*n^2 + k*n + l, where n=2
-  two_body_aaaa[0] = 1.0;   // (0,0,0,0): 0*8 + 0*4 + 0*2 + 0 = 0
-  two_body_aabb[5] = 2.0;   // (0,1,0,1): 0*8 + 1*4 + 0*2 + 1 = 5 (row-major)
-  two_body_bbbb[15] = 3.0;  // (1,1,1,1): 1*8 + 1*4 + 1*2 + 1 = 15
+  // Set specific values for each spin channel using tensor indexing
+  two_body_aaaa(0, 0, 0, 0) = 1.0;
+  two_body_aabb(0, 1, 0, 1) = 2.0;
+  two_body_bbbb(1, 1, 1, 1) = 3.0;
 
   Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
-  size_t norb = 2;
 
-  Hamiltonian h(one_body_alpha, one_body_beta,
-                qdk::chemistry::make_rank4_span(two_body_aaaa.data(), norb),
-                qdk::chemistry::make_rank4_span(two_body_aabb.data(), norb),
-                qdk::chemistry::make_rank4_span(two_body_bbbb.data(), norb),
+  qdk::chemistry::rank4_span<const double> span_aaaa(two_body_aaaa.data(),
+                                                     two_body_aaaa.mapping());
+  qdk::chemistry::rank4_span<const double> span_aabb(two_body_aabb.data(),
+                                                     two_body_aabb.mapping());
+  qdk::chemistry::rank4_span<const double> span_bbbb(two_body_bbbb.data(),
+                                                     two_body_bbbb.mapping());
+
+  Hamiltonian h(one_body_alpha, one_body_beta, span_aaaa, span_aabb, span_bbbb,
                 unrestricted_orbitals, core_energy, empty_fock, empty_fock);
 
   // Test accessing elements through different spin channels using span
   // accessors
-  auto [span_aaaa, span_aabb, span_bbbb] = h.get_two_body_integrals();
+  auto [ret_span_aaaa, ret_span_aabb, ret_span_bbbb] =
+      h.get_two_body_integrals();
 
-  EXPECT_DOUBLE_EQ(span_aaaa(0, 0, 0, 0), 1.0);
-  EXPECT_DOUBLE_EQ(span_aabb(0, 1, 0, 1), 2.0);
-  EXPECT_DOUBLE_EQ(span_bbbb(1, 1, 1, 1), 3.0);
+  EXPECT_DOUBLE_EQ(ret_span_aaaa(0, 0, 0, 0), 1.0);
+  EXPECT_DOUBLE_EQ(ret_span_aabb(0, 1, 0, 1), 2.0);
+  EXPECT_DOUBLE_EQ(ret_span_bbbb(1, 1, 1, 1), 3.0);
 
   // Verify other elements are zero
-  EXPECT_DOUBLE_EQ(span_aabb(0, 0, 0, 0), 0.0);
-  EXPECT_DOUBLE_EQ(span_bbbb(0, 0, 0, 0), 0.0);
+  EXPECT_DOUBLE_EQ(ret_span_aabb(0, 0, 0, 0), 0.0);
+  EXPECT_DOUBLE_EQ(ret_span_bbbb(0, 0, 0, 0), 0.0);
 }
 
 TEST_F(HamiltonianTest, UnrestrictedJSONSerialization) {
@@ -1035,20 +1076,25 @@ TEST_F(HamiltonianTest, UnrestrictedJSONSerialization) {
   // Create unrestricted Hamiltonian
   Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Random(2, 2);
   Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Random(2, 2);
-  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Random(16);
-  Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Random(16);
-  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Random(16);
+  auto two_body_aaaa = qdk::chemistry::make_rank4_tensor<double>(2);
+  auto two_body_aabb = qdk::chemistry::make_rank4_tensor<double>(2);
+  auto two_body_bbbb = qdk::chemistry::make_rank4_tensor<double>(2);
+  random_fill_tensor(two_body_aaaa);
+  random_fill_tensor(two_body_aabb);
+  random_fill_tensor(two_body_bbbb);
   Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Random(2, 2);
   Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Random(2, 2);
-  size_t norb = 2;
 
-  Hamiltonian h_orig(
-      one_body_alpha, one_body_beta,
-      qdk::chemistry::make_rank4_span(two_body_aaaa.data(), norb),
-      qdk::chemistry::make_rank4_span(two_body_aabb.data(), norb),
-      qdk::chemistry::make_rank4_span(two_body_bbbb.data(), norb),
-      unrestricted_orbitals, core_energy, inactive_fock_alpha,
-      inactive_fock_beta);
+  qdk::chemistry::rank4_span<const double> span_aaaa(two_body_aaaa.data(),
+                                                     two_body_aaaa.mapping());
+  qdk::chemistry::rank4_span<const double> span_aabb(two_body_aabb.data(),
+                                                     two_body_aabb.mapping());
+  qdk::chemistry::rank4_span<const double> span_bbbb(two_body_bbbb.data(),
+                                                     two_body_bbbb.mapping());
+
+  Hamiltonian h_orig(one_body_alpha, one_body_beta, span_aaaa, span_aabb,
+                     span_bbbb, unrestricted_orbitals, core_energy,
+                     inactive_fock_alpha, inactive_fock_beta);
 
   // Test JSON serialization round-trip
   nlohmann::json j = h_orig.to_json();
@@ -1066,17 +1112,11 @@ TEST_F(HamiltonianTest, UnrestrictedJSONSerialization) {
 
   auto [orig_span_aaaa, orig_span_aabb, orig_span_bbbb] =
       h_orig.get_two_body_integrals();
-  auto orig_two_aaaa = span_to_vector(orig_span_aaaa);
-  auto orig_two_aabb = span_to_vector(orig_span_aabb);
-  auto orig_two_bbbb = span_to_vector(orig_span_bbbb);
   auto [loaded_span_aaaa, loaded_span_aabb, loaded_span_bbbb] =
       h_loaded->get_two_body_integrals();
-  auto loaded_two_aaaa = span_to_vector(loaded_span_aaaa);
-  auto loaded_two_aabb = span_to_vector(loaded_span_aabb);
-  auto loaded_two_bbbb = span_to_vector(loaded_span_bbbb);
-  EXPECT_TRUE(orig_two_aaaa.isApprox(loaded_two_aaaa));
-  EXPECT_TRUE(orig_two_aabb.isApprox(loaded_two_aabb));
-  EXPECT_TRUE(orig_two_bbbb.isApprox(loaded_two_bbbb));
+  EXPECT_TRUE(spans_approx_equal(orig_span_aaaa, loaded_span_aaaa));
+  EXPECT_TRUE(spans_approx_equal(orig_span_aabb, loaded_span_aabb));
+  EXPECT_TRUE(spans_approx_equal(orig_span_bbbb, loaded_span_bbbb));
 
   auto [h_orig_alpha, h_orig_beta] = h_orig.get_inactive_fock_matrix();
   auto [h_loaded_alpha, h_loaded_beta] = h_loaded->get_inactive_fock_matrix();
@@ -1091,20 +1131,25 @@ TEST_F(HamiltonianTest, UnrestrictedHDF5Serialization) {
   // Create unrestricted Hamiltonian
   Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Random(2, 2);
   Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Random(2, 2);
-  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Random(16);
-  Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Random(16);
-  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Random(16);
+  auto two_body_aaaa = qdk::chemistry::make_rank4_tensor<double>(2);
+  auto two_body_aabb = qdk::chemistry::make_rank4_tensor<double>(2);
+  auto two_body_bbbb = qdk::chemistry::make_rank4_tensor<double>(2);
+  random_fill_tensor(two_body_aaaa);
+  random_fill_tensor(two_body_aabb);
+  random_fill_tensor(two_body_bbbb);
   Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Random(2, 2);
   Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Random(2, 2);
-  size_t norb = 2;
 
-  Hamiltonian h_orig(
-      one_body_alpha, one_body_beta,
-      qdk::chemistry::make_rank4_span(two_body_aaaa.data(), norb),
-      qdk::chemistry::make_rank4_span(two_body_aabb.data(), norb),
-      qdk::chemistry::make_rank4_span(two_body_bbbb.data(), norb),
-      unrestricted_orbitals, core_energy, inactive_fock_alpha,
-      inactive_fock_beta);
+  qdk::chemistry::rank4_span<const double> span_aaaa(two_body_aaaa.data(),
+                                                     two_body_aaaa.mapping());
+  qdk::chemistry::rank4_span<const double> span_aabb(two_body_aabb.data(),
+                                                     two_body_aabb.mapping());
+  qdk::chemistry::rank4_span<const double> span_bbbb(two_body_bbbb.data(),
+                                                     two_body_bbbb.mapping());
+
+  Hamiltonian h_orig(one_body_alpha, one_body_beta, span_aaaa, span_aabb,
+                     span_bbbb, unrestricted_orbitals, core_energy,
+                     inactive_fock_alpha, inactive_fock_beta);
 
   // Test HDF5 serialization round-trip
   std::string filename = "test_unrestricted.hamiltonian.h5";
@@ -1124,17 +1169,11 @@ TEST_F(HamiltonianTest, UnrestrictedHDF5Serialization) {
 
   auto [orig_span_aaaa, orig_span_aabb, orig_span_bbbb] =
       h_orig.get_two_body_integrals();
-  auto orig_two_aaaa = span_to_vector(orig_span_aaaa);
-  auto orig_two_aabb = span_to_vector(orig_span_aabb);
-  auto orig_two_bbbb = span_to_vector(orig_span_bbbb);
   auto [loaded_span_aaaa, loaded_span_aabb, loaded_span_bbbb] =
       h_loaded->get_two_body_integrals();
-  auto loaded_two_aaaa = span_to_vector(loaded_span_aaaa);
-  auto loaded_two_aabb = span_to_vector(loaded_span_aabb);
-  auto loaded_two_bbbb = span_to_vector(loaded_span_bbbb);
-  EXPECT_TRUE(orig_two_aaaa.isApprox(loaded_two_aaaa));
-  EXPECT_TRUE(orig_two_aabb.isApprox(loaded_two_aabb));
-  EXPECT_TRUE(orig_two_bbbb.isApprox(loaded_two_bbbb));
+  EXPECT_TRUE(spans_approx_equal(orig_span_aaaa, loaded_span_aaaa));
+  EXPECT_TRUE(spans_approx_equal(orig_span_aabb, loaded_span_aabb));
+  EXPECT_TRUE(spans_approx_equal(orig_span_bbbb, loaded_span_bbbb));
 
   auto [h_orig_alpha, h_orig_beta] = h_orig.get_inactive_fock_matrix();
   auto [h_loaded_alpha, h_loaded_beta] = h_loaded->get_inactive_fock_matrix();
@@ -1184,20 +1223,26 @@ TEST_F(HamiltonianTest, FCIDUMPSerializationUnrestrictedThrowsError) {
   Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Identity(2, 2);
   Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Ones(2, 2);
 
-  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Ones(16);
-  Eigen::VectorXd two_body_aabb = 2 * Eigen::VectorXd::Ones(16);
-  Eigen::VectorXd two_body_bbbb = 3 * Eigen::VectorXd::Ones(16);
-  size_t norb_unres = 2;
+  auto two_body_aaaa = qdk::chemistry::make_rank4_tensor<double>(2);
+  auto two_body_aabb = qdk::chemistry::make_rank4_tensor<double>(2);
+  auto two_body_bbbb = qdk::chemistry::make_rank4_tensor<double>(2);
+  constant_fill_tensor(two_body_aaaa, 1.0);
+  constant_fill_tensor(two_body_aabb, 2.0);
+  constant_fill_tensor(two_body_bbbb, 3.0);
 
   Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
 
+  qdk::chemistry::rank4_span<const double> span_aaaa(two_body_aaaa.data(),
+                                                     two_body_aaaa.mapping());
+  qdk::chemistry::rank4_span<const double> span_aabb(two_body_aabb.data(),
+                                                     two_body_aabb.mapping());
+  qdk::chemistry::rank4_span<const double> span_bbbb(two_body_bbbb.data(),
+                                                     two_body_bbbb.mapping());
+
   // Create unrestricted Hamiltonian
-  Hamiltonian h_unrestricted(
-      one_body_alpha, one_body_beta,
-      qdk::chemistry::make_rank4_span(two_body_aaaa.data(), norb_unres),
-      qdk::chemistry::make_rank4_span(two_body_aabb.data(), norb_unres),
-      qdk::chemistry::make_rank4_span(two_body_bbbb.data(), norb_unres),
-      unrestricted_orbitals, core_energy, empty_fock, empty_fock);
+  Hamiltonian h_unrestricted(one_body_alpha, one_body_beta, span_aaaa,
+                             span_aabb, span_bbbb, unrestricted_orbitals,
+                             core_energy, empty_fock, empty_fock);
 
   // Verify it's actually unrestricted
   EXPECT_TRUE(h_unrestricted.is_unrestricted());
@@ -1225,16 +1270,17 @@ TEST_F(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {
   one_body_2x2(0, 1) = 0.5;
   one_body_2x2(1, 0) = 0.5;
 
-  Eigen::VectorXd two_body_2x2 = 2 * Eigen::VectorXd::Ones(16);  // 2^4 = 16
-  size_t norb_2x2 = 2;
+  auto two_body_2x2 = qdk::chemistry::make_rank4_tensor<double>(2);
+  constant_fill_tensor(two_body_2x2, 2.0);
 
   // Create appropriate inactive Fock matrix for the inactive space
   Eigen::MatrixXd inactive_fock_2x2 = Eigen::MatrixXd::Zero(2, 2);
 
-  Hamiltonian h_active_space(
-      one_body_2x2,
-      qdk::chemistry::make_rank4_span(two_body_2x2.data(), norb_2x2),
-      orbitals_with_active_space, core_energy, inactive_fock_2x2);
+  qdk::chemistry::rank4_span<const double> span_2x2(two_body_2x2.data(),
+                                                    two_body_2x2.mapping());
+
+  Hamiltonian h_active_space(one_body_2x2, span_2x2, orbitals_with_active_space,
+                             core_energy, inactive_fock_2x2);
 
   // Should successfully write FCIDUMP using active space dimensions
   EXPECT_NO_THROW({
@@ -1289,27 +1335,29 @@ TEST_F(HamiltonianTest, ErrorHandlingUnrestrictedMismatchedActiveSpace) {
   Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Identity(2, 2);
   Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Identity(3, 3);
 
-  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Ones(16);  // 2^4
-  Eigen::VectorXd two_body_aabb =
-      Eigen::VectorXd::Ones(81);  // 3^4 - mismatched
-  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Ones(81);  // 3^4
-  size_t norb_alpha_mismatch = 2;
-  size_t norb_beta_mismatch = 3;
+  auto two_body_aaaa = qdk::chemistry::make_rank4_tensor<double>(2);  // 2^4
+  auto two_body_aabb =
+      qdk::chemistry::make_rank4_tensor<double>(3);  // 3^4 - mismatched dims
+  auto two_body_bbbb = qdk::chemistry::make_rank4_tensor<double>(3);  // 3^4
+  constant_fill_tensor(two_body_aaaa, 1.0);
+  constant_fill_tensor(two_body_aabb, 1.0);
+  constant_fill_tensor(two_body_bbbb, 1.0);
 
   Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
+
+  qdk::chemistry::rank4_span<const double> span_aaaa(two_body_aaaa.data(),
+                                                     two_body_aaaa.mapping());
+  qdk::chemistry::rank4_span<const double> span_aabb(two_body_aabb.data(),
+                                                     two_body_aabb.mapping());
+  qdk::chemistry::rank4_span<const double> span_bbbb(two_body_bbbb.data(),
+                                                     two_body_bbbb.mapping());
 
   // This should throw during construction due to dimension mismatch
   EXPECT_THROW(
       {
-        Hamiltonian h_mismatched(one_body_alpha, one_body_beta,
-                                 qdk::chemistry::make_rank4_span(
-                                     two_body_aaaa.data(), norb_alpha_mismatch),
-                                 qdk::chemistry::make_rank4_span(
-                                     two_body_aabb.data(), norb_beta_mismatch),
-                                 qdk::chemistry::make_rank4_span(
-                                     two_body_bbbb.data(), norb_beta_mismatch),
-                                 unrestricted_orbitals, core_energy, empty_fock,
-                                 empty_fock);
+        Hamiltonian h_mismatched(one_body_alpha, one_body_beta, span_aaaa,
+                                 span_aabb, span_bbbb, unrestricted_orbitals,
+                                 core_energy, empty_fock, empty_fock);
       },
       std::invalid_argument);
 }
@@ -1396,15 +1444,15 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   // Verify integral symmetries aaaa == bbbb
   auto [aaaa_span, aabb_span, bbbb_span] =
       uhf_hamiltonian->get_two_body_integrals();
-  auto aaaa_integrals = span_to_vector(aaaa_span);
-  auto aabb_integrals = span_to_vector(aabb_span);
-  auto bbbb_integrals = span_to_vector(bbbb_span);
 
   // Elementwise comparison for aaaa == bbbb integrals
-  EXPECT_EQ(aaaa_integrals.size(), bbbb_integrals.size())
+  EXPECT_EQ(aaaa_span.extent(0), bbbb_span.extent(0))
       << "Alpha-alpha and beta-beta integral sizes should match";
-  for (int i = 0; i < aaaa_integrals.size(); ++i) {
-    double diff = std::abs(aaaa_integrals[i] - bbbb_integrals[i]);
+  const size_t aaaa_size = aaaa_span.extent(0) * aaaa_span.extent(1) *
+                           aaaa_span.extent(2) * aaaa_span.extent(3);
+  for (size_t i = 0; i < aaaa_size; ++i) {
+    double diff =
+        std::abs(aaaa_span.data_handle()[i] - bbbb_span.data_handle()[i]);
     EXPECT_LT(diff, std::numeric_limits<double>::epsilon())
         << "Alpha-alpha and beta-beta integrals should be identical."
            ". Difference: "
@@ -1435,15 +1483,16 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   // The restricted integrals should match the aabb integrals
   auto [restricted_span_aaaa, restricted_span_aabb, restricted_span_bbbb] =
       rhf_hamiltonian->get_two_body_integrals();
-  auto restricted_aaaa = span_to_vector(restricted_span_aaaa);
-  auto restricted_aabb = span_to_vector(restricted_span_aabb);
-  auto restricted_bbbb = span_to_vector(restricted_span_bbbb);
 
   // Elementwise comparison for restricted aaaa == unrestricted aabb integrals
-  EXPECT_EQ(restricted_aaaa.size(), aabb_integrals.size())
+  EXPECT_EQ(restricted_span_aaaa.extent(0), aabb_span.extent(0))
       << "Restricted aaaa and unrestricted aabb integral sizes should match";
-  for (int i = 0; i < restricted_aaaa.size(); ++i) {
-    double diff = std::abs(restricted_aaaa[i] - aabb_integrals[i]);
+  const size_t restricted_size =
+      restricted_span_aaaa.extent(0) * restricted_span_aaaa.extent(1) *
+      restricted_span_aaaa.extent(2) * restricted_span_aaaa.extent(3);
+  for (size_t i = 0; i < restricted_size; ++i) {
+    double diff = std::abs(restricted_span_aaaa.data_handle()[i] -
+                           aabb_span.data_handle()[i]);
     EXPECT_LT(diff, std::numeric_limits<double>::epsilon())
         << "Integrals should be identical. "
            ". Difference: "
@@ -1458,19 +1507,12 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   active_space_size = alpha_active.size();
 
   // Test aabb[i,j,k,l] == aabb[k,l,i,j] (particle exchange symmetry)
-  auto get_integral_index = [active_space_size](size_t i, size_t j, size_t k,
-                                                size_t l) -> size_t {
-    return i * active_space_size * active_space_size * active_space_size +
-           j * active_space_size * active_space_size + k * active_space_size +
-           l;
-  };
-
   for (size_t i = 0; i < active_space_size; i++) {
     for (size_t j = 0; j < active_space_size; j++) {
       for (size_t k = 0; k < active_space_size; k++) {
         for (size_t l = 0; l < active_space_size; l++) {
-          double ijkl = aabb_integrals[get_integral_index(i, j, k, l)];
-          double klij = aabb_integrals[get_integral_index(k, l, i, j)];
+          double ijkl = aabb_span(i, j, k, l);
+          double klij = aabb_span(k, l, i, j);
           double diff = std::abs(ijkl - klij);
           EXPECT_LT(diff, testing::integral_tolerance)
               << "Symmetry violation for particle exchange. "
@@ -1507,20 +1549,10 @@ TEST_F(HamiltonianTest, MixedIntegralSymmetriesO2Triplet) {
   // Get aabb integrals
   auto [aaaa_span, aabb_span, bbbb_span] =
       uhf_hamiltonian->get_two_body_integrals();
-  auto aaaa_integrals = span_to_vector(aaaa_span);
-  auto aabb_integrals = span_to_vector(aabb_span);
-  auto bbbb_integrals = span_to_vector(bbbb_span);
 
   // Get active space size
   auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
   size_t active_space_size = alpha_active.size();
-
-  auto get_index = [active_space_size](size_t i, size_t j, size_t k,
-                                       size_t l) -> size_t {
-    return i * active_space_size * active_space_size * active_space_size +
-           j * active_space_size * active_space_size + k * active_space_size +
-           l;
-  };
 
   // Test mixed integral symmetries: ijkl == jikl == ijlk == jilk
   for (size_t i = 0; i < active_space_size; i++) {
@@ -1528,10 +1560,10 @@ TEST_F(HamiltonianTest, MixedIntegralSymmetriesO2Triplet) {
       for (size_t k = 0; k < active_space_size; k++) {
         for (size_t l = 0; l < active_space_size; l++) {
           // Get the four symmetry-related integrals
-          double ijkl = aabb_integrals[get_index(i, j, k, l)];
-          double jikl = aabb_integrals[get_index(j, i, k, l)];
-          double ijlk = aabb_integrals[get_index(i, j, l, k)];
-          double jilk = aabb_integrals[get_index(j, i, l, k)];
+          double ijkl = aabb_span(i, j, k, l);
+          double jikl = aabb_span(j, i, k, l);
+          double ijlk = aabb_span(i, j, l, k);
+          double jilk = aabb_span(j, i, l, k);
 
           // Test all symmetries
           double diff1 = std::abs(ijkl - jikl);
@@ -1600,31 +1632,34 @@ TEST_F(HamiltonianTest, O2DeterministicBehaviorRestrictedUnrestricted) {
     // Two-body integrals should be identical
     auto [h1_span_aaaa, h1_span_aabb, h1_span_bbbb] =
         hamiltonian1->get_two_body_integrals();
-    auto h1_two_aaaa = span_to_vector(h1_span_aaaa);
-    auto h1_two_aabb = span_to_vector(h1_span_aabb);
-    auto h1_two_bbbb = span_to_vector(h1_span_bbbb);
     auto [h2_span_aaaa, h2_span_aabb, h2_span_bbbb] =
         hamiltonian2->get_two_body_integrals();
-    auto h2_two_aaaa = span_to_vector(h2_span_aaaa);
-    auto h2_two_aabb = span_to_vector(h2_span_aabb);
-    auto h2_two_bbbb = span_to_vector(h2_span_bbbb);
 
-    EXPECT_EQ(h1_two_aaaa.size(), h2_two_aaaa.size());
-    EXPECT_EQ(h1_two_aabb.size(), h2_two_aabb.size());
-    EXPECT_EQ(h1_two_bbbb.size(), h2_two_bbbb.size());
+    EXPECT_EQ(h1_span_aaaa.extent(0), h2_span_aaaa.extent(0));
+    EXPECT_EQ(h1_span_aabb.extent(0), h2_span_aabb.extent(0));
+    EXPECT_EQ(h1_span_bbbb.extent(0), h2_span_bbbb.extent(0));
 
-    for (size_t i = 0; i < h1_two_aaaa.size(); ++i) {
-      EXPECT_DOUBLE_EQ(h1_two_aaaa[i], h2_two_aaaa[i])
+    const size_t size_aaaa = h1_span_aaaa.extent(0) * h1_span_aaaa.extent(1) *
+                             h1_span_aaaa.extent(2) * h1_span_aaaa.extent(3);
+    for (size_t i = 0; i < size_aaaa; ++i) {
+      EXPECT_DOUBLE_EQ(h1_span_aaaa.data_handle()[i],
+                       h2_span_aaaa.data_handle()[i])
           << "Restricted O2 aaaa two-body integral element " << i
           << " differs across runs";
     }
-    for (size_t i = 0; i < h1_two_aabb.size(); ++i) {
-      EXPECT_DOUBLE_EQ(h1_two_aabb[i], h2_two_aabb[i])
+    const size_t size_aabb = h1_span_aabb.extent(0) * h1_span_aabb.extent(1) *
+                             h1_span_aabb.extent(2) * h1_span_aabb.extent(3);
+    for (size_t i = 0; i < size_aabb; ++i) {
+      EXPECT_DOUBLE_EQ(h1_span_aabb.data_handle()[i],
+                       h2_span_aabb.data_handle()[i])
           << "Restricted O2 aabb two-body integral element " << i
           << " differs across runs";
     }
-    for (size_t i = 0; i < h1_two_bbbb.size(); ++i) {
-      EXPECT_DOUBLE_EQ(h1_two_bbbb[i], h2_two_bbbb[i])
+    const size_t size_bbbb = h1_span_bbbb.extent(0) * h1_span_bbbb.extent(1) *
+                             h1_span_bbbb.extent(2) * h1_span_bbbb.extent(3);
+    for (size_t i = 0; i < size_bbbb; ++i) {
+      EXPECT_DOUBLE_EQ(h1_span_bbbb.data_handle()[i],
+                       h2_span_bbbb.data_handle()[i])
           << "Restricted O2 bbbb two-body integral element " << i
           << " differs across runs";
     }
@@ -1668,31 +1703,34 @@ TEST_F(HamiltonianTest, O2DeterministicBehaviorRestrictedUnrestricted) {
     // Two-body integrals should be identical
     auto [h1u_span_aaaa, h1u_span_aabb, h1u_span_bbbb] =
         hamiltonian1->get_two_body_integrals();
-    auto h1_two_aaaa = span_to_vector(h1u_span_aaaa);
-    auto h1_two_aabb = span_to_vector(h1u_span_aabb);
-    auto h1_two_bbbb = span_to_vector(h1u_span_bbbb);
     auto [h2u_span_aaaa, h2u_span_aabb, h2u_span_bbbb] =
         hamiltonian2->get_two_body_integrals();
-    auto h2_two_aaaa = span_to_vector(h2u_span_aaaa);
-    auto h2_two_aabb = span_to_vector(h2u_span_aabb);
-    auto h2_two_bbbb = span_to_vector(h2u_span_bbbb);
 
-    EXPECT_EQ(h1_two_aaaa.size(), h2_two_aaaa.size());
-    EXPECT_EQ(h1_two_aabb.size(), h2_two_aabb.size());
-    EXPECT_EQ(h1_two_bbbb.size(), h2_two_bbbb.size());
+    EXPECT_EQ(h1u_span_aaaa.extent(0), h2u_span_aaaa.extent(0));
+    EXPECT_EQ(h1u_span_aabb.extent(0), h2u_span_aabb.extent(0));
+    EXPECT_EQ(h1u_span_bbbb.extent(0), h2u_span_bbbb.extent(0));
 
-    for (size_t i = 0; i < h1_two_aaaa.size(); ++i) {
-      EXPECT_DOUBLE_EQ(h1_two_aaaa[i], h2_two_aaaa[i])
+    const size_t size_aaaa = h1u_span_aaaa.extent(0) * h1u_span_aaaa.extent(1) *
+                             h1u_span_aaaa.extent(2) * h1u_span_aaaa.extent(3);
+    for (size_t i = 0; i < size_aaaa; ++i) {
+      EXPECT_DOUBLE_EQ(h1u_span_aaaa.data_handle()[i],
+                       h2u_span_aaaa.data_handle()[i])
           << "Unrestricted O2 aaaa two-body integral element " << i
           << " differs across runs";
     }
-    for (size_t i = 0; i < h1_two_aabb.size(); ++i) {
-      EXPECT_DOUBLE_EQ(h1_two_aabb[i], h2_two_aabb[i])
+    const size_t size_aabb = h1u_span_aabb.extent(0) * h1u_span_aabb.extent(1) *
+                             h1u_span_aabb.extent(2) * h1u_span_aabb.extent(3);
+    for (size_t i = 0; i < size_aabb; ++i) {
+      EXPECT_DOUBLE_EQ(h1u_span_aabb.data_handle()[i],
+                       h2u_span_aabb.data_handle()[i])
           << "Unrestricted O2 aabb two-body integral element " << i
           << " differs across runs";
     }
-    for (size_t i = 0; i < h1_two_bbbb.size(); ++i) {
-      EXPECT_DOUBLE_EQ(h1_two_bbbb[i], h2_two_bbbb[i])
+    const size_t size_bbbb = h1u_span_bbbb.extent(0) * h1u_span_bbbb.extent(1) *
+                             h1u_span_bbbb.extent(2) * h1u_span_bbbb.extent(3);
+    for (size_t i = 0; i < size_bbbb; ++i) {
+      EXPECT_DOUBLE_EQ(h1u_span_bbbb.data_handle()[i],
+                       h2u_span_bbbb.data_handle()[i])
           << "Unrestricted O2 bbbb two-body integral element " << i
           << " differs across runs";
     }
@@ -1710,13 +1748,14 @@ TEST_F(HamiltonianTest, IsValidComprehensive) {
                  inactive_fock_matrix);
 
   // Construction with mismatched dimensions should fail
-  Eigen::MatrixXd wrong_one_body = Eigen::MatrixXd::Identity(3, 3);  // 3x3
-  Eigen::VectorXd wrong_two_body = Eigen::VectorXd::Random(16);      // 2^4
+  Eigen::MatrixXd wrong_one_body = Eigen::MatrixXd::Identity(3, 3);    // 3x3
+  auto wrong_two_body = qdk::chemistry::make_rank4_tensor<double>(2);  // 2^4
+  random_fill_tensor(wrong_two_body);
 
-  EXPECT_THROW(Hamiltonian(wrong_one_body,
-                           qdk::chemistry::make_rank4_span(
-                               wrong_two_body.data(), size_t(2)),
-                           orbitals, core_energy, inactive_fock),
+  qdk::chemistry::rank4_span<const double> wrong_span(wrong_two_body.data(),
+                                                      wrong_two_body.mapping());
+  EXPECT_THROW(Hamiltonian(wrong_one_body, wrong_span, orbitals, core_energy,
+                           inactive_fock),
                std::invalid_argument);
 
   // Non-square one-body matrix should fail during construction

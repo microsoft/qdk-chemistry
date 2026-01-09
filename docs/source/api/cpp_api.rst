@@ -46,12 +46,13 @@ Tensor Types
 
 QDK/Chemistry uses the `Kokkos mdspan <https://github.com/kokkos/mdspan>`_ reference implementation for multidimensional array support.
 This provides efficient, type-safe access to tensor data with compile-time rank checking and flexible memory layouts.
+The implementation is based on the C++ standard proposals `P0009 (mdspan) <https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p0009r18.html>`_ and `P1684 (mdarray) <https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1684r4.html>`_, with mdspan standardized in C++23 (`ISO/IEC 14882:2024 <https://www.iso.org/standard/83626.html>`_).
 
 The following tensor types are available in the ``qdk::chemistry`` namespace:
 
 ``tensor_span<T, Rank>``
    A non-owning multidimensional view over contiguous data, based on ``std::experimental::mdspan``.
-   Uses column-major (Fortran) layout for compatibility with Eigen and standard quantum chemistry conventions.
+   Uses row-major (C) layout.
 
 ``rank4_span<T>``
    A convenience alias for ``tensor_span<T, 4>``, commonly used for two-electron integrals.

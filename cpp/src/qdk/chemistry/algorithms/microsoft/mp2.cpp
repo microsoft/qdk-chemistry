@@ -7,6 +7,7 @@
 #include "mp2.hpp"
 
 #include <Eigen/Dense>
+#include <complex>
 #include <cstddef>
 #include <optional>
 #include <qdk/chemistry/data/hamiltonian.hpp>
@@ -119,8 +120,7 @@ double MP2Calculator::calculate_restricted_mp2_energy(
   auto t2_amplitudes = make_rank4_tensor<double>(n_occ, n_occ, n_vir, n_vir);
 
   // Sum over all occupied and virtual orbital pairs
-  compute_restricted_t2(eps_alpha, mo_aaaa, n_occ, n_vir, t2_amplitudes,
-                        &E_MP2);
+  compute_restricted_t2(eps_alpha, mo_aaaa, t2_amplitudes, &E_MP2);
 
   return E_MP2;
 }
@@ -178,52 +178,60 @@ double MP2Calculator::calculate_unrestricted_mp2_energy(
       make_rank4_tensor<double>(n_beta, n_beta, n_vir_beta, n_vir_beta);
 
   // Alpha-Alpha contribution
-  compute_same_spin_t2(eps_alpha, mo_aaaa, n_alpha, n_vir_alpha, t2_aa,
-                       &E_MP2_AA);
+  compute_same_spin_t2(eps_alpha, mo_aaaa, t2_aa, &E_MP2_AA);
 
   // Alpha-Beta contribution
-  compute_opposite_spin_t2(eps_alpha, eps_beta, mo_aabb, n_alpha, n_beta,
-                           n_vir_alpha, n_vir_beta, t2_ab, &E_MP2_AB);
+  compute_opposite_spin_t2(eps_alpha, eps_beta, mo_aabb, t2_ab, &E_MP2_AB);
 
   // Beta-Beta contribution
-  compute_same_spin_t2(eps_beta, mo_bbbb, n_beta, n_vir_beta, t2_bb, &E_MP2_BB);
+  compute_same_spin_t2(eps_beta, mo_bbbb, t2_bb, &E_MP2_BB);
 
   double total_energy = E_MP2_AA + E_MP2_BB + E_MP2_AB;
   return total_energy;
 }
 
-void MP2Calculator::compute_opposite_spin_t2(
-    const Eigen::VectorXd& eps_i_spin, const Eigen::VectorXd& eps_j_spin,
-    rank4_span<const double> mo_aabb, size_t n_occ_i, size_t n_occ_j,
-    size_t n_vir_i, size_t n_vir_j, rank4_tensor<double>& t2, double* energy) {
+template <typename Scalar>
+void MP2Calculator::compute_opposite_spin_t2(const Eigen::VectorXd& eps_i_spin,
+                                             const Eigen::VectorXd& eps_j_spin,
+                                             rank4_span<const Scalar> mo_aabb,
+                                             rank4_tensor<Scalar>& t2,
+                                             Scalar* energy) {
+  static_assert(std::is_same_v<Scalar, double>,
+                "Complex MP2 not yet implemented");
   QDK_LOG_TRACE_ENTERING();
 
+  // Deduce dimensions from output tensor
+  const size_t n_occ_i = t2.extent(0);
+  const size_t n_occ_j = t2.extent(1);
+  const size_t n_vir_i = t2.extent(2);
+  const size_t n_vir_j = t2.extent(3);
+
   for (size_t i = 0; i < n_occ_i; ++i) {
-    const double eps_i = eps_i_spin[i];
+    const Scalar eps_i = static_cast<Scalar>(eps_i_spin[i]);
 
     for (size_t a = 0; a < n_vir_i; ++a) {
       const size_t a_idx = a + n_occ_i;
-      const double eps_ia = eps_i - eps_i_spin[a_idx];
+      const Scalar eps_ia = eps_i - static_cast<Scalar>(eps_i_spin[a_idx]);
 
       for (size_t j = 0; j < n_occ_j; ++j) {
-        const double eps_ija = eps_ia + eps_j_spin[j];
+        const Scalar eps_ija = eps_ia + static_cast<Scalar>(eps_j_spin[j]);
 
         for (size_t b = 0; b < n_vir_j; ++b) {
           const size_t b_idx = b + n_occ_j;
 
           // Access integral directly using tensor indexing: (ia|jb)
-          const double eri_iajb = mo_aabb(i, a_idx, j, b_idx);
-          const double denom = eps_ija - eps_j_spin[b_idx];
+          const Scalar eri_iajb = mo_aabb(i, a_idx, j, b_idx);
+          const Scalar denom = eps_ija - static_cast<Scalar>(eps_j_spin[b_idx]);
 
           // T2 amplitude
-          const double t2_iajb = eri_iajb / denom;
+          const Scalar t2_iajb = eri_iajb / denom;
 
           // Store T2 amplitude
           t2(i, j, a, b) = t2_iajb;
 
           // Energy contribution (if requested)
           if (energy) {
-            *energy += t2_iajb * eri_iajb;
+            *energy += std::real(t2_iajb * std::conj(eri_iajb));
           }
         }
       }
@@ -231,40 +239,53 @@ void MP2Calculator::compute_opposite_spin_t2(
   }
 }
 
+// Explicit template instantiation
+template void MP2Calculator::compute_opposite_spin_t2<double>(
+    const Eigen::VectorXd&, const Eigen::VectorXd&, rank4_span<const double>,
+    rank4_tensor<double>&, double*);
+
+template <typename Scalar>
 void MP2Calculator::compute_restricted_t2(const Eigen::VectorXd& eps,
-                                          rank4_span<const double> mo_aaaa,
-                                          size_t n_occ, size_t n_vir,
-                                          rank4_tensor<double>& t2,
-                                          double* energy) {
+                                          rank4_span<const Scalar> mo_aaaa,
+                                          rank4_tensor<Scalar>& t2,
+                                          Scalar* energy) {
+  static_assert(std::is_same_v<Scalar, double>,
+                "Complex MP2 not yet implemented");
   QDK_LOG_TRACE_ENTERING();
+
+  // Deduce dimensions from output tensor
+  const size_t n_occ = t2.extent(0);
+  const size_t n_vir = t2.extent(2);
 
   for (size_t i = 0; i < n_occ; ++i) {
     for (size_t j = 0; j < n_occ; ++j) {
-      const double eps_ij = eps[i] + eps[j];
+      const Scalar eps_ij =
+          static_cast<Scalar>(eps[i]) + static_cast<Scalar>(eps[j]);
 
       for (size_t a = 0; a < n_vir; ++a) {
         const size_t a_idx = a + n_occ;
-        const double eps_ija = eps_ij - eps[a_idx];
+        const Scalar eps_ija = eps_ij - static_cast<Scalar>(eps[a_idx]);
 
         for (size_t b = 0; b < n_vir; ++b) {
           const size_t b_idx = b + n_occ;
 
           // Get integrals (ia|jb) and (ib|ja) in Mulliken notation
-          const double eri_iajb = mo_aaaa(i, a_idx, j, b_idx);
+          const Scalar eri_iajb = mo_aaaa(i, a_idx, j, b_idx);
 
           // Energy denominator
-          const double denom = eps_ija - eps[b_idx];
+          const Scalar denom = eps_ija - static_cast<Scalar>(eps[b_idx]);
 
           // T2 amplitude: T_ijab = (ia|jb) / denominator
-          const double t2_ijab = eri_iajb / denom;
+          const Scalar t2_ijab = eri_iajb / denom;
 
           // Store T2 amplitude using tensor indexing
           t2(i, j, a, b) = t2_ijab;
 
           // MP2 energy: E_MP2 += T_ijab * (2*(ia|jb) - (ib|ja))
           if (energy) {
-            const double eri_ibja = mo_aaaa(i, b_idx, j, a_idx);
-            *energy += t2_ijab * (2.0 * eri_iajb - eri_ibja);
+            const Scalar eri_ibja = mo_aaaa(i, b_idx, j, a_idx);
+            *energy += std::real(t2_ijab * (Scalar(2.0) * std::conj(eri_iajb) -
+                                            std::conj(eri_ibja)));
           }
         }
       }
@@ -272,43 +293,60 @@ void MP2Calculator::compute_restricted_t2(const Eigen::VectorXd& eps,
   }
 }
 
+// Explicit template instantiation
+template void MP2Calculator::compute_restricted_t2<double>(
+    const Eigen::VectorXd&, rank4_span<const double>, rank4_tensor<double>&,
+    double*);
+
+template <typename Scalar>
 void MP2Calculator::compute_same_spin_t2(const Eigen::VectorXd& eps,
-                                         rank4_span<const double> mo_aaaa,
-                                         size_t n_occ, size_t n_vir,
-                                         rank4_tensor<double>& t2,
-                                         double* energy) {
+                                         rank4_span<const Scalar> mo_aaaa,
+                                         rank4_tensor<Scalar>& t2,
+                                         Scalar* energy) {
+  static_assert(std::is_same_v<Scalar, double>,
+                "Complex MP2 not yet implemented");
   QDK_LOG_TRACE_ENTERING();
+
+  // Deduce dimensions from output tensor
+  const size_t n_occ = t2.extent(0);
+  const size_t n_vir = t2.extent(2);
 
   for (size_t i = 0; i < n_occ; ++i) {
     for (size_t a = 0; a < n_vir; ++a) {
       const size_t a_idx = a + n_occ;
-      const double eps_ia = eps[i] - eps[a_idx];
+      const Scalar eps_ia =
+          static_cast<Scalar>(eps[i]) - static_cast<Scalar>(eps[a_idx]);
 
       for (size_t j = i + 1; j < n_occ; ++j) {
-        const double eps_ija = eps_ia + eps[j];
+        const Scalar eps_ija = eps_ia + static_cast<Scalar>(eps[j]);
 
         for (size_t b = a + 1; b < n_vir; ++b) {
           const size_t b_idx = b + n_occ;
 
           // Access integrals directly using tensor indexing
-          const double eri_iajb = mo_aaaa(i, a_idx, j, b_idx);
-          const double eri_ibja = mo_aaaa(i, b_idx, j, a_idx);
-          const double antisym_integral = eri_iajb - eri_ibja;
-          const double denom = eps_ija - eps[b_idx];
+          const Scalar eri_iajb = mo_aaaa(i, a_idx, j, b_idx);
+          const Scalar eri_ibja = mo_aaaa(i, b_idx, j, a_idx);
+          const Scalar antisym_integral = eri_iajb - eri_ibja;
+          const Scalar denom = eps_ija - static_cast<Scalar>(eps[b_idx]);
 
           // T2 amplitude
-          const double t2_ijab = antisym_integral / denom;
+          const Scalar t2_ijab = antisym_integral / denom;
 
           // Store T2 amplitude using tensor indexing
           t2(i, j, a, b) = t2_ijab;
 
           // Energy contribution (if requested)
           if (energy) {
-            *energy += t2_ijab * antisym_integral;
+            *energy += std::real(t2_ijab * std::conj(antisym_integral));
           }
         }
       }
     }
   }
 }
+
+// Explicit template instantiation
+template void MP2Calculator::compute_same_spin_t2<double>(
+    const Eigen::VectorXd&, rank4_span<const double>, rank4_tensor<double>&,
+    double*);
 }  // namespace qdk::chemistry::algorithms::microsoft
