@@ -6,19 +6,20 @@
 # --------------------------------------------------------------------------------------------
 
 from collections import Counter
-import numpy as np
 from pathlib import Path
-from qdk_chemistry.utils import Logger
-from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction
-from qdk_chemistry.data import Wavefunction, CasWavefunctionContainer, QpeResult
+
+import numpy as np
 from qdk_chemistry.algorithms import IterativePhaseEstimation
-from qiskit_aer import AerSimulator
-from qiskit import qasm3
+from qdk_chemistry.data import CasWavefunctionContainer, QpeResult, Wavefunction
+from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction
+from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.wavefunction import get_top_determinants
+from qiskit import qasm3
+from qiskit_aer import AerSimulator
 
 
 def prepare_2_dets_trial_state(
-    wf: Wavefunction, rotation_angle: float
+    wf: Wavefunction, rotation_angle: float = np.pi / 12
 ) -> tuple[Wavefunction, float]:
     """
     Scan rotation angles for 2-determinant wavefunction:
@@ -35,8 +36,8 @@ def prepare_2_dets_trial_state(
     dets = get_top_determinants(wf, max_determinants=2)
     orbitals = wf.get_orbitals()
 
-    c1_new = np.cos(rotation_angle)
-    c2_new = np.sin(rotation_angle)
+    c1_new = np.cos(round(rotation_angle, 4))
+    c2_new = np.sin(round(rotation_angle, 4))
 
     # Only include terms with non-zero coefficients
     coeffs_new = []
