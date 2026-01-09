@@ -8,7 +8,7 @@
 This example demonstrates the use of QDK/Chemistry tools in preparing the electronic
 structure Hamiltonian, which is then passed to OpenFermion to perform the Jordan-Wigner
 transformation. The challenges are (1) to obtain integrals in the spin-orbital basis from
-spatial ones, and (2) pack the two electron molecular intergrals in the order OpenFermion
+spatial ones, and (2) pack the two electron molecular integrals in the order OpenFermion
 expects.
 
 This example is adapted from the introduction to OpenFermion tutorial:
@@ -25,7 +25,6 @@ from qdk_chemistry.data import Structure
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.utils import Logger
 
-from openfermion.chem.molecular_data import spinorb_from_spatial
 
 
 # Open Fermion must be installed to run this example.
@@ -33,6 +32,7 @@ try:
     import openfermion
     from openfermion.transforms import get_fermion_operator, jordan_wigner
     from openfermion.linalg import get_ground_state, get_sparse_operator
+    from openfermion.chem.molecular_data import spinorb_from_spatial
 
 except ImportError as e:
     raise ImportError(
@@ -86,18 +86,18 @@ Logger.info(f"  CASCI total energy: {casci_energy: .8f} Hartree")
 
 
 ########################################################################################
-# 3. Preparing the qubit Hamiltonian and sparse-isometry trial state
+# 3. Preparing the qubit Hamiltonian for OpenFermion Jordan-Wigner transformation
 ########################################################################################
 
-one_body, _ = np.array(
-    active_hamiltonian.get_one_body_integrals(), dtype=float
-)  # One-electron integrals
+# For restricted Hartree-Fock, the alpha and beta blocks are equal.
+one_body = np.array(
+    active_hamiltonian.get_one_body_integrals()[0], dtype=float
+)  # One-electron integrals (spin up block only)
 
 norb = one_body.shape[0]  # Number of spatial orbitals
 
 # Obtain a rank-4 tensor in chemists' notation (pq|rs) from QDK
-(two_body_integrals, _, _) = active_hamiltonian.get_two_body_integrals()
-two_body_flat = np.array(two_body_integrals, dtype=float)  # Two-electron integrals
+two_body_flat = np.array(active_hamiltonian.get_two_body_integrals()[0], dtype=float)  # Two-electron integrals (aaaa only)
 two_body = two_body_flat.reshape((norb,) * 4)
 
 # Convert to open Fermion physicists' notation <pr|sq>. Note that the last two indices may be switched
@@ -106,7 +106,9 @@ two_body = two_body_flat.reshape((norb,) * 4)
 # ĝ = ½ Σ (pq|rs) p† r† s q = ½ Σ ⟨pr|sq⟩ p† r† s q
 two_body_phys = np.transpose(two_body, (0, 2, 3, 1))
 
-
+# Note:the spinorb_from_spatial function from OpenFermion works for restricted Hamiltonians only
+# If unrestricted Hamiltonians are needed, write a custom function and pay special attention to the ordering of the 
+# two-electron integrals, especially in the mix-spin blocks.
 one_body_coefficients, two_body_coefficients = spinorb_from_spatial(
     one_body, two_body_phys
 )

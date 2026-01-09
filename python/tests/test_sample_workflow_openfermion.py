@@ -50,8 +50,8 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
 
     # Build QDK/Chemistry qubit Hamiltonian
 
-    active_electrons = 2
-    active_orbitals = 2
+    n_active_electrons = 2
+    n_active_orbitals = 2
 
     structure = Structure(
         np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.45 * ANGSTROM_TO_BOHR]], dtype=float),
@@ -64,8 +64,8 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
     selector = create(
         "active_space_selector",
         "qdk_valence",
-        num_active_electrons=active_electrons,
-        num_active_orbitals=active_orbitals,
+        num_active_electrons=n_active_electrons,
+        num_active_orbitals=n_active_orbitals,
     )
     active_orbitals = selector.run(scf_wavefunction).get_orbitals()
 
@@ -79,7 +79,7 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
     # Note if printed directly, the Pauli operators will not match with openFermion output
     qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
 
-    # Obtain that the ground state energy by diagonailizing the qubit Hamiltonian matrix
+    # Obtain the ground state energy by diagonailizing the qubit Hamiltonian matrix
     jwt_matrix = qubit_hamiltonian.pauli_ops.to_matrix()
     eigenvalues = np.linalg.eigvalsh(jwt_matrix)
     ground_state_energy = np.min(eigenvalues)
