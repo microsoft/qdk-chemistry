@@ -39,7 +39,7 @@ structure = Structure(
 
 scf_solver = create("scf_solver")  # STO-3G basis for H2
 scf_energy, scf_wavefunction = scf_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_set="sto-3g"
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
 )  # Neutral singlet H2
 
 

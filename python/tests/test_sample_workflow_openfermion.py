@@ -72,10 +72,6 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
     constructor = create("hamiltonian_constructor")
     active_hamiltonian = constructor.run(active_orbitals)
 
-    n_alpha = n_beta = active_electrons // 2
-    mc_calculator = create("multi_configuration_calculator")
-    casci_energy, casci_wavefunction = mc_calculator.run(active_hamiltonian, n_alpha, n_beta)
-
     assert "qiskit" in available("qubit_mapper")
     qubit_mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
 
