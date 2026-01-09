@@ -148,7 +148,7 @@ filterwarnings = [
 ]
 testpaths = ["tests"]
 env = [
-  "QDK_CHEMISTRY_PYTHON_TELEMETRY=none"
+  "QSHARP_PYTHON_TELEMETRY=none"
 ]
 
 [tool.ruff]

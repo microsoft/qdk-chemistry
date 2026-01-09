@@ -10,7 +10,7 @@ optional properties. The telemetry will be batched and sent at a regular interva
 and when the process is about to exit.
 
 Disable qdk_chemistry Python telemetry by setting the environment variable
-`QDK_CHEMISTRY_PYTHON_TELEMETRY` to one of the following: `none`, `disabled`, `false`, or `0`.
+`QSHARP_PYTHON_TELEMETRY` to one of the following: `none`, `disabled`, `false`, or `0`.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -44,24 +44,24 @@ except PackageNotFoundError:
     QDK_CHEMISTRY_VERSION = "0.0.0.dev0"
 
 # Application Insights configuration
-AIKEY = os.environ.get("QDK_CHEMISTRY_PYTHON_AI_KEY") or "95d25b22-8b6d-448e-9677-78ad4047a95a"
+AIKEY = os.environ.get("QSHARP_PYTHON_AI_KEY") or "95d25b22-8b6d-448e-9677-78ad4047a95a"
 AIURL = (
-    os.environ.get("QDK_CHEMISTRY_PYTHON_AI_URL") or "https://westus2-2.in.applicationinsights.azure.com//v2.1/track"
+    os.environ.get("QSHARP_PYTHON_AI_URL") or "https://westus2-2.in.applicationinsights.azure.com//v2.1/track"
 )
 
 # Environment variables take precedence, else disable telemetry for non 'stable' builds
-QDK_CHEMISTRY_PYTHON_TELEMETRY = (os.environ.get("QDK_CHEMISTRY_PYTHON_TELEMETRY") or "").lower()
+QSHARP_PYTHON_TELEMETRY = (os.environ.get("QSHARP_PYTHON_TELEMETRY") or "").lower()
 TELEMETRY_ENABLED = (
     True
-    if QDK_CHEMISTRY_PYTHON_TELEMETRY in ["1", "true", "enabled"]
+    if QSHARP_PYTHON_TELEMETRY in ["1", "true", "enabled"]
     else (
         False
-        if QDK_CHEMISTRY_PYTHON_TELEMETRY in ["0", "false", "disabled", "none"]
+        if QSHARP_PYTHON_TELEMETRY in ["0", "false", "disabled", "none"]
         else ("dev" not in QDK_CHEMISTRY_VERSION)  # Auto-disable for dev builds
     )
 )
 
-BATCH_INTERVAL_SEC = int(os.environ.get("QDK_CHEMISTRY_PYTHON_TELEMETRY_INTERVAL") or 60)
+BATCH_INTERVAL_SEC = int(os.environ.get("QSHARP_PYTHON_TELEMETRY_INTERVAL") or 60)
 
 
 # The below is taken from the Azure Monitor Python SDK
