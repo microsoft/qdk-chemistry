@@ -152,13 +152,11 @@ transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
  * @param determinants Vector of determinants (modified in place)
  * @param coefficients VectorVariant of coefficients (modified in place)
  * @param threshold Coefficient magnitude threshold for pruning (default
- *                  std::numeric_limits<double>::epsilon())
+ *                  1e-14)
  */
-void consolidate_determinants(
-    std::vector<Configuration>& determinants,
-    ContainerTypes::VectorVariant& coefficients,
-    double threshold = std::numeric_limits<double>::epsilon());
-/// @endcond
+void consolidate_determinants(std::vector<Configuration>& determinants,
+                              ContainerTypes::VectorVariant& coefficients,
+                              double threshold = 1e-14);
 
 }  // namespace detail
 

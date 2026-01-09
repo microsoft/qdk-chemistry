@@ -503,15 +503,15 @@ TEST_F(MP2Test, CICoefficientsGeneration) {
   // Verify number of coefficients matches expected for MP2 expansion
   std::visit(
       [](const auto& vec) {
-        EXPECT_EQ(vec.size(), 8071)
-            << "8071 coefficients should be generated for MP2 expansion";
+        EXPECT_EQ(vec.size(), 5609)
+            << "5609 coefficients should be generated for MP2 expansion";
       },
       coefficients);
 
   // Test that determinants can be retrieved and count matches
   const auto& determinants = mp2_container->get_active_determinants();
-  EXPECT_EQ(determinants.size(), 8071)
-      << "8071 determinants should be generated for MP2 expansion";
+  EXPECT_EQ(determinants.size(), 5609)
+      << "5609 determinants should be generated for MP2 expansion";
 
   // The number of coefficients should match the number of determinants
   std::visit(
