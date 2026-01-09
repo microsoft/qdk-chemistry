@@ -63,6 +63,7 @@ dev = [
   "coverage",
   "mypy",
   "pytest",
+  "pytest-env",
   "ruff"
 ]
 docs = [
