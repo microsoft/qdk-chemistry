@@ -7,9 +7,9 @@
 
 This example demonstrates the use of QDK/Chemistry tools in preparing the electronic
 structure Hamiltonian, which is then passed to OpenFermion to perform the Jordan-Wigner
-transformation. The key points are (1) QDK/Chemistry provides integrals in the spatial molecular 
+transformation. The key points are (1) QDK/Chemistry provides integrals in the spatial molecular
 orbital basis, which need to be converted to integrals in the spin-orbital basis that OpenFermion
-expects, and (2) the two-electron molecular integrals from QDK/Chemistry are in chemist's notation 
+expects, and (2) the two-electron molecular integrals from QDK/Chemistry are in chemist's notation
 and need to be packed in the physicist's notation that OpenFermion expects.
 
 This example is adapted from the introduction to OpenFermion tutorial:

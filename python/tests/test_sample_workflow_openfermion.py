@@ -59,7 +59,7 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
 
     # Verify SCF and CASCI energies are correct
     scf_energy = _extract_float(r"SCF total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
-   
+
     assert np.isclose(scf_energy, ref_scf_energy, atol=1e-7)  # make sure the same molecule is used
 
     selector = create(
