@@ -492,10 +492,6 @@ TEST_F(MP2Test, WavefunctionHdf5SerializationSpatial) {
 // Test CI coefficients generation from MP2 amplitudes
 TEST_F(MP2Test, CICoefficientsGeneration) {
   // Singlet O2 (restricted)
-  // Set OMP_NUM_THREADS to 1 for reproducible test results
-  int old_omp_threads = omp_get_max_threads();
-  omp_set_num_threads(1);
-
   auto setup = create_o2_hf_setup(1);
 
   // Create MP2Container
@@ -508,15 +504,15 @@ TEST_F(MP2Test, CICoefficientsGeneration) {
   // Verify number of coefficients matches expected for MP2 expansion
   std::visit(
       [](const auto& vec) {
-        EXPECT_EQ(vec.size(), 6009)
-            << "6009 coefficients should be generated for MP2 expansion";
+        EXPECT_EQ(vec.size(), 4909)
+            << "4909 coefficients should be generated for MP2 expansion";
       },
       coefficients);
 
   // Test that determinants can be retrieved and count matches
   const auto& determinants = mp2_container->get_active_determinants();
-  EXPECT_EQ(determinants.size(), 6009)
-      << "6009 determinants should be generated for MP2 expansion";
+  EXPECT_EQ(determinants.size(), 4909)
+      << "4909 determinants should be generated for MP2 expansion";
 
   // The number of coefficients should match the number of determinants
   std::visit(
@@ -529,9 +525,6 @@ TEST_F(MP2Test, CICoefficientsGeneration) {
   // Test size() returns the number of determinants
   EXPECT_EQ(mp2_container->size(), determinants.size())
       << "size() should return the number of determinants";
-
-  // Restore original OMP_NUM_THREADS value
-  omp_set_num_threads(old_omp_threads);
 }
 
 // Test CI expansion consistency for MP2
