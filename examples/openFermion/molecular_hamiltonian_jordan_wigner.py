@@ -21,11 +21,12 @@ import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
-import scipy
-import scipy.linalg
 
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.utils import Logger
+
+from openfermion.chem.molecular_data import spinorb_from_spatial
+
 
 # Open Fermion must be installed to run this example.
 try:
@@ -54,7 +55,9 @@ structure = Structure(
 )  # Geometry in bohr
 
 scf_solver = create("scf_solver")
-scf_energy, scf_wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+scf_energy, scf_wavefunction = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
 
 
 ########################################################################################
@@ -104,7 +107,6 @@ two_body = two_body_flat.reshape((norb,) * 4)
 two_body_phys = np.transpose(two_body, (0, 2, 3, 1))
 
 
-from openfermion.chem.molecular_data import spinorb_from_spatial 
 one_body_coefficients, two_body_coefficients = spinorb_from_spatial(
     one_body, two_body_phys
 )
@@ -122,7 +124,9 @@ open_fermion_molecular_hamiltonian = (
 fermion_hamiltonian = get_fermion_operator(open_fermion_molecular_hamiltonian)
 qubit_hamiltonian = jordan_wigner(fermion_hamiltonian)
 qubit_hamiltonian.compress()
-Logger.info("=== The Jordan-Wigner Hamiltonian in canonical basis (interleaved ordering): ===")
+Logger.info(
+    "=== The Jordan-Wigner Hamiltonian in canonical basis (interleaved ordering): ==="
+)
 message = str(qubit_hamiltonian)
 Logger.info(message)
 
@@ -130,4 +134,3 @@ Logger.info(message)
 sparse_hamiltonian = get_sparse_operator(qubit_hamiltonian)
 energy, state = get_ground_state(sparse_hamiltonian)
 Logger.info(f"Ground state energy is {energy: .15f} Hartree.")
-
