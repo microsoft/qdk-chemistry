@@ -116,9 +116,9 @@ def _assert_warning_constraints(lines: list[str], expected_warning: str | None, 
         )
 
 
-################################################################################
-# SCI workflow testing
-################################################################################
+###############################################################################
+SCI workflow testing
+###############################################################################
 
 
 @dataclass(frozen=True)
@@ -445,31 +445,65 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
             f"{result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
         )
 
-    # Verify SCF and CASCI energies are reported
+    # Verify SCF and CASCI energies are correct
     scf_energy = _extract_float(r"SCF total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
     casci_energy = _extract_float(r"CASCI total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
 
-    # LiH SCF/CASCI energies should be around -7.8 Hartree
-    assert -8.0 < scf_energy < -7.5, f"SCF energy {scf_energy} outside expected range for LiH."
-    assert -8.0 < casci_energy < -7.5, f"CASCI energy {casci_energy} outside expected range for LiH."
+    assert np.isclose(scf_energy, -7.86256780, atol = 1e-7)
+    assert np.isclose(casci_energy, -7.86277317, atol = 1e-7)
 
-    # Verify ground state energies before and after rotation are reported and consistent
-    energy_before = _extract_float(
-        r"Ground state energy before rotation is\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr
+    # Build QDK/Chemistry qubit Hamiltonian 
+    from qdk_chemistry.data import Hamiltonian
+    from qdk_chemistry.algorithms import QubitMapper, available, create
+    from qdk_chemistry.data import Structure
+    from qdk_chemistry.constants import ANGSTROM_TO_BOHR
+
+    ACTIVE_ELECTRONS = 2
+    ACTIVE_ORBITALS = 2
+
+    structure = Structure(
+        np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.45 * ANGSTROM_TO_BOHR]], dtype=float),
+        ["Li", "H"],
     )
-    energy_after = _extract_float(
-        r"Ground state energy after rotation is\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr
+
+    scf_solver = create("scf_solver")
+    scf_energy, scf_wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+
+    selector = create(
+        "active_space_selector",
+        "qdk_valence",
+        num_active_electrons=ACTIVE_ELECTRONS,
+        num_active_orbitals=ACTIVE_ORBITALS,
     )
+    active_orbitals = selector.run(scf_wavefunction).get_orbitals()
 
-    # Ground state energy should be invariant under basis rotation
-    assert np.isclose(energy_before, energy_after, rtol=float_comparison_relative_tolerance, atol=1e-10), (
-        f"Ground state energy changed after rotation: {energy_before} vs {energy_after}"
+    constructor = create("hamiltonian_constructor")
+    active_hamiltonian = constructor.run(active_orbitals)
+
+    n_alpha = n_beta = ACTIVE_ELECTRONS // 2
+    mc_calculator = create("multi_configuration_calculator")
+    casci_energy, casci_wavefunction = mc_calculator.run(
+        active_hamiltonian, n_alpha, n_beta
     )
+    
+    assert "qiskit" in available("qubit_mapper")
+    qubit_mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
 
+    # Obtain qubit Hamiltonian assuming block ordering - spin up first then spin down
+    # Note if printed directly, the Pauli operators will not match with openFermion output
+    qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
+ 
+    # Obtain that the ground state energy by diagonailizing the qubit Hamiltonian matrix
+    jwt_matrix = qubit_hamiltonian.pauli_ops.to_matrix()
+    eigenvalues = np.linalg.eigvalsh(jwt_matrix)                                                                   
+    ground_state_energy = np.min(eigenvalues) 
 
-################################################################################
-# Qsharp interoperability sample testing
-################################################################################
+    # Verify that the ground state energy matches that obtained from OpenFermion's Jordan-Wigner Hamiltonian
+    of_jwt_energy = _extract_float(r"Ground state energy is\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
+
+    assert np.isclose(
+        ground_state_energy + active_hamiltonian.get_core_energy(), of_jwt_energy, atol=1e-4)
+
 
 
 @pytest.mark.xfail(reason="Skipping unimplemented examples/qsharp/iqpe_no_trotter.qs test.")

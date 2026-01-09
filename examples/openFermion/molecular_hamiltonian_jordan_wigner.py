@@ -53,8 +53,8 @@ structure = Structure(
     ["Li", "H"],
 )  # Geometry in bohr
 
-scf_solver = create("scf_solver", basis_set="sto-3g")
-scf_energy, scf_wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+scf_solver = create("scf_solver")
+scf_energy, scf_wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
 
 
 ########################################################################################
@@ -86,11 +86,11 @@ Logger.info(f"  CASCI total energy: {casci_energy: .8f} Hartree")
 # 3. Preparing the qubit Hamiltonian and sparse-isometry trial state
 ########################################################################################
 
-one_body_aa, one_body_bb = np.array(
+one_body, _ = np.array(
     active_hamiltonian.get_one_body_integrals(), dtype=float
 )  # One-electron integrals
 
-norb = one_body_aa.shape[0]  # Number of spatial orbitals
+norb = one_body.shape[0]  # Number of spatial orbitals
 
 # Obtain a rank-4 tensor in chemists' notation (pq|rs) from QDK
 (two_body_integrals, _, _) = active_hamiltonian.get_two_body_integrals()
@@ -104,27 +104,10 @@ two_body = two_body_flat.reshape((norb,) * 4)
 two_body_phys = np.transpose(two_body, (0, 2, 3, 1))
 
 
-# make spatial integrals into spin orbitals, ordered as alpha_1, beta_1, alpha_2, beta_2, ...
-n_spin_orbitals = 2 * norb
-one_body_coefficients = np.zeros((n_spin_orbitals, n_spin_orbitals))
-two_body_coefficients = np.zeros(
-    (n_spin_orbitals, n_spin_orbitals, n_spin_orbitals, n_spin_orbitals)
+from openfermion.chem.molecular_data import spinorb_from_spatial 
+one_body_coefficients, two_body_coefficients = spinorb_from_spatial(
+    one_body, two_body_phys
 )
-
-# For those less familiar with vectorized notation:
-# one_body_coefficients[2 * p, 2 * q] = one_body_aa[p, q]
-# one_body_coefficients[2 * p + 1, 2 * q + 1] = one_body_bb[p, q]
-# two_body_coefficients[2 * p, 2 * r, 2 * s, 2 * q] = two_body_phys[ p, r, s, q ]
-# two_body_coefficients[2 * p + 1, 2 * r + 1, 2 * s + 1, 2 * q + 1] = two_body_phys[p, r, s, q]
-# two_body_coefficients[2 * p, 2 * r + 1, 2 * s + 1, 2 * q] = two_body_phys[ p, r, s, q ]
-# two_body_coefficients[2 * p + 1, 2 * r, 2 * s, 2 * q + 1] = two_body_phys[  p, r, s, q ]
-one_body_coefficients[0::2, 0::2] = one_body_aa
-one_body_coefficients[1::2, 1::2] = one_body_bb
-two_body_coefficients[0::2, 0::2, 0::2, 0::2] = two_body_phys
-two_body_coefficients[1::2, 1::2, 1::2, 1::2] = two_body_phys
-# note order of last two indices again
-two_body_coefficients[0::2, 1::2, 1::2, 0::2] = two_body_phys
-two_body_coefficients[1::2, 0::2, 0::2, 1::2] = two_body_phys
 
 core_energy = active_hamiltonian.get_core_energy()  # Core energy constant
 
@@ -139,12 +122,12 @@ open_fermion_molecular_hamiltonian = (
 fermion_hamiltonian = get_fermion_operator(open_fermion_molecular_hamiltonian)
 qubit_hamiltonian = jordan_wigner(fermion_hamiltonian)
 qubit_hamiltonian.compress()
-Logger.info("=== The Jordan-Wigner Hamiltonian in canonical basis : ===")
+Logger.info("=== The Jordan-Wigner Hamiltonian in canonical basis (interleaved ordering): ===")
 message = str(qubit_hamiltonian)
 Logger.info(message)
 
 # Get sparse operator and ground state energy.
 sparse_hamiltonian = get_sparse_operator(qubit_hamiltonian)
 energy, state = get_ground_state(sparse_hamiltonian)
-Logger.info(f"Ground state energy before rotation is {energy: .15f} Hartree.")
+Logger.info(f"Ground state energy is {energy: .15f} Hartree.")
 
