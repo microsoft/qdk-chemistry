@@ -498,9 +498,6 @@ TEST_F(MP2Test, CICoefficientsGeneration) {
 
   auto setup = create_o2_hf_setup(1);
 
-  // Restore original OMP_NUM_THREADS value
-  omp_set_num_threads(old_omp_threads);
-
   // Create MP2Container
   auto mp2_container = std::make_unique<MP2Container>(setup.hf_hamiltonian,
                                                       setup.hf_wavefunction);
@@ -532,6 +529,9 @@ TEST_F(MP2Test, CICoefficientsGeneration) {
   // Test size() returns the number of determinants
   EXPECT_EQ(mp2_container->size(), determinants.size())
       << "size() should return the number of determinants";
+
+  // Restore original OMP_NUM_THREADS value
+  omp_set_num_threads(old_omp_threads);
 }
 
 // Test CI expansion consistency for MP2
