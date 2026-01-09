@@ -660,12 +660,10 @@ void MP2Container::_generate_ci_expansion() const {
         for (size_t a = 0; a < n_virt_alpha; ++a) {
           for (size_t b = 0; b < n_virt_beta; ++b) {
             auto t_ijab = get_t2_abab_c(i, j, a, b);
-            if (std::abs(t_ijab) > std::numeric_limits<double>::epsilon()) {
-              auto det = _apply_excitations(ref, {{i, n_alpha + a}},
-                                            {{j, n_beta + b}});
-              determinants.push_back(det);
-              coefficients.push_back(t_ijab);
-            }
+            auto det =
+                _apply_excitations(ref, {{i, n_alpha + a}}, {{j, n_beta + b}});
+            determinants.push_back(det);
+            coefficients.push_back(t_ijab);
           }
         }
       }
@@ -677,12 +675,10 @@ void MP2Container::_generate_ci_expansion() const {
         for (size_t a = 0; a < n_virt_alpha; ++a) {
           for (size_t b = a + 1; b < n_virt_alpha; ++b) {
             auto t_ijab = get_t2_aaaa_c(i, j, a, b);
-            if (std::abs(t_ijab) > std::numeric_limits<double>::epsilon()) {
-              auto det = _apply_excitations(
-                  ref, {{i, n_alpha + a}, {j, n_alpha + b}}, {});
-              determinants.push_back(det);
-              coefficients.push_back(t_ijab);
-            }
+            auto det = _apply_excitations(
+                ref, {{i, n_alpha + a}, {j, n_alpha + b}}, {});
+            determinants.push_back(det);
+            coefficients.push_back(t_ijab);
           }
         }
       }
@@ -694,12 +690,10 @@ void MP2Container::_generate_ci_expansion() const {
         for (size_t a = 0; a < n_virt_beta; ++a) {
           for (size_t b = a + 1; b < n_virt_beta; ++b) {
             auto t_ijab = get_t2_bbbb_c(i, j, a, b);
-            if (std::abs(t_ijab) > std::numeric_limits<double>::epsilon()) {
-              auto det = _apply_excitations(ref, {},
-                                            {{i, n_beta + a}, {j, n_beta + b}});
-              determinants.push_back(det);
-              coefficients.push_back(t_ijab);
-            }
+            auto det =
+                _apply_excitations(ref, {}, {{i, n_beta + a}, {j, n_beta + b}});
+            determinants.push_back(det);
+            coefficients.push_back(t_ijab);
           }
         }
       }
@@ -774,12 +768,10 @@ void MP2Container::_generate_ci_expansion() const {
         for (size_t a = 0; a < n_virt_alpha; ++a) {
           for (size_t b = 0; b < n_virt_beta; ++b) {
             double t_ijab = get_t2_abab_r(i, j, a, b);
-            if (std::abs(t_ijab) > std::numeric_limits<double>::epsilon()) {
-              auto det = _apply_excitations(ref, {{i, n_alpha + a}},
-                                            {{j, n_beta + b}});
-              determinants.push_back(det);
-              coefficients.push_back(t_ijab);
-            }
+            auto det =
+                _apply_excitations(ref, {{i, n_alpha + a}}, {{j, n_beta + b}});
+            determinants.push_back(det);
+            coefficients.push_back(t_ijab);
           }
         }
       }
@@ -791,12 +783,10 @@ void MP2Container::_generate_ci_expansion() const {
         for (size_t a = 0; a < n_virt_alpha; ++a) {
           for (size_t b = a + 1; b < n_virt_alpha; ++b) {
             double t_ijab = get_t2_aaaa_r(i, j, a, b);
-            if (std::abs(t_ijab) > std::numeric_limits<double>::epsilon()) {
-              auto det = _apply_excitations(
-                  ref, {{i, n_alpha + a}, {j, n_alpha + b}}, {});
-              determinants.push_back(det);
-              coefficients.push_back(t_ijab);
-            }
+            auto det = _apply_excitations(
+                ref, {{i, n_alpha + a}, {j, n_alpha + b}}, {});
+            determinants.push_back(det);
+            coefficients.push_back(t_ijab);
           }
         }
       }
@@ -808,12 +798,10 @@ void MP2Container::_generate_ci_expansion() const {
         for (size_t a = 0; a < n_virt_beta; ++a) {
           for (size_t b = a + 1; b < n_virt_beta; ++b) {
             double t_ijab = get_t2_bbbb_r(i, j, a, b);
-            if (std::abs(t_ijab) > std::numeric_limits<double>::epsilon()) {
-              auto det = _apply_excitations(ref, {},
-                                            {{i, n_beta + a}, {j, n_beta + b}});
-              determinants.push_back(det);
-              coefficients.push_back(t_ijab);
-            }
+            auto det =
+                _apply_excitations(ref, {}, {{i, n_beta + a}, {j, n_beta + b}});
+            determinants.push_back(det);
+            coefficients.push_back(t_ijab);
           }
         }
       }

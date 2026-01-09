@@ -1090,16 +1090,13 @@ void CoupledClusterContainer::_generate_ci_expansion() const {
                       coef += get_t2_aaaa(i, l, a, d) *
                               get_t2_aaaa(j, k, b, c) / 2.0;
                     }
-                    if (std::abs(coef) >
-                        std::numeric_limits<double>::epsilon()) {
-                      Configuration det = _apply_excitations(ref,
-                                                             {{i, n_alpha + a},
-                                                              {j, n_alpha + b},
-                                                              {k, n_alpha + c},
-                                                              {l, n_alpha + d}},
-                                                             {});
-                      add_det(det, coef);
-                    }
+                    Configuration det = _apply_excitations(ref,
+                                                           {{i, n_alpha + a},
+                                                            {j, n_alpha + b},
+                                                            {k, n_alpha + c},
+                                                            {l, n_alpha + d}},
+                                                           {});
+                    add_det(det, coef);
                   }
                 }
               }
@@ -1150,15 +1147,12 @@ void CoupledClusterContainer::_generate_ci_expansion() const {
                       coef += get_t2_bbbb(i, l, a, d) *
                               get_t2_bbbb(j, k, b, c) / 2.0;
                     }
-                    if (std::abs(coef) >
-                        std::numeric_limits<double>::epsilon()) {
-                      Configuration det = _apply_excitations(ref, {},
-                                                             {{i, n_beta + a},
-                                                              {j, n_beta + b},
-                                                              {k, n_beta + c},
-                                                              {l, n_beta + d}});
-                      add_det(det, coef);
-                    }
+                    Configuration det = _apply_excitations(ref, {},
+                                                           {{i, n_beta + a},
+                                                            {j, n_beta + b},
+                                                            {k, n_beta + c},
+                                                            {l, n_beta + d}});
+                    add_det(det, coef);
                   }
                 }
               }
@@ -1205,15 +1199,11 @@ void CoupledClusterContainer::_generate_ci_expansion() const {
                       coef += get_t2_aaaa(i, k, a, c) * get_t2_abab(j, l, b, d);
                       coef += get_t2_aaaa(j, k, b, c) * get_t2_abab(i, l, a, d);
                     }
-                    if (std::abs(coef) >
-                        std::numeric_limits<double>::epsilon()) {
-                      Configuration det = _apply_excitations(ref,
-                                                             {{i, n_alpha + a},
-                                                              {j, n_alpha + b},
-                                                              {k, n_alpha + c}},
-                                                             {{l, n_beta + d}});
-                      add_det(det, coef);
-                    }
+                    Configuration det = _apply_excitations(
+                        ref,
+                        {{i, n_alpha + a}, {j, n_alpha + b}, {k, n_alpha + c}},
+                        {{l, n_beta + d}});
+                    add_det(det, coef);
                   }
                 }
               }
@@ -1260,13 +1250,10 @@ void CoupledClusterContainer::_generate_ci_expansion() const {
                       coef += get_t2_bbbb(j, l, b, d) * get_t2_abab(i, k, a, c);
                       coef += get_t2_bbbb(k, l, c, d) * get_t2_abab(i, j, a, b);
                     }
-                    if (std::abs(coef) >
-                        std::numeric_limits<double>::epsilon()) {
-                      Configuration det = _apply_excitations(
-                          ref, {{i, n_alpha + a}},
-                          {{j, n_beta + b}, {k, n_beta + c}, {l, n_beta + d}});
-                      add_det(det, coef);
-                    }
+                    Configuration det = _apply_excitations(
+                        ref, {{i, n_alpha + a}},
+                        {{j, n_beta + b}, {k, n_beta + c}, {l, n_beta + d}});
+                    add_det(det, coef);
                   }
                 }
               }
@@ -1315,13 +1302,10 @@ void CoupledClusterContainer::_generate_ci_expansion() const {
                       coef += get_t2_abab(i, l, a, d) *
                               get_t2_abab(j, k, b, c) / 2.0;
                     }
-                    if (std::abs(coef) >
-                        std::numeric_limits<double>::epsilon()) {
-                      Configuration det = _apply_excitations(
-                          ref, {{i, n_alpha + a}, {j, n_alpha + b}},
-                          {{k, n_beta + c}, {l, n_beta + d}});
-                      add_det(det, coef);
-                    }
+                    Configuration det = _apply_excitations(
+                        ref, {{i, n_alpha + a}, {j, n_alpha + b}},
+                        {{k, n_beta + c}, {l, n_beta + d}});
+                    add_det(det, coef);
                   }
                 }
               }
