@@ -21,6 +21,7 @@ from qdk_chemistry.algorithms import create
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
 
+from .reference_tolerances import float_comparison_absolute_tolerance
 from .test_sample_workflow_utils import (
     _extract_float,
     _run_workflow,
@@ -91,5 +92,7 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
     )
 
     assert np.isclose(
-        ground_state_energy + active_hamiltonian.get_core_energy(), openfermion_jordan_wigner_energy, atol=1e-12
+        ground_state_energy + active_hamiltonian.get_core_energy(),
+        openfermion_jordan_wigner_energy,
+        atol=float_comparison_absolute_tolerance,
     )

@@ -7,14 +7,14 @@
 
 This example demonstrates the use of QDK/Chemistry tools in preparing the electronic
 structure Hamiltonian, which is then passed to OpenFermion to perform the Jordan-Wigner
-transformation. The challenges are (1) to obtain integrals in the spin-orbital basis from
+transformation. The key elements are (1) to obtain integrals in the spin-orbital basis from
 spatial ones, and (2) pack the two-electron molecular integrals in the order OpenFermion
 expects.
 
 This example is adapted from the introduction to OpenFermion tutorial:
 https://quantumai.google/openfermion/tutorials/intro_to_openfermion
 Due to minor differences in the Hamiltonian (stemming from different molecular orbitals), the
-calculated energy values differ from those in the OpenFermion tutorial by 1e-6 Hartree.
+calculated energy values differ from those in the OpenFermion tutorial by O(1e-6) Hartree.
 """
 
 import numpy as np
@@ -26,10 +26,6 @@ from qdk_chemistry.utils import Logger
 # OpenFermion must be installed to run this example.
 try:
     import openfermion
-    from openfermion.transforms import get_fermion_operator, jordan_wigner
-    from openfermion.linalg import get_ground_state, get_sparse_operator
-    from openfermion.chem.molecular_data import spinorb_from_spatial
-
 except ImportError as e:
     raise ImportError(
         "OpenFermion is not installed. Please install OpenFermion to run this example: pip install openfermion"
@@ -86,17 +82,18 @@ Logger.info(f"  CASCI total energy: {casci_energy: .8f} Hartree")
 ########################################################################################
 
 # For restricted Hartree-Fock, the alpha and beta blocks are equal.
+one_body_aa, one_body_bb = active_hamiltonian.get_one_body_integrals()
 one_body = np.array(
-    active_hamiltonian.get_one_body_integrals()[0], dtype=float
-)  # One-electron integrals (spin up block only)
+    one_body_aa, dtype=float
+)  # One-electron integrals (use spin up block only)
 
 norb = one_body.shape[0]  # Number of spatial orbitals
 
 # Obtain a rank-4 tensor in chemists' notation (pq|rs) from QDK
-two_body_flat = np.array(
-    active_hamiltonian.get_two_body_integrals()[0], dtype=float
-)  # Two-electron integrals (aaaa only)
-two_body = two_body_flat.reshape((norb,) * 4)
+two_body_aaaa, two_body_aabb, two_body_bbbb = (
+    active_hamiltonian.get_two_body_integrals()
+)
+two_body = np.array(two_body_aaaa, dtype=float).reshape((norb,) * 4)
 
 # Convert to OpenFermion physicists' notation <pr|sq>. Note that the last two indices may be switched
 # from what you expect in other physicists' notation. OpenFermion takes the integral notation below to be consistent
@@ -106,9 +103,9 @@ two_body_phys = np.transpose(two_body, (0, 2, 3, 1))
 
 # Note: the spinorb_from_spatial function from OpenFermion works for restricted Hamiltonians only
 # If unrestricted Hamiltonians are needed, write a custom function and pay special attention to the ordering of the
-# two-electron integrals, especially in the mix-spin blocks.
-one_body_coefficients, two_body_coefficients = spinorb_from_spatial(
-    one_body, two_body_phys
+# two-electron integrals, especially in the mix-spin scenarios.
+one_body_coefficients, two_body_coefficients = (
+    openfermion.chem.molecular_data.spinorb_from_spatial(one_body, two_body_phys)
 )
 
 core_energy = active_hamiltonian.get_core_energy()  # Core energy constant
@@ -121,8 +118,10 @@ open_fermion_molecular_hamiltonian = (
 )
 
 # Map operator to fermions and qubits.
-fermion_hamiltonian = get_fermion_operator(open_fermion_molecular_hamiltonian)
-qubit_hamiltonian = jordan_wigner(fermion_hamiltonian)
+fermion_hamiltonian = openfermion.transforms.get_fermion_operator(
+    open_fermion_molecular_hamiltonian
+)
+qubit_hamiltonian = openfermion.transforms.jordan_wigner(fermion_hamiltonian)
 qubit_hamiltonian.compress()
 Logger.info(
     "=== The Jordan-Wigner Hamiltonian in canonical basis (interleaved ordering): ==="
@@ -131,6 +130,6 @@ message = str(qubit_hamiltonian)
 Logger.info(message)
 
 # Get sparse operator and ground state energy.
-sparse_hamiltonian = get_sparse_operator(qubit_hamiltonian)
-energy, state = get_ground_state(sparse_hamiltonian)
+sparse_hamiltonian = openfermion.linalg.get_sparse_operator(qubit_hamiltonian)
+energy, state = openfermion.linalg.get_ground_state(sparse_hamiltonian)
 Logger.info(f"Ground state energy is {energy: .15f} Hartree.")
