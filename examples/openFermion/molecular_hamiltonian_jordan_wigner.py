@@ -25,8 +25,6 @@ from qdk_chemistry.data import Structure
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.utils import Logger
 
-
-
 # Open Fermion must be installed to run this example.
 try:
     import openfermion
@@ -97,7 +95,9 @@ one_body = np.array(
 norb = one_body.shape[0]  # Number of spatial orbitals
 
 # Obtain a rank-4 tensor in chemists' notation (pq|rs) from QDK
-two_body_flat = np.array(active_hamiltonian.get_two_body_integrals()[0], dtype=float)  # Two-electron integrals (aaaa only)
+two_body_flat = np.array(
+    active_hamiltonian.get_two_body_integrals()[0], dtype=float
+)  # Two-electron integrals (aaaa only)
 two_body = two_body_flat.reshape((norb,) * 4)
 
 # Convert to open Fermion physicists' notation <pr|sq>. Note that the last two indices may be switched
@@ -106,8 +106,8 @@ two_body = two_body_flat.reshape((norb,) * 4)
 # ĝ = ½ Σ (pq|rs) p† r† s q = ½ Σ ⟨pr|sq⟩ p† r† s q
 two_body_phys = np.transpose(two_body, (0, 2, 3, 1))
 
-# Note:the spinorb_from_spatial function from OpenFermion works for restricted Hamiltonians only
-# If unrestricted Hamiltonians are needed, write a custom function and pay special attention to the ordering of the 
+# Note: the spinorb_from_spatial function from OpenFermion works for restricted Hamiltonians only
+# If unrestricted Hamiltonians are needed, write a custom function and pay special attention to the ordering of the
 # two-electron integrals, especially in the mix-spin blocks.
 one_body_coefficients, two_body_coefficients = spinorb_from_spatial(
     one_body, two_body_phys

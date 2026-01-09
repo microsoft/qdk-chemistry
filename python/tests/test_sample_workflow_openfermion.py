@@ -1,7 +1,9 @@
 """End-to-end tests for the OpenFermion sample workflows.
 
 These tests ensure the public OpenFermion examples continue to emit the expected
-summary values when executed as scripts.
+summary values when executed as scripts. The test is performed by running the same molecule
+with QDK chemistry and look at the Jordan-Wigner transformed Hamiltonian result in the same
+ground state energy as OpenFermion.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -41,13 +43,6 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
             f"{result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
         )
 
-    # Verify SCF and CASCI energies are correct
-    scf_energy = _extract_float(r"SCF total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
-    casci_energy = _extract_float(r"CASCI total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
-
-    assert np.isclose(scf_energy, -7.86256780, atol=1e-7)
-    assert np.isclose(casci_energy, -7.86277317, atol=1e-7)
-
     # Build QDK/Chemistry qubit Hamiltonian
 
     n_active_electrons = 2
@@ -59,7 +54,14 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
     )
 
     scf_solver = create("scf_solver")
-    scf_energy, scf_wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+    ref_scf_energy, scf_wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+
+    # Verify SCF and CASCI energies are correct
+    scf_energy = _extract_float(r"SCF total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
+    casci_energy = _extract_float(r"CASCI total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
+
+    assert np.isclose(scf_energy, ref_scf_energy, atol=1e-7)  # make sure the same molecule is used
+    assert np.isclose(casci_energy, -7.86277317, atol=1e-7)
 
     selector = create(
         "active_space_selector",
@@ -79,7 +81,7 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
     # Note if printed directly, the Pauli operators will not match with openFermion output
     qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
 
-    # Obtain the ground state energy by diagonailizing the qubit Hamiltonian matrix
+    # Obtain the ground state energy by diagonalizing the qubit Hamiltonian matrix
     jwt_matrix = qubit_hamiltonian.pauli_ops.to_matrix()
     eigenvalues = np.linalg.eigvalsh(jwt_matrix)
     ground_state_energy = np.min(eigenvalues)
