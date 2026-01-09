@@ -57,7 +57,7 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
     scf_solver = create("scf_solver")
     ref_scf_energy, scf_wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
 
-    # Verify SCF and CASCI energies are correct
+    # Verify SCF energy is correct
     scf_energy = _extract_float(r"SCF total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
 
     assert np.isclose(scf_energy, ref_scf_energy, atol=1e-7)  # make sure the same molecule is used
