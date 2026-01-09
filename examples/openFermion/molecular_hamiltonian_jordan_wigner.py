@@ -8,7 +8,7 @@
 This example demonstrates the use of QDK/Chemistry tools in preparing the electronic
 structure Hamiltonian, which is then passed to OpenFermion to perform the Jordan-Wigner
 transformation. The challenges are (1) to obtain integrals in the spin-orbital basis from
-spatial ones, and (2) pack the two electron molecular integrals in the order OpenFermion
+spatial ones, and (2) pack the two-electron molecular integrals in the order OpenFermion
 expects.
 
 This example is adapted from the introduction to OpenFermion tutorial:
@@ -20,12 +20,9 @@ calculated energy values differ from those in the OpenFermion tutorial by 1e-6 H
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
-
-
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.utils import Logger
-
-# Open Fermion must be installed to run this example.
+# OpenFermion must be installed to run this example.
 try:
     import openfermion
     from openfermion.transforms import get_fermion_operator, jordan_wigner

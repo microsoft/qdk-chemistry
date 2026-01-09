@@ -2,8 +2,8 @@
 
 These tests ensure the public OpenFermion examples continue to emit the expected
 summary values when executed as scripts. The test is performed by running the same molecule
-with QDK chemistry and look at the Jordan-Wigner transformed Hamiltonian result in the same
-ground state energy as OpenFermion.
+with QDK chemistry and checking whether the Jordan-Wigner transformed Hamiltonian produces
+the same ground state energy as OpenFermion.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -43,7 +43,7 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
             f"{result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
         )
 
-    # Build QDK/Chemistry qubit Hamiltonian
+    # Rebuild the QDK/Chemistry workflow to validate against the example output
 
     n_active_electrons = 2
     n_active_orbitals = 2
@@ -78,7 +78,7 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
     qubit_mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
 
     # Obtain qubit Hamiltonian assuming block ordering - spin up first then spin down
-    # Note if printed directly, the Pauli operators will not match with openFermion output
+    # Note if printed directly, the Pauli operators will not match with OpenFermion output
     qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
 
     # Obtain the ground state energy by diagonalizing the qubit Hamiltonian matrix
