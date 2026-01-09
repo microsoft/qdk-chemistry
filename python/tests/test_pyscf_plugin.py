@@ -1959,16 +1959,17 @@ class TestPyscfPlugin:
 
     def test_orbitals_to_scf_charge_and_multiplicity_handling(self):
         """Test that orbitals_to_scf correctly sets charge and multiplicity in the PySCF molecule."""
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+
         # Test singlet state (closed-shell)
         water = create_water_structure()
-        scf_solver = algorithms.create("scf_solver", "pyscf")
         _, wavefunction_singlet = scf_solver.run(water, 0, 1, "sto-3g")
         orbitals_singlet = wavefunction_singlet.get_orbitals()
-        n_orbitals = orbitals_singlet.get_num_molecular_orbitals()
+        n_orbitals_singlet = orbitals_singlet.get_num_molecular_orbitals()
 
         # Singlet: 5 alpha, 5 beta electrons (charge = 0, multiplicity = 1)
-        occ_alpha_singlet = np.concatenate((np.ones(5), np.zeros(n_orbitals - 5)))
-        occ_beta_singlet = np.concatenate((np.ones(5), np.zeros(n_orbitals - 5)))
+        occ_alpha_singlet = np.concatenate((np.ones(5), np.zeros(n_orbitals_singlet - 5)))
+        occ_beta_singlet = np.concatenate((np.ones(5), np.zeros(n_orbitals_singlet - 5)))
         scf_singlet = orbitals_to_scf(orbitals_singlet, occ_alpha_singlet, occ_beta_singlet)
 
         assert scf_singlet.mol.charge == 0
@@ -1979,11 +1980,11 @@ class TestPyscfPlugin:
         lithium = create_li_structure()
         _, wavefunction_doublet = scf_solver.run(lithium, 0, 2, "sto-3g")
         orbitals_doublet = wavefunction_doublet.get_orbitals()
-        n_orbitals = orbitals_doublet.get_num_molecular_orbitals()
+        n_orbitals_doublet = orbitals_doublet.get_num_molecular_orbitals()
 
         # Doublet: 2 alpha, 1 beta electrons (charge = 0, multiplicity = 2)
-        occ_alpha_doublet = np.concatenate((np.ones(2), np.zeros(n_orbitals - 2)))
-        occ_beta_doublet = np.concatenate((np.ones(1), np.zeros(n_orbitals - 1)))
+        occ_alpha_doublet = np.concatenate((np.ones(2), np.zeros(n_orbitals_doublet - 2)))
+        occ_beta_doublet = np.concatenate((np.ones(1), np.zeros(n_orbitals_doublet - 1)))
         scf_doublet = orbitals_to_scf(orbitals_doublet, occ_alpha_doublet, occ_beta_doublet)
 
         assert scf_doublet.mol.charge == 0
@@ -1994,11 +1995,11 @@ class TestPyscfPlugin:
         o2 = create_o2_structure()
         _, wavefunction_triplet = scf_solver.run(o2, 0, 3, "sto-3g")
         orbitals_triplet = wavefunction_triplet.get_orbitals()
-        n_orbitals = orbitals_triplet.get_num_molecular_orbitals()
+        n_orbitals_triplet = orbitals_triplet.get_num_molecular_orbitals()
 
         # Triplet: 9 alpha, 7 beta electrons (charge = 0, multiplicity = 3)
-        occ_alpha_triplet = np.concatenate((np.ones(9), np.zeros(n_orbitals - 9)))
-        occ_beta_triplet = np.concatenate((np.ones(7), np.zeros(n_orbitals - 7)))
+        occ_alpha_triplet = np.concatenate((np.ones(9), np.zeros(n_orbitals_triplet - 9)))
+        occ_beta_triplet = np.concatenate((np.ones(7), np.zeros(n_orbitals_triplet - 7)))
         scf_triplet = orbitals_to_scf(orbitals_triplet, occ_alpha_triplet, occ_beta_triplet)
 
         assert scf_triplet.mol.charge == 0
@@ -2007,14 +2008,13 @@ class TestPyscfPlugin:
 
         # Test cation (open-shell)
         water = create_water_structure()
-        scf_solver = algorithms.create("scf_solver", "pyscf")
         _, wavefunction_cation = scf_solver.run(water, 1, 2, "sto-3g")
         orbitals_cation = wavefunction_cation.get_orbitals()
-        n_orbitals = orbitals_cation.get_num_molecular_orbitals()
+        n_orbitals_cation = orbitals_cation.get_num_molecular_orbitals()
 
         # Doublet: 5 alpha, 4 beta electrons (charge = 1, multiplicity = 2)
-        occ_alpha_cation = np.concatenate((np.ones(5), np.zeros(n_orbitals - 5)))
-        occ_beta_cation = np.concatenate((np.ones(4), np.zeros(n_orbitals - 4)))
+        occ_alpha_cation = np.concatenate((np.ones(5), np.zeros(n_orbitals_cation - 5)))
+        occ_beta_cation = np.concatenate((np.ones(4), np.zeros(n_orbitals_cation - 4)))
         scf_cation = orbitals_to_scf(orbitals_cation, occ_alpha_cation, occ_beta_cation)
 
         assert scf_cation.mol.charge == 1
@@ -2026,11 +2026,11 @@ class TestPyscfPlugin:
         ag = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))
         _, wavefunction_ecp = scf_solver.run(ag, 0, 2, "lanl2dz")
         orbitals_ecp = wavefunction_ecp.get_orbitals()
-        n_orbitals = orbitals_ecp.get_num_molecular_orbitals()
+        n_orbitals_ecp = orbitals_ecp.get_num_molecular_orbitals()
 
         # Doublet: 10 alpha, 9 beta electrons (charge = 0, multiplicity = 2)
-        occ_alpha_ecp = np.concatenate((np.ones(10), np.zeros(n_orbitals - 10)))
-        occ_beta_ecp = np.concatenate((np.ones(9), np.zeros(n_orbitals - 9)))
+        occ_alpha_ecp = np.concatenate((np.ones(10), np.zeros(n_orbitals_ecp - 10)))
+        occ_beta_ecp = np.concatenate((np.ones(9), np.zeros(n_orbitals_ecp - 9)))
         scf_ecp = orbitals_to_scf(orbitals_ecp, occ_alpha_ecp, occ_beta_ecp)
 
         assert hasattr(scf_ecp.mol, "ecp")
