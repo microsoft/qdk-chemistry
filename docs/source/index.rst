@@ -10,7 +10,25 @@ QDK/Chemistry tackles this problem holistically, by recognizing that a significa
 QDK/Chemistry also serves as a platform for innovation, by providing a unified interface to a variety of quantum chemistry methods and packages, allowing researchers to focus on their areas of interest while integrating with a vast community of existing tools to accelerate development.
 
 .. note::
-   QDK/Chemistry collects anonymous usage and performance telemetry by default (for production builds) to help improve the product. The implemented telemetry events capture algorithm name and type, calculation execution duration, and number of basis functions (aggregated into buckets to protect sensitive information). Users can disable telemetry by setting the environment variable ``QDK_CHEMISTRY_PYTHON_TELEMETRY=False`` to one of the following: ``none``, ``disabled``, ``false``, or ``0``.
+
+   This library collects anonymous usage and performance data by default to help improve the product.
+   The telemetry implementation can be found in ``python/src/qdk_chemistry/utils/telemetry.py`` and all
+   telemetry events are defined in ``python/src/qdk_chemistry/utils/telemetry_events.py``.
+
+   To disable telemetry via bash, set the environment variable ``QSHARP_PYTHON_TELEMETRY`` to one of the
+   following values: ``none``, ``disabled``, ``false``, or ``0``. For example:
+
+   .. code-block:: bash
+
+      export QSHARP_PYTHON_TELEMETRY='false'
+
+   Alternatively, telemetry can be disabled within a python script by including the following at the top of the ``.py`` file:
+
+   .. code-block:: python
+
+      import os
+      os.environ["QSHARP_PYTHON_TELEMETRY"] = "disabled"
+
 
 Key Features
 ============

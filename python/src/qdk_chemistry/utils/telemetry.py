@@ -45,9 +45,7 @@ except PackageNotFoundError:
 
 # Application Insights configuration
 AIKEY = os.environ.get("QSHARP_PYTHON_AI_KEY") or "95d25b22-8b6d-448e-9677-78ad4047a95a"
-AIURL = (
-    os.environ.get("QSHARP_PYTHON_AI_URL") or "https://westus2-2.in.applicationinsights.azure.com//v2.1/track"
-)
+AIURL = os.environ.get("QSHARP_PYTHON_AI_URL") or "https://westus2-2.in.applicationinsights.azure.com/v2.1/track"
 
 # Environment variables take precedence, else disable telemetry for non 'stable' builds
 QSHARP_PYTHON_TELEMETRY = (os.environ.get("QSHARP_PYTHON_TELEMETRY") or "").lower()
