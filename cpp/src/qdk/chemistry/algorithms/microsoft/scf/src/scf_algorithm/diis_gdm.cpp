@@ -60,7 +60,8 @@ void DIIS_GDM::iterate(SCFImpl& scf_impl) {
         "Switching from DIIS to GDM at step {} (delta_energy={}, "
         "max_diis_step={})",
         step_count_, delta_energy_, gdm_config_.gdm_max_diis_iteration);
-    gdm_algorithm_->set_delta_energy_diis(std::abs(delta_energy_));
+    double total_energy = scf_impl.context().result.scf_total_energy;
+    gdm_algorithm_->initialize_from_diis(std::abs(delta_energy_), total_energy);
   }
 
   // Delegate to appropriate algorithm

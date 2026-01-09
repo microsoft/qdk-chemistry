@@ -70,26 +70,9 @@ std::vector<data::Configuration> get_top_determinants(
 int main() {
   // ---------------------------------------------------------------------------
   // start-cell-structure
-  // Define benzene diradical structure directly using coordinates
-  Eigen::MatrixXd coords(10, 3);
-  coords.row(0) << 0.000000, 1.396000, 0.000000;
-  coords.row(1) << 1.209077, 0.698000, 0.000000;
-  coords.row(2) << 1.209077, -0.698000, 0.000000;
-  coords.row(3) << 0.000000, -1.396000, 0.000000;
-  coords.row(4) << -1.209077, -0.698000, 0.000000;
-  coords.row(5) << -1.209077, 0.698000, 0.000000;
-  coords.row(6) << 2.151000, 1.242000, 0.000000;
-  coords.row(7) << 2.151000, -1.242000, 0.000000;
-  coords.row(8) << -2.151000, -1.242000, 0.000000;
-  coords.row(9) << -2.151000, 1.242000, 0.000000;
-
-  std::vector<std::string> elements = {"C", "C", "C", "C", "C",
-                                       "C", "H", "H", "H", "H"};
-
-  auto structure = std::make_shared<data::Structure>(coords, elements);
-
-  // Alternative: Load from XYZ file
-  // auto structure = data::Structure::from_xyz_file("benzene_diradical.xyz");
+  // Load para-benzyne structure from XYZ file
+  auto structure = std::make_shared<data::Structure>(
+      data::Structure::from_xyz_file("../data/para_benzyne.structure.xyz"));
 
   std::cout << "Created structure with " << structure->get_num_atoms()
             << " atoms" << std::endl;

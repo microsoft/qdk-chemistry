@@ -9,7 +9,11 @@
 # start-cell-create-hubbard
 import numpy as np
 import qdk_chemistry.algorithms as algorithms
-from qdk_chemistry.data import Hamiltonian, ModelOrbitals
+from qdk_chemistry.data import (
+    Hamiltonian,
+    CanonicalFourCenterHamiltonianContainer,
+    ModelOrbitals,
+)
 
 # Define a 4-site Hubbard chain with restricted "orbitals"
 num_sites = 4
@@ -43,7 +47,9 @@ inactive_fock = np.zeros((0, 0))
 
 # Create the Hamiltonian
 hamiltonian = Hamiltonian(
-    one_body, two_body, model_orbitals, core_energy, inactive_fock
+    CanonicalFourCenterHamiltonianContainer(
+        one_body, two_body, model_orbitals, core_energy, inactive_fock
+    )
 )
 # end-cell-create-hubbard
 ################################################################################

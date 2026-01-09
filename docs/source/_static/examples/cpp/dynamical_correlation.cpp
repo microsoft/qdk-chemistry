@@ -25,10 +25,8 @@ auto mp2_calculator =
 
 // -----------------------------------------------------------------------------
 // start-cell-run
-// Create a simple structure
-std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.4, 0.0, 0.0}};
-std::vector<std::string> symbols = {"H", "H"};
-Structure structure(coords, symbols);
+// Load H2 structure from XYZ file
+auto structure = Structure::from_xyz_file("../data/h2.structure.xyz");
 
 // Run initial SCF to get reference wavefunction
 auto scf_solver = ScfSolverFactory::create();
