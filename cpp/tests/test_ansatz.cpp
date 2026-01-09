@@ -11,6 +11,7 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/constants.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
@@ -221,4 +222,150 @@ TEST_F(AnsatzEnergyCalculationTest, O2TripletCAS_8e6o) {
   double energy_hf = ansatz_hf.calculate_energy();
 
   EXPECT_NEAR(energy_hf, E_scf, testing::scf_energy_tolerance);
+}
+
+// Test for creating Ansatz from separately loaded Hamiltonian and Wavefunction
+// files
+class AnsatzFromSeparateFilesTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    // Create H2 structure
+    std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
+    // Convert to Bohr
+    for (auto& coord : coords) {
+      coord *= qdk::chemistry::constants::angstrom_to_bohr;
+    }
+    std::vector<Element> elements = {Element::H, Element::H};
+    structure = std::make_shared<Structure>(coords, elements);
+  }
+
+  std::shared_ptr<Structure> structure;
+};
+
+TEST_F(AnsatzFromSeparateFilesTest, CreateFromSeparatelyLoadedFiles) {
+  // Run SCF to get wavefunction
+  auto scf_solver = ScfSolverFactory::create();
+  const auto& [E_scf, wfn] = scf_solver->run(structure, 0, 1, "sto-3g");
+
+  // Build Hamiltonian from the same orbitals
+  auto ham_constructor = HamiltonianConstructorFactory::create();
+  auto ham = ham_constructor->run(wfn->get_orbitals());
+
+  // Creating Ansatz from in-memory objects should work
+  std::shared_ptr<Ansatz> ansatz_direct;
+  EXPECT_NO_THROW(ansatz_direct = std::make_shared<Ansatz>(ham, wfn));
+  EXPECT_NE(ansatz_direct, nullptr);
+
+  // Create temporary files
+  std::string wfn_path = "test_ansatz_wfn.wavefunction.json";
+  std::string ham_path = "test_ansatz_ham.hamiltonian.json";
+  std::string ansatz_path = "test_ansatz_unit.ansatz.json";
+
+  // Save objects to separate files
+  wfn->to_json_file(wfn_path);
+  ham->to_json_file(ham_path);
+  ansatz_direct->to_json_file(ansatz_path);
+
+  // Loading Ansatz that was saved as a unit should work
+  auto loaded_ansatz = Ansatz::from_json_file(ansatz_path);
+  EXPECT_NE(loaded_ansatz, nullptr);
+  EXPECT_NE(loaded_ansatz->get_hamiltonian(), nullptr);
+  EXPECT_NE(loaded_ansatz->get_wavefunction(), nullptr);
+
+  // Load Hamiltonian and Wavefunction separately
+  auto loaded_wfn = Wavefunction::from_json_file(wfn_path);
+  auto loaded_ham = Hamiltonian::from_json_file(ham_path);
+  EXPECT_NE(loaded_wfn, nullptr);
+  EXPECT_NE(loaded_ham, nullptr);
+
+  // Verify orbitals are structurally equivalent
+  auto orig_orbs = wfn->get_orbitals();
+  auto loaded_wfn_orbs = loaded_wfn->get_orbitals();
+  auto loaded_ham_orbs = loaded_ham->get_orbitals();
+
+  EXPECT_EQ(orig_orbs->get_num_molecular_orbitals(),
+            loaded_wfn_orbs->get_num_molecular_orbitals());
+  EXPECT_EQ(orig_orbs->get_num_molecular_orbitals(),
+            loaded_ham_orbs->get_num_molecular_orbitals());
+  EXPECT_EQ(orig_orbs->is_restricted(), loaded_wfn_orbs->is_restricted());
+  EXPECT_EQ(orig_orbs->is_restricted(), loaded_ham_orbs->is_restricted());
+
+  // Creating Ansatz from separately loaded files should work
+  std::shared_ptr<Ansatz> ansatz_loaded;
+  EXPECT_NO_THROW(ansatz_loaded =
+                      std::make_shared<Ansatz>(loaded_ham, loaded_wfn));
+  EXPECT_NE(ansatz_loaded, nullptr);
+  EXPECT_NE(ansatz_loaded->get_hamiltonian(), nullptr);
+  EXPECT_NE(ansatz_loaded->get_wavefunction(), nullptr);
+
+  // Mixed original + loaded should work
+  std::shared_ptr<Ansatz> ansatz_mixed1;
+  EXPECT_NO_THROW(ansatz_mixed1 = std::make_shared<Ansatz>(ham, loaded_wfn));
+  EXPECT_NE(ansatz_mixed1, nullptr);
+
+  std::shared_ptr<Ansatz> ansatz_mixed2;
+  EXPECT_NO_THROW(ansatz_mixed2 = std::make_shared<Ansatz>(loaded_ham, wfn));
+  EXPECT_NE(ansatz_mixed2, nullptr);
+
+  // Clean up
+  std::remove(wfn_path.c_str());
+  std::remove(ham_path.c_str());
+  std::remove(ansatz_path.c_str());
+}
+
+TEST_F(AnsatzFromSeparateFilesTest, CreateFromSeparatelyLoadedHDF5Files) {
+  // Run SCF to get wavefunction
+  auto scf_solver = ScfSolverFactory::create();
+  const auto& [E_scf, wfn] = scf_solver->run(structure, 0, 1, "sto-3g");
+
+  // Build Hamiltonian from the same orbitals
+  auto ham_constructor = HamiltonianConstructorFactory::create();
+  auto ham = ham_constructor->run(wfn->get_orbitals());
+
+  // Create Ansatz from in-memory objects
+  auto ansatz_direct = std::make_shared<Ansatz>(ham, wfn);
+
+  // Create temporary files
+  std::string wfn_path = "test_ansatz_wfn.wavefunction.h5";
+  std::string ham_path = "test_ansatz_ham.hamiltonian.h5";
+  std::string ansatz_path = "test_ansatz_unit.ansatz.h5";
+
+  // Save objects to separate files
+  wfn->to_hdf5_file(wfn_path);
+  ham->to_hdf5_file(ham_path);
+  ansatz_direct->to_hdf5_file(ansatz_path);
+
+  // Load Hamiltonian and Wavefunction separately
+  auto loaded_wfn = Wavefunction::from_hdf5_file(wfn_path);
+  auto loaded_ham = Hamiltonian::from_hdf5_file(ham_path);
+
+  // Creating Ansatz from separately loaded HDF5 files should work
+  std::shared_ptr<Ansatz> ansatz_loaded;
+  EXPECT_NO_THROW(ansatz_loaded =
+                      std::make_shared<Ansatz>(loaded_ham, loaded_wfn));
+  EXPECT_NE(ansatz_loaded, nullptr);
+
+  // Clean up
+  std::remove(wfn_path.c_str());
+  std::remove(ham_path.c_str());
+  std::remove(ansatz_path.c_str());
+}
+
+TEST_F(AnsatzFromSeparateFilesTest, DetectsOrbitalMismatch) {
+  // Run SCF to get first wavefunction (H2)
+  auto scf_solver = ScfSolverFactory::create();
+  const auto& [E_scf, wfn] = scf_solver->run(structure, 0, 1, "sto-3g");
+
+  // Build Hamiltonian from the first wavefunction's orbitals
+  auto ham_constructor = HamiltonianConstructorFactory::create();
+  auto ham = ham_constructor->run(wfn->get_orbitals());
+
+  // Create a different structure (water) to get different orbitals
+  auto water_structure = testing::create_water_structure();
+  const auto& [E_water, wfn_water] =
+      scf_solver->run(water_structure, 0, 1, "sto-3g");
+
+  // Attempting to create Ansatz with mismatched orbitals should fail
+  EXPECT_THROW(
+      { auto ansatz = Ansatz(ham, wfn_water); }, std::invalid_argument);
 }
