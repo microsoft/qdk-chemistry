@@ -32,7 +32,7 @@ dependencies = [
   "numpy>=1.20.0,<2.4.0",
   "scipy>=1.7.0",
   "matplotlib==3.10.0",
-  "qiskit[qasm3-import]>=2.2.0",
+  "qiskit[qasm3-import]>=2.2.0,<2.3.0",
   "qiskit-aer",
   "qiskit-nature",
   "pylatexenc==2.10",
