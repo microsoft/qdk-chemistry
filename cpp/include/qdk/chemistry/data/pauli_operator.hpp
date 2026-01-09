@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <qdk/chemistry/utils/hash.hpp>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -36,17 +37,15 @@ using SparsePauliWord = std::vector<std::pair<std::uint64_t, std::uint8_t>>;
 /**
  * @brief Hash function for SparsePauliWord.
  *
- * Uses FNV-1a style hash combining for efficient hash computation.
+ * Uses boost-style hash_combine for portable and efficient hash computation.
  */
 struct SparsePauliWordHash {
   std::size_t operator()(const SparsePauliWord& word) const noexcept {
-    std::size_t hash = 14695981039346656037ULL;  // FNV offset basis
+    std::size_t seed = 0;
     for (const auto& [qubit, op_type] : word) {
-      std::size_t combined = (qubit << 2) | op_type;
-      hash ^= combined;
-      hash *= 1099511628211ULL;  // FNV prime
+      seed = utils::hash_combine(seed, qubit, op_type);
     }
-    return hash;
+    return seed;
   }
 };
 
@@ -54,7 +53,7 @@ struct SparsePauliWordHash {
  * @brief Hash function for pairs of SparsePauliWord (used for multiplication
  * caching).
  *
- * Combines two SparsePauliWordHash results using a mixing function.
+ * Combines two SparsePauliWordHash results using hash_combine.
  */
 struct SparsePauliWordPairHash {
   std::size_t operator()(
@@ -62,8 +61,7 @@ struct SparsePauliWordPairHash {
     SparsePauliWordHash hasher;
     std::size_t h1 = hasher(pair.first);
     std::size_t h2 = hasher(pair.second);
-    // Mix using golden ratio constant
-    return h1 ^ (h2 * 0x9e3779b97f4a7c15ULL);
+    return utils::hash_combine(h1, h2);
   }
 };
 
