@@ -877,3 +877,9 @@ class TestStabilityWorkflow:
 
         # Check energy matches reference value - should converge to same UHF energy as manual rotation
         assert abs(energy - (-108.736487493576)) < 1e-6, f"Energy {energy} should match reference -108.815746915896"
+
+
+def test_stability_result_data_type_name():
+    """Test that StabilityResult has the correct _data_type_name class attribute."""
+    assert hasattr(StabilityResult, "_data_type_name")
+    assert StabilityResult._data_type_name == "stability_result"

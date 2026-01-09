@@ -1219,3 +1219,9 @@ class TestCCContainer:
         n_alpha_total, n_beta_total = wf.get_total_num_electrons()
         assert n_alpha_total == 2
         assert n_beta_total == 2
+
+
+def test_wavefunction_data_type_name():
+    """Test that Wavefunction has the correct _data_type_name class attribute."""
+    assert hasattr(Wavefunction, "_data_type_name")
+    assert Wavefunction._data_type_name == "wavefunction"

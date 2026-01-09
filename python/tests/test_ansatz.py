@@ -338,3 +338,9 @@ class TestAnsatzSerialization:
         e_rohf = ansatz.calculate_energy()
         # energy from ansatz should reproduce scf energy
         assert np.isclose(e_rohf, e_scf, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
+
+
+def test_ansatz_data_type_name():
+    """Test that Ansatz has the correct _data_type_name class attribute."""
+    assert hasattr(Ansatz, "_data_type_name")
+    assert Ansatz._data_type_name == "ansatz"
