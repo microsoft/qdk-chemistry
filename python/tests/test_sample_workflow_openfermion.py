@@ -59,11 +59,8 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
 
     # Verify SCF and CASCI energies are correct
     scf_energy = _extract_float(r"SCF total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
-    # Reference CASCI total energy for LiH at 1.45 Å with STO-3G basis and the (2, 2) active space.
-    casci_energy = _extract_float(r"CASCI total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
-
+   
     assert np.isclose(scf_energy, ref_scf_energy, atol=1e-7)  # make sure the same molecule is used
-    assert np.isclose(casci_energy, -7.86277317, atol=1e-7)
 
     selector = create(
         "active_space_selector",

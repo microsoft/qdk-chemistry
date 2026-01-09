@@ -7,9 +7,10 @@
 
 This example demonstrates the use of QDK/Chemistry tools in preparing the electronic
 structure Hamiltonian, which is then passed to OpenFermion to perform the Jordan-Wigner
-transformation. The key elements are (1) to obtain integrals in the spin-orbital basis from
-spatial ones, and (2) pack the two-electron molecular integrals in the order OpenFermion
-expects.
+transformation. The key points are (1) QDK/Chemistry provides integrals in the spatial molecular 
+orbital basis, which need to be converted to integrals in the spin-orbital basis that OpenFermion
+expects, and (2) the two-electron molecular integrals from QDK/Chemistry are in chemist's notation 
+and need to be packed in the physicist's notation that OpenFermion expects.
 
 This example is adapted from the introduction to OpenFermion tutorial:
 https://quantumai.google/openfermion/tutorials/intro_to_openfermion
@@ -66,16 +67,8 @@ active_orbitals = selector.run(scf_wavefunction).get_orbitals()
 constructor = create("hamiltonian_constructor")
 active_hamiltonian = constructor.run(active_orbitals)
 
-n_alpha = n_beta = ACTIVE_ELECTRONS // 2
-mc_calculator = create("multi_configuration_calculator")
-casci_energy, casci_wavefunction = mc_calculator.run(
-    active_hamiltonian, n_alpha, n_beta
-)
-
 Logger.info("=== Generating QDK/Chemistry artifacts for LiH (1.45 Å, STO-3G) ===")
 Logger.info(f"  SCF total energy:   {scf_energy: .8f} Hartree")
-Logger.info(f"  CASCI total energy: {casci_energy: .8f} Hartree")
-
 
 ########################################################################################
 # 3. Preparing the qubit Hamiltonian for OpenFermion Jordan-Wigner transformation
@@ -95,8 +88,8 @@ two_body_aaaa, two_body_aabb, two_body_bbbb = (
 )
 two_body = np.array(two_body_aaaa, dtype=float).reshape((norb,) * 4)
 
-# Convert to OpenFermion physicists' notation <pr|sq>. Note that the last two indices may be switched
-# from what you expect in other physicists' notation. OpenFermion takes the integral notation below to be consistent
+# Convert to OpenFermion physicist's notation <pr|sq>. Note that the last two indices may be switched
+# from what you expect from other physicist's notation. OpenFermion takes the integral notation below to be consistent
 # with the order of operators.
 # ĝ = ½ Σ (pq|rs) p† r† s q = ½ Σ ⟨pr|sq⟩ p† r† s q
 two_body_phys = np.transpose(two_body, (0, 2, 3, 1))
