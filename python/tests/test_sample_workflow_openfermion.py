@@ -58,6 +58,7 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
 
     # Verify SCF and CASCI energies are correct
     scf_energy = _extract_float(r"SCF total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
+    # Reference CASCI total energy for LiH at 1.45 Å with STO-3G basis and the (2, 2) active space.
     casci_energy = _extract_float(r"CASCI total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
 
     assert np.isclose(scf_energy, ref_scf_energy, atol=1e-7)  # make sure the same molecule is used
@@ -75,16 +76,20 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
     active_hamiltonian = constructor.run(active_orbitals)
 
     # Obtain qubit Hamiltonian assuming block ordering - spin up first then spin down
-    # Note if printed directly, the Pauli operators will not match with openFermion output
+    # Note if printed directly, the Pauli operators will not match with OpenFermion output
     qubit_mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
     qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
 
     # Obtain the ground state energy by diagonalizing the qubit Hamiltonian matrix
-    jwt_matrix = qubit_hamiltonian.pauli_ops.to_matrix()
-    eigenvalues = np.linalg.eigvalsh(jwt_matrix)
-    ground_state_energy = np.min(eigenvalues)
+    jordan_wigner_matrix = qubit_hamiltonian.pauli_ops.to_matrix()
+    eigenvalues = np.linalg.eigvalsh(jordan_wigner_matrix)
+    ground_state_energy = eigenvalues[0]
 
     # Verify that the ground state energy matches that obtained from OpenFermion's Jordan-Wigner Hamiltonian
-    of_jwt_energy = _extract_float(r"Ground state energy is\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
+    openfermion_jordan_wigner_energy = _extract_float(
+        r"Ground state energy is\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr
+    )
 
-    assert np.isclose(ground_state_energy + active_hamiltonian.get_core_energy(), of_jwt_energy, atol=1e-12)
+    assert np.isclose(
+        ground_state_energy + active_hamiltonian.get_core_energy(), openfermion_jordan_wigner_energy, atol=1e-12
+    )

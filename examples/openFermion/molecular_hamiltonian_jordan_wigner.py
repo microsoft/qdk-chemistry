@@ -13,7 +13,7 @@ expects.
 
 This example is adapted from the introduction to OpenFermion tutorial:
 https://quantumai.google/openfermion/tutorials/intro_to_openfermion
-Due to minor differences in the Hamiltonian (stemmed from different molecular orbitals), the
+Due to minor differences in the Hamiltonian (stemming from different molecular orbitals), the
 calculated energy values differ from those in the OpenFermion tutorial by 1e-6 Hartree.
 """
 
@@ -98,7 +98,7 @@ two_body_flat = np.array(
 )  # Two-electron integrals (aaaa only)
 two_body = two_body_flat.reshape((norb,) * 4)
 
-# Convert to Open Fermion physicists' notation <pr|sq>. Note that the last two indices may be switched
+# Convert to OpenFermion physicists' notation <pr|sq>. Note that the last two indices may be switched
 # from what you expect in other physicists' notation. OpenFermion takes the integral notation below to be consistent
 # with the order of operators.
 # ĝ = ½ Σ (pq|rs) p† r† s q = ½ Σ ⟨pr|sq⟩ p† r† s q
@@ -116,7 +116,7 @@ core_energy = active_hamiltonian.get_core_energy()  # Core energy constant
 # Get the Hamiltonian in an active space.
 open_fermion_molecular_hamiltonian = (
     openfermion.ops.representations.InteractionOperator(
-        core_energy, one_body_coefficients, 1 / 2 * two_body_coefficients
+        core_energy, one_body_coefficients, 0.5 * two_body_coefficients
     )
 )
 
