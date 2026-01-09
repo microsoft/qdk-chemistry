@@ -91,4 +91,5 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
     # Verify that the ground state energy matches that obtained from OpenFermion's Jordan-Wigner Hamiltonian
     of_jwt_energy = _extract_float(r"Ground state energy is\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
 
-    assert np.isclose(ground_state_energy + active_hamiltonian.get_core_energy(), of_jwt_energy, atol=1e-4)
+    assert np.isclose(ground_state_energy + active_hamiltonian.get_core_energy(), of_jwt_energy, atol=1e-12)
+
