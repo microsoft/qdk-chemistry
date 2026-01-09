@@ -32,10 +32,9 @@ The expected output for this example is
 Input: `4e4o_ethylene_2det_sci.inp`
 
 This example computes the selected configuration interaction (SCI) energy of the ethylene molecule in a 4e4o active
-space using the configurations selected in `4e4o_ethylene_wfn1.txt`. N.B. This input was constructed to meet the needs
-of the `prepq` workflow and is not a typical input for a standalone SCI calculation. In general, SCI would proceed by
-iteratively selecting the configuations that are important to the energy of the system. This input is constructed to
-"trick" the MACIS SCI machinery to just computing the energy from a manual (e.g. SQD) selection. The expected output for
+space using the configurations selected in `4e4o_ethylene_wfn1.txt`. In general, SCI would proceed by
+iteratively selecting the configurations that are important to the energy of the system. This input is constructed to
+"trick" the MACIS SCI machinery to just computing the energy from a manual selection. The expected output for
 this example is
 
 ```text
