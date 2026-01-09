@@ -184,7 +184,7 @@ TEST_F(MP2Test, MP2Container) {
       },
       t1_bb);
 
-  // Verify T2 amplitudes are non-zero 
+  // Verify T2 amplitudes are non-zero
   auto compute_tensor_norm = [](const auto& t) {
     double sum = 0.0;
     const auto* data = t.data();

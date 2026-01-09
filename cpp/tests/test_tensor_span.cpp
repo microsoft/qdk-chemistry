@@ -96,9 +96,9 @@ TEST_F(TensorSpanTest, LargerTensorWorks) {
 
   // Test a few specific indices
   EXPECT_EQ(span(0, 0, 0, 0), 0.0);
-  EXPECT_EQ(span(0, 0, 0, 1), 1.0);                           
-  EXPECT_EQ(span(0, 0, 1, 0), static_cast<double>(n));        
-  EXPECT_EQ(span(0, 1, 0, 0), static_cast<double>(n * n));    
+  EXPECT_EQ(span(0, 0, 0, 1), 1.0);
+  EXPECT_EQ(span(0, 0, 1, 0), static_cast<double>(n));
+  EXPECT_EQ(span(0, 1, 0, 0), static_cast<double>(n * n));
   EXPECT_EQ(span(1, 0, 0, 0), static_cast<double>(n * n * n));
 }
 

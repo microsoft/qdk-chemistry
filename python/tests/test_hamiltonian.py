@@ -20,7 +20,10 @@ from .test_helpers import create_test_basis_set, create_test_hamiltonian, create
 
 
 class TestHamiltonian:
+    """Test suite for the Hamiltonian class."""
+
     def test_default_constructor(self):
+        """Test basic Hamiltonian construction with default parameters."""
         h = create_test_hamiltonian(2)
         assert isinstance(h, Hamiltonian)
         assert h.has_one_body_integrals()
@@ -28,11 +31,13 @@ class TestHamiltonian:
         assert h.has_orbitals()
 
     def test_size_and_electron_counts(self):
+        """Test that Hamiltonian correctly reports orbital counts."""
         h = create_test_hamiltonian(3)
         assert isinstance(h, Hamiltonian)
         assert h.get_orbitals().get_num_molecular_orbitals() == 3
 
     def test_full_constructor(self):
+        """Test Hamiltonian construction with all parameters specified."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(0)
         two_body = rng.random(2**4)
@@ -59,6 +64,7 @@ class TestHamiltonian:
         assert np.array_equal(bbbb.flatten(order="F"), two_body)
 
     def test_one_body_integrals(self):
+        """Test one-body integral storage and retrieval."""
         one_body = np.array([[1.0, 0.2], [0.2, 1.5]])
         two_body = np.zeros(2**4)
         orbitals = create_test_orbitals(2)
@@ -67,6 +73,7 @@ class TestHamiltonian:
         assert np.array_equal(h.get_one_body_integrals()[0], one_body)
 
     def test_two_body_integrals(self):
+        """Test two-body integral storage and retrieval."""
         one_body = np.eye(2)
         rng = np.random.default_rng(1)
         two_body = rng.random(2**4)
@@ -88,12 +95,13 @@ class TestHamiltonian:
         aaaa = h.get_two_body_array_aaaa()
         # Test element access
         val = aaaa[0, 1, 1, 0]
-        assert isinstance(val, (float, np.floating))
+        assert isinstance(val, float | np.floating)
         # Test shape
         norb = h.get_orbitals().get_num_molecular_orbitals()
         assert aaaa.shape == (norb, norb, norb, norb)
 
     def test_active_space_management(self):
+        """Test core energy storage and retrieval."""
         one_body = np.eye(3)
         two_body = np.zeros(3**4)
         orbitals = create_test_orbitals(3)
@@ -101,6 +109,7 @@ class TestHamiltonian:
         assert h.get_core_energy() == 2.5
 
     def test_json_serialization(self):
+        """Test JSON serialization and deserialization."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(42)
         two_body = rng.random(2**4)
@@ -154,6 +163,7 @@ class TestHamiltonian:
         )
 
     def test_json_file_io(self):
+        """Test JSON file read/write operations."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(42)
         two_body = rng.random(2**4)
@@ -207,6 +217,7 @@ class TestHamiltonian:
             Path(filename).unlink(missing_ok=True)
 
     def test_hdf5_file_io(self):
+        """Test HDF5 file read/write operations."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(42)
         two_body = rng.random(2**4)
@@ -260,6 +271,7 @@ class TestHamiltonian:
             Path(filename).unlink(missing_ok=True)
 
     def test_generic_file_io(self):
+        """Test generic file I/O with format parameter."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(42)
         two_body = rng.random(2**4)
@@ -312,6 +324,7 @@ class TestHamiltonian:
             Path(hdf5_filename).unlink(missing_ok=True)
 
     def test_file_io_validation(self):
+        """Test error handling for invalid file operations."""
         h = create_test_hamiltonian(2)
         with pytest.raises(RuntimeError, match="Unsupported file type"):
             h.to_file("test.txt", "txt")
@@ -323,6 +336,7 @@ class TestHamiltonian:
             Hamiltonian.from_hdf5_file("nonexistent.hamiltonian.h5")
 
     def test_minimal_hamiltonian_json_roundtrip(self):
+        """Test JSON roundtrip for minimal 1-orbital Hamiltonian."""
         h = create_test_hamiltonian(1)
         data = json.loads(h.to_json())
         assert data["core_energy"] == 0.0
@@ -337,6 +351,7 @@ class TestHamiltonian:
         assert h2.has_orbitals()
 
     def test_static_methods_exist(self):
+        """Test that static factory methods are accessible."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(42)
         two_body = rng.random(2**4)
