@@ -8,7 +8,7 @@
 ################################################################################
 # start-cell-basis-set-create
 import tempfile
-import numpy as np
+from pathlib import Path
 from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell, Structure
 
 # Create a spherical basis set from a single S shell
@@ -23,10 +23,10 @@ basis_cartesian = BasisSet("6-31G", [shell], AOType.Cartesian)
 
 ################################################################################
 # start-cell-basis-set-get
-# Create a water molecule structure
-coords = np.array([[0.0, 0.0, 0.0], [0.757, 0.586, 0.0], [-0.757, 0.586, 0.0]])
-nuclear_charges = [8, 1, 1]
-structure = Structure(coords, nuclear_charges)
+# Load a water molecule structure from XYZ file
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/water.structure.xyz"
+)
 
 # Create shells consistent with structure
 shells = [

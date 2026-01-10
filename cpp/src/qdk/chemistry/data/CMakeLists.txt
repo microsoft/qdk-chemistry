@@ -7,7 +7,9 @@ target_sources(chemistry PRIVATE
     hdf5_serialization.cpp
     json_serialization.cpp
     hamiltonian.cpp
+    hamiltonian_containers/canonical_four_center.cpp
     orbitals.cpp
+    pauli_operator.cpp
     settings.cpp
     stability_result.cpp
     structure.cpp

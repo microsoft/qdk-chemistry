@@ -56,6 +56,32 @@ nlohmann::json vector_variant_to_json(const VectorVariant& vec_var,
   return j_vec;
 }
 
+nlohmann::json matrix_variant_to_json(const MatrixVariant& mat_var,
+                                      bool is_complex) {
+  QDK_LOG_TRACE_ENTERING();
+  nlohmann::json j_mat = nlohmann::json::array();
+  if (is_complex) {
+    const auto& mat_c = std::get<Eigen::MatrixXcd>(mat_var);
+    for (int row = 0; row < mat_c.rows(); ++row) {
+      nlohmann::json row_array = nlohmann::json::array();
+      for (int col = 0; col < mat_c.cols(); ++col) {
+        row_array.push_back({mat_c(row, col).real(), mat_c(row, col).imag()});
+      }
+      j_mat.push_back(row_array);
+    }
+  } else {
+    const auto& mat_r = std::get<Eigen::MatrixXd>(mat_var);
+    for (int row = 0; row < mat_r.rows(); ++row) {
+      nlohmann::json row_array = nlohmann::json::array();
+      for (int col = 0; col < mat_r.cols(); ++col) {
+        row_array.push_back(mat_r(row, col));
+      }
+      j_mat.push_back(row_array);
+    }
+  }
+  return j_mat;
+}
+
 VectorVariant json_to_vector_variant(const nlohmann::json& j_vec,
                                      bool is_complex = false) {
   QDK_LOG_TRACE_ENTERING();
@@ -85,6 +111,65 @@ VectorVariant json_to_vector_variant(const nlohmann::json& j_vec,
     vec_var = vec;
   }
   return vec_var;
+}
+
+MatrixVariant json_to_matrix_variant(const nlohmann::json& j_mat,
+                                     bool is_complex = false) {
+  QDK_LOG_TRACE_ENTERING();
+  if (!j_mat.is_array() || j_mat.empty()) {
+    throw std::runtime_error(
+        "Invalid format: expected non-empty array for matrix");
+  }
+
+  MatrixVariant mat_var;
+  const int rows = static_cast<int>(j_mat.size());
+
+  if (is_complex) {
+    if (!j_mat[0].is_array() || j_mat[0].empty() || !j_mat[0][0].is_array()) {
+      throw std::runtime_error(
+          "Invalid complex matrix format: expected array of rows, each "
+          "containing [real, imag] pairs");
+    }
+    const int cols = static_cast<int>(j_mat[0].size());
+    Eigen::MatrixXcd mat(rows, cols);
+
+    for (int row = 0; row < rows; ++row) {
+      if (!j_mat[row].is_array() ||
+          static_cast<int>(j_mat[row].size()) != cols) {
+        throw std::runtime_error(
+            "Invalid complex matrix format: all rows must have the same "
+            "length");
+      }
+      for (int col = 0; col < cols; ++col) {
+        if (!j_mat[row][col].is_array() || j_mat[row][col].size() != 2) {
+          throw std::runtime_error(
+              "Invalid complex matrix format: expected [real, imag] pairs");
+        }
+        mat(row, col) =
+            std::complex<double>(j_mat[row][col][0], j_mat[row][col][1]);
+      }
+    }
+    mat_var = mat;
+  } else {
+    if (!j_mat[0].is_array()) {
+      throw std::runtime_error("Invalid matrix format: expected array of rows");
+    }
+    const int cols = static_cast<int>(j_mat[0].size());
+    Eigen::MatrixXd mat(rows, cols);
+
+    for (int row = 0; row < rows; ++row) {
+      if (!j_mat[row].is_array() ||
+          static_cast<int>(j_mat[row].size()) != cols) {
+        throw std::runtime_error(
+            "Invalid matrix format: all rows must have the same length");
+      }
+      for (int col = 0; col < cols; ++col) {
+        mat(row, col) = j_mat[row][col].get<double>();
+      }
+    }
+    mat_var = mat;
+  }
+  return mat_var;
 }
 
 Eigen::MatrixXd json_to_matrix(const nlohmann::json& j) {

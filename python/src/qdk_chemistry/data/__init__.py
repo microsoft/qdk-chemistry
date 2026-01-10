@@ -18,11 +18,13 @@ Exposed classes are:
 - :class:`Element`: Represents a chemical element with its properties.
 - :class:`EnergyExpectationResult`: Result for Hamiltonian energy expectation value and variance.
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
+- :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitHamiltonian objects.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
 - :class:`MP2Container`: Container for MP2 wavefunction with Hamiltonian reference and optional amplitudes.
 - :class:`Orbitals`: Molecular orbital information and properties.
 - :class:`OrbitalType`: Enumeration of orbital angular momentum types (s, p, d, f, etc.).
+- :class:`PauliOperator`: Pauli operator (I, X, Y, Z) for quantum operator expressions with arithmetic support.
 - :class:`QpeResult`: Result of quantum phase estimation workflows, including phase, energy, and metadata.
 - :class:`QuantumErrorProfile`: Information about quantum gates and error properties.
 - :class:`QubitHamiltonian`: Molecular electronic Hamiltonians mapped to qubits.
@@ -55,17 +57,20 @@ from qdk_chemistry._core.data import (
     Ansatz,
     AOType,
     BasisSet,
+    CanonicalFourCenterHamiltonianContainer,
     CasWavefunctionContainer,
     Configuration,
     CoupledClusterContainer,
     ElectronicStructureSettings,
     Element,
     Hamiltonian,
+    HamiltonianContainer,
     HamiltonianType,
     ModelOrbitals,
     MP2Container,
     Orbitals,
     OrbitalType,
+    PauliOperator,
     SciWavefunctionContainer,
     SettingNotFound,
     Settings,
@@ -99,6 +104,7 @@ __all__ = [
     "AOType",
     "Ansatz",
     "BasisSet",
+    "CanonicalFourCenterHamiltonianContainer",
     "CasWavefunctionContainer",
     "Circuit",
     "Configuration",
@@ -108,12 +114,14 @@ __all__ = [
     "Element",
     "EnergyExpectationResult",
     "Hamiltonian",
+    "HamiltonianContainer",
     "HamiltonianType",
     "MP2Container",
     "MeasurementData",
     "ModelOrbitals",
     "OrbitalType",
     "Orbitals",
+    "PauliOperator",
     "QpeResult",
     "QuantumErrorProfile",
     "QubitHamiltonian",
