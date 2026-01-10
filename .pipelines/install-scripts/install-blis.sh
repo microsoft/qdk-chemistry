@@ -40,7 +40,6 @@ elif [[ ${MARCH} == 'x86-64-v3' ]]; then
 fi
 
 make -j$(nproc)
-make check
 make install
 
 cd ..

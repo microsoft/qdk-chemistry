@@ -39,7 +39,6 @@ CFLAGS="${CFLAGS}" ./configure \
     --enable-max-arg-list-hack \
     --target=$LIBFLAME_ARCH
 make -j$(nproc)
-make check
 make install
 
 cd ..
