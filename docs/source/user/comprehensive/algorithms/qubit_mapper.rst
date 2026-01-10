@@ -115,7 +115,7 @@ Use ``QubitHamiltonian.reorder_qubits()`` or ``QubitHamiltonian.to_interleaved()
    * - Setting
      - Type
      - Description
-   * - ``mapping_type``
+   * - ``encoding``
      - string
      - Fermion-to-qubit encoding (``jordan_wigner``, ``bravyi_kitaev``). Default: ``jordan_wigner``
    * - ``threshold``

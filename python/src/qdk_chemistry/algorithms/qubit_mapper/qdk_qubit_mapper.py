@@ -166,7 +166,7 @@ class QdkQubitMapperSettings(Settings):
     """Settings configuration for a QdkQubitMapper.
 
     QdkQubitMapper-specific settings:
-        mapping_type (string, default="jordan_wigner"): Fermion-to-qubit encoding type.
+        encoding (string, default="jordan_wigner"): Fermion-to-qubit encoding type.
             Valid options: "jordan_wigner", "bravyi_kitaev"
 
         threshold (double, default=1e-12): Threshold for pruning small Pauli coefficients.
@@ -182,7 +182,7 @@ class QdkQubitMapperSettings(Settings):
         Logger.trace_entering()
         super().__init__()
         self._set_default(
-            "mapping_type",
+            "encoding",
             "string",
             "jordan_wigner",
             "Fermion-to-qubit encoding type",
@@ -215,14 +215,14 @@ class QdkQubitMapper(QubitMapper):
     ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings.
 
     Attributes:
-        mapping_type (str): The fermion-to-qubit encoding type. Default: "jordan_wigner".
+        encoding (str): The fermion-to-qubit encoding type. Default: "jordan_wigner".
         threshold (float): Threshold for pruning small Pauli coefficients. Default: 1e-12.
         integral_threshold (float): Threshold for filtering small integrals. Default: 1e-12.
 
     Examples:
         >>> from qdk_chemistry.algorithms import QdkQubitMapper
         >>> mapper = QdkQubitMapper()
-        >>> mapper.settings().set("mapping_type", "jordan_wigner")
+        >>> mapper.settings().set("encoding", "jordan_wigner")
         >>> mapper.settings().set("threshold", 1e-10)
         >>> qubit_hamiltonian = mapper.run(hamiltonian)
 
@@ -230,21 +230,21 @@ class QdkQubitMapper(QubitMapper):
 
     def __init__(
         self,
-        mapping_type: str = "jordan_wigner",
+        encoding: str = "jordan_wigner",
         threshold: float = 1e-12,
         integral_threshold: float = 1e-12,
     ) -> None:
         """Initialize the QdkQubitMapper with default settings.
 
         Args:
-            mapping_type: Fermion-to-qubit encoding type. Default: "jordan_wigner".
+            encoding: Fermion-to-qubit encoding type. Default: "jordan_wigner".
             threshold: Threshold for pruning small Pauli coefficients. Default: 1e-12.
             integral_threshold: Threshold for filtering small integrals. Default: 1e-12.
 
         """
         super().__init__()
         self._settings = QdkQubitMapperSettings()
-        self._settings.set("mapping_type", mapping_type)
+        self._settings.set("encoding", encoding)
         self._settings.set("threshold", threshold)
         self._settings.set("integral_threshold", integral_threshold)
 
@@ -268,16 +268,16 @@ class QdkQubitMapper(QubitMapper):
         """
         Logger.trace_entering()
 
-        mapping_type = str(self.settings().get("mapping_type"))
+        encoding = str(self.settings().get("encoding"))
         threshold = float(self.settings().get("threshold"))
         integral_threshold = float(self.settings().get("integral_threshold"))
 
-        if mapping_type == "jordan_wigner":
+        if encoding == "jordan_wigner":
             return self._jordan_wigner_transform(hamiltonian, threshold, integral_threshold)
-        if mapping_type == "bravyi_kitaev":
+        if encoding == "bravyi_kitaev":
             return self._bravyi_kitaev_transform(hamiltonian, threshold, integral_threshold)
 
-        raise ValueError(f"Unsupported mapping type: '{mapping_type}'.")
+        raise ValueError(f"Unsupported encoding: '{encoding}'.")
 
     def _jordan_wigner_transform(
         self, hamiltonian: Hamiltonian, threshold: float, integral_threshold: float

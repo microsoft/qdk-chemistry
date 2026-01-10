@@ -111,7 +111,7 @@ class TestQdkQubitMapper:
     def test_default_settings(self) -> None:
         """Test default settings values."""
         mapper = create("qubit_mapper", "qdk")
-        assert mapper.settings().get("mapping_type") == "jordan_wigner"
+        assert mapper.settings().get("encoding") == "jordan_wigner"
         assert mapper.settings().get("threshold") == 1e-12
 
     def test_custom_threshold(self) -> None:
@@ -119,11 +119,11 @@ class TestQdkQubitMapper:
         mapper = create("qubit_mapper", "qdk", threshold=1e-10)
         assert mapper.settings().get("threshold") == 1e-10
 
-    def test_invalid_mapping_type_raises(self) -> None:
-        """Test that invalid mapping type raises ValueError."""
+    def test_invalid_encoding_raises(self) -> None:
+        """Test that invalid encoding raises ValueError."""
         mapper = create("qubit_mapper", "qdk")
         with pytest.raises(ValueError, match="out of allowed options"):
-            mapper.settings().set("mapping_type", "invalid_type")
+            mapper.settings().set("encoding", "invalid_type")
 
     def test_simple_hamiltonian(self) -> None:
         """Test mapping a simple diagonal Hamiltonian."""
@@ -593,13 +593,13 @@ class TestBravyiKitaevMapper:
     """Tests for Bravyi-Kitaev mapping."""
 
     def test_bk_instantiation(self) -> None:
-        """Test BK mapping type is valid via factory."""
-        mapper = create("qubit_mapper", "qdk", mapping_type="bravyi_kitaev")
-        assert mapper.settings().get("mapping_type") == "bravyi_kitaev"
+        """Test BK encoding is valid via factory."""
+        mapper = create("qubit_mapper", "qdk", encoding="bravyi_kitaev")
+        assert mapper.settings().get("encoding") == "bravyi_kitaev"
 
     def test_bk_simple_hamiltonian(self) -> None:
         """Test BK mapping of simple Hamiltonian."""
-        mapper = create("qubit_mapper", "qdk", mapping_type="bravyi_kitaev")
+        mapper = create("qubit_mapper", "qdk", encoding="bravyi_kitaev")
         hamiltonian = create_test_hamiltonian(2)
 
         result = mapper.run(hamiltonian)
@@ -621,7 +621,7 @@ class TestBravyiKitaevMapper:
         - n_1 (beta, j=1): F(1)={0}, so n_1 = 0.5*(I - Z_0*Z_1)
         Total with h_00=1: H = n_0 + n_1 = I - 0.5*Z_0 - 0.5*Z_0*Z_1
         """
-        mapper_bk = create("qubit_mapper", "qdk", mapping_type="bravyi_kitaev")
+        mapper_bk = create("qubit_mapper", "qdk", encoding="bravyi_kitaev")
 
         # h_00 = 1 gives H = n_0_alpha + n_0_beta
         n_orbitals = 1
@@ -643,7 +643,7 @@ class TestBravyiKitaevMapper:
 
     def test_bk_core_energy(self) -> None:
         """Test that core energy appears as identity coefficient in BK."""
-        mapper = create("qubit_mapper", "qdk", mapping_type="bravyi_kitaev")
+        mapper = create("qubit_mapper", "qdk", encoding="bravyi_kitaev")
 
         n_orbitals = 1
         one_body = np.zeros((1, 1))
@@ -670,7 +670,7 @@ class TestBravyiKitaevMapper:
         For h_01 = h_10 = 1 with 2 orbitals (4 qubits, blocked ordering):
         We verify the BK result differs from JW but preserves hermiticity.
         """
-        mapper = create("qubit_mapper", "qdk", mapping_type="bravyi_kitaev")
+        mapper = create("qubit_mapper", "qdk", encoding="bravyi_kitaev")
 
         n_orbitals = 2
         one_body = np.array([[0.0, 1.0], [1.0, 0.0]])  # h_01 = h_10 = 1
@@ -710,7 +710,7 @@ class TestBravyiKitaevMapper:
         H = h_00*(n_0 + n_2) + h_11*(n_1 + n_3)
           = 1*(n_0 + n_2) + 2*(n_1 + n_3)
         """
-        mapper = create("qubit_mapper", "qdk", mapping_type="bravyi_kitaev")
+        mapper = create("qubit_mapper", "qdk", encoding="bravyi_kitaev")
 
         n_orbitals = 2
         one_body = np.array([[1.0, 0.0], [0.0, 2.0]])
@@ -742,7 +742,7 @@ class TestBravyiKitaevMapper:
         The two-body term n_0a n_0b should produce ZZ interactions in BK,
         but with different structure than JW due to BK encoding.
         """
-        mapper = create("qubit_mapper", "qdk", mapping_type="bravyi_kitaev")
+        mapper = create("qubit_mapper", "qdk", encoding="bravyi_kitaev")
 
         n_orbitals = 1
         one_body = np.zeros((n_orbitals, n_orbitals))
@@ -792,9 +792,7 @@ class TestBravyiKitaevMapper:
             FermionicOp.atol = threshold
             SparsePauliOp.atol = threshold
 
-            qdk_result = create("qubit_mapper", "qdk", mapping_type="bravyi_kitaev", threshold=threshold).run(
-                hamiltonian
-            )
+            qdk_result = create("qubit_mapper", "qdk", encoding="bravyi_kitaev", threshold=threshold).run(hamiltonian)
             qiskit_result = create("qubit_mapper", "qiskit", encoding="bravyi-kitaev").run(hamiltonian)
         finally:
             FermionicOp.atol = original_fermionic_atol
