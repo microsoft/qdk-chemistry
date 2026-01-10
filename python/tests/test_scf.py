@@ -309,8 +309,7 @@ class TestScfSolver:
 
     @pytest.mark.skipif(
         platform.system() == "Darwin",
-        reason="""This test is skipped on macOS due to an upstream problem in Accelerate's
-        handling of single precision complex numbers.""",
+        reason="This test is skipped on macOS due to an upstream problem in Accelerate.",
     )
     def test_scf_solver_oxygen_atom_charged_doublet_gdm(self):
         """Test SCF solver on charged oxygen atom doublet with GDM enabled."""

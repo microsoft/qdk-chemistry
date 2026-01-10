@@ -169,7 +169,6 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     rm -rf "$TEMP_DIR"
 
 elif [ "$MAC_BUILD" == "ON" ]; then
-    export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
     export CMAKE_C_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin"
     export CMAKE_CXX_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin"
     python3 -m build --wheel \
@@ -184,7 +183,7 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
         -C cmake.define.CMAKE_PREFIX_PATH="/opt/homebrew"
     echo "Repairing wheel for macOS..."
-    pip install delocate
+    pip install delocate==0.13.0
     WHEEL_FILE=$(ls dist/qdk_chemistry-*.whl)
     delocate-wheel -w repaired_wheelhouse/ "$WHEEL_FILE"
     delocate-listdeps --all repaired_wheelhouse/qdk_chemistry*.whl

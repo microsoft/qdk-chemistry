@@ -36,7 +36,12 @@ CXXFLAGS=${CXX_FLAGS} ./configure --prefix=${INSTALL_PREFIX} \
     --enable-shared=no \
     --with-pic
 
-make -j${nproc}
+if [ "$MAC_BUILD" == "ON" ]; then
+    JOBS=$(sysctl -n hw.ncpu)
+else
+    JOBS=$(nproc)
+fi
+make -j${JOBS}
 
 echo "Installing HDF5..."
 if [ "$MAC_BUILD" == "ON" ]; then

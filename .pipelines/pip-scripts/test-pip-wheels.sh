@@ -85,9 +85,6 @@ pip3 install repaired_wheelhouse/qdk_chemistry*.whl
 
 # Run pytest suite
 echo '=== Running pytest suite ==='
-if [ "$MAC_BUILD" == "OFF" ]; then
-    python3 -m pytest -v ./tests
-fi
-
+python3 -m pytest -v ./tests
 
 deactivate
