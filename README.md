@@ -54,7 +54,7 @@ please see the document [How to Contribute](https://github.com/microsoft/qdk-che
 
 ## Support
 
-For help and questions about using this project, please see [SUPPORT.md](./SUPPORT.md).
+For help and questions about using this project, please see [SUPPORT.md](SUPPORT).
 
 ## Code of Conduct
 
