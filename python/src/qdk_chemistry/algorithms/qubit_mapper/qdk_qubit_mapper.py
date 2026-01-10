@@ -439,7 +439,7 @@ class QdkQubitMapper(QubitMapper):
                 ]
 
         Logger.debug("Building one-body terms...")
-        is_spin_free = np.allclose(h1_alpha, h1_beta) and np.allclose(h2_aaaa, h2_bbbb)
+        is_spin_free = hamiltonian.get_orbitals().is_restricted()
 
         if is_spin_free:
             for p in range(n_spatial):
