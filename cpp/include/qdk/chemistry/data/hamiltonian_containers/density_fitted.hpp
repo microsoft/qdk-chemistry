@@ -56,7 +56,7 @@ class DensityFittedHamiltonian : public HamiltonianContainer {
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
   DensityFittedHamiltonian(const Eigen::MatrixXd& one_body_integrals,
-                           const Eigen::VectorXd& two_body_integrals,
+                           const Eigen::MatrixXd& two_body_integrals,
                            std::shared_ptr<Orbitals> orbitals,
                            double core_energy,
                            const Eigen::MatrixXd& inactive_fock_matrix,
@@ -87,9 +87,9 @@ class DensityFittedHamiltonian : public HamiltonianContainer {
    */
   DensityFittedHamiltonian(const Eigen::MatrixXd& one_body_integrals_alpha,
                            const Eigen::MatrixXd& one_body_integrals_beta,
-                           const Eigen::VectorXd& two_body_integrals_aaaa,
-                           const Eigen::VectorXd& two_body_integrals_aabb,
-                           const Eigen::VectorXd& two_body_integrals_bbbb,
+                           const Eigen::MatrixXd& two_body_integrals_aaaa,
+                           const Eigen::MatrixXd& two_body_integrals_aabb,
+                           const Eigen::MatrixXd& two_body_integrals_bbbb,
                            std::shared_ptr<Orbitals> orbitals,
                            double core_energy,
                            const Eigen::MatrixXd& inactive_fock_matrix_alpha,
@@ -127,7 +127,7 @@ class DensityFittedHamiltonian : public HamiltonianContainer {
   /**
    * @brief Get three-center integrals in MO basis for all spin channels
    * @return Tuple of references to (aaaa, aabb, bbbb) two-electron three-center
-   * integrals vectors
+   * integrals matrices
    * @throws std::runtime_error if integrals are not set
    */
   std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
