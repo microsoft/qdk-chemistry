@@ -73,9 +73,14 @@ def _bk_compute_parity_indices(j: int, n: int) -> frozenset[int]:
     Returns:
         Frozenset of qubit indices in the parity set.
 
+    Raises:
+        ValueError: If n is not a power of 2.
+
     """
-    if n % 2 != 0:
-        return frozenset()
+    if n == 1:
+        return frozenset()  # Base case: single orbital has no parity dependencies
+    if n <= 0 or (n & (n - 1)) != 0:
+        raise ValueError(f"n must be a power of 2, got {n}")
     half = n // 2
     if j < half:
         return _bk_compute_parity_indices(j, half)
@@ -99,9 +104,14 @@ def _bk_compute_ancestor_indices(j: int, n: int) -> frozenset[int]:
     Returns:
         Frozenset of qubit indices in the update (ancestor) set.
 
+    Raises:
+        ValueError: If n is not a power of 2.
+
     """
-    if n % 2 != 0:
-        return frozenset()
+    if n == 1:
+        return frozenset()  # Base case: single orbital has no ancestors
+    if n <= 0 or (n & (n - 1)) != 0:
+        raise ValueError(f"n must be a power of 2, got {n}")
     half = n // 2
     if j < half:
         # Left half: include n-1 and recurse
@@ -126,9 +136,14 @@ def _bk_compute_children_indices(j: int, n: int) -> frozenset[int]:
     Returns:
         Frozenset of qubit indices in the flip (children) set.
 
+    Raises:
+        ValueError: If n is not a power of 2.
+
     """
-    if n % 2 != 0:
-        return frozenset()
+    if n == 1:
+        return frozenset()  # Base case: single orbital has no children
+    if n <= 0 or (n & (n - 1)) != 0:
+        raise ValueError(f"n must be a power of 2, got {n}")
     half = n // 2
     if j < half:
         # Left half: recurse
@@ -155,6 +170,9 @@ def _bk_compute_z_indices_for_y_component(j: int, n: int) -> frozenset[int]:
 
     Returns:
         Frozenset of qubit indices for Z operators in Y-component.
+
+    Raises:
+        ValueError: If n is not a power of 2.
 
     """
     parity = _bk_compute_parity_indices(j, n)

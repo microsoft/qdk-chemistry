@@ -96,6 +96,27 @@ class TestBravyiKitaevSets:
         assert _bk_compute_z_indices_for_y_component(6, 8) == frozenset({3, 5})  # {3,5} - {} = {3,5}
         assert _bk_compute_z_indices_for_y_component(7, 8) == frozenset()  # {3,5,6} - {3,5,6} = {}
 
+    def test_invalid_n_raises_value_error(self) -> None:
+        """Test that non-power-of-2 values for n raise ValueError."""
+        # Test various non-power-of-2 values
+        invalid_values = [0, 3, 5, 6, 7, 9, 10, 12, 15]
+        for n in invalid_values:
+            with pytest.raises(ValueError, match="n must be a power of 2"):
+                _bk_compute_parity_indices(0, n)
+            with pytest.raises(ValueError, match="n must be a power of 2"):
+                _bk_compute_ancestor_indices(0, n)
+            with pytest.raises(ValueError, match="n must be a power of 2"):
+                _bk_compute_children_indices(0, n)
+            with pytest.raises(ValueError, match="n must be a power of 2"):
+                _bk_compute_z_indices_for_y_component(0, n)
+
+    def test_n_equals_1_returns_empty_set(self) -> None:
+        """Test that n=1 (valid power of 2) returns empty frozenset."""
+        assert _bk_compute_parity_indices(0, 1) == frozenset()
+        assert _bk_compute_ancestor_indices(0, 1) == frozenset()
+        assert _bk_compute_children_indices(0, 1) == frozenset()
+        assert _bk_compute_z_indices_for_y_component(0, 1) == frozenset()
+
 
 class TestQdkQubitMapper:
     """Tests for QdkQubitMapper."""
