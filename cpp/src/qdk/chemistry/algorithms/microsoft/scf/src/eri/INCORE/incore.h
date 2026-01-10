@@ -87,6 +87,10 @@ class ERIINCORE : public ERI {
    */
   void quarter_trans_impl(size_t nt, const double* C, double* out) override;
 
+  std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
+                                                 const double* full_debug_eris,
+                                                 size_t* num_vectors) override;
+
   /**
    * @brief Get direct read-only access to raw stored AO ERIs
    * @see ERI::get_raw_eris for more details
@@ -180,6 +184,12 @@ class ERIINCORE_DF : public ERI {
    * @return nullptr (DF stores 3-center integrals, not 4-center ERIs)
    */
   const double* get_raw_eris() const override { return nullptr; }
+
+  std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
+                                                 const double* full_debug_eris,
+                                                 size_t* num_vectors) override {
+    return nullptr;
+  };
 
   /// PIMPL pointer to DF implementation
   std::unique_ptr<incore::ERI_DF> eri_impl_;

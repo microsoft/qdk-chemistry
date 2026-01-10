@@ -654,6 +654,245 @@ class ERI {
     throw std::runtime_error("LIBINT2_DIRECT + Gradients Not Yet Implemented");
   }
 
+  std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
+                                                 const double* full_debug_eris,
+                                                 size_t* num_vectors) {
+    QDK_LOG_TRACE_ENTERING();
+
+    const size_t num_aos = obs_.nbf();
+    const size_t num_aos2 = num_aos * num_aos;
+    const size_t num_shells = obs_.size();
+    const size_t num_shell_pairs = num_shells * (num_shells + 1) / 2;
+
+    Eigen::Map<const Eigen::MatrixXd> full_debug_eris_mat(
+        full_debug_eris, num_aos * num_aos, num_aos * num_aos);
+
+    // TODO: map shell pair to index
+    auto shell_pair_index = [num_shell_pairs](size_t s1, size_t s2) {
+      if (s1 < s2) std::swap(s1, s2);
+      return s2 + (s1 * (s1 + 1)) / 2;
+    };
+
+    // TODO: map local index to global index
+    auto get_global_pair_index = [&](size_t s1, size_t s2, size_t local_ind) {
+      const size_t bf1_st = shell2bf_[s1];
+      const size_t bf2_st = shell2bf_[s2];
+      const size_t n2 = obs_[s2].size();
+      const size_t i = local_ind / n2;
+      const size_t j = local_ind % n2;
+      return (bf1_st + i) * num_aos + (bf2_st + j);
+    };
+
+    //////////////////////////////////////////////////////
+    // basic libint setup
+    const double precision = std::numeric_limits<double>::epsilon();
+    const auto engine_precision = precision;
+    const int nthreads = 1;
+
+    std::vector<::libint2::Engine> engines_coulomb(nthreads);
+    engines_coulomb[0] = ::libint2::Engine(::libint2::Operator::coulomb,
+                                           obs_.max_nprim(), obs_.max_l(), 0);
+    engines_coulomb[0].set(::libint2::ScreeningMethod::Original);
+    engines_coulomb[0].set_precision(engine_precision);
+    for (int i = 1; i < nthreads; ++i) engines_coulomb[i] = engines_coulomb[0];
+
+    const auto thread_id = 0;
+    auto& engine = engines_coulomb[thread_id];
+    const auto& buf = engine.results();
+
+    //////////////////////////////////////////////////////
+
+    // shells
+    size_t s1 = 0;
+    size_t s2 = 0;
+
+    // Cholesky vectors
+    Eigen::MatrixXd L;
+    size_t current_col = 0;
+    L.resize(num_aos * num_aos, num_aos);
+
+    // Diagonal elements and indices
+    Eigen::Index q_shell_pair_max, q_index_max, q_tmp;
+    std::vector<Eigen::MatrixXd> D_shell_pair(num_shell_pairs);
+    for (size_t s1 = 0; s1 < num_shells; ++s1) {
+      const auto n1 = obs_[s1].size();
+      const auto bf1_st = shell2bf_[s1];
+      for (size_t s2 = 0; s2 <= s1; ++s2) {
+        const auto n2 = obs_[s2].size();
+        const auto bf2_st = shell2bf_[s2];
+        const size_t sp_index = shell_pair_index(s1, s2);
+
+        // screening via schwarz bounds
+        if (K_schwarz_(s1, s2) * K_schwarz_(s1, s2) < precision) {
+          Eigen::VectorXd D_block = Eigen::VectorXd::Zero(n1 * n2);
+          D_shell_pair[sp_index] = D_block;
+          continue;
+        }
+
+        engine.compute2<::libint2::Operator::coulomb, ::libint2::BraKet::xx_xx,
+                        0>(obs_[s1], obs_[s2], obs_[s1], obs_[s2]);
+
+        if (buf[0] == nullptr) {
+          Eigen::VectorXd D_block = Eigen::VectorXd::Zero(n1 * n2);
+          D_shell_pair[sp_index] = D_block;
+          continue;
+        }
+
+        // local diagonal block
+        // Extract diagonal from shell quartet buffer
+        const size_t n12 = n1 * n2;
+        Eigen::Map<const Eigen::MatrixXd> buf_mat(buf[0], n12, n12);
+
+        // Extract diagonal as vector
+        Eigen::VectorXd D_block = buf_mat.diagonal();
+        D_shell_pair[sp_index] = D_block;
+      }  // s2
+    }  // s1
+
+    // 2. Cholesky decomposition
+    double Q_max;
+    size_t global_index;
+
+    size_t niter = 0;
+    while (niter <= num_aos * num_aos) {
+      // get max diagonal element
+      double D_max = 0.0;
+      size_t s1_max, s2_max;
+      for (s1 = 0; s1 < num_shells; ++s1) {
+        const auto n1 = obs_[s1].size();
+        for (s2 = 0; s2 <= s1; ++s2) {
+          const auto n2 = obs_[s2].size();
+          const size_t sp_index = shell_pair_index(s1, s2);
+          Eigen::Index i, j;
+          const double block_max = D_shell_pair[sp_index].maxCoeff(&i, &j);
+          if (block_max > D_max) {
+            D_max = block_max;
+            q_shell_pair_max = sp_index;
+            s1_max = s1;
+            s2_max = s2;
+          }
+        }
+      }
+      if (D_max < threshold) {
+        break;
+      }
+
+      // get column for shell pair (s1_max, s2_max)
+      const size_t n1_max = obs_[s1_max].size();
+      const size_t n2_max = obs_[s2_max].size();
+      Eigen::MatrixXd eri_col =
+          Eigen::MatrixXd::Zero(num_aos2, n1_max * n2_max);
+      for (size_t s3 = 0; s3 < num_shells; ++s3) {
+        const size_t n3 = obs_[s3].size();
+        const size_t bf3_st = shell2bf_[s3];
+        for (size_t s4 = 0; s4 < num_shells; ++s4) {
+          // screening via schwarz bounds
+          if (K_schwarz_(s1_max, s2_max) * K_schwarz_(s3, s4) < precision) {
+            continue;
+          }
+          const size_t n4 = obs_[s4].size();
+          const size_t bf4_st = shell2bf_[s4];
+
+          engine.compute2<::libint2::Operator::coulomb,
+                          ::libint2::BraKet::xx_xx, 0>(
+              obs_[s1_max], obs_[s2_max], obs_[s3], obs_[s4]);
+          const auto res = buf[0];
+
+          // Coarse integral screening
+          if (res == nullptr) continue;
+
+          // fill in eri_col
+          for (size_t i = 0, ijkl = 0; i < n1_max; ++i) {
+            const size_t ind_i = i * n2_max;
+            for (size_t j = 0; j < n2_max; ++j) {
+              const size_t ind_ij = (ind_i + j) * num_aos2;
+              for (size_t k = 0; k < n3; ++k) {
+                const size_t ind_ijk = ind_ij + (bf3_st + k) * num_aos;
+                for (size_t l = 0; l < n4; ++l, ++ijkl) {
+                  const size_t ind_ijkl = ind_ijk + (bf4_st + l);
+                  eri_col(ind_ijkl) += res[ijkl];
+                }  // l
+              }  // k
+            }  // j
+          }  // i
+        }  // s4
+      }  // s3
+
+      // correct for cholesky contributions
+      if (current_col > 0) {
+        // subtract previous contributions
+        for (size_t col = 0; col < eri_col.cols(); ++col) {
+          global_index = get_global_pair_index(s1_max, s2_max, col);
+          eri_col.col(col) -=
+              L.leftCols(current_col) *
+              L.row(global_index).leftCols(current_col).transpose();
+        }
+      }
+
+      // form new cholesky vector for each index in shell pair
+      for (size_t local_i = 0; local_i < n1_max; ++local_i) {
+        for (size_t local_j = 0; local_j < n2_max; ++local_j) {
+          const size_t local_index = local_i * n2_max + local_j;
+          const double D_val = D_shell_pair[q_shell_pair_max](local_index);
+
+          if (D_val < threshold) {
+            continue;
+          }
+
+          // Form Cholesky vector
+          Q_max = std::sqrt(1.0 / D_val);
+          L.col(current_col) = Q_max * eri_col.col(local_index);
+
+          // Update remaining columns in eri_col for vectors formed within this
+          // shell pair
+          for (size_t col = local_index + 1; col < n1_max * n2_max; ++col) {
+            const size_t global_col_idx =
+                get_global_pair_index(s1_max, s2_max, col);
+            eri_col.col(col) -=
+                L.col(current_col) * L(global_col_idx, current_col);
+          }
+
+          // Update ALL diagonal elements and get largest element
+          for (size_t s1 = 0; s1 < num_shells; ++s1) {
+            const auto n1 = obs_[s1].size();
+            for (size_t s2 = 0; s2 <= s1; ++s2) {
+              const size_t sp_index = shell_pair_index(s1, s2);
+              const auto n2 = obs_[s2].size();
+
+              for (size_t i = 0; i < n1; ++i) {
+                for (size_t j = 0; j < n2; ++j) {
+                  const size_t idx = i * n2 + j;
+                  const size_t global_idx = get_global_pair_index(s1, s2, idx);
+                  D_shell_pair[sp_index](idx) -=
+                      L.col(current_col)(global_idx) *
+                      L.col(current_col)(global_idx);
+                }
+              }
+            }
+          }
+          current_col += 1;
+          // Append column (resize if needed)
+          if (current_col >= static_cast<size_t>(L.cols())) {
+            L.conservativeResize(Eigen::NoChange, L.cols() * 2);
+          }
+        }
+      }
+      niter += 1;
+    }
+
+    // print L and rank
+    L.conservativeResize(Eigen::NoChange, current_col);
+    std::cout << "Cholesky rank: " << current_col << std::endl;
+    // std::cout << "Cholesky Vectors L: \n" << L << std::endl;
+
+    // Allocate memory and copy
+    const size_t data_size = current_col * num_aos * num_aos;
+    auto output = std::make_unique<double[]>(data_size);
+    std::memcpy(output.get(), L.data(), data_size * sizeof(double));
+    *num_vectors = current_col;
+    return output;
+  }
+
   /**
    * @brief Perform quarter transformation of two-electron integrals
    *
@@ -968,4 +1207,13 @@ void LIBINT2_DIRECT::quarter_trans_impl(size_t nt, const double* C,
   if (!eri_impl_) throw std::runtime_error("LIBINT2_DIRECT NOT INITIALIZED");
   eri_impl_->quarter_trans(nt, C, out);
 };
+
+// Cholesky vectors interface
+std::unique_ptr<double[]> LIBINT2_DIRECT::get_cholesky_vectors(
+    double threshold, const double* full_debug_eris, size_t* num_vectors) {
+  QDK_LOG_TRACE_ENTERING();
+  if (!eri_impl_) throw std::runtime_error("LIBINT2_DIRECT NOT INITIALIZED");
+  return eri_impl_->get_cholesky_vectors(threshold, full_debug_eris,
+                                         num_vectors);
+}
 }  // namespace qdk::chemistry::scf

@@ -142,5 +142,13 @@ class ERIMultiplexer : public ERI {
   const double* get_raw_eris() const override {
     return qt_impl_ ? qt_impl_->get_raw_eris() : nullptr;
   }
+  std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
+                                                 const double* full_debug_eris,
+                                                 size_t* num_vectors) override {
+    if (qt_impl_)
+      return qt_impl_->get_cholesky_vectors(threshold, full_debug_eris,
+                                            num_vectors);
+    return nullptr;
+  }
 };
 }  // namespace qdk::chemistry::scf

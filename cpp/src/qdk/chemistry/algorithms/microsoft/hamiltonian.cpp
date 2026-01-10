@@ -162,8 +162,8 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     scf_config->eri.method = qcs::ERIMethod::Libint2Direct;
     scf_config->k_eri.method = qcs::ERIMethod::Libint2Direct;
   } else if (!method_name.compare("cholesky")) {
-    scf_config->eri.method = qcs::ERIMethod::Incore;
-    scf_config->k_eri.method = qcs::ERIMethod::Incore;
+    scf_config->eri.method = qcs::ERIMethod::Libint2Direct;
+    scf_config->k_eri.method = qcs::ERIMethod::Libint2Direct;
   } else {
     throw std::runtime_error("Unsupported ERI method '" + method_name +
                              "'. Only CPU ERI methods are supported now");
@@ -249,22 +249,16 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     // Use Cholesky Decomposition
     double cholesky_tol = _settings->get<double>("cholesky_tolerance");
 
-    // Get ao eris
-    const double* raw_eris = eri->get_raw_eris();
-    if (raw_eris == nullptr) {
-      throw std::runtime_error(
-          "Cholesky decomposition requires in-core ERI storage. "
-          "Please set eri_method to 'incore' when using eri_method='cholesky'");
-    }
+    // get cholesky vectors
+    size_t num_cholesky_vectors = 0;
+    auto output =
+        eri->get_cholesky_vectors(cholesky_tol, nullptr, &num_cholesky_vectors);
 
-    // Map raw ERIs to Eigen matrix
-    Eigen::Map<const Eigen::MatrixXd> eri(
-        raw_eris, num_atomic_orbitals * num_atomic_orbitals,
-        num_atomic_orbitals * num_atomic_orbitals);
-
-    // Compute AO Cholesky Vectors
-    L_ao = pivoted_cholesky_decomposition(eri, cholesky_tol);
-
+    // map output to Eigen matrix
+    Eigen::Map<Eigen::MatrixXd> L_ao_map(
+        output.get(), num_atomic_orbitals * num_atomic_orbitals,
+        num_cholesky_vectors);
+    L_ao = L_ao_map;
     /**
      * @brief Reconstruct MO ERIs from Cholesky vectors
      * @param L_left Left Cholesky vectors in MO basis

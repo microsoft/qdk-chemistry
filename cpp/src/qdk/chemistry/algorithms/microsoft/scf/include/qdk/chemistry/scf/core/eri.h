@@ -86,6 +86,8 @@ class ERI {
   virtual void get_gradients(const double* P, double* dJ, double* dK,
                              double alpha, double beta, double omega) = 0;
 
+  virtual std::unique_ptr<double[]> get_cholesky_vectors(
+      double threshold, const double* full_debug_eris, size_t* num_vectors) = 0;
   /**
    * @brief Perform quarter transformation of ERI tensor
    *
