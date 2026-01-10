@@ -16,7 +16,7 @@ from qdk_chemistry.data import (
     Configuration,
     Wavefunction,
     Hamiltonian,
-    CanonicalFourCenterHamiltonian,
+    CanonicalFourCenterHamiltonianContainer,
     BasisSet,
     Shell,
     OrbitalType,
@@ -78,7 +78,7 @@ def make_minimal_hamiltonian(orbitals):
 
     # Create Hamiltonian
     hamiltonian = Hamiltonian(
-        CanonicalFourCenterHamiltonian(
+        CanonicalFourCenterHamiltonianContainer(
             h_core, eri, orbitals, core_energy, inactive_fock
         )
     )

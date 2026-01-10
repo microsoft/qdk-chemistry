@@ -10,7 +10,7 @@ import numpy as np
 from qdk_chemistry.data import (
     Ansatz,
     BasisSet,
-    CanonicalFourCenterHamiltonian,
+    CanonicalFourCenterHamiltonianContainer,
     CasWavefunctionContainer,
     Configuration,
     Hamiltonian,
@@ -78,7 +78,7 @@ def create_test_hamiltonian(num_orbitals: int):
     two_body = np.zeros(num_orbitals**4)
     fock = np.eye(0)
     orbitals = create_test_orbitals(num_orbitals)
-    return Hamiltonian(CanonicalFourCenterHamiltonian(one_body, two_body, orbitals, 0.0, fock))
+    return Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 0.0, fock))
 
 
 def create_test_shells(num_atoms: int = 1, atoms_types: list | None = None):
@@ -177,7 +177,7 @@ def create_test_ansatz(num_orbitals: int = 2):
     one_body = np.eye(num_orbitals)
     two_body = np.zeros(num_orbitals**4)
     fock = np.eye(0)
-    hamiltonian = Hamiltonian(CanonicalFourCenterHamiltonian(one_body, two_body, orbitals, 0.0, fock))
+    hamiltonian = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 0.0, fock))
 
     # Create wavefunction using the same shared orbitals
     # Create single determinant configuration (e.g., "20" for 2 electrons in first orbital)

@@ -341,10 +341,21 @@ TEST_F(CasWavefunctionTest, JsonSerialization) {
   // Serialize to JSON
   nlohmann::json j = original.to_json();
 
-  // Deserialize from JSON
+  // Deserialize from JSON using container-specific method
   auto restored = std::unique_ptr<CasWavefunctionContainer>(
       dynamic_cast<CasWavefunctionContainer*>(
           WavefunctionContainer::from_json(j).release()));
+
+  // Also test base Wavefunction::from_json() by wrapping container in
+  // Wavefunction
+  auto original_wf =
+      std::make_shared<Wavefunction>(std::make_unique<CasWavefunctionContainer>(
+          coeffs, dets, orbitals, one_rdm, std::nullopt));
+  nlohmann::json wf_j = original_wf->to_json();
+  auto wf_restored = Wavefunction::from_json(wf_j);
+  EXPECT_EQ(wf_restored->get_container_type(), "cas");
+  auto& wf_restored_container =
+      wf_restored->get_container<CasWavefunctionContainer>();
 
   // Verify key properties match
   EXPECT_EQ(original.size(), restored->size());
@@ -362,6 +373,16 @@ TEST_F(CasWavefunctionTest, JsonSerialization) {
   for (size_t i = 0; i < original.get_active_determinants().size(); ++i) {
     EXPECT_EQ(original.get_active_determinants()[i],
               restored->get_active_determinants()[i]);
+  }
+
+  // Verify that base Wavefunction::from_json gives the same result
+  EXPECT_EQ(restored->size(), wf_restored_container.size());
+  const auto& wf_rest_coeffs =
+      std::get<Eigen::VectorXd>(wf_restored_container.get_coefficients());
+  EXPECT_TRUE(rest_coeffs.isApprox(wf_rest_coeffs, testing::wf_tolerance));
+  for (size_t i = 0; i < restored->get_active_determinants().size(); ++i) {
+    EXPECT_EQ(restored->get_active_determinants()[i],
+              wf_restored_container.get_active_determinants()[i]);
   }
 }
 
@@ -388,7 +409,7 @@ TEST_F(CasWavefunctionTest, Hdf5Serialization) {
     // Serialize to HDF5
     original.to_hdf5(root);
 
-    // Deserialize from HDF5
+    // Deserialize from HDF5 using container-specific method
     auto restored = CasWavefunctionContainer::from_hdf5(root);
 
     // Verify key properties match
@@ -412,7 +433,50 @@ TEST_F(CasWavefunctionTest, Hdf5Serialization) {
     file.close();
   }
 
+  // Also test base Wavefunction::from_hdf5() by creating a separate file with
+  // Wavefunction wrapper
+  std::string wf_filename = "test_cas_wavefunction_serialization.h5";
+  {
+    // Create and serialize a Wavefunction wrapping the container
+    auto original_wf = std::make_shared<Wavefunction>(
+        std::make_unique<CasWavefunctionContainer>(coeffs, dets, orbitals,
+                                                   one_rdm, std::nullopt));
+    H5::H5File file(wf_filename, H5F_ACC_TRUNC);
+    H5::Group root = file.openGroup("/");
+    original_wf->to_hdf5(root);
+    file.close();
+  }
+  {
+    // Deserialize using Wavefunction::from_hdf5
+    H5::H5File file(wf_filename, H5F_ACC_RDONLY);
+    H5::Group root = file.openGroup("/");
+    auto wf_restored = Wavefunction::from_hdf5(root);
+    EXPECT_EQ(wf_restored->get_container_type(), "cas");
+    auto& wf_restored_container =
+        wf_restored->get_container<CasWavefunctionContainer>();
+
+    // Get the restored container from container-specific method for comparison
+    H5::H5File file2(filename, H5F_ACC_RDONLY);
+    H5::Group root2 = file2.openGroup("/");
+    auto restored = CasWavefunctionContainer::from_hdf5(root2);
+
+    EXPECT_EQ(restored->size(), wf_restored_container.size());
+    const auto& rest_coeffs =
+        std::get<Eigen::VectorXd>(restored->get_coefficients());
+    const auto& wf_rest_coeffs =
+        std::get<Eigen::VectorXd>(wf_restored_container.get_coefficients());
+    EXPECT_TRUE(rest_coeffs.isApprox(wf_rest_coeffs, testing::wf_tolerance));
+    for (size_t i = 0; i < restored->get_active_determinants().size(); ++i) {
+      EXPECT_EQ(restored->get_active_determinants()[i],
+                wf_restored_container.get_active_determinants()[i]);
+    }
+
+    file.close();
+    file2.close();
+  }
+
   std::remove(filename.c_str());
+  std::remove(wf_filename.c_str());
 }
 
 // Test serialization with complex coefficients

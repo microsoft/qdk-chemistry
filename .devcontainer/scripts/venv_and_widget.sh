@@ -17,7 +17,7 @@ source $HOME/.cargo/env
 which rustc
 
 # Install ipykernel
-pip install ipykernel ipywidgets pandas pre-commit
+pip install ipykernel ipywidgets pandas pre-commit rdkit
 
 # Install QDK Chemistry package
 cd ./python

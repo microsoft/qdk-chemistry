@@ -108,8 +108,8 @@ def create_exact_iteration_circuit(
     power = 2 ** (total_iterations - iteration - 1)
     scaled_time = evolution_time * power
     evolution_gate = PauliEvolutionGate(pauli_operator, time=scaled_time)
-    systhesize_gate = synthesis.synthesize(evolution_gate)
-    circuit.append(systhesize_gate.control(1), [control, *system])
+    synthesize_gate = synthesis.synthesize(evolution_gate)
+    circuit.append(synthesize_gate.control(1, annotated=True), [control, *system])
 
     circuit.h(control)
     circuit.measure(control, classical[0])

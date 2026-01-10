@@ -7,7 +7,7 @@
 #include <iostream>
 #include <macis/util/fcidump.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/canonical_4_center.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
@@ -357,8 +357,8 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_json(
   std::string container_type = j["container_type"];
 
   // Forward to appropriate container implementation
-  if (container_type == "canonical_4_center") {
-    return CanonicalFourCenterHamiltonian::from_json(j);
+  if (container_type == "canonical_four_center") {
+    return CanonicalFourCenterHamiltonianContainer::from_json(j);
   } else {
     throw std::runtime_error("Unknown container type: " + container_type);
   }
@@ -380,13 +380,10 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_hdf5(
     type_attr.read(string_type, container_type);
 
     // Forward to appropriate container implementation
-    if (container_type == "canonical_4_center") {
-      return CanonicalFourCenterHamiltonian::from_hdf5(group);
-    } else {
-      throw std::runtime_error("Unknown container type: " + container_type);
+    if (container_type == "canonical_four_center") {
+      return CanonicalFourCenterHamiltonianContainer::from_hdf5(group);
     }
 
-  } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
 }
@@ -506,11 +503,6 @@ nlohmann::json Hamiltonian::to_json() const {
 
   // Store version first
   j["version"] = SERIALIZATION_VERSION;
-
-  j["container_type"] = _container->get_container_type();
-
-  j["type"] =
-      (get_type() == HamiltonianType::Hermitian) ? "Hermitian" : "NonHermitian";
 
   // Delegate to container serialization (orbitals are included within the
   // container)

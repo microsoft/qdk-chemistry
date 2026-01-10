@@ -10,7 +10,7 @@
 
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/canonical_4_center.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -112,11 +112,11 @@ for quantum chemistry calculations. It contains:
 * Core energy contributions from inactive orbitals and nuclear repulsion
 
 Derived classes implement specific storage formats for two-electron integrals
-(e.g., canonical 4-center, density-fitted, tensor hypercontraction).
+(e.g., canonical 4-center, density-fitted, etc.).
 
 Note:
     This class cannot be instantiated directly. Use a derived class like
-    CanonicalFourCenterHamiltonian instead.
+    CanonicalFourCenterHamiltonianContainer instead.
 )");
 
   // HamiltonianContainer methods (read-only accessors)
@@ -232,15 +232,15 @@ Returns:
 Get the type of this container as a string.
 
 Returns:
-    str: Container type identifier (e.g., "canonical_4_center")
+    str: Container type identifier (e.g., "canonical_four_center")
 )");
 
   // ============================================================================
-  // CanonicalFourCenterHamiltonian - Concrete implementation
+  // CanonicalFourCenterHamiltonianContainer - Concrete implementation
   // ============================================================================
-  py::class_<CanonicalFourCenterHamiltonian, HamiltonianContainer,
+  py::class_<CanonicalFourCenterHamiltonianContainer, HamiltonianContainer,
              py::smart_holder>
-      canonical_4_center(data, "CanonicalFourCenterHamiltonian", R"(
+      canonical_four_center(data, "CanonicalFourCenterHamiltonianContainer", R"(
 Represents a molecular Hamiltonian with canonical 4-center two-electron integrals.
 
 This class stores molecular Hamiltonian data for quantum chemistry calculations,
@@ -260,7 +260,7 @@ Examples:
     >>> one_body = np.random.rand(4, 4)  # 4 orbitals
     >>> two_body = np.random.rand(256)   # 4^4 elements
     >>> fock_matrix = np.random.rand(4, 4)
-    >>> container = CanonicalFourCenterHamiltonian(
+    >>> container = CanonicalFourCenterHamiltonianContainer(
     ...     one_body, two_body, orbitals, 10.5, fock_matrix
     ... )
     >>> # Wrap in Hamiltonian interface
@@ -268,7 +268,7 @@ Examples:
 )");
 
   // Restricted constructor
-  canonical_4_center.def(
+  canonical_four_center.def(
       py::init<const Eigen::MatrixXd&, const Eigen::VectorXd&,
                std::shared_ptr<Orbitals>, double, const Eigen::MatrixXd&,
                HamiltonianType>(),
@@ -288,7 +288,7 @@ Examples:
     >>> one_body = np.random.rand(4, 4)
     >>> two_body = np.random.rand(256)
     >>> fock_matrix = np.random.rand(4, 4)
-    >>> container = CanonicalFourCenterHamiltonian(
+    >>> container = CanonicalFourCenterHamiltonianContainer(
     ...     one_body, two_body, orbitals, 10.5, fock_matrix
     ... )
 )",
@@ -298,7 +298,7 @@ Examples:
       py::arg("type") = HamiltonianType::Hermitian);
 
   // Unrestricted constructor
-  canonical_4_center.def(
+  canonical_four_center.def(
       py::init<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
                const Eigen::VectorXd&, const Eigen::VectorXd&,
                const Eigen::VectorXd&, std::shared_ptr<Orbitals>, double,
@@ -328,7 +328,7 @@ Examples:
     >>> two_body_bbbb = np.random.rand(256)
     >>> fock_a = np.random.rand(4, 4)
     >>> fock_b = np.random.rand(4, 4)
-    >>> container = CanonicalFourCenterHamiltonian(
+    >>> container = CanonicalFourCenterHamiltonianContainer(
     ...     one_body_a, one_body_b,
     ...     two_body_aaaa, two_body_aabb, two_body_bbbb,
     ...     orbitals, 10.5, fock_a, fock_b
@@ -341,10 +341,11 @@ Examples:
       py::arg("inactive_fock_matrix_beta"),
       py::arg("type") = HamiltonianType::Hermitian);
 
-  // Two-body integral access (specific to CanonicalFourCenterHamiltonian)
+  // Two-body integral access (specific to
+  // CanonicalFourCenterHamiltonianContainer)
   bind_getter_as_property(
-      canonical_4_center, "get_two_body_integrals",
-      &CanonicalFourCenterHamiltonian::get_two_body_integrals,
+      canonical_four_center, "get_two_body_integrals",
+      &CanonicalFourCenterHamiltonianContainer::get_two_body_integrals,
       R"(
 Get two-electron integrals in molecular orbital basis.
 
@@ -358,9 +359,10 @@ Notes:
 )",
       py::return_value_policy::reference_internal);
 
-  canonical_4_center.def("get_two_body_element",
-                         &CanonicalFourCenterHamiltonian::get_two_body_element,
-                         R"(
+  canonical_four_center.def(
+      "get_two_body_element",
+      &CanonicalFourCenterHamiltonianContainer::get_two_body_element,
+      R"(
 Get specific two-electron integral element <ij|kl>.
 
 Args:
@@ -370,12 +372,12 @@ Args:
 Returns:
     float: Value of the two-electron integral <ij|kl>
 )",
-                         py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
-                         py::arg("channel") = SpinChannel::aaaa);
+      py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
+      py::arg("channel") = SpinChannel::aaaa);
 
-  canonical_4_center.def(
+  canonical_four_center.def(
       "has_two_body_integrals",
-      &CanonicalFourCenterHamiltonian::has_two_body_integrals,
+      &CanonicalFourCenterHamiltonianContainer::has_two_body_integrals,
       R"(
 Check if two-body integrals are available.
 
@@ -383,26 +385,27 @@ Returns:
     bool: True if two-body integrals have been set
 )");
 
-  canonical_4_center.def("is_restricted",
-                         &CanonicalFourCenterHamiltonian::is_restricted,
-                         R"(
+  canonical_four_center.def(
+      "is_restricted", &CanonicalFourCenterHamiltonianContainer::is_restricted,
+      R"(
 Check if Hamiltonian is restricted (alpha == beta).
 
 Returns:
     bool: True if alpha and beta integrals are identical
 )");
 
-  canonical_4_center.def("is_valid", &CanonicalFourCenterHamiltonian::is_valid,
-                         R"(
+  canonical_four_center.def("is_valid",
+                            &CanonicalFourCenterHamiltonianContainer::is_valid,
+                            R"(
 Check if the Hamiltonian data is complete and consistent.
 
 Returns:
     bool: True if all required data is set and dimensions are consistent
 )");
 
-  canonical_4_center.def(
+  canonical_four_center.def(
       "to_json",
-      [](const CanonicalFourCenterHamiltonian& self) -> std::string {
+      [](const CanonicalFourCenterHamiltonianContainer& self) -> std::string {
         return self.to_json().dump();
       },
       R"(
@@ -412,8 +415,9 @@ Returns:
     str: JSON representation of the container
 )");
 
-  canonical_4_center.def(
-      "to_fcidump_file", &CanonicalFourCenterHamiltonian::to_fcidump_file,
+  canonical_four_center.def(
+      "to_fcidump_file",
+      &CanonicalFourCenterHamiltonianContainer::to_fcidump_file,
       R"(
 Save Hamiltonian to FCIDUMP file.
 
@@ -443,8 +447,8 @@ The actual integral storage is handled by the underlying container, which
 can use different representations (canonical 4-center, density-fitted, etc.).
 
 Examples:
-    >>> # Create a Hamiltonian from a CanonicalFourCenterHamiltonian container
-    >>> container = CanonicalFourCenterHamiltonian(h1, h2, orbitals, e_core, fock)
+    >>> # Create a Hamiltonian from a CanonicalFourCenterHamiltonianContainer container
+    >>> container = CanonicalFourCenterHamiltonianContainer(h1, h2, orbitals, e_core, fock)
     >>> hamiltonian = Hamiltonian(container)
     >>>
     >>> # Access integrals through the interface
@@ -464,7 +468,7 @@ Args:
         Ownership is transferred to the Hamiltonian.
 
 Examples:
-    >>> container = CanonicalFourCenterHamiltonian(h1, h2, orbitals, e_core, fock)
+    >>> container = CanonicalFourCenterHamiltonianContainer(h1, h2, orbitals, e_core, fock)
     >>> hamiltonian = Hamiltonian(container)
 )",
                   py::arg("container"));
@@ -642,7 +646,7 @@ Returns:
 Get the type of the underlying container.
 
 Returns:
-    str: Container type identifier (e.g., "canonical_4_center")
+    str: Container type identifier (e.g., "canonical_four_center")
 )");
 
   // Summary

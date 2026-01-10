@@ -108,8 +108,8 @@ class HamiltonianContainer {
 
   /**
    * @brief Get the type of the underlying container
-   * @return String identifying the container type (e.g., "canonical_4_center",
-   * "density_fitted")
+   * @return String identifying the container type (e.g.,
+   * "canonical_four_center", "density_fitted")
    */
   virtual std::string get_container_type() const = 0;
 
@@ -124,7 +124,7 @@ class HamiltonianContainer {
    * @param i First orbital index
    * @param j Second orbital index
    * @param channel Spin channel to query (aa, or bb), defaults to aa
-   * @return One-electron integral &lt;ij&gt;
+   * @return One-electron integral (i|h|j)
    * @throws std::out_of_range if indices are invalid
    */
   double get_one_body_element(unsigned i, unsigned j,
@@ -156,7 +156,7 @@ class HamiltonianContainer {
    * @param l Fourth orbital index
    * @param channel Spin channel to query (aaaa, aabb, or bbbb), defaults to
    * aaaa
-   * @return Two-electron integral <ij|kl>
+   * @return Two-electron integral (ij|kl)
    * @throws std::out_of_range if indices are invalid
    */
   virtual double get_two_body_element(
@@ -242,7 +242,7 @@ class HamiltonianContainer {
   /**
    * @brief Deserialize Hamiltonian data from HDF5 group
    * @param group HDF5 group to read data from
-   * @return Unique pointer to const Hamiltonian loaded from group
+   * @return Unique pointer to Hamiltonian loaded from group
    * @throws std::runtime_error if I/O error occurs
    */
   static std::unique_ptr<HamiltonianContainer> from_hdf5(H5::Group& group);
@@ -250,7 +250,7 @@ class HamiltonianContainer {
   /**
    * @brief Load Hamiltonian from JSON
    * @param j JSON object containing Hamiltonian data
-   * @return Unique pointer to const Hamiltonian loaded from JSON
+   * @return Unique pointer to Hamiltonian loaded from JSON
    * @throws std::runtime_error if JSON is malformed
    */
   static std::unique_ptr<HamiltonianContainer> from_json(
@@ -373,7 +373,7 @@ class Hamiltonian : public DataClass,
    * @param i First orbital index
    * @param j Second orbital index
    * @param channel Spin channel to query (aa, or bb), defaults to aa
-   * @return One-electron integral &lt;ij&gt;
+   * @return One-electron integral (i|h|j);
    * @throws std::out_of_range if indices are invalid
    */
   double get_one_body_element(unsigned i, unsigned j,
@@ -397,7 +397,7 @@ class Hamiltonian : public DataClass,
    * @param l Fourth orbital index
    * @param channel Spin channel to query (aaaa, aabb, or bbbb), defaults to
    * aaaa
-   * @return Two-electron integral <ij|kl>
+   * @return Two-electron integral (ij|kl)
    * @throws std::out_of_range if indices are invalid
    */
   double get_two_body_element(unsigned i, unsigned j, unsigned k, unsigned l,
@@ -451,8 +451,8 @@ class Hamiltonian : public DataClass,
 
   /**
    * @brief Get the type of the underlying container
-   * @return String identifying the container type (e.g., "canonical_4_center",
-   * "density_fitted")
+   * @return String identifying the container type (e.g.,
+   * "canonical_four_center", "density_fitted")
    */
   std::string get_container_type() const;
 

@@ -18,7 +18,7 @@
 #include <qdk/chemistry/scf/util/int1e.h>
 
 // QDK/Chemistry data::Hamiltonian headers
-#include <qdk/chemistry/data/hamiltonian_containers/canonical_4_center.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 #include "utils.hpp"
@@ -299,7 +299,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
       H_active = Ca_active.transpose() * H_full * Ca_active;
       Eigen::MatrixXd dummy_fock = Eigen::MatrixXd::Zero(0, 0);
       return std::make_shared<data::Hamiltonian>(
-          std::make_unique<data::CanonicalFourCenterHamiltonian>(
+          std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
               H_active, moeri_aaaa, orbitals,
               structure->calculate_nuclear_repulsion_energy(), dummy_fock));
     } else {
@@ -311,7 +311,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
       Eigen::MatrixXd dummy_fock_alpha = Eigen::MatrixXd::Zero(0, 0);
       Eigen::MatrixXd dummy_fock_beta = Eigen::MatrixXd::Zero(0, 0);
       return std::make_shared<data::Hamiltonian>(
-          std::make_unique<data::CanonicalFourCenterHamiltonian>(
+          std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
               H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
               orbitals, structure->calculate_nuclear_repulsion_energy(),
               dummy_fock_alpha, dummy_fock_beta));
@@ -373,7 +373,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     }
 
     return std::make_shared<data::Hamiltonian>(
-        std::make_unique<data::CanonicalFourCenterHamiltonian>(
+        std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
             H_active, moeri_aaaa, orbitals,
             E_inactive + structure->calculate_nuclear_repulsion_energy(),
             F_inactive));
@@ -481,7 +481,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     }
 
     return std::make_shared<data::Hamiltonian>(
-        std::make_unique<data::CanonicalFourCenterHamiltonian>(
+        std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
             H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
             orbitals,
             E_inactive + structure->calculate_nuclear_repulsion_energy(),
