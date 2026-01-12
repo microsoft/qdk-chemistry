@@ -442,22 +442,21 @@ def orbitals_to_scf(
     if isinstance(scf_type, str):
         scf_type = SCFType(scf_type.lower())
 
-    mol = basis_to_pyscf_mol(orbitals.get_basis_set())
-    charge = mol.charge
+    # n_electrons and multiplicity from occupations
+    n_alpha = int(np.sum(occ_alpha))
+    n_beta = int(np.sum(occ_beta))
+    n_electrons = n_alpha + n_beta
+    multiplicity = abs(n_alpha - n_beta) + 1
 
-    # spin from occupations
-    nalpha = int(np.sum(occ_alpha))
-    nbeta = int(np.sum(occ_beta))
-    spin = abs(nalpha - nbeta)
+    # Calculate charge from structure's atomic symbols (accounting for ECPs)
+    basis_set = orbitals.get_basis_set()
+    atomic_symbols = basis_set.get_structure().get_atomic_symbols()
+    neutral_electrons = sum(pyscf.gto.charge(symbol) for symbol in atomic_symbols)
+    if basis_set.has_ecp_electrons():
+        neutral_electrons -= sum(basis_set.get_ecp_electrons())
+    charge = neutral_electrons - n_electrons
 
-    # charge from occupations
-    nelectrons = nalpha + nbeta
-    charge = mol.nelectron - nelectrons
-
-    # update mol object
-    mol.charge = charge
-    mol.spin = spin
-    mol.build()
+    mol = basis_to_pyscf_mol(basis_set, charge=charge, multiplicity=multiplicity)
 
     coeff_a, coeff_b = orbitals.get_coefficients()
     # Get energies if available, otherwise use zero arrays as placeholders
