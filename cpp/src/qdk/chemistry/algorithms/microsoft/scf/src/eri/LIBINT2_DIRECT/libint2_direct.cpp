@@ -661,6 +661,7 @@ class ERI {
 
     const size_t num_aos = obs_.nbf();
     const size_t num_aos2 = num_aos * num_aos;
+    const size_t num_aos3 = num_aos2 * num_aos;
     const size_t num_shells = obs_.size();
     const size_t num_shell_pairs = num_shells * (num_shells + 1) / 2;
 
@@ -683,12 +684,10 @@ class ERI {
       return (bf1_st + i) * num_aos + (bf2_st + j);
     };
 
-    //////////////////////////////////////////////////////
-    // basic libint setup
+    // setup libint engine for ERI computation
     const double precision = std::numeric_limits<double>::epsilon();
     const auto engine_precision = precision;
     const int nthreads = 1;
-
     std::vector<::libint2::Engine> engines_coulomb(nthreads);
     engines_coulomb[0] = ::libint2::Engine(::libint2::Operator::coulomb,
                                            obs_.max_nprim(), obs_.max_l(), 0);
@@ -700,19 +699,12 @@ class ERI {
     auto& engine = engines_coulomb[thread_id];
     const auto& buf = engine.results();
 
-    //////////////////////////////////////////////////////
-
-    // shells
-    size_t s1 = 0;
-    size_t s2 = 0;
-
     // Cholesky vectors
-    Eigen::MatrixXd L;
     size_t current_col = 0;
+    Eigen::MatrixXd L;
     L.resize(num_aos * num_aos, num_aos);
 
     // Diagonal elements and indices
-    Eigen::Index q_shell_pair_max, q_index_max, q_tmp;
     std::vector<Eigen::MatrixXd> D_shell_pair(num_shell_pairs);
     for (size_t s1 = 0; s1 < num_shells; ++s1) {
       const auto n1 = obs_[s1].size();
@@ -753,14 +745,15 @@ class ERI {
     double Q_max;
     size_t global_index;
 
+    size_t q_shell_pair_max;
     size_t niter = 0;
     while (niter <= num_aos * num_aos) {
       // get max diagonal element
       double D_max = 0.0;
       size_t s1_max, s2_max;
-      for (s1 = 0; s1 < num_shells; ++s1) {
+      for (size_t s1 = 0; s1 < num_shells; ++s1) {
         const auto n1 = obs_[s1].size();
-        for (s2 = 0; s2 <= s1; ++s2) {
+        for (size_t s2 = 0; s2 <= s1; ++s2) {
           const auto n2 = obs_[s2].size();
           const size_t sp_index = shell_pair_index(s1, s2);
           Eigen::Index i, j;

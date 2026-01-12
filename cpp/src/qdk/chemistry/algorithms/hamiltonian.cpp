@@ -3,6 +3,7 @@
 // license information.
 
 #include "microsoft/hamiltonian.hpp"
+#include "microsoft/cholesky_hamiltonian.hpp"
 
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/config.hpp>
@@ -10,6 +11,13 @@
 #include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::algorithms {
+
+  std::unique_ptr<HamiltonianConstructor> make_microsoft_cholesky_hamiltonian() {
+  QDK_LOG_TRACE_ENTERING();
+
+  return std::make_unique<
+      qdk::chemistry::algorithms::microsoft::CholeskyHamiltonianConstructor>();
+}
 
 std::unique_ptr<HamiltonianConstructor> make_microsoft_hamiltonian() {
   QDK_LOG_TRACE_ENTERING();
@@ -22,6 +30,8 @@ void HamiltonianConstructorFactory::register_default_instances() {
   QDK_LOG_TRACE_ENTERING();
 
   HamiltonianConstructorFactory::register_instance(&make_microsoft_hamiltonian);
+  HamiltonianConstructorFactory::register_instance(
+      &make_microsoft_cholesky_hamiltonian);
 }
 
 }  // namespace qdk::chemistry::algorithms

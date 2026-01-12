@@ -9,26 +9,25 @@
 
 namespace qdk::chemistry::algorithms::microsoft {
 
-class HamiltonianSettings : public qdk::chemistry::data::Settings {
+class CholeskyHamiltonianSettings : public qdk::chemistry::data::Settings {
  public:
-  HamiltonianSettings() {
-    // TODO enable and use
-    // set_default("integral_threshold", 1e-12);
-    set_default("eri_method", "direct");
+  CholeskyHamiltonianSettings() {
     set_default("scf_type", "auto");
+    set_default("cholesky_tolerance", 1e-6);
+    set_default("store_cholesky_vectors", true);
   }
-  ~HamiltonianSettings() override = default;
+  ~CholeskyHamiltonianSettings() override = default;
 };
 
-class HamiltonianConstructor
+class CholeskyHamiltonianConstructor
     : public qdk::chemistry::algorithms::HamiltonianConstructor {
  public:
-  HamiltonianConstructor() {
-    _settings = std::make_unique<HamiltonianSettings>();
+  CholeskyHamiltonianConstructor() {
+    _settings = std::make_unique<CholeskyHamiltonianSettings>();
   };
-  ~HamiltonianConstructor() override = default;
+  ~CholeskyHamiltonianConstructor() override = default;
 
-  virtual std::string name() const final { return "qdk"; };
+  virtual std::string name() const final { return "qdk_cholesky"; };
 
  protected:
   std::shared_ptr<data::Hamiltonian> _run_impl(
