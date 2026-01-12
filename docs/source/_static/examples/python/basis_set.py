@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 ################################################################################
-# start-cell-create
+# start-cell-loading
 import numpy as np
 from pathlib import Path
 from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell, Structure
@@ -16,23 +16,6 @@ structure = Structure.from_xyz_file(
     Path(__file__).parent / "../data/water.structure.xyz"
 )
 
-# Create a shell with multiple primitives
-atom_index = 0  # First atom
-orbital_type = OrbitalType.P  # p orbital
-exponents = np.array([0.16871439, 0.62391373])
-coefficients = np.array([0.43394573, 0.56604777])
-shell1 = Shell(atom_index, orbital_type, exponents, coefficients)
-
-# Create a shell with a single primitive
-shell2 = Shell(1, OrbitalType.S, [0.5], [1.0])
-
-# Create a basis set from the shells
-basis_set = BasisSet("6-31G", [shell1, shell2], structure, AOType.Spherical)
-# end-cell-create
-################################################################################
-
-################################################################################
-# start-cell-alternative-creation
 # Create basis sets from the library using basis set name
 basis_from_name = BasisSet.from_basis_name("sto-3g", structure)
 # With explicit ECP
@@ -53,7 +36,24 @@ index_ecp_map = {0: "def2-ecp"}  # ECP only for atom at index 0
 basis_from_index_ecp = BasisSet.from_index_map(
     index_basis_map, structure, index_ecp_map
 )
-# end-cell-alternative-creation
+# end-cell-loading
+################################################################################
+
+################################################################################
+# start-cell-create
+# Create a shell with multiple primitives
+atom_index = 0  # First atom
+orbital_type = OrbitalType.P  # p orbital
+exponents = np.array([0.16871439, 0.62391373])
+coefficients = np.array([0.43394573, 0.56604777])
+shell1 = Shell(atom_index, orbital_type, exponents, coefficients)
+
+# Create a shell with a single primitive
+shell2 = Shell(1, OrbitalType.S, [0.5], [1.0])
+
+# Create a basis set from the shells
+basis_set = BasisSet("6-31G", [shell1, shell2], structure, AOType.Spherical)
+# end-cell-create
 ################################################################################
 
 ################################################################################

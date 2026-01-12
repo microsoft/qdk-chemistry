@@ -66,31 +66,10 @@ Spherical
 Cartesian
    Uses Cartesian coordinates with :math:`(l+1)(l+2)/2` functions per shell
 
-Creating a basis set
---------------------
-
-.. note::
-   In most cases, you should use the built-in basis set library rather than creating basis sets manually.
-   Manual creation is primarily for advanced use cases or when working with custom basis sets not available in the library.
-
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
-      :language: cpp
-      :start-after: // start-cell-create
-      :end-before: // end-cell-create
-
-.. tab:: Python API
-
-   .. literalinclude:: ../../../_static/examples/python/basis_set.py
-      :language: python
-      :start-after: # start-cell-create
-      :end-before: # end-cell-create
-
 Loading from the basis set library
 -----------------------------------
 
-While the previous example demonstrates manual basis set creation, QDK/Chemistry provides a comprehensive library of predefined basis sets for convenience.
+QDK/Chemistry provides a comprehensive library of predefined basis sets for convenience.
 This is the recommended approach for most calculations, as it ensures correct basis function definitions and supports a wide range of standard basis sets.
 
 The library supports three methods for loading basis sets:
@@ -112,18 +91,39 @@ ECPs can be specified either uniformly for all atoms or selectively per element 
 
    .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
       :language: cpp
-      :start-after: // start-cell-alternative-creation
-      :end-before: // end-cell-alternative-creation
+      :start-after: // start-cell-loading
+      :end-before: // end-cell-loading
 
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
-      :start-after: # start-cell-alternative-creation
-      :end-before: # end-cell-alternative-creation
+      :start-after: # start-cell-loading
+      :end-before: # end-cell-loading
 
 .. seealso::
    For a complete list of available basis sets, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
+
+Creating a basis set
+--------------------
+
+.. note::
+   In most cases, you should use the built-in basis set library rather than creating basis sets manually.
+   Manual creation is primarily for advanced use cases or when working with custom basis sets not available in the library.
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
+      :language: python
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
 
 Accessing basis set data
 ------------------------

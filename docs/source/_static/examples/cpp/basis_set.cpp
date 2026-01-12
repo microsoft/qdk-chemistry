@@ -3,40 +3,18 @@
 // license information.
 
 // Basis Set usage examples.
-// --------------------------------------------------------------------------------------------
-// start-cell-create
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::data;
 
 int main() {
+  // --------------------------------------------------------------------------------------------
+  // start-cell-loading
   // Create a water molecule structure
   std::vector<Eigen::Vector3d> coords = {
       {0.0, 0.0, 0.0}, {0.757, 0.586, 0.0}, {-0.757, 0.586, 0.0}};
   std::vector<std::string> symbols = {"O", "H", "H"};
   Structure structure(coords, symbols);
 
-  // Create a shell with multiple primitives
-  size_t atom_index = 0;                      // First atom
-  OrbitalType orbital_type = OrbitalType::P;  // p orbital
-  Eigen::VectorXd exponents(2);
-  exponents << 0.16871439, 0.62391373;
-  Eigen::VectorXd coefficients(2);
-  coefficients << 0.43394573, 0.56604777;
-  Shell shell1(atom_index, orbital_type, exponents, coefficients);
-
-  // Add a shell with a single primitive
-  Shell shell2(1, OrbitalType::S, Eigen::VectorXd::Constant(1, 0.5),
-               Eigen::VectorXd::Constant(1, 1.0));
-
-  // Create a basis set from the shells
-  std::vector<Shell> shells = {shell1, shell2};
-  std::string name = "6-31G";
-  BasisSet basis_set(name, shells, structure, AOType::Spherical);
-  // end-cell-create
-  // --------------------------------------------------------------------------------------------
-
-  // --------------------------------------------------------------------------------------------
-  // start-cell-alternative-creation
   // Create basis sets from the library using basis set name
   auto basis_from_name = BasisSet::from_basis_name("sto-3g", structure);
   // With explicit ECP
@@ -61,7 +39,29 @@ int main() {
       {0, "def2-ecp"}};  // ECP only for atom at index 0
   auto basis_from_index_ecp =
       BasisSet::from_index_map(index_basis_map, structure, index_ecp_map);
-  // end-cell-alternative-creation
+  // end-cell-loading
+  // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-create
+  // Create a shell with multiple primitives
+  size_t atom_index = 0;                      // First atom
+  OrbitalType orbital_type = OrbitalType::P;  // p orbital
+  Eigen::VectorXd exponents(2);
+  exponents << 0.16871439, 0.62391373;
+  Eigen::VectorXd coefficients(2);
+  coefficients << 0.43394573, 0.56604777;
+  Shell shell1(atom_index, orbital_type, exponents, coefficients);
+
+  // Add a shell with a single primitive
+  Shell shell2(1, OrbitalType::S, Eigen::VectorXd::Constant(1, 0.5),
+               Eigen::VectorXd::Constant(1, 1.0));
+
+  // Create a basis set from the shells
+  std::vector<Shell> shells = {shell1, shell2};
+  std::string name = "6-31G";
+  BasisSet basis_set(name, shells, structure, AOType::Spherical);
+  // end-cell-create
   // --------------------------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------------------------
