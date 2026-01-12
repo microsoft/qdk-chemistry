@@ -48,8 +48,8 @@ namespace detail {
  * @param trial_fock Output trial Fock matrix
  * @param rhf_external Flag indicating if RHF external stability is requested
  */
-void compute_trial_fock(const std::shared_ptr<qcs::ERI>& eri,
-                        const std::shared_ptr<qcs::EXC>& exc,
+void compute_trial_fock(const std::shared_ptr<qcs::ERI> eri,
+                        const std::shared_ptr<qcs::EXC> exc,
                         const RowMajorMatrix& trial_density,
                         const RowMajorMatrix& ground_density,
                         RowMajorMatrix& trial_fock, bool rhf_external) {
@@ -362,14 +362,17 @@ StabilityChecker::_run_impl(
   utils::microsoft::initialize_backend();
 
   // Extract settings
-  const int64_t davidson_max_subspace =
-      _settings->get_or_default<int64_t>("max_subspace", 30);
-  const double stability_tol =
-      _settings->get_or_default<double>("stability_tolerance", -1.0e-4);
-  const double davidson_tol =
-      _settings->get_or_default<double>("davidson_tolerance", 1.0e-6);
+  const int64_t davidson_max_subspace = _settings->get<int64_t>("max_subspace");
+  const double stability_tol = _settings->get<double>("stability_tolerance");
+  const double davidson_tol = _settings->get<double>("davidson_tolerance");
   bool check_internal = _settings->get<bool>("internal");
   bool check_external = _settings->get<bool>("external");
+
+  if (!check_internal && !check_external) {
+    throw std::invalid_argument(
+        "At least one of 'internal' or 'external' stability checks must be "
+        "enabled.");
+  }
 
   // Extract needed components, orbitals, basis set, coefficients, eigenvalues
   const auto orbitals = wavefunction->get_orbitals();
@@ -590,11 +593,7 @@ StabilityChecker::_run_impl(
     detail::transpose_eigenvector_to_rowmajor(external_eigenvectors.data(),
                                               num_virtual_alpha_orbitals,
                                               n_alpha_electrons);
-    if (unrestricted) {
-      detail::transpose_eigenvector_to_rowmajor(
-          external_eigenvectors.data() + nova, num_virtual_beta_orbitals,
-          n_beta_electrons);
-    }
+
     if (exc_external) qcs::util::GAUXCRegistry::clear();  // clear GAUXC cache
   }
 

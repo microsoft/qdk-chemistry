@@ -69,7 +69,7 @@ namespace qdk::chemistry::data {
  *   doubly-occupied to singly-occupied block
  *
  * **Indexing Convention:**
- * The Occupied orbital index varies fastest. For the element corresponding to
+ * The occupied orbital index varies fastest. For the element corresponding to
  * occupied orbital i and virtual orbital a, the index is computed as:
  * index = i + a * num_occupied. This convention is from row-major eigenvector
  * (num_virtual, num_occupied).

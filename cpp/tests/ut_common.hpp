@@ -275,12 +275,8 @@ inline std::shared_ptr<Structure> create_stretched_n2_structure(
     double distance_angstrom) {
   std::vector<Eigen::Vector3d> coords = {
       {0.000000000, 0.000000000, 0.000000000},
-      {distance_angstrom, 0.000000000, 0.000000000}};
-
-  // Convert to Bohr
-  for (auto& coord : coords) {
-    coord *= qdk::chemistry::constants::angstrom_to_bohr;
-  }
+      {distance_angstrom * qdk::chemistry::constants::angstrom_to_bohr,
+       0.000000000, 0.000000000}};
 
   std::vector<Element> elements = {qdk::chemistry::data::Element::N,
                                    qdk::chemistry::data::Element::N};
