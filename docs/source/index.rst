@@ -11,8 +11,7 @@ QDK/Chemistry also serves as a platform for innovation, by providing a unified i
 
 .. note::
 
-   This library collects anonymous usage and performance data by default to help improve the product.
-   The telemetry implementation can be found in ``python/src/qdk_chemistry/utils/telemetry.py`` and all
+   By default, this library collects anonymous usage and performance data to help improve the user experience and product quality. The telemetry implementation can be found in ``python/src/qdk_chemistry/utils/telemetry.py`` and all
    telemetry events are defined in ``python/src/qdk_chemistry/utils/telemetry_events.py``.
 
    To disable telemetry via bash, set the environment variable ``QSHARP_PYTHON_TELEMETRY`` to one of the
