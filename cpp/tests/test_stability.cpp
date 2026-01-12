@@ -692,6 +692,7 @@ TEST_F(StabilityCheckerTest, QDK_UHF_O2_PBE_Stable) {
   stability_checker->settings().set("internal", true);
   stability_checker->settings().set("external", false);
   stability_checker->settings().set("method", "pbe");
+  stability_checker->settings().set("davidson_tolerance", 5e-6);
 
   // Run stability analysis
   auto [is_stable, result] = stability_checker->run(wavefunction);

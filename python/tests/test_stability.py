@@ -986,7 +986,6 @@ class TestStabilityWorkflow:
 
         # Create and configure solvers
         scf_solver = algorithms.create("scf_solver", backend)
-        # "auto" is set intentionally for checking the external stability checker can be automatically opened
         scf_solver.settings().set("scf_type", "auto")
         scf_solver.settings().set("method", method)
 
