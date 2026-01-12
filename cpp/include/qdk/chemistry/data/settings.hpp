@@ -278,6 +278,15 @@ class Settings : public DataClass,
    */
   Settings& operator=(Settings&& other) noexcept = default;
 
+  /// Static data type name for serialization and identification
+  static constexpr const char* DATA_TYPE_NAME = "settings";
+
+  /**
+   * @brief Get the data type name for this class
+   * @return DATA_TYPE_NAME
+   */
+  std::string get_data_type_name() const override { return DATA_TYPE_NAME; }
+
   /**
    * @brief Set a setting value
    * @param key The setting key

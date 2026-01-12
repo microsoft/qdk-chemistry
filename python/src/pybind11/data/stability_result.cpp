@@ -666,6 +666,6 @@ Examples:
         return *result;
       }));
 
-  // Data type name
-  stability_result.attr("_data_type_name") = "stability_result";
+  // Data type name class attribute
+  stability_result.attr("_data_type_name") = StabilityResult::DATA_TYPE_NAME;
 }

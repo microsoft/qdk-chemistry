@@ -499,6 +499,15 @@ class Hamiltonian : public DataClass,
    */
   bool is_unrestricted() const;
 
+  /// Static data type name for serialization and identification
+  static constexpr const char* DATA_TYPE_NAME = "hamiltonian";
+
+  /**
+   * @brief Get the data type name for this class
+   * @return DATA_TYPE_NAME
+   */
+  std::string get_data_type_name() const override { return DATA_TYPE_NAME; }
+
   /**
    * @brief Get summary string of Hamiltonian information
    * @return String describing the Hamiltonian

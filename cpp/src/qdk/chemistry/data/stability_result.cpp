@@ -171,7 +171,10 @@ StabilityResult::get_smallest_eigenvalue_and_vector() const {
 void StabilityResult::to_file(const std::string& filename,
                               const std::string& type) const {
   QDK_LOG_TRACE_ENTERING();
-  DataTypeFilename::validate_write_suffix(filename, "stability_result");
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
+  DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
 
   if (type == "json") {
     to_json_file(filename);
@@ -209,7 +212,10 @@ nlohmann::json StabilityResult::to_json() const {
 
 void StabilityResult::to_json_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
-  DataTypeFilename::validate_write_suffix(filename, "stability_result");
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
+  DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
   _to_json_file(filename);
 }
 void StabilityResult::to_hdf5(H5::Group& group) const {
@@ -258,12 +264,18 @@ void StabilityResult::to_hdf5(H5::Group& group) const {
 
 void StabilityResult::to_hdf5_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
-  DataTypeFilename::validate_write_suffix(filename, "stability_result");
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
+  DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
   _to_hdf5_file(filename);
 }
 std::shared_ptr<StabilityResult> StabilityResult::from_file(
     const std::string& filename, const std::string& type) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
   DataTypeFilename::validate_read_suffix(filename, "stability_result");
 
   if (type == "json") {
@@ -279,6 +291,9 @@ std::shared_ptr<StabilityResult> StabilityResult::from_file(
 std::shared_ptr<StabilityResult> StabilityResult::from_json_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
   DataTypeFilename::validate_read_suffix(filename, "stability_result");
   return _from_json_file(filename);
 }
@@ -333,6 +348,9 @@ std::shared_ptr<StabilityResult> StabilityResult::from_json(
 std::shared_ptr<StabilityResult> StabilityResult::from_hdf5_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
   DataTypeFilename::validate_read_suffix(filename, "stability_result");
   return _from_hdf5_file(filename);
 }

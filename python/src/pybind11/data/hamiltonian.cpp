@@ -846,6 +846,6 @@ Examples:
         return *Hamiltonian::from_json(nlohmann::json::parse(json_str));
       }));
 
-  // Data type name
-  hamiltonian.attr("_data_type_name") = "hamiltonian";
+  // Data type name class attribute
+  hamiltonian.attr("_data_type_name") = Hamiltonian::DATA_TYPE_NAME;
 }

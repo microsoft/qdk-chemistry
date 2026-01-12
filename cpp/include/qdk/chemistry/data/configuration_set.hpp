@@ -91,6 +91,15 @@ class ConfigurationSet : public DataClass {
    */
   bool empty() const;
 
+  /// Static data type name for serialization and identification
+  static constexpr const char* DATA_TYPE_NAME = "configuration_set";
+
+  /**
+   * @brief Get the data type name for this class
+   * @return DATA_TYPE_NAME
+   */
+  std::string get_data_type_name() const override { return DATA_TYPE_NAME; }
+
   /**
    * @brief Access configuration by index
    * @param idx Index

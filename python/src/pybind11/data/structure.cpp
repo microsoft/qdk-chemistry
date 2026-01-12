@@ -1052,6 +1052,6 @@ Examples:
         return *Structure::from_json(nlohmann::json::parse(json_str));
       }));
 
-  // Data type name
-  structure.attr("_data_type_name") = "structure";
+  // Data type name class attribute
+  structure.attr("_data_type_name") = Structure::DATA_TYPE_NAME;
 }

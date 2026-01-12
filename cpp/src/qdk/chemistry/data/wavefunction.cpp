@@ -18,6 +18,7 @@
 #include <tuple>
 #include <variant>
 
+#include "filename_utils.hpp"
 #include "hdf5_error_handling.hpp"
 #include "hdf5_serialization.hpp"
 #include "json_serialization.hpp"
@@ -1488,12 +1489,20 @@ std::shared_ptr<Wavefunction> Wavefunction::from_json(const nlohmann::json& j) {
 
 void Wavefunction::to_json_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
+  DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
   _to_json_file(filename);
 }
 
 std::shared_ptr<Wavefunction> Wavefunction::from_json_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
+  DataTypeFilename::validate_read_suffix(filename, "wavefunction");
   return _from_json_file(filename);
 }
 
@@ -1577,12 +1586,20 @@ std::shared_ptr<Wavefunction> Wavefunction::from_hdf5(H5::Group& group) {
 
 void Wavefunction::to_hdf5_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
+  DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
   _to_hdf5_file(filename);
 }
 
 std::shared_ptr<Wavefunction> Wavefunction::from_hdf5_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
+  DataTypeFilename::validate_read_suffix(filename, "wavefunction");
   return _from_hdf5_file(filename);
 }
 

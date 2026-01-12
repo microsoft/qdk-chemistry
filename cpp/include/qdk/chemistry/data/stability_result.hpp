@@ -319,6 +319,15 @@ class StabilityResult : public DataClass,
 
   // === DataClass interface implementation ===
 
+  /// Static data type name for serialization and identification
+  static constexpr const char* DATA_TYPE_NAME = "stability_result";
+
+  /**
+   * @brief Get the data type name for this class
+   * @return DATA_TYPE_NAME
+   */
+  std::string get_data_type_name() const override { return DATA_TYPE_NAME; }
+
   /**
    * @brief Get summary string of stability result information
    * @return String describing the stability result

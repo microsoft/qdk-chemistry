@@ -135,6 +135,15 @@ class Ansatz : public DataClass, public std::enable_shared_from_this<Ansatz> {
    */
   void validate_orbital_consistency() const;
 
+  /// Static data type name for serialization and identification
+  static constexpr const char* DATA_TYPE_NAME = "ansatz";
+
+  /**
+   * @brief Get the data type name for this class
+   * @return DATA_TYPE_NAME
+   */
+  std::string get_data_type_name() const override { return DATA_TYPE_NAME; }
+
   /**
    * @brief Get a summary string describing the Ansatz
    * @return Human-readable summary of the Ansatz

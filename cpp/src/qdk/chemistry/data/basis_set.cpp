@@ -1303,10 +1303,13 @@ std::shared_ptr<BasisSet> BasisSet::from_file(const std::string& filename,
 
 void BasisSet::to_hdf5_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
 
   // Validate filename has correct data type suffix
   std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, "basis_set");
+      DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
 
   _to_hdf5_file(validated_filename);
 }
@@ -1314,6 +1317,9 @@ void BasisSet::to_hdf5_file(const std::string& filename) const {
 std::shared_ptr<BasisSet> BasisSet::from_hdf5_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
 
   // Validate filename has correct data type suffix
   std::string validated_filename =
@@ -1324,10 +1330,13 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5_file(
 
 void BasisSet::to_json_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
 
   // Validate filename has correct data type suffix
   std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, "basis_set");
+      DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
 
   _to_json_file(validated_filename);
 }
@@ -1335,6 +1344,9 @@ void BasisSet::to_json_file(const std::string& filename) const {
 std::shared_ptr<BasisSet> BasisSet::from_json_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
 
   // Validate filename has correct data type suffix
   std::string validated_filename =

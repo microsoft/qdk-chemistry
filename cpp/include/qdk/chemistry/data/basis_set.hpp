@@ -338,6 +338,15 @@ class BasisSet : public DataClass,
   /** @brief Default name for default ecp */
   static constexpr std::string_view default_ecp_name = "default_ecp";
 
+  /// Static data type name for serialization and identification
+  static constexpr const char* DATA_TYPE_NAME = "basis_set";
+
+  /**
+   * @brief Get the data type name for this class
+   * @return DATA_TYPE_NAME
+   */
+  std::string get_data_type_name() const override { return DATA_TYPE_NAME; }
+
   /**
    * @brief Get supported basis set names
    * @return Vector of supported basis set names

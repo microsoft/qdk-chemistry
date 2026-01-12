@@ -384,6 +384,6 @@ Raises:
         return *Ansatz::from_json(nlohmann::json::parse(json_str));
       }));
 
-  // Data type name
-  ansatz.attr("_data_type_name") = "ansatz";
+  // Data type name class attribute
+  ansatz.attr("_data_type_name") = Ansatz::DATA_TYPE_NAME;
 }

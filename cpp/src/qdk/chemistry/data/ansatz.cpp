@@ -405,41 +405,37 @@ std::shared_ptr<Ansatz> Ansatz::from_file(const std::string& filename,
 
 void Ansatz::to_hdf5_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
-
-  // Validate filename
   if (filename.empty()) {
-    throw std::runtime_error("Filename cannot be empty");
+    throw std::invalid_argument("Filename cannot be empty");
   }
+  DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
   _to_hdf5_file(filename);
 }
 
 std::shared_ptr<Ansatz> Ansatz::from_hdf5_file(const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
-
-  // Validate filename
   if (filename.empty()) {
-    throw std::runtime_error("Filename cannot be empty");
+    throw std::invalid_argument("Filename cannot be empty");
   }
+  DataTypeFilename::validate_read_suffix(filename, DATA_TYPE_NAME);
   return _from_hdf5_file(filename);
 }
 
 void Ansatz::to_json_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
-
-  // Validate filename
   if (filename.empty()) {
-    throw std::runtime_error("Filename cannot be empty");
+    throw std::invalid_argument("Filename cannot be empty");
   }
+  DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
   _to_json_file(filename);
 }
 
 std::shared_ptr<Ansatz> Ansatz::from_json_file(const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
-
-  // Validate filename
   if (filename.empty()) {
-    throw std::runtime_error("Filename cannot be empty");
+    throw std::invalid_argument("Filename cannot be empty");
   }
+  DataTypeFilename::validate_read_suffix(filename, DATA_TYPE_NAME);
   return _from_json_file(filename);
 }
 

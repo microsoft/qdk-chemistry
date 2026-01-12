@@ -335,6 +335,15 @@ class Orbitals : public DataClass,
   virtual Eigen::MatrixXd calculate_ao_density_matrix_from_rdm(
       const Eigen::MatrixXd& rdm) const;
 
+  /// Static data type name for serialization and identification
+  static constexpr const char* DATA_TYPE_NAME = "orbitals";
+
+  /**
+   * @brief Get the data type name for this class
+   * @return DATA_TYPE_NAME
+   */
+  std::string get_data_type_name() const override { return DATA_TYPE_NAME; }
+
   /**
    * @brief Get summary string of orbital information
    * @return String describing the orbital data

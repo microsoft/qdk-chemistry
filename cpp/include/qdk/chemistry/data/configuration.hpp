@@ -175,6 +175,15 @@ class Configuration : public DataClass {
    */
   size_t get_orbital_capacity() const;
 
+  /// Static data type name for serialization and identification
+  static constexpr const char* DATA_TYPE_NAME = "configuration";
+
+  /**
+   * @brief Get the data type name for this class
+   * @return DATA_TYPE_NAME
+   */
+  std::string get_data_type_name() const override { return DATA_TYPE_NAME; }
+
   /**
    * @brief Check if a specific orbital has an alpha electron
    * @param orbital_idx The orbital index (0-indexed)

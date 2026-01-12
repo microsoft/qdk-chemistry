@@ -419,9 +419,12 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_file(const std::string& filename,
 
 void Hamiltonian::to_hdf5_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
   // Validate filename has correct data type suffix
   std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, "hamiltonian");
+      DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
 
   _to_hdf5_file(validated_filename);
 }
@@ -429,6 +432,9 @@ void Hamiltonian::to_hdf5_file(const std::string& filename) const {
 std::shared_ptr<Hamiltonian> Hamiltonian::from_hdf5_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "hamiltonian");
@@ -438,9 +444,12 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_hdf5_file(
 
 void Hamiltonian::to_json_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
   // Validate filename has correct data type suffix
   std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, "hamiltonian");
+      DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
 
   _to_json_file(validated_filename);
 }
@@ -448,6 +457,9 @@ void Hamiltonian::to_json_file(const std::string& filename) const {
 std::shared_ptr<Hamiltonian> Hamiltonian::from_json_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "hamiltonian");
@@ -458,9 +470,12 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_json_file(
 void Hamiltonian::to_fcidump_file(const std::string& filename, size_t nalpha,
                                   size_t nbeta) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
   // Validate filename has correct data type suffix
   std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, "hamiltonian");
+      DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
 
   _container->to_fcidump_file(validated_filename, nalpha, nbeta);
 }

@@ -218,6 +218,15 @@ class Structure : public DataClass,
    */
   double get_total_mass() const;
 
+  /// Static data type name for serialization and identification
+  static constexpr const char* DATA_TYPE_NAME = "structure";
+
+  /**
+   * @brief Get the data type name for this class
+   * @return DATA_TYPE_NAME
+   */
+  std::string get_data_type_name() const override { return DATA_TYPE_NAME; }
+
   /**
    * @brief Get summary string of structure information
    * @return String describing the structure

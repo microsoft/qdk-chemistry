@@ -2421,6 +2421,9 @@ Examples:
 )",
                       py::arg("filename"), py::arg("format_type"));
 
+  // Data type name class attribute
+  settings.attr("_data_type_name") = Settings::DATA_TYPE_NAME;
+
   // Bind ElectronicStructureSettings class
   py::class_<qdk::chemistry::algorithms::ElectronicStructureSettings, Settings,
              py::smart_holder>(data, "ElectronicStructureSettings", R"(
