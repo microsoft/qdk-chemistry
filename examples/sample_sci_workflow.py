@@ -112,7 +112,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     if not structure_path.is_file():
         raise FileNotFoundError(f"XYZ file {structure_path} not found.")
     structure = Structure.from_xyz_file(structure_path)
-    nuclear_repulsion = structure.calculate_nuclear_repulsion_energy()
     Logger.info(structure.get_summary())
 
     ########################################################################################
@@ -122,8 +121,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     e_scf, scf_wavefunction = scf_solver.run(
         structure, args.charge, args.spin, args.basis
     )
-    total_scf_energy = e_scf + nuclear_repulsion
-    Logger.info(f"SCF Energy: {total_scf_energy:.8f} Hartree")
+    Logger.info(f"SCF Energy: {e_scf:.8f} Hartree")
 
     ########################################################################################
     # 3. Select the valence active space (heuristic or user overrides).
@@ -156,7 +154,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     ########################################################################################
     hamiltonian_constructor = create("hamiltonian_constructor")
     active_hamiltonian = hamiltonian_constructor.run(active_orbitals)
-    core_energy = active_hamiltonian.get_core_energy()
     Logger.info(active_hamiltonian.get_summary())
 
     ########################################################################################
@@ -174,8 +171,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     e_cas, wfn_cas = casci_calculator.run(
         active_hamiltonian, *active_orbital_wavefunction.get_active_num_electrons()
     )
-    total_casci_energy = e_cas + core_energy
-    Logger.info(f"CASCI energy = {total_casci_energy:.8f} Hartree")
+    Logger.info(f"CASCI energy = {e_cas:.8f} Hartree")
 
     ########################################################################################
     # 6. Optional AutoCAS refinement of active space size.
@@ -199,10 +195,8 @@ def main(argv: Sequence[str] | None = None) -> None:
             e_cas, wfn_cas = casci_calculator.run(
                 active_hamiltonian, *refined_wfn.get_active_num_electrons()
             )
-            core_energy = active_hamiltonian.get_core_energy()
-            total_casci_energy = e_cas + core_energy
             Logger.info(active_hamiltonian.get_summary())
-            Logger.info(f"AutoCAS energy = {total_casci_energy:.8f} Hartree")
+            Logger.info(f"AutoCAS energy = {e_cas:.8f} Hartree")
 
     ########################################################################################
     # 7. Perform sparse-CI screening.
@@ -210,7 +204,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     sparse_ci_energy, sparse_ci_wavefunction = calculate_sparse_wavefunction(
         reference_wavefunction=wfn_cas,
         hamiltonian=active_hamiltonian,
-        reference_energy=total_casci_energy - core_energy,
+        reference_energy=e_cas,
         energy_tolerance=args.energy_tolerance,
         max_determinants=args.max_determinants,
     )
