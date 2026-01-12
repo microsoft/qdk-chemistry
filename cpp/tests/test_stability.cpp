@@ -681,6 +681,12 @@ TEST_F(StabilityCheckerTest, QDK_UHF_O2_PBE_Stable) {
   auto orbitals = wavefunction->get_orbitals();
   EXPECT_FALSE(orbitals->is_restricted());
 
+  std::cout << "orbital eigenvalues:" << std::endl;
+  const auto& [alpha_energies, beta_energies] = orbitals->get_energies();
+  std::cout << std::setprecision(10);
+  std::cout << "alpha: " << alpha_energies.transpose() << std::endl;
+  std::cout << "beta:  " << beta_energies.transpose() << std::endl;
+
   // Create stability checker for internal-only analysis
   auto stability_checker = StabilityCheckerFactory::create("qdk");
   stability_checker->settings().set("internal", true);

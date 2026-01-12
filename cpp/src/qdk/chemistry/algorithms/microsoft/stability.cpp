@@ -362,8 +362,9 @@ void initialize_eigenvector(const Eigen::VectorXd& eigen_diff,
     }
   }
   eigenvector.normalize();
-  eigenvector((n_alpha_electrons - 1) * num_virtual_alpha_orbitals) = 1.0;
-  if (unrestricted)
+  if (n_alpha_electrons > 0)
+    eigenvector((n_alpha_electrons - 1) * num_virtual_alpha_orbitals) = 1.0;
+  if (unrestricted && n_beta_electrons > 0)
     eigenvector((n_beta_electrons - 1) * num_virtual_beta_orbitals + nova) =
         1.0;
   eigenvector.normalize();
