@@ -381,9 +381,6 @@ void Ansatz::validate_orbital_consistency() const {
   }
 
   // Compare orbital coefficients numerically
-  // Use a tolerance for floating-point comparison (to handle serialization
-  // precision)
-  constexpr double coefficient_tolerance = 1e-12;
 
   const auto& [ham_coeffs_alpha, ham_coeffs_beta] =
       ham_orbitals.get_coefficients();
@@ -399,7 +396,7 @@ void Ansatz::validate_orbital_consistency() const {
   }
 
   double alpha_diff = (ham_coeffs_alpha - wf_coeffs_alpha).norm();
-  if (alpha_diff > coefficient_tolerance) {
+  if (alpha_diff > std::numeric_limits<double>::epsilon()) {
     throw std::runtime_error(
         "Orbital inconsistency: Hamiltonian and Wavefunction have different "
         "alpha orbital coefficients (norm difference: " +
@@ -415,7 +412,7 @@ void Ansatz::validate_orbital_consistency() const {
   }
 
   double beta_diff = (ham_coeffs_beta - wf_coeffs_beta).norm();
-  if (beta_diff > coefficient_tolerance) {
+  if (beta_diff > std::numeric_limits<double>::epsilon()) {
     throw std::runtime_error(
         "Orbital inconsistency: Hamiltonian and Wavefunction have different "
         "beta orbital coefficients (norm difference: " +
