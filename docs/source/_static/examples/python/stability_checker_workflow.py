@@ -76,11 +76,10 @@ while iteration < max_iterations:
         is_stable, result = stability_checker.run(wavefunction)
     except RuntimeError as e:
         if "Davidson Did Not Converge!" in str(e):
-            print(f"Davidson solver did not converge: {e}")
             print("Try increasing max_subspace or adjusting davidson_tolerance")
+            raise RuntimeError(f"Davidson solver did not converge: {str(e)}")
         else:
-            print(f"Stability check failed: {e}")
-        break
+            raise RuntimeError(f"Stability check failed: {str(e)}")
 
     if is_stable:
         print("\nConverged to stable wavefunction!")

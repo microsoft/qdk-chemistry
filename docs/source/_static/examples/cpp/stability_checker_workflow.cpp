@@ -90,15 +90,13 @@ int main() {
     } catch (const std::runtime_error& e) {
       std::string error_msg = e.what();
       if (error_msg.find("Davidson Did Not Converge!") != std::string::npos) {
-        std::cout << "Davidson solver did not converge: " << e.what()
-                  << std::endl;
         std::cout
             << "Try increasing max_subspace or adjusting davidson_tolerance"
             << std::endl;
+        throw std::runtime_error("Davidson Did Not Converge!");
       } else {
-        std::cout << "Stability check failed: " << e.what() << std::endl;
+        throw std::runtime_error("Stability check failed: " + error_msg);
       }
-      break;
     }
 
     if (is_stable) {
@@ -129,10 +127,9 @@ int main() {
                 << std::fixed << std::setprecision(6) << smallest_eigenvalue
                 << std::endl;
     } else {
-      std::cout << "Unexpected state: neither internal nor external "
-                   "instability detected"
-                << std::endl;
-      break;
+      throw std::runtime_error(
+          "Unexpected state: neither internal nor external instability "
+          "detected");
     }
 
     // Rotate orbitals along the instability direction
