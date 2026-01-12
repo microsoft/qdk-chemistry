@@ -56,10 +56,6 @@ void compute_trial_fock(const std::shared_ptr<qcs::ERI> eri,
   QDK_LOG_TRACE_ENTERING();
   const size_t num_atomic_orbitals = ground_density.cols();
   const bool unrestricted = (ground_density.rows() == 2 * num_atomic_orbitals);
-  if (rhf_external and unrestricted)
-    throw std::runtime_error(
-        "RHF external stability requested but unrestricted density matrix "
-        "provided");
 
   // Get hybrid coefficients (0,0,0 for HF)
   double alpha = 1.0, beta = 0.0, omega = 0.0;
@@ -333,6 +329,47 @@ class StabilityOperator {
 };
 
 /**
+ * @brief Construct an initial eigenvector for the Davidson heuristic. Uses the
+ * inverse of the orbital energy differences as a preconditioned guess and
+ * enforces single dominant components in each occupied block. Safeguards of
+ * 1e4/1e-4 avoid division by zero when the energy differences are extremely
+ * small.
+ *
+ * Note Davidson algorithm is highly sensitive to the choice of initial vector.
+ * The mix of two initialization here is to avoid Davidson unconverged.
+ *
+ * @param eigen_diff Flattened array of orbital energy differences.
+ * @param n_alpha_electrons Number of occupied alpha orbitals.
+ * @param n_beta_electrons Number of occupied beta orbitals.
+ * @param num_virtual_alpha_orbitals Number of virtual alpha orbitals.
+ * @param num_virtual_beta_orbitals Number of virtual beta orbitals.
+ * @param unrestricted True when the reference wavefunction is UHF.
+ * @param eigenvector [in, out] Output vector that stores the initialized guess.
+ */
+void initialize_eigenvector(const Eigen::VectorXd& eigen_diff,
+                            size_t n_alpha_electrons, size_t n_beta_electrons,
+                            size_t num_virtual_alpha_orbitals,
+                            size_t num_virtual_beta_orbitals, bool unrestricted,
+                            Eigen::VectorXd& eigenvector) {
+  QDK_LOG_TRACE_ENTERING();
+  int eigensize = eigenvector.size();
+  auto nova = num_virtual_alpha_orbitals * n_alpha_electrons;
+  double min_abs_eigen_diff = 1e-4;
+  eigenvector = Eigen::VectorXd::Constant(eigensize, 1.0 / min_abs_eigen_diff);
+  for (int i = 0; i < eigen_diff.size(); ++i) {
+    if (std::abs(eigen_diff(i)) > min_abs_eigen_diff) {
+      eigenvector(i) = 1.0 / eigen_diff(i);
+    }
+  }
+  eigenvector.normalize();
+  eigenvector((n_alpha_electrons - 1) * num_virtual_alpha_orbitals) = 1.0;
+  if (unrestricted)
+    eigenvector((n_beta_electrons - 1) * num_virtual_beta_orbitals + nova) =
+        1.0;
+  eigenvector.normalize();
+}
+
+/**
  * @brief Transpose eigenvector from column-major to row-major format in-place
  *
  * Converts eigenvector storage from (nvir x nocc) column-major to (nocc x nvir)
@@ -392,7 +429,7 @@ StabilityChecker::_run_impl(
         "checker. Please use pySCF instead.");
   }
 
-  if (check_external and unrestricted) {
+  if (check_external && unrestricted) {
     throw std::invalid_argument(
         "External stability analysis (RHF -> UHF) is not supported for UHF "
         "wavefunctions.");
@@ -479,24 +516,11 @@ StabilityChecker::_run_impl(
     }
   }
 
-  // Construct Initial Eigenvector by using the inverse of energy differences
-  // Note Davidson algorithm is highly sensitive to the choice of initial
-  // vector. The mix of two initialization here is to avoid Davidson unconverged
-  // Note 1e4 and 1e-4 here is just to avoid division by zero.
-  double min_abs_eigen_diff = 1e-4;
-  Eigen::VectorXd eigenvector =
-      Eigen::VectorXd::Constant(eigensize, 1.0 / min_abs_eigen_diff);
-  for (int i = 0; i < eigen_diff.size(); ++i) {
-    if (std::abs(eigen_diff(i)) > min_abs_eigen_diff) {
-      eigenvector(i) = 1.0 / eigen_diff(i);
-    }
-  }
-  eigenvector.normalize();
-  eigenvector((n_alpha_electrons - 1) * num_virtual_alpha_orbitals) = 1.0;
-  if (unrestricted)
-    eigenvector((n_beta_electrons - 1) * num_virtual_beta_orbitals + nova) =
-        1.0;
-  eigenvector.normalize();
+  Eigen::VectorXd eigenvector = Eigen::VectorXd::Zero(eigensize);
+  detail::initialize_eigenvector(eigen_diff, n_alpha_electrons,
+                                 n_beta_electrons, num_virtual_alpha_orbitals,
+                                 num_virtual_beta_orbitals, unrestricted,
+                                 eigenvector);
 
   const int64_t max_subspace =
       std::min(davidson_max_subspace, static_cast<int64_t>(eigensize));

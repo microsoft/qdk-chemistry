@@ -208,6 +208,7 @@ The PySCF plugin provides access to stability analysis through the `PySCF <https
 - Support for both Hartree-Fock and :term:`DFT` wavefunctions
 - Point group symmetry considerations in stability analysis
 - Configurable Davidson solver parameters and PySCF verbosity
+- Note: ROHF wavefunctions are not supported by the QDK backend for now
 
 .. rubric:: Settings
 
