@@ -26,6 +26,10 @@ Due to the relaxation of the orbitals, :term:`MCSCF` can capture both static and
 Running an :term:`MCSCF` calculation
 ------------------------------------
 
+.. note::
+   This algorithm is currently available only in the Python API.
+
+
 This section demonstrates how to create, configure, and run an :term:`MCSCF` calculation.
 The ``run`` method takes initial :doc:`Orbitals <../data/orbitals>`, a :doc:`HamiltonianConstructor <hamiltonian_constructor>`,
 a :doc:`MultiConfigurationCalculator <mc_calculator>`, and the number of electrons as input and returns an optimized :class:`~qdk_chemistry.data.Wavefunction` object along with its associated energy.
@@ -86,25 +90,8 @@ See `Available implementations`_ below for implementation-specific options.
 Available settings
 ------------------
 
-The :class:`~qdk_chemistry.algorithms.MultiConfigurationScf` accepts a range of settings to control its behavior.
-All implementations share a common base set of settings from ``MultiConfigurationScfSettings``:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 15 15 45
-
-   * - Setting
-     - Type
-     - Default
-     - Description
-   * - ``max_cycle_macro``
-     - int
-     - ``50``
-     - Maximum number of :term:`MCSCF` macro iterations (orbital optimization cycles)
-   * - ``verbose``
-     - int
-     - ``0``
-     - Verbosity level for output (0 = minimal, higher = more detailed)
+.. note::
+   Because only one implementation of the algorithm is currently available through the PySCF plugin, no implementation-specific settings are shown here.
 
 See :doc:`Settings <settings>` for a more general treatment of settings in QDK/Chemistry.
 
@@ -133,7 +120,6 @@ PySCF
 **Factory name:** ``"pyscf"`` (default)
 
 The current :class:`~qdk_chemistry.algorithms.MultiConfigurationScf` implementation in QDK/Chemistry uses PySCF's :term:`CASSCF` framework.
-The implementation wraps a QDK :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` to serve as the :term:`FCI` solver within PySCF's :term:`MCSCF` procedure.
 
 Key features of the PySCF implementation:
 
@@ -148,7 +134,18 @@ Key features of the PySCF implementation:
 
 .. rubric:: Settings
 
-This implementation uses only the common settings described above.
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
+
+   * - Setting
+     - Type
+     - Default
+     - Description
+   * - ``max_cycle_macro``
+     - int
+     - ``50``
+     - Maximum number of :term:`MCSCF` macro iterations (orbital optimization cycles)
 
 Related classes
 ---------------
