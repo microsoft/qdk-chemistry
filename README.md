@@ -52,6 +52,10 @@ There are many ways in which you can participate in this project, for example:
 If you are interested in fixing issues and contributing directly to the code base,
 please see the document [How to Contribute](https://github.com/microsoft/qdk-chemistry/blob/main/CONTRIBUTING.md).
 
+## Support
+
+For help and questions about using this project, please see [SUPPORT](./SUPPORT.md).
+
 ## Code of Conduct
 
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
