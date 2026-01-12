@@ -92,7 +92,8 @@ jobs:
           gcovr \
           nlohmann-json \
           bison \
-          flex
+          flex \
+          googletest
 
     - name: Build doxygen from source on macOS
       if: matrix.os-name == 'macOS'
