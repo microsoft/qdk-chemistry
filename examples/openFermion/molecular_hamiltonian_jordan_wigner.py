@@ -86,8 +86,8 @@ two_body_aaaa, two_body_aabb, two_body_bbbb = (
 
 two_body_tensor = two_body_aaaa.reshape((norb,) * 4)
 
-# Convert to OpenFermion physicist's notation <pr|sq>. Note that the last two indices may be switched from what you 
-# expect from other physicist's notation. OpenFermion takes the integral notation below to be consistent with the order 
+# Convert to OpenFermion physicist's notation <pr|sq>. Note that the last two indices may be switched from what you
+# expect from other physicist's notation. OpenFermion takes the integral notation below to be consistent with the order
 # of operators.
 # ĝ = ½ Σ (pq|rs) p† r† s q = ½ Σ ⟨pr|sq⟩ p† r† s q
 two_body_phys = np.transpose(two_body_tensor, (0, 2, 3, 1))
