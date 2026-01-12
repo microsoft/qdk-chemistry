@@ -3,8 +3,6 @@
 // license information.
 
 // Projected Multi-Configuration Calculator usage examples.
-// --------------------------------------------------------------------------------------------
-// start-cell-create
 #include <iostream>
 #include <qdk/chemistry.hpp>
 #include <string>
@@ -12,6 +10,8 @@ using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 
 int main() {
+  // --------------------------------------------------------------------------------------------
+  // start-cell-create
   // Create a MACIS PMC calculator instance
   auto pmc_calculator =
       ProjectedMultiConfigurationCalculatorFactory::create("macis_pmc");

@@ -9,7 +9,12 @@ Overview
 --------
 
 The :class:`~qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator` algorithm projects the Hamiltonian onto a user-specified space of configurations (Slater determinants) and solves the resulting eigenvalue problem to obtain the ground state energy and wavefunction.
-This contrasts with :doc:`MultiConfigurationCalculator <mc_calculator>`, where the solver adaptively determines which configurations to include.
+This contrasts with :doc:`MultiConfigurationCalculator <mc_calculator>`, where the solver determines which configurations to include.
+
+.. note::
+   In contrast to the :doc:`MultiConfigurationCalculator <mc_calculator>`, where the spin and number of particles are explicitly defined via the number of alpha and beta particles,
+   the :class:`~qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator` derives these symmetry properties from the provided configurations.
+   Hence, all configurations must share the same number of alpha and beta electrons.
 
 Using the ProjectedMultiConfigurationCalculator
 -----------------------------------------------
@@ -26,7 +31,7 @@ Hamiltonian
    A :doc:`Hamiltonian <../data/hamiltonian>` instance that defines the electronic structure problem.
 
 Configurations
-   A list/vector of :class:`~qdk_chemistry.data.Configuration` objects specifying the determinants to include in the calculation. Each configuration defines the occupation of orbitals in the active space.
+   A collection of :class:`~qdk_chemistry.data.Configuration` objects specifying the determinants to include in the calculation. Each configuration defines the occupation of orbitals in the active space.
 
 
 .. rubric:: Creating a PMC calculator
