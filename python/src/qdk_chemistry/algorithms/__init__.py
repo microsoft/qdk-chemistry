@@ -156,6 +156,7 @@ def __dir__() -> list[str]:
 
 
 if TELEMETRY_ENABLED:
+
     def apply_telemetry_to_classes():
         """Apply telemetry tracking to the 'run' methods of all algorithm classes."""
         with contextlib.suppress(NameError):
@@ -163,7 +164,7 @@ if TELEMETRY_ENABLED:
                 cls = globals().get(name)
                 if isinstance(cls, type) and hasattr(cls, "run"):
                     cls.run = telemetry_tracker()(cls.run)
-                    
+
     apply_telemetry_to_classes()
     # Delete the function to avoid namespace pollution
     del apply_telemetry_to_classes
