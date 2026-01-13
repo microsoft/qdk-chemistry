@@ -12,7 +12,6 @@
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 
-#include "../src/qdk/chemistry/algorithms/microsoft/cholesky.hpp"
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::data;
@@ -23,36 +22,6 @@ class CholeskyTest : public ::testing::Test {
   void SetUp() override {}
   void TearDown() override {}
 };
-
-// TEST_F(CholeskyTest, CompareCholeskyWithEigenCholesky) {
-//   // Test the pivoted Cholesky decomposition against Eigen's standard
-//   Cholesky const int n = 100; Eigen::MatrixXd A = Eigen::MatrixXd::Random(n,
-//   n); Eigen::MatrixXd M = A * A.transpose();
-
-//   // Perform pivoted Cholesky with tight tolerance
-//   double tolerance = testing::integral_tolerance;
-//   Eigen::MatrixXd L = microsoft::pivoted_cholesky_decomposition(M,
-//   tolerance); Eigen::MatrixXd M_approx = L * L.transpose();
-
-//   // Compare with original
-//   double max_error = (M - M_approx).cwiseAbs().maxCoeff();
-//   EXPECT_LT(max_error, testing::numerical_zero_tolerance)
-//       << "Cholesky reconstruction error too large";
-
-//   // Verify against Eigen
-//   Eigen::LLT<Eigen::MatrixXd> llt(M);
-//   EXPECT_EQ(llt.info(), Eigen::Success) << "Eigen's Cholesky failed";
-//   Eigen::MatrixXd L_eigen = llt.matrixL();
-//   Eigen::MatrixXd M_eigen = L_eigen * L_eigen.transpose();
-
-//   // Both should reconstruct M equally well
-//   double eigen_error = (M - M_eigen).cwiseAbs().maxCoeff();
-//   EXPECT_LT(eigen_error, testing::numerical_zero_tolerance);
-
-//   // Errors should be comparable
-//   EXPECT_LT(abs(max_error - eigen_error), testing::numerical_zero_tolerance)
-//       << "Pivoted Cholesky error different than standard Cholesky";
-// }
 
 TEST_F(CholeskyTest, N2_Restricted_Comparison) {
   // 1. Setup N2
