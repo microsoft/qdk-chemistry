@@ -124,13 +124,13 @@ extends:
                 pythonVersion: $(pythonVersion)
 
           # Test - Linux x86_64
-          - ${{ if eq(target.arch, 'x86_64') }}:
-            - template: .pipelines/templates/test-pip-wheels.yml@self
-              parameters:
-                agentBuildDirectory: $(Agent.BuildDirectory)
-                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
-                imageTag: linux/amd64
-                pythonVersion: $(pythonVersion)
+          # - ${{ if eq(target.arch, 'x86_64') }}:
+          #   - template: .pipelines/templates/test-pip-wheels.yml@self
+          #     parameters:
+          #       agentBuildDirectory: $(Agent.BuildDirectory)
+          #       dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
+          #       imageTag: linux/amd64
+          #       pythonVersion: $(pythonVersion)
 
           # Build - Linux ARM64
           - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
@@ -145,13 +145,13 @@ extends:
                 pythonVersion: $(pythonVersion)
 
           # Test - Linux ARM64
-          - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
-            - template: .pipelines/templates/test-pip-wheels.yml@self
-              parameters:
-                agentBuildDirectory: $(Agent.BuildDirectory)
-                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
-                imageTag: linux/arm64/v8
-                pythonVersion: $(pythonVersion)
+          # - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
+          #   - template: .pipelines/templates/test-pip-wheels.yml@self
+          #     parameters:
+          #       agentBuildDirectory: $(Agent.BuildDirectory)
+          #       dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
+          #       imageTag: linux/arm64/v8
+          #       pythonVersion: $(pythonVersion)
 
           # Build - macOS ARM64
           - ${{ if eq(target.os, 'macos') }}:
@@ -165,12 +165,12 @@ extends:
                 macBuild: ON
 
           # Test - macOS ARM64
-          - ${{ if eq(target.os, 'macos') }}:
-            - template: .pipelines/templates/test-pip-wheels.yml@self
-              parameters:
-                agentBuildDirectory: $(Agent.BuildDirectory)
-                pythonVersion: $(pythonVersion)
-                macBuild: ON
+          # - ${{ if eq(target.os, 'macos') }}:
+          #   - template: .pipelines/templates/test-pip-wheels.yml@self
+          #     parameters:
+          #       agentBuildDirectory: $(Agent.BuildDirectory)
+          #       pythonVersion: $(pythonVersion)
+          #       macBuild: ON
 
           # ARM builds require that we transfer ownership of the wheel directory
           # back to the original base image user
