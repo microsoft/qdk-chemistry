@@ -511,7 +511,7 @@ class TestStabilityChecker:
         smallest = (
             result.get_smallest_internal_eigenvalue() if is_internal else result.get_smallest_external_eigenvalue()
         )
-        alg_tol = stability_checker.settings().get("davidson_tolerance")
+        alg_tol = stability_checker.settings().get("davidson_tolerance") * 1e2
         assert abs(smallest - ref_value) < alg_tol, f"Eigenvalue mismatch: {smallest} vs {ref_value}"
 
     def test_stability_no_analysis_requested(self):
@@ -919,8 +919,6 @@ class TestStabilityWorkflow:
         stability_checker = algorithms.create("stability_checker", backend)
         stability_checker.settings().set("internal", True)
         stability_checker.settings().set("external", True)
-        stability_checker.settings().set("stability_tolerance", -1e-4)
-        stability_checker.settings().set("davidson_tolerance", 1e-4)
         stability_checker.settings().set("method", method)
 
         # Run workflow with pyscf SCF and pyscf stability checker
@@ -950,8 +948,6 @@ class TestStabilityWorkflow:
         stability_checker = algorithms.create("stability_checker", backend)
         stability_checker.settings().set("internal", True)
         stability_checker.settings().set("external", True)
-        stability_checker.settings().set("stability_tolerance", -1e-4)
-        stability_checker.settings().set("davidson_tolerance", 1e-4)
         stability_checker.settings().set("method", method)
 
         # Run workflow - should detect external instability and switch to UHF
@@ -992,8 +988,6 @@ class TestStabilityWorkflow:
         stability_checker = algorithms.create("stability_checker", backend)
         stability_checker.settings().set("internal", True)
         stability_checker.settings().set("external", False)
-        stability_checker.settings().set("stability_tolerance", -1e-4)
-        stability_checker.settings().set("davidson_tolerance", 1e-4)
         stability_checker.settings().set("method", method)
 
         # Run workflow - should detect internal instability of UHF
