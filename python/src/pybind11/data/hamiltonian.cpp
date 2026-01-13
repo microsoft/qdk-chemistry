@@ -238,9 +238,9 @@ Returns:
   // ============================================================================
   // CholeskyHamiltonianContainer - Concrete implementation
   // ============================================================================
-    py::class_<CholeskyHamiltonianContainer, HamiltonianContainer,
-                 py::smart_holder>
-        cholesky_container(data, "CholeskyHamiltonianContainer", R"(
+  py::class_<CholeskyHamiltonianContainer, HamiltonianContainer,
+             py::smart_holder>
+      cholesky_container(data, "CholeskyHamiltonianContainer", R"(
 Represents a molecular Hamiltonian using Cholesky-decomposed two-electron integrals.
 This class stores molecular Hamiltonian data for quantum chemistry calculations,
 specifically designed for active space methods. It contains:
@@ -344,10 +344,9 @@ Examples:
       py::arg("type") = HamiltonianType::Hermitian);
 
   // Two-body integral access
-  bind_getter_as_property(
-      cholesky_container, "get_two_body_integrals",
-      &CholeskyHamiltonianContainer::get_two_body_integrals,
-      R"(
+  bind_getter_as_property(cholesky_container, "get_two_body_integrals",
+                          &CholeskyHamiltonianContainer::get_two_body_integrals,
+                          R"(
 Get two-electron integrals in molecular orbital basis.
 
 Returns:
@@ -358,12 +357,11 @@ Notes:
     Integrals are stored as flattened vectors in chemist notation <ij|kl>
     where indices are ordered as i + j*norb + k*norb^2 + l*norb^3
 )",
-      py::return_value_policy::reference_internal);
+                          py::return_value_policy::reference_internal);
 
-  cholesky_container.def(
-      "get_two_body_element",
-      &CholeskyHamiltonianContainer::get_two_body_element,
-      R"(
+  cholesky_container.def("get_two_body_element",
+                         &CholeskyHamiltonianContainer::get_two_body_element,
+                         R"(
 Get specific two-electron integral element <ij|kl>.
 
 Args:
@@ -373,30 +371,28 @@ Args:
 Returns:
     float: Value of the two-electron integral <ij|kl>
 )",
-      py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
-      py::arg("channel") = SpinChannel::aaaa);
+                         py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
+                         py::arg("channel") = SpinChannel::aaaa);
 
-  cholesky_container.def(
-      "has_two_body_integrals",
-      &CholeskyHamiltonianContainer::has_two_body_integrals,
-      R"(
+  cholesky_container.def("has_two_body_integrals",
+                         &CholeskyHamiltonianContainer::has_two_body_integrals,
+                         R"(
 Check if two-body integrals are available.
 
 Returns:
     bool: True if two-body integrals have been set
 )");
 
-  cholesky_container.def(
-      "is_restricted", &CholeskyHamiltonianContainer::is_restricted,
-      R"(
+  cholesky_container.def("is_restricted",
+                         &CholeskyHamiltonianContainer::is_restricted,
+                         R"(
 Check if Hamiltonian is restricted (alpha == beta).
 
 Returns:
     bool: True if alpha and beta integrals are identical
 )");
 
-  cholesky_container.def("is_valid",
-                         &CholeskyHamiltonianContainer::is_valid,
+  cholesky_container.def("is_valid", &CholeskyHamiltonianContainer::is_valid,
                          R"(
 Check if the Hamiltonian data is complete and consistent.
 
@@ -417,8 +413,7 @@ Returns:
 )");
 
   cholesky_container.def(
-      "to_fcidump_file",
-      &CholeskyHamiltonianContainer::to_fcidump_file,
+      "to_fcidump_file", &CholeskyHamiltonianContainer::to_fcidump_file,
       R"(
 Save Hamiltonian to FCIDUMP file.
 
@@ -428,7 +423,6 @@ Args:
     nbeta (int): Number of beta electrons
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
-
 
   // ============================================================================
   // CanonicalFourCenterHamiltonianContainer - Concrete implementation

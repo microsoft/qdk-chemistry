@@ -3,7 +3,6 @@
 // license information.
 
 #include "qdk/chemistry/algorithms/microsoft/hamiltonian.hpp"
-#include "qdk/chemistry/algorithms/microsoft/cholesky_hamiltonian.hpp"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -11,6 +10,7 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/cholesky_hamiltonian.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -206,9 +206,8 @@ Initializes a Hamiltonian constructor with default settings.
 )");
 
   // Bind concrete microsoft::CholeskyHamiltonianConstructor implementation
-  py::class_<microsoft::CholeskyHamiltonianConstructor,
-             HamiltonianConstructor, py::smart_holder>(
-      m, "QdkCholeskyHamiltonianConstructor", R"(
+  py::class_<microsoft::CholeskyHamiltonianConstructor, HamiltonianConstructor,
+             py::smart_holder>(m, "QdkCholeskyHamiltonianConstructor", R"(
 QDK implementation of the Cholesky Hamiltonian constructor.
 
 This class provides a concrete implementation of the Hamiltonian constructor
@@ -243,5 +242,5 @@ Default constructor.
 
 Initializes a Cholesky Hamiltonian constructor with default settings.
 
-)") ;
+)");
 }

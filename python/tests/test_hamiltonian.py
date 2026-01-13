@@ -612,9 +612,7 @@ class TestCholeskyHamiltonian:
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
 
-        h = Hamiltonian(
-            CholeskyHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([]), cholesky_vecs)
-        )
+        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([]), cholesky_vecs))
         assert isinstance(h, Hamiltonian)
         assert h.has_one_body_integrals()
         assert h.has_two_body_integrals()
@@ -973,9 +971,7 @@ class TestCholeskyHamiltonian:
         cholesky_vecs = rng.random((9, 15))
         inactive_fock = rng.random((3, 3))
 
-        h = Hamiltonian(
-            CholeskyHamiltonianContainer(one_body, two_body, orbitals, 1.0, inactive_fock, cholesky_vecs)
-        )
+        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, two_body, orbitals, 1.0, inactive_fock, cholesky_vecs))
 
         # Verify Hamiltonian properties
         assert h.is_restricted()
