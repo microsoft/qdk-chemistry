@@ -74,14 +74,12 @@ Logger.info(f"  SCF total energy:   {scf_energy: .8f} Hartree")
 ########################################################################################
 
 # For restricted Hartree-Fock, the alpha and beta blocks are equal.
-one_body_aa, one_body_bb = active_hamiltonian.get_one_body_integrals()
+one_body_aa, _ = active_hamiltonian.get_one_body_integrals()
 
 norb = one_body_aa.shape[0]  # Number of spatial orbitals
 
 # Obtain a rank-4 tensor in chemist's notation (pq|rs) from QDK
-two_body_aaaa, two_body_aabb, two_body_bbbb = (
-    active_hamiltonian.get_two_body_integrals()
-)
+two_body_aaaa, _, _ = active_hamiltonian.get_two_body_integrals()
 
 two_body_tensor = two_body_aaaa.reshape((norb,) * 4)
 
@@ -92,8 +90,6 @@ two_body_tensor = two_body_aaaa.reshape((norb,) * 4)
 two_body_phys = np.transpose(two_body_tensor, (0, 2, 3, 1))
 
 # Note: the spinorb_from_spatial function from OpenFermion works for restricted Hamiltonians only
-# If unrestricted Hamiltonians are needed, write a custom function and pay special attention to the ordering of the
-# two-electron integrals, especially in the mix-spin scenarios.
 one_body = one_body_aa
 two_body = two_body_phys
 one_body_spinorb, two_body_spinorb = of.chem.molecular_data.spinorb_from_spatial(
