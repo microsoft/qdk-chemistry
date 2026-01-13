@@ -21,14 +21,25 @@ permissions:
 
 jobs:
   coverage:
-    name: Build, Test, and Coverage Analysis
-    runs-on: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
+    name: ${{ matrix.os-name }} Build, Test, and Coverage Analysis
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+        - os-name: Linux
+          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
+          build-parallel: 120
+          uarch: x86-64-v3
+        - os-name: macOS
+          runner: macos-26-xlarge
+          build-parallel: 5
+          uarch: native
     env:
       BUILD_DIR: cpp/build
-      CMAKE_BUILD_PARALLEL_LEVEL: 120
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
-      QDK_UARCH: x86-64-v3
       CTEST_OUTPUT_ON_FAILURE: 1
+      CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
+      QDK_UARCH: ${{ matrix.uarch }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -47,7 +58,8 @@ jobs:
         python-version: '3.13'
         cache: pip
 
-    - name: Install system packages
+    - name: Install Linux system packages
+      if: matrix.os-name == 'Linux'
       run: |
         sudo apt-get update
         sudo apt-get install -y \
@@ -65,7 +77,43 @@ jobs:
           graphviz \
           gcovr
 
+    - name: Install macOS system packages
+      if: matrix.os-name == 'macOS'
+      run: |
+        brew update
+        brew upgrade
+        arch -arm64 brew install \
+          cmake \
+          ninja \
+          eigen \
+          boost \
+          hdf5 \
+          graphviz \
+          gcovr \
+          nlohmann-json \
+          bison \
+          flex \
+          googletest
+
+    - name: Build doxygen from source on macOS
+      if: matrix.os-name == 'macOS'
+      run: |
+        # Clone repo for working Doxygen version
+        git clone https://github.com/doxygen/doxygen.git
+        cd doxygen
+
+        # Checkout working release
+        git checkout Release_1_9_8
+        mkdir build && cd build
+
+        cmake -DBISON_EXECUTABLE=/opt/homebrew/Cellar/bison/3.8.2/bin/bison \
+        -DCMAKE_CXX_FLAGS="-Wno-missing-template-arg-list-after-template-kw $CMAKE_CXX_FLAGS" \
+        -G "Unix Makefiles" ..
+        make -j$(sysctl -n hw.ncpu)
+        make install
+
     - name: Install C++ dependencies
+      if: matrix.os-name == 'Linux'
       env:
         INSTALL_PREFIX: ${{ github.workspace }}/install
         BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
@@ -90,13 +138,23 @@ jobs:
     - name: Build C++ Release library
       run: cmake --build "$BUILD_DIR"
 
-    - name: Run C++ tests in Release mode
+    - name: Run C++ tests in Release mode (Linux)
+      if: matrix.os-name == 'Linux'
       env:
         OMP_NUM_THREADS: 16
       run: |
         cd "$BUILD_DIR"
         echo "=== Running C++ Tests in Release Mode ==="
         ctest --output-on-failure --verbose --timeout 300
+
+    - name: Run C++ tests in Release mode (macOS)
+      if: matrix.os-name == 'macOS'
+      env:
+        OMP_NUM_THREADS: 1
+      run: |
+        cd "$BUILD_DIR"
+        echo "=== Running C++ Tests in Release Mode ==="
+        ctest --output-on-failure --verbose -E "AtomInitGuessEnergyConvergence" --timeout 300
 
     - name: Clean build directory for RelWithDebInfo/Coverage build
       run: rm -rf "$BUILD_DIR"
@@ -122,7 +180,12 @@ jobs:
 
         echo "=== Running C++ Tests in Debug Mode with Coverage ==="
         set +e
-        ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
+        if [ "$QDK_UARCH" == "native" ]; then # Exclude particular test on macOS builds
+          ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
+        else
+          ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
+        fi
+
         CTEST_EXIT_CODE=$?
         set -e
 
@@ -144,7 +207,9 @@ jobs:
           --exclude '.*/external/.*' \
           --html-details ${{ github.workspace }}/coverage-reports/cpp_coverage.html \
           --xml ${{ github.workspace }}/coverage-reports/cpp_coverage.xml \
-          --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
+          --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt \
+          --merge-mode-functions=separate \
+          --gcov-ignore-parse-errors
 
         echo "C++ Coverage Summary:"
         cat ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
