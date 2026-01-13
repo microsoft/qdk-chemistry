@@ -656,7 +656,7 @@ class ERI {
   }
 
   std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
-                                                  size_t* num_vectors) {
+                                                 size_t* num_vectors) {
     QDK_LOG_TRACE_ENTERING();
 
     std::cout << "Threshold: " << threshold << std::endl;
@@ -726,12 +726,11 @@ class ERI {
       auto& engine = engines_coulomb[thread_id];
       const auto& buf = engine.results();
 
-      for (size_t s1 = 0, s12=0; s1 < num_shells; ++s1) {
+      for (size_t s1 = 0, s12 = 0; s1 < num_shells; ++s1) {
         const auto n1 = obs_[s1].size();
         for (size_t s2 = 0; s2 <= s1; ++s2) {
-
           // Assign to threads
-          if((s12++) % nthreads != thread_id) continue;
+          if ((s12++) % nthreads != thread_id) continue;
 
           const auto n2 = obs_[s2].size();
           const size_t sp_index = shell_pair_index(s1, s2);
@@ -743,8 +742,9 @@ class ERI {
           }
 
           // compute diagonal block (s1,s2|s1,s2)
-          engine.compute2<::libint2::Operator::coulomb, ::libint2::BraKet::xx_xx,
-                          0>(obs_[s1], obs_[s2], obs_[s1], obs_[s2]);
+          engine.compute2<::libint2::Operator::coulomb,
+                          ::libint2::BraKet::xx_xx, 0>(obs_[s1], obs_[s2],
+                                                       obs_[s1], obs_[s2]);
           const auto& res = buf[0];
           if (res == nullptr) {
             continue;
@@ -760,7 +760,7 @@ class ERI {
 #endif
         }  // s2
       }  // s1
-    } // omp parallel
+    }  // omp parallel
 
     // Merge thread-local active lists
 #ifdef _OPENMP
@@ -777,7 +777,7 @@ class ERI {
       size_t q_shell_pair_max;
       double D_max = 0.0;
       size_t s1_max, s2_max;
-      for(const auto sp_index : active_shell_pairs) {
+      for (const auto sp_index : active_shell_pairs) {
         const auto [s1, s2] = sp_index_to_shells[sp_index];
         // get block max
         const double block_max = D_shell_pair[sp_index].maxCoeff();
@@ -802,8 +802,7 @@ class ERI {
 #ifdef _OPENMP
       std::vector<Eigen::MatrixXd> eri_col_threads(nthreads);
       for (int t = 0; t < nthreads; ++t) {
-        eri_col_threads[t] =
-            Eigen::MatrixXd::Zero(num_aos2, n1_max * n2_max);
+        eri_col_threads[t] = Eigen::MatrixXd::Zero(num_aos2, n1_max * n2_max);
       }
 #pragma omp parallel
 #endif
@@ -821,7 +820,6 @@ class ERI {
           const size_t n3 = obs_[s3].size();
           const size_t bf3_st = shell2bf_[s3];
           for (size_t s4 = 0; s4 < num_shells; ++s4) {
-
             // Assign to threads
             if ((s34++) % nthreads != thread_id) continue;
 
@@ -873,17 +871,19 @@ class ERI {
       const size_t bf1_max_st = shell2bf_[s1_max];
       const size_t bf2_max_st = shell2bf_[s2_max];
       std::vector<size_t> shell_pairs_to_lookup(n1_max * n2_max);
-      for(size_t i = 0; i < n1_max; ++i) {
-        for(size_t j = 0; j < n2_max; ++j) {
+      for (size_t i = 0; i < n1_max; ++i) {
+        for (size_t j = 0; j < n2_max; ++j) {
           const size_t local_index = i * n2_max + j;
-          shell_pairs_to_lookup[local_index] = (bf1_max_st + i) * num_aos + (bf2_max_st + j);
+          shell_pairs_to_lookup[local_index] =
+              (bf1_max_st + i) * num_aos + (bf2_max_st + j);
         }
       }
 
       // correct for cholesky contributions
       if (current_col > 0) {
         // Eigen map to existing L vectors
-        Eigen::Map<const Eigen::MatrixXd> L_map(L_data.data(), num_aos2, current_col);
+        Eigen::Map<const Eigen::MatrixXd> L_map(L_data.data(), num_aos2,
+                                                current_col);
 
         // subtract previous contributions
         Eigen::MatrixXd L_rows(eri_col.cols(), current_col);
@@ -910,7 +910,8 @@ class ERI {
           Eigen::VectorXd L_col_vec = Q_max * eri_col.col(local_index);
 
           // append to L_data
-          L_data.insert(L_data.end(), L_col_vec.data(), L_col_vec.data() + num_aos2);
+          L_data.insert(L_data.end(), L_col_vec.data(),
+                        L_col_vec.data() + num_aos2);
 
           // reference to current column
           const double* L_col = L_data.data() + current_col * num_aos2;
@@ -928,7 +929,7 @@ class ERI {
 
           // Update diagonal elements
           std::vector<size_t> shell_pairs_to_remove;
-          for(const auto sp_index : active_shell_pairs) {
+          for (const auto sp_index : active_shell_pairs) {
             const auto [s1, s2] = sp_index_to_shells[sp_index];
             const auto n1 = obs_[s1].size();
             const auto n2 = obs_[s2].size();
@@ -940,7 +941,8 @@ class ERI {
               for (size_t j = 0; j < n2; ++j) {
                 const size_t idx = i * n2 + j;
                 const size_t global_idx = bf1_st_i + (bf2_st + j);
-                D_shell_pair[sp_index](idx) -= L_col[global_idx] * L_col[global_idx];
+                D_shell_pair[sp_index](idx) -=
+                    L_col[global_idx] * L_col[global_idx];
               }
             }
             // remove if below threshold

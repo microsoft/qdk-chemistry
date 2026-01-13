@@ -18,19 +18,17 @@
 
 namespace qdk::chemistry::data {
 
-CholeskyHamiltonianContainer::
-    CholeskyHamiltonianContainer(
-        const Eigen::MatrixXd& one_body_integrals,
-        const Eigen::VectorXd& two_body_integrals,
-        std::shared_ptr<Orbitals> orbitals, double core_energy,
-        const Eigen::MatrixXd& inactive_fock_matrix,
-        const Eigen::MatrixXd& L_ao,
-        HamiltonianType type)
+CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
+    const Eigen::MatrixXd& one_body_integrals,
+    const Eigen::VectorXd& two_body_integrals,
+    std::shared_ptr<Orbitals> orbitals, double core_energy,
+    const Eigen::MatrixXd& inactive_fock_matrix, const Eigen::MatrixXd& L_ao,
+    HamiltonianType type)
     : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
                            inactive_fock_matrix, type),
       _two_body_integrals(
           make_restricted_two_body_integrals(two_body_integrals)),
-          _ao_cholesky_vectors(std::make_shared<Eigen::MatrixXd>(L_ao)) {
+      _ao_cholesky_vectors(std::make_shared<Eigen::MatrixXd>(L_ao)) {
   QDK_LOG_TRACE_ENTERING();
 
   validate_integral_dimensions();
@@ -43,18 +41,16 @@ CholeskyHamiltonianContainer::
   }
 }
 
-CholeskyHamiltonianContainer::
-    CholeskyHamiltonianContainer(
-        const Eigen::MatrixXd& one_body_integrals_alpha,
-        const Eigen::MatrixXd& one_body_integrals_beta,
-        const Eigen::VectorXd& two_body_integrals_aaaa,
-        const Eigen::VectorXd& two_body_integrals_aabb,
-        const Eigen::VectorXd& two_body_integrals_bbbb,
-        std::shared_ptr<Orbitals> orbitals, double core_energy,
-        const Eigen::MatrixXd& inactive_fock_matrix_alpha,
-        const Eigen::MatrixXd& inactive_fock_matrix_beta,
-        const Eigen::MatrixXd& L_ao,
-        HamiltonianType type)
+CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
+    const Eigen::MatrixXd& one_body_integrals_alpha,
+    const Eigen::MatrixXd& one_body_integrals_beta,
+    const Eigen::VectorXd& two_body_integrals_aaaa,
+    const Eigen::VectorXd& two_body_integrals_aabb,
+    const Eigen::VectorXd& two_body_integrals_bbbb,
+    std::shared_ptr<Orbitals> orbitals, double core_energy,
+    const Eigen::MatrixXd& inactive_fock_matrix_alpha,
+    const Eigen::MatrixXd& inactive_fock_matrix_beta,
+    const Eigen::MatrixXd& L_ao, HamiltonianType type)
     : HamiltonianContainer(one_body_integrals_alpha, one_body_integrals_beta,
                            orbitals, core_energy, inactive_fock_matrix_alpha,
                            inactive_fock_matrix_beta, type),
@@ -62,7 +58,7 @@ CholeskyHamiltonianContainer::
           std::make_unique<Eigen::VectorXd>(two_body_integrals_aaaa),
           std::make_unique<Eigen::VectorXd>(two_body_integrals_aabb),
           std::make_unique<Eigen::VectorXd>(two_body_integrals_bbbb)),
-          _ao_cholesky_vectors(std::make_shared<Eigen::MatrixXd>(L_ao)) {
+      _ao_cholesky_vectors(std::make_shared<Eigen::MatrixXd>(L_ao)) {
   QDK_LOG_TRACE_ENTERING();
 
   validate_integral_dimensions();
@@ -75,23 +71,24 @@ CholeskyHamiltonianContainer::
   }
 }
 
-std::unique_ptr<HamiltonianContainer>
-CholeskyHamiltonianContainer::clone() const {
+std::unique_ptr<HamiltonianContainer> CholeskyHamiltonianContainer::clone()
+    const {
   QDK_LOG_TRACE_ENTERING();
   if (is_restricted()) {
     return std::make_unique<CholeskyHamiltonianContainer>(
         *_one_body_integrals.first, *std::get<0>(_two_body_integrals),
-        _orbitals, _core_energy, *_inactive_fock_matrix.first, *_ao_cholesky_vectors, _type);
+        _orbitals, _core_energy, *_inactive_fock_matrix.first,
+        *_ao_cholesky_vectors, _type);
   }
   return std::make_unique<CholeskyHamiltonianContainer>(
       *_one_body_integrals.first, *_one_body_integrals.second,
       *std::get<0>(_two_body_integrals), *std::get<1>(_two_body_integrals),
       *std::get<2>(_two_body_integrals), _orbitals, _core_energy,
-      *_inactive_fock_matrix.first, *_inactive_fock_matrix.second, *_ao_cholesky_vectors, _type);
+      *_inactive_fock_matrix.first, *_inactive_fock_matrix.second,
+      *_ao_cholesky_vectors, _type);
 }
 
-std::string CholeskyHamiltonianContainer::get_container_type()
-    const {
+std::string CholeskyHamiltonianContainer::get_container_type() const {
   QDK_LOG_TRACE_ENTERING();
   return "canonical_four_center";
 }
@@ -136,8 +133,9 @@ double CholeskyHamiltonianContainer::get_two_body_element(
   }
 }
 
-size_t CholeskyHamiltonianContainer::get_two_body_index(
-    size_t i, size_t j, size_t k, size_t l) const {
+size_t CholeskyHamiltonianContainer::get_two_body_index(size_t i, size_t j,
+                                                        size_t k,
+                                                        size_t l) const {
   QDK_LOG_TRACE_ENTERING();
   size_t norb = _orbitals->get_active_space_indices().first.size();
   return i * norb * norb * norb + j * norb * norb + k * norb + l;
@@ -179,8 +177,7 @@ bool CholeskyHamiltonianContainer::is_valid() const {
   return true;
 }
 
-void CholeskyHamiltonianContainer::validate_integral_dimensions()
-    const {
+void CholeskyHamiltonianContainer::validate_integral_dimensions() const {
   QDK_LOG_TRACE_ENTERING();
   // Check alpha one-body integrals
   HamiltonianContainer::validate_integral_dimensions();
@@ -232,8 +229,9 @@ CholeskyHamiltonianContainer::make_restricted_two_body_integrals(
       shared_integrals);  // aaaa, aabb, bbbb all point to same data
 }
 
-void CholeskyHamiltonianContainer::to_fcidump_file(
-    const std::string& filename, size_t nalpha, size_t nbeta) const {
+void CholeskyHamiltonianContainer::to_fcidump_file(const std::string& filename,
+                                                   size_t nalpha,
+                                                   size_t nbeta) const {
   QDK_LOG_TRACE_ENTERING();
   _to_fcidump_file(filename, nalpha, nbeta);
 }
@@ -362,8 +360,7 @@ nlohmann::json CholeskyHamiltonianContainer::to_json() const {
   }
 
   // Store ao cholesky vectors
-  if (_ao_cholesky_vectors != nullptr &&
-      _ao_cholesky_vectors->size() > 0) {
+  if (_ao_cholesky_vectors != nullptr && _ao_cholesky_vectors->size() > 0) {
     j["has_ao_cholesky_vectors"] = true;
     // Store ao cholesky vectors
     std::vector<std::vector<double>> L_ao_vec;
@@ -633,8 +630,7 @@ void CholeskyHamiltonianContainer::to_hdf5(H5::Group& group) const {
     }
 
     // Save ao cholesky vectors
-    if (_ao_cholesky_vectors != nullptr &&
-        _ao_cholesky_vectors->size() > 0) {
+    if (_ao_cholesky_vectors != nullptr && _ao_cholesky_vectors->size() > 0) {
       save_matrix_to_group(group, "ao_cholesky_vectors", *_ao_cholesky_vectors);
     }
 
@@ -773,8 +769,9 @@ CholeskyHamiltonianContainer::from_hdf5(H5::Group& group) {
   }
 }
 
-void CholeskyHamiltonianContainer::_to_fcidump_file(
-    const std::string& filename, size_t nalpha, size_t nbeta) const {
+void CholeskyHamiltonianContainer::_to_fcidump_file(const std::string& filename,
+                                                    size_t nalpha,
+                                                    size_t nbeta) const {
   QDK_LOG_TRACE_ENTERING();
   // Check if this is an unrestricted Hamiltonian and throw error
   if (is_unrestricted()) {

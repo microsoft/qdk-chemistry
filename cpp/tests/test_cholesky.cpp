@@ -88,7 +88,8 @@ TEST_F(CholeskyTest, N2_Restricted_Comparison) {
     auto ham_incore = ham_incore_factory->run(orbitals);
 
     // 4. Run Hamiltonian with Cholesky
-    auto ham_chol_factory = HamiltonianConstructorFactory::create("qdk_cholesky");
+    auto ham_chol_factory =
+        HamiltonianConstructorFactory::create("qdk_cholesky");
     ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
     auto ham_chol = ham_chol_factory->run(orbitals);
 
@@ -133,7 +134,8 @@ TEST_F(CholeskyTest, N2_Restricted_Comparison) {
     auto ham_incore = ham_incore_factory->run(orbitals);
 
     // 4. Run Hamiltonian with Cholesky
-    auto ham_chol_factory = HamiltonianConstructorFactory::create("qdk_cholesky");
+    auto ham_chol_factory =
+        HamiltonianConstructorFactory::create("qdk_cholesky");
     ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
     auto ham_chol = ham_chol_factory->run(orbitals);
 
@@ -189,7 +191,8 @@ TEST_F(CholeskyTest, N2_Restricted_Comparison) {
     auto ham_incore = ham_incore_factory->run(orbitals);
 
     // 4. Run Hamiltonian with Cholesky
-    auto ham_chol_factory = HamiltonianConstructorFactory::create("qdk_cholesky");
+    auto ham_chol_factory =
+        HamiltonianConstructorFactory::create("qdk_cholesky");
     ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
     auto ham_chol = ham_chol_factory->run(orbitals);
 
@@ -262,7 +265,8 @@ TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
     auto ham_incore = ham_incore_factory->run(orbitals);
 
     // 4. Run Hamiltonian with Cholesky
-    auto ham_chol_factory = HamiltonianConstructorFactory::create("qdk_cholesky");
+    auto ham_chol_factory =
+        HamiltonianConstructorFactory::create("qdk_cholesky");
     ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
     auto ham_chol = ham_chol_factory->run(orbitals);
 
@@ -310,7 +314,8 @@ TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
     auto ham_incore = ham_incore_factory->run(orbitals);
 
     // 4. Run Hamiltonian with Cholesky
-    auto ham_chol_factory = HamiltonianConstructorFactory::create("qdk_cholesky");
+    auto ham_chol_factory =
+        HamiltonianConstructorFactory::create("qdk_cholesky");
     ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
     auto ham_chol = ham_chol_factory->run(orbitals);
 
@@ -371,7 +376,8 @@ TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
     auto ham_incore = ham_incore_factory->run(orbitals);
 
     // 4. Run Hamiltonian with Cholesky
-    auto ham_chol_factory = HamiltonianConstructorFactory::create("qdk_cholesky");
+    auto ham_chol_factory =
+        HamiltonianConstructorFactory::create("qdk_cholesky");
     ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
     auto ham_chol = ham_chol_factory->run(orbitals);
 

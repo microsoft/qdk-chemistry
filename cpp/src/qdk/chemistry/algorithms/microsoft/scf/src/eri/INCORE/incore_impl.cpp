@@ -306,8 +306,8 @@ ERI::~ERI() noexcept {
 #endif
 };
 
-std::unique_ptr<double[]> ERI::get_cholesky_vectors(
-    double threshold, size_t* num_vectors) {
+std::unique_ptr<double[]> ERI::get_cholesky_vectors(double threshold,
+                                                    size_t* num_vectors) {
   QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "INCORE::ERI::get_cholesky_vectors NOT YET IMPLEMENTED");

@@ -64,7 +64,7 @@ class SNK : public ERI {
                 double beta, double omega) override;
 
   std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
-                                                  size_t* num_vectors) override;
+                                                 size_t* num_vectors) override;
 
  private:
   /**

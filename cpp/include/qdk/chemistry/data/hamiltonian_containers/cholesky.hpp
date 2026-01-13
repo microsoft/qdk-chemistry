@@ -58,8 +58,7 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
       const Eigen::MatrixXd& one_body_integrals,
       const Eigen::VectorXd& two_body_integrals,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
-      const Eigen::MatrixXd& inactive_fock_matrix,
-      const Eigen::MatrixXd& L_ao,
+      const Eigen::MatrixXd& inactive_fock_matrix, const Eigen::MatrixXd& L_ao,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**

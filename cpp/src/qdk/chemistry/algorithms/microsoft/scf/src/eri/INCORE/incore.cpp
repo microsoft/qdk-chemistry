@@ -42,8 +42,8 @@ const double* ERIINCORE::get_raw_eris() const {
   return eri_impl_->get_raw_eris();
 }
 
-std::unique_ptr<double[]> ERIINCORE::get_cholesky_vectors(
-    double threshold, size_t* num_vectors) {
+std::unique_ptr<double[]> ERIINCORE::get_cholesky_vectors(double threshold,
+                                                          size_t* num_vectors) {
   QDK_LOG_TRACE_ENTERING();
 
   if (!eri_impl_) throw std::runtime_error("ERIINCORE NOT INITIALIZED");
