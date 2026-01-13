@@ -25,10 +25,10 @@ Represents a molecular electronic configuration.
 
 This class efficiently stores the occupation pattern of molecular orbitals using a compact representation where each orbital can be in one of four states:
 
-- UNOCCUPIED (0): No electrons
-- ALPHA (1): One alpha electron
-- BETA (2): One beta electron
-- DOUBLY (3): Both alpha and beta electrons
+- UNOCCUPIED ('0'): No electrons
+- ALPHA ('u'): One alpha electron
+- BETA ('d'): One beta electron
+- DOUBLY ('2'): Both alpha and beta electrons
 
 The class provides methods for constructing, manipulating, and querying configurations.
 )");
