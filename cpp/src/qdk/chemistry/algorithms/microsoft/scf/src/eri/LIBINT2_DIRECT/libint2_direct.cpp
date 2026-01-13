@@ -14,6 +14,7 @@
 #endif
 #include <stdexcept>
 #include <unordered_set>
+#include <blas.hh>
 
 #include "util/timer.h"
 
@@ -705,7 +706,7 @@ class ERI {
     L_data.reserve(num_aos2 * estimated_rank);
 
     // Diagonal elements and indices
-    std::vector<Eigen::VectorXd> D_shell_pair(num_shell_pairs);
+    std::vector<std::vector<double>> D_shell_pair(num_shell_pairs);
     std::unordered_set<size_t> active_shell_pairs;
 
 #ifdef _OPENMP
@@ -751,8 +752,10 @@ class ERI {
           }
 
           // local diagonal block
-          Eigen::Map<const Eigen::MatrixXd> buf_mat(res, n12, n12);
-          D_shell_pair[sp_index] = buf_mat.diagonal();
+          D_shell_pair[sp_index].resize(n12);
+          for (size_t i = 0; i < n12; ++i) {
+            D_shell_pair[sp_index][i] = res[i * n12 + i];
+          }
 #ifdef _OPENMP
           active_shell_pairs_local[thread_id].push_back(sp_index);
 #else
@@ -780,7 +783,8 @@ class ERI {
       for (const auto sp_index : active_shell_pairs) {
         const auto [s1, s2] = sp_index_to_shells[sp_index];
         // get block max
-        const double block_max = D_shell_pair[sp_index].maxCoeff();
+        const auto& diag = D_shell_pair[sp_index];
+        const double block_max = *std::max_element(diag.begin(), diag.end());
         if (block_max > D_max) {
           D_max = block_max;
           q_shell_pair_max = sp_index;
@@ -797,12 +801,12 @@ class ERI {
       // get column for max shell pair (s1_max, s2_max)
       const size_t n1_max = obs_[s1_max].size();
       const size_t n2_max = obs_[s2_max].size();
-      Eigen::MatrixXd eri_col =
-          Eigen::MatrixXd::Zero(num_aos2, n1_max * n2_max);
+      const size_t n_cols = n1_max * n2_max;
+      std::vector<double> eri_col(num_aos2 * n_cols, 0.0);
 #ifdef _OPENMP
-      std::vector<Eigen::MatrixXd> eri_col_threads(nthreads);
+      std::vector<std::vector<double>> eri_col_threads(nthreads);
       for (int t = 0; t < nthreads; ++t) {
-        eri_col_threads[t] = Eigen::MatrixXd::Zero(num_aos2, n1_max * n2_max);
+        eri_col_threads[t].resize(num_aos2 * n_cols, 0.0);
       }
 #pragma omp parallel
 #endif
@@ -848,9 +852,9 @@ class ERI {
                   for (size_t l = 0; l < n4; ++l, ++ijkl) {
                     const size_t ind_ijkl = ind_ijk + (bf4_st + l);
 #ifdef _OPENMP
-                    eri_col_local(ind_ijkl) += res[ijkl];
+                    eri_col_local[ind_ijkl] += res[ijkl];
 #else
-                    eri_col(ind_ijkl) += res[ijkl];
+                    eri_col[ind_ijkl] += res[ijkl];
 #endif
                   }  // l
                 }  // k
@@ -863,7 +867,8 @@ class ERI {
       // merge thread-local eri_col
 #ifdef _OPENMP
       for (int t = 0; t < nthreads; ++t) {
-        eri_col += eri_col_threads[t];
+        blas::axpy(eri_col.size(), 1.0, eri_col_threads[t].data(), 1,
+                   eri_col.data(), 1);
       }
 #endif
 
@@ -880,25 +885,29 @@ class ERI {
       }
 
       // correct for cholesky contributions
+      // subtract previous contiributions
       if (current_col > 0) {
-        // Eigen map to existing L vectors
-        Eigen::Map<const Eigen::MatrixXd> L_map(L_data.data(), num_aos2,
-                                                current_col);
-
-        // subtract previous contributions
-        Eigen::MatrixXd L_rows(eri_col.cols(), current_col);
-        for (size_t col = 0; col < eri_col.cols(); ++col) {
+        // Extract rows from L_data corresponding to shell pairs
+        std::vector<double> L_rows(n_cols * current_col);
+        for (size_t col = 0; col < n_cols; ++col) {
           const size_t global_index = shell_pairs_to_lookup[col];
-          L_rows.row(col) = L_map.row(global_index).leftCols(current_col);
+          // Copy row from L_data: L_rows[col, :] = L_data[global_index, :]
+          blas::copy(current_col, L_data.data() + global_index, num_aos2,
+                     L_rows.data() + col, n_cols);
         }
-        eri_col -= L_map.leftCols(current_col) * L_rows.transpose();
+        // Compute eri_col -= L_data * L_rows^T using GEMM
+        // eri_col is num_aos2 x n_cols, L_data is num_aos2 x current_col, L_rows^T is current_col x n_cols
+        blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                   num_aos2, n_cols, current_col, -1.0, L_data.data(),
+                   num_aos2, L_rows.data(), n_cols, 1.0, eri_col.data(),
+                   num_aos2);
       }
 
       // form new cholesky vector for each index in shell pair
       for (size_t local_i = 0; local_i < n1_max; ++local_i) {
         for (size_t local_j = 0; local_j < n2_max; ++local_j) {
           const size_t local_index = local_i * n2_max + local_j;
-          const double D_val = D_shell_pair[q_shell_pair_max](local_index);
+          const double D_val = D_shell_pair[q_shell_pair_max][local_index];
 
           // skip if below threshold
           if (D_val < threshold) {
@@ -907,7 +916,12 @@ class ERI {
 
           // Form Cholesky vector
           double Q_max = std::sqrt(1.0 / D_val);
-          Eigen::VectorXd L_col_vec = Q_max * eri_col.col(local_index);
+          std::vector<double> L_col_vec(num_aos2);
+          // Copy column from eri_col
+          blas::copy(num_aos2, eri_col.data() + local_index * num_aos2, 1,
+                     L_col_vec.data(), 1);
+          // Scale by Q_max
+          blas::scal(num_aos2, Q_max, L_col_vec.data(), 1);
 
           // append to L_data
           L_data.insert(L_data.end(), L_col_vec.data(),
@@ -921,10 +935,8 @@ class ERI {
           for (size_t col = local_index + 1; col < n1_max * n2_max; ++col) {
             const size_t global_col_idx = shell_pairs_to_lookup[col];
             const double scale_factor = -L_col[global_col_idx];
-            double* eri_col_ptr = eri_col.col(col).data();
-            for (size_t i = 0; i < num_aos2; ++i) {
-              eri_col_ptr[i] += scale_factor * L_col[i];
-            }
+            double* eri_col_ptr = eri_col.data() + col * num_aos2;
+            blas::axpy(num_aos2, scale_factor, L_col, 1, eri_col_ptr, 1);
           }
 
           // Update diagonal elements
@@ -941,12 +953,14 @@ class ERI {
               for (size_t j = 0; j < n2; ++j) {
                 const size_t idx = i * n2 + j;
                 const size_t global_idx = bf1_st_i + (bf2_st + j);
-                D_shell_pair[sp_index](idx) -=
+                D_shell_pair[sp_index][idx] -=
                     L_col[global_idx] * L_col[global_idx];
               }
             }
             // remove if below threshold
-            if (D_shell_pair[sp_index].maxCoeff() < threshold) {
+            const auto& diag = D_shell_pair[sp_index];
+            const double max_diag = *std::max_element(diag.begin(), diag.end());
+            if (max_diag < threshold) {
               shell_pairs_to_remove.push_back(sp_index);
             }
           }
