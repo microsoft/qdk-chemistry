@@ -20,6 +20,7 @@ from qdk_chemistry.utils import rotate_orbitals
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
+    min_hessian_eig_tolerance,
     scf_energy_tolerance,
 )
 
@@ -506,13 +507,12 @@ class TestStabilityChecker:
         else:
             assert len(external_eigenvalues) == 0
 
-    def _check_reference_eigenvalue(self, result, stability_checker, ref_value, is_internal=True):
+    def _check_reference_eigenvalue(self, result, ref_value, is_internal=True):
         """Helper to check eigenvalue against reference within solver tolerance."""
         smallest = (
             result.get_smallest_internal_eigenvalue() if is_internal else result.get_smallest_external_eigenvalue()
         )
-        alg_tol = stability_checker.settings().get("davidson_tolerance") * 1e2
-        assert abs(smallest - ref_value) < alg_tol, f"Eigenvalue mismatch: {smallest} vs {ref_value}"
+        assert abs(smallest - ref_value) < min_hessian_eig_tolerance, f"Eigenvalue mismatch: {smallest} vs {ref_value}"
 
     def test_stability_no_analysis_requested(self):
         """Test stability checker when no analysis is requested."""
@@ -557,8 +557,8 @@ class TestStabilityChecker:
         assert result.is_external_stable() is True
 
         # Check reference values
-        self._check_reference_eigenvalue(result, stability_checker, ref_internal, is_internal=True)
-        self._check_reference_eigenvalue(result, stability_checker, ref_external, is_internal=False)
+        self._check_reference_eigenvalue(result, ref_internal, is_internal=True)
+        self._check_reference_eigenvalue(result, ref_external, is_internal=False)
 
         # Test internal-only analysis
         stability_checker_internal = self._create_stability_checker(backend=backend, internal=True, external=False)
@@ -567,7 +567,7 @@ class TestStabilityChecker:
         self._assert_basic_stability_result(result_internal, is_stable_internal, has_internal=True, has_external=False)
         assert result_internal.is_internal_stable() is True
         assert is_stable_internal is True
-        self._check_reference_eigenvalue(result_internal, stability_checker_internal, ref_internal, is_internal=True)
+        self._check_reference_eigenvalue(result_internal, ref_internal, is_internal=True)
 
         # Test external-only analysis
         stability_checker_external = self._create_stability_checker(backend=backend, internal=False, external=True)
@@ -576,7 +576,7 @@ class TestStabilityChecker:
         self._assert_basic_stability_result(result_external, is_stable_external, has_internal=False, has_external=True)
         assert result_external.is_external_stable() is True
         assert is_stable_external is True
-        self._check_reference_eigenvalue(result_external, stability_checker_external, ref_external, is_internal=False)
+        self._check_reference_eigenvalue(result_external, ref_external, is_internal=False)
 
     @pytest.mark.parametrize(
         ("backend", "method", "ref_internal", "ref_external"),
@@ -605,8 +605,8 @@ class TestStabilityChecker:
         assert result.is_external_stable() is True
 
         # Check reference values
-        self._check_reference_eigenvalue(result, stability_checker, ref_internal, is_internal=True)
-        self._check_reference_eigenvalue(result, stability_checker, ref_external, is_internal=False)
+        self._check_reference_eigenvalue(result, ref_internal, is_internal=True)
+        self._check_reference_eigenvalue(result, ref_external, is_internal=False)
 
     @pytest.mark.parametrize(
         ("backend", "method", "ref_internal"),
@@ -632,7 +632,7 @@ class TestStabilityChecker:
         self._assert_basic_stability_result(result_internal, is_stable_internal, has_internal=True, has_external=False)
         assert result_internal.is_internal_stable() is True
         assert is_stable_internal is True
-        self._check_reference_eigenvalue(result_internal, stability_checker_internal, ref_internal, is_internal=True)
+        self._check_reference_eigenvalue(result_internal, ref_internal, is_internal=True)
 
     @pytest.mark.parametrize(
         ("backend", "method", "scf_energy", "ref_internal"),
@@ -660,7 +660,7 @@ class TestStabilityChecker:
 
         self._assert_basic_stability_result(result, True, has_internal=True, has_external=False)
         assert result.is_internal_stable() is True
-        self._check_reference_eigenvalue(result, stability_checker, ref_internal, is_internal=True)
+        self._check_reference_eigenvalue(result, ref_internal, is_internal=True)
 
         # Test that external analysis raises error for UHF
         stability_checker_external = self._create_stability_checker(backend=backend, internal=False, external=True)
@@ -679,12 +679,7 @@ class TestStabilityChecker:
 
         self._assert_basic_stability_result(result, False, has_internal=True, has_external=False)
         assert result.is_internal_stable() is False  # ROHF O2 should be internally unstable
-        self._check_reference_eigenvalue(
-            result,
-            stability_checker,
-            -0.00965024239084978,
-            is_internal=True,
-        )
+        self._check_reference_eigenvalue(result, -0.00965024239084978, is_internal=True)
 
         # Test that external analysis raises error for ROHF
         stability_checker_external = self._create_stability_checker(backend="pyscf", internal=False, external=True)
@@ -723,8 +718,8 @@ class TestStabilityChecker:
         assert is_stable is (expected_internal_stable and expected_external_stable)
 
         # Check reference eigenvalues
-        self._check_reference_eigenvalue(result, stability_checker, ref_internal, is_internal=True)
-        self._check_reference_eigenvalue(result, stability_checker, ref_external, is_internal=False)
+        self._check_reference_eigenvalue(result, ref_internal, is_internal=True)
+        self._check_reference_eigenvalue(result, ref_external, is_internal=False)
 
     @pytest.mark.parametrize(
         ("backend", "ref_eigenvalue"),
@@ -748,7 +743,7 @@ class TestStabilityChecker:
 
         self._assert_basic_stability_result(result, False, has_internal=True, has_external=False)
         assert result.is_internal_stable() is False  # Should be internally unstable
-        self._check_reference_eigenvalue(result, stability_checker, ref_eigenvalue, is_internal=True)
+        self._check_reference_eigenvalue(result, ref_eigenvalue, is_internal=True)
 
         # Check number of negative eigenvalues
         internal_eigenvalues = result.get_internal_eigenvalues()
@@ -772,7 +767,7 @@ class TestStabilityChecker:
 
         self._assert_basic_stability_result(result, False, has_internal=True, has_external=False)
         assert result.is_internal_stable() is False  # Should be internally unstable
-        self._check_reference_eigenvalue(result, stability_checker, ref_eigenvalue, is_internal=True)
+        self._check_reference_eigenvalue(result, ref_eigenvalue, is_internal=True)
 
         # Check number of negative eigenvalues
         internal_eigenvalues = result.get_internal_eigenvalues()
