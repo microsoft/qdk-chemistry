@@ -706,7 +706,7 @@ class TestStabilityChecker:
     ):
         """Test stability checker on N2 at different distances with RHF."""
         n2 = create_stretched_n2_structure(distance_angstrom=distance)
-        scf_solver = self._create_scf_solver(backend="pyscf")
+        scf_solver = self._create_scf_solver(backend=backend)
         _, wavefunction = scf_solver.run(n2, 0, 1, "def2-svp")
 
         stability_checker = self._create_stability_checker(backend=backend)
