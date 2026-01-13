@@ -705,39 +705,35 @@ class ERI {
     L.resize(num_aos * num_aos, num_aos);
 
     // Diagonal elements and indices
-    std::vector<Eigen::MatrixXd> D_shell_pair(num_shell_pairs);
+    std::vector<Eigen::VectorXd> D_shell_pair(num_shell_pairs);
     for (size_t s1 = 0; s1 < num_shells; ++s1) {
       const auto n1 = obs_[s1].size();
-      const auto bf1_st = shell2bf_[s1];
       for (size_t s2 = 0; s2 <= s1; ++s2) {
         const auto n2 = obs_[s2].size();
-        const auto bf2_st = shell2bf_[s2];
         const size_t sp_index = shell_pair_index(s1, s2);
 
         // screening via schwarz bounds
         if (K_schwarz_(s1, s2) * K_schwarz_(s1, s2) < precision) {
-          Eigen::VectorXd D_block = Eigen::VectorXd::Zero(n1 * n2);
-          D_shell_pair[sp_index] = D_block;
+          D_shell_pair[sp_index] = Eigen::VectorXd::Zero(n1 * n2);
           continue;
         }
 
+        // compute diagonal block (s1,s2|s1,s2)
         engine.compute2<::libint2::Operator::coulomb, ::libint2::BraKet::xx_xx,
                         0>(obs_[s1], obs_[s2], obs_[s1], obs_[s2]);
-
-        if (buf[0] == nullptr) {
-          Eigen::VectorXd D_block = Eigen::VectorXd::Zero(n1 * n2);
-          D_shell_pair[sp_index] = D_block;
+        const auto& res = buf[0];
+        if (res == nullptr) {
+          D_shell_pair[sp_index] = Eigen::VectorXd::Zero(n1 * n2);
           continue;
         }
 
         // local diagonal block
         // Extract diagonal from shell quartet buffer
         const size_t n12 = n1 * n2;
-        Eigen::Map<const Eigen::MatrixXd> buf_mat(buf[0], n12, n12);
+        Eigen::Map<const Eigen::MatrixXd> buf_mat(res, n12, n12);
 
         // Extract diagonal as vector
-        Eigen::VectorXd D_block = buf_mat.diagonal();
-        D_shell_pair[sp_index] = D_block;
+        D_shell_pair[sp_index] = buf_mat.diagonal();
       }  // s2
     }  // s1
 
@@ -756,8 +752,7 @@ class ERI {
         for (size_t s2 = 0; s2 <= s1; ++s2) {
           const auto n2 = obs_[s2].size();
           const size_t sp_index = shell_pair_index(s1, s2);
-          Eigen::Index i, j;
-          const double block_max = D_shell_pair[sp_index].maxCoeff(&i, &j);
+          const double block_max = D_shell_pair[sp_index].maxCoeff();
           if (block_max > D_max) {
             D_max = block_max;
             q_shell_pair_max = sp_index;
@@ -789,7 +784,7 @@ class ERI {
           engine.compute2<::libint2::Operator::coulomb,
                           ::libint2::BraKet::xx_xx, 0>(
               obs_[s1_max], obs_[s2_max], obs_[s3], obs_[s4]);
-          const auto res = buf[0];
+          const auto& res = buf[0];
 
           // Coarse integral screening
           if (res == nullptr) continue;
