@@ -2,6 +2,7 @@
 set -e
 PYTHON_VERSION=${1:-3.11}
 MAC_BUILD=${2:-OFF}
+PYENV_VERSION=${3:-2.6.15}
 export MAC_BUILD
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -55,10 +56,17 @@ fi
 
 # Install pyenv to use non-system python3 versions
 if [ ! -d "$PYENV_ROOT" ]; then
-    wget -q https://github.com/pyenv/pyenv/archive/refs/heads/master.zip -O pyenv.zip
+    echo "Installing pyenv ${PYENV_VERSION}..."
+    export PYENV_CHECKSUM=95187d6ad9bc8310662b5b805a88506e5cbbe038f88890e5aabe3021711bf3c8
+    wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v${PYENV_VERSION}.zip -O pyenv.zip
+    echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -a 256 -c || exit 1
     unzip -q pyenv.zip
-    mv pyenv-master "$PYENV_ROOT"
+    mv pyenv-${PYENV_VERSION} "$PYENV_ROOT"
     rm pyenv.zip
+    "$PYENV_ROOT/bin/pyenv" install ${PYTHON_VERSION}
+    "$PYENV_ROOT/bin/pyenv" global ${PYTHON_VERSION}
+    export PATH="$PYENV_ROOT/versions/${PYTHON_VERSION}/bin:$PATH"
+    export PATH="$PYENV_ROOT/shims:$PATH"
 fi
 
 # Install and activate the specific Python version

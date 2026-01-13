@@ -14,6 +14,9 @@ parameters:
 - name: macBuild
   type: string
   default: OFF
+- name: pyenvVersion
+  type: string
+  default: 2.6.15
 
 steps:
 - ${{ if eq(parameters.macBuild, 'OFF') }}:
@@ -25,7 +28,8 @@ steps:
         -w /workspace/qdk-chemistry/python \
         ${{ parameters.dockerImage }} \
         bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
-                                                          ${{ parameters.macBuild }}
+                                                          ${{ parameters.macBuild }} \
+                                                          ${{ parameters.pyenvVersion }}
     displayName: Test wheel (Docker)
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
@@ -33,5 +37,6 @@ steps:
       echo "Running wheel tests (native)..."
       cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry/python
       bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
-                                                        ${{ parameters.macBuild }}
+                                                        ${{ parameters.macBuild }} \
+                                                        ${{ parameters.pyenvVersion }}
     displayName: Test wheel (native)
