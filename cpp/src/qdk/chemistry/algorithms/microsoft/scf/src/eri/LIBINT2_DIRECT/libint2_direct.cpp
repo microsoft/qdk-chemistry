@@ -13,6 +13,7 @@
 #include <omp.h>
 #endif
 #include <stdexcept>
+#include <unordered_set>
 
 #include "util/timer.h"
 
@@ -659,22 +660,30 @@ class ERI {
                                                  size_t* num_vectors) {
     QDK_LOG_TRACE_ENTERING();
 
+    std::cout << "Threshold: " << threshold << std::endl;
+
     const size_t num_aos = obs_.nbf();
     const size_t num_aos2 = num_aos * num_aos;
     const size_t num_aos3 = num_aos2 * num_aos;
     const size_t num_shells = obs_.size();
     const size_t num_shell_pairs = num_shells * (num_shells + 1) / 2;
 
-    Eigen::Map<const Eigen::MatrixXd> full_debug_eris_mat(
-        full_debug_eris, num_aos * num_aos, num_aos * num_aos);
-
-    // TODO: map shell pair to index
+    // map shell pair to index
     auto shell_pair_index = [num_shell_pairs](size_t s1, size_t s2) {
       if (s1 < s2) std::swap(s1, s2);
       return s2 + (s1 * (s1 + 1)) / 2;
     };
 
-    // TODO: map local index to global index
+    // Precompute inverse mapping: sp_index -> (s1, s2) for fast lookup
+    std::vector<std::pair<size_t, size_t>> sp_index_to_shells(num_shell_pairs);
+    for (size_t s1 = 0; s1 < num_shells; ++s1) {
+      for (size_t s2 = 0; s2 <= s1; ++s2) {
+        const size_t sp_idx = shell_pair_index(s1, s2);
+        sp_index_to_shells[sp_idx] = {s1, s2};
+      }
+    }
+
+    // map local index to global index
     auto get_global_pair_index = [&](size_t s1, size_t s2, size_t local_ind) {
       const size_t bf1_st = shell2bf_[s1];
       const size_t bf2_st = shell2bf_[s2];
@@ -687,17 +696,17 @@ class ERI {
     // setup libint engine for ERI computation
     const double precision = std::numeric_limits<double>::epsilon();
     const auto engine_precision = precision;
+#ifdef _OPENMP
+    const int nthreads = omp_get_max_threads();
+#else
     const int nthreads = 1;
+#endif
     std::vector<::libint2::Engine> engines_coulomb(nthreads);
     engines_coulomb[0] = ::libint2::Engine(::libint2::Operator::coulomb,
                                            obs_.max_nprim(), obs_.max_l(), 0);
     engines_coulomb[0].set(::libint2::ScreeningMethod::Original);
     engines_coulomb[0].set_precision(engine_precision);
     for (int i = 1; i < nthreads; ++i) engines_coulomb[i] = engines_coulomb[0];
-
-    const auto thread_id = 0;
-    auto& engine = engines_coulomb[thread_id];
-    const auto& buf = engine.results();
 
     // Cholesky vectors
     size_t current_col = 0;
@@ -706,36 +715,71 @@ class ERI {
 
     // Diagonal elements and indices
     std::vector<Eigen::VectorXd> D_shell_pair(num_shell_pairs);
-    for (size_t s1 = 0; s1 < num_shells; ++s1) {
-      const auto n1 = obs_[s1].size();
-      for (size_t s2 = 0; s2 <= s1; ++s2) {
-        const auto n2 = obs_[s2].size();
-        const size_t sp_index = shell_pair_index(s1, s2);
+    std::unordered_set<size_t> active_shell_pairs;
 
-        // screening via schwarz bounds
-        if (K_schwarz_(s1, s2) * K_schwarz_(s1, s2) < precision) {
-          D_shell_pair[sp_index] = Eigen::VectorXd::Zero(n1 * n2);
-          continue;
-        }
+#ifdef _OPENMP
+    std::vector<std::vector<size_t>> active_shell_pairs_local(nthreads);
+#endif
 
-        // compute diagonal block (s1,s2|s1,s2)
-        engine.compute2<::libint2::Operator::coulomb, ::libint2::BraKet::xx_xx,
-                        0>(obs_[s1], obs_[s2], obs_[s1], obs_[s2]);
-        const auto& res = buf[0];
-        if (res == nullptr) {
-          D_shell_pair[sp_index] = Eigen::VectorXd::Zero(n1 * n2);
-          continue;
-        }
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    {
+#ifdef _OPENMP
+      const auto thread_id = omp_get_thread_num();
+#else
+      const auto thread_id = 0;
+#endif
+      auto& engine = engines_coulomb[thread_id];
+      const auto& buf = engine.results();
 
-        // local diagonal block
-        // Extract diagonal from shell quartet buffer
-        const size_t n12 = n1 * n2;
-        Eigen::Map<const Eigen::MatrixXd> buf_mat(res, n12, n12);
+      for (size_t s1 = 0, s12=0; s1 < num_shells; ++s1) {
+        const auto n1 = obs_[s1].size();
+        for (size_t s2 = 0; s2 <= s1; ++s2) {
 
-        // Extract diagonal as vector
-        D_shell_pair[sp_index] = buf_mat.diagonal();
-      }  // s2
-    }  // s1
+          // Assign to threads
+          if((s12++) % nthreads != thread_id) continue;
+
+          const auto n2 = obs_[s2].size();
+          const size_t sp_index = shell_pair_index(s1, s2);
+          const size_t n12 = n1 * n2;
+
+          // screening via schwarz bounds
+          if (K_schwarz_(s1, s2) * K_schwarz_(s1, s2) < precision) {
+            continue;
+          }
+
+          // compute diagonal block (s1,s2|s1,s2)
+          engine.compute2<::libint2::Operator::coulomb, ::libint2::BraKet::xx_xx,
+                          0>(obs_[s1], obs_[s2], obs_[s1], obs_[s2]);
+          const auto& res = buf[0];
+          if (res == nullptr) {
+            continue;
+          }
+
+          // local diagonal block
+          // Extract diagonal from shell quartet buffer
+          Eigen::Map<const Eigen::MatrixXd> buf_mat(res, n12, n12);
+
+          // No race - each sp_index written by exactly one thread
+          D_shell_pair[sp_index] = buf_mat.diagonal();
+#ifdef _OPENMP
+          active_shell_pairs_local[thread_id].push_back(sp_index);
+#else
+          active_shell_pairs.insert(sp_index);
+#endif
+        }  // s2
+      }  // s1
+    } // omp parallel
+
+    // Merge thread-local active lists
+#ifdef _OPENMP
+    for (int t = 0; t < nthreads; ++t) {
+      for (size_t sp_index : active_shell_pairs_local[t]) {
+        active_shell_pairs.insert(sp_index);
+      }
+    }
+#endif
 
     // 2. Cholesky decomposition
     double Q_max;
@@ -747,20 +791,19 @@ class ERI {
       // get max diagonal element
       double D_max = 0.0;
       size_t s1_max, s2_max;
-      for (size_t s1 = 0; s1 < num_shells; ++s1) {
-        const auto n1 = obs_[s1].size();
-        for (size_t s2 = 0; s2 <= s1; ++s2) {
-          const auto n2 = obs_[s2].size();
-          const size_t sp_index = shell_pair_index(s1, s2);
-          const double block_max = D_shell_pair[sp_index].maxCoeff();
-          if (block_max > D_max) {
-            D_max = block_max;
-            q_shell_pair_max = sp_index;
-            s1_max = s1;
-            s2_max = s2;
-          }
+      for(const auto sp_index : active_shell_pairs) {
+        const auto [s1, s2] = sp_index_to_shells[sp_index];
+        // get block max
+        const double block_max = D_shell_pair[sp_index].maxCoeff();
+        if (block_max > D_max) {
+          D_max = block_max;
+          q_shell_pair_max = sp_index;
+          s1_max = s1;
+          s2_max = s2;
         }
       }
+
+      // check convergence
       if (D_max < threshold) {
         break;
       }
@@ -770,51 +813,89 @@ class ERI {
       const size_t n2_max = obs_[s2_max].size();
       Eigen::MatrixXd eri_col =
           Eigen::MatrixXd::Zero(num_aos2, n1_max * n2_max);
-      for (size_t s3 = 0; s3 < num_shells; ++s3) {
-        const size_t n3 = obs_[s3].size();
-        const size_t bf3_st = shell2bf_[s3];
-        for (size_t s4 = 0; s4 < num_shells; ++s4) {
-          // screening via schwarz bounds
-          if (K_schwarz_(s1_max, s2_max) * K_schwarz_(s3, s4) < precision) {
-            continue;
-          }
-          const size_t n4 = obs_[s4].size();
-          const size_t bf4_st = shell2bf_[s4];
+#ifdef _OPENMP
+      std::vector<Eigen::MatrixXd> eri_col_threads(nthreads);
+      for (int t = 0; t < nthreads; ++t) {
+        eri_col_threads[t] =
+            Eigen::MatrixXd::Zero(num_aos2, n1_max * n2_max);
+      }
 
-          engine.compute2<::libint2::Operator::coulomb,
-                          ::libint2::BraKet::xx_xx, 0>(
-              obs_[s1_max], obs_[s2_max], obs_[s3], obs_[s4]);
-          const auto& res = buf[0];
+#pragma omp parallel
+#endif
+      {
+#ifdef _OPENMP
+        const auto thread_id = omp_get_thread_num();
+#else
+        const auto thread_id = 0;
+#endif
+        auto& engine = engines_coulomb[thread_id];
+        const auto& buf = engine.results();
+        auto& eri_col_local = eri_col_threads[thread_id];
 
-          // Coarse integral screening
-          if (res == nullptr) continue;
+        for (size_t s3 = 0, s34 = 0; s3 < num_shells; ++s3) {
+          const size_t n3 = obs_[s3].size();
+          const size_t bf3_st = shell2bf_[s3];
+          for (size_t s4 = 0; s4 < num_shells; ++s4) {
 
-          // fill in eri_col
-          for (size_t i = 0, ijkl = 0; i < n1_max; ++i) {
-            const size_t ind_i = i * n2_max;
-            for (size_t j = 0; j < n2_max; ++j) {
-              const size_t ind_ij = (ind_i + j) * num_aos2;
-              for (size_t k = 0; k < n3; ++k) {
-                const size_t ind_ijk = ind_ij + (bf3_st + k) * num_aos;
-                for (size_t l = 0; l < n4; ++l, ++ijkl) {
-                  const size_t ind_ijkl = ind_ijk + (bf4_st + l);
-                  eri_col(ind_ijkl) += res[ijkl];
-                }  // l
-              }  // k
-            }  // j
-          }  // i
-        }  // s4
-      }  // s3
+            // Assign to threads
+            if ((s34++) % nthreads != thread_id) continue;
+
+            // screening via schwarz bounds
+            if (K_schwarz_(s1_max, s2_max) * K_schwarz_(s3, s4) < precision) {
+              continue;
+            }
+
+            const size_t n4 = obs_[s4].size();
+            const size_t bf4_st = shell2bf_[s4];
+
+            // compute integral shell quartet
+            engine.compute2<::libint2::Operator::coulomb,
+                            ::libint2::BraKet::xx_xx, 0>(
+                obs_[s1_max], obs_[s2_max], obs_[s3], obs_[s4]);
+            const auto& res = buf[0];
+
+            // Coarse integral screening
+            if (res == nullptr) continue;
+
+            // fill in eri_col
+            for (size_t i = 0, ijkl = 0; i < n1_max; ++i) {
+              const size_t ind_i = i * n2_max;
+              for (size_t j = 0; j < n2_max; ++j) {
+                const size_t ind_ij = (ind_i + j) * num_aos2;
+                for (size_t k = 0; k < n3; ++k) {
+                  const size_t ind_ijk = ind_ij + (bf3_st + k) * num_aos;
+                  for (size_t l = 0; l < n4; ++l, ++ijkl) {
+                    const size_t ind_ijkl = ind_ijk + (bf4_st + l);
+#ifdef _OPENMP
+                    eri_col_local(ind_ijkl) += res[ijkl];
+#else
+                    eri_col(ind_ijkl) += res[ijkl];
+#endif
+                  }  // l
+                }  // k
+              }  // j
+            }  // i
+          }  // s4
+        }  // s3
+      }  // omp parallel
+
+      // merge thread-local eri_col
+#ifdef _OPENMP
+      for (int t = 0; t < nthreads; ++t) {
+        eri_col += eri_col_threads[t];
+      }
+#endif
+
 
       // correct for cholesky contributions
       if (current_col > 0) {
         // subtract previous contributions
+        Eigen::MatrixXd L_rows(eri_col.cols(), current_col);
         for (size_t col = 0; col < eri_col.cols(); ++col) {
           global_index = get_global_pair_index(s1_max, s2_max, col);
-          eri_col.col(col) -=
-              L.leftCols(current_col) *
-              L.row(global_index).leftCols(current_col).transpose();
+          L_rows.row(col) = L.row(global_index).leftCols(current_col);
         }
+        eri_col -= L.leftCols(current_col) * L_rows.transpose();
       }
 
       // form new cholesky vector for each index in shell pair
@@ -823,6 +904,7 @@ class ERI {
           const size_t local_index = local_i * n2_max + local_j;
           const double D_val = D_shell_pair[q_shell_pair_max](local_index);
 
+          // skip if below threshold
           if (D_val < threshold) {
             continue;
           }
@@ -831,31 +913,33 @@ class ERI {
           Q_max = std::sqrt(1.0 / D_val);
           L.col(current_col) = Q_max * eri_col.col(local_index);
 
+          // reference to current column
+          const double* L_col = L.col(current_col).data();
+
           // Update remaining columns in eri_col for vectors formed within this
           // shell pair
           for (size_t col = local_index + 1; col < n1_max * n2_max; ++col) {
-            const size_t global_col_idx =
-                get_global_pair_index(s1_max, s2_max, col);
-            eri_col.col(col) -=
-                L.col(current_col) * L(global_col_idx, current_col);
+            const size_t global_col_idx = get_global_pair_index(s1_max, s2_max, col);
+            eri_col.col(col) -= L.col(current_col) * L(global_col_idx, current_col);
           }
 
-          // Update ALL diagonal elements and get largest element
-          for (size_t s1 = 0; s1 < num_shells; ++s1) {
+          // Update active diagonal blocks
+          std::vector<size_t> shell_pairs_to_remove;
+          for(const auto sp_index : active_shell_pairs) {
+            const auto [s1, s2] = sp_index_to_shells[sp_index];
             const auto n1 = obs_[s1].size();
-            for (size_t s2 = 0; s2 <= s1; ++s2) {
-              const size_t sp_index = shell_pair_index(s1, s2);
-              const auto n2 = obs_[s2].size();
-
-              for (size_t i = 0; i < n1; ++i) {
-                for (size_t j = 0; j < n2; ++j) {
-                  const size_t idx = i * n2 + j;
-                  const size_t global_idx = get_global_pair_index(s1, s2, idx);
-                  D_shell_pair[sp_index](idx) -=
-                      L.col(current_col)(global_idx) *
-                      L.col(current_col)(global_idx);
-                }
+            const auto n2 = obs_[s2].size();
+            // update diagonal block
+            for (size_t i = 0; i < n1; ++i) {
+              for (size_t j = 0; j < n2; ++j) {
+                const size_t idx = i * n2 + j;
+                const size_t global_idx = get_global_pair_index(s1, s2, idx);
+                D_shell_pair[sp_index](idx) -= L_col[global_idx] * L_col[global_idx];
               }
+            }
+            // remove if below threshold
+            if (D_shell_pair[sp_index].maxCoeff() < threshold) {
+              shell_pairs_to_remove.push_back(sp_index);
             }
           }
           current_col += 1;
