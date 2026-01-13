@@ -44,7 +44,7 @@ hamiltonian = hamiltonian_constructor.run(wfn_hf.get_orbitals())
 ansatz = Ansatz(hamiltonian, wfn_hf)
 
 # Run the correlation calculation
-mp2_total_energy, final_wavefunction = mp2_calculator.run(ansatz)
+mp2_total_energy, final_wavefunction, _ = mp2_calculator.run(ansatz)
 
 # Extract correlation energy
 mp2_corr_energy = mp2_total_energy - E_hf

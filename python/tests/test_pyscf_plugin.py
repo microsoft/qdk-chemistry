@@ -1464,7 +1464,7 @@ class TestPyscfPlugin:
         cc_calculator = algorithms.create("dynamical_correlation_calculator", "pyscf_coupled_cluster")
         cc_calculator.settings().set("store_amplitudes", True)
         ansatz_object = Ansatz(hamiltonian, wavefunction)
-        _, cc_wavefunction = cc_calculator.run(ansatz_object)
+        _, cc_wavefunction, _ = cc_calculator.run(ansatz_object)
 
         # Verify original wavefunction properties
         assert cc_wavefunction.get_container_type() == "coupled_cluster"
@@ -1616,7 +1616,7 @@ class TestPyscfPlugin:
         cc_calculator = algorithms.create("dynamical_correlation_calculator", "pyscf_coupled_cluster")
         cc_calculator.settings().set("store_amplitudes", True)
         ansatz_object = Ansatz(hamiltonian, wavefunction)
-        _, cc_wavefunction = cc_calculator.run(ansatz_object)
+        _, cc_wavefunction, _ = cc_calculator.run(ansatz_object)
 
         # Verify original wavefunction properties
         assert cc_wavefunction.get_container_type() == "coupled_cluster"
