@@ -77,14 +77,14 @@ class SequenceStructureMapper(ControlledEvolutionCircuitMapper):
         return "controlled_evolution_circuit_mapper"
 
     def _run_impl(
-        self, controlled_evolution: ControlledTimeEvolutionUnitary, system_indices: Sequence[int] | None = None
+        self, controlled_evolution: ControlledTimeEvolutionUnitary, target_indices: Sequence[int] | None = None
     ) -> Circuit:
         r"""Construct a quantum circuit implementing the controlled time evolution unitary.
 
         Args:
             controlled_evolution: The controlled time evolution unitary containing the Hamiltonian
             and evolution parameters.
-            system_indices: Indices of the system qubits in the circuit. If None, defaults to all
+            target_indices: Indices of the target qubits in the circuit. If None, defaults to all
             qubits except the control qubits at controlled_evolution.control_indices.
 
         Returns:
@@ -98,17 +98,17 @@ class SequenceStructureMapper(ControlledEvolutionCircuitMapper):
                 "SequenceStructureMapper only supports PauliProductFormula container for time evolution unitary."
             )
 
-        num_system_qubits = controlled_evolution.get_num_system_qubits()
+        num_unitary_qubits = controlled_evolution.get_num_unitary_qubits()
 
-        total_qubits = num_system_qubits + len(controlled_evolution.control_indices)
+        total_qubits = num_unitary_qubits + len(controlled_evolution.control_indices)
 
-        if system_indices is None:
-            system_indices = [i for i in range(total_qubits) if i not in controlled_evolution.control_indices]
+        if target_indices is None:
+            target_indices = [i for i in range(total_qubits) if i not in controlled_evolution.control_indices]
 
         circuit = QuantumCircuit(total_qubits)
 
         append_controlled_time_evolution(
-            circuit, controlled_evolution, system_indices=system_indices, power=self._settings.get("power")
+            circuit, controlled_evolution, target_qubits=target_indices, power=self._settings.get("power")
         )
 
         qasm_str = qasm3.dumps(circuit)
@@ -118,7 +118,7 @@ class SequenceStructureMapper(ControlledEvolutionCircuitMapper):
 def _append_controlled_pauli_rotation(
     circuit: QuantumCircuit,
     control_qubit: int,
-    system_qubits: Sequence[int],
+    target_qubits: Sequence[int],
     term: ExponentiatedPauliTerm,
 ) -> QuantumCircuit:
     """Append a controlled ``exp(-i angle * P)`` to ``circuit``.
@@ -126,7 +126,7 @@ def _append_controlled_pauli_rotation(
     Args:
         circuit: Quantum circuit receiving the controlled rotation.
         control_qubit: Index of the ancilla qubit providing the control.
-        system_qubits: Ordered collection of system qubit indices.
+        target_qubits: Ordered collection of target qubit indices.
         term: Pauli term describing the rotation axis.
 
     Returns:
@@ -140,7 +140,7 @@ def _append_controlled_pauli_rotation(
         return circuit
 
     involved_indices = sorted(term.pauli_term.keys())
-    involved_qubits = [system_qubits[i] for i in involved_indices]
+    involved_qubits = [target_qubits[i] for i in involved_indices]
 
     # Basis-change into Z
     for idx, qubit in zip(involved_indices, involved_qubits, strict=True):
@@ -175,7 +175,7 @@ def append_controlled_time_evolution(
     circuit: QuantumCircuit,
     controlled_evolution: ControlledTimeEvolutionUnitary,
     *,
-    system_indices: Sequence[int],
+    target_qubits: Sequence[int],
     power: int = 1,
 ) -> None:
     """Append the controlled unitary ``(exp(-i H time))**power``.
@@ -183,8 +183,8 @@ def append_controlled_time_evolution(
     Args:
         circuit: Circuit being extended.
         controlled_evolution: The controlled time evolution unitary.
-        system_indices: The system qubit indices.
-            If None, assumes system qubits are all qubits except the control qubit.
+        target_qubits: The target qubit indices.
+            If None, assumes target qubits are all qubits except the control qubit.
         power: Number of repeated applications (``U`` raised to ``power``).
 
     Raises:
@@ -217,6 +217,6 @@ def append_controlled_time_evolution(
                 _append_controlled_pauli_rotation(
                     circuit,
                     control_qubit,
-                    system_indices,
+                    target_qubits,
                     term,
                 )

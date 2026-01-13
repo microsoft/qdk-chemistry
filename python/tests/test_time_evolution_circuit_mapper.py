@@ -7,8 +7,11 @@
 
 import re
 
+import numpy as np
 import pytest
-from qiskit import QuantumCircuit
+import scipy
+from qiskit import QuantumCircuit, qasm3
+from qiskit.quantum_info import Operator
 
 from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.sequence_structure_mapper import (
     SequenceStructureMapper,
@@ -24,6 +27,8 @@ from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
 from qdk_chemistry.data.time_evolution.controlled_time_evolution import (
     ControlledTimeEvolutionUnitary,
 )
+
+from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 
 @pytest.fixture
@@ -99,6 +104,58 @@ class TestSequenceStructureMapper:
 
         with pytest.raises(ValueError, match="not supported"):
             mapper.run(invalid_controlled)
+
+    def test_rotation_parameters(self, controlled_unitary):
+        """Test that rotation parameters are correctly set in the mapped circuit."""
+        mapper = SequenceStructureMapper(power=1)
+
+        circuit = mapper.run(controlled_unitary)
+
+        # Check that the angles in the CRZ gates are correctly set
+        crz_angles = re.findall(r"crz\s*\(\s*([^\)]+)\s*\)", circuit.qasm)
+        container = controlled_unitary.time_evolution_unitary.get_container()
+        expected_angles = [
+            f"{2 * container.step_terms[0].angle:.1f}",
+            f"{2 * container.step_terms[1].angle:.1f}",
+        ]
+
+        assert crz_angles == expected_angles
+
+    def test_controlled_u_circuit_matrix(self, controlled_unitary):
+        """Test that the constructed controlled-U circuit has the expected matrix."""
+        mapper = SequenceStructureMapper(power=1)
+        circuit = mapper.run(controlled_unitary)
+
+        # Extract angles from the container
+        container = controlled_unitary.time_evolution_unitary.get_container()
+        angle_x = container.step_terms[0].angle
+        angle_z = container.step_terms[1].angle
+
+        pauli_x = np.array([[0, 1], [1, 0]], dtype=complex)
+        pauli_z = np.array([[1, 0], [0, -1]], dtype=complex)
+        identity = np.eye(2, dtype=complex)
+        x_0 = np.kron(identity, pauli_x)
+        z_1 = np.kron(pauli_z, identity)
+        u_1 = scipy.linalg.expm(-1j * angle_x * x_0)
+        u_2 = scipy.linalg.expm(-1j * angle_z * z_1)
+        u = u_2 @ u_1
+
+        # CU = (|0><0| ⊗ I₄) + (|1><1| ⊗ U)
+        p_0 = np.array([[1, 0], [0, 0]], dtype=complex)
+        p_1 = np.array([[0, 0], [0, 1]], dtype=complex)
+        i_4 = np.eye(4, dtype=complex)
+        expected_matrix = np.kron(p_0, i_4) + np.kron(p_1, u)
+
+        # Get actual matrix from the circuit
+        qc = qasm3.loads(circuit.qasm)
+        actual_matrix = Operator(qc).data
+
+        assert np.allclose(
+            actual_matrix,
+            expected_matrix,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
 
 
 class TestAppendControlledTimeEvolution:

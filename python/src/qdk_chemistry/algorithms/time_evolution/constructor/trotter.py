@@ -83,10 +83,10 @@ class Trotter(TimeEvolutionConstructor):
 
         """
         # Calculate evolution time per Trotter step
-        dt = time / self._settings.get("num_trotter_steps")
+        delta = time / self._settings.get("num_trotter_steps")
         tolerance = self._settings.get("tolerance")
 
-        terms = self._decompose_trotter_step(qubit_hamiltonian, time=dt, atol=tolerance)
+        terms = self._decompose_trotter_step(qubit_hamiltonian, time=delta, atol=tolerance)
 
         num_qubits = qubit_hamiltonian.num_qubits
 

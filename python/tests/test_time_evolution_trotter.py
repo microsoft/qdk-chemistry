@@ -7,6 +7,7 @@
 
 import numpy as np
 import pytest
+import scipy
 
 from qdk_chemistry.algorithms.time_evolution.constructor.trotter import Trotter
 from qdk_chemistry.data import QubitHamiltonian, TimeEvolutionUnitary
@@ -38,10 +39,6 @@ class TestPauliLabelToMap:
         constructor = Trotter()
         mapping = constructor._pauli_label_to_map("XYZ")
         assert mapping == {0: "Z", 1: "Y", 2: "X"}
-
-
-class TestDecomposeTrotterStep:
-    """Tests for the _decompose_trotter_step helper function."""
 
 
 class TestTrotter:
@@ -136,3 +133,39 @@ class TestTrotter:
 
         with pytest.raises(NotImplementedError, match="Only first-order Trotter decomposition is currently supported."):
             ctor.run(hamiltonian, time=1.0)
+
+    def test_trotter_x_z_example(self):
+        """Correctness check for first-order Trotter decomposition."""
+        # Hamiltonian H = X + Z
+        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
+
+        ctor = Trotter(num_trotter_steps=1)
+        t = 0.1
+        unitary = ctor.run(hamiltonian, time=t)
+        container = unitary.get_container()
+
+        def _pauli_matrix(label: str) -> np.ndarray:
+            """Helper to get Pauli matrix from label."""
+            if label == "X":
+                return np.array([[0, 1], [1, 0]], dtype=complex)
+            if label == "Z":
+                return np.array([[1, 0], [0, -1]], dtype=complex)
+            raise ValueError(f"Unsupported Pauli label: {label}")
+
+        # Build Trotter unitary matrix
+        u_trot = np.eye(2, dtype=complex)
+        for term in container.step_terms:
+            pauli_label = next(iter(term.pauli_term.values()))
+            pauli_matrix = _pauli_matrix(pauli_label)
+            u_trot = scipy.linalg.expm(-1j * term.angle * pauli_matrix) @ u_trot
+
+        # Exact unitary
+        hamiltonian_matrix = _pauli_matrix("X") + _pauli_matrix("Z")
+        u_exact = scipy.linalg.expm(-1j * t * hamiltonian_matrix)
+
+        assert container.step_terms[0].pauli_term == {0: "X"}
+        assert container.step_terms[1].pauli_term == {0: "Z"}
+        assert container.step_terms[0].angle == t  # angle for X term
+        assert container.step_terms[1].angle == t  # angle for Z term
+        # Compare: the error should scales as O(t^2) for first-order Trotter
+        assert np.allclose(u_trot, u_exact, atol=t**2)

@@ -67,7 +67,7 @@ class TestControlledTimeEvolutionUnitary:
         cteu = ControlledTimeEvolutionUnitary(teu, control_indices=[1])
 
         assert cteu.control_indices == [1]
-        assert cteu.get_num_system_qubits() == 4
+        assert cteu.get_num_unitary_qubits() == 4
         assert cteu.get_unitary_container_type() == "mock"
 
     def test_to_json_serialization(self):

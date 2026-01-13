@@ -46,8 +46,8 @@ class ControlledTimeEvolutionUnitary(DataClass):
         """
         return self.time_evolution_unitary.get_container_type()
 
-    def get_num_system_qubits(self) -> int:
-        """Get the number of system qubits.
+    def get_num_unitary_qubits(self) -> int:
+        """Get the number of qubits in the time evolution unitary.
 
         Returns:
             The number of qubits.
