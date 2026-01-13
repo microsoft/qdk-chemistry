@@ -18,7 +18,7 @@
 namespace qdk::chemistry::data {
 
 /**
- * @class DensityFittedHamiltonian
+ * @class DensityFittedHamiltonianContainer
  * @brief Contains a molecular Hamiltonian using canonical four center
  * integrals, implemented as a subclass of HamiltonianContainer.
  *
@@ -38,7 +38,7 @@ namespace qdk::chemistry::data {
  * integrates with the broader quantum chemistry framework for active space
  * methods.
  */
-class DensityFittedHamiltonian : public HamiltonianContainer {
+class DensityFittedHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
    * @brief Constructor for active space Hamiltonian with four center integrals
@@ -55,12 +55,12 @@ class DensityFittedHamiltonian : public HamiltonianContainer {
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
-  DensityFittedHamiltonian(const Eigen::MatrixXd& one_body_integrals,
-                           const Eigen::MatrixXd& two_body_integrals,
-                           std::shared_ptr<Orbitals> orbitals,
-                           double core_energy,
-                           const Eigen::MatrixXd& inactive_fock_matrix,
-                           HamiltonianType type = HamiltonianType::Hermitian);
+  DensityFittedHamiltonianContainer(
+      const Eigen::MatrixXd& one_body_integrals,
+      const Eigen::MatrixXd& two_body_integrals,
+      std::shared_ptr<Orbitals> orbitals, double core_energy,
+      const Eigen::MatrixXd& inactive_fock_matrix,
+      HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
    * @brief Constructor for active space Hamiltonian with four center integrals
@@ -85,21 +85,21 @@ class DensityFittedHamiltonian : public HamiltonianContainer {
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
-  DensityFittedHamiltonian(const Eigen::MatrixXd& one_body_integrals_alpha,
-                           const Eigen::MatrixXd& one_body_integrals_beta,
-                           const Eigen::MatrixXd& two_body_integrals_aaaa,
-                           const Eigen::MatrixXd& two_body_integrals_aabb,
-                           const Eigen::MatrixXd& two_body_integrals_bbbb,
-                           std::shared_ptr<Orbitals> orbitals,
-                           double core_energy,
-                           const Eigen::MatrixXd& inactive_fock_matrix_alpha,
-                           const Eigen::MatrixXd& inactive_fock_matrix_beta,
-                           HamiltonianType type = HamiltonianType::Hermitian);
+  DensityFittedHamiltonianContainer(
+      const Eigen::MatrixXd& one_body_integrals_alpha,
+      const Eigen::MatrixXd& one_body_integrals_beta,
+      const Eigen::MatrixXd& two_body_integrals_aaaa,
+      const Eigen::MatrixXd& two_body_integrals_aabb,
+      const Eigen::MatrixXd& two_body_integrals_bbbb,
+      std::shared_ptr<Orbitals> orbitals, double core_energy,
+      const Eigen::MatrixXd& inactive_fock_matrix_alpha,
+      const Eigen::MatrixXd& inactive_fock_matrix_beta,
+      HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
    * @brief Destructor
    */
-  ~DensityFittedHamiltonian() override final = default;
+  ~DensityFittedHamiltonianContainer() override final = default;
 
   /**
    * @brief Create a deep copy of this container
@@ -180,7 +180,8 @@ class DensityFittedHamiltonian : public HamiltonianContainer {
    * @return Unique pointer to const Hamiltonian loaded from group
    * @throws std::runtime_error if I/O error occurs
    */
-  static std::unique_ptr<DensityFittedHamiltonian> from_hdf5(H5::Group& group);
+  static std::unique_ptr<DensityFittedHamiltonianContainer> from_hdf5(
+      H5::Group& group);
 
   /**
    * @brief Load Hamiltonian from JSON
@@ -188,7 +189,7 @@ class DensityFittedHamiltonian : public HamiltonianContainer {
    * @return Shared pointer to const Hamiltonian loaded from JSON
    * @throws std::runtime_error if JSON is malformed
    */
-  static std::unique_ptr<DensityFittedHamiltonian> from_json(
+  static std::unique_ptr<DensityFittedHamiltonianContainer> from_json(
       const nlohmann::json& j);
 
   /**

@@ -18,7 +18,7 @@
 
 namespace qdk::chemistry::data {
 
-DensityFittedHamiltonian::DensityFittedHamiltonian(
+DensityFittedHamiltonianContainer::DensityFittedHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals,
     const Eigen::MatrixXd& three_center_integrals,
     std::shared_ptr<Orbitals> orbitals, double core_energy,
@@ -39,7 +39,7 @@ DensityFittedHamiltonian::DensityFittedHamiltonian(
   }
 }
 
-DensityFittedHamiltonian::DensityFittedHamiltonian(
+DensityFittedHamiltonianContainer::DensityFittedHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals_alpha,
     const Eigen::MatrixXd& one_body_integrals_beta,
     const Eigen::MatrixXd& three_center_integrals_aaaa,
@@ -67,14 +67,15 @@ DensityFittedHamiltonian::DensityFittedHamiltonian(
   }
 }
 
-std::unique_ptr<HamiltonianContainer> DensityFittedHamiltonian::clone() const {
+std::unique_ptr<HamiltonianContainer> DensityFittedHamiltonianContainer::clone()
+    const {
   QDK_LOG_TRACE_ENTERING();
   if (is_restricted()) {
-    return std::make_unique<DensityFittedHamiltonian>(
+    return std::make_unique<DensityFittedHamiltonianContainer>(
         *_one_body_integrals.first, *std::get<0>(_three_center_integrals),
         _orbitals, _core_energy, *_inactive_fock_matrix.first, _type);
   }
-  return std::make_unique<DensityFittedHamiltonian>(
+  return std::make_unique<DensityFittedHamiltonianContainer>(
       *_one_body_integrals.first, *_one_body_integrals.second,
       *std::get<0>(_three_center_integrals),
       *std::get<1>(_three_center_integrals),
@@ -82,14 +83,14 @@ std::unique_ptr<HamiltonianContainer> DensityFittedHamiltonian::clone() const {
       *_inactive_fock_matrix.first, *_inactive_fock_matrix.second, _type);
 }
 
-std::string DensityFittedHamiltonian::get_container_type() const {
+std::string DensityFittedHamiltonianContainer::get_container_type() const {
   QDK_LOG_TRACE_ENTERING();
   return "denisity_fitted";
 }
 
 std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
            const Eigen::VectorXd&>
-DensityFittedHamiltonian::get_two_body_integrals() const {
+DensityFittedHamiltonianContainer::get_two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_two_body_integrals()) {
     throw std::runtime_error("Three-center integrals are not set");
@@ -106,7 +107,7 @@ DensityFittedHamiltonian::get_two_body_integrals() const {
       std::cref(*std::get<2>(*_cached_four_center_integrals)));
 }
 
-void DensityFittedHamiltonian::_build_two_body_cache() const {
+void DensityFittedHamiltonianContainer::_build_two_body_cache() const {
   QDK_LOG_TRACE_ENTERING();
 
   size_t norb = _orbitals->get_active_space_indices().first.size();
@@ -148,7 +149,7 @@ void DensityFittedHamiltonian::_build_two_body_cache() const {
 
 std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
            const Eigen::MatrixXd&>
-DensityFittedHamiltonian::get_three_center_integrals() const {
+DensityFittedHamiltonianContainer::get_three_center_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_two_body_integrals()) {
     throw std::runtime_error("Two-body integrals are not set");
@@ -158,7 +159,7 @@ DensityFittedHamiltonian::get_three_center_integrals() const {
                          std::cref(*std::get<2>(_three_center_integrals)));
 }
 
-double DensityFittedHamiltonian::get_two_body_element(
+double DensityFittedHamiltonianContainer::get_two_body_element(
     unsigned i, unsigned j, unsigned k, unsigned l, SpinChannel channel) const {
   QDK_LOG_TRACE_ENTERING();
 
@@ -190,27 +191,27 @@ double DensityFittedHamiltonian::get_two_body_element(
   }
 }
 
-double DensityFittedHamiltonian::_get_two_body_element(const Eigen::MatrixXd& A,
-                                                       unsigned ij,
-                                                       unsigned kl) const {
+double DensityFittedHamiltonianContainer::_get_two_body_element(
+    const Eigen::MatrixXd& A, unsigned ij, unsigned kl) const {
   QDK_LOG_TRACE_ENTERING();
   // Note three-center integral stores each geminal in a column
   return A.col(ij).dot(A.col(kl));
 }
 
-size_t DensityFittedHamiltonian::_get_geminal_index(size_t i, size_t j) const {
+size_t DensityFittedHamiltonianContainer::_get_geminal_index(size_t i,
+                                                             size_t j) const {
   QDK_LOG_TRACE_ENTERING();
   size_t norb = _orbitals->get_active_space_indices().first.size();
   return i * norb + j;
 }
 
-bool DensityFittedHamiltonian::has_two_body_integrals() const {
+bool DensityFittedHamiltonianContainer::has_two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   return std::get<0>(_three_center_integrals) != nullptr &&
          std::get<0>(_three_center_integrals)->size() > 0;
 }
 
-bool DensityFittedHamiltonian::is_restricted() const {
+bool DensityFittedHamiltonianContainer::is_restricted() const {
   QDK_LOG_TRACE_ENTERING();
   // Hamiltonian is restricted if alpha and beta components point to the same
   // data
@@ -223,7 +224,7 @@ bool DensityFittedHamiltonian::is_restricted() const {
           (!_inactive_fock_matrix.first && !_inactive_fock_matrix.second));
 }
 
-bool DensityFittedHamiltonian::is_valid() const {
+bool DensityFittedHamiltonianContainer::is_valid() const {
   QDK_LOG_TRACE_ENTERING();
   // Check if essential data is present
   if (!has_one_body_integrals() || !has_two_body_integrals()) {
@@ -240,7 +241,7 @@ bool DensityFittedHamiltonian::is_valid() const {
   return true;
 }
 
-void DensityFittedHamiltonian::validate_integral_dimensions() const {
+void DensityFittedHamiltonianContainer::validate_integral_dimensions() const {
   QDK_LOG_TRACE_ENTERING();
   // Check alpha one-body integrals
   HamiltonianContainer::validate_integral_dimensions();
@@ -291,7 +292,7 @@ void DensityFittedHamiltonian::validate_integral_dimensions() const {
 
 std::tuple<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>,
            std::shared_ptr<Eigen::MatrixXd>>
-DensityFittedHamiltonian::make_restricted_three_center_integrals(
+DensityFittedHamiltonianContainer::make_restricted_three_center_integrals(
     const Eigen::MatrixXd& integrals) {
   QDK_LOG_TRACE_ENTERING();
   auto shared_integrals = std::make_shared<Eigen::MatrixXd>(integrals);
@@ -300,14 +301,13 @@ DensityFittedHamiltonian::make_restricted_three_center_integrals(
       shared_integrals);  // aaaa, aabb, bbbb all point to same data
 }
 
-void DensityFittedHamiltonian::to_fcidump_file(const std::string& filename,
-                                               size_t nalpha,
-                                               size_t nbeta) const {
+void DensityFittedHamiltonianContainer::to_fcidump_file(
+    const std::string& filename, size_t nalpha, size_t nbeta) const {
   QDK_LOG_TRACE_ENTERING();
   _to_fcidump_file(filename, nalpha, nbeta);
 }
 
-nlohmann::json DensityFittedHamiltonian::to_json() const {
+nlohmann::json DensityFittedHamiltonianContainer::to_json() const {
   QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
 
@@ -436,8 +436,8 @@ nlohmann::json DensityFittedHamiltonian::to_json() const {
   return j;
 }
 
-std::unique_ptr<DensityFittedHamiltonian> DensityFittedHamiltonian::from_json(
-    const nlohmann::json& j) {
+std::unique_ptr<DensityFittedHamiltonianContainer>
+DensityFittedHamiltonianContainer::from_json(const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version first
@@ -572,12 +572,12 @@ std::unique_ptr<DensityFittedHamiltonian> DensityFittedHamiltonian::from_json(
     if (is_restricted_data) {
       // Use restricted constructor - it will create shared pointers internally
       // so alpha and beta point to the same data
-      return std::make_unique<DensityFittedHamiltonian>(
+      return std::make_unique<DensityFittedHamiltonianContainer>(
           one_body_alpha, three_center_aaaa, orbitals, core_energy,
           inactive_fock_alpha, type);
     } else {
       // Use unrestricted constructor with separate alpha and beta data
-      return std::make_unique<DensityFittedHamiltonian>(
+      return std::make_unique<DensityFittedHamiltonianContainer>(
           one_body_alpha, one_body_beta, three_center_aaaa, three_center_aabb,
           three_center_bbbb, orbitals, core_energy, inactive_fock_alpha,
           inactive_fock_beta, type);
@@ -589,7 +589,7 @@ std::unique_ptr<DensityFittedHamiltonian> DensityFittedHamiltonian::from_json(
   }
 }
 
-void DensityFittedHamiltonian::to_hdf5(H5::Group& group) const {
+void DensityFittedHamiltonianContainer::to_hdf5(H5::Group& group) const {
   QDK_LOG_TRACE_ENTERING();
   try {
     // Save version first
@@ -671,8 +671,8 @@ void DensityFittedHamiltonian::to_hdf5(H5::Group& group) const {
   }
 }
 
-std::unique_ptr<DensityFittedHamiltonian> DensityFittedHamiltonian::from_hdf5(
-    H5::Group& group) {
+std::unique_ptr<DensityFittedHamiltonianContainer>
+DensityFittedHamiltonianContainer::from_hdf5(H5::Group& group) {
   QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version first
@@ -780,12 +780,12 @@ std::unique_ptr<DensityFittedHamiltonian> DensityFittedHamiltonian::from_hdf5(
     // Create and return appropriate Hamiltonian using the correct constructor
     if (is_restricted_data) {
       // Use restricted constructor - it will create shared pointers internally
-      return std::make_unique<DensityFittedHamiltonian>(
+      return std::make_unique<DensityFittedHamiltonianContainer>(
           one_body_alpha, three_center_aaaa, orbitals, core_energy,
           inactive_fock_alpha, type);
     } else {
       // Use unrestricted constructor with separate alpha and beta data
-      return std::make_unique<DensityFittedHamiltonian>(
+      return std::make_unique<DensityFittedHamiltonianContainer>(
           one_body_alpha, one_body_beta, three_center_aaaa, three_center_aabb,
           three_center_bbbb, orbitals, core_energy, inactive_fock_alpha,
           inactive_fock_beta, type);
@@ -796,9 +796,8 @@ std::unique_ptr<DensityFittedHamiltonian> DensityFittedHamiltonian::from_hdf5(
   }
 }
 
-void DensityFittedHamiltonian::_to_fcidump_file(const std::string& filename,
-                                                size_t nalpha,
-                                                size_t nbeta) const {
+void DensityFittedHamiltonianContainer::_to_fcidump_file(
+    const std::string& filename, size_t nalpha, size_t nbeta) const {
   QDK_LOG_TRACE_ENTERING();
   // Check if this is an unrestricted Hamiltonian and throw error
   if (is_unrestricted()) {
