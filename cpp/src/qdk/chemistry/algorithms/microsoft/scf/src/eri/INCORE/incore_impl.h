@@ -135,8 +135,7 @@ class ERI {
   void quarter_trans(size_t nt, const double* C, double* out);
 
   std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
-                                                 const double* full_debug_eris,
-                                                 size_t* num_vectors);
+                                                  size_t* num_vectors);
   /**
    * @brief Get direct read-only access to raw stored AO ERIs
    * @return Const pointer to the stored ERI tensor
@@ -243,8 +242,7 @@ class ERI_DF : public DensityFittingBase {
   void quarter_trans(size_t nt, const double* C, double* out);
 
   std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
-                                                 const double* full_debug_eris,
-                                                 size_t* num_vectors);
+                                                  size_t* num_vectors);
 
   /**
    * @brief Destructor

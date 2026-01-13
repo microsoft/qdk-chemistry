@@ -88,8 +88,7 @@ class ERIINCORE : public ERI {
   void quarter_trans_impl(size_t nt, const double* C, double* out) override;
 
   std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
-                                                 const double* full_debug_eris,
-                                                 size_t* num_vectors) override;
+                                                  size_t* num_vectors) override;
 
   /**
    * @brief Get direct read-only access to raw stored AO ERIs
@@ -186,8 +185,7 @@ class ERIINCORE_DF : public ERI {
   const double* get_raw_eris() const override { return nullptr; }
 
   std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
-                                                 const double* full_debug_eris,
-                                                 size_t* num_vectors) override {
+                                                  size_t* num_vectors) override {
     return nullptr;
   };
 

@@ -63,8 +63,7 @@ class LIBINT2_DIRECT : public ERI {
                 double beta, double omega) override;
 
   std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
-                                                 const double* full_debug_eris,
-                                                 size_t* num_vectors) override;
+                                                  size_t* num_vectors) override;
 
  private:
   /**

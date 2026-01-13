@@ -656,8 +656,7 @@ class ERI {
   }
 
   std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
-                                                 const double* full_debug_eris,
-                                                 size_t* num_vectors) {
+                                                  size_t* num_vectors) {
     QDK_LOG_TRACE_ENTERING();
 
     std::cout << "Threshold: " << threshold << std::endl;
@@ -674,7 +673,7 @@ class ERI {
       return s2 + (s1 * (s1 + 1)) / 2;
     };
 
-    // Precompute inverse mapping: sp_index -> (s1, s2) for fast lookup
+    // Precompute sp_index to (s1, s2) mapping
     std::vector<std::pair<size_t, size_t>> sp_index_to_shells(num_shell_pairs);
     for (size_t s1 = 0; s1 < num_shells; ++s1) {
       for (size_t s2 = 0; s2 <= s1; ++s2) {
@@ -698,19 +697,23 @@ class ERI {
     engines_coulomb[0].set_precision(engine_precision);
     for (int i = 1; i < nthreads; ++i) engines_coulomb[i] = engines_coulomb[0];
 
-    // Cholesky vectors
+    // index of current cholesky vector
     size_t current_col = 0;
-    Eigen::MatrixXd L;
-    L.resize(num_aos * num_aos, num_aos);
+    std::vector<double> L_data;
+    // Reserve number of aos for Cholesky vectors
+    size_t estimated_rank = num_aos;
+    L_data.reserve(num_aos2 * estimated_rank);
 
     // Diagonal elements and indices
     std::vector<Eigen::VectorXd> D_shell_pair(num_shell_pairs);
     std::unordered_set<size_t> active_shell_pairs;
 
 #ifdef _OPENMP
+    //  Thread-local active shell pair lists
     std::vector<std::vector<size_t>> active_shell_pairs_local(nthreads);
 #endif
 
+    // Compute diagonal elements for all shell pairs
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -748,10 +751,7 @@ class ERI {
           }
 
           // local diagonal block
-          // Extract diagonal from shell quartet buffer
           Eigen::Map<const Eigen::MatrixXd> buf_mat(res, n12, n12);
-
-          // No race - each sp_index written by exactly one thread
           D_shell_pair[sp_index] = buf_mat.diagonal();
 #ifdef _OPENMP
           active_shell_pairs_local[thread_id].push_back(sp_index);
@@ -771,14 +771,10 @@ class ERI {
     }
 #endif
 
-    // 2. Cholesky decomposition
-    double Q_max;
-    size_t global_index;
-
-    size_t q_shell_pair_max;
-    size_t niter = 0;
-    while (niter <= num_aos * num_aos) {
+    // Cholesky decomposition
+    while (true) {
       // get max diagonal element
+      size_t q_shell_pair_max;
       double D_max = 0.0;
       size_t s1_max, s2_max;
       for(const auto sp_index : active_shell_pairs) {
@@ -798,7 +794,7 @@ class ERI {
         break;
       }
 
-      // get column for shell pair (s1_max, s2_max)
+      // get column for max shell pair (s1_max, s2_max)
       const size_t n1_max = obs_[s1_max].size();
       const size_t n2_max = obs_[s2_max].size();
       Eigen::MatrixXd eri_col =
@@ -809,19 +805,18 @@ class ERI {
         eri_col_threads[t] =
             Eigen::MatrixXd::Zero(num_aos2, n1_max * n2_max);
       }
-
 #pragma omp parallel
 #endif
       {
 #ifdef _OPENMP
         const auto thread_id = omp_get_thread_num();
+        // get thread-local eri_col
+        auto& eri_col_local = eri_col_threads[thread_id];
 #else
         const auto thread_id = 0;
 #endif
         auto& engine = engines_coulomb[thread_id];
         const auto& buf = engine.results();
-        auto& eri_col_local = eri_col_threads[thread_id];
-
         for (size_t s3 = 0, s34 = 0; s3 < num_shells; ++s3) {
           const size_t n3 = obs_[s3].size();
           const size_t bf3_st = shell2bf_[s3];
@@ -843,8 +838,6 @@ class ERI {
                             ::libint2::BraKet::xx_xx, 0>(
                 obs_[s1_max], obs_[s2_max], obs_[s3], obs_[s4]);
             const auto& res = buf[0];
-
-            // Coarse integral screening
             if (res == nullptr) continue;
 
             // fill in eri_col
@@ -880,7 +873,6 @@ class ERI {
       const size_t bf1_max_st = shell2bf_[s1_max];
       const size_t bf2_max_st = shell2bf_[s2_max];
       std::vector<size_t> shell_pairs_to_lookup(n1_max * n2_max);
-
       for(size_t i = 0; i < n1_max; ++i) {
         for(size_t j = 0; j < n2_max; ++j) {
           const size_t local_index = i * n2_max + j;
@@ -890,13 +882,16 @@ class ERI {
 
       // correct for cholesky contributions
       if (current_col > 0) {
+        // Eigen map to existing L vectors
+        Eigen::Map<const Eigen::MatrixXd> L_map(L_data.data(), num_aos2, current_col);
+
         // subtract previous contributions
         Eigen::MatrixXd L_rows(eri_col.cols(), current_col);
         for (size_t col = 0; col < eri_col.cols(); ++col) {
-          global_index = shell_pairs_to_lookup[col];
-          L_rows.row(col) = L.row(global_index).leftCols(current_col);
+          const size_t global_index = shell_pairs_to_lookup[col];
+          L_rows.row(col) = L_map.row(global_index).leftCols(current_col);
         }
-        eri_col -= L.leftCols(current_col) * L_rows.transpose();
+        eri_col -= L_map.leftCols(current_col) * L_rows.transpose();
       }
 
       // form new cholesky vector for each index in shell pair
@@ -911,20 +906,27 @@ class ERI {
           }
 
           // Form Cholesky vector
-          Q_max = std::sqrt(1.0 / D_val);
-          L.col(current_col) = Q_max * eri_col.col(local_index);
+          double Q_max = std::sqrt(1.0 / D_val);
+          Eigen::VectorXd L_col_vec = Q_max * eri_col.col(local_index);
+
+          // append to L_data
+          L_data.insert(L_data.end(), L_col_vec.data(), L_col_vec.data() + num_aos2);
 
           // reference to current column
-          const double* L_col = L.col(current_col).data();
+          const double* L_col = L_data.data() + current_col * num_aos2;
 
           // Update remaining columns in eri_col for vectors formed within this
           // shell pair
           for (size_t col = local_index + 1; col < n1_max * n2_max; ++col) {
             const size_t global_col_idx = shell_pairs_to_lookup[col];
-            eri_col.col(col) -= L.col(current_col) * L(global_col_idx, current_col);
+            const double scale_factor = -L_col[global_col_idx];
+            double* eri_col_ptr = eri_col.col(col).data();
+            for (size_t i = 0; i < num_aos2; ++i) {
+              eri_col_ptr[i] += scale_factor * L_col[i];
+            }
           }
 
-          // Update active diagonal blocks
+          // Update diagonal elements
           std::vector<size_t> shell_pairs_to_remove;
           for(const auto sp_index : active_shell_pairs) {
             const auto [s1, s2] = sp_index_to_shells[sp_index];
@@ -951,24 +953,16 @@ class ERI {
             active_shell_pairs.erase(sp_index);
           }
           current_col += 1;
-          // Append column (resize if needed)
-          if (current_col >= static_cast<size_t>(L.cols())) {
-            L.conservativeResize(Eigen::NoChange, L.cols() * 2);
-          }
         }
       }
-      niter += 1;
     }
 
-    // print L and rank
-    L.conservativeResize(Eigen::NoChange, current_col);
     std::cout << "Cholesky rank: " << current_col << std::endl;
-    // std::cout << "Cholesky Vectors L: \n" << L << std::endl;
 
-    // Allocate memory and copy
+    // Allocate and return exact size
     const size_t data_size = current_col * num_aos * num_aos;
     auto output = std::make_unique<double[]>(data_size);
-    std::memcpy(output.get(), L.data(), data_size * sizeof(double));
+    std::memcpy(output.get(), L_data.data(), data_size * sizeof(double));
     *num_vectors = current_col;
     return output;
   }
@@ -1290,10 +1284,9 @@ void LIBINT2_DIRECT::quarter_trans_impl(size_t nt, const double* C,
 
 // Cholesky vectors interface
 std::unique_ptr<double[]> LIBINT2_DIRECT::get_cholesky_vectors(
-    double threshold, const double* full_debug_eris, size_t* num_vectors) {
+    double threshold, size_t* num_vectors) {
   QDK_LOG_TRACE_ENTERING();
   if (!eri_impl_) throw std::runtime_error("LIBINT2_DIRECT NOT INITIALIZED");
-  return eri_impl_->get_cholesky_vectors(threshold, full_debug_eris,
-                                         num_vectors);
+  return eri_impl_->get_cholesky_vectors(threshold, num_vectors);
 }
 }  // namespace qdk::chemistry::scf

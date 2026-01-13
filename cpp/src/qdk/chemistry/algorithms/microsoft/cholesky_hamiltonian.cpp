@@ -232,21 +232,20 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   const size_t moeri_size = nactive * nactive * nactive * nactive;
 
   // Store Cholesky vectors for later use in inactive space computation
-  Eigen::MatrixXd L_ao;
+  // Eigen::MatrixXd L_ao;
 
     // Use Cholesky Decomposition
     double cholesky_tol = _settings->get<double>("cholesky_tolerance");
 
     // get cholesky vectors
     size_t num_cholesky_vectors = 0;
-    auto output =
-        eri->get_cholesky_vectors(cholesky_tol, nullptr, &num_cholesky_vectors);
+    auto output = eri->get_cholesky_vectors(cholesky_tol, &num_cholesky_vectors);
 
-    // map output to Eigen matrix
-    Eigen::Map<Eigen::MatrixXd> L_ao_map(
+    // map output to Eigen matrix and copy
+    Eigen::Map<const Eigen::MatrixXd> L_ao(
         output.get(), num_atomic_orbitals * num_atomic_orbitals,
         num_cholesky_vectors);
-    L_ao = L_ao_map;
+    // L_ao = L_ao_map;
     /**
      * @brief Reconstruct MO ERIs from Cholesky vectors
      * @param L_left Left Cholesky vectors in MO basis
