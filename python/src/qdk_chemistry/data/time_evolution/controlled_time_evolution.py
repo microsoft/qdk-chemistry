@@ -25,16 +25,16 @@ class ControlledTimeEvolutionUnitary(DataClass):
     # Serialization version for this class
     _serialization_version = "0.1.0"
 
-    def __init__(self, time_evolution_unitary: TimeEvolutionUnitary, control_index: int):
+    def __init__(self, time_evolution_unitary: TimeEvolutionUnitary, control_indices: list[int]):
         """Initialize a ControlledTimeEvolutionUnitary.
 
         Args:
             time_evolution_unitary: The time evolution unitary to be controlled.
-            control_index: The control qubit index.
+            control_indices: The control qubit indices.
 
         """
         self.time_evolution_unitary = time_evolution_unitary
-        self.control_index = control_index
+        self.control_indices = control_indices
         super().__init__()
 
     def get_unitary_container_type(self) -> str:
@@ -64,7 +64,7 @@ class ControlledTimeEvolutionUnitary(DataClass):
         """
         data: dict[str, Any] = {}
         data["time_evolution_unitary"] = self.time_evolution_unitary.to_json()
-        data["control_index"] = self.control_index
+        data["control_indices"] = self.control_indices
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -77,7 +77,7 @@ class ControlledTimeEvolutionUnitary(DataClass):
         self._add_hdf5_version(group)
 
         # Write simple attributes
-        group.attrs["control_index"] = self.control_index
+        group.attrs["control_indices"] = self.control_indices
 
         # Create subgroup for the nested object
         teu_group = group.create_group("time_evolution_unitary")
@@ -95,10 +95,10 @@ class ControlledTimeEvolutionUnitary(DataClass):
 
         """
         time_evolution_unitary = TimeEvolutionUnitary.from_json(json_data["time_evolution_unitary"])
-        control_index = json_data["control_index"]
+        control_indices = json_data["control_indices"]
         return cls(
             time_evolution_unitary=time_evolution_unitary,
-            control_index=control_index,
+            control_indices=control_indices,
         )
 
     @classmethod
@@ -116,7 +116,7 @@ class ControlledTimeEvolutionUnitary(DataClass):
         cls._validate_hdf5_version(cls._serialization_version, group)
 
         # Load simple attributes
-        control_index = int(group.attrs["control_index"])
+        control_indices = list(group.attrs["control_indices"])
 
         # Load nested TimeEvolutionUnitary
         teu_group = group["time_evolution_unitary"]
@@ -124,7 +124,7 @@ class ControlledTimeEvolutionUnitary(DataClass):
 
         return cls(
             time_evolution_unitary=time_evolution_unitary,
-            control_index=control_index,
+            control_indices=control_indices,
         )
 
     def get_summary(self) -> str:
@@ -135,7 +135,7 @@ class ControlledTimeEvolutionUnitary(DataClass):
 
         """
         line = "Controlled Time Evolution Unitary:\n"
-        line += f"  Control Index: {self.control_index}\n"
+        line += f"  Control Indices: {self.control_indices}\n"
         line += "  Time Evolution Unitary Summary:\n"
         teu_summary = self.time_evolution_unitary.get_summary()
         teu_summary_indented = "\n".join("    " + summary_line for summary_line in teu_summary.splitlines())

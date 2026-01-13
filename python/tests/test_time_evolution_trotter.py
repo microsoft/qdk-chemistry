@@ -8,7 +8,7 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms.time_evolution.constructor.trotter.first_order_trotter import FirstOrderTrotter
+from qdk_chemistry.algorithms.time_evolution.constructor.trotter import Trotter
 from qdk_chemistry.data import QubitHamiltonian, TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
@@ -23,19 +23,19 @@ class TestPauliLabelToMap:
 
     def test_identity_only(self):
         """Test that identity-only labels return an empty mapping."""
-        constructor = FirstOrderTrotter()
+        constructor = Trotter()
         assert constructor._pauli_label_to_map("III") == {}
 
     def test_single_pauli(self):
         """Test labels with a single non-identity Pauli."""
-        constructor = FirstOrderTrotter()
+        constructor = Trotter()
         assert constructor._pauli_label_to_map("X") == {0: "X"}
         assert constructor._pauli_label_to_map("IZ") == {0: "Z"}
 
     def test_multiple_paulis(self):
         """Test labels with multiple non-identity Paulis."""
         # label is little-endian: rightmost char -> qubit 0
-        constructor = FirstOrderTrotter()
+        constructor = Trotter()
         mapping = constructor._pauli_label_to_map("XYZ")
         assert mapping == {0: "Z", 1: "Y", 2: "X"}
 
@@ -44,18 +44,18 @@ class TestDecomposeTrotterStep:
     """Tests for the _decompose_trotter_step helper function."""
 
 
-class TestFirstOrderTrotter:
-    """Tests for the FirstOrderTrotter class."""
+class TestTrotter:
+    """Tests for the Trotter class."""
 
     def test_name(self):
-        """Test the name method of FirstOrderTrotter."""
-        ctor = FirstOrderTrotter()
-        assert ctor.name() == "first_order_trotter"
+        """Test the name method of Trotter."""
+        ctor = Trotter()
+        assert ctor.name() == "trotter"
 
     def test_single_step_construction(self):
         """Test construction of time evolution unitary with a single Trotter step."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
-        ctor = FirstOrderTrotter(num_trotter_steps=1)
+        ctor = Trotter(num_trotter_steps=1)
         unitary = ctor.run(hamiltonian, time=0.2)
 
         assert isinstance(unitary, TimeEvolutionUnitary)
@@ -73,7 +73,7 @@ class TestFirstOrderTrotter:
             coefficients=[2.0, 1.0],
         )
 
-        ctor = FirstOrderTrotter(num_trotter_steps=4)
+        ctor = Trotter(num_trotter_steps=4)
         unitary = ctor.run(hamiltonian, time=0.2)
 
         container = unitary.get_container()
@@ -95,7 +95,7 @@ class TestFirstOrderTrotter:
 
     def test_basic_decomposition(self):
         """Test basic decomposition of a qubit Hamiltonian."""
-        ctor = FirstOrderTrotter()
+        ctor = Trotter()
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
 
         terms = ctor._decompose_trotter_step(hamiltonian, time=2.0)
@@ -107,7 +107,7 @@ class TestFirstOrderTrotter:
 
     def test_filters_small_coefficients(self):
         """Test that terms with small coefficients are filtered out."""
-        ctor = FirstOrderTrotter()
+        ctor = Trotter()
         hamiltonian = QubitHamiltonian(
             pauli_strings=["X", "Z"],
             coefficients=[1e-15, 1.0],
@@ -120,7 +120,7 @@ class TestFirstOrderTrotter:
 
     def test_rejects_non_hermitian(self):
         """Test that non-Hermitian Hamiltonians raise a ValueError."""
-        ctor = FirstOrderTrotter()
+        ctor = Trotter()
         hamiltonian = QubitHamiltonian(
             pauli_strings=["X"],
             coefficients=[1.0 + 1.0j],
@@ -128,3 +128,11 @@ class TestFirstOrderTrotter:
 
         with pytest.raises(ValueError, match="Non-Hermitian"):
             ctor._decompose_trotter_step(hamiltonian, time=1.0)
+
+    def test_not_implemented_order(self):
+        """Test that unsupported Trotter orders raise NotImplementedError."""
+        ctor = Trotter(order=2)
+        hamiltonian = QubitHamiltonian(pauli_strings=["X"], coefficients=[1.0])
+
+        with pytest.raises(NotImplementedError, match="Only first-order Trotter decomposition is currently supported."):
+            ctor.run(hamiltonian, time=1.0)

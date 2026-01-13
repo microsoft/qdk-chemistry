@@ -1,4 +1,4 @@
-"""QDK/Chemistry implementation of the first order trotter constructor."""
+"""QDK/Chemistry implementation of the Trotter decomposition constructor."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -12,48 +12,67 @@ from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     PauliProductFormulaContainer,
 )
 
-__all__: list[str] = ["FirstOrderTrotter", "FirstOrderTrotterSettings"]
+__all__: list[str] = ["Trotter", "TrotterSettings"]
 
 
-class FirstOrderTrotterSettings(Settings):
-    """Settings for first-order Trotterization unitary constructor."""
+class TrotterSettings(Settings):
+    """Settings for Trotter decomposition constructor."""
 
     def __init__(self):
-        """Initialize FirstOrderTrotterSettings with default values.
+        """Initialize TrotterSettings with default values.
 
         Attributes:
+            order: The order of the Trotter decomposition (currently only first order is supported).
             num_trotter_steps: The number of Trotter steps to use in the construction.
             tolerance: The absolute tolerance for filtering small coefficients.
 
         """
         super().__init__()
+        self._set_default("order", "int", 1, "The order of the Trotter decomposition.")
         self._set_default("num_trotter_steps", "int", 1, "The number of Trotter steps.")
         self._set_default("tolerance", "float", 1e-12, "The absolute tolerance for filtering small coefficients.")
 
 
-class FirstOrderTrotter(TimeEvolutionConstructor):
-    """First-order Trotterization unitary constructor."""
+class Trotter(TimeEvolutionConstructor):
+    """Trotter decomposition constructor."""
 
-    def __init__(self, num_trotter_steps: int = 1, tolerance: float = 1e-12):
-        r"""Initialize FirstOrderTrotter with specified Trotter decomposition parameters.
-
-        The First Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`
-        by decomposing the Hamiltonian H into a sum of terms and using the product formula:
-        :math:`e^{-iHt} \approx \left[\prod_i e^{-iH_i t/n}\right]^n`, where n is the number of Trotter steps.
+    def __init__(self, order: int = 1, num_trotter_steps: int = 1, tolerance: float = 1e-12):
+        """Initialize Trotter Constructor with specified Trotter decomposition settings.
 
         Args:
+            order: The order of the Trotter decomposition (currently only first order is supported). Defaults to 1.
             num_trotter_steps: Number of Trotter steps for the decomposition. Higher values improve accuracy
                 but increase circuit depth. Defaults to 1.
             tolerance: Absolute threshold for filtering small Hamiltonian coefficients. Defaults to 1e-12.
 
         """
         super().__init__()
-        self._settings = FirstOrderTrotterSettings()
+        self._settings = TrotterSettings()
+        self._settings.set("order", order)
         self._settings.set("num_trotter_steps", num_trotter_steps)
         self._settings.set("tolerance", tolerance)
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
-        """Construct the time evolution unitary using first-order Trotterization.
+        """Construct the time evolution unitary using Trotter decomposition.
+
+        Args:
+            qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
+            time: The total evolution time.
+
+        Returns:
+            TimeEvolutionUnitary: The constructed time evolution unitary.
+
+        """
+        if self._settings.get("order") == 1:
+            return self._first_order_trotter(qubit_hamiltonian, time)
+        raise NotImplementedError("Only first-order Trotter decomposition is currently supported.")
+
+    def _first_order_trotter(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
+        r"""Construct the time evolution unitary using first-order Trotter decomposition.
+
+        The First Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`
+        by decomposing the Hamiltonian H into a sum of terms and using the product formula:
+        :math:`e^{-iHt} \approx \left[\prod_i e^{-iH_i t/n}\right]^n`, where n is the number of Trotter steps.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
@@ -135,7 +154,7 @@ class FirstOrderTrotter(TimeEvolutionConstructor):
 
     def name(self) -> str:
         """Return the name of the time evolution unitary constructor."""
-        return "first_order_trotter"
+        return "trotter"
 
     def type_name(self) -> str:
         """Return time_evolution_constructor as the algorithm type name."""

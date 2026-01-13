@@ -6,10 +6,10 @@
 # --------------------------------------------------------------------------------------------
 
 from .base import ControlledEvolutionCircuitMapperFactory
-from .chain_structure_mapper import ChainStructureMapper, ChainStructureMapperSettings
+from .sequence_structure_mapper import SequenceStructureMapper, SequenceStructureMapperSettings
 
 __all__ = [
-    "ChainStructureMapper",
-    "ChainStructureMapperSettings",
     "ControlledEvolutionCircuitMapperFactory",
+    "SequenceStructureMapper",
+    "SequenceStructureMapperSettings",
 ]

@@ -42,5 +42,5 @@ class TimeEvolutionConstructorFactory(AlgorithmFactory):
         return "time_evolution_constructor"
 
     def default_algorithm_name(self) -> str:
-        """Return first_order_trotter as the default algorithm name."""
-        return "first_order_trotter"
+        """Return Trotter as the default algorithm name."""
+        return "trotter"

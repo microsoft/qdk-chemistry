@@ -573,16 +573,18 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.time_evolution.constructor.trotter import (  # noqa: PLC0415
-        FirstOrderTrotter,
+        Trotter,
     )
-    from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import ChainStructureMapper  # noqa: PLC0415
+    from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import (  # noqa: PLC0415
+        SequenceStructureMapper,
+    )
 
     register(lambda: QDKEnergyEstimator())
     register(lambda: SparseIsometryGF2XStatePreparation())
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
-    register(lambda: FirstOrderTrotter())
-    register(lambda: ChainStructureMapper())
+    register(lambda: Trotter())
+    register(lambda: SequenceStructureMapper())
 
 
 _register_python_algorithms()

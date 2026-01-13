@@ -64,25 +64,25 @@ class TestControlledTimeEvolutionUnitary:
     def test_basic_properties(self):
         """Test basic properties of ControlledTimeEvolutionUnitary."""
         teu = create_mock_time_evolution_unitary(num_qubits=4)
-        cteu = ControlledTimeEvolutionUnitary(teu, control_index=1)
+        cteu = ControlledTimeEvolutionUnitary(teu, control_indices=[1])
 
-        assert cteu.control_index == 1
+        assert cteu.control_indices == [1]
         assert cteu.get_num_system_qubits() == 4
         assert cteu.get_unitary_container_type() == "mock"
 
     def test_to_json_serialization(self):
         """Test JSON serialization."""
         teu = create_mock_time_evolution_unitary(num_qubits=6)
-        cteu = ControlledTimeEvolutionUnitary(teu, control_index=2)
+        cteu = ControlledTimeEvolutionUnitary(teu, control_indices=[2])
 
         json_data = cteu.to_json()
         assert "time_evolution_unitary" in json_data
-        assert json_data["control_index"] == 2
+        assert json_data["control_indices"] == [2]
 
     def test_to_hdf5_roundtrip(self, tmp_path):
         """Test HDF5 serialization and deserialization."""
         teu = create_mock_time_evolution_unitary(num_qubits=8)
-        cteu = ControlledTimeEvolutionUnitary(teu, control_index=0)
+        cteu = ControlledTimeEvolutionUnitary(teu, control_indices=[0])
 
         file_path = tmp_path / "cte_unitary.h5"
 
@@ -93,8 +93,8 @@ class TestControlledTimeEvolutionUnitary:
         assert file_path.stat().st_size > 0
         with h5py.File(file_path, "r") as f:
             grp = f["cte"]
-            control_index = grp.attrs["control_index"]
-            assert control_index == 0
+            control_indices = grp.attrs["control_indices"]
+            assert list(control_indices) == [0]
 
             teu_group = grp["time_evolution_unitary"]
             num_qubits = teu_group.attrs["num_qubits"]
@@ -103,9 +103,9 @@ class TestControlledTimeEvolutionUnitary:
     def test_summary_format(self):
         """Test the summary format of ControlledTimeEvolutionUnitary."""
         teu = create_mock_time_evolution_unitary(num_qubits=3)
-        cteu = ControlledTimeEvolutionUnitary(teu, control_index=5)
+        cteu = ControlledTimeEvolutionUnitary(teu, control_indices=[5])
 
         summary = cteu.get_summary()
         assert "Controlled Time Evolution Unitary" in summary
-        assert "Control Index: 5" in summary
+        assert "Control Indices: [5]" in summary
         assert "Mock Time Evolution Unitary" in summary

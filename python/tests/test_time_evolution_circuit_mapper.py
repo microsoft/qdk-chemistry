@@ -1,4 +1,4 @@
-"""Tests for the ChainStructureMapper and its helper functions in QDK/Chemistry."""
+"""Tests for the SequenceStructureMapper and its helper functions in QDK/Chemistry."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -10,8 +10,8 @@ import re
 import pytest
 from qiskit import QuantumCircuit
 
-from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.chain_structure_mapper import (
-    ChainStructureMapper,
+from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.sequence_structure_mapper import (
+    SequenceStructureMapper,
     _append_controlled_pauli_rotation,
     append_controlled_time_evolution,
 )
@@ -47,21 +47,21 @@ def controlled_unitary(simple_ppf_container):
     teu = TimeEvolutionUnitary(container=simple_ppf_container)
     return ControlledTimeEvolutionUnitary(
         time_evolution_unitary=teu,
-        control_index=2,
+        control_indices=[2],
     )
 
 
-class TestChainStructureMapper:
-    """Tests for the ChainStructureMapper class."""
+class TestSequenceStructureMapper:
+    """Tests for the SequenceStructureMapper class."""
 
     def test_name(self):
         """Test that the name method returns the correct algorithm name."""
-        mapper = ChainStructureMapper()
-        assert mapper.name() == "chain_structure"
+        mapper = SequenceStructureMapper()
+        assert mapper.name() == "sequence_structure"
 
     def test_basic_mapping(self, controlled_unitary):
         """Test basic mapping of ControlledTimeEvolutionUnitary to Circuit."""
-        mapper = ChainStructureMapper(power=1)
+        mapper = SequenceStructureMapper(power=1)
 
         circuit = mapper.run(controlled_unitary)
 
@@ -71,7 +71,7 @@ class TestChainStructureMapper:
 
     def test_default_system_indices(self, controlled_unitary):
         """Test that default system indices are used when none are provided."""
-        mapper = ChainStructureMapper()
+        mapper = SequenceStructureMapper()
 
         circuit = mapper.run(controlled_unitary)
 
@@ -92,10 +92,10 @@ class TestChainStructureMapper:
         invalid_teu = TimeEvolutionUnitary(container=MockContainer())
         invalid_controlled = ControlledTimeEvolutionUnitary(
             time_evolution_unitary=invalid_teu,
-            control_index=2,
+            control_indices=[2],
         )
 
-        mapper = ChainStructureMapper()
+        mapper = SequenceStructureMapper()
 
         with pytest.raises(ValueError, match="not supported"):
             mapper.run(invalid_controlled)
@@ -139,7 +139,7 @@ class TestAppendControlledTimeEvolution:
             num_qubits=1,
         )
         teu = TimeEvolutionUnitary(container=container)
-        controlled = ControlledTimeEvolutionUnitary(teu, control_index=1)
+        controlled = ControlledTimeEvolutionUnitary(teu, control_indices=[1])
 
         qc = QuantumCircuit(2)
 
