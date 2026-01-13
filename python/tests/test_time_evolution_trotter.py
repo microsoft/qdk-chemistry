@@ -1,4 +1,4 @@
-"""Tests for FirstOrderTrotterConstructor and its helper functions in QDK/Chemistry."""
+"""Tests for Trotter Constructor and its helper functions in QDK/Chemistry."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

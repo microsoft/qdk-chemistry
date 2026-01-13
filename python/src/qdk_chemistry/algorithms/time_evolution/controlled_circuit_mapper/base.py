@@ -22,11 +22,14 @@ class ControlledEvolutionCircuitMapper(Algorithm):
         super().__init__()
 
     @abstractmethod
-    def _run_impl(self, controlled_evolution: ControlledTimeEvolutionUnitary) -> Circuit:
+    def _run_impl(self, controlled_evolution: ControlledTimeEvolutionUnitary, *args, **kwargs) -> Circuit:
         """Construct a Circuit representing the controlled unitary for the given ControlledTimeEvolutionUnitary.
 
         Args:
             controlled_evolution: The controlled time evolution unitary.
+            *args: Positional arguments, where the first argument is expected to be the
+                controlled time evolution unitary.
+            **kwargs: Additional keyword arguments for concrete implementation.
 
         Returns:
             Circuit: A Circuit representing the controlled unitary for the given ControlledTimeEvolutionUnitary.

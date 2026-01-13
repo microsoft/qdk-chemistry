@@ -96,13 +96,14 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
         """Reorder the Pauli terms according to a given permutation.
 
         Args:
-            permutation: A permutation mapping old Pauli term indices to new indices.
+            permutation: A list where ``permutation[i]`` gives the old index of the term
+                that should be placed at position ``i`` in the reordered list.
 
         Returns:
             PauliProductFormulaContainer: A new container with the updated ordering.
 
         Note:
-            The permutation maps old indices to new indices. For example, permutation = [2, 0, 1]
+            The permutation maps new positions to old indices. For example, ``permutation = [2, 0, 1]``
             means the new position 0 gets the old term at index 2, new position 1 gets
             the old term at index 0, and new position 2 gets the old term at index 1.
 

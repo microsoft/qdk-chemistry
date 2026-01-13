@@ -103,7 +103,7 @@ class Trotter(TimeEvolutionConstructor):
         """Translate a Pauli label to a mapping ``qubit -> {X, Y, Z}``.
 
         Args:
-        label: Pauli string label in little-endian ordering.
+            label: Pauli string label in little-endian ordering.
 
         Returns:
             Dictionary assigning each non-identity qubit index to its Pauli axis.
@@ -126,7 +126,7 @@ class Trotter(TimeEvolutionConstructor):
             atol: Absolute tolerance for filtering small coefficients.
 
         Returns:
-        A list of ``ExponentiatedPauliTerm`` representing the decomposed terms.
+            A list of ``ExponentiatedPauliTerm`` representing the decomposed terms.
 
         """
         terms: list[ExponentiatedPauliTerm] = []

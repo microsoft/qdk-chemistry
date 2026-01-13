@@ -47,7 +47,7 @@ class MockTimeEvolutionUnitaryContainer(TimeEvolutionUnitaryContainer):
         group.attrs["container_type"] = self.type
         group.attrs["num_qubits"] = self._num_qubits
 
-    def get_summary(self):
+    def get_summary(self) -> str:
         """Get a summary string for the mock container."""
         return f"Mock Time Evolution Unitary with {self._num_qubits} qubits"
 
@@ -67,7 +67,7 @@ class TestControlledTimeEvolutionUnitary:
         cteu = ControlledTimeEvolutionUnitary(teu, control_indices=[1])
 
         assert cteu.control_indices == [1]
-        assert cteu.get_num_unitary_qubits() == 4
+        assert cteu.get_num_total_qubits() == 5
         assert cteu.get_unitary_container_type() == "mock"
 
     def test_to_json_serialization(self):

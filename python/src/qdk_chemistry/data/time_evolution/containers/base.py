@@ -93,6 +93,6 @@ class TimeEvolutionUnitaryContainer(DataClass):
         """Get summary of time evolution unitary.
 
         Returns:
-            str: Summary string describing the  TimeEvolutionUnitaryContainer's contents and properties
+            str: Summary string describing the TimeEvolutionUnitaryContainer's contents and properties
 
         """

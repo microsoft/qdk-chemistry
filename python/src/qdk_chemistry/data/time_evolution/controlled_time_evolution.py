@@ -46,14 +46,14 @@ class ControlledTimeEvolutionUnitary(DataClass):
         """
         return self.time_evolution_unitary.get_container_type()
 
-    def get_num_unitary_qubits(self) -> int:
-        """Get the number of qubits in the time evolution unitary.
+    def get_num_total_qubits(self) -> int:
+        """Get the total number of qubits including control qubits.
 
         Returns:
-            The number of qubits.
+            The total number of qubits (time evolution qubits + control qubits).
 
         """
-        return self.time_evolution_unitary.get_num_qubits()
+        return self.time_evolution_unitary.get_num_qubits() + len(self.control_indices)
 
     def to_json(self) -> dict[str, Any]:
         """Convert the ControlledTimeEvolutionUnitary to a dictionary for JSON serialization.

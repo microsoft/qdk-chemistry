@@ -98,9 +98,7 @@ class SequenceStructureMapper(ControlledEvolutionCircuitMapper):
                 "SequenceStructureMapper only supports PauliProductFormula container for time evolution unitary."
             )
 
-        num_unitary_qubits = controlled_evolution.get_num_unitary_qubits()
-
-        total_qubits = num_unitary_qubits + len(controlled_evolution.control_indices)
+        total_qubits = controlled_evolution.get_num_total_qubits()
 
         if target_indices is None:
             target_indices = [i for i in range(total_qubits) if i not in controlled_evolution.control_indices]
@@ -186,10 +184,6 @@ def append_controlled_time_evolution(
         target_qubits: The target qubit indices.
             If None, assumes target qubits are all qubits except the control qubit.
         power: Number of repeated applications (``U`` raised to ``power``).
-
-    Raises:
-        ValueError: If the container type is not supported.
-        ValueError: If ``power`` is less than 1.
 
     """
     Logger.trace_entering()
