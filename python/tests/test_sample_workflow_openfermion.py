@@ -21,7 +21,7 @@ from qdk_chemistry.algorithms import create
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
 
-from .reference_tolerances import float_comparison_absolute_tolerance
+from .reference_tolerances import float_comparison_absolute_tolerance, scf_energy_tolerance
 from .test_sample_workflow_utils import (
     _extract_float,
     _run_workflow,
@@ -60,7 +60,7 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
     # Verify SCF energy is correct
     scf_energy = _extract_float(r"SCF total energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr)
 
-    assert np.isclose(scf_energy, ref_scf_energy, atol=1e-7)  # make sure the same molecule is used
+    assert np.isclose(scf_energy, ref_scf_energy, atol=scf_energy_tolerance) # make sure the same molecule is used
 
     selector = create(
         "active_space_selector",
