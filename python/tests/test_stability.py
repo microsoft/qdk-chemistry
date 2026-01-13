@@ -528,13 +528,15 @@ class TestStabilityChecker:
         assert result.is_stable() is True
         assert is_stable is True
 
-    @pytest.mark.parametrize("backend", ["pyscf", "qdk"])
     @pytest.mark.parametrize(
-        ("method", "ref_internal", "ref_external"),
+        ("backend", "method", "ref_internal", "ref_external"),
         [
-            ("hf", 0.2978821, 0.179865),
-            ("m06-2x", 0.262895, 0.21016),
-            ("pbe", 0.235900, 0.17777),
+            ("pyscf", "hf", 0.2978821, 0.179865),
+            ("pyscf", "m06-2x", 0.262895, 0.2101587728),
+            ("pyscf", "pbe", 0.2358971641, 0.1777711776),
+            ("qdk", "hf", 0.2978821, 0.1798639003),
+            ("qdk", "m06-2x", 0.2628852466, 0.2101565915),
+            ("qdk", "pbe", 0.2359016882, 0.1777753715),
         ],
     )
     def test_stability_rhf_water(self, backend, method, ref_internal, ref_external):
@@ -576,12 +578,13 @@ class TestStabilityChecker:
         assert is_stable_external is True
         self._check_reference_eigenvalue(result_external, stability_checker_external, ref_external, is_internal=False)
 
-    @pytest.mark.parametrize("backend", ["qdk", "pyscf"])
     @pytest.mark.parametrize(
-        ("method", "ref_internal", "ref_external"),
+        ("backend", "method", "ref_internal", "ref_external"),
         [
-            ("hf", 1.304700, 0.910941),
-            ("m06-2x", 1.280285, 1.004914),
+            ("pyscf", "hf", 1.304700, 0.910941),
+            ("pyscf", "m06-2x", 1.2802832042, 1.0049090209),
+            ("qdk", "hf", 1.304700, 0.910941),
+            ("qdk", "m06-2x", 1.280285, 1.004914),
         ],
     )
     def test_stability_rhf_f_minus(self, backend, method, ref_internal, ref_external):
@@ -605,12 +608,13 @@ class TestStabilityChecker:
         self._check_reference_eigenvalue(result, stability_checker, ref_internal, is_internal=True)
         self._check_reference_eigenvalue(result, stability_checker, ref_external, is_internal=False)
 
-    @pytest.mark.parametrize("backend", ["pyscf", "qdk"])
     @pytest.mark.parametrize(
-        ("method", "ref_internal"),
+        ("backend", "method", "ref_internal"),
         [
-            ("hf", 0.07874966),
-            ("pbe", 0.0788062),
+            ("pyscf", "hf", 0.0787483095),
+            ("pyscf", "pbe", 0.0787946207),
+            ("qdk", "hf", 0.0787484729),
+            ("qdk", "pbe", 0.0788074855),
         ],
     )
     def test_stability_uhf_water_plus(self, backend, method, ref_internal):
@@ -630,13 +634,15 @@ class TestStabilityChecker:
         assert is_stable_internal is True
         self._check_reference_eigenvalue(result_internal, stability_checker_internal, ref_internal, is_internal=True)
 
-    @pytest.mark.parametrize("backend", ["pyscf", "qdk"])
     @pytest.mark.parametrize(
-        ("method", "scf_energy", "ref_internal"),
+        ("backend", "method", "scf_energy", "ref_internal"),
         [
-            ("pbe", -150.0657335489032, 0.228479663),
-            ("m06-2x", -150.14208614693325, 0.19723640),
-            ("hf", -149.490299174458, 0.02098231121429321),
+            ("pyscf", "pbe", -150.0657335489032, 0.228479663),
+            ("pyscf", "m06-2x", -150.14208614693325, 0.1972340900),
+            ("pyscf", "hf", -149.490299174458, 0.02098231121429321),
+            ("qdk", "pbe", -150.0657335489032, 0.228479663),
+            ("qdk", "m06-2x", -150.14208614693325, 0.1972617779),
+            ("qdk", "hf", -149.490299174458, 0.0209811178),
         ],
     )
     def test_stability_uhf_o2(self, backend, method, scf_energy, ref_internal):
@@ -685,12 +691,13 @@ class TestStabilityChecker:
         with pytest.raises(ValueError, match=r"External stability analysis.*is not supported for ROHF"):
             stability_checker_external.run(wavefunction)
 
-    @pytest.mark.parametrize("backend", ["pyscf", "qdk"])
     @pytest.mark.parametrize(
-        ("distance", "expected_internal_stable", "expected_external_stable", "ref_internal", "ref_external"),
+        ("backend", "distance", "expected_internal_stable", "expected_external_stable", "ref_internal", "ref_external"),
         [
-            (1.2, True, False, 0.16709956461035308, -0.04997491473779583),  # External instability
-            (1.6, False, False, -0.06540845676884896, -0.28245222121208535),  # Internal instability
+            ("pyscf", 1.2, True, False, 0.16709956461035308, -0.04997491473779583),  # External instability
+            ("pyscf", 1.6, False, False, -0.06540845676884896, -0.2824532733),  # Internal instability
+            ("qdk", 1.2, True, False, 0.16709956461035308, -0.04997491473779583),  # External instability
+            ("qdk", 1.6, False, False, -0.06540845676884896, -0.2824533201),  # Internal instability
         ],
     )
     def test_stability_n2_rhf_instabilities(
@@ -719,11 +726,16 @@ class TestStabilityChecker:
         self._check_reference_eigenvalue(result, stability_checker, ref_internal, is_internal=True)
         self._check_reference_eigenvalue(result, stability_checker, ref_external, is_internal=False)
 
-    @pytest.mark.parametrize("backend", ["pyscf", "qdk"])
-    def test_stability_bn_plus_uhf(self, backend):
+    @pytest.mark.parametrize(
+        ("backend", "ref_eigenvalue"), 
+        [
+            ("pyscf", -0.07936046244954532), 
+            ("qdk", -0.07935926726345147),
+        ]
+    )
+    def test_stability_bn_plus_uhf(self, backend, ref_eigenvalue):
         """Test stability checker on BN+ cation (UHF) with different backends."""
         structure = create_bn_plus_structure()
-        ref_eigenvalue = -0.07936046244954532
         # QDK only checks the lowest eigenvalue now
         expected_negative_count = 1 if backend == "qdk" else 2
 
@@ -749,7 +761,7 @@ class TestStabilityChecker:
     def test_stability_c2_plus_rohf(self):
         """Test PySCF stability checker on C2+ cation (ROHF)."""
         structure = create_c2_plus_structure()
-        ref_eigenvalue = -0.08256762551795531
+        ref_eigenvalue = -0.08256924996458573
 
         scf_solver = self._create_scf_solver(backend="pyscf", scf_type="restricted")
         _, wavefunction = scf_solver.run(structure, 1, 2, "def2-svp")

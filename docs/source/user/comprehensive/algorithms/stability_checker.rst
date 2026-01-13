@@ -144,11 +144,11 @@ All implementations share a common base set of settings:
      - Eigenvalue threshold for determining stability. Eigenvalues below this value indicate instability
    * - ``davidson_tolerance``
      - float
-     - ``1e-4``
+     - ``1e-8``
      - Convergence tolerance for the Davidson eigenvalue solver
    * - ``max_subspace``
      - int
-     - ``30``
+     - ``80``
      - Maximum subspace dimension for the Davidson solver
 
 See :doc:`Settings <settings>` for a more general treatment of settings in QDK/Chemistry.
