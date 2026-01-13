@@ -20,7 +20,7 @@ The :term:`MCSCF` procedure alternates between:
 - **Configuration interaction**: Solving the :term:`CI` problem in the active space with fixed orbitals
 - **Orbital optimization**: Updating molecular orbital coefficients while keeping :term:`CI` coefficients fixed
 
-Due to the relaxation of the orbitals, :term:`MCSCF` can capture both static and some dynamic correlation effects more effectively and hence, results in lower energies than :term:`CI` calculations.
+Due to the relaxation of the orbitals, :term:`MCSCF` can capture both static and some dynamic correlation effects more effectively and hence results in lower energies than :term:`CI` calculations.
 
 
 Running an :term:`MCSCF` calculation
@@ -68,7 +68,7 @@ The :class:`~qdk_chemistry.algorithms.MultiConfigurationScf` is created using th
 
 .. rubric:: Configuring settings
 
-Each of the required algorithms can be configured through its settings which can be modified using the ``settings()`` object.
+The required algorithms can be configured through their settings, which can be modified using the ``settings()`` object.
 See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: Python API
@@ -91,7 +91,7 @@ Available settings
 ------------------
 
 .. note::
-   Because only one implementation of the algorithm is currently available through the PySCF plugin, no implementation-specific settings are shown here.
+   Because only one implementation of the algorithm is currently available through the PySCF plugin, only its implementation-specific settings (such as ``max_cycle_macro``) are listed in the table below.
 
 See :doc:`Settings <settings>` for a more general treatment of settings in QDK/Chemistry.
 
