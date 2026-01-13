@@ -12,9 +12,9 @@
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+#include <blas.hh>
 #include <stdexcept>
 #include <unordered_set>
-#include <blas.hh>
 
 #include "util/timer.h"
 
@@ -896,11 +896,11 @@ class ERI {
                      L_rows.data() + col, n_cols);
         }
         // Compute eri_col -= L_data * L_rows^T using GEMM
-        // eri_col is num_aos2 x n_cols, L_data is num_aos2 x current_col, L_rows^T is current_col x n_cols
+        // eri_col is num_aos2 x n_cols, L_data is num_aos2 x current_col,
+        // L_rows^T is current_col x n_cols
         blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-                   num_aos2, n_cols, current_col, -1.0, L_data.data(),
-                   num_aos2, L_rows.data(), n_cols, 1.0, eri_col.data(),
-                   num_aos2);
+                   num_aos2, n_cols, current_col, -1.0, L_data.data(), num_aos2,
+                   L_rows.data(), n_cols, 1.0, eri_col.data(), num_aos2);
       }
 
       // form new cholesky vector for each index in shell pair
