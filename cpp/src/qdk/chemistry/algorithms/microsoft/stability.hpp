@@ -43,8 +43,8 @@ class StabilityCheckerSettings : public qdk::chemistry::data::Settings {
   StabilityCheckerSettings() : qdk::chemistry::data::Settings() {
     set_default("internal", true);
     set_default("external", false);
-    set_default("max_subspace", 30);
-    set_default("davidson_tolerance", 1e-4);
+    set_default("max_subspace", 80);
+    set_default("davidson_tolerance", 1e-8);
     set_default("stability_tolerance", -1e-4);
     set_default("method", "hf");
   }

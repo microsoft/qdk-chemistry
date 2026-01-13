@@ -331,8 +331,6 @@ class PyscfStabilityChecker(StabilityChecker):
                 )
                 internal_eigenvalues_list.extend(e if isinstance(e, list | tuple | np.ndarray) else [e])
                 internal_eigenvectors_list.extend(v if isinstance(v, list | tuple | np.ndarray) else [v])
-                # TODO: Update internal_scale_factor if needed for future implementation.
-                # ROHF internal stability is not implemented in QDK backend so the factor is not known.
                 internal_scale_factor = 1.0
             # Raise error if external stability is requested for ROHF
             if do_external:
