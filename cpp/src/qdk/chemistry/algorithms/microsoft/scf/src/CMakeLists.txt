@@ -47,6 +47,7 @@ target_sources(chemistry PRIVATE
   util/libint2_util.cpp
   util/matrix_exp.cpp
 )
+
 if(QDK_CHEMISTRY_ENABLE_MPI)
   target_sources(chemistry PRIVATE util/mpi_util.cpp)
 endif()

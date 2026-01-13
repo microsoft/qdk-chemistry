@@ -55,6 +55,11 @@ pytest tests/
 
 **NOTE:** Building this Python package may require significant memory, since the C++ library build uses all available threads by default and some compilations can consume around 3 GB of RAM. To avoid running out of memory, set `CMAKE_BUILD_PARALLEL_LEVEL` to a reasonably small value. For example, use: `CMAKE_BUILD_PARALLEL_LEVEL=1 pip install .` to perform a single-threaded C++ library build.
 
+**Memory pools & safe builds:**
+
+- **Ninja required** by default (for per-file memory throttling via `JOB_POOL_COMPILE`). Configure with `cmake -G Ninja`.
+- To opt out (no per-file pools), pass `-DQDK_ALLOW_NON_NINJA=ON`. Then either use `cmake --build . --target qdk_build_safe` or set `CMAKE_BUILD_PARALLEL_LEVEL` manually.
+
 #### Accelerating Rebuilds with Build Caching
 
 By default, each `pip install` uses a fresh temporary build directory to ensure reproducible builds and avoid issues with stale CMake cache state. However, for development workflows where you're making frequent changes, you can enable persistent build caching for significantly faster rebuilds:

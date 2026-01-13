@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 4.2)
 project(qdk_doc_examples VERSION 1.0.0 LANGUAGES CXX)
 
 # This CMakeLists.txt builds documentation examples to validate they compile correctly

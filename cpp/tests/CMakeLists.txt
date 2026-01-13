@@ -1,6 +1,8 @@
 # Enable testing with CTest
 include(CTest)
 
+find_package(Python3 COMPONENTS Interpreter QUIET)
+
 # Try to find Google Test, if not found, fetch it
 find_package(GTest QUIET)
 
@@ -111,3 +113,11 @@ add_custom_target(run_tests_verbose
 
 # Output test results to the console
 set(CMAKE_CTEST_ARGUMENTS "--output-on-failure")
+
+# CMake memory pools sanity test (Ninja + non-Ninja)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME cmake_memory_pools
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_memory_pools.py
+            --repo-root ${PROJECT_SOURCE_DIR}
+    )
+endif()

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 4.2)
 project(qdk_examples VERSION 1.0.0 LANGUAGES CXX)
 find_package(qdk REQUIRED COMPONENTS chemistry)
 add_executable(simple_e2e simple_e2e.cpp)

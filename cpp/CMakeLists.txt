@@ -1,7 +1,19 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 4.2)
 project(qdk VERSION 1.0.0.1 LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Enforce Ninja to enable per-file memory pools (JOB_POOL_COMPILE)
+option(QDK_ALLOW_NON_NINJA "Allow non-Ninja generators (disables per-file memory throttling)" OFF)
+if(NOT CMAKE_GENERATOR MATCHES "Ninja")
+    if(QDK_ALLOW_NON_NINJA)
+        message(WARNING "Ninja is recommended to enable per-file memory throttling. Proceeding without pools;
+        use: cmake --build . --target qdk_build_safe or set CMAKE_BUILD_PARALLEL_LEVEL=${QDK_BUILD_PARALLEL_LEVEL_HINT}.")
+    else()
+        message(FATAL_ERROR "Ninja generator required for memory throttling. Configure with: cmake -S cpp -B build -G Ninja
+        (or override with -DQDK_ALLOW_NON_NINJA=ON to proceed without per-file pools).")
+    endif()
+endif()
 
 if(APPLE AND NOT DEFINED CMAKE_MACOSX_RPATH)
     set(CMAKE_MACOSX_RPATH ON CACHE BOOL "Use macOS RPATH" FORCE)
@@ -38,6 +50,9 @@ cmake_dependent_option(QDK_ENABLE_OPENMP
     "NOT (APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL \"AppleClang\")" OFF)
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)
+
+# Memory pools for Ninja to prevent OOM on memory-intensive files
+include(cmake/memory_pools.cmake)
 
 # Custom CMake Find* modules for linear algebra dependencies
 include( FetchContent )
@@ -250,6 +265,9 @@ export(EXPORT chemistryTargets
     FILE "${CMAKE_CURRENT_BINARY_DIR}/chemistryTargets.cmake"
     NAMESPACE qdk::
 )
+
+# Apply memory pool throttling to heavy source files (after all sources are added)
+qdk_apply_heavy_source_pools()
 
 # Testing
 include(CTest) # BUILD_TESTING variable
