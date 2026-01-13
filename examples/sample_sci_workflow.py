@@ -121,7 +121,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     e_scf, scf_wavefunction = scf_solver.run(
         structure, args.charge, args.spin, args.basis
     )
-    Logger.info(f"SCF Energy: {e_scf:.8f} Hartree")
+    Logger.info(f"SCF energy = {e_scf:.8f} Hartree")
 
     ########################################################################################
     # 3. Select the valence active space (heuristic or user overrides).
@@ -209,7 +209,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         max_determinants=args.max_determinants,
     )
 
-    Logger.info(f"Sparse CI energy values {sparse_ci_energy:.3f} Hartree")
+    Logger.info(f"Sparse CI energy = {sparse_ci_energy:.8f} Hartree")
     Logger.info(get_active_determinants_info(sparse_ci_wavefunction))
 
 
