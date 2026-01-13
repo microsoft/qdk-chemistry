@@ -103,15 +103,14 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
             PauliProductFormulaContainer: A new container with the updated ordering.
 
         Note:
-            The permutation maps new positions to old indices. For example, ``permutation = [2, 0, 1]``
-            means the new position 0 gets the old term at index 2, new position 1 gets
-            the old term at index 0, and new position 2 gets the old term at index 1.
+            ``permutation[i]`` is the old index for new position ``i``. For example,
+            ``permutation = [2, 0, 1]`` yields ``new_terms = [old_terms[2], old_terms[0], old_terms[1]]``.
 
         """
         # Validate permutation
         if len(permutation) != len(self.step_terms):
             raise ValueError(
-                f"Permutation length ({len(permutation)}) must match number of terms ({len(self.step_terms)})."
+                f"Permutation length ({len(permutation)}) must match the number of terms ({len(self.step_terms)})."
             )
         if set(permutation) != set(range(len(self.step_terms))):
             raise ValueError(f"Invalid permutation: must be a permutation of [0, 1, ..., {len(self.step_terms) - 1}].")

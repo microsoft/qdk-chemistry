@@ -167,5 +167,5 @@ class TestTrotter:
         assert container.step_terms[1].pauli_term == {0: "Z"}
         assert container.step_terms[0].angle == t  # angle for X term
         assert container.step_terms[1].angle == t  # angle for Z term
-        # Compare: the error should scales as O(t^2) for first-order Trotter
+        # Compare: the error should scale as O(t^2) for first-order Trotter
         assert np.allclose(u_trot, u_exact, atol=t**2)

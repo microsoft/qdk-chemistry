@@ -185,6 +185,11 @@ def append_controlled_time_evolution(
             If None, assumes target qubits are all qubits except the control qubit.
         power: Number of repeated applications (``U`` raised to ``power``).
 
+    Raises:
+        ValueError: If the time evolution unitary container type is not supported.
+        ValueError: If ``power`` is less than 1.
+        ValueError: If there is not exactly one control qubit.
+
     """
     Logger.trace_entering()
 
