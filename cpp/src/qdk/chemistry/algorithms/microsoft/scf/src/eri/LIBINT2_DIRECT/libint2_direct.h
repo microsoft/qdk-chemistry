@@ -61,7 +61,10 @@ class LIBINT2_DIRECT : public ERI {
    */
   void build_JK(const double* P, double* J, double* K, double alpha,
                 double beta, double omega) override;
-
+  /**
+   * @brief Public interface for computing cholesky vectors
+   * @see ERI::get_cholesky_vectors for API details
+   */
   std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
                                                  size_t* num_vectors) override;
 
@@ -86,12 +89,6 @@ class LIBINT2_DIRECT : public ERI {
    * @see ERI::quarter_trans for API details
    */
   void quarter_trans_impl(size_t nt, const double* C, double* out) override;
-
-  /**
-   * @brief Get raw ERIs (not available for direct method)
-   * @return nullptr (direct method does not store integrals)
-   */
-  const double* get_raw_eris() const override { return nullptr; }
 
   /// PIMPL pointer to implementation
   std::unique_ptr<libint2::direct::ERI> eri_impl_;

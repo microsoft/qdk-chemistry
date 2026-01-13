@@ -87,14 +87,13 @@ class ERIINCORE : public ERI {
    */
   void quarter_trans_impl(size_t nt, const double* C, double* out) override;
 
+  /**
+   * @brief Build cholesky vectors from stored integrals (NOT SUPPORTED)
+   * @throws std::runtime_error if invoked (not implemented)
+   * @see ERI::get_cholesky_vectors for API details
+   */
   std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
                                                  size_t* num_vectors) override;
-
-  /**
-   * @brief Get direct read-only access to raw stored AO ERIs
-   * @see ERI::get_raw_eris for more details
-   */
-  const double* get_raw_eris() const override;
 
   /// PIMPL pointer to implementation
   std::unique_ptr<incore::ERI> eri_impl_;
@@ -179,11 +178,10 @@ class ERIINCORE_DF : public ERI {
   void quarter_trans_impl(size_t nt, const double* C, double* out) override;
 
   /**
-   * @brief Get raw ERIs (not available for density-fitted method)
-   * @return nullptr (DF stores 3-center integrals, not 4-center ERIs)
+   * @brief Build cholesky vectors from stored integrals (NOT SUPPORTED)
+   * @throws std::runtime_error if invoked (not implemented)
+   * @see ERI::get_cholesky_vectors for API details
    */
-  const double* get_raw_eris() const override { return nullptr; }
-
   std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
                                                  size_t* num_vectors) override {
     return nullptr;

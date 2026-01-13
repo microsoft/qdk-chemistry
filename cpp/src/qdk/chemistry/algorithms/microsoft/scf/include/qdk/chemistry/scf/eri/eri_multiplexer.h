@@ -135,13 +135,8 @@ class ERIMultiplexer : public ERI {
   void quarter_trans_impl(size_t nt, const double* C, double* out) override {};
 
   /**
-   * @brief Get raw ERIs from underlying implementation
-   * @return Const pointer to raw ERIs if available from underlying
-   * implementation
+   * @brief Stub implementation for get_cholesky_vectors
    */
-  const double* get_raw_eris() const override {
-    return qt_impl_ ? qt_impl_->get_raw_eris() : nullptr;
-  }
   std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
                                                  size_t* num_vectors) override {
     if (qt_impl_) return qt_impl_->get_cholesky_vectors(threshold, num_vectors);

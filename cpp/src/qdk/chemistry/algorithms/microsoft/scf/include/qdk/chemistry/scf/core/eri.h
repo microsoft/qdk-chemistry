@@ -86,6 +86,16 @@ class ERI {
   virtual void get_gradients(const double* P, double* dJ, double* dK,
                              double alpha, double beta, double omega) = 0;
 
+  /**
+   * @brief Build cholesky vectors from ERI tensor
+   *
+   * Computes the Cholesky decomposition of the ERI tensor to generate
+   * cholesky vectors that approximate the full integral tensor.
+   *
+   * @param threshold Cholesky decomposition threshold
+   * @param num_vectors Output number of cholesky vectors generated
+   * @return Pointer to array of cholesky vectors stored in column-major order
+   */
   virtual std::unique_ptr<double[]> get_cholesky_vectors(
       double threshold, size_t* num_vectors) = 0;
   /**
@@ -132,11 +142,6 @@ class ERI {
   static std::shared_ptr<ERI> create(BasisSet& basis_set,
                                      BasisSet& aux_basis_set,
                                      const SCFConfig& cfg, double omega);
-  /**
-   * @brief Get direct read-only access to raw stored AO ERIs
-   * @return Const pointer to raw ERI data, or nullptr if not stored in memory
-   */
-  virtual const double* get_raw_eris() const = 0;
 
  protected:
   /**
