@@ -5,17 +5,16 @@
 
 """qdk-chemistry molecular Hamiltonian + OpenFermion Jordan-Wigner transformation example.
 
-This example demonstrates the use of QDK/Chemistry tools in preparing the electronic
-structure Hamiltonian, which is then passed to OpenFermion to perform the Jordan-Wigner
-transformation. The key points are (1) QDK/Chemistry provides integrals in the spatial molecular
-orbital basis, which need to be converted to integrals in the spin-orbital basis that OpenFermion
-expects, and (2) the two-electron molecular integrals from QDK/Chemistry are in chemist's notation
+This example demonstrates the use of QDK/Chemistry tools in preparing the electronic structure Hamiltonian, which is
+then passed to OpenFermion to perform the Jordan-Wigner transformation. The key points are (1) QDK/Chemistry provides
+integrals in the spatial molecular orbital basis, which need to be converted to integrals in the spin-orbital basis
+that OpenFermion expects, and (2) the two-electron molecular integrals from QDK/Chemistry are in chemist's notation
 and need to be packed in the physicist's notation that OpenFermion expects.
 
 This example is adapted from the introduction to OpenFermion tutorial:
 https://quantumai.google/openfermion/tutorials/intro_to_openfermion
-Due to minor differences in the Hamiltonian (stemming from different molecular orbitals), the
-calculated energy values differ from those in the OpenFermion tutorial by O(1e-6) Hartree.
+Due to minor differences in the Hamiltonian (stemming from different molecular orbitals), the calculated energy values
+differ from those in the OpenFermion tutorial by O(1e-6) Hartree.
 """
 
 import numpy as np
@@ -26,7 +25,7 @@ from qdk_chemistry.utils import Logger
 
 # OpenFermion must be installed to run this example.
 try:
-    import openfermion
+    import openfermion as of
 except ImportError as e:
     raise ImportError(
         "OpenFermion is not installed. Please install OpenFermion to run this example: pip install openfermion"
@@ -95,24 +94,24 @@ two_body_phys = np.transpose(two_body_tensor, (0, 2, 3, 1))
 # Note: the spinorb_from_spatial function from OpenFermion works for restricted Hamiltonians only
 # If unrestricted Hamiltonians are needed, write a custom function and pay special attention to the ordering of the
 # two-electron integrals, especially in the mix-spin scenarios.
-one_body_coefficients, two_body_coefficients = (
-    openfermion.chem.molecular_data.spinorb_from_spatial(one_body_aa, two_body_phys)
+one_body = one_body_aa
+two_body = two_body_phys
+one_body_spinorb, two_body_spinorb = of.chem.molecular_data.spinorb_from_spatial(
+    one_body, two_body
 )
 
 core_energy = active_hamiltonian.get_core_energy()  # Core energy constant
 
 # Get the Hamiltonian in an active space.
-open_fermion_molecular_hamiltonian = (
-    openfermion.ops.representations.InteractionOperator(
-        core_energy, one_body_coefficients, 0.5 * two_body_coefficients
-    )
+open_fermion_molecular_hamiltonian = of.ops.representations.InteractionOperator(
+    core_energy, one_body_spinorb, 0.5 * two_body_spinorb
 )
 
 # Map operator to fermions and qubits.
-fermion_hamiltonian = openfermion.transforms.get_fermion_operator(
+fermion_hamiltonian = of.transforms.get_fermion_operator(
     open_fermion_molecular_hamiltonian
 )
-qubit_hamiltonian = openfermion.transforms.jordan_wigner(fermion_hamiltonian)
+qubit_hamiltonian = of.transforms.jordan_wigner(fermion_hamiltonian)
 qubit_hamiltonian.compress()
 Logger.info(
     "=== The Jordan-Wigner Hamiltonian in canonical basis (interleaved ordering): ==="
@@ -121,6 +120,6 @@ message = str(qubit_hamiltonian)
 Logger.info(message)
 
 # Get sparse operator and ground state energy.
-sparse_hamiltonian = openfermion.linalg.get_sparse_operator(qubit_hamiltonian)
-energy, state = openfermion.linalg.get_ground_state(sparse_hamiltonian)
+sparse_hamiltonian = of.linalg.get_sparse_operator(qubit_hamiltonian)
+energy, state = of.linalg.get_ground_state(sparse_hamiltonian)
 Logger.info(f"Ground state energy is {energy: .15f} Hartree.")
