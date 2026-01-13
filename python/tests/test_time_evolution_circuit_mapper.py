@@ -74,8 +74,8 @@ class TestSequenceStructureMapper:
         assert isinstance(circuit.qasm, str)
         assert "OPENQASM" in circuit.qasm
 
-    def test_default_system_indices(self, controlled_unitary):
-        """Test that default system indices are used when none are provided."""
+    def test_default_target_indices(self, controlled_unitary):
+        """Test that default target indices are used when none are provided."""
         mapper = SequenceStructureMapper()
 
         circuit = mapper.run(controlled_unitary)
@@ -169,7 +169,7 @@ class TestAppendControlledTimeEvolution:
             append_controlled_time_evolution(
                 qc,
                 controlled_unitary,
-                system_indices=[0, 1],
+                target_qubits=[0, 1],
                 power=0,
             )
 
@@ -180,7 +180,7 @@ class TestAppendControlledTimeEvolution:
         append_controlled_time_evolution(
             qc,
             controlled_unitary,
-            system_indices=[0, 1],
+            target_qubits=[0, 1],
             power=2,
         )
 
@@ -203,7 +203,7 @@ class TestAppendControlledTimeEvolution:
         append_controlled_time_evolution(
             qc,
             controlled,
-            system_indices=[0],
+            target_qubits=[0],
             power=1,
         )
 
@@ -222,7 +222,7 @@ class TestAppendControlledPauliRotation:
         _append_controlled_pauli_rotation(
             qc,
             control_qubit=0,
-            system_qubits=[],
+            target_qubits=[],
             term=term,
         )
 
@@ -236,7 +236,7 @@ class TestAppendControlledPauliRotation:
         _append_controlled_pauli_rotation(
             qc,
             control_qubit=1,
-            system_qubits=[0],
+            target_qubits=[0],
             term=term,
         )
 
@@ -250,7 +250,7 @@ class TestAppendControlledPauliRotation:
         _append_controlled_pauli_rotation(
             qc,
             control_qubit=2,
-            system_qubits=[0, 1],
+            target_qubits=[0, 1],
             term=term,
         )
 
