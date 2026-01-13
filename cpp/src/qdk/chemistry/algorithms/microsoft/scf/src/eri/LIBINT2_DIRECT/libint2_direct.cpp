@@ -683,16 +683,6 @@ class ERI {
       }
     }
 
-    // map local index to global index
-    auto get_global_pair_index = [&](size_t s1, size_t s2, size_t local_ind) {
-      const size_t bf1_st = shell2bf_[s1];
-      const size_t bf2_st = shell2bf_[s2];
-      const size_t n2 = obs_[s2].size();
-      const size_t i = local_ind / n2;
-      const size_t j = local_ind % n2;
-      return (bf1_st + i) * num_aos + (bf2_st + j);
-    };
-
     // setup libint engine for ERI computation
     const double precision = std::numeric_limits<double>::epsilon();
     const auto engine_precision = precision;
@@ -886,13 +876,24 @@ class ERI {
       }
 #endif
 
+      // precompute lookup
+      const size_t bf1_max_st = shell2bf_[s1_max];
+      const size_t bf2_max_st = shell2bf_[s2_max];
+      std::vector<size_t> shell_pairs_to_lookup(n1_max * n2_max);
+
+      for(size_t i = 0; i < n1_max; ++i) {
+        for(size_t j = 0; j < n2_max; ++j) {
+          const size_t local_index = i * n2_max + j;
+          shell_pairs_to_lookup[local_index] = (bf1_max_st + i) * num_aos + (bf2_max_st + j);
+        }
+      }
 
       // correct for cholesky contributions
       if (current_col > 0) {
         // subtract previous contributions
         Eigen::MatrixXd L_rows(eri_col.cols(), current_col);
         for (size_t col = 0; col < eri_col.cols(); ++col) {
-          global_index = get_global_pair_index(s1_max, s2_max, col);
+          global_index = shell_pairs_to_lookup[col];
           L_rows.row(col) = L.row(global_index).leftCols(current_col);
         }
         eri_col -= L.leftCols(current_col) * L_rows.transpose();
@@ -919,7 +920,7 @@ class ERI {
           // Update remaining columns in eri_col for vectors formed within this
           // shell pair
           for (size_t col = local_index + 1; col < n1_max * n2_max; ++col) {
-            const size_t global_col_idx = get_global_pair_index(s1_max, s2_max, col);
+            const size_t global_col_idx = shell_pairs_to_lookup[col];
             eri_col.col(col) -= L.col(current_col) * L(global_col_idx, current_col);
           }
 
@@ -929,11 +930,14 @@ class ERI {
             const auto [s1, s2] = sp_index_to_shells[sp_index];
             const auto n1 = obs_[s1].size();
             const auto n2 = obs_[s2].size();
+            const auto bf1_st = shell2bf_[s1];
+            const auto bf2_st = shell2bf_[s2];
             // update diagonal block
             for (size_t i = 0; i < n1; ++i) {
+              const size_t bf1_st_i = (bf1_st + i) * num_aos;
               for (size_t j = 0; j < n2; ++j) {
                 const size_t idx = i * n2 + j;
-                const size_t global_idx = get_global_pair_index(s1, s2, idx);
+                const size_t global_idx = bf1_st_i + (bf2_st + j);
                 D_shell_pair[sp_index](idx) -= L_col[global_idx] * L_col[global_idx];
               }
             }
@@ -941,6 +945,10 @@ class ERI {
             if (D_shell_pair[sp_index].maxCoeff() < threshold) {
               shell_pairs_to_remove.push_back(sp_index);
             }
+          }
+          // remove inactive shell pairs
+          for (const auto sp_index : shell_pairs_to_remove) {
+            active_shell_pairs.erase(sp_index);
           }
           current_col += 1;
           // Append column (resize if needed)
