@@ -480,7 +480,7 @@ class TestStabilityChecker:
         scf_solver.settings().set("scf_type", scf_type)
         return scf_solver
 
-    def _create_stability_checker(self, backend="pyscf", internal=True, external=True):
+    def _create_stability_checker(self, backend, internal=True, external=True):
         """Helper to create stability checker with specified settings."""
         stability_checker = algorithms.create("stability_checker", backend)
         stability_checker.settings().set("internal", internal)
@@ -520,7 +520,7 @@ class TestStabilityChecker:
         scf_solver = self._create_scf_solver(backend="pyscf")
         _, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
 
-        stability_checker = self._create_stability_checker(internal=False, external=False)
+        stability_checker = self._create_stability_checker(backend="pyscf", internal=False, external=False)
         is_stable, result = stability_checker.run(wavefunction)
 
         # Should return empty result with stable defaults
@@ -534,15 +534,15 @@ class TestStabilityChecker:
             ("pyscf", "hf", 0.2978821, 0.179865),
             ("pyscf", "m06-2x", 0.262895, 0.2101587728),
             ("pyscf", "pbe", 0.2358971641, 0.1777711776),
-            ("qdk", "hf", 0.2978821, 0.1798639003),
-            ("qdk", "m06-2x", 0.2628852466, 0.2101565915),
-            ("qdk", "pbe", 0.2359016882, 0.1777753715),
+            ("qdk", "hf", 0.2978821, 0.1798656249),
+            ("qdk", "m06-2x", 0.2628966726, 0.2101707965),
+            ("qdk", "pbe", 0.2359001392, 0.1777736962),
         ],
     )
     def test_stability_rhf_water(self, backend, method, ref_internal, ref_external):
         """Test stability checker on stable RHF water molecule with different backends and methods."""
         water = create_water_structure()
-        scf_solver = self._create_scf_solver(backend="pyscf")
+        scf_solver = self._create_scf_solver(backend=backend)
         scf_solver.settings().set("method", method)
         _, wavefunction = scf_solver.run(water, 0, 1, "def2-svp")
 
@@ -590,7 +590,7 @@ class TestStabilityChecker:
     def test_stability_rhf_f_minus(self, backend, method, ref_internal, ref_external):
         """Test stability checker on stable RHF F- with different backends and methods."""
         f_minus = create_f_minus_structure()
-        scf_solver = self._create_scf_solver(backend="pyscf")
+        scf_solver = self._create_scf_solver(backend=backend)
         scf_solver.settings().set("method", method)
         _, wavefunction = scf_solver.run(f_minus, -1, 1, "def2-svp")
 
@@ -640,15 +640,15 @@ class TestStabilityChecker:
             ("pyscf", "pbe", -150.0657335489032, 0.228479663),
             ("pyscf", "m06-2x", -150.14208614693325, 0.1972340900),
             ("pyscf", "hf", -149.490299174458, 0.02098231121429321),
-            ("qdk", "pbe", -150.0657335489032, 0.228479663),
-            ("qdk", "m06-2x", -150.14208614693325, 0.1972617779),
+            ("qdk", "pbe", -150.06573508243736, 0.228479663),
+            ("qdk", "m06-2x", -150.14208965731274, 0.1972664302),
             ("qdk", "hf", -149.490299174458, 0.0209811178),
         ],
     )
     def test_stability_uhf_o2(self, backend, method, scf_energy, ref_internal):
         """Test stability checker on UHF oxygen molecule with different backends and methods."""
         o2 = create_o2_structure()
-        scf_solver = self._create_scf_solver(backend="pyscf")
+        scf_solver = self._create_scf_solver(backend=backend)
         scf_solver.settings().set("method", method)
         energy, wavefunction = scf_solver.run(o2, 0, 3, "def2-svp")
         assert abs(energy - scf_energy) < scf_energy_tolerance
@@ -674,7 +674,7 @@ class TestStabilityChecker:
         _, wavefunction = scf_solver.run(o2, 0, 3, "def2-svp")
 
         # Test internal-only analysis (external not supported for ROHF)
-        stability_checker = self._create_stability_checker(internal=True, external=False)
+        stability_checker = self._create_stability_checker(backend="pyscf", internal=True, external=False)
         _, result = stability_checker.run(wavefunction)
 
         self._assert_basic_stability_result(result, False, has_internal=True, has_external=False)
@@ -687,7 +687,7 @@ class TestStabilityChecker:
         )
 
         # Test that external analysis raises error for ROHF
-        stability_checker_external = self._create_stability_checker(internal=False, external=True)
+        stability_checker_external = self._create_stability_checker(backend="pyscf", internal=False, external=True)
         with pytest.raises(ValueError, match=r"External stability analysis.*is not supported for ROHF"):
             stability_checker_external.run(wavefunction)
 
@@ -730,7 +730,7 @@ class TestStabilityChecker:
         ("backend", "ref_eigenvalue"),
         [
             ("pyscf", -0.07936046244954532),
-            ("qdk", -0.07935926726345147),
+            ("qdk", -0.07936094808974327),
         ],
     )
     def test_stability_bn_plus_uhf(self, backend, ref_eigenvalue):
@@ -739,7 +739,7 @@ class TestStabilityChecker:
         # QDK only checks the lowest eigenvalue now
         expected_negative_count = 1 if backend == "qdk" else 2
 
-        scf_solver = self._create_scf_solver(backend="pyscf")
+        scf_solver = self._create_scf_solver(backend=backend)
         _, wavefunction = scf_solver.run(structure, 1, 2, "def2-svp")
 
         # Test internal-only analysis (external not supported for UHF)
@@ -767,7 +767,7 @@ class TestStabilityChecker:
         _, wavefunction = scf_solver.run(structure, 1, 2, "def2-svp")
 
         # Test internal-only analysis (external not supported for ROHF)
-        stability_checker = self._create_stability_checker(internal=True, external=False)
+        stability_checker = self._create_stability_checker(backend="pyscf", internal=True, external=False)
         _, result = stability_checker.run(wavefunction)
 
         self._assert_basic_stability_result(result, False, has_internal=True, has_external=False)
