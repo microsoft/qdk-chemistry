@@ -11,6 +11,7 @@
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -234,6 +235,200 @@ Get the type of this container as a string.
 Returns:
     str: Container type identifier (e.g., "canonical_four_center")
 )");
+  // ============================================================================
+  // CholeskyHamiltonianContainer - Concrete implementation
+  // ============================================================================
+    py::class_<CholeskyHamiltonianContainer, HamiltonianContainer,
+                 py::smart_holder>
+        cholesky_container(data, "CholeskyHamiltonianContainer", R"(
+Represents a molecular Hamiltonian using Cholesky-decomposed two-electron integrals.
+This class stores molecular Hamiltonian data for quantum chemistry calculations,
+specifically designed for active space methods. It contains:
+
+* One-electron integrals (kinetic + nuclear attraction) in MO representation
+* Two-electron integrals (electron-electron repulsion) in MO representation
+* Cholesky vectors approximating the ao two-electron integrals
+* Molecular orbital information for the active space
+* Core energy contributions from inactive orbitals and nuclear repulsion
+
+Examples:
+    >>> import numpy as np
+    >>> # Create restricted Hamiltonian
+    >>> one_body = np.random.rand(4, 4)  # 4 orbitals
+    >>> two_body = np.random.rand(256)   # 4^4 elements
+    >>> cholesky_vectors = np.random.rand(4*4, 10)   # 10 Cholesky vectors
+    >>> fock_matrix = np.random.rand(4, 4)
+    >>> container = CholeskyHamiltonianContainer(
+    ...     one_body, two_body, cholesky_vectors, orbitals, 10.5, fock_matrix
+    ... )
+    >>> # Wrap in Hamiltonian interface
+    >>> hamiltonian = Hamiltonian(container)
+)");
+
+  // Restricted constructor
+  cholesky_container.def(
+      py::init<const Eigen::MatrixXd&, const Eigen::VectorXd&,
+               std::shared_ptr<Orbitals>, double, const Eigen::MatrixXd&,
+               const Eigen::MatrixXd&, HamiltonianType>(),
+      R"(
+Constructor for restricted active space Hamiltonian with Cholesky-decomposed integrals.
+
+Args:
+    one_body_integrals (numpy.ndarray): One-electron integrals matrix [norb x norb]
+    two_body_integrals (numpy.ndarray): Two-electron integrals vector [norb^4]
+    orbitals (Orbitals): Molecular orbital data
+    core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
+    inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [norb x norb]
+    ao_cholesky_vectors (numpy.ndarray): AO basis Cholesky vectors [norb^2 x nvec]
+    type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
+
+Examples:
+    >>> import numpy as np
+    >>> one_body = np.random.rand(4, 4)
+    >>> two_body = np.random.rand(256)  # 4^4 elements
+    >>> cholesky_vecs = np.random.rand(16, 10)  # 16 = 4^2, 10 vectors
+    >>> fock_matrix = np.random.rand(4, 4)
+    >>> container = CholeskyHamiltonianContainer(
+    ...     one_body, two_body, orbitals, 10.5, fock_matrix, cholesky_vecs
+    ... )
+)",
+      py::arg("one_body_integrals"), py::arg("two_body_integrals"),
+      py::arg("orbitals"), py::arg("core_energy"),
+      py::arg("inactive_fock_matrix"), py::arg("ao_cholesky_vectors"),
+      py::arg("type") = HamiltonianType::Hermitian);
+
+  // Unrestricted constructor
+  cholesky_container.def(
+      py::init<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
+               const Eigen::VectorXd&, const Eigen::VectorXd&,
+               const Eigen::VectorXd&, std::shared_ptr<Orbitals>, double,
+               const Eigen::MatrixXd&, const Eigen::MatrixXd&,
+               const Eigen::MatrixXd&, HamiltonianType>(),
+      R"(
+Constructor for unrestricted active space Hamiltonian with Cholesky-decomposed integrals.
+
+Args:
+    one_body_integrals_alpha (numpy.ndarray): Alpha one-electron integrals [norb x norb]
+    one_body_integrals_beta (numpy.ndarray): Beta one-electron integrals [norb x norb]
+    two_body_integrals_aaaa (numpy.ndarray): Alpha-alpha-alpha-alpha integrals [norb^4]
+    two_body_integrals_aabb (numpy.ndarray): Alpha-beta-alpha-beta integrals [norb^4]
+    two_body_integrals_bbbb (numpy.ndarray): Beta-beta-beta-beta integrals [norb^4]
+    orbitals (Orbitals): Molecular orbital data
+    core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
+    inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix [norb x norb]
+    inactive_fock_matrix_beta (numpy.ndarray): Beta inactive Fock matrix [norb x norb]
+    ao_cholesky_vectors (numpy.ndarray): AO basis Cholesky vectors [norb^2 x nvec]
+    type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
+
+Examples:
+    >>> import numpy as np
+    >>> one_body_a = np.random.rand(4, 4)
+    >>> one_body_b = np.random.rand(4, 4)
+    >>> two_body_aaaa = np.random.rand(256)
+    >>> two_body_aabb = np.random.rand(256)
+    >>> two_body_bbbb = np.random.rand(256)
+    >>> cholesky_vecs = np.random.rand(16, 10)
+    >>> fock_a = np.random.rand(4, 4)
+    >>> fock_b = np.random.rand(4, 4)
+    >>> container = CholeskyHamiltonianContainer(
+    ...     one_body_a, one_body_b,
+    ...     two_body_aaaa, two_body_aabb, two_body_bbbb,
+    ...     orbitals, 10.5, fock_a, fock_b, cholesky_vecs
+    ... )
+)",
+      py::arg("one_body_integrals_alpha"), py::arg("one_body_integrals_beta"),
+      py::arg("two_body_integrals_aaaa"), py::arg("two_body_integrals_aabb"),
+      py::arg("two_body_integrals_bbbb"), py::arg("orbitals"),
+      py::arg("core_energy"), py::arg("inactive_fock_matrix_alpha"),
+      py::arg("inactive_fock_matrix_beta"), py::arg("ao_cholesky_vectors"),
+      py::arg("type") = HamiltonianType::Hermitian);
+
+  // Two-body integral access
+  bind_getter_as_property(
+      cholesky_container, "get_two_body_integrals",
+      &CholeskyHamiltonianContainer::get_two_body_integrals,
+      R"(
+Get two-electron integrals in molecular orbital basis.
+
+Returns:
+    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
+    integral vectors [norb^4] for aaaa, aabb, and bbbb spin channels.
+
+Notes:
+    Integrals are stored as flattened vectors in chemist notation <ij|kl>
+    where indices are ordered as i + j*norb + k*norb^2 + l*norb^3
+)",
+      py::return_value_policy::reference_internal);
+
+  cholesky_container.def(
+      "get_two_body_element",
+      &CholeskyHamiltonianContainer::get_two_body_element,
+      R"(
+Get specific two-electron integral element <ij|kl>.
+
+Args:
+    i, j, k, l (int): Orbital indices
+    channel (SpinChannel): Spin channel (aaaa, aabb, or bbbb), defaults to aaaa
+
+Returns:
+    float: Value of the two-electron integral <ij|kl>
+)",
+      py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
+      py::arg("channel") = SpinChannel::aaaa);
+
+  cholesky_container.def(
+      "has_two_body_integrals",
+      &CholeskyHamiltonianContainer::has_two_body_integrals,
+      R"(
+Check if two-body integrals are available.
+
+Returns:
+    bool: True if two-body integrals have been set
+)");
+
+  cholesky_container.def(
+      "is_restricted", &CholeskyHamiltonianContainer::is_restricted,
+      R"(
+Check if Hamiltonian is restricted (alpha == beta).
+
+Returns:
+    bool: True if alpha and beta integrals are identical
+)");
+
+  cholesky_container.def("is_valid",
+                         &CholeskyHamiltonianContainer::is_valid,
+                         R"(
+Check if the Hamiltonian data is complete and consistent.
+
+Returns:
+    bool: True if all required data is set and dimensions are consistent
+)");
+
+  cholesky_container.def(
+      "to_json",
+      [](const CholeskyHamiltonianContainer& self) -> std::string {
+        return self.to_json().dump();
+      },
+      R"(
+Convert container to JSON string.
+
+Returns:
+    str: JSON representation of the container
+)");
+
+  cholesky_container.def(
+      "to_fcidump_file",
+      &CholeskyHamiltonianContainer::to_fcidump_file,
+      R"(
+Save Hamiltonian to FCIDUMP file.
+
+Args:
+    filename (str): Path to FCIDUMP file to create/overwrite
+    nalpha (int): Number of alpha electrons
+    nbeta (int): Number of beta electrons
+)",
+      py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
+
 
   // ============================================================================
   // CanonicalFourCenterHamiltonianContainer - Concrete implementation

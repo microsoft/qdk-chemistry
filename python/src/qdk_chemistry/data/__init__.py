@@ -7,9 +7,11 @@ primary interface for managing quantum chemical data within the QDK/Chemistry fr
 Exposed classes are:
 
 - :class:`Ansatz`: Quantum chemical ansatz combining a Hamiltonian and wavefunction for energy calculations.
-- :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
 - :class:`AOType`: Enumeration of basis set types (STO-3G, 6-31G, etc.).
+- :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
+- :class:`CanonicalFourCenterHamiltonianContainer`: Container for four-center two-electron integrals in canonical form.
 - :class:`CasWavefunctionContainer`: Complete Active Space (CAS) wavefunction with CI coefficients and determinants.
+- :class:`CholeskyHamiltonianContainer`: Container for Hamiltonians represented using Cholesky-decomposed integrals.
 - :class:`Circuit`: Quantum circuit information.
 - :class:`Configuration`: Electronic configuration state information.
 - :class:`CoupledClusterContainer`: Container for coupled cluster wavefunction amplitudes and determinants.
@@ -19,6 +21,7 @@ Exposed classes are:
 - :class:`EnergyExpectationResult`: Result for Hamiltonian energy expectation value and variance.
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
+- :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitHamiltonian objects.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
 - :class:`MP2Container`: Container for MP2 wavefunction with Hamiltonian reference and optional amplitudes.
@@ -59,6 +62,7 @@ from qdk_chemistry._core.data import (
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
     CasWavefunctionContainer,
+    CholeskyHamiltonianContainer,
     Configuration,
     CoupledClusterContainer,
     ElectronicStructureSettings,
