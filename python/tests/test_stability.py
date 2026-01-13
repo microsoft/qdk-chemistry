@@ -727,11 +727,11 @@ class TestStabilityChecker:
         self._check_reference_eigenvalue(result, stability_checker, ref_external, is_internal=False)
 
     @pytest.mark.parametrize(
-        ("backend", "ref_eigenvalue"), 
+        ("backend", "ref_eigenvalue"),
         [
-            ("pyscf", -0.07936046244954532), 
+            ("pyscf", -0.07936046244954532),
             ("qdk", -0.07935926726345147),
-        ]
+        ],
     )
     def test_stability_bn_plus_uhf(self, backend, ref_eigenvalue):
         """Test stability checker on BN+ cation (UHF) with different backends."""
