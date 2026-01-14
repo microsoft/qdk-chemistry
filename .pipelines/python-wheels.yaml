@@ -185,7 +185,7 @@ extends:
                 sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
               displayName: Fix wheel directory ownership
 
-          - ${{ if eq(parameters.publishInternalFeed, true) }}:
+          - ${{ if eq(${{ parameters.publishInternalFeed }}, true) }}:
             - task: TwineAuthenticate@1
               displayName: Authenticate to internal feed
               inputs:
@@ -216,7 +216,7 @@ extends:
     - stage: Release
       displayName: Release
       dependsOn: Approval
-      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'), eq(parameters.publishEsrp, true))
+      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'), eq(${{ parameters.publishEsrp }}, true))
       jobs:
       - job: Publish_Python_Packages
         pool:
