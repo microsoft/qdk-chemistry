@@ -1326,6 +1326,86 @@ class TestPyscfPlugin:
         random_objective_value = er_objective_function(localized_random.get_orbitals(), ca_loc_selected)
         assert random_objective_value >= can_random_objective_value
 
+    # =============================================================================
+    # Tests for active space preservation after localization
+    # Regression tests for bug: active space indices lost after orbital localization
+    # =============================================================================
+
+    def _verify_active_space_preserved(self, wfn_before, wfn_after, localizer_name):
+        """Helper to verify active space indices are preserved after localization."""
+        orbitals_before = wfn_before.get_orbitals()
+        orbitals_after = wfn_after.get_orbitals()
+
+        assert orbitals_before.has_active_space()
+        assert orbitals_after.has_active_space(), f"Active space lost after {localizer_name} localization"
+
+        alpha_before, beta_before = orbitals_before.get_active_space_indices()
+        alpha_after, beta_after = orbitals_after.get_active_space_indices()
+
+        assert list(alpha_before) == list(alpha_after), f"{localizer_name}: alpha indices changed"
+        assert list(beta_before) == list(beta_after), f"{localizer_name}: beta indices changed"
+
+    @pytest.mark.parametrize("method", ["pipek-mezey", "foster-boys", "edmiston-ruedenberg", "cholesky"])
+    def test_pyscf_localization_preserves_active_space_restricted(self, method):
+        """Test that PySCF localization preserves active space indices (restricted)."""
+        water = create_water_structure()
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
+
+        # Select an active space
+        selector = algorithms.create("active_space_selector", "qdk_valence")
+        selector.settings().set("num_active_electrons", 6)
+        selector.settings().set("num_active_orbitals", 5)
+        active_wfn = selector.run(wavefunction)
+
+        active_alpha, active_beta = active_wfn.get_orbitals().get_active_space_indices()
+
+        # Localize
+        localizer = algorithms.create("orbital_localizer", "pyscf_multi")
+        localizer.settings().set("method", method)
+        localized_wfn = localizer.run(active_wfn, list(active_alpha), list(active_beta))
+
+        self._verify_active_space_preserved(active_wfn, localized_wfn, f"pyscf_{method}")
+
+    def test_pyscf_localization_preserves_active_space_unrestricted(self):
+        """Test that PySCF localization preserves active space indices (unrestricted)."""
+        water = create_water_structure()
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        scf_solver.settings().set("scf_type", "unrestricted")
+        _, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
+
+        # Manually set active space indices (ValenceActiveSpaceSelector doesn't support UHF)
+        orbitals = wavefunction.get_orbitals()
+        num_mo = orbitals.get_num_molecular_orbitals()
+
+        # Define active space: frozen core (first 2 are inactive), rest are active
+        # Must include all occupied orbitals in active space for SlaterDeterminantContainer
+        active_alpha = list(range(2, num_mo))
+        active_beta = list(range(2, num_mo))
+        inactive_alpha = [0, 1]
+        inactive_beta = [0, 1]
+
+        # Create orbitals with active space
+        coeffs_alpha, coeffs_beta = orbitals.get_coefficients()
+        active_orbitals = data.Orbitals(
+            coefficients_alpha=coeffs_alpha,
+            coefficients_beta=coeffs_beta,
+            ao_overlap=orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
+            basis_set=orbitals.get_basis_set(),
+            indices=(active_alpha, active_beta, inactive_alpha, inactive_beta),
+        )
+
+        active_wfn = data.Wavefunction(
+            data.SlaterDeterminantContainer(wavefunction.get_active_determinants()[0], active_orbitals)
+        )
+
+        # Localize only the active orbitals
+        localizer = algorithms.create("orbital_localizer", "pyscf_multi")
+        localizer.settings().set("method", "pipek-mezey")
+        localized_wfn = localizer.run(active_wfn, active_alpha, active_beta)
+
+        self._verify_active_space_preserved(active_wfn, localized_wfn, "pyscf_pipek_mezey_unrestricted")
+
     def test_pyscf_avas_selector_water_def2svp(self):
         """Test PySCF AVAS selector on water molecule with def2-svp basis."""
         water = create_water_structure()

@@ -167,6 +167,15 @@ class PyscfLocalizer(OrbitalLocalizer):
                 return lo.cholesky_mos(inp[:, indices])
             raise ValueError(f"Unknown localization method: {loc_method}")
 
+        # Preserve active/inactive space indices from input orbitals if they exist
+        # For restricted: indices = (active, inactive)
+        # For unrestricted: indices = (active_alpha, active_beta, inactive_alpha, inactive_beta)
+        if orbitals.has_active_space():
+            active_alpha, active_beta = orbitals.get_active_space_indices()
+            inactive_alpha, inactive_beta = orbitals.get_inactive_space_indices()
+        else:
+            active_alpha = active_beta = inactive_alpha = inactive_beta = None
+
         # Perform localization and populate localized orbitals instance
         if orbitals.is_restricted():
             if loc_indices_a != loc_indices_b:
@@ -185,6 +194,7 @@ class PyscfLocalizer(OrbitalLocalizer):
                 energies=orbitals.get_energies()[0] if orbitals.has_energies() else None,
                 ao_overlap=orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
                 basis_set=orbitals.get_basis_set(),
+                indices=(list(active_alpha), list(inactive_alpha)) if active_alpha is not None else None,
             )
         else:
             # Unrestricted case - handle alpha and beta separately
@@ -208,6 +218,14 @@ class PyscfLocalizer(OrbitalLocalizer):
                 energies_beta=energies_beta,
                 ao_overlap=orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
                 basis_set=orbitals.get_basis_set(),
+                indices=(
+                    list(active_alpha),
+                    list(active_beta),
+                    list(inactive_alpha),
+                    list(inactive_beta),
+                )
+                if active_alpha is not None
+                else None,
             )
         if len(wavefunction.get_active_determinants()) == 1:
             # Single determinant case - return new wavefunction with localized orbitals

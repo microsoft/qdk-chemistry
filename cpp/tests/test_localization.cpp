@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
@@ -694,4 +695,213 @@ TEST_F(LocalizationTest, O2TripletVVHV) {
   EXPECT_NEAR(3.148110465e+01, pm_metric_alpha,
               testing::localization_tolerance);
   EXPECT_NEAR(2.862067715e+01, pm_metric_beta, testing::localization_tolerance);
+}
+
+// =============================================================================
+// Tests for active space preservation after localization
+// Regression tests for bug: active space indices lost after orbital
+// localization
+// =============================================================================
+
+// Helper function to verify active space preservation after localization
+void verify_active_space_preserved(
+    std::shared_ptr<qdk::chemistry::data::Wavefunction> wfn_before,
+    std::shared_ptr<qdk::chemistry::data::Wavefunction> wfn_after,
+    const std::string& localizer_name) {
+  auto orbitals_before = wfn_before->get_orbitals();
+  auto orbitals_after = wfn_after->get_orbitals();
+
+  ASSERT_TRUE(orbitals_before->has_active_space());
+  ASSERT_TRUE(orbitals_after->has_active_space())
+      << "Active space lost after " << localizer_name << " localization";
+
+  auto [active_alpha_before, active_beta_before] =
+      orbitals_before->get_active_space_indices();
+  auto [active_alpha_after, active_beta_after] =
+      orbitals_after->get_active_space_indices();
+
+  EXPECT_EQ(active_alpha_before, active_alpha_after)
+      << localizer_name << ": alpha indices changed";
+  EXPECT_EQ(active_beta_before, active_beta_after)
+      << localizer_name << ": beta indices changed";
+}
+
+// Parameterized test for active space preservation
+class ActiveSpacePreservationTest
+    : public ::testing::TestWithParam<std::string> {};
+
+TEST_P(ActiveSpacePreservationTest, PreservesActiveSpaceRestricted) {
+  const std::string localizer_name = GetParam();
+
+  // Setup: Water molecule with active space
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E, wfn] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  // Select an active space
+  auto selector = ActiveSpaceSelectorFactory::create("qdk_valence");
+  selector->settings().set("num_active_electrons", 6);
+  selector->settings().set("num_active_orbitals", 5);
+  auto active_wfn = selector->run(wfn);
+
+  auto [active_alpha, active_beta] =
+      active_wfn->get_orbitals()->get_active_space_indices();
+
+  // Localize
+  auto localizer = LocalizerFactory::create(localizer_name);
+  auto localized_wfn = localizer->run(active_wfn, active_alpha, active_beta);
+
+  verify_active_space_preserved(active_wfn, localized_wfn, localizer_name);
+}
+
+INSTANTIATE_TEST_SUITE_P(Localizers, ActiveSpacePreservationTest,
+                         ::testing::Values("qdk_pipek_mezey",
+                                           "qdk_mp2_natural_orbitals"),
+                         [](const ::testing::TestParamInfo<std::string>& info) {
+                           // Convert localizer name to valid test name (replace
+                           // non-alphanumeric)
+                           std::string name = info.param;
+                           std::replace(name.begin(), name.end(), '_', ' ');
+                           name.erase(0, name.find_first_not_of(' '));
+                           std::replace(name.begin(), name.end(), ' ', '_');
+                           return name;
+                         });
+
+TEST_F(LocalizationTest, PipekMezeyPreservesActiveSpaceUnrestricted) {
+  // Setup: Water with unrestricted orbitals and active space
+  // (Closed-shell but exercises the unrestricted code path)
+  auto h2o = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("scf_type", "unrestricted");
+  auto [E, wfn] = scf_solver->run(h2o, 0, 1, "sto-3g");
+
+  // Manually set active space indices (ValenceActiveSpaceSelector doesn't
+  // support UHF)
+  auto orbitals = wfn->get_orbitals();
+  const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
+
+  // Define active space: frozen core (first 2 are inactive), rest are active
+  // Must include all occupied orbitals in active space for
+  // SlaterDeterminantContainer
+  std::vector<size_t> active_alpha, active_beta, inactive_alpha, inactive_beta;
+
+  // First 2 are inactive (core)
+  inactive_alpha = {0, 1};
+  inactive_beta = {0, 1};
+  // Rest of orbitals are active
+  for (size_t i = 2; i < num_molecular_orbitals; ++i) {
+    active_alpha.push_back(i);
+    active_beta.push_back(i);
+  }
+
+  // Create orbitals with active space
+  auto active_orbitals = std::make_shared<Orbitals>(
+      orbitals->get_coefficients().first, orbitals->get_coefficients().second,
+      std::nullopt, std::nullopt, orbitals->get_overlap_matrix(),
+      orbitals->get_basis_set(),
+      std::make_tuple(active_alpha, active_beta, inactive_alpha,
+                      inactive_beta));
+
+  auto active_wfn = std::make_shared<Wavefunction>(
+      std::make_unique<SlaterDeterminantContainer>(
+          wfn->get_active_determinants()[0], active_orbitals));
+
+  // Localize only the active orbitals
+  auto localizer = LocalizerFactory::create("qdk_pipek_mezey");
+  auto localized_wfn = localizer->run(active_wfn, active_alpha, active_beta);
+
+  verify_active_space_preserved(active_wfn, localized_wfn,
+                                "qdk_pipek_mezey_unrestricted");
+}
+
+TEST_F(LocalizationTest, VVHVPreservesActiveSpace) {
+  // Setup: Water molecule with active space (needs def2-svp for VVHV)
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E, wfn] = scf_solver->run(water, 0, 1, "def2-svp");
+
+  // Select an active space
+  auto selector = ActiveSpaceSelectorFactory::create("qdk_valence");
+  selector->settings().set("num_active_electrons", 6);
+  selector->settings().set("num_active_orbitals", 10);
+  auto active_wfn = selector->run(wfn);
+
+  // Get virtual indices for VVHV
+  const auto [na, nb] = wfn->get_total_num_electrons();
+  const size_t num_occupied = std::round(na);
+  std::vector<size_t> virt_indices;
+  for (size_t i = num_occupied;
+       i < active_wfn->get_orbitals()->get_num_molecular_orbitals(); ++i) {
+    virt_indices.push_back(i);
+  }
+
+  // Localize virtual orbitals with VVHV
+  auto localizer = LocalizerFactory::create("qdk_vvhv");
+  localizer->settings().set("minimal_basis", "sto-3g");
+  auto localized_wfn = localizer->run(active_wfn, virt_indices, virt_indices);
+
+  verify_active_space_preserved(active_wfn, localized_wfn, "qdk_vvhv");
+}
+
+TEST_F(LocalizationTest, VVHVPreservesActiveSpaceUnrestricted) {
+  // Setup: Water with unrestricted orbitals and active space
+  // (Boring since water is closed-shell, but tests the unrestricted code path)
+  auto h2o = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("scf_type", "unrestricted");
+  auto [E, wfn] = scf_solver->run(h2o, 0, 1, "def2-svp");
+
+  // Manually set active space indices (ValenceActiveSpaceSelector doesn't
+  // support UHF)
+  auto orbitals = wfn->get_orbitals();
+  const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
+
+  // Define active space: frozen core (first 2 occupied are inactive),
+  // rest of occupied + all virtuals are active.
+  // VVHV requires all virtual indices, so we can only have inactive occupied.
+  std::vector<size_t> active_alpha, active_beta, inactive_alpha, inactive_beta;
+
+  // First 2 occupied are inactive (core)
+  for (size_t i = 0; i < 2; ++i) {
+    inactive_alpha.push_back(i);
+    inactive_beta.push_back(i);
+  }
+  // Rest of orbitals are active
+  for (size_t i = 2; i < num_molecular_orbitals; ++i) {
+    active_alpha.push_back(i);
+    active_beta.push_back(i);
+  }
+
+  // Create orbitals with active space
+  auto active_orbitals = std::make_shared<Orbitals>(
+      orbitals->get_coefficients().first, orbitals->get_coefficients().second,
+      std::nullopt, std::nullopt, orbitals->get_overlap_matrix(),
+      orbitals->get_basis_set(),
+      std::make_tuple(active_alpha, active_beta, inactive_alpha,
+                      inactive_beta));
+
+  auto active_wfn = std::make_shared<Wavefunction>(
+      std::make_unique<SlaterDeterminantContainer>(
+          wfn->get_active_determinants()[0], active_orbitals));
+
+  // Get virtual indices for VVHV
+  const auto [na, nb] = active_wfn->get_total_num_electrons();
+  const size_t num_alpha = std::round(na);
+  const size_t num_beta = std::round(nb);
+
+  std::vector<size_t> virt_alpha, virt_beta;
+  for (size_t i = num_alpha; i < num_molecular_orbitals; ++i) {
+    virt_alpha.push_back(i);
+  }
+  for (size_t i = num_beta; i < num_molecular_orbitals; ++i) {
+    virt_beta.push_back(i);
+  }
+
+  // Localize virtual orbitals with VVHV
+  auto localizer = LocalizerFactory::create("qdk_vvhv");
+  localizer->settings().set("minimal_basis", "sto-3g");
+  auto localized_wfn = localizer->run(active_wfn, virt_alpha, virt_beta);
+
+  verify_active_space_preserved(active_wfn, localized_wfn,
+                                "qdk_vvhv_unrestricted");
 }

@@ -159,12 +159,23 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
     coeffs.col(loc_indices_a[i]) = selected_no_coeffs.col(i);
   }
 
+  // Preserve active space indices from input orbitals if they exist
+  // MP2 natural orbitals only supports restricted orbitals (alpha == beta)
+  std::optional<data::Orbitals::RestrictedCASIndices> restricted_indices;
+  if (orbitals->has_active_space()) {
+    const auto& active = orbitals->get_active_space_indices().first;
+    const auto& inactive = orbitals->get_inactive_space_indices().first;
+    restricted_indices =
+        std::make_tuple(std::vector<size_t>(active.begin(), active.end()),
+                        std::vector<size_t>(inactive.begin(), inactive.end()));
+  }
+
   // Create new orbitals with MP2 natural orbital data
   auto new_orbitals = std::make_shared<data::Orbitals>(
       coeffs,
       std::nullopt,  // no energies for natural orbitals
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
-      std::nullopt);  // no active space indices
+      restricted_indices);  // preserve active space indices from input
   return detail::new_wavefunction(wavefunction, new_orbitals);
 }
 
