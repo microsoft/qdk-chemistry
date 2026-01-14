@@ -10,6 +10,7 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/element_data.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <utility>
 #include <vector>
@@ -218,14 +219,13 @@ class Structure : public DataClass,
    */
   double get_total_mass() const;
 
-  /// Static data type name for serialization and identification
-  static constexpr const char* DATA_TYPE_NAME = "structure";
-
   /**
    * @brief Get the data type name for this class
-   * @return DATA_TYPE_NAME
+   * @return "structure"
    */
-  std::string get_data_type_name() const override { return DATA_TYPE_NAME; }
+  std::string get_data_type_name() const override {
+    return dataclass_to_snake_case(Structure);
+  }
 
   /**
    * @brief Get summary string of structure information

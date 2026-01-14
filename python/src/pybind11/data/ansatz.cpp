@@ -8,6 +8,7 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -385,5 +386,5 @@ Raises:
       }));
 
   // Data type name class attribute
-  ansatz.attr("_data_type_name") = Ansatz::DATA_TYPE_NAME;
+  ansatz.attr("_data_type_name") = dataclass_to_snake_case(Ansatz);
 }

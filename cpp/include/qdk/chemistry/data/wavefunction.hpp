@@ -13,6 +13,7 @@
 #include <qdk/chemistry/data/configuration_set.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <tuple>
 #include <variant>
@@ -532,14 +533,13 @@ class WavefunctionContainer {
 class Wavefunction : public DataClass,
                      public std::enable_shared_from_this<Wavefunction> {
  public:
-  /// Static data type name for serialization and identification
-  static constexpr const char* DATA_TYPE_NAME = "wavefunction";
-
   /**
    * @brief Get the data type name for this class
-   * @return DATA_TYPE_NAME
+   * @return "wavefunction"
    */
-  std::string get_data_type_name() const override { return DATA_TYPE_NAME; }
+  std::string get_data_type_name() const override {
+    return dataclass_to_snake_case(Wavefunction);
+  }
 
   /**
    * @brief Get a summary string

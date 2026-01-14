@@ -10,6 +10,7 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -1291,5 +1292,5 @@ Type:
 )");
 
   // Data type name class attribute
-  basis_set.attr("_data_type_name") = BasisSet::DATA_TYPE_NAME;
+  basis_set.attr("_data_type_name") = dataclass_to_snake_case(BasisSet);
 }

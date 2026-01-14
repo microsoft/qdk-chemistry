@@ -10,6 +10,7 @@
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
@@ -1308,8 +1309,8 @@ void BasisSet::to_hdf5_file(const std::string& filename) const {
   }
 
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
+  std::string validated_filename = DataTypeFilename::validate_write_suffix(
+      filename, dataclass_to_snake_case(BasisSet));
 
   _to_hdf5_file(validated_filename);
 }
@@ -1335,8 +1336,8 @@ void BasisSet::to_json_file(const std::string& filename) const {
   }
 
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
+  std::string validated_filename = DataTypeFilename::validate_write_suffix(
+      filename, dataclass_to_snake_case(BasisSet));
 
   _to_json_file(validated_filename);
 }

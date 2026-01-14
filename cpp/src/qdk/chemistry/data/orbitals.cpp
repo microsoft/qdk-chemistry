@@ -9,6 +9,7 @@
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <set>
 #include <stdexcept>
 
@@ -906,8 +907,8 @@ void Orbitals::to_hdf5_file(const std::string& filename) const {
     throw std::invalid_argument("Filename cannot be empty");
   }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
+  std::string validated_filename = DataTypeFilename::validate_write_suffix(
+      filename, dataclass_to_snake_case(Orbitals));
 
   _to_hdf5_file(validated_filename);
 }
@@ -931,8 +932,8 @@ void Orbitals::to_json_file(const std::string& filename) const {
     throw std::invalid_argument("Filename cannot be empty");
   }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
+  std::string validated_filename = DataTypeFilename::validate_write_suffix(
+      filename, dataclass_to_snake_case(Orbitals));
 
   _to_json_file(validated_filename);
 }

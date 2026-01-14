@@ -7,6 +7,7 @@
 
 #include <Eigen/Dense>
 #include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 namespace qdk::chemistry::data {
 
@@ -319,14 +320,13 @@ class StabilityResult : public DataClass,
 
   // === DataClass interface implementation ===
 
-  /// Static data type name for serialization and identification
-  static constexpr const char* DATA_TYPE_NAME = "stability_result";
-
   /**
    * @brief Get the data type name for this class
-   * @return DATA_TYPE_NAME
+   * @return "stability_result"
    */
-  std::string get_data_type_name() const override { return DATA_TYPE_NAME; }
+  std::string get_data_type_name() const override {
+    return dataclass_to_snake_case(StabilityResult);
+  }
 
   /**
    * @brief Get summary string of stability result information

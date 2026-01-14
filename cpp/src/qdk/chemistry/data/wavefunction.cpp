@@ -14,6 +14,7 @@
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
 #include <tuple>
 #include <variant>
@@ -1492,7 +1493,8 @@ void Wavefunction::to_json_file(const std::string& filename) const {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
+  DataTypeFilename::validate_write_suffix(
+      filename, dataclass_to_snake_case(Wavefunction));
   _to_json_file(filename);
 }
 
@@ -1589,7 +1591,8 @@ void Wavefunction::to_hdf5_file(const std::string& filename) const {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
+  DataTypeFilename::validate_write_suffix(
+      filename, dataclass_to_snake_case(Wavefunction));
   _to_hdf5_file(filename);
 }
 

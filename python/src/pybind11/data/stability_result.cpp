@@ -8,6 +8,7 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/stability_result.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -667,5 +668,6 @@ Examples:
       }));
 
   // Data type name class attribute
-  stability_result.attr("_data_type_name") = StabilityResult::DATA_TYPE_NAME;
+  stability_result.attr("_data_type_name") =
+      dataclass_to_snake_case(StabilityResult);
 }

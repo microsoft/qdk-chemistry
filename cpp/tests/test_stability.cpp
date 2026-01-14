@@ -482,3 +482,9 @@ TEST_F(StabilityCheckerTest, StabilityResult_Validation) {
   EXPECT_TRUE(empty_result.has_internal_result());
   EXPECT_FALSE(empty_result.has_external_result());
 }
+
+TEST_F(StabilityCheckerTest, StabilityResult_DataTypeName) {
+  // Test that StabilityResult has the correct data type name
+  StabilityResult result;
+  EXPECT_EQ(result.get_data_type_name(), "stability_result");
+}

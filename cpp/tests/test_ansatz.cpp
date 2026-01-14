@@ -163,6 +163,11 @@ class AnsatzEnergyCalculationTest : public ::testing::Test {
   void SetUp() override {}
 };
 
+TEST_F(AnsatzSerializationTest, TestDataTypeName) {
+  // test the data_type_name property
+  EXPECT_EQ(ansatz->get_data_type_name(), "ansatz");
+}
+
 TEST_F(AnsatzEnergyCalculationTest, N2SingletCAS_6e6o) {
   // N2 structure
   auto structure = testing::create_stretched_n2_structure();

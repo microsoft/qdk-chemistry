@@ -10,6 +10,7 @@
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
 #include <stdexcept>
 
@@ -423,8 +424,8 @@ void Hamiltonian::to_hdf5_file(const std::string& filename) const {
     throw std::invalid_argument("Filename cannot be empty");
   }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
+  std::string validated_filename = DataTypeFilename::validate_write_suffix(
+      filename, dataclass_to_snake_case(Hamiltonian));
 
   _to_hdf5_file(validated_filename);
 }
@@ -448,8 +449,8 @@ void Hamiltonian::to_json_file(const std::string& filename) const {
     throw std::invalid_argument("Filename cannot be empty");
   }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
+  std::string validated_filename = DataTypeFilename::validate_write_suffix(
+      filename, dataclass_to_snake_case(Hamiltonian));
 
   _to_json_file(validated_filename);
 }
@@ -474,8 +475,8 @@ void Hamiltonian::to_fcidump_file(const std::string& filename, size_t nalpha,
     throw std::invalid_argument("Filename cannot be empty");
   }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, get_data_type_name());
+  std::string validated_filename = DataTypeFilename::validate_write_suffix(
+      filename, dataclass_to_snake_case(Hamiltonian));
 
   _container->to_fcidump_file(validated_filename, nalpha, nbeta);
 }

@@ -11,6 +11,7 @@
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/settings.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 
@@ -2422,7 +2423,7 @@ Examples:
                       py::arg("filename"), py::arg("format_type"));
 
   // Data type name class attribute
-  settings.attr("_data_type_name") = Settings::DATA_TYPE_NAME;
+  settings.attr("_data_type_name") = dataclass_to_snake_case(Settings);
 
   // Bind ElectronicStructureSettings class
   py::class_<qdk::chemistry::algorithms::ElectronicStructureSettings, Settings,

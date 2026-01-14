@@ -9,6 +9,7 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <stdexcept>
 #include <string>
 
@@ -135,15 +136,13 @@ class Ansatz : public DataClass, public std::enable_shared_from_this<Ansatz> {
    */
   void validate_orbital_consistency() const;
 
-  /// Static data type name for serialization and identification
-  static constexpr const char* DATA_TYPE_NAME = "ansatz";
-
   /**
    * @brief Get the data type name for this class
-   * @return DATA_TYPE_NAME
+   * @return "ansatz"
    */
-  std::string get_data_type_name() const override { return DATA_TYPE_NAME; }
-
+  std::string get_data_type_name() const override {
+    return dataclass_to_snake_case(Ansatz);
+  }
   /**
    * @brief Get a summary string describing the Ansatz
    * @return Human-readable summary of the Ansatz

@@ -10,6 +10,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <qdk/chemistry/data/basis_set.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <utility>
 #include <vector>
@@ -335,14 +336,13 @@ class Orbitals : public DataClass,
   virtual Eigen::MatrixXd calculate_ao_density_matrix_from_rdm(
       const Eigen::MatrixXd& rdm) const;
 
-  /// Static data type name for serialization and identification
-  static constexpr const char* DATA_TYPE_NAME = "orbitals";
-
   /**
    * @brief Get the data type name for this class
-   * @return DATA_TYPE_NAME
+   * @return "orbitals"
    */
-  std::string get_data_type_name() const override { return DATA_TYPE_NAME; }
+  std::string get_data_type_name() const override {
+    return dataclass_to_snake_case(Orbitals);
+  }
 
   /**
    * @brief Get summary string of orbital information

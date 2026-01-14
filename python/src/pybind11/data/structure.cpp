@@ -9,6 +9,7 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -1053,5 +1054,5 @@ Examples:
       }));
 
   // Data type name class attribute
-  structure.attr("_data_type_name") = Structure::DATA_TYPE_NAME;
+  structure.attr("_data_type_name") = dataclass_to_snake_case(Structure);
 }

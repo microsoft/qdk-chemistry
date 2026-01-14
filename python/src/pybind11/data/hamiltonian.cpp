@@ -11,6 +11,7 @@
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -847,5 +848,5 @@ Examples:
       }));
 
   // Data type name class attribute
-  hamiltonian.attr("_data_type_name") = Hamiltonian::DATA_TYPE_NAME;
+  hamiltonian.attr("_data_type_name") = dataclass_to_snake_case(Hamiltonian);
 }

@@ -19,6 +19,7 @@
 #include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "property_binding_helpers.hpp"
 
@@ -753,7 +754,7 @@ Examples:
       }));
 
   // Data type name class attribute
-  wavefunction.attr("_data_type_name") = Wavefunction::DATA_TYPE_NAME;
+  wavefunction.attr("_data_type_name") = dataclass_to_snake_case(Wavefunction);
 
   // Bind SciWavefunctionContainer
   py::class_<SciWavefunctionContainer, WavefunctionContainer, py::smart_holder>(

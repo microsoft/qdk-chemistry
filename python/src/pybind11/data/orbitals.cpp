@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -819,7 +820,7 @@ Examples:
           }));
 
   // Data type name class attribute
-  orbitals.attr("_data_type_name") = Orbitals::DATA_TYPE_NAME;
+  orbitals.attr("_data_type_name") = dataclass_to_snake_case(Orbitals);
 
   // Bind ModelOrbitals
   bind_model_orbitals(data);

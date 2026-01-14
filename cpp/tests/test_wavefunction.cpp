@@ -913,3 +913,8 @@ TEST_F(WavefunctionActiveSpaceConversionTest, SlaterDeterminantContainer) {
   Configuration recovered_active = wf->get_active_determinant(total_det);
   EXPECT_EQ(recovered_active.to_string(), active_det1.to_string());
 }
+
+TEST_F(WavefunctionCoreTest, DataTypeName) {
+  // Test that Wavefunction has the correct data type name
+  EXPECT_EQ(wf->get_data_type_name(), "wavefunction");
+}
