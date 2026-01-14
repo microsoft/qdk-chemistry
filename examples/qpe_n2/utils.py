@@ -36,6 +36,7 @@ def prepare_2_dets_trial_state(
     Returns:
         wavefunction: Wavefunction object for the given rotation angle
         fidelity: Fidelity with respect to the exact wavefunction
+
     """
     dets = get_top_determinants(wf, max_determinants=2)
     orbitals = wf.get_orbitals()
@@ -78,6 +79,7 @@ def compute_wavefunction_overlap_fidelity(
 
     Returns:
         fidelity: |complex inner product <psi_exact | psi_test>|^2
+
     """
     # Convert to statevectors using your internal function
     psi_ref = create_statevector_from_wavefunction(wf_exact)
@@ -116,6 +118,7 @@ def run_single_trial_iqpe(
     Returns:
         result: QpeResult object with the results of the IQPE run
         circuit_info: Summary info of the first iteration circuit
+
     """
     from qdk.openqasm import compile
     from qdk.simulation import run_qir
@@ -188,6 +191,7 @@ def run_iqpe(
 
     Returns:
         results: List of tuples (QpeResult, circuit_info) for each trial
+
     """
     results = []
     for trial in range(trials):
