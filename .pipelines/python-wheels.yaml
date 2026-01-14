@@ -40,11 +40,9 @@ parameters:
   default: false
 
 variables:
-- group: QdkChemistry
-- name: publishInternalFeed
-  value: ${{ parameters.publishInternalFeed }}
-- name: publishEsrp
-  value: ${{ parameters.publishEsrp }}
+  publishInternalFeed: ${{ parameters.publishInternalFeed }}
+  publishEsrp: ${{ parameters.publishEsrp }}
+
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
@@ -189,7 +187,7 @@ extends:
                 sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
               displayName: Fix wheel directory ownership
 
-          - ${{ if eq(variables["publishInternalFeed"], true) }}:
+          - ${{ if eq($(publishInternalFeed), true) }}:
             - task: TwineAuthenticate@1
               displayName: Authenticate to internal feed
               inputs:
@@ -220,7 +218,7 @@ extends:
     - stage: Release
       displayName: Release
       dependsOn: Approval
-      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'), eq(variables["publishEsrp"], true))
+      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'), eq($(publishEsrp), 'true'))
       jobs:
       - job: Publish_Python_Packages
         pool:
