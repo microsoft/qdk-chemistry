@@ -10,4 +10,7 @@ internal package paths.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry._core._algorithms import StabilityChecker  # noqa: F401 - re-export
+from qdk_chemistry._core._algorithms import (
+    QdkStabilityChecker,  # noqa: F401 - re-export
+    StabilityChecker,  # noqa: F401 - re-export
+)

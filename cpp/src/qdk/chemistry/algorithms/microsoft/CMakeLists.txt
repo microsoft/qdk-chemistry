@@ -15,6 +15,7 @@ target_sources(chemistry PRIVATE
     macis_pmc.cpp
     mp2.cpp
     scf.cpp
+    stability.cpp
     utils.cpp
 )
 
