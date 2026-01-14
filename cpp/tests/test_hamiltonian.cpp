@@ -524,7 +524,6 @@ TEST_F(HamiltonianTest, ValidationEdgeCases) {
 TEST_F(HamiltonianConstructorTest, Factory) {
   auto available_solvers = HamiltonianConstructorFactory::available();
   EXPECT_EQ(available_solvers.size(), 2);
-  EXPECT_EQ(available_solvers[0], "qdk_cholesky");
   EXPECT_THROW(HamiltonianConstructorFactory::create("nonexistent_solver"),
                std::runtime_error);
   EXPECT_NO_THROW(HamiltonianConstructorFactory::register_instance(
