@@ -199,8 +199,9 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     auditwheel repair dist/qdk_chemistry-*.whl -w ../python/repaired_wheelhouse/
 else
     cd temp-release
-    python3 -m build --wheel
-    pip install delocate==0.13.0
+    python3 -m build --wheel \
+        -C cmake.define.CMAKE_OSX_ARCHITECTURES=arm64
+    python3 -m pip install delocate==0.13.0
     WHEEL_FILE=$(ls dist/qdk_chemistry-*.whl)
     delocate-wheel -w ../python/repaired_wheelhouse/ "$WHEEL_FILE"
 fi

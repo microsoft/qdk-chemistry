@@ -3,6 +3,7 @@ build-backend = "scikit_build_core.build"
 
 requires = [
   "scikit-build-core>=0.10.0",
+  "pybind11>=2.13.6",
 ]
 
 [project]
@@ -30,3 +31,13 @@ version = "0.0.1"
 description = "Quantum Development Kit - Chemistry Library"
 name = "qdk-chemistry"
 requires-python = ">=3.11"
+
+# Scikit-build-core configuration (minimal)
+[tool.scikit-build]
+cmake.version = ">=3.15"
+cmake.build-type = "Release"
+cmake.source-dir = "."
+
+[tool.scikit-build.wheel]
+packages = ["src/qdk_chemistry"]
+install-dir = "qdk_chemistry"
