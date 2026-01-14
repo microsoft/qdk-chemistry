@@ -187,17 +187,19 @@ extends:
                 sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
               displayName: Fix wheel directory ownership
 
-          - ${{ if eq($(publishInternalFeed), true) }}:
-            - task: TwineAuthenticate@1
-              displayName: Authenticate to internal feed
-              inputs:
-                artifactFeed: $(artifactProject)/$(artifactFeed)
 
-            - script: |
-                cd $(Agent.BuildDirectory)/qdk-chemistry/python
-                pip install twine
-                python -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
-              displayName: Upload wheel with twine
+          - task: TwineAuthenticate@1
+            inputs:
+              artifactFeed: $(artifactProject)/$(artifactFeed)
+            displayName: Authenticate to internal feed
+            condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
+
+          - script: |
+              cd $(Agent.BuildDirectory)/qdk-chemistry/python
+              pip install twine
+              python -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
+            displayName: Upload wheel with twine
+            condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
 
     - stage: Approval
       displayName: Approval
@@ -218,7 +220,7 @@ extends:
     - stage: Release
       displayName: Release
       dependsOn: Approval
-      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'), eq($(publishEsrp), 'true'))
+      condition: and( succeeded(), eq(variables['Build.Reason'], 'Manual'), ${{ parameters.publishEsrp }} )
       jobs:
       - job: Publish_Python_Packages
         pool:
