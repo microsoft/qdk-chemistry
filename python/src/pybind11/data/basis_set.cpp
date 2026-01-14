@@ -309,7 +309,7 @@ Creates a complete basis set with regular shells, ECP shells, ECP metadata, and 
 Args:
     name (str): Name of the basis set
     shells (list[Shell]): Vector of shell objects defining the atomic orbitals
-    ecp_name (str): Name of the ECP (basis set);
+    ecp_name (str): Name of the ECP (basis set)
     ecp_shells (list[Shell]): Vector of ECP shell objects
     ecp_electrons (list[int]): Number of ECP electrons for each atom
     structure (Structure): Molecular structure to associate with this basis set
@@ -349,14 +349,14 @@ Examples:
 Get the basis type.
 
 Returns:
-    AOType: Current basis type (Spherical or Cartesian);
+    AOType: Current basis type (Spherical or Cartesian)
 
 Examples:
     >>> atomic_orbital_type = basis_set.get_atomic_orbital_type()
     >>> print(f"Basis type: {atomic_orbital_type}")
 )");
 
-  // Shell access (read-only);
+  // Shell access (read-only)
   basis_set.def("get_shells", &BasisSet::get_shells,
                 R"(
 Get all shells (flattened from per-atom storage).
