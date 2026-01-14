@@ -41,6 +41,8 @@ parameters:
 
 variables:
 - group: QdkChemistry
+- name: publishInternalFeed
+  value: ${{ parameters.publishInternalFeed }}
 - name: publishEsrp
   value: ${{ parameters.publishEsrp }}
 extends:
@@ -187,7 +189,7 @@ extends:
                 sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
               displayName: Fix wheel directory ownership
 
-          - ${{ if eq(${{ parameters.publishInternalFeed }}, true) }}:
+          - ${{ if eq(variables["publishInternalFeed"], true) }}:
             - task: TwineAuthenticate@1
               displayName: Authenticate to internal feed
               inputs:
