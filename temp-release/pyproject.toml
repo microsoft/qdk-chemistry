@@ -30,4 +30,3 @@ version = "0.0.1"
 description = "Quantum Development Kit - Chemistry Library"
 name = "qdk-chemistry"
 requires-python = ">=3.11"
-source = ["src"]

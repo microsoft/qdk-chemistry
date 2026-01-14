@@ -178,7 +178,10 @@ extends:
             - script: |
                 sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
               displayName: Fix wheel directory ownership
-
+          - task: TwineAuthenticate@1
+            displayName: Authenticate to internal feed
+            inputs:
+              artifactFeed: $(artifactProject)/$(artifactFeed)
     - stage: Approval
       displayName: Approval
       dependsOn: Build
