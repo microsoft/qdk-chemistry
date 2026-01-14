@@ -110,6 +110,7 @@ __all__ = [
     "BasisSet",
     "CanonicalFourCenterHamiltonianContainer",
     "CasWavefunctionContainer",
+    "CholeskyHamiltonianContainer",
     "Circuit",
     "Configuration",
     "CoupledClusterContainer",
