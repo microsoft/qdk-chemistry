@@ -455,6 +455,70 @@ class WavefunctionContainer {
 
   /** @brief Clear cached RDMs */
   void _clear_rdms() const;
+
+  /**
+   * @brief Serialize RDMs to HDF5 group if they are available
+   * @param group HDF5 group to write RDM data to
+   */
+  void _serialize_rdms_to_hdf5(H5::Group& group) const;
+
+  /**
+   * @brief Deserialize RDMs from HDF5 group for restricted case
+   * @param rdm_group HDF5 group containing RDM data
+   * @param orbitals Orbitals for computing derived quantities
+   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb,
+   * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb, one_rdm_spin_traced,
+   * two_rdm_spin_traced)
+   */
+  static std::tuple<std::optional<MatrixVariant>, std::optional<MatrixVariant>,
+                    std::optional<VectorVariant>, std::optional<VectorVariant>,
+                    std::optional<VectorVariant>, std::optional<MatrixVariant>,
+                    std::optional<VectorVariant>>
+  _deserialize_rdms_from_hdf5_restricted(
+      H5::Group& rdm_group, const std::shared_ptr<Orbitals>& orbitals);
+
+  /**
+   * @brief Deserialize RDMs from HDF5 group for unrestricted case
+   * @param rdm_group HDF5 group containing RDM data
+   * @param orbitals Orbitals for computing derived quantities
+   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb,
+   * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb, one_rdm_spin_traced,
+   * two_rdm_spin_traced)
+   */
+  static std::tuple<std::optional<MatrixVariant>, std::optional<MatrixVariant>,
+                    std::optional<VectorVariant>, std::optional<VectorVariant>,
+                    std::optional<VectorVariant>, std::optional<MatrixVariant>,
+                    std::optional<VectorVariant>>
+  _deserialize_rdms_from_hdf5_unrestricted(
+      H5::Group& rdm_group, const std::shared_ptr<Orbitals>& orbitals);
+
+  /**
+   * @brief Serialize RDMs to JSON if they are available
+   * @param j JSON object to add RDM data to
+   */
+  void _serialize_rdms_to_json(nlohmann::json& j) const;
+
+  /**
+   * @brief Deserialize RDMs from JSON for restricted case
+   * @param j JSON object containing RDM data
+   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb,
+   * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
+   */
+  static std::tuple<std::optional<MatrixVariant>, std::optional<MatrixVariant>,
+                    std::optional<VectorVariant>, std::optional<VectorVariant>,
+                    std::optional<VectorVariant>>
+  _deserialize_rdms_from_json_restricted(const nlohmann::json& j);
+
+  /**
+   * @brief Deserialize RDMs from JSON for unrestricted case
+   * @param j JSON object containing RDM data
+   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb,
+   * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
+   */
+  static std::tuple<std::optional<MatrixVariant>, std::optional<MatrixVariant>,
+                    std::optional<VectorVariant>, std::optional<VectorVariant>,
+                    std::optional<VectorVariant>>
+  _deserialize_rdms_from_json_unrestricted(const nlohmann::json& j);
 };
 
 /**
