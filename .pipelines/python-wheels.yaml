@@ -254,7 +254,7 @@ extends:
             keyvaultname: quantum-esrp-kv
             signcertname: ESRPCert
             clientid: 832c049d-cd07-4c1c-bfa5-c07250d190cb
-            contenttype: NPM
+            contenttype: PyPI
             domaintenantid: 975f013f-7f24-47e8-a7d3-abc4752bf346
             folderlocation: $(System.DefaultWorkingDirectory)/target/wheels
             waitforreleasecompletion: true
