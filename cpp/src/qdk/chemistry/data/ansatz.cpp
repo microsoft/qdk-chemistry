@@ -312,16 +312,155 @@ void Ansatz::validate_orbital_consistency() const {
     return;  // Same object, orbital consistency is guaranteed
   }
 
-  // If pointers are different, get the actual objects and compare them
-  const auto& ham_orbitals = _hamiltonian->get_orbitals();
-  const auto& wf_orbitals = _wavefunction->get_orbitals();
+  // If pointers are different, compare the orbital properties for structural
+  // equivalence.
+  // This is necessary when Hamiltonian and Wavefunction are loaded
+  // from separate files.
+  const auto& ham_orbitals = *ham_orbitals_ptr;
+  const auto& wf_orbitals = *wf_orbitals_ptr;
 
-  // If they're not the same object instance, throw an error
-  if (&ham_orbitals != &wf_orbitals) {
+  // Check number of molecular orbitals
+  if (ham_orbitals.get_num_molecular_orbitals() !=
+      wf_orbitals.get_num_molecular_orbitals()) {
     throw std::runtime_error(
-        "Orbital inconsistency: Hamiltonian and Wavefunction must use the "
-        "same "
-        "Orbitals object instance");
+        "Orbital inconsistency: Hamiltonian has " +
+        std::to_string(ham_orbitals.get_num_molecular_orbitals()) +
+        " molecular orbitals but Wavefunction has " +
+        std::to_string(wf_orbitals.get_num_molecular_orbitals()));
+  }
+
+  // Check number of atomic orbitals
+  if (ham_orbitals.get_num_atomic_orbitals() !=
+      wf_orbitals.get_num_atomic_orbitals()) {
+    throw std::runtime_error(
+        "Orbital inconsistency: Hamiltonian has " +
+        std::to_string(ham_orbitals.get_num_atomic_orbitals()) +
+        " atomic orbitals but Wavefunction has " +
+        std::to_string(wf_orbitals.get_num_atomic_orbitals()));
+  }
+
+  // Check restricted/unrestricted consistency
+  if (ham_orbitals.is_restricted() != wf_orbitals.is_restricted()) {
+    throw std::runtime_error(
+        "Orbital inconsistency: Hamiltonian and Wavefunction have different "
+        "spin restriction (restricted vs unrestricted)");
+  }
+
+  // Check active space indices consistency
+  const auto& [ham_active_alpha, ham_active_beta] =
+      ham_orbitals.get_active_space_indices();
+  const auto& [wf_active_alpha, wf_active_beta] =
+      wf_orbitals.get_active_space_indices();
+
+  if (ham_active_alpha != wf_active_alpha) {
+    throw std::runtime_error(
+        "Orbital inconsistency: Hamiltonian and Wavefunction have different "
+        "alpha active space indices");
+  }
+  if (ham_active_beta != wf_active_beta) {
+    throw std::runtime_error(
+        "Orbital inconsistency: Hamiltonian and Wavefunction have different "
+        "beta active space indices");
+  }
+
+  // Check inactive space indices consistency
+  const auto& [ham_inactive_alpha, ham_inactive_beta] =
+      ham_orbitals.get_inactive_space_indices();
+  const auto& [wf_inactive_alpha, wf_inactive_beta] =
+      wf_orbitals.get_inactive_space_indices();
+
+  if (ham_inactive_alpha != wf_inactive_alpha) {
+    throw std::runtime_error(
+        "Orbital inconsistency: Hamiltonian and Wavefunction have different "
+        "alpha inactive space indices");
+  }
+  if (ham_inactive_beta != wf_inactive_beta) {
+    throw std::runtime_error(
+        "Orbital inconsistency: Hamiltonian and Wavefunction have different "
+        "beta inactive space indices");
+  }
+
+  // Compare orbital coefficients numerically
+
+  const auto& [ham_coeffs_alpha, ham_coeffs_beta] =
+      ham_orbitals.get_coefficients();
+  const auto& [wf_coeffs_alpha, wf_coeffs_beta] =
+      wf_orbitals.get_coefficients();
+
+  // Check alpha coefficients
+  if (ham_coeffs_alpha.rows() != wf_coeffs_alpha.rows() ||
+      ham_coeffs_alpha.cols() != wf_coeffs_alpha.cols()) {
+    throw std::runtime_error(
+        "Orbital inconsistency: Hamiltonian and Wavefunction have different "
+        "alpha coefficient matrix dimensions");
+  }
+
+  double alpha_diff = (ham_coeffs_alpha - wf_coeffs_alpha).norm();
+  if (alpha_diff > std::numeric_limits<double>::epsilon()) {
+    throw std::runtime_error(
+        "Orbital inconsistency: Hamiltonian and Wavefunction have different "
+        "alpha orbital coefficients (norm difference: " +
+        std::to_string(alpha_diff) + ")");
+  }
+
+  // Check beta coefficients
+  if (ham_coeffs_beta.rows() != wf_coeffs_beta.rows() ||
+      ham_coeffs_beta.cols() != wf_coeffs_beta.cols()) {
+    throw std::runtime_error(
+        "Orbital inconsistency: Hamiltonian and Wavefunction have different "
+        "beta coefficient matrix dimensions");
+  }
+
+  double beta_diff = (ham_coeffs_beta - wf_coeffs_beta).norm();
+  if (beta_diff > std::numeric_limits<double>::epsilon()) {
+    throw std::runtime_error(
+        "Orbital inconsistency: Hamiltonian and Wavefunction have different "
+        "beta orbital coefficients (norm difference: " +
+        std::to_string(beta_diff) + ")");
+  }
+
+  // Compare orbital energies if both have them
+  if (ham_orbitals.has_energies() && wf_orbitals.has_energies()) {
+    constexpr double energy_tolerance = 1e-12;
+
+    const auto& [ham_energies_alpha, ham_energies_beta] =
+        ham_orbitals.get_energies();
+    const auto& [wf_energies_alpha, wf_energies_beta] =
+        wf_orbitals.get_energies();
+
+    // Check alpha energies
+    if (ham_energies_alpha.size() != wf_energies_alpha.size()) {
+      throw std::runtime_error(
+          "Orbital inconsistency: Hamiltonian and Wavefunction have different "
+          "number of alpha orbital energies");
+    }
+
+    double alpha_energy_diff = (ham_energies_alpha - wf_energies_alpha).norm();
+    if (alpha_energy_diff > energy_tolerance) {
+      throw std::runtime_error(
+          "Orbital inconsistency: Hamiltonian and Wavefunction have different "
+          "alpha orbital energies (norm difference: " +
+          std::to_string(alpha_energy_diff) + ")");
+    }
+
+    // Check beta energies
+    if (ham_energies_beta.size() != wf_energies_beta.size()) {
+      throw std::runtime_error(
+          "Orbital inconsistency: Hamiltonian and Wavefunction have different "
+          "number of beta orbital energies");
+    }
+
+    double beta_energy_diff = (ham_energies_beta - wf_energies_beta).norm();
+    if (beta_energy_diff > energy_tolerance) {
+      throw std::runtime_error(
+          "Orbital inconsistency: Hamiltonian and Wavefunction have different "
+          "beta orbital energies (norm difference: " +
+          std::to_string(beta_energy_diff) + ")");
+    }
+  } else if (ham_orbitals.has_energies() != wf_orbitals.has_energies()) {
+    throw std::runtime_error(
+        "Orbital inconsistency: Hamiltonian and Wavefunction have different "
+        "orbital energy availability (one has energies, the other does not)");
   }
 }
 
