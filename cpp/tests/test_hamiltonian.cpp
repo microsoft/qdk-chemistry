@@ -844,7 +844,8 @@ TEST_F(HamiltonianConstructorTest, CholeskyFactory) {
       break;
     }
   }
-  EXPECT_TRUE(found_cholesky) << "qdk_cholesky not found in available constructors";
+  EXPECT_TRUE(found_cholesky)
+      << "qdk_cholesky not found in available constructors";
 
   // Test that we can create a cholesky hamiltonian constructor
   EXPECT_NO_THROW(HamiltonianConstructorFactory::create("qdk_cholesky"));
@@ -867,7 +868,8 @@ TEST_F(HamiltonianConstructorTest, CholeskyRestrictedO2) {
   // Verify we can access the typed container
   EXPECT_TRUE(hamiltonian->has_container_type<CholeskyHamiltonianContainer>());
   EXPECT_NO_THROW({
-    const auto& container = hamiltonian->get_container<CholeskyHamiltonianContainer>();
+    const auto& container =
+        hamiltonian->get_container<CholeskyHamiltonianContainer>();
     EXPECT_EQ(container.get_container_type(), "cholesky");
   });
 }
@@ -886,7 +888,8 @@ TEST_F(HamiltonianConstructorTest, CholeskyUnrestrictedO2) {
   // Verify we can access the typed container
   EXPECT_TRUE(hamiltonian->has_container_type<CholeskyHamiltonianContainer>());
   EXPECT_NO_THROW({
-    const auto& container = hamiltonian->get_container<CholeskyHamiltonianContainer>();
+    const auto& container =
+        hamiltonian->get_container<CholeskyHamiltonianContainer>();
     EXPECT_EQ(container.get_container_type(), "cholesky");
   });
 }
@@ -972,8 +975,8 @@ TEST_F(HamiltonianTest, CholeskyContainerUnrestrictedConstruction) {
   // Test unrestricted constructor
   Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
       one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
-      two_body_bbbb, unrestricted_orbitals, core_energy,
-      inactive_fock_alpha, inactive_fock_beta, L_ao));
+      two_body_bbbb, unrestricted_orbitals, core_energy, inactive_fock_alpha,
+      inactive_fock_beta, L_ao));
 
   EXPECT_TRUE(h.has_one_body_integrals());
   EXPECT_TRUE(h.has_two_body_integrals());
