@@ -1326,6 +1326,86 @@ class TestPyscfPlugin:
         random_objective_value = er_objective_function(localized_random.get_orbitals(), ca_loc_selected)
         assert random_objective_value >= can_random_objective_value
 
+    # =============================================================================
+    # Tests for active space preservation after localization
+    # Regression tests for bug: active space indices lost after orbital localization
+    # =============================================================================
+
+    def _verify_active_space_preserved(self, wfn_before, wfn_after, localizer_name):
+        """Helper to verify active space indices are preserved after localization."""
+        orbitals_before = wfn_before.get_orbitals()
+        orbitals_after = wfn_after.get_orbitals()
+
+        assert orbitals_before.has_active_space()
+        assert orbitals_after.has_active_space(), f"Active space lost after {localizer_name} localization"
+
+        alpha_before, beta_before = orbitals_before.get_active_space_indices()
+        alpha_after, beta_after = orbitals_after.get_active_space_indices()
+
+        assert list(alpha_before) == list(alpha_after), f"{localizer_name}: alpha indices changed"
+        assert list(beta_before) == list(beta_after), f"{localizer_name}: beta indices changed"
+
+    @pytest.mark.parametrize("method", ["pipek-mezey", "foster-boys", "edmiston-ruedenberg", "cholesky"])
+    def test_pyscf_localization_preserves_active_space_restricted(self, method):
+        """Test that PySCF localization preserves active space indices (restricted)."""
+        water = create_water_structure()
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
+
+        # Select an active space
+        selector = algorithms.create("active_space_selector", "qdk_valence")
+        selector.settings().set("num_active_electrons", 6)
+        selector.settings().set("num_active_orbitals", 5)
+        active_wfn = selector.run(wavefunction)
+
+        active_alpha, active_beta = active_wfn.get_orbitals().get_active_space_indices()
+
+        # Localize
+        localizer = algorithms.create("orbital_localizer", "pyscf_multi")
+        localizer.settings().set("method", method)
+        localized_wfn = localizer.run(active_wfn, list(active_alpha), list(active_beta))
+
+        self._verify_active_space_preserved(active_wfn, localized_wfn, f"pyscf_{method}")
+
+    def test_pyscf_localization_preserves_active_space_unrestricted(self):
+        """Test that PySCF localization preserves active space indices (unrestricted)."""
+        water = create_water_structure()
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        scf_solver.settings().set("scf_type", "unrestricted")
+        _, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
+
+        # Manually set active space indices (ValenceActiveSpaceSelector doesn't support UHF)
+        orbitals = wavefunction.get_orbitals()
+        num_mo = orbitals.get_num_molecular_orbitals()
+
+        # Define active space: frozen core (first 2 are inactive), rest are active
+        # Must include all occupied orbitals in active space for SlaterDeterminantContainer
+        active_alpha = list(range(2, num_mo))
+        active_beta = list(range(2, num_mo))
+        inactive_alpha = [0, 1]
+        inactive_beta = [0, 1]
+
+        # Create orbitals with active space
+        coeffs_alpha, coeffs_beta = orbitals.get_coefficients()
+        active_orbitals = data.Orbitals(
+            coefficients_alpha=coeffs_alpha,
+            coefficients_beta=coeffs_beta,
+            ao_overlap=orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
+            basis_set=orbitals.get_basis_set(),
+            indices=(active_alpha, active_beta, inactive_alpha, inactive_beta),
+        )
+
+        active_wfn = data.Wavefunction(
+            data.SlaterDeterminantContainer(wavefunction.get_active_determinants()[0], active_orbitals)
+        )
+
+        # Localize only the active orbitals
+        localizer = algorithms.create("orbital_localizer", "pyscf_multi")
+        localizer.settings().set("method", "pipek-mezey")
+        localized_wfn = localizer.run(active_wfn, active_alpha, active_beta)
+
+        self._verify_active_space_preserved(active_wfn, localized_wfn, "pyscf_pipek_mezey_unrestricted")
+
     def test_pyscf_avas_selector_water_def2svp(self):
         """Test PySCF AVAS selector on water molecule with def2-svp basis."""
         water = create_water_structure()
@@ -1956,6 +2036,89 @@ class TestPyscfPlugin:
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+
+    def test_orbitals_to_scf_charge_and_multiplicity_handling(self):
+        """Test that orbitals_to_scf correctly sets charge and multiplicity in the PySCF molecule."""
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+
+        # Test singlet state (closed-shell)
+        water = create_water_structure()
+        _, wavefunction_singlet = scf_solver.run(water, 0, 1, "sto-3g")
+        orbitals_singlet = wavefunction_singlet.get_orbitals()
+        n_orbitals_singlet = orbitals_singlet.get_num_molecular_orbitals()
+
+        # Singlet: 5 alpha, 5 beta electrons (charge = 0, multiplicity = 1)
+        occ_alpha_singlet = np.concatenate((np.ones(5), np.zeros(n_orbitals_singlet - 5)))
+        occ_beta_singlet = np.concatenate((np.ones(5), np.zeros(n_orbitals_singlet - 5)))
+        scf_singlet = orbitals_to_scf(orbitals_singlet, occ_alpha_singlet, occ_beta_singlet)
+
+        assert scf_singlet.mol.charge == 0
+        assert scf_singlet.mol.spin == 0
+        assert scf_singlet.mol.multiplicity == 1
+
+        # Test doublet state (open-shell)
+        lithium = create_li_structure()
+        _, wavefunction_doublet = scf_solver.run(lithium, 0, 2, "sto-3g")
+        orbitals_doublet = wavefunction_doublet.get_orbitals()
+        n_orbitals_doublet = orbitals_doublet.get_num_molecular_orbitals()
+
+        # Doublet: 2 alpha, 1 beta electrons (charge = 0, multiplicity = 2)
+        occ_alpha_doublet = np.concatenate((np.ones(2), np.zeros(n_orbitals_doublet - 2)))
+        occ_beta_doublet = np.concatenate((np.ones(1), np.zeros(n_orbitals_doublet - 1)))
+        scf_doublet = orbitals_to_scf(orbitals_doublet, occ_alpha_doublet, occ_beta_doublet)
+
+        assert scf_doublet.mol.charge == 0
+        assert scf_doublet.mol.spin == 1
+        assert scf_doublet.mol.multiplicity == 2
+
+        # Test triplet state (open-shell)
+        o2 = create_o2_structure()
+        _, wavefunction_triplet = scf_solver.run(o2, 0, 3, "sto-3g")
+        orbitals_triplet = wavefunction_triplet.get_orbitals()
+        n_orbitals_triplet = orbitals_triplet.get_num_molecular_orbitals()
+
+        # Triplet: 9 alpha, 7 beta electrons (charge = 0, multiplicity = 3)
+        occ_alpha_triplet = np.concatenate((np.ones(9), np.zeros(n_orbitals_triplet - 9)))
+        occ_beta_triplet = np.concatenate((np.ones(7), np.zeros(n_orbitals_triplet - 7)))
+        scf_triplet = orbitals_to_scf(orbitals_triplet, occ_alpha_triplet, occ_beta_triplet)
+
+        assert scf_triplet.mol.charge == 0
+        assert scf_triplet.mol.spin == 2
+        assert scf_triplet.mol.multiplicity == 3
+
+        # Test cation (open-shell)
+        water = create_water_structure()
+        _, wavefunction_cation = scf_solver.run(water, 1, 2, "sto-3g")
+        orbitals_cation = wavefunction_cation.get_orbitals()
+        n_orbitals_cation = orbitals_cation.get_num_molecular_orbitals()
+
+        # Doublet: 5 alpha, 4 beta electrons (charge = 1, multiplicity = 2)
+        occ_alpha_cation = np.concatenate((np.ones(5), np.zeros(n_orbitals_cation - 5)))
+        occ_beta_cation = np.concatenate((np.ones(4), np.zeros(n_orbitals_cation - 4)))
+        scf_cation = orbitals_to_scf(orbitals_cation, occ_alpha_cation, occ_beta_cation)
+
+        assert scf_cation.mol.charge == 1
+        assert scf_cation.mol.spin == 1
+        assert scf_cation.mol.multiplicity == 2
+        assert scf_cation.mol.nelectron == 9
+
+        # Test with ECP electrons
+        ag = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))
+        _, wavefunction_ecp = scf_solver.run(ag, 0, 2, "lanl2dz")
+        orbitals_ecp = wavefunction_ecp.get_orbitals()
+        n_orbitals_ecp = orbitals_ecp.get_num_molecular_orbitals()
+
+        # Doublet: 10 alpha, 9 beta electrons (charge = 0, multiplicity = 2)
+        occ_alpha_ecp = np.concatenate((np.ones(10), np.zeros(n_orbitals_ecp - 10)))
+        occ_beta_ecp = np.concatenate((np.ones(9), np.zeros(n_orbitals_ecp - 9)))
+        scf_ecp = orbitals_to_scf(orbitals_ecp, occ_alpha_ecp, occ_beta_ecp)
+
+        assert hasattr(scf_ecp.mol, "ecp")
+        assert scf_ecp.mol.ecp
+        assert scf_ecp.mol.charge == 0
+        assert scf_ecp.mol.spin == 1
+        assert scf_ecp.mol.multiplicity == 2
+        assert scf_ecp.mol.nelectron == 19
 
     def test_hamiltonian_to_scf_rerouting_and_error_handling(self):
         """Test hamiltonian_to_scf rerouting and error handling.
