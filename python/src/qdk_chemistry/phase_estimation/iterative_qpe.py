@@ -109,6 +109,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             iteration_name: Optional custom name for the circuit. If None, no specific
 
                 name is assigned.
+
             circuit_folding: Whether to apply circuit folding for visualization. Defaults to True.
 
         Returns:
@@ -246,6 +247,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             iteration_names: Optional custom names for the per-iteration circuits.
 
                 Must have length equal to ``num_bits`` if provided.
+
             circuit_folding: Whether to apply circuit folding for visualization. Defaults to True.
 
         Returns:
