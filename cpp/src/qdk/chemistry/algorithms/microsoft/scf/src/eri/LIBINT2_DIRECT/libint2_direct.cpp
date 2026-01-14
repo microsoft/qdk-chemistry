@@ -659,8 +659,7 @@ class ERI {
   std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
                                                  size_t* num_vectors) {
     QDK_LOG_TRACE_ENTERING();
-
-    std::cout << "Threshold: " << threshold << std::endl;
+    QDK_LOG_INFO("Cholesky decomposition threshold: {}", threshold);
 
     const size_t num_aos = obs_.nbf();
     const size_t num_aos2 = num_aos * num_aos;
@@ -884,8 +883,7 @@ class ERI {
         }
       }
 
-      // correct for cholesky contributions
-      // subtract previous contiributions
+      // correct for cholesky contributions by subtracting previous vectors
       if (current_col > 0) {
         // Extract rows from L_data corresponding to shell pairs
         std::vector<double> L_rows(n_cols * current_col);
@@ -895,7 +893,7 @@ class ERI {
           blas::copy(current_col, L_data.data() + global_index, num_aos2,
                      L_rows.data() + col, n_cols);
         }
-        // Compute eri_col -= L_data * L_rows^T using GEMM
+        // Compute eri_col -= L_data * L_rows^T
         // eri_col is num_aos2 x n_cols, L_data is num_aos2 x current_col,
         // L_rows^T is current_col x n_cols
         blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
@@ -973,7 +971,7 @@ class ERI {
       }
     }
 
-    std::cout << "Cholesky rank: " << current_col << std::endl;
+    QDK_LOG_INFO("Cholesky rank: {}", current_col);
 
     // Allocate and return exact size
     const size_t data_size = current_col * num_aos * num_aos;
