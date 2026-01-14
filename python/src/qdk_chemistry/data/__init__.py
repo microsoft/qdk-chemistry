@@ -12,6 +12,7 @@ Exposed classes are:
 - :class:`CasWavefunctionContainer`: Complete Active Space (CAS) wavefunction with CI coefficients and determinants.
 - :class:`Circuit`: Quantum circuit information.
 - :class:`Configuration`: Electronic configuration state information.
+- :class:`ConfigurationSet`: Collection of electronic configurations with associated orbital information.
 - :class:`ControlledTimeEvolutionUnitary`: Controlled time evolution unitary.
 - :class:`CoupledClusterContainer`: Container for coupled cluster wavefunction amplitudes and determinants.
 - :class:`DataClass`: Base data class.
@@ -64,6 +65,7 @@ from qdk_chemistry._core.data import (
     CanonicalFourCenterHamiltonianContainer,
     CasWavefunctionContainer,
     Configuration,
+    ConfigurationSet,
     CoupledClusterContainer,
     ElectronicStructureSettings,
     Element,
@@ -116,6 +118,7 @@ __all__ = [
     "CasWavefunctionContainer",
     "Circuit",
     "Configuration",
+    "ConfigurationSet",
     "ControlledTimeEvolutionUnitary",
     "CoupledClusterContainer",
     "DataClass",
