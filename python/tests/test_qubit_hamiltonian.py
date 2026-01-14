@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import re
+
 import numpy as np
 import pytest
 
@@ -120,7 +122,7 @@ class TestQubitHamiltonian:
     def test_to_interleaved_invalid_n_spatial(self):
         """Test that invalid n_spatial raises error."""
         qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
-        with pytest.raises(ValueError, match="must be 2 \\* n_spatial"):
+        with pytest.raises(ValueError, match=re.escape("must be 2 * n_spatial")):
             qh.to_interleaved(n_spatial=3)
 
     def test_to_interleaved_single_orbital(self):

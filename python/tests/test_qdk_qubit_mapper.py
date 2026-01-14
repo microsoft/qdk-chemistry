@@ -22,6 +22,12 @@ from qdk_chemistry.data import CanonicalFourCenterHamiltonianContainer, Hamilton
 from .test_helpers import create_test_hamiltonian, create_test_orbitals
 
 
+@pytest.fixture
+def test_data_path() -> Path:
+    """Get path to test data directory."""
+    return Path(__file__).resolve().parent / "test_data"
+
+
 def _make_hamiltonian(
     one_body: np.ndarray,
     two_body: np.ndarray,
@@ -39,8 +45,8 @@ class TestBravyiKitaevSets:
     The second argument n must be a power of 2.
     """
 
-    def test_update_set_4_qubits(self) -> None:
-        """Test update set for 4 qubit system (n=4 is already power of 2)."""
+    def test_ancestor_indices_4_qubits(self) -> None:
+        """Test ancestor indices for 4 qubit system (n=4 is already power of 2)."""
         # U(0) = {1, 3} - qubit 0's occupation affects qubits 1 and 3
         assert _bk_compute_ancestor_indices(0, 4) == frozenset({1, 3})
         # U(1) = {3}
@@ -50,8 +56,8 @@ class TestBravyiKitaevSets:
         # U(3) = {} - qubit 3 is the root, no ancestors
         assert _bk_compute_ancestor_indices(3, 4) == frozenset()
 
-    def test_update_set_8_qubits(self) -> None:
-        """Test update set for 8 qubit system."""
+    def test_ancestor_indices_8_qubits(self) -> None:
+        """Test ancestor indices for 8 qubit system."""
         assert _bk_compute_ancestor_indices(0, 8) == frozenset({1, 3, 7})
         assert _bk_compute_ancestor_indices(4, 8) == frozenset({5, 7})
         assert _bk_compute_ancestor_indices(7, 8) == frozenset()
@@ -74,23 +80,23 @@ class TestBravyiKitaevSets:
         assert _bk_compute_parity_indices(6, 8) == frozenset({3, 5})
         assert _bk_compute_parity_indices(7, 8) == frozenset({3, 5, 6})
 
-    def test_flip_set_4_qubits(self) -> None:
-        """Test flip set for 4 qubit system."""
+    def test_children_indices_4_qubits(self) -> None:
+        """Test children indices for 4 qubit system."""
         assert _bk_compute_children_indices(0, 4) == frozenset()
         assert _bk_compute_children_indices(1, 4) == frozenset({0})
         assert _bk_compute_children_indices(2, 4) == frozenset()
         assert _bk_compute_children_indices(3, 4) == frozenset({1, 2})
 
-    def test_remainder_set_4_qubits(self) -> None:
-        """Test remainder set R(j) = P(j) - F(j) for 4 qubit system."""
+    def test_z_indices_for_y_component_4_qubits(self) -> None:
+        """Test Z indices for Y component R(j) = P(j) - F(j) for 4 qubit system."""
         # R(j) = P(j) - F(j) (set difference)
         assert _bk_compute_z_indices_for_y_component(0, 4) == frozenset()  # {} - {} = {}
         assert _bk_compute_z_indices_for_y_component(1, 4) == frozenset()  # {0} - {0} = {}
         assert _bk_compute_z_indices_for_y_component(2, 4) == frozenset({1})  # {1} - {} = {1}
         assert _bk_compute_z_indices_for_y_component(3, 4) == frozenset()  # {1,2} - {1,2} = {}
 
-    def test_remainder_set_8_qubits(self) -> None:
-        """Test remainder set for 8 qubit system."""
+    def test_z_indices_for_y_component_8_qubits(self) -> None:
+        """Test Z indices for Y component for 8 qubit system."""
         assert _bk_compute_z_indices_for_y_component(4, 8) == frozenset({3})  # {3} - {} = {3}
         assert _bk_compute_z_indices_for_y_component(5, 8) == frozenset({3})  # {3,4} - {4} = {3}
         assert _bk_compute_z_indices_for_y_component(6, 8) == frozenset({3, 5})  # {3,5} - {} = {3,5}
@@ -535,11 +541,6 @@ class TestQdkQubitMapper:
 class TestQdkQubitMapperRealHamiltonians:
     """Tests with real molecular Hamiltonians."""
 
-    @pytest.fixture
-    def test_data_path(self) -> Path:
-        """Get path to test data directory."""
-        return Path(__file__).resolve().parent / "test_data"
-
     def test_ethylene_4e4o(self, test_data_path: Path) -> None:
         """Test ethylene 4e4o Hamiltonian mapping."""
         hamiltonian = Hamiltonian.from_json_file(test_data_path / "ethylene_4e4o_2det.hamiltonian.json")
@@ -791,11 +792,6 @@ class TestBravyiKitaevMapper:
             assert np.isclose(pauli_dict[pauli_str].real, expected_coeff, atol=1e-10), (
                 f"BK coefficient mismatch for {pauli_str}: got {pauli_dict[pauli_str].real}, expected {expected_coeff}"
             )
-
-    @pytest.fixture
-    def test_data_path(self) -> Path:
-        """Get path to test data directory."""
-        return Path(__file__).resolve().parent / "test_data"
 
     def test_bk_vs_qiskit(self, test_data_path: Path) -> None:
         """Cross-validate BK against Qiskit BravyiKitaevMapper."""

@@ -1028,7 +1028,10 @@ PauliTermAccumulator::get_terms_as_strings(std::uint64_t num_qubits,
   return result;
 }
 
-void PauliTermAccumulator::clear() { terms_.clear(); }
+void PauliTermAccumulator::clear() {
+  terms_.clear();
+  clear_cache();
+}
 
 void PauliTermAccumulator::set_cache_capacity(std::size_t capacity) {
   cache_capacity_ = capacity;

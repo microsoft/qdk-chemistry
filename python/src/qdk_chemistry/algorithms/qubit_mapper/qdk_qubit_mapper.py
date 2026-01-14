@@ -449,7 +449,7 @@ class QdkQubitMapper(QubitMapper):
                 for coeff, word in beta_terms:
                     key_tuple = tuple(word)
                     combined[key_tuple] = combined.get(key_tuple, 0) + coeff
-                # Filter using machine epsilon for numerical stability
+                # Filter using machine epsilon for efficiency
                 spin_summed_terms[(p, q)] = [
                     (coeff, list(word_tuple))
                     for word_tuple, coeff in combined.items()

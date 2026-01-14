@@ -101,7 +101,7 @@ Jordan-Wigner mapping :cite:`Jordan-Wigner1928`
    Fermionic antisymmetry is enforced through a Z-string on all lower-indexed qubits.
 
 Bravyi-Kitaev mapping :cite:`Seeley2012`
-   Distributes both occupation and parity information across qubits using a binary-tree structure :cite:`Bravyi-Kitaev2002`, achieving O(log n) Pauli weight compared to O(n) for Jordan-Wigner.
+   Distributes both occupation and parity information across qubits using a binary-tree structure, achieving O(log n) Pauli weight compared to O(n) for Jordan-Wigner.
 
 The native mapper uses blocked spin-orbital ordering internally (alpha orbitals first, then beta orbitals).
 Use ``QubitHamiltonian.reorder_qubits()`` or ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if needed.
@@ -145,9 +145,9 @@ Qubit mapping implementation integrated through the Qiskit plugin. This module s
 
 Jordan-Wigner mapping** :cite:`Jordan-Wigner1928`
    Encodes each fermionic mode in a single qubit whose state directly represents the orbital occupation.
-Parity mapping** :cite:`Love2012`
+Parity mapping** :cite:`Seeley2012`
    Encodes qubits with cumulative electron-number parities of the orbitals.
-Bravyi-Kitaev mapping** :cite:`Bravyi-Kitaev2002`
+Bravyi-Kitaev mapping** :cite:`Seeley2012`
    Distributes both occupation and parity information across qubits using a binary-tree (Fenwick tree) structure, reducing the average Pauli-string length to logarithmic scaling.
 
 .. rubric:: Settings
