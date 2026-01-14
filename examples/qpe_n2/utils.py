@@ -10,12 +10,16 @@ from pathlib import Path
 
 import numpy as np
 from qdk_chemistry.algorithms import IterativePhaseEstimation
-from qdk_chemistry.data import CasWavefunctionContainer, QpeResult, Wavefunction
+from qdk_chemistry.data import (
+    CasWavefunctionContainer,
+    QpeResult,
+    QubitHamiltonian,
+    Wavefunction,
+)
 from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.wavefunction import get_top_determinants
-from qiskit import qasm3
-from qiskit_aer import AerSimulator
+from qiskit import QuantumCircuit, qasm3
 
 
 def prepare_2_dets_trial_state(
@@ -89,74 +93,14 @@ def compute_wavefunction_overlap_fidelity(
     return abs_overlap
 
 
-def run_single_trial_iqpe_qiskit(
-    qubit_hamiltonian,
-    state_prep,
-    time,
-    precision,
-    shots,
-    trial_seed,
-    reference_energy,
-) -> tuple[QpeResult, dict]:
-    """Helper function to run a single IQPE trial with the given seed.
-
-    Args:
-        qubit_hamiltonian: Qubit Hamiltonian for the system
-        state_prep: Qiskit circuit for state preparation
-        time: Evolution time for IQPE
-        precision: Number of bits of precision
-        shots: Shots per iteration
-        trial_seed: Random seed for simulator
-        reference_energy: Reference energy for phase estimation
-
-    Returns:
-        result: QpeResult object with the results of the IQPE run
-        circuit_info: Summary info of the first iteration circuit
-    """
-    Logger.trace_entering()
-    simulator = AerSimulator(method="statevector", seed_simulator=trial_seed)
-    iqpe = IterativePhaseEstimation(qubit_hamiltonian, time)
-    phase_feedback = 0.0
-    bits: list[int] = []
-
-    Logger.info(f"Running IQPE trial with seed {trial_seed}")
-
-    for iteration in range(precision):
-        Logger.info(f"Iteration {iteration + 1}/{precision}")
-        iter_info = iqpe.create_iteration(
-            state_prep,
-            iteration=iteration,
-            total_iterations=precision,
-            phase_correction=phase_feedback,
-        )
-        compiled = iter_info.circuit.decompose(reps=4)
-
-        result = simulator.run(compiled, shots=shots).result()
-        counts = result.get_counts()
-        measured_bit = 0 if counts.get("0", 0) >= counts.get("1", 0) else 1
-
-        bits.append(measured_bit)
-        phase_feedback = iqpe.update_phase_feedback(phase_feedback, measured_bit)
-
-    phase_fraction = iqpe.phase_fraction_from_feedback(phase_feedback)
-    result = QpeResult.from_phase_fraction(
-        method=IterativePhaseEstimation.algorithm,
-        phase_fraction=phase_fraction,
-        evolution_time=time,
-        bits_msb_first=bits,
-        reference_energy=reference_energy,
-    )
-    return result
-
-
 def run_single_trial_iqpe(
-    qubit_hamiltonian,
-    state_prep,
-    time,
-    precision,
-    shots,
-    trial_seed,
-    reference_energy,
+    qubit_hamiltonian: QubitHamiltonian,
+    state_prep: QuantumCircuit,
+    time: float,
+    precision: int,
+    shots: int,
+    trial_seed: int,
+    reference_energy: float,
 ) -> tuple[QpeResult, dict]:
     """Helper function to run a single IQPE trial with the given seed.
 
@@ -220,15 +164,15 @@ def run_single_trial_iqpe(
 
 
 def run_iqpe(
-    qubit_hamiltonian,
-    state_prep,
+    qubit_hamiltonian: QubitHamiltonian,
+    state_prep: QuantumCircuit,
     *,
-    time,
-    precision,
-    shots,
-    seed,
-    reference_energy,
-    trials,
+    time: float,
+    precision: int,
+    shots: int,
+    seed: int,
+    reference_energy: float,
+    trials: int,
 ) -> list[QpeResult]:
     """Run multiple IQPE trials with different seeds.
 
