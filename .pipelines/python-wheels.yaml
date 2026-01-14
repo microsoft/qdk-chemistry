@@ -194,8 +194,8 @@ extends:
 
           - script: |
               cd $(Agent.BuildDirectory)/qdk-chemistry/python
-              pip install twine
-              python -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
+              python3 -m pip install twine
+              python3 -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
             displayName: Upload wheel with twine
             condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
 
