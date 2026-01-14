@@ -32,6 +32,12 @@ parameters:
     arch: aarch64
     march: armv8-a
     imageName: ACES_VM_SharedPool_Tahoe
+- name: publishInternalFeed
+  type: boolean
+  default: false
+- name: publishEsrp
+  type: boolean
+  default: false
 
 variables:
 - group: QdkChemistry
@@ -124,13 +130,13 @@ extends:
                 pythonVersion: $(pythonVersion)
 
           # Test - Linux x86_64
-          # - ${{ if eq(target.arch, 'x86_64') }}:
-          #   - template: .pipelines/templates/test-pip-wheels.yml@self
-          #     parameters:
-          #       agentBuildDirectory: $(Agent.BuildDirectory)
-          #       dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
-          #       imageTag: linux/amd64
-          #       pythonVersion: $(pythonVersion)
+          - ${{ if eq(target.arch, 'x86_64') }}:
+            - template: .pipelines/templates/test-pip-wheels.yml@self
+              parameters:
+                agentBuildDirectory: $(Agent.BuildDirectory)
+                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
+                imageTag: linux/amd64
+                pythonVersion: $(pythonVersion)
 
           # Build - Linux ARM64
           - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
@@ -145,13 +151,13 @@ extends:
                 pythonVersion: $(pythonVersion)
 
           # Test - Linux ARM64
-          # - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
-          #   - template: .pipelines/templates/test-pip-wheels.yml@self
-          #     parameters:
-          #       agentBuildDirectory: $(Agent.BuildDirectory)
-          #       dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
-          #       imageTag: linux/arm64/v8
-          #       pythonVersion: $(pythonVersion)
+          - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
+            - template: .pipelines/templates/test-pip-wheels.yml@self
+              parameters:
+                agentBuildDirectory: $(Agent.BuildDirectory)
+                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
+                imageTag: linux/arm64/v8
+                pythonVersion: $(pythonVersion)
 
           # Build - macOS ARM64
           - ${{ if eq(target.os, 'macos') }}:
@@ -165,12 +171,12 @@ extends:
                 macBuild: ON
 
           # Test - macOS ARM64
-          # - ${{ if eq(target.os, 'macos') }}:
-          #   - template: .pipelines/templates/test-pip-wheels.yml@self
-          #     parameters:
-          #       agentBuildDirectory: $(Agent.BuildDirectory)
-          #       pythonVersion: $(pythonVersion)
-          #       macBuild: ON
+          - ${{ if eq(target.os, 'macos') }}:
+            - template: .pipelines/templates/test-pip-wheels.yml@self
+              parameters:
+                agentBuildDirectory: $(Agent.BuildDirectory)
+                pythonVersion: $(pythonVersion)
+                macBuild: ON
 
           # ARM builds require that we transfer ownership of the wheel directory
           # back to the original base image user
@@ -178,10 +184,19 @@ extends:
             - script: |
                 sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
               displayName: Fix wheel directory ownership
-          - task: TwineAuthenticate@1
-            displayName: Authenticate to internal feed
-            inputs:
-              artifactFeed: $(artifactProject)/$(artifactFeed)
+
+          - ${{ if eq(parameters.publishInternalFeed, true) }}:
+            - task: TwineAuthenticate@1
+              displayName: Authenticate to internal feed
+              inputs:
+                artifactFeed: $(artifactProject)/$(artifactFeed)
+
+            - script: |
+                cd $(Agent.BuildDirectory)/qdk-chemistry/python
+                pip install twine
+                python -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
+              displayName: Upload wheel with twine
+
     - stage: Approval
       displayName: Approval
       dependsOn: Build
@@ -201,7 +216,7 @@ extends:
     - stage: Release
       displayName: Release
       dependsOn: Approval
-      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'))
+      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'), eq(parameters.publishEsrp, true))
       jobs:
       - job: Publish_Python_Packages
         pool:
@@ -257,7 +272,7 @@ extends:
             keyvaultname: quantum-esrp-kv
             signcertname: ESRPCert
             clientid: 832c049d-cd07-4c1c-bfa5-c07250d190cb
-            contenttype: PyPI
+            contenttype: NPM
             domaintenantid: 975f013f-7f24-47e8-a7d3-abc4752bf346
             folderlocation: $(System.DefaultWorkingDirectory)/target/wheels
             waitforreleasecompletion: true

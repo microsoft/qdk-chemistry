@@ -49,28 +49,28 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         libpugixml-dev \
         python3-pybind11 pybind11-dev
 
-    # # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
-    # echo "Downloading and installing CMake ${CMAKE_VERSION}..."
-    # export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
-    # wget -q https://cmake.org/files/v3.28/cmake-${CMAKE_VERSION}.tar.gz -O cmake-${CMAKE_VERSION}.tar.gz
-    # echo "${CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}.tar.gz" | shasum -a 256 -c || exit 1
-    # tar -xzf cmake-${CMAKE_VERSION}.tar.gz
-    # rm cmake-${CMAKE_VERSION}.tar.gz
-    # cd cmake-${CMAKE_VERSION}
-    # ./bootstrap --parallel=$(nproc) --prefix=/usr/local
-    # make --silent -j$(nproc)
-    # make install
-    # cd ..
-    # rm -r cmake-${CMAKE_VERSION}
-    # cmake --version
+    # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
+    echo "Downloading and installing CMake ${CMAKE_VERSION}..."
+    export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
+    wget -q https://cmake.org/files/v3.28/cmake-${CMAKE_VERSION}.tar.gz -O cmake-${CMAKE_VERSION}.tar.gz
+    echo "${CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}.tar.gz" | shasum -a 256 -c || exit 1
+    tar -xzf cmake-${CMAKE_VERSION}.tar.gz
+    rm cmake-${CMAKE_VERSION}.tar.gz
+    cd cmake-${CMAKE_VERSION}
+    ./bootstrap --parallel=$(nproc) --prefix=/usr/local
+    make --silent -j$(nproc)
+    make install
+    cd ..
+    rm -r cmake-${CMAKE_VERSION}
+    cmake --version
 
-    # # We use BLIS/libflame as the BLAS/LAPACK vendors to prevent symbol collisions
-    # # with qiskit's shared OpenBLAS
-    # echo "Downloading and installing BLIS..."
-    # bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} "${CFLAGS}"
+    # We use BLIS/libflame as the BLAS/LAPACK vendors to prevent symbol collisions
+    # with qiskit's shared OpenBLAS
+    echo "Downloading and installing BLIS..."
+    bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} "${CFLAGS}"
 
-    # echo "Downloading and installing libflame..."
-    # bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} "${CFLAGS}"
+    echo "Downloading and installing libflame..."
+    bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} "${CFLAGS}"
 
     export PYENV_ROOT="/workspace/.pyenv"
 elif [ "$MAC_BUILD" == "ON" ]; then
@@ -90,16 +90,16 @@ elif [ "$MAC_BUILD" == "ON" ]; then
 fi
 
 # echo "Downloading HDF5 $HDF5_VERSION..."
-# export HDF5_CHECKSUM=1826e198df8dac679f0d3dc703aba02af4c614fd6b7ec936cf4a55e6aa0646ec
-# wget -q -nc --no-check-certificate https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-${HDF5_VERSION}/src/hdf5-${HDF5_VERSION}.tar.bz2
-# echo "${HDF5_CHECKSUM}  hdf5-${HDF5_VERSION}.tar.bz2" | shasum -a 256 -c || exit 1
-# tar -xjf hdf5-${HDF5_VERSION}.tar.bz2
-# rm hdf5-${HDF5_VERSION}.tar.bz2
-# mv hdf5-${HDF5_VERSION} hdf5
-# echo "HDF5 $HDF5_VERSION downloaded and extracted successfully"
+export HDF5_CHECKSUM=1826e198df8dac679f0d3dc703aba02af4c614fd6b7ec936cf4a55e6aa0646ec
+wget -q -nc --no-check-certificate https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-${HDF5_VERSION}/src/hdf5-${HDF5_VERSION}.tar.bz2
+echo "${HDF5_CHECKSUM}  hdf5-${HDF5_VERSION}.tar.bz2" | shasum -a 256 -c || exit 1
+tar -xjf hdf5-${HDF5_VERSION}.tar.bz2
+rm hdf5-${HDF5_VERSION}.tar.bz2
+mv hdf5-${HDF5_VERSION} hdf5
+echo "HDF5 $HDF5_VERSION downloaded and extracted successfully"
 
 # echo "Installing HDF5..."
-# bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} "${CFLAGS}" ${MAC_BUILD}
+bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} "${CFLAGS}" ${MAC_BUILD}
 
 # Install pyenv to use non-system python3 versions
 # pyenv is used in place of a venv to prevent any collisions with the system Python
@@ -123,85 +123,71 @@ python3 -m pip install --upgrade pip
 python3 -m pip install auditwheel build
 python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
 
-# Install Python package
-# cd python
+Install Python package
+cd python
 
-# # Build wheel with all necessary CMake flags
-# if [ "$MAC_BUILD" == "OFF" ]; then
-#     export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
-#     export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
-#     export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
-#     python3 -m build --wheel \
-#         -C build-dir="build/{wheel_tag}" \
-#         -C cmake.define.QDK_UARCH=${MARCH} \
-#         -C cmake.define.BUILD_SHARED_LIBS=OFF \
-#         -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \
-#         -C cmake.define.QDK_ENABLE_OPENMP=OFF \
-#         -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
-#         -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
-#         -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
-#         -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
-
-#     echo "Checking shared dependencies..."
-#     ldd build/cp*/_core.*.so
-
-#     # Repair wheel
-#     auditwheel repair dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
-
-#     # Fix RPATH
-#     WHEEL_FILE=$(ls repaired_wheelhouse/qdk_chemistry-*.whl)
-#     FULL_WHEEL_PATH="$PWD/$WHEEL_FILE"
-#     TEMP_DIR=$(mktemp -d)
-#     python3 -m zipfile -e "$WHEEL_FILE" "$TEMP_DIR"
-
-#     find "$TEMP_DIR" -name '*.so*' -type f -not -path '*/qdk_chemistry.libs/*' | while read so_file; do
-#         echo "Fixing RPATH for main package: $so_file"
-#         patchelf --set-rpath '$ORIGIN/../../qdk_chemistry.libs' "$so_file" || true
-#     done
-
-#     find "$TEMP_DIR" -path '*/qdk_chemistry.libs/*' -name '*.so*' -type f | while read so_file; do
-#         echo "Fixing RPATH for bundled library: $so_file"
-#         patchelf --set-rpath '$ORIGIN' "$so_file" || true
-#     done
-
-#     rm "$WHEEL_FILE"
-#     (cd "$TEMP_DIR" && python3 -m zipfile -c "$FULL_WHEEL_PATH" .)
-#     rm -rf "$TEMP_DIR"
-
-# elif [ "$MAC_BUILD" == "ON" ]; then
-#     export CMAKE_C_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin"
-#     export CMAKE_CXX_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin"
-#     python3 -m build --wheel \
-#         -C build-dir="build/{wheel_tag}" \
-#         -C cmake.define.QDK_UARCH=native \
-#         -C cmake.define.BUILD_SHARED_LIBS=OFF \
-#         -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \
-#         -C cmake.define.QDK_ENABLE_OPENMP=OFF \
-#         -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
-#         -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
-#         -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
-#         -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
-#         -C cmake.define.CMAKE_PREFIX_PATH="/opt/homebrew"
-#     echo "Repairing wheel for macOS..."
-#     pip install delocate==0.13.0
-#     WHEEL_FILE=$(ls dist/qdk_chemistry-*.whl)
-#     delocate-wheel -w repaired_wheelhouse/ "$WHEEL_FILE"
-#     delocate-listdeps --all repaired_wheelhouse/qdk_chemistry*.whl
-
-#     echo "Checking shared dependencies..."
-#     otool -L build/cp*/_core.*.so
-# fi
-
-# Temporary release
+# Build wheel with all necessary CMake flags
 if [ "$MAC_BUILD" == "OFF" ]; then
-    cd temp-release
-    python3 -m build --wheel
-    auditwheel repair dist/qdk_chemistry-*.whl -w ../python/repaired_wheelhouse/
-else
-    cd temp-release
+    export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
+    export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
+    export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
     python3 -m build --wheel \
-        -C cmake.define.CMAKE_OSX_ARCHITECTURES=arm64
-    python3 -m pip install delocate==0.13.0
+        -C build-dir="build/{wheel_tag}" \
+        -C cmake.define.QDK_UARCH=${MARCH} \
+        -C cmake.define.BUILD_SHARED_LIBS=OFF \
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \
+        -C cmake.define.QDK_ENABLE_OPENMP=OFF \
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
+        -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
+        -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
+        -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
+
+    echo "Checking shared dependencies..."
+    ldd build/cp*/_core.*.so
+
+    # Repair wheel
+    auditwheel repair dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
+
+    # Fix RPATH
+    WHEEL_FILE=$(ls repaired_wheelhouse/qdk_chemistry-*.whl)
+    FULL_WHEEL_PATH="$PWD/$WHEEL_FILE"
+    TEMP_DIR=$(mktemp -d)
+    python3 -m zipfile -e "$WHEEL_FILE" "$TEMP_DIR"
+
+    find "$TEMP_DIR" -name '*.so*' -type f -not -path '*/qdk_chemistry.libs/*' | while read so_file; do
+        echo "Fixing RPATH for main package: $so_file"
+        patchelf --set-rpath '$ORIGIN/../../qdk_chemistry.libs' "$so_file" || true
+    done
+
+    find "$TEMP_DIR" -path '*/qdk_chemistry.libs/*' -name '*.so*' -type f | while read so_file; do
+        echo "Fixing RPATH for bundled library: $so_file"
+        patchelf --set-rpath '$ORIGIN' "$so_file" || true
+    done
+
+    rm "$WHEEL_FILE"
+    (cd "$TEMP_DIR" && python3 -m zipfile -c "$FULL_WHEEL_PATH" .)
+    rm -rf "$TEMP_DIR"
+
+elif [ "$MAC_BUILD" == "ON" ]; then
+    export CMAKE_C_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin"
+    export CMAKE_CXX_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin"
+    python3 -m build --wheel \
+        -C build-dir="build/{wheel_tag}" \
+        -C cmake.define.QDK_UARCH=native \
+        -C cmake.define.BUILD_SHARED_LIBS=OFF \
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \
+        -C cmake.define.QDK_ENABLE_OPENMP=OFF \
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
+        -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
+        -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
+        -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
+        -C cmake.define.CMAKE_PREFIX_PATH="/opt/homebrew"
+    echo "Repairing wheel for macOS..."
+    pip install delocate==0.13.0
     WHEEL_FILE=$(ls dist/qdk_chemistry-*.whl)
-    delocate-wheel -w ../python/repaired_wheelhouse/ "$WHEEL_FILE"
+    delocate-wheel -w repaired_wheelhouse/ "$WHEEL_FILE"
+    delocate-listdeps --all repaired_wheelhouse/qdk_chemistry*.whl
+
+    echo "Checking shared dependencies..."
+    otool -L build/cp*/_core.*.so
 fi
