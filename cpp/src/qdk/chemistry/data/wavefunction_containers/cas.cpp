@@ -471,84 +471,10 @@ nlohmann::json CasWavefunctionContainer::to_json() const {
   // Store configuration set (delegates to ConfigurationSet serialization)
   j["configuration_set"] = _configuration_set.to_json();
 
+  // Serialize RDMs if available
+  _serialize_rdms_to_json(j);
+
   return j;
-}
-
-std::unique_ptr<CasWavefunctionContainer> CasWavefunctionContainer::from_json(
-    const nlohmann::json& j) {
-  QDK_LOG_TRACE_ENTERING();
-
-  try {
-    // Validate version first
-    if (!j.contains("version")) {
-      throw std::runtime_error("Invalid JSON: missing version field");
-    }
-    validate_serialization_version(SERIALIZATION_VERSION, j["version"]);
-
-    // Load wavefunction type
-    WavefunctionType type = WavefunctionType::SelfDual;
-    if (j.contains("wavefunction_type")) {
-      std::string type_str = j["wavefunction_type"];
-      type = (type_str == "self_dual") ? WavefunctionType::SelfDual
-                                       : WavefunctionType::NotSelfDual;
-    }
-
-    // Load coefficients
-    VectorVariant coefficients;
-    bool is_complex = j.value("is_complex", false);
-    if (is_complex) {
-      if (!j.contains("coefficients")) {
-        throw std::runtime_error("JSON missing required 'coefficients' field");
-      }
-      const auto& coeffs_json = j["coefficients"];
-
-      // NumPy format: array of [real, imag] pairs
-      if (!coeffs_json.is_array() || coeffs_json.empty() ||
-          !coeffs_json[0].is_array()) {
-        throw std::runtime_error(
-            "Invalid complex coefficient format: expected array of [real, "
-            "imag] pairs");
-      }
-
-      Eigen::VectorXcd coeffs_complex(coeffs_json.size());
-      for (size_t i = 0; i < coeffs_json.size(); ++i) {
-        if (coeffs_json[i].size() != 2) {
-          throw std::runtime_error(
-              "Invalid complex coefficient format: expected [real, imag] "
-              "pairs");
-        }
-        coeffs_complex(i) =
-            std::complex<double>(coeffs_json[i][0], coeffs_json[i][1]);
-      }
-      coefficients = coeffs_complex;
-    } else {
-      if (!j.contains("coefficients")) {
-        throw std::runtime_error("JSON missing required 'coefficients' field");
-      }
-      std::vector<double> coeff_data = j["coefficients"];
-      Eigen::VectorXd coeffs_real =
-          Eigen::Map<Eigen::VectorXd>(coeff_data.data(), coeff_data.size());
-      coefficients = coeffs_real;
-    }
-
-    // Load configuration set (delegates to ConfigurationSet deserialization)
-    // ConfigurationSet now deserializes orbitals internally
-    if (!j.contains("configuration_set")) {
-      throw std::runtime_error(
-          "JSON missing required 'configuration_set' field");
-    }
-    auto config_set = ConfigurationSet::from_json(j["configuration_set"]);
-    const auto& determinants = config_set.get_configurations();
-    auto orbitals = config_set.get_orbitals();
-
-    return std::make_unique<CasWavefunctionContainer>(
-        coefficients, determinants, orbitals, type);
-
-  } catch (const std::exception& e) {
-    throw std::runtime_error(
-        "Failed to parse CasWavefunctionContainer from JSON: " +
-        std::string(e.what()));
-  }
 }
 
 }  // namespace qdk::chemistry::data

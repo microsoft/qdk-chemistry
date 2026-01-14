@@ -7,6 +7,7 @@ import sys
 
 import numpy as np
 import pytest
+from pathlib import Path
 
 # Add the directory containing pymacis to Python's path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,15 +17,24 @@ try:
 except ImportError:
     pytest.skip("pymacis not found, skipping tests", allow_module_level=True)
 
-from prepq.library.problems.electronic import ElectronicProblem
+# Paths to FCIDUMP files for different molecules and active spaces
+FCIDUMP_2E2O_PATH = (
+    Path(__file__).parent / "data" / "h2_valence_2e2o.hamiltonian.fcidump"
+)
+FCIDUMP_6E6O_PATH = (
+    Path(__file__).parent / "data" / "n2_selected_6e6o.hamiltonian.fcidump"
+)
+FCIDUMP_14E18O_PATH = (
+    Path(__file__).parent / "data" / "n2_full_14e18o.hamiltonian.fcidump"
+)
+TEST_WFN = Path(__file__).parent.parent.parent / "tests" / "ref_data" / "ch4.wfn.dat"
 
 
 def test_read_fcidump():
     """
     Test reading an FCIDUMP file and verifying the Hamiltonian structure
     """
-    problem = ElectronicProblem("2e2o-fe_pnnp-can-2ae5327f")
-    fcidump_path = str(problem.fcidump_path)
+    fcidump_path = str(FCIDUMP_2E2O_PATH)
     H = pymacis.read_fcidump(fcidump_path)
     assert H is not None, "Failed to read FCIDUMP file"
     assert H.T.shape == (2, 2), "Incorrect shape for 1-body integrals"
@@ -33,34 +43,22 @@ def test_read_fcidump():
     ref_V = np.zeros((2, 2, 2, 2))
     ref_T = np.zeros((2, 2))
 
-    ref_V[0, 0, 0, 0] = 0.3034465207326911
+    ref_V[0, 0, 0, 0] = 4.0473778090034601e-01
 
-    ref_V[0, 1, 0, 0] = 0.002188867979271676
-    ref_V[1, 0, 0, 0] = 0.002188867979271676
-    ref_V[0, 0, 0, 1] = 0.002188867979271676
-    ref_V[0, 0, 1, 0] = 0.002188867979271676
+    ref_V[0, 0, 1, 1] = 3.8938965704645029e-01
+    ref_V[1, 1, 0, 0] = 3.8938965704645029e-01
 
-    ref_V[0, 0, 1, 1] = 0.1752675845371727
-    ref_V[1, 1, 0, 0] = 0.1752675845371727
+    ref_V[0, 1, 0, 1] = 1.5674348492425350e-01
+    ref_V[0, 1, 1, 0] = 1.5674348492425350e-01
+    ref_V[1, 0, 0, 1] = 1.5674348492425350e-01
+    ref_V[1, 0, 1, 0] = 1.5674348492425350e-01
 
-    ref_V[0, 1, 0, 1] = 0.01495594810715078
-    ref_V[0, 1, 1, 0] = 0.01495594810715078
-    ref_V[1, 0, 0, 1] = 0.01495594810715078
-    ref_V[1, 0, 1, 0] = 0.01495594810715078
+    ref_V[1, 1, 1, 1] = 3.8881092186477084e-01
 
-    ref_V[0, 1, 1, 1] = 0.002491442225588175
-    ref_V[1, 0, 1, 1] = 0.002491442225588175
-    ref_V[1, 1, 0, 1] = 0.002491442225588175
-    ref_V[1, 1, 1, 0] = 0.002491442225588175
+    ref_T[0, 0] = -7.8075940673562072e-01
+    ref_T[1, 1] = -6.7135629843446021e-01
 
-    ref_V[1, 1, 1, 1] = 0.2831258252695618
-
-    ref_T[0, 0] = -1.17200550962273
-    ref_T[0, 1] = -0.03116941961754365
-    ref_T[1, 0] = -0.03116941961754365
-    ref_T[1, 1] = -1.053610187855433
-
-    ref_core = -2588.786639503278
+    ref_core = 2.5000000000000000e-01
 
     assert np.allclose(H.T, ref_T), "1-body integrals do not match reference"
     assert np.allclose(H.V, ref_V), "2-body integrals do not match reference"
@@ -71,8 +69,7 @@ def test_active_hamiltonian_noop():
     """
     Test that compute_active_hamiltonian returns the same Hamiltonian when full active space is specified
     """
-    problem = ElectronicProblem("2e2o-fe_pnnp-can-2ae5327f")
-    fcidump_path = str(problem.fcidump_path)
+    fcidump_path = str(FCIDUMP_2E2O_PATH)
     H = pymacis.read_fcidump(fcidump_path)
 
     # Compute active Hamiltonian for 2 electrons in 2 orbitals
@@ -93,12 +90,11 @@ def test_active_hamiltonian_noop():
     )
 
 
-def test_active_hamiltonian_2e2o_benzene():
+def test_active_hamiltonian_2e2o_nitrogen():
     """
-    Test the 2e2o active Hamiltonian for benzene (from 4e4o)
+    Test the 2e2o active Hamiltonian for nitrogen (from 6e6o)
     """
-    problem = ElectronicProblem("4e4o-benzene-can-55364ff9")
-    fcidump_path = str(problem.fcidump_path)
+    fcidump_path = str(FCIDUMP_6E6O_PATH)
     H = pymacis.read_fcidump(fcidump_path)
 
     H_active = pymacis.compute_active_hamiltonian(2, 2, H)
@@ -110,7 +106,7 @@ def test_active_hamiltonian_2e2o_benzene():
     assert H_active.V.shape == (2, 2, 2, 2), (
         "Active Hamiltonian 2-body integrals shape mismatch"
     )
-    assert np.isclose(H_active.core_energy, -230.53576473787828), (
+    assert np.isclose(H_active.core_energy, -107.05494530230706), (
         "Core energy mismatch in active Hamiltonian"
     )
 
@@ -119,33 +115,31 @@ def test_casci_default():
     """
     Test CASCI calculation with default parameters (no determinants)
     """
-    problem = ElectronicProblem("4e4o-benzene-can-55364ff9")
-    fcidump_path = str(problem.fcidump_path)
+    fcidump_path = str(FCIDUMP_6E6O_PATH)
     H = pymacis.read_fcidump(fcidump_path)
 
     # Perform CASCI calculation
-    result = pymacis.casci(2, 2, H)
+    result = pymacis.casci(3, 3, H)
 
     assert "energy" in result, "CASCI energy not found in result"
     assert "determinants" not in result, "CASCI determinants not found in result"
-    assert np.isclose(result["energy"], problem.e_cas), "CASCI energy mismatch"
+    assert np.isclose(result["energy"], -9.155573e00), "CASCI energy mismatch"
 
 
 def test_casci_with_determinants():
     """
     Test CASCI calculation with determinants in output
     """
-    problem = ElectronicProblem("4e4o-benzene-can-55364ff9")
-    fcidump_path = str(problem.fcidump_path)
+    fcidump_path = str(FCIDUMP_6E6O_PATH)
     H = pymacis.read_fcidump(fcidump_path)
 
     # Perform CASCI calculation with determinants
-    result = pymacis.casci(2, 2, H, {"return_determinants": True})
+    result = pymacis.casci(3, 3, H, {"return_determinants": True})
 
     assert "energy" in result, "CASCI energy not found in result"
     assert "determinants" in result, "CASCI determinants not found in result"
-    assert len(result["determinants"]) == 36, "No determinants found in CASCI result"
-    assert np.isclose(result["energy"], problem.e_cas), "CASCI energy mismatch"
+    assert len(result["determinants"]) == 400, "No determinants found in CASCI result"
+    assert np.isclose(result["energy"], -9.155573e00), "CASCI energy mismatch"
 
 
 def test_canonical_hf_determinant():
@@ -165,11 +159,10 @@ def test_asci():
     """
     Test the ASCI calculation with a specific problem
     """
-    problem = ElectronicProblem("10e10o-fe_porphyrin-can-52f9f405")
-    fcidump_path = str(problem.fcidump_path)
+    fcidump_path = str(FCIDUMP_14E18O_PATH)
     H = pymacis.read_fcidump(fcidump_path)
 
-    initial_guess = [pymacis.canonical_hf_determinant(5, 5, 10)]
+    initial_guess = [pymacis.canonical_hf_determinant(7, 7, 18)]
     C0 = [1.0]
     E0 = pymacis.compute_wfn_energy(initial_guess, C0, H)
 
@@ -179,85 +172,27 @@ def test_asci():
         E0,
         H,
         {
-            "ci": {"max_subspace": 200},
-            "asci": {"grow_factor": 2, "ntdets_max": 1000},
+            "ci": {"max_subspace": 1000},
+            "asci": {"grow_factor": 2, "ntdets_max": 2000, "max_refine_iter": 15},
         },
     )
     assert "energy" in res, "ASCI energy not found in result"
     assert "determinants" in res, "ASCI determinants not found in result"
     assert "coefficients" in res, "ASCI coefficients not found in result"
 
-    assert np.isclose(res["energy"], -16.71421439573152), "ASCI energy mismatch"
-    assert len(res["determinants"]) == 1000, "No determinants found in ASCI result"
+    assert np.isclose(res["energy"], -1.205187165264e02), "ASCI energy mismatch"
+    assert len(res["determinants"]) == 2000, "No determinants found in ASCI result"
     assert np.isclose(np.linalg.norm(res["coefficients"]), 1.0), (
         "ASCI coefficients do not normalize to 1"
     )
 
 
-def test_read_wavefunction():
-    """Test that pymacis.read_wavefunction reproduces the reference CAS wave function data from ElectronicProblem"""
-    # Use a problem that has a wavefunction file
-    problem = ElectronicProblem("4e4o-benzene-can-55364ff9")
-
-    # Check if CAS wavefunction file exists
-    wfn_path = problem.wavefunction_cas_path
-    if not wfn_path or not wfn_path.exists():
-        pytest.skip(f"CAS wavefunction file not found: {wfn_path}")
-
-    # Read using pymacis.read_wavefunction
-    pymacis_result = pymacis.read_wavefunction(str(wfn_path))
-
-    # Read using ElectronicProblem
-    prepq_n_orbitals, prepq_coefficients, prepq_bitstrings = problem.read_wfn_file(
-        "cas"
-    )
-
-    # Compare coefficients - this is the key comparison
-    assert "coefficients" in pymacis_result, "pymacis result missing coefficients"
-    pymacis_coefficients = pymacis_result["coefficients"]
-
-    # Check that coefficients have the same length
-    assert len(pymacis_coefficients) == len(prepq_coefficients), (
-        f"Coefficient array length mismatch: pymacis={len(pymacis_coefficients)}, prepq={len(prepq_coefficients)}"
-    )
-
-    # Compare coefficients (allowing for small numerical differences)
-    np.testing.assert_allclose(
-        pymacis_coefficients,
-        prepq_coefficients,
-        rtol=1e-10,
-        atol=1e-12,
-        err_msg="Coefficients do not match between pymacis and ElectronicProblem",
-    )
-
-    # Compare number of orbitals if available in pymacis result
-    if "norbitals" in pymacis_result:
-        assert pymacis_result["norbitals"] == prepq_n_orbitals, (
-            f"Number of orbitals mismatch: pymacis={pymacis_result['norbitals']}, prepq={prepq_n_orbitals}"
-        )
-
-    # Compare determinants/bitstrings if available in pymacis result
-    if "determinants" in pymacis_result:
-        pymacis_bitstrings = pymacis_result["determinants"]
-
-        # Check that we have the same number of determinants
-        assert len(pymacis_bitstrings) == len(prepq_bitstrings), (
-            f"Number of determinants mismatch: pymacis={len(pymacis_bitstrings)}, prepq={len(prepq_bitstrings)}"
-        )
-
-
-def test_write_wavefunction(tmp_path):
+def test_read_write_wavefunction(tmp_path):
     """Test that pymacis.write_wavefunction writes a valid wavefunction file"""
-    # Use a problem that has a wavefunction file
-    problem = ElectronicProblem("4e4o-benzene-can-55364ff9")
-
-    # Check if CAS wavefunction file exists
-    wfn_path = problem.wavefunction_cas_path
-    if not wfn_path or not wfn_path.exists():
-        pytest.skip(f"CAS wavefunction file not found: {wfn_path}")
+    wfn_path = str(TEST_WFN)
 
     # Read using pymacis.read_wavefunction
-    pymacis_result = pymacis.read_wavefunction(str(wfn_path))
+    pymacis_result = pymacis.read_wavefunction(wfn_path)
 
     # Write to a temporary file
     temp_wfn_path = str(tmp_path / "temp_test.wfn")
@@ -309,8 +244,7 @@ def test_fcidump_header_creation():
 
 def test_read_fcidump_header():
     """Test reading FCIDUMP header information"""
-    problem = ElectronicProblem("2e2o-fe_pnnp-can-2ae5327f")
-    fcidump_path = str(problem.fcidump_path)
+    fcidump_path = str(FCIDUMP_2E2O_PATH)
 
     header = pymacis.read_fcidump_header(fcidump_path)
 
@@ -421,8 +355,7 @@ def test_write_fcidump_with_threshold(tmp_path):
 def test_write_fcidump_round_trip(tmp_path):
     """Test reading and writing back an FCIDUMP file preserves data"""
     # Read existing FCIDUMP
-    problem = ElectronicProblem("2e2o-fe_pnnp-can-2ae5327f")
-    original_path = str(problem.fcidump_path)
+    original_path = str(FCIDUMP_2E2O_PATH)
 
     # Read header and Hamiltonian
     original_header = pymacis.read_fcidump_header(original_path)
