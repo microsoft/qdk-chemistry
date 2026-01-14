@@ -78,6 +78,7 @@ pybind11_add_module(_core
     src/pybind11/data/structure.cpp
     src/pybind11/data/basis_set.cpp
     src/pybind11/data/configuration.cpp
+    src/pybind11/data/configuration_set.cpp
     src/pybind11/data/ansatz.cpp
     src/pybind11/data/stability_result.cpp
     src/pybind11/data/pauli_operator.cpp

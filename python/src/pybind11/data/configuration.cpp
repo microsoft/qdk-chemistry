@@ -25,10 +25,10 @@ Represents a molecular electronic configuration.
 
 This class efficiently stores the occupation pattern of molecular orbitals using a compact representation where each orbital can be in one of four states:
 
-- UNOCCUPIED (0): No electrons
-- ALPHA (1): One alpha electron
-- BETA (2): One beta electron
-- DOUBLY (3): Both alpha and beta electrons
+- UNOCCUPIED ('0'): No electrons
+- ALPHA ('u'): One alpha electron
+- BETA ('d'): One beta electron
+- DOUBLY ('2'): Both alpha and beta electrons
 
 The class provides methods for constructing, manipulating, and querying configurations.
 )");
@@ -50,11 +50,11 @@ Constructs a configuration from a string representation.
 Args:
     str (str): String representation of the configuration
 
-        Where '0' = unoccupied orbital, '1' = alpha-occupied orbital,
-        '2' = beta-occupied orbital, '3' = doubly-occupied orbital
+        Where '0' = unoccupied orbital, 'u' = alpha-occupied orbital,
+        'd' = beta-occupied orbital, '2' = doubly-occupied orbital
 
 Examples:
-    >>> config = qdk_chemistry.Configuration("3322110")  # 7 orbitals with different occupations
+    >>> config = qdk_chemistry.Configuration("22ud0ud")  # 7 orbitals with different occupations
 
 )",
                     py::arg("str"));
@@ -67,13 +67,13 @@ Convert the configuration to a string representation.
 Returns:
     str: String representation
 
-        where '0' = unoccupied orbital, '1' = alpha-occupied orbital,
-        '2' = beta-occupied orbital, '3' = doubly-occupied orbital
+        where '0' = unoccupied orbital, 'u' = alpha-occupied orbital,
+        'd' = beta-occupied orbital, '2' = doubly-occupied orbital
 
 Examples:
-    >>> config = qdk_chemistry.Configuration("3322110")
+    >>> config = qdk_chemistry.Configuration("22ud0ud")
     >>> print(config.to_string())
-    3322110
+    22ud0ud
 
 )");
 
@@ -109,7 +109,7 @@ Returns:
     tuple: A tuple containing (n_alpha, n_beta)
 
 Examples:
-    >>> config = qdk_chemistry.Configuration("3322110")
+    >>> config = qdk_chemistry.Configuration("22ud0ud")
     >>> n_alpha, n_beta = config.get_n_electrons()
     >>> print(f"Alpha electrons: {n_alpha}, Beta electrons: {n_beta}")
 
@@ -126,8 +126,8 @@ Returns:
     bool: True if configurations are identical, False otherwise
 
 Examples:
-    >>> config1 = qdk_chemistry.Configuration("3322110")
-    >>> config2 = qdk_chemistry.Configuration("3322110")
+    >>> config1 = qdk_chemistry.Configuration("22ud0ud")
+    >>> config2 = qdk_chemistry.Configuration("22ud0ud")
     >>> print(config1 == config2)
     True
 
@@ -145,8 +145,8 @@ Returns:
     bool: True if configurations are different, False otherwise
 
 Examples:
-    >>> config1 = qdk_chemistry.Configuration("3322110")
-    >>> config2 = qdk_chemistry.Configuration("3322111")
+    >>> config1 = qdk_chemistry.Configuration("22ud0ud")
+    >>> config2 = qdk_chemistry.Configuration("22ud0u0")
     >>> print(config1 != config2)
     True
 
