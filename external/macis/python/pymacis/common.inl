@@ -15,7 +15,7 @@ std::vector<T> array_to_vector(const py::array_t<T> &array) {
 // Template implementation for vector_to_array
 template <typename T>
 py::array_t<T> vector_to_array(const std::vector<T> &vec) {
-  py::array_t<T> result(vec.size());
+  py::array_t<T> result({vec.size()}, {sizeof(T)});
   py::buffer_info buf = result.request();
   T *ptr = static_cast<T *>(buf.ptr);
   std::copy(vec.begin(), vec.end(), ptr);
