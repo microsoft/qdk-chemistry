@@ -76,7 +76,7 @@ class TestPauliProductFormulaContainer:
 
     def test_update_ordering_invalid(self, container):
         """Test setting an invalid evolution ordering."""
-        with pytest.raises(ValueError, match="must match number of terms"):
+        with pytest.raises(ValueError, match="must match the number of terms"):
             container.reorder_terms([0, 1])
 
         with pytest.raises(ValueError, match="Invalid permutation"):

@@ -1,4 +1,4 @@
-"""QDK/Chemistry time evolution unitary constructor abstractions."""
+"""QDK/Chemistry time evolution unitary builder abstractions."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -10,14 +10,14 @@ from abc import abstractmethod
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import QubitHamiltonian, TimeEvolutionUnitary
 
-__all__: list[str] = ["TimeEvolutionConstructor", "TimeEvolutionConstructorFactory"]
+__all__: list[str] = ["TimeEvolutionBuilder", "TimeEvolutionBuilderFactory"]
 
 
-class TimeEvolutionConstructor(Algorithm):
-    """Base class for time evolution constructors in QDK/Chemistry algorithms."""
+class TimeEvolutionBuilder(Algorithm):
+    """Base class for time evolution Builders in QDK/Chemistry algorithms."""
 
     def __init__(self):
-        """Initialize the TimeEvolutionConstructor."""
+        """Initialize the TimeEvolutionBuilder."""
         super().__init__()
 
     @abstractmethod
@@ -34,12 +34,12 @@ class TimeEvolutionConstructor(Algorithm):
         """
 
 
-class TimeEvolutionConstructorFactory(AlgorithmFactory):
-    """Factory class for creating TimeEvolutionConstructor instances."""
+class TimeEvolutionBuilderFactory(AlgorithmFactory):
+    """Factory class for creating TimeEvolutionBuilder instances."""
 
     def algorithm_type_name(self) -> str:
-        """Return time_evolution_constructor as the algorithm type name."""
-        return "time_evolution_constructor"
+        """Return time_evolution_builder as the algorithm type name."""
+        return "time_evolution_builder"
 
     def default_algorithm_name(self) -> str:
         """Return Trotter as the default algorithm name."""

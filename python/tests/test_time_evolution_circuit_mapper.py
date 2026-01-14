@@ -1,4 +1,4 @@
-"""Tests for the SequenceStructureMapper and its helper functions in QDK/Chemistry."""
+"""Tests for the PauliSequenceMapper and its helper functions in QDK/Chemistry."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -13,8 +13,8 @@ import scipy
 from qiskit import QuantumCircuit, qasm3
 from qiskit.quantum_info import Operator
 
-from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.sequence_structure_mapper import (
-    SequenceStructureMapper,
+from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.pauli_sequence_mapper import (
+    PauliSequenceMapper,
     _append_controlled_pauli_rotation,
     append_controlled_time_evolution,
 )
@@ -56,17 +56,17 @@ def controlled_unitary(simple_ppf_container):
     )
 
 
-class TestSequenceStructureMapper:
-    """Tests for the SequenceStructureMapper class."""
+class TestPauliSequenceMapper:
+    """Tests for the PauliSequenceMapper class."""
 
     def test_name(self):
         """Test that the name method returns the correct algorithm name."""
-        mapper = SequenceStructureMapper()
-        assert mapper.name() == "sequence_structure"
+        mapper = PauliSequenceMapper()
+        assert mapper.name() == "pauli_sequence"
 
     def test_basic_mapping(self, controlled_unitary):
         """Test basic mapping of ControlledTimeEvolutionUnitary to Circuit."""
-        mapper = SequenceStructureMapper(power=1)
+        mapper = PauliSequenceMapper(power=1)
 
         circuit = mapper.run(controlled_unitary)
 
@@ -76,7 +76,7 @@ class TestSequenceStructureMapper:
 
     def test_default_target_indices(self, controlled_unitary):
         """Test that default target indices are used when none are provided."""
-        mapper = SequenceStructureMapper()
+        mapper = PauliSequenceMapper()
 
         circuit = mapper.run(controlled_unitary)
 
@@ -100,14 +100,14 @@ class TestSequenceStructureMapper:
             control_indices=[2],
         )
 
-        mapper = SequenceStructureMapper()
+        mapper = PauliSequenceMapper()
 
         with pytest.raises(ValueError, match="not supported"):
             mapper.run(invalid_controlled)
 
     def test_rotation_parameters(self, controlled_unitary):
         """Test that rotation parameters are correctly set in the mapped circuit."""
-        mapper = SequenceStructureMapper(power=1)
+        mapper = PauliSequenceMapper(power=1)
 
         circuit = mapper.run(controlled_unitary)
 
@@ -123,7 +123,7 @@ class TestSequenceStructureMapper:
 
     def test_controlled_u_circuit_matrix(self, controlled_unitary):
         """Test that the constructed controlled-U circuit has the expected matrix."""
-        mapper = SequenceStructureMapper(power=1)
+        mapper = PauliSequenceMapper(power=1)
         circuit = mapper.run(controlled_unitary)
 
         # Extract angles from the container
@@ -164,11 +164,14 @@ class TestAppendControlledTimeEvolution:
     def test_power_validation(self, controlled_unitary):
         """Test that invalid power raises a ValueError."""
         qc = QuantumCircuit(3)
+        container = controlled_unitary.time_evolution_unitary.get_container()
 
         with pytest.raises(ValueError, match="power must be at least 1"):
             append_controlled_time_evolution(
                 qc,
-                controlled_unitary,
+                exponential_terms=container.step_terms,
+                reps=container.step_reps,
+                control_qubit=controlled_unitary.control_indices[0],
                 target_qubits=[0, 1],
                 power=0,
             )
@@ -176,10 +179,13 @@ class TestAppendControlledTimeEvolution:
     def test_appends_operations(self, controlled_unitary):
         """Test that controlled time evolution operations are appended to the circuit."""
         qc = QuantumCircuit(3)
+        container = controlled_unitary.time_evolution_unitary.get_container()
 
         append_controlled_time_evolution(
             qc,
-            controlled_unitary,
+            exponential_terms=container.step_terms,
+            reps=container.step_reps,
+            control_qubit=controlled_unitary.control_indices[0],
             target_qubits=[0, 1],
             power=2,
         )
@@ -188,21 +194,13 @@ class TestAppendControlledTimeEvolution:
 
     def test_skips_zero_angle_terms(self):
         """Test that terms with zero angle are skipped."""
-        container = PauliProductFormulaContainer(
-            step_terms=[
-                ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.0),
-            ],
-            step_reps=1,
-            num_qubits=1,
-        )
-        teu = TimeEvolutionUnitary(container=container)
-        controlled = ControlledTimeEvolutionUnitary(teu, control_indices=[1])
-
         qc = QuantumCircuit(2)
 
         append_controlled_time_evolution(
             qc,
-            controlled,
+            exponential_terms=[ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.0)],
+            reps=1,
+            control_qubit=1,
             target_qubits=[0],
             power=1,
         )

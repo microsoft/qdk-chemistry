@@ -21,14 +21,14 @@ from qdk_chemistry.utils import Logger
 
 from .base import ControlledEvolutionCircuitMapper
 
-__all__: list[str] = ["SequenceStructureMapper", "SequenceStructureMapperSettings"]
+__all__: list[str] = ["PauliSequenceMapper", "PauliSequenceMapperSettings"]
 
 
-class SequenceStructureMapperSettings(Settings):
-    """Settings for SequenceStructureMapper."""
+class PauliSequenceMapperSettings(Settings):
+    """Settings for PauliSequenceMapper."""
 
     def __init__(self):
-        """Initialize SequenceStructureMapperSettings with default values.
+        """Initialize PauliSequenceMapperSettings with default values.
 
         Attributes:
             power: The power of the controlled unitary to be constructed. It controls
@@ -39,8 +39,8 @@ class SequenceStructureMapperSettings(Settings):
         self._set_default("power", "int", 1, "The power of the controlled unitary to be constructed.")
 
 
-class SequenceStructureMapper(ControlledEvolutionCircuitMapper):
-    r"""Sequence structure controlled evolution circuit mapper implementation.
+class PauliSequenceMapper(ControlledEvolutionCircuitMapper):
+    r"""Controlled evolution circuit mapper using Pauli product formula term sequences.
 
     Given a time-evolution operator expressed as a Pauli product formula
     :math:`U(t) \approx \left[ U_{\mathrm{step}}(t / r) \right]^{r}`, this mapper constructs
@@ -52,12 +52,17 @@ class SequenceStructureMapper(ControlledEvolutionCircuitMapper):
         :math:`e^{-i\,\theta_j\,P_j} \;\rightarrow\; \text{CRZ}(2 \theta_j)`.
     4. The basis rotations and entangling operations are uncomputed.
 
-    This process is repeated for each term in the product formula, and for the
-    specified number of repetitions (power).
+    The process repeats for all terms in :math:`U_{\mathrm{step}}`, for :math:`r` step repetitions,
+    and for the specified power.
+
+    Notes:
+        * Currently supports only single-control-qubit scenarios.
+        * Requires a ``PauliProductFormulaContainer`` for the time evolution unitary.
+
     """
 
     def __init__(self, power: int = 1):
-        """Initialize the SequenceStructureMapper.
+        """Initialize the PauliSequenceMapper.
 
         Args:
             power: The power of the controlled unitary to be constructed. It controls
@@ -65,12 +70,12 @@ class SequenceStructureMapper(ControlledEvolutionCircuitMapper):
 
         """
         super().__init__()
-        self._settings = SequenceStructureMapperSettings()
+        self._settings = PauliSequenceMapperSettings()
         self._settings.set("power", power)
 
     def name(self) -> str:
         """Return the algorithm name."""
-        return "sequence_structure"
+        return "pauli_sequence"
 
     def type_name(self) -> str:
         """Return controlled_evolution_circuit_mapper as the algorithm type name."""
@@ -91,12 +96,20 @@ class SequenceStructureMapper(ControlledEvolutionCircuitMapper):
             Circuit: A quantum circuit implementing the controlled unitary :math:`U^{\text{power}}`
             where :math:`U` is the time evolution operator :math:`\exp(-i H t)`.
 
+        Raises:
+            ValueError: If the time evolution unitary container type is not supported.
+            ValueError: If multiple control qubits are provided.
+
         """
-        if not isinstance(controlled_evolution.time_evolution_unitary.get_container(), PauliProductFormulaContainer):
+        unitary_container = controlled_evolution.time_evolution_unitary.get_container()
+        if not isinstance(unitary_container, PauliProductFormulaContainer):
             raise ValueError(
                 f"The {controlled_evolution.get_unitary_container_type()} container type is not supported. "
-                "SequenceStructureMapper only supports PauliProductFormula container for time evolution unitary."
+                "PauliSequenceMapper only supports PauliProductFormula container for time evolution unitary."
             )
+
+        if len(controlled_evolution.control_indices) != 1:
+            raise ValueError("PauliSequenceMapper currently only supports a single control qubit.")
 
         total_qubits = controlled_evolution.get_num_total_qubits()
 
@@ -106,7 +119,12 @@ class SequenceStructureMapper(ControlledEvolutionCircuitMapper):
         circuit = QuantumCircuit(total_qubits)
 
         append_controlled_time_evolution(
-            circuit, controlled_evolution, target_qubits=target_indices, power=self._settings.get("power")
+            circuit,
+            exponential_terms=unitary_container.step_terms,
+            reps=unitary_container.step_reps,
+            control_qubit=controlled_evolution.control_indices[0],
+            target_qubits=target_indices,
+            power=self._settings.get("power"),
         )
 
         qasm_str = qasm3.dumps(circuit)
@@ -171,8 +189,10 @@ def _append_controlled_pauli_rotation(
 
 def append_controlled_time_evolution(
     circuit: QuantumCircuit,
-    controlled_evolution: ControlledTimeEvolutionUnitary,
     *,
+    exponential_terms: list[ExponentiatedPauliTerm],
+    reps: int,
+    control_qubit: int,
     target_qubits: Sequence[int],
     power: int = 1,
 ) -> None:
@@ -180,37 +200,25 @@ def append_controlled_time_evolution(
 
     Args:
         circuit: Circuit being extended.
-        controlled_evolution: The controlled time evolution unitary.
+        exponential_terms: List of exponentiated Pauli terms describing the rotation axes.
+        reps: Number of repetitions for each step.
+        control_qubit: Index of the control qubit.
         target_qubits: The target qubit indices.
             If None, assumes target qubits are all qubits except the control qubit.
         power: Number of repeated applications (``U`` raised to ``power``).
 
     Raises:
-        ValueError: If the time evolution unitary container type is not supported.
         ValueError: If ``power`` is less than 1.
-        ValueError: If there is not exactly one control qubit.
 
     """
     Logger.trace_entering()
 
-    unitary_container = controlled_evolution.time_evolution_unitary.get_container()
-    if not isinstance(unitary_container, PauliProductFormulaContainer):
-        raise ValueError(
-            f"The {unitary_container.type} container type is not supported. "
-            "SequenceStructureMapper currently only supports PauliProductFormula container for time evolution unitary."
-        )
-
     if power < 1:
         raise ValueError("power must be at least 1 for controlled time evolution.")
 
-    if len(controlled_evolution.control_indices) != 1:
-        raise ValueError("SequenceStructureMapper currently only supports a single control qubit.")
-
-    control_qubit = controlled_evolution.control_indices[0]
-
     for _ in range(power):
-        for _ in range(unitary_container.step_reps):
-            for term in unitary_container.step_terms:
+        for _ in range(reps):
+            for term in exponential_terms:
                 if np.isclose(term.angle, 0.0):
                     continue
                 _append_controlled_pauli_rotation(

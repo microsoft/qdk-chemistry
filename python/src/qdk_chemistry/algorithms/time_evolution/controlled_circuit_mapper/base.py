@@ -45,5 +45,5 @@ class ControlledEvolutionCircuitMapperFactory(AlgorithmFactory):
         return "controlled_evolution_circuit_mapper"
 
     def default_algorithm_name(self) -> str:
-        """Return sequence_structure as the default algorithm name."""
-        return "sequence_structure"
+        """Return pauli_sequence as the default algorithm name."""
+        return "pauli_sequence"

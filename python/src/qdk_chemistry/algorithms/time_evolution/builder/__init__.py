@@ -5,8 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from .base import TimeEvolutionConstructorFactory
+from .base import TimeEvolutionBuilderFactory
 
 __all__ = [
-    "TimeEvolutionConstructorFactory",
+    "TimeEvolutionBuilderFactory",
 ]

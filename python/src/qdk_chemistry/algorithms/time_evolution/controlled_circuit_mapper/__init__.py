@@ -6,10 +6,10 @@
 # --------------------------------------------------------------------------------------------
 
 from .base import ControlledEvolutionCircuitMapperFactory
-from .sequence_structure_mapper import SequenceStructureMapper, SequenceStructureMapperSettings
+from .pauli_sequence_mapper import PauliSequenceMapper, PauliSequenceMapperSettings
 
 __all__ = [
     "ControlledEvolutionCircuitMapperFactory",
-    "SequenceStructureMapper",
-    "SequenceStructureMapperSettings",
+    "PauliSequenceMapper",
+    "PauliSequenceMapperSettings",
 ]

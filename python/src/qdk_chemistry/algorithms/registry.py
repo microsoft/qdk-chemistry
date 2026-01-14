@@ -507,7 +507,7 @@ def _register_python_factories():
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolverFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
-    from qdk_chemistry.algorithms.time_evolution.constructor import TimeEvolutionConstructorFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.time_evolution.builder import TimeEvolutionBuilderFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledEvolutionCircuitMapperFactory,
     )
@@ -516,7 +516,7 @@ def _register_python_factories():
     register_factory(StatePreparationFactory())
     register_factory(QubitMapperFactory())
     register_factory(QubitHamiltonianSolverFactory())
-    register_factory(TimeEvolutionConstructorFactory())
+    register_factory(TimeEvolutionBuilderFactory())
     register_factory(ControlledEvolutionCircuitMapperFactory())
 
 
@@ -572,11 +572,11 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
-    from qdk_chemistry.algorithms.time_evolution.constructor.trotter import (  # noqa: PLC0415
+    from qdk_chemistry.algorithms.time_evolution.builder.trotter import (  # noqa: PLC0415
         Trotter,
     )
     from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import (  # noqa: PLC0415
-        SequenceStructureMapper,
+        PauliSequenceMapper,
     )
 
     register(lambda: QDKEnergyEstimator())
@@ -584,7 +584,7 @@ def _register_python_algorithms():
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
     register(lambda: Trotter())
-    register(lambda: SequenceStructureMapper())
+    register(lambda: PauliSequenceMapper())
 
 
 _register_python_algorithms()

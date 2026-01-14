@@ -1,11 +1,11 @@
-"""QDK/Chemistry implementation of the Trotter decomposition constructor."""
+"""QDK/Chemistry implementation of the Trotter decomposition Builder."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.time_evolution.constructor.base import TimeEvolutionConstructor
+from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.data import QubitHamiltonian, Settings, TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
@@ -16,7 +16,7 @@ __all__: list[str] = ["Trotter", "TrotterSettings"]
 
 
 class TrotterSettings(Settings):
-    """Settings for Trotter decomposition constructor."""
+    """Settings for Trotter decomposition builder."""
 
     def __init__(self):
         """Initialize TrotterSettings with default values.
@@ -33,11 +33,11 @@ class TrotterSettings(Settings):
         self._set_default("tolerance", "float", 1e-12, "The absolute tolerance for filtering small coefficients.")
 
 
-class Trotter(TimeEvolutionConstructor):
-    """Trotter decomposition constructor."""
+class Trotter(TimeEvolutionBuilder):
+    """Trotter decomposition builder."""
 
     def __init__(self, order: int = 1, num_trotter_steps: int = 1, tolerance: float = 1e-12):
-        """Initialize Trotter Constructor with specified Trotter decomposition settings.
+        """Initialize Trotter builder with specified Trotter decomposition settings.
 
         Args:
             order: The order of the Trotter decomposition (currently only first order is supported). Defaults to 1.
@@ -60,7 +60,7 @@ class Trotter(TimeEvolutionConstructor):
             time: The total evolution time.
 
         Returns:
-            TimeEvolutionUnitary: The constructed time evolution unitary.
+            TimeEvolutionUnitary: The time evolution unitary built by the Trotter decomposition.
 
         """
         if self._settings.get("order") == 1:
@@ -79,7 +79,7 @@ class Trotter(TimeEvolutionConstructor):
             time: The total evolution time.
 
         Returns:
-            TimeEvolutionUnitary: The constructed time evolution unitary.
+            TimeEvolutionUnitary: The time evolution unitary built by the Trotter decomposition.
 
         """
         # Calculate evolution time per Trotter step
@@ -153,9 +153,9 @@ class Trotter(TimeEvolutionConstructor):
         return terms
 
     def name(self) -> str:
-        """Return the name of the time evolution unitary constructor."""
+        """Return the name of the time evolution unitary builder."""
         return "trotter"
 
     def type_name(self) -> str:
-        """Return time_evolution_constructor as the algorithm type name."""
-        return "time_evolution_constructor"
+        """Return time_evolution_builder as the algorithm type name."""
+        return "time_evolution_builder"
