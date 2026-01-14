@@ -123,7 +123,7 @@ python3 -m pip install --upgrade pip
 python3 -m pip install auditwheel build
 python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
 
-Install Python package
+# Install Python package
 cd python
 
 # Build wheel with all necessary CMake flags

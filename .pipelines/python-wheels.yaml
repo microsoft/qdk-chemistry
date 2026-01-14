@@ -39,10 +39,6 @@ parameters:
   type: boolean
   default: false
 
-variables:
-  publishInternalFeed: ${{ parameters.publishInternalFeed }}
-  publishEsrp: ${{ parameters.publishEsrp }}
-
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
