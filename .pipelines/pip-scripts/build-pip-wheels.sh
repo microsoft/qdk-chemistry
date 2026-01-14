@@ -193,7 +193,14 @@ python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
 # fi
 
 # Temporary release
-cd temp-release
-python3 -m build --wheel
-mkdir -p ../python/repaired_wheelhouse/
-mv dist/qdk_chemistry-*.whl ../python/repaired_wheelhouse/
+if [ "$MAC_BUILD" == "OFF" ]; then
+    cd temp-release
+    python3 -m build --wheel
+    auditwheel repair dist/qdk_chemistry-*.whl -w ../python/repaired_wheelhouse/
+else
+    cd temp-release
+    python3 -m build --wheel
+    pip install delocate==0.13.0
+    WHEEL_FILE=$(ls dist/qdk_chemistry-*.whl)
+    delocate-wheel -w ../python/repaired_wheelhouse/ "$WHEEL_FILE"
+fi
