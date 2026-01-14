@@ -6,7 +6,6 @@
 
 #include <H5Cpp.h>
 #include <gtest/gtest.h>
-#include <omp.h>
 
 #include <Eigen/Dense>
 #include <filesystem>
