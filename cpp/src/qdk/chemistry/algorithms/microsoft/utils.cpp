@@ -433,4 +433,17 @@ std::vector<unsigned> compute_shell_map(
   return ret_val;
 }
 
+size_t factorial(size_t n) {
+  size_t result = 1;
+  for (size_t i = 2; i <= n; ++i) {
+    result *= i;
+  }
+  return result;
+}
+
+size_t binomial_coefficient(size_t n, size_t k) {
+  if (k > n) return 0ul;
+  return factorial(n) / (factorial(k) * factorial(n - k));
+}
+
 }  // namespace qdk::chemistry::utils::microsoft

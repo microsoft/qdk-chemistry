@@ -11,12 +11,11 @@ from pathlib import Path
 import numpy as np
 from qdk_chemistry.algorithms import IterativePhaseEstimation
 from qdk_chemistry.data import (
-    CasWavefunctionContainer,
     QpeResult,
     QubitHamiltonian,
+    SciWavefunctionContainer,
     Wavefunction,
 )
-from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.wavefunction import get_top_determinants
 from qiskit import QuantumCircuit, qasm3
@@ -55,44 +54,16 @@ def prepare_2_dets_trial_state(
 
     # Convert to numpy arrays and normalize
     coeffs_new = np.array(coeffs_new, dtype=float)
-    coeffs_new /= np.linalg.norm(coeffs_new)  # normalize explicitly
+    coeffs_new /= np.linalg.norm(coeffs_new)
 
     # Construct trial wavefunction
-    rotated_wf = Wavefunction(CasWavefunctionContainer(coeffs_new, dets_new, orbitals))
+    rotated_wf = Wavefunction(SciWavefunctionContainer(coeffs_new, dets_new, orbitals))
 
     # Fidelity with original reference wf
-    fidelity = compute_wavefunction_overlap_fidelity(wf, rotated_wf)
+    coeffs_wf = np.array(list(dets.values()))
+    fidelity = np.abs(np.vdot(coeffs_new, coeffs_wf)) ** 2
 
     return rotated_wf, fidelity
-
-
-def compute_wavefunction_overlap_fidelity(
-    wf_exact: Wavefunction,
-    wf_test: Wavefunction,
-) -> float:
-    """
-    Compute overlap <psi_exact | psi_test> and fidelity |overlap|^2.
-
-    Args:
-        wf_exact: the perfect/reference Wavefunction
-        wf_test:  the trial/noisy/random Wavefunction
-
-    Returns:
-        fidelity: |complex inner product <psi_exact | psi_test>|^2
-
-    """
-    # Convert to statevectors using your internal function
-    psi_ref = create_statevector_from_wavefunction(wf_exact)
-    psi_test = create_statevector_from_wavefunction(wf_test)
-
-    # Ensure both are normalized (just in case)
-    psi_ref = psi_ref / np.linalg.norm(psi_ref)
-    psi_test = psi_test / np.linalg.norm(psi_test)
-
-    # Compute inner product <psi_ref | psi_test>
-    abs_overlap = np.abs(np.vdot(psi_ref, psi_test)) ** 2
-
-    return abs_overlap
 
 
 def run_single_trial_iqpe(

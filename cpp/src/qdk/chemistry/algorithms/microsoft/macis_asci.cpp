@@ -14,6 +14,9 @@
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
+// Local implementation details
+#include "utils.hpp"
+
 namespace qdk::chemistry::algorithms::microsoft {
 
 /**
@@ -71,24 +74,16 @@ struct asci_helper {
                             num_molecular_orbitals, num_molecular_orbitals,
                             num_molecular_orbitals, num_molecular_orbitals));
 
-    auto factorial = [](size_t n) {
-      size_t result = 1;
-      for (size_t i = 2; i <= n; ++i) {
-        result *= i;
-      }
-      return result;
-    };
-
-    auto binomial_coefficient = [&](size_t n, size_t k) {
-      if (k > n) return 0ul;
-      return factorial(n) / (factorial(k) * factorial(n - k));
-    };
-
     size_t fci_dimension =
-        binomial_coefficient(num_molecular_orbitals, nalpha) *
-        binomial_coefficient(num_molecular_orbitals, nbeta);
+        qdk::chemistry::utils::microsoft::binomial_coefficient(
+            num_molecular_orbitals, nalpha) *
+        qdk::chemistry::utils::microsoft::binomial_coefficient(
+            num_molecular_orbitals, nbeta);
 
     if (asci_settings.ntdets_max > fci_dimension) {
+      QDK_LOGGER().info(
+          "Requested number of determinants ({}) exceeds FCI dimension ({}).",
+          asci_settings.ntdets_max, fci_dimension);
       E_casci = macis::CASRDMFunctor<generator_t>::rdms(
           mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
           nbeta, const_cast<double*>(T_a.data()),
