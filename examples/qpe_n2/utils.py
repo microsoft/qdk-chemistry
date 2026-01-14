@@ -24,8 +24,8 @@ from qiskit import QuantumCircuit, qasm3
 def prepare_2_dets_trial_state(
     wf: Wavefunction, rotation_angle: float = np.pi / 12
 ) -> tuple[Wavefunction, float]:
-    """
-    Scan rotation angles for 2-determinant wavefunction:
+    """Scan rotation angles for 2-determinant wavefunction.
+
         psi(theta) = cos(theta)*|D1> + sin(theta)*|D2|
 
     Args:
@@ -74,7 +74,7 @@ def run_single_trial_iqpe(
     shots: int,
     trial_seed: int,
     reference_energy: float,
-) -> tuple[QpeResult, dict]:
+) -> QpeResult:
     """Helper function to run a single IQPE trial with the given seed.
 
     Args:
@@ -87,8 +87,7 @@ def run_single_trial_iqpe(
         reference_energy: Reference energy for phase estimation
 
     Returns:
-        result: QpeResult object with the results of the IQPE run
-        circuit_info: Summary info of the first iteration circuit
+        `QpeResult` for a single IQPE trial
 
     """
     from qdk.openqasm import compile
@@ -161,7 +160,7 @@ def run_iqpe(
         trials: Number of trials to run
 
     Returns:
-        results: List of tuples (QpeResult, circuit_info) for each trial
+        List of `QpeResult` for each trial
 
     """
     results = []

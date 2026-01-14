@@ -813,3 +813,26 @@ def test_iterative_qpe_initialization() -> None:
     assert iqpe.hamiltonian == hamiltonian
     assert iqpe.evolution_time == evolution_time
     assert iqpe.algorithm == PhaseEstimationAlgorithm.ITERATIVE
+
+
+def test_create_folding_circuits() -> None:
+    """Test circuit folding in create_iteration_circuit."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
+    state_prep = QuantumCircuit(1)
+    state_prep.h(0)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    # Create circuit without folding
+    circuit_no_folding = iqpe.create_iteration_circuit(
+        state_prep, iteration=1, total_iterations=3, circuit_folding=False
+    )
+
+    # Create circuit with folding
+    circuit_with_folding = iqpe.create_iteration_circuit(
+        state_prep, iteration=1, total_iterations=3, circuit_folding=True
+    )
+
+    # The folded circuit should have state_prep operations included
+    assert "state_prep" not in circuit_no_folding.count_ops()
+    assert "state_prep" in circuit_with_folding.count_ops()
