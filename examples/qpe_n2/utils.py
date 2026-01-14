@@ -9,6 +9,8 @@ from collections import Counter
 from pathlib import Path
 
 import numpy as np
+from qdk.openqasm import compile
+from qdk.simulation import run_qir
 from qdk_chemistry.algorithms import IterativePhaseEstimation
 from qdk_chemistry.data import (
     QpeResult,
@@ -74,6 +76,7 @@ def run_single_trial_iqpe(
     shots: int,
     trial_seed: int,
     reference_energy: float,
+    output_dir: str | None = None,
 ) -> QpeResult:
     """Helper function to run a single IQPE trial with the given seed.
 
@@ -85,14 +88,11 @@ def run_single_trial_iqpe(
         shots: Shots per iteration
         trial_seed: Random seed for simulator
         reference_energy: Reference energy for phase estimation
-
+        output_dir: Directory to save the result JSON file (optional)
     Returns:
         `QpeResult` for a single IQPE trial
 
     """
-    from qdk.openqasm import compile
-    from qdk.simulation import run_qir
-
     Logger.trace_entering()
     iqpe = IterativePhaseEstimation(qubit_hamiltonian, time)
     phase_feedback = 0.0
@@ -131,8 +131,9 @@ def run_single_trial_iqpe(
         bits_msb_first=bits,
         reference_energy=reference_energy,
     )
-    Path("results_n2").mkdir(exist_ok=True)
-    result.to_json_file(f"results_n2/iqpe_result_{trial_seed}.qpe_result.json")
+    if output_dir is not None:
+        Path(output_dir).mkdir(exist_ok=True)
+        result.to_json_file(f"{output_dir}/iqpe_result_{trial_seed}.qpe_result.json")
     return result
 
 
@@ -146,6 +147,7 @@ def run_iqpe(
     seed: int,
     reference_energy: float,
     trials: int,
+    output_dir: str | None = None,
 ) -> list[QpeResult]:
     """Run multiple IQPE trials with different seeds.
 
@@ -158,6 +160,7 @@ def run_iqpe(
         seed: Base random seed for simulator
         reference_energy: Reference energy for phase estimation
         trials: Number of trials to run
+        output_dir: Directory to save the result JSON files (optional)
 
     Returns:
         List of `QpeResult` for each trial
@@ -174,6 +177,7 @@ def run_iqpe(
             shots,
             trial_seed,
             reference_energy,
+            output_dir=output_dir,
         )
         results.append(result)
     return results
