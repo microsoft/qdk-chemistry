@@ -41,6 +41,8 @@ parameters:
 
 variables:
 - group: QdkChemistry
+- name: publishEsrp
+  value: ${{ parameters.publishEsrp }}
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
@@ -216,7 +218,7 @@ extends:
     - stage: Release
       displayName: Release
       dependsOn: Approval
-      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'), eq(${{ parameters.publishEsrp }}, true))
+      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'), eq(variables["publishEsrp"], true))
       jobs:
       - job: Publish_Python_Packages
         pool:
