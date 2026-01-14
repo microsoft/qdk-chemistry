@@ -182,23 +182,23 @@ def append_controlled_time_evolution(
     control_idx = 0
     system_indices = list(range(1, num_qubits))
 
+    ctrl_evol_circuit = QuantumCircuit(num_qubits, name="ctrl_time_evol")
+    for term in terms:
+        rotation_angle = time * term.coefficient
+        if np.isclose(rotation_angle, 0.0):
+            continue
+        controlled_pauli_rotation(
+            ctrl_evol_circuit,
+            control_idx,
+            system_indices,
+            term,
+            angle=rotation_angle,
+        )
+
+    ctrl_evol_gate = ctrl_evol_circuit.to_gate()
     for _ in range(power):
         # Create a subcircuit for each power iteration
-        ctrl_evol_circuit = QuantumCircuit(num_qubits, name="ctrl_time_evol")
-
-        for term in terms:
-            rotation_angle = time * term.coefficient
-            if np.isclose(rotation_angle, 0.0):
-                continue
-            controlled_pauli_rotation(
-                ctrl_evol_circuit,
-                control_idx,
-                system_indices,
-                term,
-                angle=rotation_angle,
-            )
-
-        power_evolution_circuit.append(ctrl_evol_circuit.to_gate(), list(range(num_qubits)))
+        power_evolution_circuit.append(ctrl_evol_gate, list(range(num_qubits)))
 
     # Convert to gate and append to original circuit
     circuit.append(power_evolution_circuit.to_gate(), [control_qubit, *list(system_qubits)])
