@@ -224,7 +224,7 @@ class Structure : public DataClass,
    * @return "structure"
    */
   std::string get_data_type_name() const override {
-    return dataclass_to_snake_case(Structure);
+    return DATACLASS_TO_SNAKE_CASE(Structure);
   }
 
   /**

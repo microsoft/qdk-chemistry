@@ -480,7 +480,7 @@ void Structure::to_json_file(const std::string& filename) const {
   }
   // Validate filename has correct data type suffix
   std::string validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, dataclass_to_snake_case(Structure));
+      filename, DATACLASS_TO_SNAKE_CASE(Structure));
 
   _to_json_file(validated_filename);
 }
@@ -1064,7 +1064,7 @@ void Structure::to_hdf5_file(const std::string& filename) const {
   }
   // Validate filename has correct data type suffix
   std::string validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, dataclass_to_snake_case(Structure));
+      filename, DATACLASS_TO_SNAKE_CASE(Structure));
 
   _to_hdf5_file(validated_filename);
 }

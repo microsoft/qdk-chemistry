@@ -325,7 +325,7 @@ class StabilityResult : public DataClass,
    * @return "stability_result"
    */
   std::string get_data_type_name() const override {
-    return dataclass_to_snake_case(StabilityResult);
+    return DATACLASS_TO_SNAKE_CASE(StabilityResult);
   }
 
   /**

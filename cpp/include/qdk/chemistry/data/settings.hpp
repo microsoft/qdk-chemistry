@@ -284,7 +284,7 @@ class Settings : public DataClass,
    * @return "settings"
    */
   std::string get_data_type_name() const override {
-    return dataclass_to_snake_case(Settings);
+    return DATACLASS_TO_SNAKE_CASE(Settings);
   }
 
   /**

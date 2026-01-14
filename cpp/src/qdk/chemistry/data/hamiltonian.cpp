@@ -425,7 +425,7 @@ void Hamiltonian::to_hdf5_file(const std::string& filename) const {
   }
   // Validate filename has correct data type suffix
   std::string validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, dataclass_to_snake_case(Hamiltonian));
+      filename, DATACLASS_TO_SNAKE_CASE(Hamiltonian));
 
   _to_hdf5_file(validated_filename);
 }
@@ -450,7 +450,7 @@ void Hamiltonian::to_json_file(const std::string& filename) const {
   }
   // Validate filename has correct data type suffix
   std::string validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, dataclass_to_snake_case(Hamiltonian));
+      filename, DATACLASS_TO_SNAKE_CASE(Hamiltonian));
 
   _to_json_file(validated_filename);
 }
@@ -476,7 +476,7 @@ void Hamiltonian::to_fcidump_file(const std::string& filename, size_t nalpha,
   }
   // Validate filename has correct data type suffix
   std::string validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, dataclass_to_snake_case(Hamiltonian));
+      filename, DATACLASS_TO_SNAKE_CASE(Hamiltonian));
 
   _container->to_fcidump_file(validated_filename, nalpha, nbeta);
 }

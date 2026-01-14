@@ -820,7 +820,7 @@ Examples:
           }));
 
   // Data type name class attribute
-  orbitals.attr("_data_type_name") = dataclass_to_snake_case(Orbitals);
+  orbitals.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Orbitals);
 
   // Bind ModelOrbitals
   bind_model_orbitals(data);

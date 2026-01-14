@@ -1292,5 +1292,5 @@ Type:
 )");
 
   // Data type name class attribute
-  basis_set.attr("_data_type_name") = dataclass_to_snake_case(BasisSet);
+  basis_set.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(BasisSet);
 }

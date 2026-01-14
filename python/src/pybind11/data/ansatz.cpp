@@ -386,5 +386,5 @@ Raises:
       }));
 
   // Data type name class attribute
-  ansatz.attr("_data_type_name") = dataclass_to_snake_case(Ansatz);
+  ansatz.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Ansatz);
 }

@@ -218,5 +218,5 @@ Returns:
 )");
   // Data type name class attribute
   configuration.attr("_data_type_name") =
-      dataclass_to_snake_case(Configuration);
+      DATACLASS_TO_SNAKE_CASE(Configuration);
 }

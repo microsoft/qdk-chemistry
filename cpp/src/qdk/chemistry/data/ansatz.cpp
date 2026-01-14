@@ -549,7 +549,7 @@ void Ansatz::to_hdf5_file(const std::string& filename) const {
     throw std::invalid_argument("Filename cannot be empty");
   }
   DataTypeFilename::validate_write_suffix(filename,
-                                          dataclass_to_snake_case(Ansatz));
+                                          DATACLASS_TO_SNAKE_CASE(Ansatz));
   _to_hdf5_file(filename);
 }
 
@@ -559,7 +559,7 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5_file(const std::string& filename) {
     throw std::invalid_argument("Filename cannot be empty");
   }
   DataTypeFilename::validate_read_suffix(filename,
-                                         dataclass_to_snake_case(Ansatz));
+                                         DATACLASS_TO_SNAKE_CASE(Ansatz));
   return _from_hdf5_file(filename);
 }
 
@@ -569,7 +569,7 @@ void Ansatz::to_json_file(const std::string& filename) const {
     throw std::invalid_argument("Filename cannot be empty");
   }
   DataTypeFilename::validate_write_suffix(filename,
-                                          dataclass_to_snake_case(Ansatz));
+                                          DATACLASS_TO_SNAKE_CASE(Ansatz));
   _to_json_file(filename);
 }
 
@@ -579,7 +579,7 @@ std::shared_ptr<Ansatz> Ansatz::from_json_file(const std::string& filename) {
     throw std::invalid_argument("Filename cannot be empty");
   }
   DataTypeFilename::validate_read_suffix(filename,
-                                         dataclass_to_snake_case(Ansatz));
+                                         DATACLASS_TO_SNAKE_CASE(Ansatz));
   return _from_json_file(filename);
 }
 

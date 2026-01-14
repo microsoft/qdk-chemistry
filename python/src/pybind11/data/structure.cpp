@@ -1054,5 +1054,5 @@ Examples:
       }));
 
   // Data type name class attribute
-  structure.attr("_data_type_name") = dataclass_to_snake_case(Structure);
+  structure.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Structure);
 }

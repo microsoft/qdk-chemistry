@@ -141,7 +141,7 @@ class Ansatz : public DataClass, public std::enable_shared_from_this<Ansatz> {
    * @return "ansatz"
    */
   std::string get_data_type_name() const override {
-    return dataclass_to_snake_case(Ansatz);
+    return DATACLASS_TO_SNAKE_CASE(Ansatz);
   }
   /**
    * @brief Get a summary string describing the Ansatz

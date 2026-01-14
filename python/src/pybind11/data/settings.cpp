@@ -2423,7 +2423,7 @@ Examples:
                       py::arg("filename"), py::arg("format_type"));
 
   // Data type name class attribute
-  settings.attr("_data_type_name") = dataclass_to_snake_case(Settings);
+  settings.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Settings);
 
   // Bind ElectronicStructureSettings class
   py::class_<qdk::chemistry::algorithms::ElectronicStructureSettings, Settings,

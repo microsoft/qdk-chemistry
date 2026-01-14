@@ -1494,7 +1494,7 @@ void Wavefunction::to_json_file(const std::string& filename) const {
     throw std::invalid_argument("Filename cannot be empty");
   }
   DataTypeFilename::validate_write_suffix(
-      filename, dataclass_to_snake_case(Wavefunction));
+      filename, DATACLASS_TO_SNAKE_CASE(Wavefunction));
   _to_json_file(filename);
 }
 
@@ -1592,7 +1592,7 @@ void Wavefunction::to_hdf5_file(const std::string& filename) const {
     throw std::invalid_argument("Filename cannot be empty");
   }
   DataTypeFilename::validate_write_suffix(
-      filename, dataclass_to_snake_case(Wavefunction));
+      filename, DATACLASS_TO_SNAKE_CASE(Wavefunction));
   _to_hdf5_file(filename);
 }
 

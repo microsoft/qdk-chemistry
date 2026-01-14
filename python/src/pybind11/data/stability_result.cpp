@@ -669,5 +669,5 @@ Examples:
 
   // Data type name class attribute
   stability_result.attr("_data_type_name") =
-      dataclass_to_snake_case(StabilityResult);
+      DATACLASS_TO_SNAKE_CASE(StabilityResult);
 }

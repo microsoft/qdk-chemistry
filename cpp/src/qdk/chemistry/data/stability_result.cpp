@@ -176,7 +176,7 @@ void StabilityResult::to_file(const std::string& filename,
     throw std::invalid_argument("Filename cannot be empty");
   }
   DataTypeFilename::validate_write_suffix(
-      filename, dataclass_to_snake_case(StabilityResult));
+      filename, DATACLASS_TO_SNAKE_CASE(StabilityResult));
 
   if (type == "json") {
     to_json_file(filename);
@@ -218,7 +218,7 @@ void StabilityResult::to_json_file(const std::string& filename) const {
     throw std::invalid_argument("Filename cannot be empty");
   }
   DataTypeFilename::validate_write_suffix(
-      filename, dataclass_to_snake_case(StabilityResult));
+      filename, DATACLASS_TO_SNAKE_CASE(StabilityResult));
   _to_json_file(filename);
 }
 void StabilityResult::to_hdf5(H5::Group& group) const {
@@ -271,7 +271,7 @@ void StabilityResult::to_hdf5_file(const std::string& filename) const {
     throw std::invalid_argument("Filename cannot be empty");
   }
   DataTypeFilename::validate_write_suffix(
-      filename, dataclass_to_snake_case(StabilityResult));
+      filename, DATACLASS_TO_SNAKE_CASE(StabilityResult));
   _to_hdf5_file(filename);
 }
 std::shared_ptr<StabilityResult> StabilityResult::from_file(

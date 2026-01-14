@@ -181,7 +181,7 @@ class Configuration : public DataClass {
    * @return "configuration"
    */
   std::string get_data_type_name() const override {
-    return dataclass_to_snake_case(Configuration);
+    return DATACLASS_TO_SNAKE_CASE(Configuration);
   }
 
   /**

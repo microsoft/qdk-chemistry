@@ -538,7 +538,7 @@ class Wavefunction : public DataClass,
    * @return "wavefunction"
    */
   std::string get_data_type_name() const override {
-    return dataclass_to_snake_case(Wavefunction);
+    return DATACLASS_TO_SNAKE_CASE(Wavefunction);
   }
 
   /**

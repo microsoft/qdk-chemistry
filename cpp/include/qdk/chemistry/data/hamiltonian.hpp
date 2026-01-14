@@ -505,7 +505,7 @@ class Hamiltonian : public DataClass,
    * @return "hamiltonian"
    */
   std::string get_data_type_name() const override {
-    return dataclass_to_snake_case(Hamiltonian);
+    return DATACLASS_TO_SNAKE_CASE(Hamiltonian);
   }
 
   /**

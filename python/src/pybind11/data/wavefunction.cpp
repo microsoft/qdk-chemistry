@@ -754,7 +754,7 @@ Examples:
       }));
 
   // Data type name class attribute
-  wavefunction.attr("_data_type_name") = dataclass_to_snake_case(Wavefunction);
+  wavefunction.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Wavefunction);
 
   // Bind SciWavefunctionContainer
   py::class_<SciWavefunctionContainer, WavefunctionContainer, py::smart_holder>(

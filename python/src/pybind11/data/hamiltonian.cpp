@@ -848,5 +848,5 @@ Examples:
       }));
 
   // Data type name class attribute
-  hamiltonian.attr("_data_type_name") = dataclass_to_snake_case(Hamiltonian);
+  hamiltonian.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Hamiltonian);
 }

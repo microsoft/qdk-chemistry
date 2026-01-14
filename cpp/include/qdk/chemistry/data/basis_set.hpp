@@ -344,7 +344,7 @@ class BasisSet : public DataClass,
    * @return "basis_set"
    */
   std::string get_data_type_name() const override {
-    return dataclass_to_snake_case(BasisSet);
+    return DATACLASS_TO_SNAKE_CASE(BasisSet);
   }
   /**
    * @brief Get supported basis set names

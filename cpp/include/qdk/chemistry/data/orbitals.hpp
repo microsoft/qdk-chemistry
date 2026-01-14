@@ -341,7 +341,7 @@ class Orbitals : public DataClass,
    * @return "orbitals"
    */
   std::string get_data_type_name() const override {
-    return dataclass_to_snake_case(Orbitals);
+    return DATACLASS_TO_SNAKE_CASE(Orbitals);
   }
 
   /**
