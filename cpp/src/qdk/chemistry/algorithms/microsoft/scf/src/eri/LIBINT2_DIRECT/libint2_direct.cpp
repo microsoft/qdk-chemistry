@@ -659,7 +659,7 @@ class ERI {
   std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
                                                  size_t* num_vectors) {
     QDK_LOG_TRACE_ENTERING();
-    QDK_LOG_INFO("Cholesky decomposition threshold: {}", threshold);
+    QDK_LOGGER().info("Cholesky decomposition threshold: {}", threshold);
 
     const size_t num_aos = obs_.nbf();
     const size_t num_aos2 = num_aos * num_aos;
@@ -971,7 +971,7 @@ class ERI {
       }
     }
 
-    QDK_LOG_INFO("Cholesky rank: {}", current_col);
+    QDK_LOGGER().info("Cholesky rank: {}", current_col);
 
     // Allocate and return exact size
     const size_t data_size = current_col * num_aos * num_aos;

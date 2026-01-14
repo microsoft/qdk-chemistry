@@ -133,7 +133,7 @@ QDK Cholesky
 
 A Cholesky decomposition-based implementation for Hamiltonian construction.
 This method uses Cholesky decomposition of the electron repulsion integral (ERI) tensor to reduce memory requirements and computational cost while maintaining high accuracy.
-The decomposition represents the four-center ERIs as products of three-center integrals (Cholesky vectors), which are then trasfomred to the molecular one- and two-electron integrals.
+The decomposition represents the four-center ERIs as products of three-center integrals (Cholesky vectors), which are then transformed to the molecular one- and two-electron integrals.
 
 .. rubric:: Settings
 

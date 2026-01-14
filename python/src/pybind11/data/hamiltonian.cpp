@@ -256,10 +256,10 @@ Examples:
     >>> # Create restricted Hamiltonian
     >>> one_body = np.random.rand(4, 4)  # 4 orbitals
     >>> two_body = np.random.rand(256)   # 4^4 elements
-    >>> cholesky_vectors = np.random.rand(4*4, 10)   # 10 Cholesky vectors
-    >>> fock_matrix = np.random.rand(4, 4)
+    >>> ao_cholesky_vectors = np.random.rand(4*4, 10)   # 10 Cholesky vectors
+    >>> inactive_fock_matrix = np.random.rand(4, 4)
     >>> container = CholeskyHamiltonianContainer(
-    ...     one_body, two_body, cholesky_vectors, orbitals, 10.5, fock_matrix
+    ...     one_body, two_body, orbitals, 10.5, inactive_fock_matrix, ao_cholesky_vectors
     ... )
     >>> # Wrap in Hamiltonian interface
     >>> hamiltonian = Hamiltonian(container)
@@ -289,7 +289,7 @@ Examples:
     >>> cholesky_vecs = np.random.rand(16, 10)  # 16 = 4^2, 10 vectors
     >>> fock_matrix = np.random.rand(4, 4)
     >>> container = CholeskyHamiltonianContainer(
-    ...     one_body, two_body, orbitals, 10.5, fock_matrix, cholesky_vecs
+    ...     one_body, two_body, orbitals, 10.5, inactive_fock_matrix, ao_cholesky_vectors
     ... )
 )",
       py::arg("one_body_integrals"), py::arg("two_body_integrals"),
