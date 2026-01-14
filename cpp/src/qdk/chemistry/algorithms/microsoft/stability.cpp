@@ -335,8 +335,9 @@ class StabilityOperator {
  * 1e4/1e-4 avoid division by zero when the energy differences are extremely
  * small.
  *
- * Note Davidson algorithm is highly sensitive to the choice of initial vector.
- * The mix of two initialization here is to avoid Davidson unconverged.
+ * The Davidson algorithm is highly sensitive to the choice of the initial
+ * vector. Mixing the two initialization strategies reduces the risk of
+ * Davidson failing to converge.
  *
  * @param eigen_diff Flattened array of orbital energy differences.
  * @param n_alpha_electrons Number of occupied alpha orbitals.
