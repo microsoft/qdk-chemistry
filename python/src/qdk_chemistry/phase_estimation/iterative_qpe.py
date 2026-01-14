@@ -85,6 +85,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         phase_correction: float = 0.0,
         measurement_register: ClassicalRegister | None = None,
         iteration_name: str | None = None,
+        circuit_folding: bool = True,
     ) -> QuantumCircuit:
         """Construct a single IQPE iteration circuit.
 
@@ -108,6 +109,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             iteration_name: Optional custom name for the circuit. If None, no specific
 
                 name is assigned.
+            circuit_folding: Whether to apply circuit folding for visualization. Defaults to True.
 
         Returns:
             A quantum circuit implementing one IQPE iteration with an ancilla qubit,
@@ -125,7 +127,10 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         state_prep.name = "state_prep"
 
-        circuit.compose(state_prep.to_gate(), qubits=system, inplace=True)
+        if circuit_folding:
+            circuit.compose(state_prep.to_gate(), qubits=system, inplace=True)
+        else:
+            circuit.compose(state_prep, qubits=system, inplace=True)
 
         control = ancilla[0]
         system_qubits = list(system)
@@ -166,6 +171,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         phase_correction: float = 0.0,
         measurement_register: ClassicalRegister | None = None,
         iteration_name: str | None = None,
+        circuit_folding: bool = True,
     ) -> IterativePhaseEstimationIteration:
         """Build an iteration and return contextual metadata.
 
@@ -185,6 +191,7 @@ class IterativePhaseEstimation(PhaseEstimation):
                 If None, a new register named ``c{iteration}`` is created.
 
             iteration_name: Optional custom name for the circuit. If None, no specific name is assigned.
+            circuit_folding: Whether to apply circuit folding for visualization. Defaults to True.
 
         Returns:
             An IterativePhaseEstimationIteration object containing the circuit and
@@ -200,6 +207,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             phase_correction=phase_correction,
             measurement_register=measurement_register,
             iteration_name=iteration_name,
+            circuit_folding=circuit_folding,
         )
 
         power = 2 ** (total_iterations - iteration - 1)
@@ -219,6 +227,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         phase_corrections: Sequence[float] | None = None,
         measurement_registers: Sequence[ClassicalRegister] | None = None,
         iteration_names: Sequence[str | None] | None = None,
+        circuit_folding: bool = True,
     ) -> list[IterativePhaseEstimationIteration]:
         """Generate ``num_bits`` iteration circuits with optional phase feedback.
 
@@ -237,6 +246,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             iteration_names: Optional custom names for the per-iteration circuits.
 
                 Must have length equal to ``num_bits`` if provided.
+            circuit_folding: Whether to apply circuit folding for visualization. Defaults to True.
 
         Returns:
             A list of IterativePhaseEstimationIteration objects, one for each iteration,
@@ -278,6 +288,7 @@ class IterativePhaseEstimation(PhaseEstimation):
                 phase_correction=phase_corrections[idx],
                 measurement_register=measurement_register,
                 iteration_name=iteration_name,
+                circuit_folding=circuit_folding,
             )
 
             iterations.append(iteration_circuit)
