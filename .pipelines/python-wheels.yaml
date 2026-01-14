@@ -39,6 +39,8 @@ parameters:
   type: boolean
   default: false
 
+variables:
+- group: QdkChemistry
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
