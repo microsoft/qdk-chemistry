@@ -22,6 +22,7 @@ permissions:
 jobs:
   check-up-to-date:
     name: Check if branch is up to date with main
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
@@ -35,7 +36,7 @@ jobs:
         # Ensure origin/main is present
         git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
 
-        # Check if the current commit is ahead of manifest
+        # Check if the current commit is ahead of main
         # Kills pipeline if branch is not up to date with main
         if ! git merge-base --is-ancestor origin/main "${{ github.sha }}"; then
           echo "This branch is not up to date with main. Please merge the latest changes from main into your branch to continue."
