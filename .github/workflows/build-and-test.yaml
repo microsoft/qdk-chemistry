@@ -32,9 +32,11 @@ jobs:
 
     - name: Check if branch is up to date with main
       run: |
-        # Ensure origin/main is present (harmless if already fetched)
+        # Ensure origin/main is present
         git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
 
+        # Check if the current commit is ahead of manifest
+        # Kills pipeline if branch is not up to date with main
         if ! git merge-base --is-ancestor origin/main "${{ github.sha }}"; then
           echo "This branch is not up to date with main. Please merge the latest changes from main into your branch to continue."
           exit 1
@@ -64,7 +66,6 @@ jobs:
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
     steps:
-
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
