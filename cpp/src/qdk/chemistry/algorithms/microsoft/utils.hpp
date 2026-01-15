@@ -142,4 +142,21 @@ std::vector<unsigned> compute_shell_map(
     const qdk::chemistry::data::BasisSet& qdk_basis_set,
     const qcs::BasisSet& itrn_basis_set);
 
+/**
+ * @brief Compute the factorial of a non-negative integer
+ *
+ * @param n The non-negative integer to compute the factorial of.
+ * @return The factorial of n (n!).
+ */
+size_t factorial(size_t n);
+
+/**
+ * @brief Compute the binomial coefficient C(n, k) = n! / (k! * (n-k)!)
+ *
+ * @param n The total number of items.
+ * @param k The number of items to choose.
+ * @return The binomial coefficient C(n, k), or 0 if k > n.
+ */
+size_t binomial_coefficient(size_t n, size_t k);
+
 }  // namespace qdk::chemistry::utils::microsoft

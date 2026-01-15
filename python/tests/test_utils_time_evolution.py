@@ -74,16 +74,7 @@ def test_append_controlled_time_evolution_repeats_for_power() -> None:
     append_controlled_time_evolution(circuit, ancilla[0], list(system), terms, time=np.pi, power=2)
 
     ops = circuit.count_ops()
-    assert ops == {"crz": 2}
-    for data in circuit.data:
-        instruction = data.operation
-        assert instruction.name == "crz"
-        assert np.isclose(
-            float(instruction.params[0]),
-            np.pi,
-            rtol=float_comparison_relative_tolerance,
-            atol=float_comparison_absolute_tolerance,
-        )
+    assert ops == {"ctrl_time_evol_power_2": 1}
 
 
 def test_append_controlled_time_evolution_rejects_invalid_power() -> None:

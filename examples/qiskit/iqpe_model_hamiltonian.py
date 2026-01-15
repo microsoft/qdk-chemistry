@@ -82,6 +82,7 @@ for iteration in range(PHASE_BITS_1):
         iteration=iteration,
         total_iterations=PHASE_BITS_1,
         phase_correction=phase_feedback_1,
+        circuit_folding=False,
     )
     compiled = transpile(iteration_info.circuit, simulator_1, optimization_level=0)
     result = simulator_1.run(compiled, shots=SHOTS_PER_ITERATION_1).result()
@@ -169,6 +170,7 @@ for iteration in range(PHASE_BITS_2):
         iteration=iteration,
         total_iterations=PHASE_BITS_2,
         phase_correction=phase_feedback_2,
+        circuit_folding=False,
     )
     compiled = transpile(iteration_info.circuit, simulator_2, optimization_level=0)
     result = simulator_2.run(compiled, shots=SHOTS_PER_ITERATION_2).result()

@@ -433,4 +433,28 @@ std::vector<unsigned> compute_shell_map(
   return ret_val;
 }
 
+size_t factorial(size_t n) {
+  size_t result = 1;
+  for (size_t i = 2; i <= n; ++i) {
+    result *= i;
+  }
+  return result;
+}
+
+size_t binomial_coefficient(size_t n, size_t k) {
+  if (k > n) return 0ul;
+  if (k == 0 || k == n) return 1ul;
+  // Take advantage of symmetry: C(n, k) == C(n, n - k)
+  if (k > n - k) {
+    k = n - k;
+  }
+  size_t result = 1;
+  for (size_t i = 1; i <= k; ++i) {
+    // At each step: result *= (n - (k - i)); result /= i;
+    // This keeps intermediate values smaller than full factorials.
+    result = (result * (n - (k - i))) / i;
+  }
+  return result;
+}
+
 }  // namespace qdk::chemistry::utils::microsoft
