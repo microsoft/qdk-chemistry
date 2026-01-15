@@ -31,6 +31,40 @@ inline std::shared_ptr<Molecule> make_h2o() {
   return mol;
 }
 
+inline std::shared_ptr<Molecule> make_HI() {
+  std::shared_ptr<Molecule> mol = std::make_shared<Molecule>();
+  mol->atomic_nums = {53, 1};
+  mol->n_atoms = mol->atomic_nums.size();
+  mol->atomic_charges = mol->atomic_nums;
+  mol->total_nuclear_charge =
+      std::accumulate(mol->atomic_nums.begin(), mol->atomic_nums.end(), 0ul);
+  mol->n_electrons = mol->total_nuclear_charge;
+  mol->coords = {{0.0, 0.0, 0.0},
+                {0.0, 0.0, 1.6019}};
+
+  const auto bohr_to_ang = 0.52917721092;  // Local def of conversion factor
+                                           // consistent with unit tests
+  for (auto& c : mol->coords)
+    for (auto& p : c) {
+      p /= bohr_to_ang;
+    }
+
+  return mol;
+}
+
+inline std::shared_ptr<Molecule> make_Te_atom() {
+  std::shared_ptr<Molecule> mol = std::make_shared<Molecule>();
+  mol->atomic_nums = {52};
+  mol->n_atoms = mol->atomic_nums.size();
+  mol->atomic_charges = mol->atomic_nums;
+  mol->total_nuclear_charge =
+      std::accumulate(mol->atomic_nums.begin(), mol->atomic_nums.end(), 0ul);
+  mol->n_electrons = mol->total_nuclear_charge;
+  mol->coords = {{0.0, 0.0, 0.0}};
+
+  return mol;
+}
+
 inline std::shared_ptr<Molecule> make_TeH2_HI() {
   std::shared_ptr<Molecule> mol = std::make_shared<Molecule>();
   mol->atomic_nums = {52, 1, 1, 1, 53};

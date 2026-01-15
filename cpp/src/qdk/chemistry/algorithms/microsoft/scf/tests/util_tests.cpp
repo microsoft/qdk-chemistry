@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "scf_algorithm/asahf.h"
+#include "scf/guess.h"
 #include "test_common.h"
 
 //==============================================================================
@@ -583,4 +584,74 @@ TEST(AtomGuessTest, BasisSetMap) {
   // Retrieve using basis5 (should not be found)
   auto it5 = basis_map.find(*basis5);
   EXPECT_EQ(it5, basis_map.end());
+}
+
+TEST(AtomGuessTest, FileReadVsGenerated) {
+  // Test that atom_guess produces the same density matrix whether it reads
+  // from file or generates it
+  // std::vector<std::shared_ptr<Molecule>> molecules = {
+  //   make_bf(), make_Te_atom(), make_HI(), make_TeH2_HI()};
+  std::vector<std::shared_ptr<Molecule>> molecules = {make_Te_atom()};
+  // std::vector<std::string> basis_names = {"sto-3g", "def2-svp"};
+  std::vector<std::string> basis_names = {"def2-svp"};
+
+  for (const auto& mol : molecules) {
+    for (const auto& basis_name : basis_names) {
+      bool pure = true;
+
+      // Create basis set with standard name (will read from file if available)
+      auto basis_from_file = BasisSet::from_database_json(
+          mol, basis_name, BasisMode::PSI4, pure, false);
+
+      int N = basis_from_file->num_atomic_orbitals;
+      RowMajorMatrix D_from_file = RowMajorMatrix::Zero(N, N);
+
+      // First call: this should read from file if the file exists
+      atom_guess(*basis_from_file, *mol, D_from_file.data());
+
+      // Create identical basis set but with a custom name that won't be found
+      // This will force generation of the atomic guess
+      auto basis_generated = BasisSet::from_database_json(
+          mol, basis_name, BasisMode::PSI4, pure, false);
+      basis_generated->name = "custom_basis_for_testing";
+
+      RowMajorMatrix D_generated = RowMajorMatrix::Zero(N, N);
+
+      // Second call: this should generate the atomic guess since the file
+      // with the custom name doesn't exist
+      atom_guess(*basis_generated, *mol, D_generated.data());
+
+      // Get default SCF convergence threshold for comparison
+      auto config = SCFConfig();
+      double conv_thresh = config.scf_algorithm.density_threshold;
+
+      // Compare the two density matrices - they should be essentially identical
+
+      std::string atom_nums_string;
+      for (const auto& num : mol->atomic_nums) {
+        atom_nums_string += std::to_string(num) + "_";
+      }
+      atom_nums_string.pop_back(); // remove trailing underscore
+
+      // if(!D_from_file.isApprox(D_generated, conv_thresh)) {
+      //   for(size_t i=0; i<D_from_file.rows(); ++i) {
+      //     for(size_t j=0; j<D_from_file.cols(); ++j) {
+      //       if(std::abs(D_from_file(i,j) - D_generated(i,j)) > conv_thresh) {
+      //         std::cout << "Difference at (" << i << "," << j << "): "
+      //                   << D_from_file(i,j) << " vs " << D_generated(i,j) << std::endl;
+      //       }
+      //     }
+      //   }
+      // }
+      if(!D_from_file.isApprox(D_generated, conv_thresh)) {
+        std::cout << D_from_file << std::endl;
+        std::cout << "\n=====\n" << std::endl;
+        std::cout << D_generated << std::endl;
+      }
+
+      EXPECT_TRUE(D_from_file.isApprox(D_generated, conv_thresh))
+          << "Density matrix from file differs from generated density matrix "
+          << "for basis " << basis_name << " on molecule with atomic numbers: " << atom_nums_string << std::endl;
+    }
+  }
 }
