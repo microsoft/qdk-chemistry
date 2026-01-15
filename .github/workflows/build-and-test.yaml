@@ -48,7 +48,7 @@ jobs:
 
     - name: Check if branch is up to date with main
       run: |
-        if ! git merge-base --is-ancestor origin/main ${{ github.event.pull_request.head.sha }};
+        if ! git merge-base --is-ancestor origin/main ${{ github.sha }};
         then echo "This branch is not up to date with main. Please merge the latest changes from main into your branch to continue.";
         exit 1; fi
         echo "Branch is up to date, starting Build and Test workflow."
