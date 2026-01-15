@@ -7,6 +7,14 @@ qdk\_chemistry.data package
    :show-inheritance:
    :undoc-members:
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.data.time_evolution
+
 Submodules
 ----------
 

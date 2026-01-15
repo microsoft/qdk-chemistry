@@ -1,0 +1,17 @@
+qdk\_chemistry.algorithms.time\_evolution.builder package
+=========================================================
+
+.. automodule:: qdk_chemistry.algorithms.time_evolution.builder
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.time_evolution.builder.base
+   qdk_chemistry.algorithms.time_evolution.builder.trotter

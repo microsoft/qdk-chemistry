@@ -1,0 +1,8 @@
+qdk\_chemistry.data.time\_evolution.containers.pauli\_product\_formula module
+=============================================================================
+
+.. automodule:: qdk_chemistry.data.time_evolution.containers.pauli_product_formula
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

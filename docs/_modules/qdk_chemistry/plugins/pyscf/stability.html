@@ -7,18 +7,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>qdk_chemistry.plugins.pyscf.stability &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=a64bac2b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=06674eb4" />
 
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../../../_static/documentation_options.js?v=81bd8d55"></script>
-      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../../../_static/copybutton.js?v=f281be69"></script>
@@ -115,6 +115,7 @@
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyscf</span><span class="w"> </span><span class="kn">import</span> <span class="n">lib</span><span class="p">,</span> <span class="n">scf</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyscf.lib</span><span class="w"> </span><span class="kn">import</span> <span class="n">logger</span> <span class="k">as</span> <span class="n">pyscf_logger</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyscf.scf.stability</span><span class="w"> </span><span class="kn">import</span> <span class="n">_gen_hop_rhf_external</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyscf.soscf</span><span class="w"> </span><span class="kn">import</span> <span class="n">newton_ah</span>
 
@@ -151,13 +152,14 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_rhf_internal</span><span class="p">(</span>
-    <span class="n">mf</span><span class="p">:</span> <span class="n">scf</span><span class="o">.</span><span class="n">hf</span><span class="o">.</span><span class="n">SCF</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">nroots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span>
+    <span class="n">mf</span><span class="p">:</span> <span class="n">scf</span><span class="o">.</span><span class="n">hf</span><span class="o">.</span><span class="n">SCF</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">nroots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;RHF internal stability analysis.</span>
 
 <span class="sd">    Modified from PySCF implementation.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+    <span class="n">log</span> <span class="o">=</span> <span class="n">pyscf_logger</span><span class="o">.</span><span class="n">new_logger</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">verbose</span><span class="p">)</span>
     <span class="n">g</span><span class="p">,</span> <span class="n">hop</span><span class="p">,</span> <span class="n">hdiag</span> <span class="o">=</span> <span class="n">newton_ah</span><span class="o">.</span><span class="n">gen_g_hop_rhf</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mf</span><span class="o">.</span><span class="n">mo_coeff</span><span class="p">,</span> <span class="n">mf</span><span class="o">.</span><span class="n">mo_occ</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">)</span>
     <span class="n">hdiag</span> <span class="o">*=</span> <span class="mi">2</span>
 
@@ -171,35 +173,42 @@
         <span class="k">lambda</span> <span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">_x0</span><span class="p">:</span> <span class="n">_stability_preconditioner</span><span class="p">(</span><span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">hdiag</span><span class="p">),</span>
         <span class="n">tol</span><span class="o">=</span><span class="n">tol</span><span class="p">,</span>
         <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span>
+        <span class="n">verbose</span><span class="o">=</span><span class="n">log</span><span class="p">,</span>
     <span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;rhf_internal: lowest eigs of H = </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">e</span><span class="p">,</span> <span class="n">v</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_rhf_external</span><span class="p">(</span>
-    <span class="n">mf</span><span class="p">:</span> <span class="n">scf</span><span class="o">.</span><span class="n">hf</span><span class="o">.</span><span class="n">SCF</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">nroots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span>
+    <span class="n">mf</span><span class="p">:</span> <span class="n">scf</span><span class="o">.</span><span class="n">hf</span><span class="o">.</span><span class="n">SCF</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">nroots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;RHF external stability analysis (RHF -&gt; UHF).</span>
 
 <span class="sd">    Modified from PySCF implementation.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+    <span class="n">log</span> <span class="o">=</span> <span class="n">pyscf_logger</span><span class="o">.</span><span class="n">new_logger</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">verbose</span><span class="p">)</span>
     <span class="c1"># Do not consider real -&gt; complex instability</span>
     <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">hop2</span><span class="p">,</span> <span class="n">hdiag2</span> <span class="o">=</span> <span class="n">_gen_hop_rhf_external</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="p">)</span>
 
     <span class="n">x0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">hdiag2</span><span class="p">)</span>
     <span class="n">x0</span><span class="p">[</span><span class="n">hdiag2</span> <span class="o">&gt;</span> <span class="mf">1e-5</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">hdiag2</span><span class="p">[</span><span class="n">hdiag2</span> <span class="o">&gt;</span> <span class="mf">1e-5</span><span class="p">]</span>
-    <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">lib</span><span class="o">.</span><span class="n">davidson</span><span class="p">(</span><span class="n">hop2</span><span class="p">,</span> <span class="n">x0</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">_x0</span><span class="p">:</span> <span class="n">_stability_preconditioner</span><span class="p">(</span><span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">hdiag2</span><span class="p">),</span> <span class="n">tol</span><span class="o">=</span><span class="n">tol</span><span class="p">,</span> <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">)</span>
+    <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">lib</span><span class="o">.</span><span class="n">davidson</span><span class="p">(</span>
+        <span class="n">hop2</span><span class="p">,</span> <span class="n">x0</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">_x0</span><span class="p">:</span> <span class="n">_stability_preconditioner</span><span class="p">(</span><span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">hdiag2</span><span class="p">),</span> <span class="n">tol</span><span class="o">=</span><span class="n">tol</span><span class="p">,</span> <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">log</span>
+    <span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;rhf_external: lowest eigs of H = </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">e</span><span class="p">,</span> <span class="n">v</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_rohf_internal</span><span class="p">(</span>
-    <span class="n">mf</span><span class="p">:</span> <span class="n">scf</span><span class="o">.</span><span class="n">rohf</span><span class="o">.</span><span class="n">ROHF</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">nroots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span>
+    <span class="n">mf</span><span class="p">:</span> <span class="n">scf</span><span class="o">.</span><span class="n">rohf</span><span class="o">.</span><span class="n">ROHF</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">nroots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;ROHF internal stability analysis.</span>
 
 <span class="sd">    Modified from PySCF implementation.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+    <span class="n">log</span> <span class="o">=</span> <span class="n">pyscf_logger</span><span class="o">.</span><span class="n">new_logger</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">verbose</span><span class="p">)</span>
     <span class="n">g</span><span class="p">,</span> <span class="n">hop</span><span class="p">,</span> <span class="n">hdiag</span> <span class="o">=</span> <span class="n">newton_ah</span><span class="o">.</span><span class="n">gen_g_hop_rohf</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mf</span><span class="o">.</span><span class="n">mo_coeff</span><span class="p">,</span> <span class="n">mf</span><span class="o">.</span><span class="n">mo_occ</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">)</span>
     <span class="n">hdiag</span> <span class="o">*=</span> <span class="mi">2</span>
 
@@ -213,7 +222,9 @@
         <span class="k">lambda</span> <span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">_x0</span><span class="p">:</span> <span class="n">_stability_preconditioner</span><span class="p">(</span><span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">hdiag</span><span class="p">),</span>
         <span class="n">tol</span><span class="o">=</span><span class="n">tol</span><span class="p">,</span>
         <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span>
+        <span class="n">verbose</span><span class="o">=</span><span class="n">log</span><span class="p">,</span>
     <span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;rohf_internal: lowest eigs of H = </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">e</span><span class="p">,</span> <span class="n">v</span>
 
 
@@ -223,13 +234,14 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_uhf_internal</span><span class="p">(</span>
-    <span class="n">mf</span><span class="p">:</span> <span class="n">scf</span><span class="o">.</span><span class="n">uhf</span><span class="o">.</span><span class="n">UHF</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">nroots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span>
+    <span class="n">mf</span><span class="p">:</span> <span class="n">scf</span><span class="o">.</span><span class="n">uhf</span><span class="o">.</span><span class="n">UHF</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">nroots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;UHF internal stability analysis.</span>
 
 <span class="sd">    Modified from PySCF implementation.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+    <span class="n">log</span> <span class="o">=</span> <span class="n">pyscf_logger</span><span class="o">.</span><span class="n">new_logger</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">verbose</span><span class="p">)</span>
     <span class="n">g</span><span class="p">,</span> <span class="n">hop</span><span class="p">,</span> <span class="n">hdiag</span> <span class="o">=</span> <span class="n">newton_ah</span><span class="o">.</span><span class="n">gen_g_hop_uhf</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mf</span><span class="o">.</span><span class="n">mo_coeff</span><span class="p">,</span> <span class="n">mf</span><span class="o">.</span><span class="n">mo_occ</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">)</span>
     <span class="n">hdiag</span> <span class="o">*=</span> <span class="mi">2</span>
 
@@ -243,7 +255,9 @@
         <span class="k">lambda</span> <span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">_x0</span><span class="p">:</span> <span class="n">_stability_preconditioner</span><span class="p">(</span><span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">hdiag</span><span class="p">),</span>
         <span class="n">tol</span><span class="o">=</span><span class="n">tol</span><span class="p">,</span>
         <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span>
+        <span class="n">verbose</span><span class="o">=</span><span class="n">log</span><span class="p">,</span>
     <span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;uhf_internal: lowest eigs of H = </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">e</span><span class="p">,</span> <span class="n">v</span>
 
 
@@ -266,6 +280,8 @@
 <span class="sd">    - davidson_tolerance: Convergence threshold for the Davidson eigenvalue solver.</span>
 <span class="sd">    - stability_tolerance: Threshold for determining stability from eigenvalues.</span>
 <span class="sd">    - method: The electronic structure method (&quot;hf&quot; for Hartree-Fock or a DFT functional name).</span>
+<span class="sd">    - xc_grid: Integer DFT integration grid density level passed to PySCF (0=coarse, 9=very fine).</span>
+<span class="sd">    - pyscf_verbose: PySCF verbosity level for lib.davidson logging (0=silent, 4=info, 5=debug).</span>
 
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; settings = PyscfStabilitySettings()</span>
@@ -285,11 +301,15 @@
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;internal&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;external&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;with_symmetry&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;with_symmetry&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;nroots&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;davidson_tolerance&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="mf">1e-4</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;davidson_tolerance&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="mf">1e-8</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;stability_tolerance&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="o">-</span><span class="mf">1e-4</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;string&quot;</span><span class="p">,</span> <span class="s2">&quot;hf&quot;</span><span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;string&quot;</span><span class="p">,</span> <span class="s2">&quot;hf&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;xc_grid&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="s2">&quot;Density functional integration grid level (0=coarse, 9=very fine)&quot;</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">))</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;pyscf_verbose&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span></div>
 </div>
 
 
@@ -302,6 +322,14 @@
 <span class="sd">    This class implements wavefunction stability analysis using routines from PySCF.</span>
 <span class="sd">    It supports multiple wavefunction types and can perform internal stability analysis of</span>
 <span class="sd">    RHF, ROHF, UHF and external stability analysis (RHF -&gt; UHF instability).</span>
+
+<span class="sd">    Internal stability eigenvalues are rescaled to follow the convention used in the</span>
+<span class="sd">    original stability analysis formulation (J. Chem. Phys. 66, 3045-3050 (1977)) and</span>
+<span class="sd">    to be consistent with the QDK implementation:</span>
+
+<span class="sd">    - RHF internal eigenvalues are scaled by 1/4</span>
+<span class="sd">    - UHF internal eigenvalues are scaled by 1/2</span>
+<span class="sd">    - RHF external eigenvalues are left unscaled</span>
 
 <span class="sd">    Key behavior:</span>
 <span class="sd">    - Automatically detects wavefunction type (RHF, ROHF, UHF) and applies appropriate analysis</span>
@@ -364,6 +392,8 @@
         <span class="n">alg_tol</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;davidson_tolerance&quot;</span><span class="p">)</span>
         <span class="n">stability_tol</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;stability_tolerance&quot;</span><span class="p">)</span>
         <span class="n">method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">)</span>
+        <span class="n">xc_grid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;xc_grid&quot;</span><span class="p">)</span>
+        <span class="n">pyscf_verbose</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;pyscf_verbose&quot;</span><span class="p">)</span>
 
         <span class="c1"># Get orbitals from wavefunction</span>
         <span class="n">orbitals</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
@@ -382,6 +412,8 @@
 
         <span class="c1"># Convert to PySCF SCF object</span>
         <span class="n">mf</span> <span class="o">=</span> <span class="n">orbitals_to_scf</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span> <span class="n">occ_alpha</span><span class="p">,</span> <span class="n">occ_beta</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">&quot;hf&quot;</span><span class="p">:</span>
+            <span class="n">mf</span><span class="o">.</span><span class="n">grids</span><span class="o">.</span><span class="n">level</span> <span class="o">=</span> <span class="n">xc_grid</span>
 
         <span class="c1"># Determine wavefunction type and perform appropriate stability analysis</span>
         <span class="n">internal_eigenvalues_list</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[]</span>
@@ -389,12 +421,19 @@
         <span class="n">external_eigenvalues_list</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">external_eigenvectors_list</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[]</span>
 
+        <span class="c1"># Scale factors for internal eigenvalues so that reported values follow the</span>
+        <span class="c1"># convention of J. Chem. Phys. 66, 3045-3050 (1977) and match the QDK backend.</span>
+        <span class="n">internal_scale_factor</span> <span class="o">=</span> <span class="mf">1.0</span>
+
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">scf</span><span class="o">.</span><span class="n">rohf</span><span class="o">.</span><span class="n">ROHF</span><span class="p">):</span>
             <span class="c1"># ROHF stability analysis</span>
             <span class="k">if</span> <span class="n">do_internal</span><span class="p">:</span>
-                <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">_rohf_internal</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">,</span> <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="n">alg_tol</span><span class="p">)</span>
+                <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">_rohf_internal</span><span class="p">(</span>
+                    <span class="n">mf</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">,</span> <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="n">alg_tol</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">pyscf_verbose</span>
+                <span class="p">)</span>
                 <span class="n">internal_eigenvalues_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">e</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">e</span><span class="p">])</span>
                 <span class="n">internal_eigenvectors_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">v</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">v</span><span class="p">])</span>
+                <span class="n">internal_scale_factor</span> <span class="o">=</span> <span class="mf">1.0</span>
             <span class="c1"># Raise error if external stability is requested for ROHF</span>
             <span class="k">if</span> <span class="n">do_external</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -405,7 +444,10 @@
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">scf</span><span class="o">.</span><span class="n">uhf</span><span class="o">.</span><span class="n">UHF</span><span class="p">):</span>
             <span class="c1"># UHF stability analysis</span>
             <span class="k">if</span> <span class="n">do_internal</span><span class="p">:</span>
-                <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">_uhf_internal</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">,</span> <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="n">alg_tol</span><span class="p">)</span>
+                <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">_uhf_internal</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">,</span> <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="n">alg_tol</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">pyscf_verbose</span><span class="p">)</span>
+                <span class="c1"># Scale UHF internal eigenvalues by 1/2 to match the convention</span>
+                <span class="c1"># used in the original stability analysis paper and the QDK backend.</span>
+                <span class="n">internal_scale_factor</span> <span class="o">=</span> <span class="mf">0.5</span>
                 <span class="n">internal_eigenvalues_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">e</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">e</span><span class="p">])</span>
                 <span class="n">internal_eigenvectors_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">v</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">v</span><span class="p">])</span>
             <span class="c1"># Raise error if external stability is requested for UHF</span>
@@ -418,11 +460,14 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># RHF stability analysis (default)</span>
             <span class="k">if</span> <span class="n">do_internal</span><span class="p">:</span>
-                <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">_rhf_internal</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">,</span> <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="n">alg_tol</span><span class="p">)</span>
+                <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">_rhf_internal</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">,</span> <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="n">alg_tol</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">pyscf_verbose</span><span class="p">)</span>
+                <span class="c1"># Scale RHF internal eigenvalues by 1/4 to match the convention</span>
+                <span class="c1"># used in the original stability analysis paper and the QDK backend.</span>
+                <span class="n">internal_scale_factor</span> <span class="o">=</span> <span class="mf">0.25</span>
                 <span class="n">internal_eigenvalues_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">e</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">e</span><span class="p">])</span>
                 <span class="n">internal_eigenvectors_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">v</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">v</span><span class="p">])</span>
             <span class="k">if</span> <span class="n">do_external</span><span class="p">:</span>
-                <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">_rhf_external</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">,</span> <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="n">alg_tol</span><span class="p">)</span>
+                <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">_rhf_external</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">,</span> <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="n">alg_tol</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">pyscf_verbose</span><span class="p">)</span>
                 <span class="n">external_eigenvalues_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">e</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">e</span><span class="p">])</span>
                 <span class="n">external_eigenvectors_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">v</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">v</span><span class="p">])</span>
 
@@ -430,9 +475,12 @@
         <span class="n">internal_stable</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="n">external_stable</span> <span class="o">=</span> <span class="kc">True</span>
 
-        <span class="c1"># Convert to numpy arrays if we have results</span>
+        <span class="c1"># Convert to numpy arrays if we have results. Internal eigenvalues are</span>
+        <span class="c1"># scaled (RHF by 1/4, UHF by 1/2) to follow the convention of</span>
+        <span class="c1"># J. Chem. Phys. 66, 3045-3050 (1977) and to match the QDK backend.</span>
+        <span class="c1"># External eigenvalues are left unscaled.</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">internal_eigenvalues_list</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="n">internal_eigenvalues</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">internal_eigenvalues_list</span><span class="p">)</span>
+            <span class="n">internal_eigenvalues</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">internal_eigenvalues_list</span><span class="p">)</span> <span class="o">*</span> <span class="n">internal_scale_factor</span>
             <span class="n">internal_eigenvectors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">internal_eigenvectors_list</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>  <span class="c1"># Transpose for proper shape</span>
             <span class="c1"># Check internal stability: all eigenvalues should be &gt; stability_tol</span>
             <span class="n">internal_stable</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">internal_eigenvalues</span> <span class="o">&gt;</span> <span class="n">stability_tol</span><span class="p">)</span>

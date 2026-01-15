@@ -1,0 +1,338 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pauli Operators &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=06674eb4" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Structure" href="structure.html" />
+    <link rel="prev" title="Orbitals" href="orbitals.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data classes</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="index.html#quick-reference">Quick reference</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="serialization.html">Serialization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="basis_set.html">BasisSet</a></li>
+<li class="toctree-l4"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
+<li class="toctree-l4"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Pauli Operators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="structure.html">Structure</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Algorithm classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Data classes</a></li>
+      <li class="breadcrumb-item active">Pauli Operators</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/user/comprehensive/data/pauli_operator.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="pauli-operators">
+<h1>Pauli Operators<a class="headerlink" href="#pauli-operators" title="Link to this heading"></a></h1>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.PauliOperator" title="qdk_chemistry.data.PauliOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">PauliOperator</span></code></a> class enables building quantum operator expressions using natural mathematical notation.
+Arithmetic operators (<code class="docutils literal notranslate"><span class="pre">*</span></code>, <code class="docutils literal notranslate"><span class="pre">+</span></code>, <code class="docutils literal notranslate"><span class="pre">-</span></code>) combine Pauli operators into products and sums, making it easy to construct Hamiltonians and other quantum expressions.</p>
+<section id="creating-operators">
+<h2>Creating Operators<a class="headerlink" href="#creating-operators" title="Link to this heading"></a></h2>
+<p>Use factory methods to create Pauli operators on specific qubits:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry/data/pauli_operator.hpp&gt;</span>
+
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// Create Pauli operators on specific qubits</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">X0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">  </span><span class="c1">// Pauli X on qubit 0</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">Y1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">Y</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span><span class="w">  </span><span class="c1">// Pauli Y on qubit 1</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">Z2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">Z</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span><span class="w">  </span><span class="c1">// Pauli Z on qubit 2</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">I0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">I</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">  </span><span class="c1">// Identity on qubit 0</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">PauliOperator</span>
+
+<span class="c1"># Create Pauli operators on specific qubits</span>
+<span class="n">X0</span> <span class="o">=</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># Pauli X on qubit 0</span>
+<span class="n">Y1</span> <span class="o">=</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">Y</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># Pauli Y on qubit 1</span>
+<span class="n">Z2</span> <span class="o">=</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">Z</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>  <span class="c1"># Pauli Z on qubit 2</span>
+<span class="n">I0</span> <span class="o">=</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">I</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># Identity on qubit 0</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="building-expressions">
+<h2>Building Expressions<a class="headerlink" href="#building-expressions" title="Link to this heading"></a></h2>
+<p>Combine operators using arithmetic to build expressions:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Scalar multiplication</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">scaled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.5</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">scaled_complex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">complex</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">Z</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Products of operators</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">product</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">Z</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Sums of operators</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">sum_expr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">Y</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Building a Hamiltonian-like expression</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">H</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.5</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">X</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">+</span>
+<span class="w">           </span><span class="mf">0.5</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">Y</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">Y</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">+</span>
+<span class="w">           </span><span class="mf">1.0</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">Z</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">Z</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">H</span><span class="p">.</span><span class="n">to_string</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">  </span><span class="c1">// &quot;0.5 * X(0) * X(1) + 0.5 * Y(0) * Y(1) + Z(0) * Z(1)&quot;</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Scalar multiplication</span>
+<span class="n">scaled</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">scaled_complex</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="mi">2</span><span class="n">j</span><span class="p">)</span> <span class="o">*</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">Z</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># Products of operators</span>
+<span class="n">product</span> <span class="o">=</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">Z</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># Sums of operators</span>
+<span class="n">sum_expr</span> <span class="o">=</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">Y</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># Building a Hamiltonian-like expression</span>
+<span class="n">H</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="mf">0.5</span> <span class="o">*</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">X</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">Y</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">Y</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="o">+</span> <span class="mf">1.0</span> <span class="o">*</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">Z</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">Z</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">H</span><span class="p">)</span>  <span class="c1"># &quot;0.5 * X(0) * X(1) + 0.5 * Y(0) * Y(1) + Z(0) * Z(1)&quot;</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="simplifying-expressions">
+<h2>Simplifying Expressions<a class="headerlink" href="#simplifying-expressions" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">simplify()</span></code> method applies Pauli algebra rules and combines like terms.
+The <code class="docutils literal notranslate"><span class="pre">distribute()</span></code> method expands products over sums.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Pauli algebra: X * X = I (identity)</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">xx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xx</span><span class="p">.</span><span class="n">simplify</span><span class="p">();</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">result</span><span class="o">-&gt;</span><span class="n">to_string</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span><span class="w">  </span><span class="c1">// &quot;1&quot;</span>
+
+<span class="w">  </span><span class="c1">// Pauli algebra: X * Y = iZ</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">xy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">Y</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">  </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xy</span><span class="p">.</span><span class="n">simplify</span><span class="p">();</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">result</span><span class="o">-&gt;</span><span class="n">to_string</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span><span class="w">  </span><span class="c1">// &quot;i * Z(0)&quot;</span>
+
+<span class="w">  </span><span class="c1">// Combining like terms</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">duplicate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">  </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">duplicate</span><span class="p">.</span><span class="n">simplify</span><span class="p">();</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">result</span><span class="o">-&gt;</span><span class="n">to_string</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span><span class="w">  </span><span class="c1">// &quot;2 * X(0)&quot;</span>
+
+<span class="w">  </span><span class="c1">// Distributing products over sums</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">nested</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="p">(</span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">Y</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">Z</span><span class="p">(</span><span class="mi">1</span><span class="p">));</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">distributed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nested</span><span class="p">.</span><span class="n">distribute</span><span class="p">();</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">distributed</span><span class="o">-&gt;</span><span class="n">to_string</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">  </span><span class="c1">// &quot;X(0) * Y(1) + X(0) * Z(1)&quot;</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Pauli algebra: X * X = I (identity)</span>
+<span class="n">xx</span> <span class="o">=</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">xx</span><span class="o">.</span><span class="n">simplify</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>  <span class="c1"># &quot;1&quot;</span>
+
+<span class="c1"># Pauli algebra: X * Y = iZ</span>
+<span class="n">xy</span> <span class="o">=</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">Y</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">xy</span><span class="o">.</span><span class="n">simplify</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>  <span class="c1"># &quot;1j * Z(0)&quot;</span>
+
+<span class="c1"># Combining like terms</span>
+<span class="n">duplicate</span> <span class="o">=</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">duplicate</span><span class="o">.</span><span class="n">simplify</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>  <span class="c1"># &quot;2 * X(0)&quot;</span>
+
+<span class="c1"># Distributing products over sums</span>
+<span class="n">nested</span> <span class="o">=</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">PauliOperator</span><span class="o">.</span><span class="n">Y</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">Z</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+<span class="n">distributed</span> <span class="o">=</span> <span class="n">nested</span><span class="o">.</span><span class="n">distribute</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">distributed</span><span class="p">)</span>  <span class="c1"># &quot;X(0) * Y(1) + X(0) * Z(1)&quot;</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="canonical-representation">
+<h2>Canonical Representation<a class="headerlink" href="#canonical-representation" title="Link to this heading"></a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">to_canonical_string()</span></code> to get a circuit-compatible string format, or <code class="docutils literal notranslate"><span class="pre">to_canonical_terms()</span></code> to get coefficient-string pairs:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Get canonical string representation (little-endian: qubit 0 leftmost)</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">expr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">Z</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">simplified</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">expr</span><span class="p">.</span><span class="n">simplify</span><span class="p">();</span>
+
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">canonical</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">simplified</span><span class="o">-&gt;</span><span class="n">to_canonical_string</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span><span class="w">  </span><span class="c1">// 4 qubits total</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">canonical</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span><span class="w">                  </span><span class="c1">// &quot;XIZI&quot;</span>
+
+<span class="w">  </span><span class="c1">// Get coefficient and string pairs for each term</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">terms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">simplified</span><span class="o">-&gt;</span><span class="n">to_canonical_terms</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span>
+<span class="w">  </span><span class="c1">// terms[0] = {(1+0i), &quot;XIZI&quot;}</span>
+
+<span class="w">  </span><span class="c1">// For sums, get all terms</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">H2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">PauliOperator</span><span class="o">::</span><span class="n">Z</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">sum_terms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">H2</span><span class="p">.</span><span class="n">to_canonical_terms</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span>
+<span class="w">  </span><span class="c1">// sum_terms = [{(1+0i), &quot;XI&quot;}, {(1+0i), &quot;IZ&quot;}]</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get canonical string representation (little-endian: qubit 0 leftmost)</span>
+<span class="n">expr</span> <span class="o">=</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">Z</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">simplified</span> <span class="o">=</span> <span class="n">expr</span><span class="o">.</span><span class="n">simplify</span><span class="p">()</span>
+
+<span class="n">canonical</span> <span class="o">=</span> <span class="n">simplified</span><span class="o">.</span><span class="n">to_canonical_string</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>  <span class="c1"># 4 qubits total</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">canonical</span><span class="p">)</span>  <span class="c1"># &quot;XIZI&quot;</span>
+
+<span class="c1"># Get coefficient and string pairs for each term</span>
+<span class="n">terms</span> <span class="o">=</span> <span class="n">simplified</span><span class="o">.</span><span class="n">to_canonical_terms</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">terms</span><span class="p">)</span>  <span class="c1"># [((1+0j), &#39;XIZI&#39;)]</span>
+
+<span class="c1"># For sums, get all terms</span>
+<span class="n">H</span> <span class="o">=</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">PauliOperator</span><span class="o">.</span><span class="n">Z</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">terms</span> <span class="o">=</span> <span class="n">H</span><span class="o">.</span><span class="n">to_canonical_terms</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">terms</span><span class="p">)</span>  <span class="c1"># [((1+0j), &#39;XI&#39;), ((1+0j), &#39;IZ&#39;)]</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="further-reading">
+<h2>Further Reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>The above examples can be downloaded as complete <a class="reference external" href="../../../_static/examples/cpp/pauli_operator.cpp">C++</a> and <a class="reference external" href="../../../_static/examples/python/pauli_operator.py">Python</a> scripts.</p></li>
+<li><p><a class="reference internal" href="../algorithms/qubit_mapper.html"><span class="doc">QubitMapper</span></a>: Maps molecular Hamiltonians to Pauli operator representations.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="orbitals.html" class="btn btn-neutral float-left" title="Orbitals" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="structure.html" class="btn btn-neutral float-right" title="Structure" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

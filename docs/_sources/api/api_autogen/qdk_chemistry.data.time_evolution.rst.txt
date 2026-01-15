@@ -1,0 +1,25 @@
+qdk\_chemistry.data.time\_evolution package
+===========================================
+
+.. automodule:: qdk_chemistry.data.time_evolution
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.data.time_evolution.containers
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.data.time_evolution.base
+   qdk_chemistry.data.time_evolution.controlled_time_evolution

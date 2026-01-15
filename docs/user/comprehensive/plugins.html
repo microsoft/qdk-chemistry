@@ -8,18 +8,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Plugins &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a64bac2b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=06674eb4" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
-      <script src="../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../_static/copybutton.js?v=f281be69"></script>
@@ -153,7 +153,7 @@ We refer the reader to the <a class="reference internal" href="algorithms/factor
 <h3>Using plugins<a class="headerlink" href="#using-plugins" title="Link to this heading"></a></h3>
 <p>To select an implementation, specify it by name:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
 
 <span class="c1">// Create a SCF solver that uses the QDK/Chemistry library as solver</span>
@@ -168,13 +168,13 @@ We refer the reader to the <a class="reference internal" href="algorithms/factor
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
 
-<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
+<span class="c1"># Load H2 molecule from XYZ file</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">&quot;../data/h2.structure.xyz&quot;</span><span class="p">)</span>
 
 <span class="c1"># Create a SCF solver using the factory</span>
 <span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;pyscf&quot;</span><span class="p">)</span>
@@ -195,7 +195,7 @@ We refer the reader to the <a class="reference internal" href="algorithms/factor
 </div>
 <p id="listing-implementations">To list available implementations:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
 
@@ -210,7 +210,7 @@ We refer the reader to the <a class="reference internal" href="algorithms/factor
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># List available implementations for each algorithm type</span>
 <span class="k">for</span> <span class="n">algorithm_name</span> <span class="ow">in</span> <span class="n">available</span><span class="p">():</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">algorithm_name</span><span class="si">}</span><span class="s2"> has methods:&quot;</span><span class="p">)</span>
@@ -248,17 +248,17 @@ We refer the reader to the <a class="reference internal" href="algorithms/factor
 <section id="implementing-a-new-algorithm-backend">
 <span id="adding-implementations"></span><h3>Implementing a new algorithm backend<a class="headerlink" href="#implementing-a-new-algorithm-backend" title="Link to this heading"></a></h3>
 <p>This section demonstrates how to integrate an external <a class="reference internal" href="../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> solver as a QDK/Chemistry plugin, enabling access through the standard API.</p>
-<p><strong>Interface requirements</strong></p>
+<p class="rubric">Interface requirements</p>
 <p>Each algorithm type in QDK/Chemistry defines an abstract base class specifying the interface that all implementations must satisfy:</p>
 <ul class="simple">
 <li><p>A <code class="docutils literal notranslate"><span class="pre">name()</span></code> method that returns a unique identifier for the implementation</p></li>
 <li><p>A <code class="docutils literal notranslate"><span class="pre">_run_impl()</span></code> method containing the computational logic</p></li>
 <li><p>A <code class="docutils literal notranslate"><span class="pre">settings()</span></code> object for runtime configuration</p></li>
 </ul>
-<p><strong>Defining custom settings</strong></p>
+<p class="rubric">Defining custom settings</p>
 <p>When an implementation requires configuration options beyond those provided by the base settings class, a derived settings class can be defined:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">CustomScfSettings</span>
 <span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">algorithms</span><span class="o">::</span><span class="n">ElectronicStructureSettings</span><span class="w"> </span><span class="p">{</span>
 <span class="w"> </span><span class="k">public</span><span class="o">:</span>
@@ -270,7 +270,7 @@ We refer the reader to the <a class="reference internal" href="algorithms/factor
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">ElectronicStructureSettings</span>
 
 
@@ -292,7 +292,7 @@ We refer the reader to the <a class="reference internal" href="algorithms/factor
 </div>
 </div>
 </div>
-<p><strong>Implementation structure</strong></p>
+<p class="rubric">Implementation structure</p>
 <p>The implementation class inherits from the algorithm base class and overrides the required methods.
 The <code class="docutils literal notranslate"><span class="pre">_run_impl()</span></code> method is responsible for:</p>
 <ol class="arabic simple">
@@ -301,7 +301,7 @@ The <code class="docutils literal notranslate"><span class="pre">_run_impl()</sp
 <li><p>Converting results back to QDK/Chemistry data structures</p></li>
 </ol>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry/algorithms/scf.hpp&gt;</span>
 
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;external_chemistry_package.hpp&quot;</span>
@@ -335,7 +335,7 @@ The <code class="docutils literal notranslate"><span class="pre">_run_impl()</sp
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">ScfSolver</span>  <span class="c1"># noqa: E402</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: E402</span>
     <span class="n">BasisSet</span><span class="p">,</span>
@@ -397,11 +397,11 @@ The <code class="docutils literal notranslate"><span class="pre">_run_impl()</sp
 </div>
 </div>
 </div>
-<p><strong>Registration</strong></p>
+<p class="rubric">Registration</p>
 <p>Implementations are registered with the algorithm factory to enable discovery and instantiation by name.
 Registration is typically performed during module initialization:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry/algorithms/scf.hpp&gt;</span>
 
 <span class="c1">// Static registration during library initialization</span>
@@ -411,7 +411,7 @@ Registration is typically performed during module initialization:</p>
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">register</span>  <span class="c1"># noqa: E402</span>
 
 <span class="c1"># Registration during module import</span>
@@ -443,17 +443,20 @@ Registration is typically performed during module initialization:</p>
 <span id="custom-algorithm-types"></span><h3>Defining a new algorithm type<a class="headerlink" href="#defining-a-new-algorithm-type" title="Link to this heading"></a></h3>
 <p>When the required functionality does not correspond to an existing algorithm category, a new algorithm type can be defined.
 This section demonstrates the complete process using a geometry optimizer as an example.</p>
-<p><strong>Interface design</strong></p>
+<p class="rubric">Interface design</p>
 <p>The first step is to specify the algorithm’s interface:</p>
-<ul class="simple">
-<li><p><strong>Input type</strong>: The data the algorithm operates on (e.g., <code class="docutils literal notranslate"><span class="pre">Structure</span></code>)</p></li>
-<li><p><strong>Output type</strong>: The data the algorithm produces (e.g., optimized <code class="docutils literal notranslate"><span class="pre">Structure</span></code>)</p></li>
-<li><p><strong>Configuration</strong>: Required settings (e.g., convergence thresholds, iteration limits)</p></li>
-</ul>
-<p><strong>Settings class definition</strong></p>
+<dl class="simple">
+<dt>Input type</dt><dd><p>The data the algorithm operates on (e.g., <code class="docutils literal notranslate"><span class="pre">Structure</span></code>)</p>
+</dd>
+<dt>Output type</dt><dd><p>The data the algorithm produces (e.g., optimized <code class="docutils literal notranslate"><span class="pre">Structure</span></code>)</p>
+</dd>
+<dt>Configuration</dt><dd><p>Required settings (e.g., convergence thresholds, iteration limits)</p>
+</dd>
+</dl>
+<p class="rubric">Settings class definition</p>
 <p>Define a settings class containing all configuration parameters:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">GeometryOptimizerSettings</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Settings</span><span class="w"> </span><span class="p">{</span>
 <span class="w"> </span><span class="k">public</span><span class="o">:</span>
 <span class="w">  </span><span class="n">GeometryOptimizerSettings</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
@@ -468,7 +471,7 @@ This section demonstrates the complete process using a geometry optimizer as an 
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>  <span class="c1"># noqa: E402</span>
 
 
@@ -490,10 +493,10 @@ This section demonstrates the complete process using a geometry optimizer as an 
 </div>
 </div>
 </div>
-<p><strong>Base class definition</strong></p>
+<p class="rubric">Base class definition</p>
 <p>Define an abstract base class specifying the interface for all implementations:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio"><label class="tab-label" for="tab-set--6-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">GeometryOptimizer</span>
 <span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">algorithms</span><span class="o">::</span><span class="n">Algorithm</span><span class="o">&lt;</span>
 <span class="w">          </span><span class="n">GeometryOptimizer</span><span class="p">,</span>
@@ -506,7 +509,7 @@ This section demonstrates the complete process using a geometry optimizer as an 
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio"><label class="tab-label" for="tab-set--6-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">Algorithm</span>  <span class="c1"># noqa: E402</span>
 
 
@@ -521,16 +524,16 @@ This section demonstrates the complete process using a geometry optimizer as an 
 </div>
 </div>
 </div>
-<p><strong>Factory definition</strong></p>
+<p class="rubric">Factory definition</p>
 <p>The factory manages implementation registration and provides instance creation:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--7-input--1" name="tab-set--7" type="radio"><label class="tab-label" for="tab-set--7-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--7-input--1" name="tab-set--7" type="radio" /><label class="tab-label" for="tab-set--7-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// The Algorithm base class template provides factory functionality</span>
 <span class="c1">// automatically.</span>
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--7-input--2" name="tab-set--7" type="radio"><label class="tab-label" for="tab-set--7-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--7-input--2" name="tab-set--7" type="radio" /><label class="tab-label" for="tab-set--7-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmFactory</span>  <span class="c1"># noqa: E402</span>
 
 
@@ -548,10 +551,10 @@ This section demonstrates the complete process using a geometry optimizer as an 
 </div>
 </div>
 </div>
-<p><strong>Concrete implementations</strong></p>
+<p class="rubric">Concrete implementations</p>
 <p>Implement the algorithm by inheriting from the base class:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--8-input--1" name="tab-set--8" type="radio"><label class="tab-label" for="tab-set--8-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--8-input--1" name="tab-set--8" type="radio" /><label class="tab-label" for="tab-set--8-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">BfgsOptimizer</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">GeometryOptimizer</span><span class="w"> </span><span class="p">{</span>
 <span class="w"> </span><span class="k">public</span><span class="o">:</span>
 <span class="w">  </span><span class="n">BfgsOptimizer</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">_settings</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">GeometryOptimizerSettings</span><span class="o">&gt;</span><span class="p">();</span><span class="w"> </span><span class="p">}</span>
@@ -571,7 +574,7 @@ This section demonstrates the complete process using a geometry optimizer as an 
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--8-input--2" name="tab-set--8" type="radio"><label class="tab-label" for="tab-set--8-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--8-input--2" name="tab-set--8" type="radio" /><label class="tab-label" for="tab-set--8-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>  <span class="c1"># noqa: E402</span>
 
 
@@ -619,10 +622,10 @@ This section demonstrates the complete process using a geometry optimizer as an 
 
 </pre></div>
 </div>
-<p><strong>Registration</strong></p>
+<p class="rubric">Registration</p>
 <p>Register the factory and all implementations:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--9-input--1" name="tab-set--9" type="radio"><label class="tab-label" for="tab-set--9-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--9-input--1" name="tab-set--9" type="radio" /><label class="tab-label" for="tab-set--9-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// During library initialization</span>
 <span class="k">static</span><span class="w"> </span><span class="k">auto</span><span class="w"> </span><span class="n">factory_reg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">register_factory</span><span class="o">&lt;</span><span class="n">GeometryOptimizer</span><span class="o">&gt;</span><span class="p">();</span>
 <span class="k">static</span><span class="w"> </span><span class="k">auto</span><span class="w"> </span><span class="n">bfgs_reg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">GeometryOptimizer</span><span class="o">::</span><span class="n">register_implementation</span><span class="p">(</span>
@@ -630,7 +633,7 @@ This section demonstrates the complete process using a geometry optimizer as an 
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--9-input--2" name="tab-set--9" type="radio"><label class="tab-label" for="tab-set--9-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--9-input--2" name="tab-set--9" type="radio" /><label class="tab-label" for="tab-set--9-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">algorithms</span>  <span class="c1"># noqa: E402</span>
 
 <span class="c1"># Register the factory</span>
@@ -643,7 +646,7 @@ This section demonstrates the complete process using a geometry optimizer as an 
 </div>
 </div>
 </div>
-<p><strong>Usage</strong></p>
+<p class="rubric">Usage</p>
 <p>Following registration, the new algorithm type is accessible through the standard API:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>  <span class="c1"># noqa: E402</span>
 

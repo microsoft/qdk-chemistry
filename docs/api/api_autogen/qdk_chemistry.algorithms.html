@@ -8,18 +8,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>qdk_chemistry.algorithms package &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a64bac2b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=06674eb4" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
-      <script src="../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../_static/copybutton.js?v=f281be69"></script>
@@ -62,6 +62,7 @@
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a><ul class="current">
 <li class="toctree-l3 current"><a class="current reference internal" href="#">qdk_chemistry.algorithms package</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.ControlledEvolutionCircuitMapper"><code class="docutils literal notranslate"><span class="pre">ControlledEvolutionCircuitMapper</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.DynamicalCorrelationCalculator"><code class="docutils literal notranslate"><span class="pre">DynamicalCorrelationCalculator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.EnergyEstimator"><code class="docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.HamiltonianConstructor"><code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code></a></li>
@@ -83,6 +84,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.QdkOccupationActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkOccupationActiveSpaceSelector</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.QdkPipekMezeyLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkPipekMezeyLocalizer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.QdkScfSolver"><code class="docutils literal notranslate"><span class="pre">QdkScfSolver</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.QdkStabilityChecker"><code class="docutils literal notranslate"><span class="pre">QdkStabilityChecker</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.QdkVVHVLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkVVHVLocalizer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.QdkValenceActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkValenceActiveSpaceSelector</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.QubitHamiltonianSolver"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonianSolver</span></code></a></li>
@@ -90,6 +92,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.ScfSolver"><code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.StabilityChecker"><code class="docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.StatePreparation"><code class="docutils literal notranslate"><span class="pre">StatePreparation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.TimeEvolutionBuilder"><code class="docutils literal notranslate"><span class="pre">TimeEvolutionBuilder</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.TraditionalPhaseEstimation"><code class="docutils literal notranslate"><span class="pre">TraditionalPhaseEstimation</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.available"><code class="docutils literal notranslate"><span class="pre">available()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.algorithms.create"><code class="docutils literal notranslate"><span class="pre">create()</span></code></a></li>
@@ -150,7 +153,7 @@
 custom algorithms that can be registered and used within the QDK/Chemistry framework.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.ActiveSpaceSelector">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">ActiveSpaceSelector</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.ActiveSpaceSelector" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">ActiveSpaceSelector</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.ActiveSpaceSelector" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="../_py_placeholders.html#pybind11_builtins.pybind11_object" title="pybind11_builtins.pybind11_object"><code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></a></p>
 <p>Abstract base class for active space selector algorithms.</p>
 <p>This class defines the interface for selecting active spaces from a set of orbitals.
@@ -263,8 +266,21 @@ This should typically be called from derived class constructors.</p>
 </dd></dl>
 
 <dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.ControlledEvolutionCircuitMapper">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">ControlledEvolutionCircuitMapper</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.ControlledEvolutionCircuitMapper" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">Algorithm</span></code></a></p>
+<p>Base class for controlled time evolution circuit mapper in QDK/Chemistry algorithms.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.ControlledEvolutionCircuitMapper.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.ControlledEvolutionCircuitMapper.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize the ControlledEvolutionCircuitMapper.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.DynamicalCorrelationCalculator">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">DynamicalCorrelationCalculator</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.DynamicalCorrelationCalculator" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">DynamicalCorrelationCalculator</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.DynamicalCorrelationCalculator" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="../_py_placeholders.html#pybind11_builtins.pybind11_object" title="pybind11_builtins.pybind11_object"><code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></a></p>
 <p>Abstract base class for reference-derived quantum chemistry methods.</p>
 <p>This class provides a unified interface for quantum chemistry methods that derive
@@ -354,13 +370,24 @@ Configuration options can be modified through the <code class="docutils literal 
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.EnergyEstimator">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">EnergyEstimator</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.EnergyEstimator" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">EnergyEstimator</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.EnergyEstimator" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">Algorithm</span></code></a></p>
 <p>Abstract base class for energy estimator algorithms.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.EnergyEstimator.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.EnergyEstimator.__init__" title="Link to this definition"></a></dt>
 <dd><p>Initialize the EnergyEstimator.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.EnergyEstimator.type_name">
+<span class="sig-name descname"><span class="pre">type_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.EnergyEstimator.type_name" title="Link to this definition"></a></dt>
+<dd><p>Return <code class="docutils literal notranslate"><span class="pre">energy_estimator</span></code> as the algorithm type name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
@@ -394,22 +421,11 @@ Configuration options can be modified through the <code class="docutils literal 
 </div>
 </dd></dl>
 
-<dl class="py method">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.EnergyEstimator.type_name">
-<span class="sig-name descname"><span class="pre">type_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.EnergyEstimator.type_name" title="Link to this definition"></a></dt>
-<dd><p>Return <code class="docutils literal notranslate"><span class="pre">energy_estimator</span></code> as the algorithm type name.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
-</dd>
-</dl>
-</dd></dl>
-
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.HamiltonianConstructor">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">HamiltonianConstructor</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.HamiltonianConstructor" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">HamiltonianConstructor</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.HamiltonianConstructor" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="../_py_placeholders.html#pybind11_builtins.pybind11_object" title="pybind11_builtins.pybind11_object"><code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></a></p>
 <p>Abstract base class for Hamiltonian constructors.</p>
 <p>This class defines the interface for constructing Hamiltonian matrices from orbital data.
@@ -510,7 +526,7 @@ modifications during construction.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimation">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">IterativePhaseEstimation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">IterativePhaseEstimation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.algorithms.PhaseEstimation" title="qdk_chemistry.phase_estimation.base.PhaseEstimation"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhaseEstimation</span></code></a></p>
 <p>Most-significant-bit-first iterative phase estimation (Kitaev style <span id="id1">[<a class="reference internal" href="../../references.html#id14" title="A. Y. Kitaev. Quantum measurements and the Abelian stabilizer problem. arXiv, 1995. URL: https://arxiv.org/abs/quant-ph/9511026.">Kit95</a>]</span>).</p>
 <dl class="field-list simple">
@@ -521,6 +537,11 @@ modifications during construction.</p>
 </ul>
 </dd>
 </dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimation.algorithm">
+<span class="sig-name descname"><span class="pre">algorithm</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#qdk_chemistry.algorithms.PhaseEstimationAlgorithm" title="qdk_chemistry.phase_estimation.base.PhaseEstimationAlgorithm"><span class="pre">PhaseEstimationAlgorithm</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'iterative'</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation.algorithm" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimation.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation.__init__" title="Link to this definition"></a></dt>
@@ -535,14 +556,44 @@ modifications during construction.</p>
 </dl>
 </dd></dl>
 
-<dl class="py attribute">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimation.algorithm">
-<span class="sig-name descname"><span class="pre">algorithm</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#qdk_chemistry.algorithms.PhaseEstimationAlgorithm" title="qdk_chemistry.phase_estimation.base.PhaseEstimationAlgorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhaseEstimationAlgorithm</span></code></a> <span class="pre">|</span> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'iterative'</span></em><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation.algorithm" title="Link to this definition"></a></dt>
-<dd></dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimation.create_iteration_circuit">
+<span class="sig-name descname"><span class="pre">create_iteration_circuit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state_prep</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">iteration</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_iterations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_correction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">measurement_register</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">iteration_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">circuit_folding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation.create_iteration_circuit" title="Link to this definition"></a></dt>
+<dd><p>Construct a single IQPE iteration circuit.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">QuantumCircuit</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>state_prep</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.3)"><em>QuantumCircuit</em></a>) – Trial-state preparation circuit that prepares the initial
+quantum state on the system qubits.</p></li>
+<li><p><strong>iteration</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – <p>Current iteration index (0-based), where 0 corresponds to the</p>
+<p>most-significant bit.</p>
+</p></li>
+<li><p><strong>total_iterations</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Total number of phase bits to measure across all iterations.</p></li>
+<li><p><strong>phase_correction</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – <p>Feedback phase angle to apply before controlled evolution.</p>
+<p>Defaults to 0.0 for the first iteration.</p>
+</p></li>
+<li><p><strong>measurement_register</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/circuit#qiskit.circuit.ClassicalRegister" title="(in Qiskit v2.3)"><em>ClassicalRegister</em></a><em> | </em><em>None</em>) – <p>Optional classical register for storing the measurement</p>
+<p>result. If None, a new register named <code class="docutils literal notranslate"><span class="pre">c{iteration}</span></code> is created.</p>
+</p></li>
+<li><p><strong>iteration_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>) – <p>Optional custom name for the circuit. If None, no specific</p>
+<p>name is assigned.</p>
+</p></li>
+<li><p><strong>circuit_folding</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – Whether to apply circuit folding for visualization. Defaults to True.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A quantum circuit implementing one IQPE iteration with an ancilla qubit,
+system qubits, and classical measurement register.</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimation.create_iteration">
-<span class="sig-name descname"><span class="pre">create_iteration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state_prep</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">iteration</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_iterations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_correction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">measurement_register</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">iteration_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation.create_iteration" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">create_iteration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state_prep</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">iteration</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_iterations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_correction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">measurement_register</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">iteration_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">circuit_folding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation.create_iteration" title="Link to this definition"></a></dt>
 <dd><p>Build an iteration and return contextual metadata.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
@@ -550,7 +601,7 @@ modifications during construction.</p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>state_prep</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.2)"><em>QuantumCircuit</em></a>) – <p>Trial-state preparation circuit that prepares the initial</p>
+<li><p><strong>state_prep</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.3)"><em>QuantumCircuit</em></a>) – <p>Trial-state preparation circuit that prepares the initial</p>
 <p>quantum state on the system qubits.</p>
 </p></li>
 <li><p><strong>iteration</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Current iteration index (0-based), where 0 corresponds to the most-significant bit.</p></li>
@@ -558,10 +609,11 @@ modifications during construction.</p>
 <li><p><strong>phase_correction</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – <p>Feedback phase angle to apply before controlled evolution.</p>
 <p>Defaults to 0.0 for the first iteration.</p>
 </p></li>
-<li><p><strong>measurement_register</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/circuit#qiskit.circuit.ClassicalRegister" title="(in Qiskit v2.2)"><em>ClassicalRegister</em></a><em> | </em><em>None</em>) – <p>Optional classical register for storing the measurement result.</p>
+<li><p><strong>measurement_register</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/circuit#qiskit.circuit.ClassicalRegister" title="(in Qiskit v2.3)"><em>ClassicalRegister</em></a><em> | </em><em>None</em>) – <p>Optional classical register for storing the measurement result.</p>
 <p>If None, a new register named <code class="docutils literal notranslate"><span class="pre">c{iteration}</span></code> is created.</p>
 </p></li>
 <li><p><strong>iteration_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>) – Optional custom name for the circuit. If None, no specific name is assigned.</p></li>
+<li><p><strong>circuit_folding</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – Whether to apply circuit folding for visualization. Defaults to True.</p></li>
 </ul>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
@@ -573,42 +625,8 @@ and phase correction.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimation.create_iteration_circuit">
-<span class="sig-name descname"><span class="pre">create_iteration_circuit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state_prep</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">iteration</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_iterations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_correction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">measurement_register</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">iteration_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation.create_iteration_circuit" title="Link to this definition"></a></dt>
-<dd><p>Construct a single IQPE iteration circuit.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">QuantumCircuit</span></code></a></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>state_prep</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.2)"><em>QuantumCircuit</em></a>) – Trial-state preparation circuit that prepares the initial
-quantum state on the system qubits.</p></li>
-<li><p><strong>iteration</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – <p>Current iteration index (0-based), where 0 corresponds to the</p>
-<p>most-significant bit.</p>
-</p></li>
-<li><p><strong>total_iterations</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Total number of phase bits to measure across all iterations.</p></li>
-<li><p><strong>phase_correction</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – <p>Feedback phase angle to apply before controlled evolution.</p>
-<p>Defaults to 0.0 for the first iteration.</p>
-</p></li>
-<li><p><strong>measurement_register</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/circuit#qiskit.circuit.ClassicalRegister" title="(in Qiskit v2.2)"><em>ClassicalRegister</em></a><em> | </em><em>None</em>) – <p>Optional classical register for storing the measurement</p>
-<p>result. If None, a new register named <code class="docutils literal notranslate"><span class="pre">c{iteration}</span></code> is created.</p>
-</p></li>
-<li><p><strong>iteration_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>) – <p>Optional custom name for the circuit. If None, no specific</p>
-<p>name is assigned.</p>
-</p></li>
-</ul>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>A quantum circuit implementing one IQPE iteration with an ancilla qubit,
-system qubits, and classical measurement register.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimation.create_iterations">
-<span class="sig-name descname"><span class="pre">create_iterations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state_prep</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_bits</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_corrections</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">measurement_registers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">iteration_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation.create_iterations" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">create_iterations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state_prep</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_bits</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_corrections</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">measurement_registers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">iteration_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">circuit_folding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation.create_iterations" title="Link to this definition"></a></dt>
 <dd><p>Generate <code class="docutils literal notranslate"><span class="pre">num_bits</span></code> iteration circuits with optional phase feedback.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
@@ -616,18 +634,19 @@ system qubits, and classical measurement register.</p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>state_prep</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.2)"><em>QuantumCircuit</em></a>) – Trial-state preparation circuit that prepares the initial quantum state on the system qubits.</p></li>
+<li><p><strong>state_prep</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.3)"><em>QuantumCircuit</em></a>) – Trial-state preparation circuit that prepares the initial quantum state on the system qubits.</p></li>
 <li><p><strong>num_bits</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Total number of IQPE iterations to generate. Must be a positive integer.</p></li>
 <li><p><strong>phase_corrections</strong> (<a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>] </em><em>| </em><em>None</em>) – <p>Optional list of feedback phases Φ(k+1) to apply before each iteration.</p>
 <p>Must have length equal to <code class="docutils literal notranslate"><span class="pre">num_bits</span></code> if provided.
 Defaults to zeros if not specified.</p>
 </p></li>
-<li><p><strong>measurement_registers</strong> (<a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/circuit#qiskit.circuit.ClassicalRegister" title="(in Qiskit v2.2)"><em>ClassicalRegister</em></a><em>] </em><em>| </em><em>None</em>) – <p>Optional collection of classical registers, one per iteration.</p>
+<li><p><strong>measurement_registers</strong> (<a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/circuit#qiskit.circuit.ClassicalRegister" title="(in Qiskit v2.3)"><em>ClassicalRegister</em></a><em>] </em><em>| </em><em>None</em>) – <p>Optional collection of classical registers, one per iteration.</p>
 <p>Must have length equal to <code class="docutils literal notranslate"><span class="pre">num_bits</span></code> if provided.</p>
 </p></li>
 <li><p><strong>iteration_names</strong> (<a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em><em>] </em><em>| </em><em>None</em>) – <p>Optional custom names for the per-iteration circuits.</p>
 <p>Must have length equal to <code class="docutils literal notranslate"><span class="pre">num_bits</span></code> if provided.</p>
 </p></li>
+<li><p><strong>circuit_folding</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – Whether to apply circuit folding for visualization. Defaults to True.</p></li>
 </ul>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
@@ -644,43 +663,8 @@ containing circuits and metadata.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimation.phase_feedback_from_bits">
-<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">phase_feedback_from_bits</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bits_msb_first</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation.phase_feedback_from_bits" title="Link to this definition"></a></dt>
-<dd><p>Convenience helper that wraps <a class="reference internal" href="qdk_chemistry.utils.phase.html#qdk_chemistry.utils.phase.accumulated_phase_from_bits" title="qdk_chemistry.utils.phase.accumulated_phase_from_bits"><code class="xref py py-func docutils literal notranslate"><span class="pre">accumulated_phase_from_bits()</span></code></a>.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>bits_msb_first</strong> (<a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>) – Sequence of measured bits ordered from most-significant to least-significant.</p>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>The accumulated phase feedback computed from the bit sequence.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimation.phase_fraction_from_feedback">
-<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">phase_fraction_from_feedback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">phase_feedback</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation.phase_fraction_from_feedback" title="Link to this definition"></a></dt>
-<dd><p>Compute the phase fraction <code class="docutils literal notranslate"><span class="pre">φ</span></code> from the final feedback phase.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>phase_feedback</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – The accumulated phase feedback after all iterations.</p>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>The phase fraction φ in the range [0, 1), representing the fractional
-part of the eigenphase.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimation.update_phase_feedback">
-<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">update_phase_feedback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">current_phase</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">measured_bit</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation.update_phase_feedback" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">update_phase_feedback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">current_phase</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">measured_bit</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation.update_phase_feedback" title="Link to this definition"></a></dt>
 <dd><p>Update the feedback angle after measuring an iteration.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
@@ -698,17 +682,52 @@ part of the eigenphase.</p>
 </dl>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimation.phase_fraction_from_feedback">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">phase_fraction_from_feedback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">phase_feedback</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation.phase_fraction_from_feedback" title="Link to this definition"></a></dt>
+<dd><p>Compute the phase fraction <code class="docutils literal notranslate"><span class="pre">φ</span></code> from the final feedback phase.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>phase_feedback</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – The accumulated phase feedback after all iterations.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The phase fraction φ in the range [0, 1), representing the fractional
+part of the eigenphase.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimation.phase_feedback_from_bits">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">phase_feedback_from_bits</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bits_msb_first</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimation.phase_feedback_from_bits" title="Link to this definition"></a></dt>
+<dd><p>Convenience helper that wraps <a class="reference internal" href="qdk_chemistry.utils.phase.html#qdk_chemistry.utils.phase.accumulated_phase_from_bits" title="qdk_chemistry.utils.phase.accumulated_phase_from_bits"><code class="xref py py-func docutils literal notranslate"><span class="pre">accumulated_phase_from_bits()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>bits_msb_first</strong> (<a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>) – Sequence of measured bits ordered from most-significant to least-significant.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The accumulated phase feedback computed from the bit sequence.</p>
+</dd>
+</dl>
+</dd></dl>
+
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimationIteration">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">IterativePhaseEstimationIteration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">circuit</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">iteration</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_iterations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">power</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_correction</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimationIteration" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">IterativePhaseEstimationIteration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">circuit</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">iteration</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_iterations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">power</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_correction</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimationIteration" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>Container describing a single iteration circuit.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>circuit</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.2)"><em>QuantumCircuit</em></a>)</p></li>
+<li><p><strong>circuit</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.3)"><em>QuantumCircuit</em></a>)</p></li>
 <li><p><strong>iteration</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
 <li><p><strong>total_iterations</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
 <li><p><strong>power</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
@@ -716,13 +735,38 @@ part of the eigenphase.</p>
 </ul>
 </dd>
 </dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimationIteration.circuit">
+<span class="sig-name descname"><span class="pre">circuit</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.3)"><span class="pre">QuantumCircuit</span></a></span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimationIteration.circuit" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimationIteration.iteration">
+<span class="sig-name descname"><span class="pre">iteration</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimationIteration.iteration" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimationIteration.total_iterations">
+<span class="sig-name descname"><span class="pre">total_iterations</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimationIteration.total_iterations" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimationIteration.power">
+<span class="sig-name descname"><span class="pre">power</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimationIteration.power" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimationIteration.phase_correction">
+<span class="sig-name descname"><span class="pre">phase_correction</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimationIteration.phase_correction" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimationIteration.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">circuit</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">iteration</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_iterations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">power</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_correction</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimationIteration.__init__" title="Link to this definition"></a></dt>
 <dd><dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>circuit</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.2)"><em>QuantumCircuit</em></a>)</p></li>
+<li><p><strong>circuit</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.3)"><em>QuantumCircuit</em></a>)</p></li>
 <li><p><strong>iteration</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
 <li><p><strong>total_iterations</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
 <li><p><strong>power</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
@@ -735,36 +779,11 @@ part of the eigenphase.</p>
 </dl>
 </dd></dl>
 
-<dl class="py attribute">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimationIteration.circuit">
-<span class="sig-name descname"><span class="pre">circuit</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">QuantumCircuit</span></code></a></em><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimationIteration.circuit" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimationIteration.iteration">
-<span class="sig-name descname"><span class="pre">iteration</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></em><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimationIteration.iteration" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimationIteration.total_iterations">
-<span class="sig-name descname"><span class="pre">total_iterations</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></em><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimationIteration.total_iterations" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimationIteration.power">
-<span class="sig-name descname"><span class="pre">power</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></em><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimationIteration.power" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.IterativePhaseEstimationIteration.phase_correction">
-<span class="sig-name descname"><span class="pre">phase_correction</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></em><a class="headerlink" href="#qdk_chemistry.algorithms.IterativePhaseEstimationIteration.phase_correction" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.MultiConfigurationCalculator">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">MultiConfigurationCalculator</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.MultiConfigurationCalculator" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">MultiConfigurationCalculator</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.MultiConfigurationCalculator" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="../_py_placeholders.html#pybind11_builtins.pybind11_object" title="pybind11_builtins.pybind11_object"><code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></a></p>
 <p>Abstract base class for multi-configuration calculators.</p>
 <p>This class defines the interface for multi configuration-based quantum chemistry calculations.
@@ -867,7 +886,7 @@ This should typically be called from derived class constructors.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.MultiConfigurationScf">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">MultiConfigurationScf</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.MultiConfigurationScf" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">MultiConfigurationScf</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.MultiConfigurationScf" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="../_py_placeholders.html#pybind11_builtins.pybind11_object" title="pybind11_builtins.pybind11_object"><code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></a></p>
 <p>Abstract base class for multi-configurational Self-Consistent Field (MultiConfigurationScf) algorithms.</p>
 <p>This class defines the interface for MultiConfigurationScf calculations that simultaneously optimize both molecular orbital coefficients and configuration interaction coefficients.
@@ -920,7 +939,7 @@ This should typically be called from derived class constructors.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.MultiConfigurationScf.run">
-<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self:</span> <span class="pre">qdk_chemistry.algorithms.MultiConfigurationScf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">orbitals:</span> <span class="pre">qdk_chemistry.data.Orbitals</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ham_ctor:</span> <span class="pre">qdk::chemistry::algorithms::HamiltonianConstructor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mc_calculator:</span> <span class="pre">qdk_chemistry.algorithms.MultiConfigurationCalculator</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_active_alpha_electrons:</span> <span class="pre">typing.SupportsInt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_active_beta_electrons:</span> <span class="pre">typing.SupportsInt</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><span class="pre">qdk_chemistry.data.Wavefunction</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.MultiConfigurationScf.run" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.algorithms.MultiConfigurationScf" title="qdk_chemistry.algorithms.MultiConfigurationScf"><span class="pre">qdk_chemistry.algorithms.MultiConfigurationScf</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">orbitals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><span class="pre">qdk_chemistry.data.Orbitals</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">ham_ctor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">qdk::chemistry::algorithms::HamiltonianConstructor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mc_calculator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.algorithms.MultiConfigurationCalculator" title="qdk_chemistry.algorithms.MultiConfigurationCalculator"><span class="pre">qdk_chemistry.algorithms.MultiConfigurationCalculator</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_active_alpha_electrons</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_active_beta_electrons</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><span class="pre">qdk_chemistry.data.Wavefunction</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.MultiConfigurationScf.run" title="Link to this definition"></a></dt>
 <dd><p>Perform a MultiConfigurationScf calculation.</p>
 <p>This method automatically locks settings before execution.</p>
 <dl class="field-list simple">
@@ -974,7 +993,7 @@ This should typically be called from derived class constructors.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.OrbitalLocalizer">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">OrbitalLocalizer</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.OrbitalLocalizer" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">OrbitalLocalizer</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.OrbitalLocalizer" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="../_py_placeholders.html#pybind11_builtins.pybind11_object" title="pybind11_builtins.pybind11_object"><code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></a></p>
 <p>Abstract base class for orbital localizers.</p>
 <p>This class defines the interface for localizing molecular orbitals.
@@ -1085,7 +1104,7 @@ This should typically be called from derived class constructors.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.PhaseEstimation">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">PhaseEstimation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimation" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">PhaseEstimation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimation" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
 <p>Abstract interface for phase estimation strategies.</p>
 <dl class="field-list simple">
@@ -1096,6 +1115,11 @@ This should typically be called from derived class constructors.</p>
 </ul>
 </dd>
 </dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.PhaseEstimation.algorithm">
+<span class="sig-name descname"><span class="pre">algorithm</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#qdk_chemistry.algorithms.PhaseEstimationAlgorithm" title="qdk_chemistry.phase_estimation.base.PhaseEstimationAlgorithm"><span class="pre">PhaseEstimationAlgorithm</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimation.algorithm" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.PhaseEstimation.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimation.__init__" title="Link to this definition"></a></dt>
@@ -1110,20 +1134,21 @@ This should typically be called from derived class constructors.</p>
 </dl>
 </dd></dl>
 
-<dl class="py attribute">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.PhaseEstimation.algorithm">
-<span class="sig-name descname"><span class="pre">algorithm</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#qdk_chemistry.algorithms.PhaseEstimationAlgorithm" title="qdk_chemistry.phase_estimation.base.PhaseEstimationAlgorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhaseEstimationAlgorithm</span></code></a> <span class="pre">|</span> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimation.algorithm" title="Link to this definition"></a></dt>
-<dd></dd></dl>
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.PhaseEstimation.hamiltonian">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">hamiltonian</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian"><span class="pre">QubitHamiltonian</span></a></span><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimation.hamiltonian" title="Link to this definition"></a></dt>
+<dd><p>Return the Hamiltonian used by the algorithm.</p>
+</dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.PhaseEstimation.evolution_time">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">evolution_time</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></em><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimation.evolution_time" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">evolution_time</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimation.evolution_time" title="Link to this definition"></a></dt>
 <dd><p>Return the evolution time used for <code class="docutils literal notranslate"><span class="pre">U</span> <span class="pre">=</span> <span class="pre">exp(-i</span> <span class="pre">H</span> <span class="pre">t)</span></code>.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.PhaseEstimation.from_algorithm">
-<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_algorithm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">algorithm</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimation.from_algorithm" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">from_algorithm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">algorithm</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimation.from_algorithm" title="Link to this definition"></a></dt>
 <dd><p>Factory method returning the requested phase estimation strategy.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
@@ -1145,17 +1170,11 @@ This should typically be called from derived class constructors.</p>
 </dl>
 </dd></dl>
 
-<dl class="py property">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.PhaseEstimation.hamiltonian">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">hamiltonian</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian"><span class="pre">QubitHamiltonian</span></a></em><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimation.hamiltonian" title="Link to this definition"></a></dt>
-<dd><p>Return the Hamiltonian used by the algorithm.</p>
-</dd></dl>
-
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.PhaseEstimationAlgorithm">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">PhaseEstimationAlgorithm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">values</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimationAlgorithm" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">PhaseEstimationAlgorithm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">values</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimationAlgorithm" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.StrEnum" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">StrEnum</span></code></a></p>
 <p>Enumeration of supported phase estimation routines.</p>
 <p class="rubric">References</p>
@@ -1165,19 +1184,19 @@ This should typically be called from derived class constructors.</p>
 </ul>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.PhaseEstimationAlgorithm.ITERATIVE">
-<span class="sig-name descname"><span class="pre">ITERATIVE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'iterative'</span></em><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimationAlgorithm.ITERATIVE" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">ITERATIVE</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'iterative'</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimationAlgorithm.ITERATIVE" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.PhaseEstimationAlgorithm.TRADITIONAL">
-<span class="sig-name descname"><span class="pre">TRADITIONAL</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'traditional'</span></em><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimationAlgorithm.TRADITIONAL" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">TRADITIONAL</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'traditional'</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.PhaseEstimationAlgorithm.TRADITIONAL" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">ProjectedMultiConfigurationCalculator</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">ProjectedMultiConfigurationCalculator</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="../_py_placeholders.html#pybind11_builtins.pybind11_object" title="pybind11_builtins.pybind11_object"><code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></a></p>
 <p>Abstract base class for projected multi-configurational (PMC) calculations in quantum chemistry.</p>
 <p>This class provides the interface for projected multi-configurational-based quantum chemistry calculations.
@@ -1285,12 +1304,12 @@ This should typically be called from derived class constructors.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.QdkAutocasActiveSpaceSelector">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkAutocasActiveSpaceSelector</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkAutocasActiveSpaceSelector" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkAutocasActiveSpaceSelector</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkAutocasActiveSpaceSelector" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.algorithms.ActiveSpaceSelector" title="qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="xref py py-class docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a></p>
 <p>QDK Automated Complete Active Space (AutoCAS) selector.</p>
 <p>This class provides an automated approach to selecting active space orbitals
 based on various criteria including occupation numbers, orbital energies,
-and other chemical information <span id="id4">[<a class="reference internal" href="../../references.html#id25" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span>.</p>
+and other chemical information <span id="id4">[<a class="reference internal" href="../../references.html#id26" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span>.</p>
 <p>Typical usage:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">alg</span>
 
@@ -1317,14 +1336,14 @@ and other chemical information <span id="id4">[<a class="reference internal" hre
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.QdkAutocasEosActiveSpaceSelector">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkAutocasEosActiveSpaceSelector</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkAutocasEosActiveSpaceSelector" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkAutocasEosActiveSpaceSelector</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkAutocasEosActiveSpaceSelector" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.algorithms.ActiveSpaceSelector" title="qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="xref py py-class docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a></p>
 <p>QDK entropy-based active space selector.</p>
 <p>This class selects active space orbitals based on orbital entropy measures.
 It identifies orbitals with high entropy, which indicates strong electron
 correlation and multi-reference character.
 This method is a variant of the AutoCAS method that uses entropy as the primary
-criterion for selecting active orbitals <span id="id5">[<a class="reference internal" href="../../references.html#id25" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span>.</p>
+criterion for selecting active orbitals <span id="id5">[<a class="reference internal" href="../../references.html#id26" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span>.</p>
 <p>Typical usage:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">alg</span>
 
@@ -1354,7 +1373,7 @@ criterion for selecting active orbitals <span id="id5">[<a class="reference inte
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.QdkHamiltonianConstructor">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkHamiltonianConstructor</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkHamiltonianConstructor" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkHamiltonianConstructor</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkHamiltonianConstructor" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.algorithms.HamiltonianConstructor" title="qdk_chemistry.algorithms.HamiltonianConstructor"><code class="xref py py-class docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code></a></p>
 <p>QDK implementation of the Hamiltonian constructor.</p>
 <p>This class provides a concrete implementation of the Hamiltonian constructor
@@ -1391,7 +1410,7 @@ orbital data, computing the necessary one- and two-electron integrals.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.QdkMP2NaturalOrbitalLocalizer">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkMP2NaturalOrbitalLocalizer</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkMP2NaturalOrbitalLocalizer" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkMP2NaturalOrbitalLocalizer</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkMP2NaturalOrbitalLocalizer" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.algorithms.OrbitalLocalizer" title="qdk_chemistry.algorithms.OrbitalLocalizer"><code class="xref py py-class docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a></p>
 <p>QDK MP2 natural orbital transformer.</p>
 <p>This class provides a concrete implementation that transforms canonical
@@ -1431,7 +1450,7 @@ correlation methods.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.QdkMacisAsci">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkMacisAsci</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkMacisAsci" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkMacisAsci</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkMacisAsci" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.algorithms.MultiConfigurationCalculator" title="qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a></p>
 <p>QDK MACIS-based Adaptive Sampling Configuration Interaction (ASCI) calculator.</p>
 <p>This class provides a concrete implementation of the multi-configuration
@@ -1469,7 +1488,7 @@ configurations.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.QdkMacisCas">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkMacisCas</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkMacisCas" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkMacisCas</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkMacisCas" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.algorithms.MultiConfigurationCalculator" title="qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a></p>
 <p>QDK MACIS-based Complete Active Space (CAS) calculator.</p>
 <p>This class provides a concrete implementation of the multi-configuration
@@ -1505,7 +1524,7 @@ Interaction (CASCI) calculations.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.QdkMacisPmc">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkMacisPmc</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkMacisPmc" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkMacisPmc</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkMacisPmc" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator" title="qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">ProjectedMultiConfigurationCalculator</span></code></a></p>
 <p>QDK MACIS-based Projected Multi-Configuration (PMC) calculator.</p>
 <p>This class provides a concrete implementation of the projected multi-configuration
@@ -1551,7 +1570,7 @@ the determinant space is provided as input rather than generated adaptively.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.QdkOccupationActiveSpaceSelector">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkOccupationActiveSpaceSelector</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkOccupationActiveSpaceSelector" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkOccupationActiveSpaceSelector</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkOccupationActiveSpaceSelector" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.algorithms.ActiveSpaceSelector" title="qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="xref py py-class docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a></p>
 <p>QDK occupation-based active space selector.</p>
 <p>This class selects active space orbitals based on their occupation numbers.
@@ -1587,7 +1606,7 @@ and strong electron correlation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.QdkPipekMezeyLocalizer">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkPipekMezeyLocalizer</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkPipekMezeyLocalizer" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkPipekMezeyLocalizer</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkPipekMezeyLocalizer" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.algorithms.OrbitalLocalizer" title="qdk_chemistry.algorithms.OrbitalLocalizer"><code class="xref py py-class docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a></p>
 <p>QDK Pipek-Mezey orbital localizer.</p>
 <p>This class provides a concrete implementation of the orbital localizer using
@@ -1626,7 +1645,7 @@ maintain the occupied-virtual separation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.QdkScfSolver">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkScfSolver</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkScfSolver" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkScfSolver</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkScfSolver" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.algorithms.ScfSolver" title="qdk_chemistry.algorithms.ScfSolver"><code class="xref py py-class docutils literal notranslate"><span class="pre">ScfSolver</span></code></a></p>
 <p>QDK implementation of the SCF solver.</p>
 <p>This class provides a concrete implementation of the SCF (Self-Consistent
@@ -1670,8 +1689,50 @@ structures.</p>
 </dd></dl>
 
 <dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.QdkStabilityChecker">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkStabilityChecker</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkStabilityChecker" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.algorithms.StabilityChecker" title="qdk_chemistry.algorithms.StabilityChecker"><code class="xref py py-class docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a></p>
+<p>QDK implementation of the stability checker.</p>
+<p>This class provides a concrete implementation of the stability checker using the backend.
+It inherits from the base <a class="reference internal" href="#qdk_chemistry.algorithms.StabilityChecker" title="qdk_chemistry.algorithms.StabilityChecker"><code class="xref py py-class docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a> class and implements the
+<code class="docutils literal notranslate"><span class="pre">run</span></code> method to perform stability analysis on wavefunctions.</p>
+<p>Typical usage:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">alg</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">data</span>
+
+<span class="c1"># Assume you have a wavefunction from an SCF calculation</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">algorithms</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="n">backend</span><span class="p">)</span>
+<span class="n">energy</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;basis_set&quot;</span><span class="p">)</span>
+
+<span class="c1"># Create a stability checker instance</span>
+<span class="n">stability_checker</span> <span class="o">=</span> <span class="n">algorithms</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;stability_checker&quot;</span><span class="p">,</span> <span class="n">backend</span><span class="p">)</span>
+
+<span class="c1"># Configure settings if needed</span>
+<span class="n">stability_checker</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;internal&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="n">stability_checker</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;external&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Perform stability analysis</span>
+<span class="n">is_stable</span><span class="p">,</span> <span class="n">result</span> <span class="o">=</span> <span class="n">stability_checker</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p><a class="reference internal" href="#qdk_chemistry.algorithms.StabilityChecker" title="qdk_chemistry.algorithms.StabilityChecker"><code class="xref py py-class docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a>
+<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.StabilityResult" title="qdk_chemistry.data.StabilityResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">qdk_chemistry.data.StabilityResult</span></code></a>
+<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">qdk_chemistry.data.Wavefunction</span></code></a></p>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.QdkStabilityChecker.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.algorithms.QdkStabilityChecker" title="qdk_chemistry.algorithms.QdkStabilityChecker"><span class="pre">qdk_chemistry.algorithms.QdkStabilityChecker</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkStabilityChecker.__init__" title="Link to this definition"></a></dt>
+<dd><p>Default constructor.</p>
+<p>Initializes a stability checker with default settings.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.QdkVVHVLocalizer">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkVVHVLocalizer</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkVVHVLocalizer" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkVVHVLocalizer</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkVVHVLocalizer" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.algorithms.OrbitalLocalizer" title="qdk_chemistry.algorithms.OrbitalLocalizer"><code class="xref py py-class docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a></p>
 <p>QDK Valence Virtual - Hard Virtual (VV-HV) orbital localizer.</p>
 <p>This class provides a concrete implementation of the orbital localizer using
@@ -1723,7 +1784,7 @@ localization call.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.QdkValenceActiveSpaceSelector">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkValenceActiveSpaceSelector</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkValenceActiveSpaceSelector" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QdkValenceActiveSpaceSelector</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QdkValenceActiveSpaceSelector" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.algorithms.ActiveSpaceSelector" title="qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="xref py py-class docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a></p>
 <p>QDK valence-based active space selector.</p>
 <p>This class selects active space orbitals based on valence orbital criteria.
@@ -1755,7 +1816,7 @@ molecular system under study.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.QubitHamiltonianSolver">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QubitHamiltonianSolver</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QubitHamiltonianSolver" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QubitHamiltonianSolver</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QubitHamiltonianSolver" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">Algorithm</span></code></a></p>
 <p>Abstract base class for solving a qubit Hamiltonian.</p>
 <dl class="py method">
@@ -1779,7 +1840,7 @@ molecular system under study.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.QubitMapper">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QubitMapper</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QubitMapper" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">QubitMapper</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.QubitMapper" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">Algorithm</span></code></a></p>
 <p>Abstract base class for mapping a Hamiltonian to a QubitHamiltonian.</p>
 <dl class="py method">
@@ -1803,7 +1864,7 @@ molecular system under study.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.ScfSolver">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">ScfSolver</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.ScfSolver" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">ScfSolver</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.ScfSolver" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="../_py_placeholders.html#pybind11_builtins.pybind11_object" title="pybind11_builtins.pybind11_object"><code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></a></p>
 <p>Abstract base class for Self-Consistent Field (SCF) solvers.</p>
 <p>This class defines the interface for SCF calculations that compute molecular orbitals from a molecular structure.
@@ -1910,7 +1971,7 @@ Configuration options can be modified through the <code class="docutils literal 
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.StabilityChecker">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">StabilityChecker</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.StabilityChecker" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">StabilityChecker</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.StabilityChecker" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="../_py_placeholders.html#pybind11_builtins.pybind11_object" title="pybind11_builtins.pybind11_object"><code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></a></p>
 <p>Abstract base class for wavefunction stability checkers.</p>
 <p>This class defines the interface for checking the stability of wavefunctions in quantum chemistry calculations.
@@ -2017,13 +2078,24 @@ A stable wavefunction should have all positive eigenvalues for both internal and
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.StatePreparation">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">StatePreparation</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.StatePreparation" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">StatePreparation</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.StatePreparation" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">Algorithm</span></code></a></p>
 <p>Abstract base class for state preparation algorithms.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.StatePreparation.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.StatePreparation.__init__" title="Link to this definition"></a></dt>
 <dd><p>Initialize the StatePreparation with default settings.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.StatePreparation.type_name">
+<span class="sig-name descname"><span class="pre">type_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.StatePreparation.type_name" title="Link to this definition"></a></dt>
+<dd><p>Return the algorithm type name as state_prep.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
@@ -2043,22 +2115,24 @@ A stable wavefunction should have all positive eigenvalues for both internal and
 </dl>
 </dd></dl>
 
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.TimeEvolutionBuilder">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">TimeEvolutionBuilder</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.TimeEvolutionBuilder" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">Algorithm</span></code></a></p>
+<p>Base class for time evolution Builders in QDK/Chemistry algorithms.</p>
 <dl class="py method">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.StatePreparation.type_name">
-<span class="sig-name descname"><span class="pre">type_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.StatePreparation.type_name" title="Link to this definition"></a></dt>
-<dd><p>Return the algorithm type name as state_prep.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
-</dd>
-</dl>
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.TimeEvolutionBuilder.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.TimeEvolutionBuilder.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize the TimeEvolutionBuilder.</p>
 </dd></dl>
 
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.TraditionalPhaseEstimation">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">TraditionalPhaseEstimation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">qft_do_swaps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.TraditionalPhaseEstimation" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.</span></span><span class="sig-name descname"><span class="pre">TraditionalPhaseEstimation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">qft_do_swaps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.TraditionalPhaseEstimation" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.algorithms.PhaseEstimation" title="qdk_chemistry.phase_estimation.base.PhaseEstimation"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhaseEstimation</span></code></a></p>
 <p>Standard QFT-based (non-iterative) phase estimation.</p>
 <dl class="field-list simple">
@@ -2070,6 +2144,11 @@ A stable wavefunction should have all positive eigenvalues for both internal and
 </ul>
 </dd>
 </dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.TraditionalPhaseEstimation.algorithm">
+<span class="sig-name descname"><span class="pre">algorithm</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#qdk_chemistry.algorithms.PhaseEstimationAlgorithm" title="qdk_chemistry.phase_estimation.base.PhaseEstimationAlgorithm"><span class="pre">PhaseEstimationAlgorithm</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'traditional'</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.TraditionalPhaseEstimation.algorithm" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.TraditionalPhaseEstimation.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">qft_do_swaps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.TraditionalPhaseEstimation.__init__" title="Link to this definition"></a></dt>
@@ -2088,24 +2167,19 @@ ordered from most-significant to least-significant bit.</p>
 </dl>
 </dd></dl>
 
-<dl class="py attribute">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.TraditionalPhaseEstimation.algorithm">
-<span class="sig-name descname"><span class="pre">algorithm</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#qdk_chemistry.algorithms.PhaseEstimationAlgorithm" title="qdk_chemistry.phase_estimation.base.PhaseEstimationAlgorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhaseEstimationAlgorithm</span></code></a> <span class="pre">|</span> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'traditional'</span></em><a class="headerlink" href="#qdk_chemistry.algorithms.TraditionalPhaseEstimation.algorithm" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.TraditionalPhaseEstimation.create_circuit">
 <span class="sig-name descname"><span class="pre">create_circuit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state_prep</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_bits</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">measurement_register</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_measurement</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.TraditionalPhaseEstimation.create_circuit" title="Link to this definition"></a></dt>
 <dd><p>Build the traditional QPE circuit.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">QuantumCircuit</span></code></a></span></p>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">QuantumCircuit</span></code></a></span></p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>state_prep</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.2)"><em>QuantumCircuit</em></a>)</p></li>
+<li><p><strong>state_prep</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.3)"><em>QuantumCircuit</em></a>)</p></li>
 <li><p><strong>num_bits</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
-<li><p><strong>measurement_register</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/circuit#qiskit.circuit.ClassicalRegister" title="(in Qiskit v2.2)"><em>ClassicalRegister</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>measurement_register</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/circuit#qiskit.circuit.ClassicalRegister" title="(in Qiskit v2.3)"><em>ClassicalRegister</em></a><em> | </em><em>None</em>)</p></li>
 <li><p><strong>include_measurement</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
 </ul>
 </dd>
@@ -2359,7 +2433,7 @@ the returned instance.</p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><p><strong>generator</strong> (<em>Callable</em><em>[</em><em>[</em><em>]</em><em>, </em><a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm"><em>Algorithm</em></a><em>]</em>) – <p>A callable that returns a new instance.</p>
-<p>Need to reurn an instance of the custom algorithm.
+<p>Need to return an instance of the custom algorithm.
 This will be called each time the algorithm is created
 from the factory.</p>
 </p>
@@ -2514,6 +2588,24 @@ name for that specific type (empty string if type not found).</p>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.html#submodules">Submodules</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html">qdk_chemistry.algorithms.state_preparation.sparse_isometry module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html">qdk_chemistry.algorithms.state_preparation.state_preparation module</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.html">qdk_chemistry.algorithms.time_evolution package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.html">qdk_chemistry.algorithms.time_evolution.builder package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.html#qdk_chemistry.algorithms.time_evolution.builder.TimeEvolutionBuilderFactory"><code class="docutils literal notranslate"><span class="pre">TimeEvolutionBuilderFactory</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.html#submodules">Submodules</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.html">qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.html#qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.ControlledEvolutionCircuitMapperFactory"><code class="docutils literal notranslate"><span class="pre">ControlledEvolutionCircuitMapperFactory</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.html#qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.PauliSequenceMapper"><code class="docutils literal notranslate"><span class="pre">PauliSequenceMapper</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.html#qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.PauliSequenceMapperSettings"><code class="docutils literal notranslate"><span class="pre">PauliSequenceMapperSettings</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.html#submodules">Submodules</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -2770,6 +2862,10 @@ name for that specific type (empty string if type not found).</p>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.stability_checker.html">qdk_chemistry.algorithms.stability_checker module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.stability_checker.html#qdk_chemistry.algorithms.stability_checker.QdkStabilityChecker"><code class="docutils literal notranslate"><span class="pre">QdkStabilityChecker</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.stability_checker.html#qdk_chemistry.algorithms.stability_checker.QdkStabilityChecker.__init__"><code class="docutils literal notranslate"><span class="pre">QdkStabilityChecker.__init__()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.stability_checker.html#qdk_chemistry.algorithms.stability_checker.StabilityChecker"><code class="docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.stability_checker.html#qdk_chemistry.algorithms.stability_checker.StabilityChecker.__init__"><code class="docutils literal notranslate"><span class="pre">StabilityChecker.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.stability_checker.html#qdk_chemistry.algorithms.stability_checker.StabilityChecker.name"><code class="docutils literal notranslate"><span class="pre">StabilityChecker.name()</span></code></a></li>

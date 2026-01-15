@@ -8,22 +8,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Wavefunction &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=a64bac2b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=06674eb4" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
-      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../../_static/copybutton.js?v=f281be69"></script>
-      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" /> 
@@ -117,7 +117,7 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 <h3>Slater determinant container<a class="headerlink" href="#slater-determinant-container" title="Link to this heading"></a></h3>
 <p>Single-determinant wavefunctions (e.g., from Hartree-Fock calculations).</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Use helper function to get orbitals</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">Orbitals</span><span class="o">&gt;</span><span class="w"> </span><span class="n">orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_minimal_orbitals</span><span class="p">();</span>
 <span class="w">  </span><span class="c1">// Create a simple Slater determinant wavefunction for H2 ground state</span>
@@ -131,7 +131,7 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use helper function to get orbitals</span>
 <span class="n">orbitals</span> <span class="o">=</span> <span class="n">make_minimal_orbitals</span><span class="p">()</span>
 
@@ -151,7 +151,7 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 <h3>SCI wavefunction container<a class="headerlink" href="#sci-wavefunction-container" title="Link to this heading"></a></h3>
 <p>Sparse multi-determinant wavefunctions for Selected Configuration Interaction methods.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create an SCI wavefunction for H2</span>
 <span class="w">  </span><span class="c1">// SCI selects only the most important configurations/determinants from the</span>
 <span class="w">  </span><span class="c1">// full space</span>
@@ -173,7 +173,7 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create an SCI wavefunction for H2</span>
 <span class="c1"># SCI selects only the most important configurations/determinants from the full space</span>
 <span class="n">sci_dets</span> <span class="o">=</span> <span class="p">[</span>
@@ -198,7 +198,7 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 <h3>CAS wavefunction container<a class="headerlink" href="#cas-wavefunction-container" title="Link to this heading"></a></h3>
 <p>A multi-determinant wavefunction from Complete Active Space methods (<a class="reference internal" href="../../../glossary.html#term-CASSCF"><span class="xref std std-term">CASSCF</span></a>/<a class="reference internal" href="../../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a>).</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a CAS wavefunction for H2</span>
 <span class="w">  </span><span class="c1">// CAS(2,2) = 2 electrons in 2 MOs (bonding and antibonding)</span>
 <span class="w">  </span><span class="c1">// All possible configurations:</span>
@@ -221,7 +221,7 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a CAS wavefunction for H2</span>
 <span class="c1"># CAS(2,2) = 2 electrons in 2 MOs (bonding and antibonding)</span>
 <span class="c1"># All possible configurations:</span>
@@ -249,7 +249,7 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 <p>A wavefunction container for second-order Møller-Plesset perturbation theory (<a class="reference internal" href="../../../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a>), which stores a reference wavefunction and Hamiltonian.
 From these, T1 and T2 amplitudes can be computed on demand.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create an MP2 wavefunction for H2</span>
 <span class="w">  </span><span class="c1">// MP2 uses a reference wavefunction and Hamiltonian to compute amplitudes on</span>
 <span class="w">  </span><span class="c1">// demand</span>
@@ -271,7 +271,7 @@ From these, T1 and T2 amplitudes can be computed on demand.</p>
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create an MP2 wavefunction for H2</span>
 <span class="c1"># MP2 uses a reference wavefunction and Hamiltonian to compute amplitudes on demand</span>
 
@@ -296,7 +296,7 @@ From these, T1 and T2 amplitudes can be computed on demand.</p>
 <p>A coupled cluster wavefunction container that stores T1 and T2 cluster amplitudes along with a reference wavefunction.
 The container supports reduced density matrices (<a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a>), which are available if they are provided at construction or computed and stored; otherwise, <a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a>-related operations are not available.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a coupled cluster wavefunction for H2</span>
 <span class="w">  </span><span class="c1">// CC uses a reference wavefunction and pre-computed amplitudes</span>
 
@@ -326,7 +326,7 @@ The container supports reduced density matrices (<a class="reference internal" h
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a coupled cluster wavefunction for H2</span>
 <span class="c1"># CC uses a reference wavefunction and pre-computed amplitudes</span>
 
@@ -475,7 +475,7 @@ The container supports reduced density matrices (<a class="reference internal" h
 <h2>Accessing wavefunction data<a class="headerlink" href="#accessing-wavefunction-data" title="Link to this heading"></a></h2>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> class provides methods to access coefficients, determinants, and derived properties:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Access coefficient(s) and determinant(s) - SD has only one</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">coeffs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_coefficients</span><span class="p">();</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">dets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_active_determinants</span><span class="p">();</span>
@@ -498,7 +498,7 @@ The container supports reduced density matrices (<a class="reference internal" h
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Access coefficient(s) and determinant(s) - SD has only one</span>
 <span class="n">coeffs</span> <span class="o">=</span> <span class="n">sd_wavefunction</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()</span>
 <span class="n">dets</span> <span class="o">=</span> <span class="n">sd_wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">()</span>
@@ -526,7 +526,7 @@ The container supports reduced density matrices (<a class="reference internal" h
 <h2>Accessing cluster amplitudes<a class="headerlink" href="#accessing-cluster-amplitudes" title="Link to this heading"></a></h2>
 <p>For <a class="reference internal" href="../../../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a> and coupled cluster wavefunctions, one can access T1 and T2 cluster amplitudes.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio"><label class="tab-label" for="tab-set--6-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Access T1 and T2 amplitudes from MP2 and CC containers</span>
 
 <span class="w">  </span><span class="c1">// MP2</span>
@@ -547,7 +547,7 @@ The container supports reduced density matrices (<a class="reference internal" h
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio"><label class="tab-label" for="tab-set--6-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Access T1 and T2 amplitudes from MP2 and CC containers</span>
 
 <span class="c1"># For MP2 - amplitudes computed on demand</span>

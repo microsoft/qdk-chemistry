@@ -8,22 +8,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quickstart &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=a64bac2b" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=06674eb4" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=81bd8d55"></script>
-      <script src="../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../_static/tabs.js?v=3ee01567"></script>
       <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../_static/copybutton.js?v=f281be69"></script>
-      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -130,27 +130,10 @@ QDK/Chemistry supports multiple serialization formats for <a class="reference in
 Internally to QDK/Chemistry, coordinates are always stored in Bohr/atomic units; however, when reading or writing to files, the units follow the file format convention (Angstrom for XYZ) or can be specified (JSON, HDF5).
 See below for language specific examples of creating and serializing <a class="reference internal" href="comprehensive/data/structure.html"><span class="doc">Structure</span></a> objects.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Define benzene diradical structure directly using coordinates</span>
-<span class="w">  </span><span class="n">Eigen</span><span class="o">::</span><span class="n">MatrixXd</span><span class="w"> </span><span class="nf">coords</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
-<span class="w">  </span><span class="n">coords</span><span class="p">.</span><span class="n">row</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">,</span><span class="w"> </span><span class="mf">1.396000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">;</span>
-<span class="w">  </span><span class="n">coords</span><span class="p">.</span><span class="n">row</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">1.209077</span><span class="p">,</span><span class="w"> </span><span class="mf">0.698000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">;</span>
-<span class="w">  </span><span class="n">coords</span><span class="p">.</span><span class="n">row</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">1.209077</span><span class="p">,</span><span class="w"> </span><span class="mf">-0.698000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">;</span>
-<span class="w">  </span><span class="n">coords</span><span class="p">.</span><span class="n">row</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">,</span><span class="w"> </span><span class="mf">-1.396000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">;</span>
-<span class="w">  </span><span class="n">coords</span><span class="p">.</span><span class="n">row</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">-1.209077</span><span class="p">,</span><span class="w"> </span><span class="mf">-0.698000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">;</span>
-<span class="w">  </span><span class="n">coords</span><span class="p">.</span><span class="n">row</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">-1.209077</span><span class="p">,</span><span class="w"> </span><span class="mf">0.698000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">;</span>
-<span class="w">  </span><span class="n">coords</span><span class="p">.</span><span class="n">row</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">2.151000</span><span class="p">,</span><span class="w"> </span><span class="mf">1.242000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">;</span>
-<span class="w">  </span><span class="n">coords</span><span class="p">.</span><span class="n">row</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">2.151000</span><span class="p">,</span><span class="w"> </span><span class="mf">-1.242000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">;</span>
-<span class="w">  </span><span class="n">coords</span><span class="p">.</span><span class="n">row</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">-2.151000</span><span class="p">,</span><span class="w"> </span><span class="mf">-1.242000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">;</span>
-<span class="w">  </span><span class="n">coords</span><span class="p">.</span><span class="n">row</span><span class="p">(</span><span class="mi">9</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">-2.151000</span><span class="p">,</span><span class="w"> </span><span class="mf">1.242000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.000000</span><span class="p">;</span>
-
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">elements</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;C&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;C&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;C&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;C&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;C&quot;</span><span class="p">,</span>
-<span class="w">                                       </span><span class="s">&quot;C&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">};</span>
-
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">structure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">&gt;</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span><span class="w"> </span><span class="n">elements</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Alternative: Load from XYZ file</span>
-<span class="w">  </span><span class="c1">// auto structure = data::Structure::from_xyz_file(&quot;benzene_diradical.xyz&quot;);</span>
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Load para-benzyne structure from XYZ file</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">structure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">      </span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">::</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s">&quot;../data/para_benzyne.structure.xyz&quot;</span><span class="p">));</span>
 
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Created structure with &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">structure</span><span class="o">-&gt;</span><span class="n">get_num_atoms</span><span class="p">()</span>
 <span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; atoms&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
@@ -162,8 +145,9 @@ See below for language specific examples of creating and serializing <a class="r
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.qubit_hamiltonian</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -171,27 +155,10 @@ See below for language specific examples of creating and serializing <a class="r
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.wavefunction</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_top_determinants</span>
 
-<span class="c1"># Define benzene diradical structure directly using numpy arrays</span>
-<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
-    <span class="p">[</span>
-        <span class="p">[</span><span class="mf">0.00000000</span><span class="p">,</span> <span class="mf">2.63805767</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">],</span>
-        <span class="p">[</span><span class="mf">2.28482439</span><span class="p">,</span> <span class="mf">1.31902883</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">],</span>
-        <span class="p">[</span><span class="mf">2.28482439</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.31902883</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">],</span>
-        <span class="p">[</span><span class="mf">0.00000000</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.63805767</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">],</span>
-        <span class="p">[</span><span class="o">-</span><span class="mf">2.28482439</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.31902883</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">],</span>
-        <span class="p">[</span><span class="o">-</span><span class="mf">2.28482439</span><span class="p">,</span> <span class="mf">1.31902883</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">],</span>
-        <span class="p">[</span><span class="mf">4.06480089</span><span class="p">,</span> <span class="mf">2.34703985</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">],</span>
-        <span class="p">[</span><span class="mf">4.06480089</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.34703985</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">],</span>
-        <span class="p">[</span><span class="o">-</span><span class="mf">4.06480089</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.34703985</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">],</span>
-        <span class="p">[</span><span class="o">-</span><span class="mf">4.06480089</span><span class="p">,</span> <span class="mf">2.34703985</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">],</span>
-    <span class="p">]</span>
+<span class="c1"># Load para-benzyne structure from XYZ file</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span>
+    <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">&quot;../data/para_benzyne.structure.xyz&quot;</span>
 <span class="p">)</span>
-<span class="n">elements</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">elements</span><span class="p">)</span>
-
-<span class="c1"># Alternative: load from XYZ file</span>
-<span class="c1"># from pathlib import Path</span>
-<span class="c1"># structure = Structure.from_xyz_file(Path(&quot;benzene_diradical.structure.xyz&quot;))</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created structure with </span><span class="si">{</span><span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span><span class="si">}</span><span class="s2"> atoms&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Elements: </span><span class="si">{</span><span class="n">structure</span><span class="o">.</span><span class="n">get_elements</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -208,10 +175,10 @@ See the <a class="reference internal" href="comprehensive/design/index.html"><sp
 Instantiations of the <a class="reference internal" href="comprehensive/algorithms/scf_solver.html"><span class="doc">Self-consistent field (SCF) solver</span></a> algorithm (and all other <a class="reference internal" href="comprehensive/algorithms/index.html"><span class="doc">Algorithm classes</span></a>) are managed by a factory.
 See the <a class="reference internal" href="comprehensive/algorithms/factory_pattern.html"><span class="doc">Factory pattern</span></a> documentation for more information on how it is used in the code base.</p>
 <p>The inputs for an <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation are a <a class="reference internal" href="comprehensive/data/structure.html"><span class="doc">Structure</span></a> object, the total charge and spin multiplicity of the molecular system, and information about the single-particle basis to be used.
-Optionally, <a class="reference internal" href="comprehensive/algorithms/settings.html"><span class="doc">Settings</span></a> specific to the particular <a class="reference internal" href="comprehensive/algorithms/scf_solver.html"><span class="doc">Self-consistent field (SCF) solver</span></a> can be configured to control the execution of the <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> algorihm (e.g. convergence tolerances, etc) by accessing the <code class="docutils literal notranslate"><span class="pre">settings()</span></code> method.
+Optionally, <a class="reference internal" href="comprehensive/algorithms/settings.html"><span class="doc">Settings</span></a> specific to the particular <a class="reference internal" href="comprehensive/algorithms/scf_solver.html"><span class="doc">Self-consistent field (SCF) solver</span></a> can be configured to control the execution of the <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> algorithm (e.g. convergence tolerances, etc) by accessing the <code class="docutils literal notranslate"><span class="pre">settings()</span></code> method.
 The basis for the <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation can be set via a string input (specifying one of the <a class="reference internal" href="comprehensive/basis_functionals.html#available-basis-sets"><span class="std std-ref">Available basis sets</span></a>), a custom <a class="reference internal" href="comprehensive/data/basis_set.html"><span class="doc">BasisSet</span></a> or initial <a class="reference internal" href="comprehensive/data/orbitals.html"><span class="doc">Orbitals</span></a> can also be provided.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Perform a SCF calculation</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">algorithms</span><span class="o">::</span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_hf</span><span class="p">,</span><span class="w"> </span><span class="n">wfn_hf</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;cc-pvdz&quot;</span><span class="p">);</span>
@@ -223,7 +190,7 @@ The basis for the <a class="reference internal" href="../glossary.html#term-SCF"
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Perform an SCF calculation, returning the energy and wavefunction</span>
 <span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
 <span class="n">E_hf</span><span class="p">,</span> <span class="n">wfn_hf</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
@@ -246,7 +213,7 @@ For this reason, both <a class="reference internal" href="comprehensive/algorith
 See the <a class="reference internal" href="comprehensive/algorithms/active_space.html"><span class="doc">Active space selection</span></a> documentation for a list of supported methods, along with their associated <a class="reference internal" href="comprehensive/algorithms/settings.html"><span class="doc">Settings</span></a>, which accompany the standard QDK/Chemistry distribution.</p>
 <p>The following are language-specific examples of how to select a so-called “valence” active space containing a subset of only those orbitals surrounding the Fermi level - in this case 6 electrons to be distributed in 6 orbitals (6e, 6o).</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Select active space (6 electrons in 6 orbitals)</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_space_selector</span><span class="w"> </span><span class="o">=</span>
 <span class="w">      </span><span class="n">algorithms</span><span class="o">::</span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;qdk_valence&quot;</span><span class="p">);</span>
@@ -262,8 +229,8 @@ See the <a class="reference internal" href="comprehensive/algorithms/active_spac
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Select active space (6 electrons in 6 orbitals for the benzene diradical)</span>
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Select active space (6 electrons in 6 orbitals for para-benzyne)</span>
 <span class="c1">#   to choose most chemically relevant orbitals</span>
 <span class="n">active_space_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
     <span class="s2">&quot;active_space_selector&quot;</span><span class="p">,</span>
@@ -287,7 +254,7 @@ See the <a class="reference internal" href="comprehensive/algorithms/active_spac
 QDK/Chemistry provides flexible Hamiltonian construction capabilities through the <a class="reference internal" href="comprehensive/algorithms/hamiltonian_constructor.html"><span class="doc">Hamiltonian construction</span></a> algorithm.
 The Hamiltonian constructor generates the one- and two-electron integrals (or factorizations thereof) needed for subsequent quantum many-body calculations and quantum algorithms.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Construct Hamiltonian in the active space</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian_constructor</span><span class="w"> </span><span class="o">=</span>
 <span class="w">      </span><span class="n">algorithms</span><span class="o">::</span><span class="n">HamiltonianConstructorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
@@ -297,7 +264,7 @@ The Hamiltonian constructor generates the one- and two-electron integrals (or fa
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Construct Hamiltonian in the active space and print its summary</span>
 <span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
 <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">active_orbitals</span><span class="p">)</span>
@@ -314,10 +281,10 @@ QDK/Chemistry supports various Multi-Configuration (<a class="reference internal
 <a class="reference internal" href="../glossary.html#term-MC"><span class="xref std std-term">MC</span></a> calculations are performed via instantiations of the <a class="reference internal" href="comprehensive/algorithms/mc_calculator.html"><span class="doc">Multi-configuration calculations</span></a> algorithm, which takes as input an instance of an active space <a class="reference internal" href="comprehensive/data/hamiltonian.html"><span class="doc">Hamiltonian</span></a>, and the number of alpha and beta electrons, and produces as output a <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> representing the multi-configurational state as well as its associated energy.</p>
 <p>While multi-configurational methods provide more accurate energy estimates than <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a>, their primary role in the quantum applications workflow is to generate high-quality initial states for quantum algorithms.
 On scaled fault-tolerant quantum computers, these classically-computed wavefunctions serve as the foundation for state preparation circuits, enabling algorithms such as quantum phase estimation to achieve chemical accuracy for systems that remain intractable for purely classical methods.
-These methods also serve as a critical analysis tool, allowing users to better understand the electronic structure of theire systems of interest and the potential for quantum algorithms to provide meaningful utility over classical state of the art.</p>
+These methods also serve as a critical analysis tool, allowing users to better understand the electronic structure of their systems of interest and the potential for quantum algorithms to provide meaningful utility over classical state of the art.</p>
 <p>In the following example, as the aforementioned (6e, 6o) active space is relatively small, we perform a <a class="reference internal" href="../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> calculation to obtain the exact ground state wavefunction within the active space.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Perform CASCI calculation</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">mc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">algorithms</span><span class="o">::</span><span class="n">MultiConfigurationCalculatorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_cas</span><span class="p">,</span><span class="w"> </span><span class="n">wfn_cas</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mc</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
@@ -327,7 +294,7 @@ These methods also serve as a critical analysis tool, allowing users to better u
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Perform CASCI calculation to get the wavefunction and exact energy for the active space</span>
 <span class="n">mc</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">)</span>
 <span class="n">E_cas</span><span class="p">,</span> <span class="n">wfn_cas</span> <span class="o">=</span> <span class="n">mc</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
@@ -346,7 +313,7 @@ These methods also serve as a critical analysis tool, allowing users to better u
 <p>For large active spaces, the multi-configuration <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> may contain thousands or millions of configurations, but often only a small subset contributes significantly to the overall state.
 By identifying and retaining only the dominant configurations (those with the largest amplitudes), we can create a sparse wavefunction that maintains high fidelity with respect to the original Wavefunction while dramatically reducing resource requirements for quantum state preparation.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cm">/**</span>
 <span class="cm"> * @brief Get top N determinants from a wavefunction sorted by coefficient</span>
 <span class="cm"> * magnitude</span>
@@ -398,7 +365,7 @@ By identifying and retaining only the dominant configurations (those with the la
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get top 2 determinants from the CASCI wavefunction to form a sparse wavefunction</span>
 <span class="n">top_configurations</span> <span class="o">=</span> <span class="n">get_top_determinants</span><span class="p">(</span><span class="n">wfn_cas</span><span class="p">,</span> <span class="n">max_determinants</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 
@@ -423,12 +390,12 @@ The resulting qubit Hamiltonian is represented as a sum of Pauli strings (tensor
 <li><p>Group the remaining Pauli operators into commuting sets that can be measured simultaneously, significantly reducing the number of measurement circuits required on the quantum device.</p></li>
 </ol>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio"><label class="tab-label" for="tab-set--6-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// This step is currently only available in the Python API.</span>
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio"><label class="tab-label" for="tab-set--6-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Prepare qubit Hamiltonian</span>
 <span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qiskit&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;jordan-wigner&quot;</span><span class="p">)</span>
 <span class="n">qubit_hamiltonian</span> <span class="o">=</span> <span class="n">qubit_mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
@@ -456,17 +423,17 @@ The resulting qubit Hamiltonian is represented as a sum of Pauli strings (tensor
 <section id="generate-the-state-preparation-circuit">
 <h3>Generate the state preparation circuit<a class="headerlink" href="#generate-the-state-preparation-circuit" title="Link to this heading"></a></h3>
 <p>Given the classical representation of the sparse multi-configurational <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>, a quantum circuit can be generated to prepare this state on a quantum computer.
-This can be done in many ways, including via Isometry encoding <span id="id1">[<a class="reference internal" href="../references.html#id13" title="Raban Iten, Roger Colbeck, Ivan Kukuljan, Jonathan Home, and Matthias Christandl. Quantum circuits for isometries. Physical Review A, 93:032318, 2016. doi:10.1103/PhysRevA.93.032318.">ICK+16</a>]</span>, linear combinations of unitaries […], and tensor product methods […].
+This can be done in many ways, including via Isometry encoding <span id="id1">[<a class="reference internal" href="../references.html#id13" title="Raban Iten, Roger Colbeck, Ivan Kukuljan, Jonathan Home, and Matthias Christandl. Quantum circuits for isometries. Physical Review A, 93:032318, 2016. doi:10.1103/PhysRevA.93.032318.">ICK+16</a>]</span>, linear combinations of unitaries, and tensor product methods.
 However, when the wavefunction is very sparse, these methods can be inefficient.
-In QDK/Chemistry, we provide a specialized method for generating state preparation circuits for sparse wavefunctions based on the construction of sparse isometries over GF(2) with X gates […], provided as a <a class="reference internal" href="comprehensive/algorithms/state_preparation.html"><span class="doc">State preparation</span></a> algorithm.
+In QDK/Chemistry, we provide a specialized method for generating state preparation circuits for sparse wavefunctions based on the construction of sparse isometries over GF(2) with X gates, provided as a <a class="reference internal" href="comprehensive/algorithms/state_preparation.html"><span class="doc">State preparation</span></a> algorithm.
 See <a class="reference internal" href="comprehensive/algorithms/state_preparation.html"><span class="doc">State preparation</span></a> for more details on the other algorithms provided for state preparation in QDK/Chemistry.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--7-input--1" name="tab-set--7" type="radio"><label class="tab-label" for="tab-set--7-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--7-input--1" name="tab-set--7" type="radio" /><label class="tab-label" for="tab-set--7-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// This step is currently only available in the Python API.</span>
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--7-input--2" name="tab-set--7" type="radio"><label class="tab-label" for="tab-set--7-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--7-input--2" name="tab-set--7" type="radio" /><label class="tab-label" for="tab-set--7-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
 <span class="c1"># Generate state preparation circuit for the sparse state via sparse isometry (GF2 + X)</span>
 <span class="n">state_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;state_prep&quot;</span><span class="p">,</span> <span class="s2">&quot;sparse_isometry_gf2x&quot;</span><span class="p">)</span>
@@ -485,12 +452,12 @@ The measurement outcomes are repeated many times (shots) to build up statistics 
 <p>The energy expectation value is computed by combining the measurement statistics from each group with their corresponding Hamiltonian coefficients and the pre-computed classical contributions.
 The statistical nature of quantum measurements introduces variance in the energy estimate, which decreases as the number of shots is increased.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--8-input--1" name="tab-set--8" type="radio"><label class="tab-label" for="tab-set--8-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--8-input--1" name="tab-set--8" type="radio" /><label class="tab-label" for="tab-set--8-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// This step is currently only available in the Python API.</span>
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--8-input--2" name="tab-set--8" type="radio"><label class="tab-label" for="tab-set--8-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--8-input--2" name="tab-set--8" type="radio" /><label class="tab-label" for="tab-set--8-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Estimate energy using the optimized circuit and filtered Hamiltonian operators</span>
 <span class="n">estimator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;energy_estimator&quot;</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qdk_base_simulator&quot;</span><span class="p">)</span>
 <span class="n">energy_results</span><span class="p">,</span> <span class="n">simulation_data</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>

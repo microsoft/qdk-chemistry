@@ -8,18 +8,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>qdk_chemistry.plugins.qiskit._interop.circuit module &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a64bac2b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=06674eb4" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
-      <script src="../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../_static/copybutton.js?v=f281be69"></script>
@@ -115,42 +115,42 @@
 <p>Utilities to analyze and plot qiskit quantum circuits.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.qiskit._interop.circuit.</span></span><span class="sig-name descname"><span class="pre">CircuitInfo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">circuit</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/circuit.html#CircuitInfo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.qiskit._interop.circuit.</span></span><span class="sig-name descname"><span class="pre">CircuitInfo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">circuit</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/circuit.html#CircuitInfo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>Data class to store information of a quantum circuit.</p>
 <p>This class provides methods to analyze the circuit and summarize its properties.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>circuit</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.2)"><em>QuantumCircuit</em></a>)</p>
+<dd class="field-odd"><p><strong>circuit</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.3)"><em>QuantumCircuit</em></a>)</p>
 </dd>
 </dl>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.circuit">
-<span class="sig-name descname"><span class="pre">circuit</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">QuantumCircuit</span></code></a></em><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.circuit" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">circuit</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.3)"><span class="pre">QuantumCircuit</span></a></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.circuit" title="Link to this definition"></a></dt>
 <dd><p>The quantum circuit to analyze.</p>
 </dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_qubits">
-<span class="sig-name descname"><span class="pre">num_qubits</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></em><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_qubits" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">num_qubits</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_qubits" title="Link to this definition"></a></dt>
 <dd><p>Number of qubits in the circuit.</p>
 </dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.depth">
-<span class="sig-name descname"><span class="pre">depth</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></em><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.depth" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">depth</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.depth" title="Link to this definition"></a></dt>
 <dd><p>Depth of the circuit.</p>
 </dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_gates">
-<span class="sig-name descname"><span class="pre">num_gates</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></em><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_gates" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">num_gates</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_gates" title="Link to this definition"></a></dt>
 <dd><p>Total number of gates in the circuit.</p>
 </dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.gate_counts">
-<span class="sig-name descname"><span class="pre">gate_counts</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/collections.html#collections.Counter" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Counter</span></code></a></em><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.gate_counts" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">gate_counts</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/collections.html#collections.Counter" title="(in Python v3.14)"><span class="pre">Counter</span></a></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.gate_counts" title="Link to this definition"></a></dt>
 <dd><p>Counts of each type of gate in the circuit.</p>
 </dd></dl>
 
@@ -184,7 +184,7 @@
 
 <dl class="py property">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_single_qubit_clifford">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">num_single_qubit_clifford</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></em><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/circuit.html#CircuitInfo.num_single_qubit_clifford"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_single_qubit_clifford" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">num_single_qubit_clifford</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/circuit.html#CircuitInfo.num_single_qubit_clifford"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_single_qubit_clifford" title="Link to this definition"></a></dt>
 <dd><p>Return the number of single-qubit Clifford gates in the circuit.</p>
 </dd></dl>
 
@@ -193,7 +193,7 @@
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">circuit</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.__init__" title="Link to this definition"></a></dt>
 <dd><dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>circuit</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.2)"><em>QuantumCircuit</em></a>)</p>
+<dd class="field-odd"><p><strong>circuit</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.3)"><em>QuantumCircuit</em></a>)</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p>None</p>
@@ -203,13 +203,13 @@
 
 <dl class="py property">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_two_qubit_clifford">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">num_two_qubit_clifford</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></em><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/circuit.html#CircuitInfo.num_two_qubit_clifford"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_two_qubit_clifford" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">num_two_qubit_clifford</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/circuit.html#CircuitInfo.num_two_qubit_clifford"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_two_qubit_clifford" title="Link to this definition"></a></dt>
 <dd><p>Return the number of two-qubit Clifford gates in the circuit.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_non_clifford">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">num_non_clifford</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></em><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/circuit.html#CircuitInfo.num_non_clifford"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_non_clifford" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">num_non_clifford</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/circuit.html#CircuitInfo.num_non_clifford"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_non_clifford" title="Link to this definition"></a></dt>
 <dd><p>Return the number of non-Clifford gates in the circuit.</p>
 </dd></dl>
 
@@ -239,7 +239,7 @@ definitions.py. Please modify gate sets to ensure gate consistency.</p>
 </ul>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>circuit</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.2)"><em>QuantumCircuit</em></a>) – The quantum circuit to analyze.</p>
+<dd class="field-odd"><p><strong>circuit</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.3)"><em>QuantumCircuit</em></a>) – The quantum circuit to analyze.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>A summary of qubit roles indexed by qubit index.</p>
@@ -258,7 +258,7 @@ definitions.py. Please modify gate sets to ensure gate consistency.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>circuit</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.2)"><em>QuantumCircuit</em></a>)</p></li>
+<li><p><strong>circuit</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.3)"><em>QuantumCircuit</em></a>)</p></li>
 <li><p><strong>remove_idle_qubits</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
 <li><p><strong>remove_classical_qubits</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
 <li><p><strong>output_file</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>)</p></li>

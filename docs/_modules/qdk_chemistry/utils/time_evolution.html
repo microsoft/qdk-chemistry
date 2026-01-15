@@ -7,18 +7,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>qdk_chemistry.utils.time_evolution &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=a64bac2b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=06674eb4" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
-      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../../_static/copybutton.js?v=f281be69"></script>
@@ -101,13 +101,13 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuantumCircuit</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Sequence</span>
 
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuantumCircuit</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Qubit</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.quantum_info</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparsePauliOp</span>
 
@@ -275,18 +275,34 @@
     <span class="k">if</span> <span class="n">power</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;power must be at least 1 for controlled time evolution.&quot;</span><span class="p">)</span>
 
+    <span class="c1"># Create a new circuit for the controlled time evolution</span>
+    <span class="n">num_qubits</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">system_qubits</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>  <span class="c1"># +1 for control qubit</span>
+    <span class="n">power_evolution_circuit</span> <span class="o">=</span> <span class="n">QuantumCircuit</span><span class="p">(</span><span class="n">num_qubits</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;ctrl_time_evol_power_</span><span class="si">{</span><span class="n">power</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Map qubits: control is 0, system qubits are 1, 2, ...</span>
+    <span class="n">control_idx</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">system_indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_qubits</span><span class="p">))</span>
+
+    <span class="n">ctrl_evol_circuit</span> <span class="o">=</span> <span class="n">QuantumCircuit</span><span class="p">(</span><span class="n">num_qubits</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;ctrl_time_evol&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">terms</span><span class="p">:</span>
+        <span class="n">rotation_angle</span> <span class="o">=</span> <span class="n">time</span> <span class="o">*</span> <span class="n">term</span><span class="o">.</span><span class="n">coefficient</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">rotation_angle</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">):</span>
+            <span class="k">continue</span>
+        <span class="n">controlled_pauli_rotation</span><span class="p">(</span>
+            <span class="n">ctrl_evol_circuit</span><span class="p">,</span>
+            <span class="n">control_idx</span><span class="p">,</span>
+            <span class="n">system_indices</span><span class="p">,</span>
+            <span class="n">term</span><span class="p">,</span>
+            <span class="n">angle</span><span class="o">=</span><span class="n">rotation_angle</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">ctrl_evol_gate</span> <span class="o">=</span> <span class="n">ctrl_evol_circuit</span><span class="o">.</span><span class="n">to_gate</span><span class="p">()</span>
     <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">power</span><span class="p">):</span>
-        <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">terms</span><span class="p">:</span>
-            <span class="n">rotation_angle</span> <span class="o">=</span> <span class="n">time</span> <span class="o">*</span> <span class="n">term</span><span class="o">.</span><span class="n">coefficient</span>
-            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">rotation_angle</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">):</span>
-                <span class="k">continue</span>
-            <span class="n">controlled_pauli_rotation</span><span class="p">(</span>
-                <span class="n">circuit</span><span class="p">,</span>
-                <span class="n">control_qubit</span><span class="p">,</span>
-                <span class="n">system_qubits</span><span class="p">,</span>
-                <span class="n">term</span><span class="p">,</span>
-                <span class="n">angle</span><span class="o">=</span><span class="n">rotation_angle</span><span class="p">,</span>
-            <span class="p">)</span></div>
+        <span class="c1"># Create a subcircuit for each power iteration</span>
+        <span class="n">power_evolution_circuit</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ctrl_evol_gate</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">num_qubits</span><span class="p">)))</span>
+
+    <span class="c1"># Convert to gate and append to original circuit</span>
+    <span class="n">circuit</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">power_evolution_circuit</span><span class="o">.</span><span class="n">to_gate</span><span class="p">(),</span> <span class="p">[</span><span class="n">control_qubit</span><span class="p">,</span> <span class="o">*</span><span class="nb">list</span><span class="p">(</span><span class="n">system_qubits</span><span class="p">)])</span></div>
 
 
 

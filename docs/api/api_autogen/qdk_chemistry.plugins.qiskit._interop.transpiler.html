@@ -8,22 +8,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>qdk_chemistry.plugins.qiskit._interop.transpiler module &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a64bac2b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=06674eb4" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
-      <script src="../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../_static/copybutton.js?v=f281be69"></script>
-      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -119,8 +119,8 @@ rotations, substituting Clifford Rz gates, and removing Z-basis operations on qu
 state. It also includes functions to create custom pass managers based on preset configurations and custom passes.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.MergeZBasisRotations">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.qiskit._interop.transpiler.</span></span><span class="sig-name descname"><span class="pre">MergeZBasisRotations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/transpiler.html#MergeZBasisRotations"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.MergeZBasisRotations" title="Link to this definition"></a></dt>
-<dd><p>Bases: <a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.transpiler.TransformationPass" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TransformationPass</span></code></a></p>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.qiskit._interop.transpiler.</span></span><span class="sig-name descname"><span class="pre">MergeZBasisRotations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/transpiler.html#MergeZBasisRotations"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.MergeZBasisRotations" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.transpiler.TransformationPass" title="(in Qiskit v2.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TransformationPass</span></code></a></p>
 <p>Transformation pass to merge consecutive Z-basis rotations into a single Rz gate and remove identity gates.</p>
 <p>This pass identifies sequences of single-qubit gates in the Z-basis,
 specifically Rz(θ), Z, S, and Sdg, and combines them into a single Rz(θ_new)
@@ -166,10 +166,10 @@ Z-axis of the Bloch sphere and can be represented in a unified form.</p>
 <dd><p>Run the pass on the given <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">DAGCircuit</span></code></a></span></p>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">DAGCircuit</span></code></a></span></p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>dag</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.2)"><em>DAGCircuit</em></a>) – The input <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code> to transform.</p>
+<dd class="field-even"><p><strong>dag</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.3)"><em>DAGCircuit</em></a>) – The input <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code> to transform.</p>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>The transformed <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code> with merged Z-basis rotations.</p>
@@ -181,8 +181,8 @@ Z-axis of the Bloch sphere and can be represented in a unified form.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.RemoveZBasisOnZeroState">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.qiskit._interop.transpiler.</span></span><span class="sig-name descname"><span class="pre">RemoveZBasisOnZeroState</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/transpiler.html#RemoveZBasisOnZeroState"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.RemoveZBasisOnZeroState" title="Link to this definition"></a></dt>
-<dd><p>Bases: <a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.transpiler.TransformationPass" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TransformationPass</span></code></a></p>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.qiskit._interop.transpiler.</span></span><span class="sig-name descname"><span class="pre">RemoveZBasisOnZeroState</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/transpiler.html#RemoveZBasisOnZeroState"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.RemoveZBasisOnZeroState" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.transpiler.TransformationPass" title="(in Qiskit v2.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TransformationPass</span></code></a></p>
 <p>Transformation pass to remove Z-basis operations on qubits that are in the <span class="math notranslate nohighlight">\(\lvert 0 \rangle\)</span> state.</p>
 <p>This optimization eliminates gates that apply only a global phase to the qubit,
 which has no effect on observable outcomes (measurement probabilities) or
@@ -209,10 +209,10 @@ states, since Z-basis rotations there modify relative phases between basis state
 <dd><p>Run the pass on the given <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">DAGCircuit</span></code></a></span></p>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">DAGCircuit</span></code></a></span></p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>dag</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.2)"><em>DAGCircuit</em></a>) – The input <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code> to transform.</p>
+<dd class="field-even"><p><strong>dag</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.3)"><em>DAGCircuit</em></a>) – The input <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code> to transform.</p>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>The transformed <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code> with Z-basis gates removed.</p>
@@ -224,8 +224,8 @@ states, since Z-basis rotations there modify relative phases between basis state
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.qiskit._interop.transpiler.</span></span><span class="sig-name descname"><span class="pre">SubstituteCliffordRz</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">equivalent_gate_set</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tolerance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2.220446049250313e-16</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/transpiler.html#SubstituteCliffordRz"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz" title="Link to this definition"></a></dt>
-<dd><p>Bases: <a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.transpiler.TransformationPass" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TransformationPass</span></code></a></p>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.qiskit._interop.transpiler.</span></span><span class="sig-name descname"><span class="pre">SubstituteCliffordRz</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">equivalent_gate_set</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tolerance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2.220446049250313e-16</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/transpiler.html#SubstituteCliffordRz"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.transpiler.TransformationPass" title="(in Qiskit v2.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TransformationPass</span></code></a></p>
 <p>Transformation pass to substitute Rz(θ) gates with equivalent Clifford gates for special angles.</p>
 <p>This pass replaces Rz(θ) gates with one of the following Clifford gates:</p>
 <ul class="simple">
@@ -286,10 +286,10 @@ angles. Default is None, which means [‘id’, ‘s’, ‘sdg’, ‘z’].</p
 <dd><p>Run the pass on the given <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">DAGCircuit</span></code></a></span></p>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">DAGCircuit</span></code></a></span></p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>dag</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.2)"><em>DAGCircuit</em></a>) – The input <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code> to transform.</p>
+<dd class="field-even"><p><strong>dag</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.3)"><em>DAGCircuit</em></a>) – The input <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code> to transform.</p>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>The transformed <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code> with Rz substitutions.</p>

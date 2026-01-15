@@ -8,22 +8,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hamiltonian &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=a64bac2b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=06674eb4" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
-      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../../_static/copybutton.js?v=f281be69"></script>
-      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
@@ -62,6 +62,7 @@
 <li class="toctree-l4"><a class="reference internal" href="basis_set.html">BasisSet</a></li>
 <li class="toctree-l4 current"><a class="current reference internal" href="#">Hamiltonian</a></li>
 <li class="toctree-l4"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pauli_operator.html">Pauli Operators</a></li>
 <li class="toctree-l4"><a class="reference internal" href="structure.html">Structure</a></li>
 </ul>
 </li>
@@ -130,15 +131,22 @@ While setter methods are available for construction and initialization purposes,
 </section>
 <section id="properties">
 <h2>Properties<a class="headerlink" href="#properties" title="Link to this heading"></a></h2>
-<ul class="simple">
-<li><p><strong>One-electron integrals</strong>: Matrix of one-electron integrals (h₁)</p></li>
-<li><p><strong>Two-electron integrals</strong>: Vector of two-electron integrals (h₂) in physicist notation <span class="math notranslate nohighlight">\(\left\langle ij|kl \right\rangle\)</span></p></li>
-<li><p><strong>Core energy</strong>: Constant energy term combining nuclear repulsion and inactive orbital contributions</p></li>
-<li><p><strong>Inactive Fock matrix</strong>: Matrix representing interactions between active and inactive orbitals</p></li>
-<li><p><strong>Orbitals</strong>: Molecular orbital information for the system (see the <a class="reference internal" href="orbitals.html"><span class="doc">Orbitals</span></a> documentation for detailed information about orbital properties and representations)</p></li>
-<li><p><strong>Selected orbital indices</strong>: Indices defining the active space orbitals</p></li>
-<li><p><strong>Number of electrons</strong>: Count of electrons in the active space</p></li>
-</ul>
+<dl class="simple">
+<dt>One-electron integrals</dt><dd><p>Matrix of one-electron integrals (h₁)</p>
+</dd>
+<dt>Two-electron integrals</dt><dd><p>Vector of two-electron integrals (h₂) in physicist notation <span class="math notranslate nohighlight">\(\left\langle ij|kl \right\rangle\)</span></p>
+</dd>
+<dt>Core energy</dt><dd><p>Constant energy term combining nuclear repulsion and inactive orbital contributions</p>
+</dd>
+<dt>Inactive Fock matrix</dt><dd><p>Matrix representing interactions between active and inactive orbitals</p>
+</dd>
+<dt>Orbitals</dt><dd><p>Molecular orbital information for the system (see the <a class="reference internal" href="orbitals.html"><span class="doc">Orbitals</span></a> documentation for detailed information about orbital properties and representations)</p>
+</dd>
+<dt>Selected orbital indices</dt><dd><p>Indices defining the active space orbitals</p>
+</dd>
+<dt>Number of electrons</dt><dd><p>Count of electrons in the active space</p>
+</dd>
+</dl>
 <section id="restricted-vs-unrestricted-hamiltonians">
 <h3>Restricted vs. unrestricted Hamiltonians<a class="headerlink" href="#restricted-vs-unrestricted-hamiltonians" title="Link to this heading"></a></h3>
 <p>The <code class="docutils literal notranslate"><span class="pre">Hamiltonian</span></code> class supports both restricted and unrestricted representations:</p>
@@ -163,13 +171,9 @@ The <a class="reference internal" href="../algorithms/hamiltonian_constructor.ht
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a> object is typically created using the <a class="reference internal" href="../algorithms/hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a> algorithm (recommended approach for most users), or it can be created directly with the appropriate integral data.
 Once properly constructed with all required data, the Hamiltonian object should be considered constant and not modified:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create a structure object</span>
-<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="o">&gt;</span><span class="w"> </span><span class="n">coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{{</span><span class="mf">0.00000000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.00000000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.00000000</span><span class="p">},</span>
-<span class="w">                                       </span><span class="p">{</span><span class="mf">2.70672414</span><span class="p">,</span><span class="w"> </span><span class="mf">0.00000000</span><span class="p">,</span><span class="w"> </span><span class="mf">0.00000000</span><span class="p">},</span>
-<span class="w">                                       </span><span class="p">{</span><span class="mf">-0.84290504</span><span class="p">,</span><span class="w"> </span><span class="mf">2.07169023</span><span class="p">,</span><span class="w"> </span><span class="mf">0.00000000</span><span class="p">}};</span>
-<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">symbols</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;O&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">};</span>
-<span class="n">Structure</span><span class="w"> </span><span class="nf">structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span><span class="w"> </span><span class="n">symbols</span><span class="p">);</span>
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Load structure from XYZ file</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">structure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Structure</span><span class="o">::</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s">&quot;../data/water.structure.xyz&quot;</span><span class="p">);</span>
 
 <span class="c1">// Run initial SCF to get orbitals</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
@@ -185,23 +189,17 @@ Once properly constructed with all required data, the Hamiltonian object should 
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span><span class="p">,</span> <span class="n">SpinChannel</span>
 
-<span class="c1"># Create a structure object</span>
-<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
-    <span class="p">[</span>
-        <span class="p">[</span><span class="mf">0.00000000</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">],</span>
-        <span class="p">[</span><span class="mf">2.70672414</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">],</span>
-        <span class="p">[</span><span class="o">-</span><span class="mf">0.84290504</span><span class="p">,</span> <span class="mf">2.07169023</span><span class="p">,</span> <span class="mf">0.00000000</span><span class="p">],</span>
-    <span class="p">]</span>
+<span class="c1"># Load a structure from XYZ file</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span>
+    <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">&quot;../data/water.structure.xyz&quot;</span>
 <span class="p">)</span>
-<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;O&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="p">)</span>
 
-<span class="c1"># Run intiial SCF to get orbitals</span>
+<span class="c1"># Run initial SCF to get orbitals</span>
 <span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
 <span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
     <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
@@ -226,14 +224,16 @@ In line with its immutable design principle, these methods return const referenc
 <h3>Two-electron integral storage and notation<a class="headerlink" href="#two-electron-integral-storage-and-notation" title="Link to this heading"></a></h3>
 <p>Two-electron integrals in quantum chemistry can be represented using different notations and storage formats.
 QDK/Chemistry uses the physicist notation by default, but it’s important to understand the different conventions:</p>
-<ul class="simple">
-<li><p><strong>Physicist/Dirac notation</strong> <span class="math notranslate nohighlight">\(\left\langle ij|kl \right\rangle\)</span> or <span class="math notranslate nohighlight">\(\left\langle ij|kl \right\rangle\)</span>: represents the Coulomb interaction where electron 1 occupies orbitals <span class="math notranslate nohighlight">\(i\)</span> and <span class="math notranslate nohighlight">\(k\)</span>, while electron 2 occupies orbitals <span class="math notranslate nohighlight">\(j\)</span> and <span class="math notranslate nohighlight">\(l\)</span>.
+<dl class="simple">
+<dt>Physicist/Dirac notation <span class="math notranslate nohighlight">\(\left\langle ij|kl \right\rangle\)</span> or <span class="math notranslate nohighlight">\(\left\langle ij|kl \right\rangle\)</span></dt><dd><p>Represents the Coulomb interaction where electron 1 occupies orbitals <span class="math notranslate nohighlight">\(i\)</span> and <span class="math notranslate nohighlight">\(k\)</span>, while electron 2 occupies orbitals <span class="math notranslate nohighlight">\(j\)</span> and <span class="math notranslate nohighlight">\(l\)</span>.
 This is the default representation in QDK/Chemistry.
-In this notation, the first index of each pair <span class="math notranslate nohighlight">\((i,k)\)</span> refers to electron 1, and the second index of each pair <span class="math notranslate nohighlight">\((j,l)\)</span> refers to electron 2, following a (1,2,1,2) electron indexing pattern.</p></li>
-<li><p><strong>Chemist/Mulliken notation</strong> <span class="math notranslate nohighlight">\((ij|kl)\)</span> or <span class="math notranslate nohighlight">\([ij|kl]\)</span>: represents the Coulomb interaction where electron 1 occupies orbitals <span class="math notranslate nohighlight">\(i\)</span> and <span class="math notranslate nohighlight">\(j\)</span>, while electron 2 occupies orbitals <span class="math notranslate nohighlight">\(k\)</span> and <span class="math notranslate nohighlight">\(l\)</span>.
+In this notation, the first index of each pair <span class="math notranslate nohighlight">\((i,k)\)</span> refers to electron 1, and the second index of each pair <span class="math notranslate nohighlight">\((j,l)\)</span> refers to electron 2, following a (1,2,1,2) electron indexing pattern.</p>
+</dd>
+<dt>Chemist/Mulliken notation <span class="math notranslate nohighlight">\((ij|kl)\)</span> or <span class="math notranslate nohighlight">\([ij|kl]\)</span></dt><dd><p>Represents the Coulomb interaction where electron 1 occupies orbitals <span class="math notranslate nohighlight">\(i\)</span> and <span class="math notranslate nohighlight">\(j\)</span>, while electron 2 occupies orbitals <span class="math notranslate nohighlight">\(k\)</span> and <span class="math notranslate nohighlight">\(l\)</span>.
 In this notation, the first pair of indices <span class="math notranslate nohighlight">\((i,j)\)</span> refers to electron 1, and the second pair <span class="math notranslate nohighlight">\((k,l)\)</span> refers to electron 2, following a (1,1,2,2) electron indexing pattern.
-The symbols differ (parentheses vs square brackets), but the indexing convention is the same.</p></li>
-</ul>
+The symbols differ (parentheses vs square brackets), but the indexing convention is the same.</p>
+</dd>
+</dl>
 <p>The relationship between physicist and chemist notation is:</p>
 <div class="math notranslate nohighlight">
 \[\left\langle ij | kl \right\rangle = \left(ik|jl \right)\]</div>
@@ -244,7 +244,7 @@ From a theoretical perspective, these symmetries can be expressed as:</p>
 <p>These permutational symmetries arise from the mathematical properties of the two-electron repulsion integrals.
 When accessing specific elements with <code class="docutils literal notranslate"><span class="pre">get_two_body_element(i,</span> <span class="pre">j,</span> <span class="pre">k,</span> <span class="pre">l)</span></code>, the function handles the appropriate index mapping to retrieve the correct value based on the implementation’s storage format.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Example indices for one- and two-body integral access</span>
 <span class="kt">size_t</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
 <span class="kt">size_t</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
@@ -273,7 +273,7 @@ When accessing specific elements with <code class="docutils literal notranslate"
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example indices for one- and two-electron integral access</span>
 <span class="n">i_int</span><span class="p">,</span> <span class="n">j_int</span><span class="p">,</span> <span class="n">k_int</span><span class="p">,</span> <span class="n">l_int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span>
 
@@ -317,7 +317,7 @@ The <a class="reference internal" href="../algorithms/hamiltonian_constructor.ht
 <h2>Validation methods<a class="headerlink" href="#validation-methods" title="Link to this heading"></a></h2>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a> class provides methods to check the validity and consistency of its data:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Check if the Hamiltonian data is complete and consistent</span>
 <span class="c1">// Returns bool</span>
 <span class="kt">bool</span><span class="w"> </span><span class="n">valid</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">is_valid</span><span class="p">();</span>
@@ -330,7 +330,7 @@ The <a class="reference internal" href="../algorithms/hamiltonian_constructor.ht
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>This example shows the API pattern. For complete working examples, see the test suite.</p>

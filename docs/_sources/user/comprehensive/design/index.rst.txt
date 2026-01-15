@@ -28,10 +28,17 @@ Data classes
 
 Data classes in QDK/Chemistry concretely represent intermediate quantities commonly encountered in quantum applications workflows. These classes are designed to be:
 
-- **Immutable**: Once created, the core data cannot be modified
-- **Self-contained**: Include all information necessary to represent the underlying quantum chemical quantity
-- :doc:`Serializable <../data/serialization>`: Can be easily saved to and loaded from files
-- **Language-agnostic**: Accessible through identical APIs in both C++ and Python
+Immutable
+   Once created, the core data cannot be modified
+
+Self-contained
+   Include all information necessary to represent the underlying quantum chemical quantity
+
+:doc:`Serializable <../data/serialization>`
+   Can be easily saved to and loaded from files
+
+Language-agnostic
+   Accessible through identical APIs in both C++ and Python
 
 See the :doc:`Data Classes <../data/index>` documentation for further details on the availability and usage of QDK/Chemistry's data classes.
 
@@ -43,12 +50,19 @@ Algorithm classes
 Algorithm classes represent mutations on data, such as the execution of quantum chemical methods and generation of circuit components commonly found in quantum applications workflows.
 These classes are designed to be:
 
-- **Stateless**: Their behavior depends only on their input data and configuration
-- **Configurable**: Through a standardized ``Settings`` interface
-- **Conforming**: Exposing a common interface for disparate implementations to enable a unified user experience.
-- **Extensible**: Allowing new implementations to be added without modifying existing code
+Stateless
+   Their behavior depends only on their input data and configuration
 
-Programatically, Algorithms are specified as abstract interfaces which can be specialized downstream through concrete implementations.
+Configurable
+   Through a standardized ``Settings`` interface
+
+Conforming
+   Exposing a common interface for disparate implementations to enable a unified user experience.
+
+Extensible
+   Allowing new implementations to be added without modifying existing code
+
+Programmatically, Algorithms are specified as abstract interfaces which can be specialized downstream through concrete implementations.
 This allows QDK/Chemistry to be expressed as a :doc:`plugin architecture <../plugins>`, for which algorithm implementations may be specified either natively within QDK/Chemistry or through established third-party quantum chemistry packages:
 
 .. graphviz:: /_static/diagrams/plugin_architecture.dot
@@ -58,7 +72,7 @@ This allows QDK/Chemistry to be expressed as a :doc:`plugin architecture <../plu
 This design allows users to benefit from specialized capabilities of "best-in-breed" software while maintaining a consistent user experience.
 See the :doc:`Plugin System <../plugins>` documentation for further details on how to contribute new algorithm implementations.
 
-Further details on the availablity and usage of QDK/Chemistry's algorithm implementations can be found in the :doc:`Algorithms <../algorithms/index>` documentation.
+Further details on the availability and usage of QDK/Chemistry's algorithm implementations can be found in the :doc:`Algorithms <../algorithms/index>` documentation.
 
 .. _hl_factory_pattertn:
 

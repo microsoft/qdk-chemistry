@@ -16,6 +16,7 @@ Subpackages
    qdk_chemistry.algorithms.energy_estimator
    qdk_chemistry.algorithms.qubit_mapper
    qdk_chemistry.algorithms.state_preparation
+   qdk_chemistry.algorithms.time_evolution
 
 Submodules
 ----------

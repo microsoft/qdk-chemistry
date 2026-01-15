@@ -7,18 +7,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>qdk_chemistry.plugins.pyscf.localization &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=a64bac2b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=06674eb4" />
 
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../../../_static/documentation_options.js?v=81bd8d55"></script>
-      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../../../_static/copybutton.js?v=f281be69"></script>
@@ -269,6 +269,15 @@
                 <span class="k">return</span> <span class="n">lo</span><span class="o">.</span><span class="n">cholesky_mos</span><span class="p">(</span><span class="n">inp</span><span class="p">[:,</span> <span class="n">indices</span><span class="p">])</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown localization method: </span><span class="si">{</span><span class="n">loc_method</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
+        <span class="c1"># Preserve active/inactive space indices from input orbitals if they exist</span>
+        <span class="c1"># For restricted: indices = (active, inactive)</span>
+        <span class="c1"># For unrestricted: indices = (active_alpha, active_beta, inactive_alpha, inactive_beta)</span>
+        <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_active_space</span><span class="p">():</span>
+            <span class="n">active_alpha</span><span class="p">,</span> <span class="n">active_beta</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()</span>
+            <span class="n">inactive_alpha</span><span class="p">,</span> <span class="n">inactive_beta</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_inactive_space_indices</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">active_alpha</span> <span class="o">=</span> <span class="n">active_beta</span> <span class="o">=</span> <span class="n">inactive_alpha</span> <span class="o">=</span> <span class="n">inactive_beta</span> <span class="o">=</span> <span class="kc">None</span>
+
         <span class="c1"># Perform localization and populate localized orbitals instance</span>
         <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">is_restricted</span><span class="p">():</span>
             <span class="k">if</span> <span class="n">loc_indices_a</span> <span class="o">!=</span> <span class="n">loc_indices_b</span><span class="p">:</span>
@@ -287,6 +296,7 @@
                 <span class="n">energies</span><span class="o">=</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_energies</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_energies</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
                 <span class="n">ao_overlap</span><span class="o">=</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_overlap_matrix</span><span class="p">()</span> <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_overlap_matrix</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
                 <span class="n">basis_set</span><span class="o">=</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">(),</span>
+                <span class="n">indices</span><span class="o">=</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">active_alpha</span><span class="p">),</span> <span class="nb">list</span><span class="p">(</span><span class="n">inactive_alpha</span><span class="p">))</span> <span class="k">if</span> <span class="n">active_alpha</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Unrestricted case - handle alpha and beta separately</span>
@@ -310,6 +320,14 @@
                 <span class="n">energies_beta</span><span class="o">=</span><span class="n">energies_beta</span><span class="p">,</span>
                 <span class="n">ao_overlap</span><span class="o">=</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_overlap_matrix</span><span class="p">()</span> <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_overlap_matrix</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
                 <span class="n">basis_set</span><span class="o">=</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">(),</span>
+                <span class="n">indices</span><span class="o">=</span><span class="p">(</span>
+                    <span class="nb">list</span><span class="p">(</span><span class="n">active_alpha</span><span class="p">),</span>
+                    <span class="nb">list</span><span class="p">(</span><span class="n">active_beta</span><span class="p">),</span>
+                    <span class="nb">list</span><span class="p">(</span><span class="n">inactive_alpha</span><span class="p">),</span>
+                    <span class="nb">list</span><span class="p">(</span><span class="n">inactive_beta</span><span class="p">),</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="n">active_alpha</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">())</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
             <span class="c1"># Single determinant case - return new wavefunction with localized orbitals</span>

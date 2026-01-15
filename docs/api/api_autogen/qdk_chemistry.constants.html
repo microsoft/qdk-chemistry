@@ -8,18 +8,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>qdk_chemistry.constants module &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a64bac2b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=06674eb4" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
-      <script src="../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../_static/copybutton.js?v=f281be69"></script>
@@ -113,7 +113,7 @@
   <section id="module-qdk_chemistry.constants">
 <span id="qdk-chemistry-constants-module"></span><h1>qdk_chemistry.constants module<a class="headerlink" href="#module-qdk_chemistry.constants" title="Link to this heading"></a></h1>
 <p>QDK/Chemistry Physical Constants Module.</p>
-<p>This module provides access to physical constants from CODATA standards <span id="id1">[<a class="reference internal" href="../../references.html#id27" title="Peter J. Mohr, David B. Newell, and Barry N. Taylor. CODATA recommended values of the fundamental physical constants: 2022. Reviews of Modern Physics, 97:025002, 2025. URL: https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=958143, doi:10.1103/RevModPhys.97.025002.">MNT25</a>]</span>.
+<p>This module provides access to physical constants from CODATA standards <span id="id1">[<a class="reference internal" href="../../references.html#id28" title="Peter J. Mohr, David B. Newell, and Barry N. Taylor. CODATA recommended values of the fundamental physical constants: 2022. Reviews of Modern Physics, 97:025002, 2025. URL: https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=958143, doi:10.1103/RevModPhys.97.025002.">MNT25</a>]</span>.
 The constants are sourced from the most recent CODATA recommendations
 (currently CODATA 2022), but the underlying C++ implementation supports
 multiple CODATA versions for compatibility and comparison purposes.</p>
@@ -159,7 +159,7 @@ of individual constants.</p>
 </div>
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.constants.ConstantInfo">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.constants.</span></span><span class="sig-name descname"><span class="pre">ConstantInfo</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.constants.</span></span><span class="sig-name descname"><span class="pre">ConstantInfo</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="../_py_placeholders.html#pybind11_builtins.pybind11_object" title="pybind11_builtins.pybind11_object"><code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></a></p>
 <p>Documentation information for a physical constant</p>
 <dl class="py method">
@@ -169,37 +169,37 @@ of individual constants.</p>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="qdk_chemistry.constants.ConstantInfo.description">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">description</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.description" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">description</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.description" title="Link to this definition"></a></dt>
 <dd><p>Description of the physical meaning</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="qdk_chemistry.constants.ConstantInfo.name">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.name" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.name" title="Link to this definition"></a></dt>
 <dd><p>Name of the constant</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="qdk_chemistry.constants.ConstantInfo.source">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">source</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.source" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">source</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.source" title="Link to this definition"></a></dt>
 <dd><p>Data source (e.g., ‘CODATA 2022’)</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="qdk_chemistry.constants.ConstantInfo.symbol">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">symbol</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.symbol" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">symbol</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.symbol" title="Link to this definition"></a></dt>
 <dd><p>Mathematical symbol</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="qdk_chemistry.constants.ConstantInfo.units">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">units</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.units" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">units</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.units" title="Link to this definition"></a></dt>
 <dd><p>Units of measurement</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="qdk_chemistry.constants.ConstantInfo.value">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">value</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.value" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">value</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.value" title="Link to this definition"></a></dt>
 <dd><p>Numerical value</p>
 </dd></dl>
 

@@ -8,18 +8,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Model Hamiltonians &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a64bac2b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=06674eb4" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
-      <script src="../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../_static/copybutton.js?v=f281be69"></script>
@@ -122,10 +122,14 @@ This is particularly useful for studying model systems like Hubbard models, Heis
 <h3>Example: Hubbard model Hamiltonian<a class="headerlink" href="#example-hubbard-model-hamiltonian" title="Link to this heading"></a></h3>
 <p>The following example demonstrates how to create a simple Hubbard model Hamiltonian using <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.ModelOrbitals" title="qdk_chemistry.data.ModelOrbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelOrbitals</span></code></a> and the <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a> class:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">algorithms</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">ModelOrbitals</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">Hamiltonian</span><span class="p">,</span>
+    <span class="n">CanonicalFourCenterHamiltonianContainer</span><span class="p">,</span>
+    <span class="n">ModelOrbitals</span><span class="p">,</span>
+<span class="p">)</span>
 
 <span class="c1"># Define a 4-site Hubbard chain with restricted &quot;orbitals&quot;</span>
 <span class="n">num_sites</span> <span class="o">=</span> <span class="mi">4</span>
@@ -159,7 +163,9 @@ This is particularly useful for studying model systems like Hubbard models, Heis
 
 <span class="c1"># Create the Hamiltonian</span>
 <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">Hamiltonian</span><span class="p">(</span>
-    <span class="n">one_body</span><span class="p">,</span> <span class="n">two_body</span><span class="p">,</span> <span class="n">model_orbitals</span><span class="p">,</span> <span class="n">core_energy</span><span class="p">,</span> <span class="n">inactive_fock</span>
+    <span class="n">CanonicalFourCenterHamiltonianContainer</span><span class="p">(</span>
+        <span class="n">one_body</span><span class="p">,</span> <span class="n">two_body</span><span class="p">,</span> <span class="n">model_orbitals</span><span class="p">,</span> <span class="n">core_energy</span><span class="p">,</span> <span class="n">inactive_fock</span>
+    <span class="p">)</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -176,7 +182,7 @@ This is particularly useful for studying model systems like Hubbard models, Heis
 </ul>
 <p>Example with multi-configuration calculator:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a multi-configuration calculator</span>
 <span class="n">mc_calculator</span> <span class="o">=</span> <span class="n">algorithms</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;macis_cas&quot;</span><span class="p">)</span>
 

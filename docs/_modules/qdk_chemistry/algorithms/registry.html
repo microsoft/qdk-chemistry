@@ -7,18 +7,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>qdk_chemistry.algorithms.registry &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=a64bac2b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=06674eb4" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
-      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../../_static/copybutton.js?v=f281be69"></script>
@@ -364,7 +364,7 @@
 <span class="sd">    Args:</span>
 <span class="sd">        generator (Callable[[], Algorithm]): A callable that returns a new instance.</span>
 
-<span class="sd">            Need to reurn an instance of the custom algorithm.</span>
+<span class="sd">            Need to return an instance of the custom algorithm.</span>
 <span class="sd">            This will be called each time the algorithm is created</span>
 <span class="sd">            from the factory.</span>
 
@@ -615,7 +615,7 @@
 
 <span class="sd">    This internal initialization function registers all the Python-implemented</span>
 <span class="sd">    algorithm factories. This includes factories for energy estimators, qubit Hamiltonian solver,</span>
-<span class="sd">    qubit mappers, and state preparation algorithms that are implemented in Python.</span>
+<span class="sd">    qubit mappers, time evolution algorithms, and state preparation algorithms that are implemented in Python.</span>
 
 <span class="sd">    This function is automatically called during module import and should not</span>
 <span class="sd">    be called by users.</span>
@@ -624,11 +624,17 @@
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_hamiltonian_solver</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitHamiltonianSolverFactory</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitMapperFactory</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.state_preparation</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatePreparationFactory</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.builder</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimeEvolutionBuilderFactory</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">ControlledEvolutionCircuitMapperFactory</span><span class="p">,</span>
+    <span class="p">)</span>
 
     <span class="n">register_factory</span><span class="p">(</span><span class="n">EnergyEstimatorFactory</span><span class="p">())</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">StatePreparationFactory</span><span class="p">())</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">QubitMapperFactory</span><span class="p">())</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">QubitHamiltonianSolverFactory</span><span class="p">())</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">TimeEvolutionBuilderFactory</span><span class="p">())</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">ControlledEvolutionCircuitMapperFactory</span><span class="p">())</span>
 
 
 <span class="n">_</span> <span class="o">=</span> <span class="n">_register_cpp_factories</span><span class="p">()</span>
@@ -675,7 +681,7 @@
 
 <span class="sd">    This internal initialization function registers specific Python-implemented</span>
 <span class="sd">    algorithm instances as built-in algorithms. This includes the default QDK</span>
-<span class="sd">    energy estimator, qubit Hamiltonian solvers, and state preparation algorithms.</span>
+<span class="sd">    energy estimator, qubit Hamiltonian solvers, time evolution algorithms, and state preparation algorithms.</span>
 
 <span class="sd">    This function is automatically called during module import and should not</span>
 <span class="sd">    be called by users.</span>
@@ -683,11 +689,19 @@
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.energy_estimator</span><span class="w"> </span><span class="kn">import</span> <span class="n">QDKEnergyEstimator</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_hamiltonian_solver</span><span class="w"> </span><span class="kn">import</span> <span class="n">DenseMatrixSolver</span><span class="p">,</span> <span class="n">SparseMatrixSolver</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.state_preparation</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparseIsometryGF2XStatePreparation</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.builder.trotter</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">Trotter</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">PauliSequenceMapper</span><span class="p">,</span>
+    <span class="p">)</span>
 
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QDKEnergyEstimator</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">SparseIsometryGF2XStatePreparation</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">DenseMatrixSolver</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">SparseMatrixSolver</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">Trotter</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">PauliSequenceMapper</span><span class="p">())</span>
 
 
 <span class="n">_register_python_algorithms</span><span class="p">()</span>

@@ -1,0 +1,17 @@
+qdk\_chemistry.data.time\_evolution.containers package
+======================================================
+
+.. automodule:: qdk_chemistry.data.time_evolution.containers
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.data.time_evolution.containers.base
+   qdk_chemistry.data.time_evolution.containers.pauli_product_formula

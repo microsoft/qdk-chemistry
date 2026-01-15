@@ -1,0 +1,17 @@
+qdk\_chemistry.algorithms.time\_evolution package
+=================================================
+
+.. automodule:: qdk_chemistry.algorithms.time_evolution
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.time_evolution.builder
+   qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper

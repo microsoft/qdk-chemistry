@@ -8,18 +8,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Stability analysis &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=a64bac2b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=06674eb4" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
-      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../../_static/copybutton.js?v=f281be69"></script>
@@ -67,7 +67,16 @@
 <li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
 <li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field (SCF) solver</a></li>
-<li class="toctree-l3 current"><a class="current reference internal" href="#">Stability analysis</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Stability analysis</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#running-a-stability-check">Running a stability check</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#available-settings">Available settings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#available-implementations">Available implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#understanding-stability-results">Understanding stability results</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#discovering-implementations">Discovering implementations</a></li>
@@ -118,12 +127,585 @@
              
   <section id="stability-analysis">
 <h1>Stability analysis<a class="headerlink" href="#stability-analysis" title="Link to this heading"></a></h1>
-<p>Stability analysis <span id="id1">[<a class="reference internal" href="../../../references.html#id33" title="H. B. Schlegel and J. J. W. McDouall. Do You Have SCF Stability and Convergence Problems?, pages 167–185. Springer Netherlands, Dordrecht, 1991. URL: https://doi.org/10.1007/978-94-011-3262-6_2, doi:10.1007/978-94-011-3262-6_2.">SM91</a>]</span> is a crucial step in self-consistent field (<a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a>) calculations to ensure that the obtained solution corresponds to a true energy minimum rather than a saddle point or maximum. Unstable solutions can lead to inaccurate results in subsequent calculations, such as correlation methods or excited state computations.</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StabilityChecker" title="qdk_chemistry.algorithms.StabilityChecker"><code class="xref py py-class docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a> algorithm in QDK/Chemistry performs wavefunction stability analysis to verify that a Self-Consistent Field (<a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a>) solution corresponds to a true energy minimum rather than a saddle point.
+Following QDK/Chemistry’s <a class="reference internal" href="../design/index.html"><span class="doc">algorithm design principles</span></a>, it takes a <a class="reference internal" href="../data/wavefunction.html"><span class="doc">Wavefunction</span></a> instance as input and produces a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StabilityResult" title="qdk_chemistry.data.StabilityResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">StabilityResult</span></code></a> object containing stability information as output.
+Its primary purpose is to identify directions in orbital space where the energy can be further lowered, which is crucial for ensuring the reliability of quantum chemistry calculations.</p>
+<p>Unstable <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> solutions can occur in challenging cases such as stretched molecular geometries, open-shell systems, and molecules with near-degenerate orbitals.
+This iterative stability analysis of checking stability, rotating orbitals, and re-running <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> continues until a stable minimum is reached.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Stability analysis <span id="id1">[<a class="reference internal" href="../../../references.html#id34" title="H. B. Schlegel and J. J. W. McDouall. Do you have SCF stability and convergence problems?, pages 167–185. Springer Netherlands, Dordrecht, 1991. URL: https://doi.org/10.1007/978-94-011-3262-6_2, doi:10.1007/978-94-011-3262-6_2.">SM91</a>]</span> examines the second-order response of the wavefunction energy to orbital rotations.
+Mathematically, this involves computing the eigenvalues of the electronic Hessian matrix.
+A stable wavefunction should have all positive (or non-negative) eigenvalues, indicating that the energy cannot be lowered by any orbital rotation.
+Negative eigenvalues signal instabilities and identify directions in which the energy can decrease.</p>
+<p>There are two types of stability that can be checked:</p>
+<dl class="simple">
+<dt>Internal stability</dt><dd><p>Examines whether the wavefunction is stable with respect to rotations within the same wavefunction type.
+For example, restricted Hartree-Fock (<a class="reference internal" href="../../../glossary.html#term-RHF"><span class="xref std std-term">RHF</span></a>) internal stability checks if the energy can be lowered while maintaining the restricted formalism.</p>
+</dd>
+<dt>External stability</dt><dd><p>Examines whether the wavefunction is stable with respect to transitions to a different wavefunction type.
+The most common case is <a class="reference internal" href="../../../glossary.html#term-RHF"><span class="xref std std-term">RHF</span></a> external stability, which checks for <a class="reference internal" href="../../../glossary.html#term-RHF"><span class="xref std std-term">RHF</span></a> to unrestricted Hartree-Fock (<a class="reference internal" href="../../../glossary.html#term-UHF"><span class="xref std std-term">UHF</span></a>) instabilities.
+This is particularly important for systems that may benefit from spin symmetry breaking, such as stretched bonds or transition metal complexes.</p>
+</dd>
+</dl>
+<p>The typical workflow for handling instabilities involves an iterative procedure:</p>
+<ol class="arabic simple">
+<li><p>Run an <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation to obtain initial orbitals</p></li>
+<li><p>Check stability of the resulting wavefunction</p></li>
+<li><p>If unstable, extract the eigenvector corresponding to the most negative eigenvalue</p></li>
+<li><p>Rotate orbitals along this eigenvector direction</p></li>
+<li><p>Use rotated orbitals as initial guess for a new <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation</p></li>
+<li><p>Repeat until a stable solution is found</p></li>
+</ol>
+<p>When an external instability is detected in a restricted calculation, the procedure typically switches to an unrestricted calculation type, as the instability indicates that spin symmetry breaking would lower the energy.</p>
+</section>
+<section id="running-a-stability-check">
+<h2>Running a stability check<a class="headerlink" href="#running-a-stability-check" title="Link to this heading"></a></h2>
+<p>This section demonstrates how to setup, configure, and run a stability check.
+The <code class="docutils literal notranslate"><span class="pre">run</span></code> method returns two values: a boolean indicating overall stability status and a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StabilityResult" title="qdk_chemistry.data.StabilityResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">StabilityResult</span></code></a> object containing detailed analysis results including eigenvalues and eigenvectors.</p>
+<section id="input-requirements">
+<h3>Input requirements<a class="headerlink" href="#input-requirements" title="Link to this heading"></a></h3>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StabilityChecker" title="qdk_chemistry.algorithms.StabilityChecker"><code class="xref py py-class docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a> requires a converged wavefunction from an <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation:</p>
+<dl class="simple">
+<dt>Wavefunction</dt><dd><p>A <a class="reference internal" href="../data/wavefunction.html"><span class="doc">Wavefunction</span></a> instance containing orbital information.
+This is typically obtained as output from a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ScfSolver" title="qdk_chemistry.algorithms.ScfSolver"><code class="xref py py-class docutils literal notranslate"><span class="pre">ScfSolver</span></code></a> calculation.</p>
+</dd>
+</dl>
+<p class="rubric">Creating a stability checker</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iomanip&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry/constants.hpp&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry/utils/orbital_rotation.hpp&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span>
+
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">algorithms</span><span class="p">;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">utils</span><span class="p">;</span>
+
+<span class="c1">// Create the default StabilityChecker instance</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">stability_checker</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">StabilityCheckerFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">rotate_orbitals</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">ANGSTROM_TO_BOHR</span>
+
+<span class="c1"># Create the default StabilityChecker instance</span>
+<span class="n">stability_checker</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;stability_checker&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p class="rubric">Configuring settings</p>
+<p>Settings can be modified using the <code class="docutils literal notranslate"><span class="pre">settings()</span></code> object.
+See <a class="reference internal" href="#available-settings">Available settings</a> below for a complete list of options.
+Key settings include whether to perform internal and external stability checks, and the tolerance for determining stability.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Configure stability checker settings</span>
+<span class="w">  </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;internal&quot;</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+<span class="w">  </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span>
+<span class="w">      </span><span class="s">&quot;external&quot;</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span><span class="w">  </span><span class="c1">// Will be adjusted based on calculation type</span>
+<span class="w">  </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;stability_tolerance&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">-1e-4</span><span class="p">);</span>
+<span class="w">  </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;davidson_tolerance&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-4</span><span class="p">);</span>
+<span class="w">  </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;max_subspace&quot;</span><span class="p">,</span><span class="w"> </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="p">(</span><span class="mi">30</span><span class="p">));</span>
+<span class="w">  </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;method&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;hf&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Configure stability checker settings</span>
+<span class="n">stability_checker</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;internal&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="c1"># Will be adjusted based on calculation type</span>
+<span class="n">stability_checker</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;external&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="n">stability_checker</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;stability_tolerance&quot;</span><span class="p">,</span> <span class="o">-</span><span class="mf">1e-4</span><span class="p">)</span>
+<span class="n">stability_checker</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;davidson_tolerance&quot;</span><span class="p">,</span> <span class="mf">1e-4</span><span class="p">)</span>
+<span class="c1"># Maximum subspace size for Davidson solver</span>
+<span class="n">stability_checker</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_subspace&quot;</span><span class="p">,</span> <span class="mi">30</span><span class="p">)</span>
+<span class="n">stability_checker</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;hf&quot;</span><span class="p">)</span>
+
+</pre></div>
+</div>
+</div>
+</div>
+<p class="rubric">Running the stability check and iterative workflow</p>
+<p>The example below shows a complete iterative workflow for achieving a stable wavefunction.
+This includes running an initial <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation, checking stability, and iteratively rotating orbitals and re-running <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> until convergence to a stable solution.</p>
+<p>The workflow handles both internal instabilities (requiring orbital rotation within the same calculation type) and external instabilities (requiring a switch from restricted to unrestricted calculation).
+Note that the Davidson eigenvalue solver used in stability analysis may occasionally fail to converge; when this occurs, increasing <code class="docutils literal notranslate"><span class="pre">max_subspace</span></code> or adjusting <code class="docutils literal notranslate"><span class="pre">davidson_tolerance</span></code> can help.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create N2 molecule at stretched geometry (1.4 Angstrom)</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="o">&gt;</span><span class="w"> </span><span class="n">coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="mf">1.4</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">}};</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">symbols</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;N&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;N&quot;</span><span class="p">};</span>
+<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">coord</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">coords</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">coord</span><span class="w"> </span><span class="o">*=</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">constants</span><span class="o">::</span><span class="n">angstrom_to_bohr</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">n2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span><span class="n">Structure</span><span class="o">&gt;</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span><span class="w"> </span><span class="n">symbols</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Create and configure SCF solver with auto scf_type</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+<span class="w">  </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;scf_type&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;auto&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;method&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;hf&quot;</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Run initial SCF calculation</span>
+<span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">spin_multiplicity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">energy</span><span class="p">,</span><span class="w"> </span><span class="n">wavefunction</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">n2</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">spin_multiplicity</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;def2-svp&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Initial SCF Energy: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">fixed</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">setprecision</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">energy</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+
+<span class="w">  </span><span class="c1">// Determine if calculation is restricted and configure stability checker</span>
+<span class="w">  </span><span class="c1">// accordingly</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">is_restricted</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">wavefunction</span><span class="o">-&gt;</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">is_restricted</span><span class="p">()</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">spin_multiplicity</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">is_restricted</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;external&quot;</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;external&quot;</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="c1">// Iterative workflow: Check stability and rotate orbitals until convergence</span>
+<span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">max_iterations</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">5</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">iteration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">is_stable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">StabilityResult</span><span class="o">&gt;</span><span class="w"> </span><span class="n">result</span><span class="p">;</span>
+
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s">=== Starting Iterative Stability Workflow ===</span><span class="se">\n</span><span class="s">&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+
+<span class="w">  </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">iteration</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">max_iterations</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">iteration</span><span class="o">++</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;--- Iteration &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">iteration</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; ---&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Current Energy: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">fixed</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">setprecision</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+<span class="w">              </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">energy</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Check stability - handle potential Davidson convergence failure</span>
+<span class="w">    </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">stable</span><span class="p">,</span><span class="w"> </span><span class="n">stability_result</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">);</span>
+<span class="w">      </span><span class="n">is_stable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">stable</span><span class="p">;</span>
+<span class="w">      </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">stability_result</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">runtime_error</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">error_msg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">what</span><span class="p">();</span>
+<span class="w">      </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">error_msg</span><span class="p">.</span><span class="n">find</span><span class="p">(</span><span class="s">&quot;Davidson Did Not Converge!&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">::</span><span class="n">npos</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span>
+<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Try increasing max_subspace or adjusting davidson_tolerance&quot;</span>
+<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">        </span><span class="k">throw</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">runtime_error</span><span class="p">(</span><span class="s">&quot;Davidson Did Not Converge!&quot;</span><span class="p">);</span>
+<span class="w">      </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">throw</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">runtime_error</span><span class="p">(</span><span class="s">&quot;Stability check failed: &quot;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">error_msg</span><span class="p">);</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">is_stable</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s">Converged to stable wavefunction!&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">      </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// Determine rotation type based on which instability is present</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">do_external</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">double</span><span class="w"> </span><span class="n">smallest_eigenvalue</span><span class="p">;</span>
+<span class="w">    </span><span class="n">Eigen</span><span class="o">::</span><span class="n">VectorXd</span><span class="w"> </span><span class="n">rotation_vector</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">result</span><span class="o">-&gt;</span><span class="n">is_internal_stable</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">eigenvalue</span><span class="p">,</span><span class="w"> </span><span class="n">eigenvector</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
+<span class="w">          </span><span class="n">result</span><span class="o">-&gt;</span><span class="n">get_smallest_internal_eigenvalue_and_vector</span><span class="p">();</span>
+<span class="w">      </span><span class="n">smallest_eigenvalue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">eigenvalue</span><span class="p">;</span>
+<span class="w">      </span><span class="n">rotation_vector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">eigenvector</span><span class="p">;</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Internal instability detected. Smallest eigenvalue: &quot;</span>
+<span class="w">                </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">fixed</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">setprecision</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">smallest_eigenvalue</span>
+<span class="w">                </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">result</span><span class="o">-&gt;</span><span class="n">is_external_stable</span><span class="p">()</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">result</span><span class="o">-&gt;</span><span class="n">has_external_result</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">eigenvalue</span><span class="p">,</span><span class="w"> </span><span class="n">eigenvector</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
+<span class="w">          </span><span class="n">result</span><span class="o">-&gt;</span><span class="n">get_smallest_external_eigenvalue_and_vector</span><span class="p">();</span>
+<span class="w">      </span><span class="n">smallest_eigenvalue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">eigenvalue</span><span class="p">;</span>
+<span class="w">      </span><span class="n">rotation_vector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">eigenvector</span><span class="p">;</span>
+<span class="w">      </span><span class="n">do_external</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;External instability detected. Smallest eigenvalue: &quot;</span>
+<span class="w">                </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">fixed</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">setprecision</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">smallest_eigenvalue</span>
+<span class="w">                </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">throw</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">runtime_error</span><span class="p">(</span>
+<span class="w">          </span><span class="s">&quot;Unexpected state: neither internal nor external instability &quot;</span>
+<span class="w">          </span><span class="s">&quot;detected&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// Rotate orbitals along the instability direction</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">num_alpha</span><span class="p">,</span><span class="w"> </span><span class="n">num_beta</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">wavefunction</span><span class="o">-&gt;</span><span class="n">get_total_num_electrons</span><span class="p">();</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">wavefunction</span><span class="o">-&gt;</span><span class="n">get_orbitals</span><span class="p">();</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">rotated_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rotate_orbitals</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span><span class="w"> </span><span class="n">rotation_vector</span><span class="p">,</span>
+<span class="w">                                            </span><span class="n">num_alpha</span><span class="p">,</span><span class="w"> </span><span class="n">num_beta</span><span class="p">,</span><span class="w"> </span><span class="n">do_external</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// If external instability detected, switch to unrestricted calculation</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">do_external</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span>
+<span class="w">          </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Switching to unrestricted calculation due to external instability&quot;</span>
+<span class="w">          </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+
+<span class="w">      </span><span class="c1">// Get current settings values to preserve them</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">get</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;method&quot;</span><span class="p">);</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">stab_method</span><span class="w"> </span><span class="o">=</span>
+<span class="w">          </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">get</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;method&quot;</span><span class="p">);</span>
+<span class="w">      </span><span class="kt">double</span><span class="w"> </span><span class="n">davidson_tol</span><span class="w"> </span><span class="o">=</span>
+<span class="w">          </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;davidson_tolerance&quot;</span><span class="p">);</span>
+<span class="w">      </span><span class="kt">double</span><span class="w"> </span><span class="n">stability_tol</span><span class="w"> </span><span class="o">=</span>
+<span class="w">          </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;stability_tolerance&quot;</span><span class="p">);</span>
+<span class="w">      </span><span class="kt">int64_t</span><span class="w"> </span><span class="n">max_sub</span><span class="w"> </span><span class="o">=</span>
+<span class="w">          </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;max_subspace&quot;</span><span class="p">);</span>
+<span class="w">      </span><span class="kt">bool</span><span class="w"> </span><span class="n">internal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;internal&quot;</span><span class="p">);</span>
+
+<span class="w">      </span><span class="c1">// Create new solver instances</span>
+<span class="w">      </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+<span class="w">      </span><span class="n">stability_checker</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">StabilityCheckerFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+
+<span class="w">      </span><span class="c1">// Reconfigure with updated settings</span>
+<span class="w">      </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;scf_type&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;unrestricted&quot;</span><span class="p">);</span>
+<span class="w">      </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;method&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">method</span><span class="p">);</span>
+
+<span class="w">      </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;internal&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">internal</span><span class="p">);</span>
+<span class="w">      </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;external&quot;</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">);</span>
+<span class="w">      </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;method&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">stab_method</span><span class="p">);</span>
+<span class="w">      </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;davidson_tolerance&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">davidson_tol</span><span class="p">);</span>
+<span class="w">      </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;stability_tolerance&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">stability_tol</span><span class="p">);</span>
+<span class="w">      </span><span class="n">stability_checker</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;max_subspace&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">max_sub</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// Re-run SCF with rotated orbitals as initial guess</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">new_energy</span><span class="p">,</span><span class="w"> </span><span class="n">new_wavefunction</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
+<span class="w">        </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">n2</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">spin_multiplicity</span><span class="p">,</span><span class="w"> </span><span class="n">rotated_orbitals</span><span class="p">);</span>
+<span class="w">    </span><span class="n">energy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">new_energy</span><span class="p">;</span>
+<span class="w">    </span><span class="n">wavefunction</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">new_wavefunction</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;New Energy after rotation: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">fixed</span>
+<span class="w">              </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">setprecision</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">energy</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s">Final Energy: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">fixed</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">setprecision</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">energy</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Final stability status: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="p">(</span><span class="n">is_stable</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="s">&quot;stable&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s">&quot;unstable&quot;</span><span class="p">)</span>
+<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create N2 molecule at stretched geometry (1.4 Angstrom)</span>
+<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;N&quot;</span><span class="p">,</span> <span class="s2">&quot;N&quot;</span><span class="p">]</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.4</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]])</span>
+<span class="n">coords</span> <span class="o">*=</span> <span class="n">ANGSTROM_TO_BOHR</span>
+<span class="n">n2</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">symbols</span><span class="p">,</span> <span class="n">coords</span><span class="p">)</span>
+
+<span class="c1"># Create and configure SCF solver with auto scf_type</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;scf_type&quot;</span><span class="p">,</span> <span class="s2">&quot;auto&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;hf&quot;</span><span class="p">)</span>
+
+<span class="c1"># Run initial SCF calculation</span>
+<span class="n">spin_multiplicity</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">energy</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">n2</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;def2-svp&quot;</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Initial SCF Energy: </span><span class="si">{</span><span class="n">energy</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+
+<span class="c1"># Determine if calculation is restricted and configure stability checker accordingly</span>
+<span class="n">is_restricted</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">is_restricted</span><span class="p">()</span> <span class="ow">and</span> <span class="n">spin_multiplicity</span> <span class="o">==</span> <span class="mi">1</span>
+<span class="k">if</span> <span class="n">is_restricted</span><span class="p">:</span>
+    <span class="n">stability_checker</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;external&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">stability_checker</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;external&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+
+<span class="c1"># Iterative workflow: Check stability and rotate orbitals until convergence</span>
+<span class="n">max_iterations</span> <span class="o">=</span> <span class="mi">5</span>
+<span class="n">iteration</span> <span class="o">=</span> <span class="mi">0</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">=== Starting Iterative Stability Workflow ===</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="k">while</span> <span class="n">iteration</span> <span class="o">&lt;</span> <span class="n">max_iterations</span><span class="p">:</span>
+    <span class="n">iteration</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;--- Iteration </span><span class="si">{</span><span class="n">iteration</span><span class="si">}</span><span class="s2"> ---&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Current Energy: </span><span class="si">{</span><span class="n">energy</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Check stability - handle potential Davidson convergence failure</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">is_stable</span><span class="p">,</span> <span class="n">result</span> <span class="o">=</span> <span class="n">stability_checker</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">RuntimeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">&quot;Davidson Did Not Converge!&quot;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Try increasing max_subspace or adjusting davidson_tolerance&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Davidson solver did not converge: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Stability check failed: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">is_stable</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Converged to stable wavefunction!&quot;</span><span class="p">)</span>
+        <span class="k">break</span>
+
+    <span class="c1"># Determine rotation type based on which instability is present</span>
+    <span class="n">do_external</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="o">.</span><span class="n">is_internal_stable</span><span class="p">():</span>
+        <span class="n">smallest_eigenvalue</span><span class="p">,</span> <span class="n">rotation_vector</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">get_smallest_internal_eigenvalue_and_vector</span><span class="p">()</span>
+        <span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Internal instability detected. Smallest eigenvalue: </span><span class="si">{</span><span class="n">smallest_eigenvalue</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="n">result</span><span class="o">.</span><span class="n">is_external_stable</span><span class="p">()</span> <span class="ow">and</span> <span class="n">result</span><span class="o">.</span><span class="n">has_external_result</span><span class="p">():</span>
+        <span class="n">smallest_eigenvalue</span><span class="p">,</span> <span class="n">rotation_vector</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">get_smallest_external_eigenvalue_and_vector</span><span class="p">()</span>
+        <span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;External instability detected. Smallest eigenvalue: </span><span class="si">{</span><span class="n">smallest_eigenvalue</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="n">do_external</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Unexpected state: neither internal nor external instability detected&quot;</span><span class="p">)</span>
+        <span class="k">break</span>
+
+    <span class="c1"># Rotate orbitals along the instability direction</span>
+    <span class="n">num_alpha</span><span class="p">,</span> <span class="n">num_beta</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_total_num_electrons</span><span class="p">()</span>
+    <span class="n">orbitals</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+    <span class="n">rotated_orbitals</span> <span class="o">=</span> <span class="n">rotate_orbitals</span><span class="p">(</span>
+        <span class="n">orbitals</span><span class="p">,</span> <span class="n">rotation_vector</span><span class="p">,</span> <span class="n">num_alpha</span><span class="p">,</span> <span class="n">num_beta</span><span class="p">,</span> <span class="n">do_external</span>
+    <span class="p">)</span>
+
+    <span class="c1"># If external instability detected, switch to unrestricted calculation</span>
+    <span class="k">if</span> <span class="n">do_external</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Switching to unrestricted calculation due to external instability&quot;</span><span class="p">)</span>
+        <span class="c1"># Create new solver instances with updated settings</span>
+        <span class="n">scf_solver_name</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">name</span><span class="p">()</span>
+        <span class="n">stability_checker_name</span> <span class="o">=</span> <span class="n">stability_checker</span><span class="o">.</span><span class="n">name</span><span class="p">()</span>
+
+        <span class="c1"># Copy settings and update for unrestricted calculation</span>
+        <span class="n">scf_settings_map</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">scf_settings_map</span><span class="p">[</span><span class="s2">&quot;scf_type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;unrestricted&quot;</span>
+        <span class="n">new_scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="n">scf_solver_name</span><span class="p">)</span>
+        <span class="n">new_scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">scf_settings_map</span><span class="p">)</span>
+
+        <span class="n">stability_settings_map</span> <span class="o">=</span> <span class="n">stability_checker</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">stability_settings_map</span><span class="p">[</span><span class="s2">&quot;external&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">new_stability_checker</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;stability_checker&quot;</span><span class="p">,</span> <span class="n">stability_checker_name</span><span class="p">)</span>
+        <span class="n">new_stability_checker</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">stability_settings_map</span><span class="p">)</span>
+
+        <span class="n">scf_solver</span> <span class="o">=</span> <span class="n">new_scf_solver</span>
+        <span class="n">stability_checker</span> <span class="o">=</span> <span class="n">new_stability_checker</span>
+
+    <span class="c1"># Re-run SCF with rotated orbitals as initial guess</span>
+    <span class="n">energy</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="n">n2</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="n">rotated_orbitals</span>
+    <span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;New Energy after rotation: </span><span class="si">{</span><span class="n">energy</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">()</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Final Energy: </span><span class="si">{</span><span class="n">energy</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Final stability status: </span><span class="si">{</span><span class="n">is_stable</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="available-settings">
+<h2>Available settings<a class="headerlink" href="#available-settings" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StabilityChecker" title="qdk_chemistry.algorithms.StabilityChecker"><code class="xref py py-class docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a> accepts settings to control stability analysis behavior.
+All implementations share a common base set of settings:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 15.0%" />
+<col style="width: 45.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">internal</span></code></p></td>
+<td><p>bool</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">True</span></code></p></td>
+<td><p>Check internal stability (within same wavefunction type)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">external</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Implementation-dependent</p></td>
+<td><p>Check external stability (<a class="reference internal" href="../../../glossary.html#term-RHF"><span class="xref std std-term">RHF</span></a> → <a class="reference internal" href="../../../glossary.html#term-UHF"><span class="xref std std-term">UHF</span></a> instabilities). Only supported for <a class="reference internal" href="../../../glossary.html#term-RHF"><span class="xref std std-term">RHF</span></a> wavefunctions</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">method</span></code></p></td>
+<td><p>string</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;hf&quot;</span></code></p></td>
+<td><p>The method to match the wavefunction: <code class="docutils literal notranslate"><span class="pre">&quot;hf&quot;</span></code> for Hartree-Fock, or a <a class="reference internal" href="../../../glossary.html#term-DFT"><span class="xref std std-term">DFT</span></a> functional name</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">stability_tolerance</span></code></p></td>
+<td><p>float</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">-1e-4</span></code></p></td>
+<td><p>Eigenvalue threshold for determining stability. Eigenvalues below this value indicate instability</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">davidson_tolerance</span></code></p></td>
+<td><p>float</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-8</span></code></p></td>
+<td><p>Convergence tolerance for the Davidson eigenvalue solver</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">max_subspace</span></code></p></td>
+<td><p>int</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">80</span></code></p></td>
+<td><p>Maximum subspace dimension for the Davidson solver</p></td>
+</tr>
+</tbody>
+</table>
+<p>See <a class="reference internal" href="settings.html"><span class="doc">Settings</span></a> for a more general treatment of settings in QDK/Chemistry.</p>
+</section>
+<section id="available-implementations">
+<h2>Available implementations<a class="headerlink" href="#available-implementations" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry’s <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StabilityChecker" title="qdk_chemistry.algorithms.StabilityChecker"><code class="xref py py-class docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a> provides a unified interface to stability analysis across various quantum chemistry packages.
+You can discover available implementations programmatically:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">available</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">StabilityCheckerFactory</span><span class="o">::</span><span class="n">available</span><span class="p">();</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s">Available stability checker implementations: &quot;</span><span class="p">;</span>
+<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">available</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; &quot;</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>  <span class="c1"># noqa: E402</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;available backend choices for scf_solver and stability_checker:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;stability_checker&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="qdk-native">
+<span id="qdk-stability-native"></span><h3>QDK (Native)<a class="headerlink" href="#qdk-native" title="Link to this heading"></a></h3>
+<p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;qdk&quot;</span></code> (default)</p>
+<p>The native QDK/Chemistry implementation provides high-performance stability analysis using the built-in quantum chemistry engine.</p>
+<p class="rubric">Capabilities</p>
+<ul class="simple">
+<li><p>Internal stability analysis for <a class="reference internal" href="../../../glossary.html#term-RHF"><span class="xref std std-term">RHF</span></a> and <a class="reference internal" href="../../../glossary.html#term-UHF"><span class="xref std std-term">UHF</span></a> wavefunctions</p></li>
+<li><p>External stability analysis for <a class="reference internal" href="../../../glossary.html#term-RHF"><span class="xref std std-term">RHF</span></a> wavefunctions (<a class="reference internal" href="../../../glossary.html#term-RHF"><span class="xref std std-term">RHF</span></a> → <a class="reference internal" href="../../../glossary.html#term-UHF"><span class="xref std std-term">UHF</span></a> instabilities)</p></li>
+<li><p>Efficient Davidson eigenvalue solver for computing lowest eigenvalues</p></li>
+<li><p>Support for both Hartree-Fock and <a class="reference internal" href="../../../glossary.html#term-DFT"><span class="xref std std-term">DFT</span></a> wavefunctions</p></li>
+</ul>
+<p class="rubric">Settings</p>
+<p>The QDK implementation uses the common base settings listed in the <a class="reference internal" href="#available-settings">Available settings</a> section above.
+The default value for <code class="docutils literal notranslate"><span class="pre">external</span></code> is <code class="docutils literal notranslate"><span class="pre">False</span></code> for this implementation.</p>
+</section>
+<section id="pyscf">
+<h3>PySCF<a class="headerlink" href="#pyscf" title="Link to this heading"></a></h3>
+<p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;pyscf&quot;</span></code></p>
+<p>The PySCF plugin provides access to stability analysis through the <a class="reference external" href="https://pyscf.org/">PySCF</a> quantum chemistry package.</p>
+<p class="rubric">Capabilities</p>
+<ul class="simple">
+<li><p>Internal stability analysis for <a class="reference internal" href="../../../glossary.html#term-RHF"><span class="xref std std-term">RHF</span></a>, restricted open-shell Hartree-Fock (<a class="reference internal" href="../../../glossary.html#term-ROHF"><span class="xref std std-term">ROHF</span></a>), and <a class="reference internal" href="../../../glossary.html#term-UHF"><span class="xref std std-term">UHF</span></a> wavefunctions</p></li>
+<li><p>External stability analysis for <a class="reference internal" href="../../../glossary.html#term-RHF"><span class="xref std std-term">RHF</span></a> wavefunctions (<a class="reference internal" href="../../../glossary.html#term-RHF"><span class="xref std std-term">RHF</span></a> → <a class="reference internal" href="../../../glossary.html#term-UHF"><span class="xref std std-term">UHF</span></a> instabilities)</p></li>
+<li><p>Support for both Hartree-Fock and <a class="reference internal" href="../../../glossary.html#term-DFT"><span class="xref std std-term">DFT</span></a> wavefunctions</p></li>
+<li><p>Point group symmetry considerations in stability analysis</p></li>
+<li><p>Configurable Davidson solver parameters and PySCF verbosity</p></li>
+<li><p>Note: ROHF wavefunctions are not supported by the QDK backend for now</p></li>
+</ul>
+<p class="rubric">Settings</p>
+<p>The PySCF implementation supports all common base settings. The following table shows settings that differ from or extend the base implementation:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 15.0%" />
+<col style="width: 45.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">external</span></code></p></td>
+<td><p>bool</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">True</span></code></p></td>
+<td><p>Check external stability (differs from QDK default of <code class="docutils literal notranslate"><span class="pre">False</span></code>)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">with_symmetry</span></code></p></td>
+<td><p>bool</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>Whether to respect point group symmetry during analysis</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nroots</span></code></p></td>
+<td><p>int</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">3</span></code></p></td>
+<td><p>Number of eigenvalue roots to compute in the Davidson solver</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">xc_grid</span></code></p></td>
+<td><p>int</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">3</span></code></p></td>
+<td><p><a class="reference internal" href="../../../glossary.html#term-DFT"><span class="xref std std-term">DFT</span></a> integration grid density level (0=coarse, 9=very fine)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">pyscf_verbose</span></code></p></td>
+<td><p>int</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">4</span></code></p></td>
+<td><p>PySCF verbosity level for logging (0=silent, 4=info, 5=debug)</p></td>
+</tr>
+</tbody>
+</table>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> stability checks documentation is currently under construction.
-In the meantime, please refer to <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StabilityChecker" title="qdk_chemistry.algorithms.StabilityChecker"><code class="xref py py-class docutils literal notranslate"><span class="pre">qdk_chemistry.algorithms.StabilityChecker</span></code></a> for more information.</p>
+<p>The PySCF implementation automatically detects the wavefunction type (<a class="reference internal" href="../../../glossary.html#term-RHF"><span class="xref std std-term">RHF</span></a>, <a class="reference internal" href="../../../glossary.html#term-ROHF"><span class="xref std std-term">ROHF</span></a>, or <a class="reference internal" href="../../../glossary.html#term-UHF"><span class="xref std std-term">UHF</span></a>) and applies the appropriate stability analysis method.
+External stability analysis is only supported for <a class="reference internal" href="../../../glossary.html#term-RHF"><span class="xref std std-term">RHF</span></a> wavefunctions and will raise an error if requested for <a class="reference internal" href="../../../glossary.html#term-ROHF"><span class="xref std std-term">ROHF</span></a> or <a class="reference internal" href="../../../glossary.html#term-UHF"><span class="xref std std-term">UHF</span></a>.</p>
 </div>
+<p>For more details on how to extend QDK/Chemistry with additional implementations, see the <a class="reference internal" href="../plugins.html"><span class="doc">plugin system</span></a> documentation.</p>
+</section>
+</section>
+<section id="understanding-stability-results">
+<h2>Understanding stability results<a class="headerlink" href="#understanding-stability-results" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StabilityResult" title="qdk_chemistry.data.StabilityResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">StabilityResult</span></code></a> object returned by the stability checker contains detailed information about the stability analysis:</p>
+<dl class="simple">
+<dt>Overall stability status</dt><dd><p>The boolean return value indicates whether the wavefunction is stable overall (both internally and externally if checked).</p>
+</dd>
+<dt>Internal stability</dt><dd><p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StabilityResult.is_internal_stable" title="qdk_chemistry.data.StabilityResult.is_internal_stable"><code class="xref py py-meth docutils literal notranslate"><span class="pre">is_internal_stable()</span></code></a> method indicates whether internal stability is satisfied.
+Internal instabilities suggest the energy can be lowered while maintaining the same wavefunction type.</p>
+</dd>
+<dt>External stability</dt><dd><p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StabilityResult.is_external_stable" title="qdk_chemistry.data.StabilityResult.is_external_stable"><code class="xref py py-meth docutils literal notranslate"><span class="pre">is_external_stable()</span></code></a> method indicates whether external stability is satisfied (if external stability was checked).
+External instabilities in <a class="reference internal" href="../../../glossary.html#term-RHF"><span class="xref std std-term">RHF</span></a> calculations indicate that breaking spin symmetry (switching to <a class="reference internal" href="../../../glossary.html#term-UHF"><span class="xref std std-term">UHF</span></a>) would lower the energy.</p>
+</dd>
+<dt>Eigenvalues and eigenvectors</dt><dd><p>The stability result provides access to the computed eigenvalues and their corresponding eigenvectors:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StabilityResult.get_internal_eigenvalues" title="qdk_chemistry.data.StabilityResult.get_internal_eigenvalues"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_internal_eigenvalues()</span></code></a> and <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StabilityResult.get_internal_eigenvectors" title="qdk_chemistry.data.StabilityResult.get_internal_eigenvectors"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_internal_eigenvectors()</span></code></a></p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StabilityResult.get_external_eigenvalues" title="qdk_chemistry.data.StabilityResult.get_external_eigenvalues"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_external_eigenvalues()</span></code></a> and <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StabilityResult.get_external_eigenvectors" title="qdk_chemistry.data.StabilityResult.get_external_eigenvectors"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_external_eigenvectors()</span></code></a></p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StabilityResult.get_smallest_eigenvalue" title="qdk_chemistry.data.StabilityResult.get_smallest_eigenvalue"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_smallest_eigenvalue()</span></code></a> returns the overall smallest eigenvalue</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StabilityResult.get_smallest_internal_eigenvalue_and_vector" title="qdk_chemistry.data.StabilityResult.get_smallest_internal_eigenvalue_and_vector"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_smallest_internal_eigenvalue_and_vector()</span></code></a> and <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StabilityResult.get_smallest_external_eigenvalue_and_vector" title="qdk_chemistry.data.StabilityResult.get_smallest_external_eigenvalue_and_vector"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_smallest_external_eigenvalue_and_vector()</span></code></a> provide convenient access to the most unstable direction</p></li>
+</ul>
+</dd>
+</dl>
+<p>The eigenvector corresponding to the smallest (most negative) eigenvalue indicates the direction in orbital space that would most effectively lower the energy.
+This eigenvector can be used with the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.utils.html#qdk_chemistry.utils.rotate_orbitals" title="qdk_chemistry.utils.rotate_orbitals"><code class="xref py py-func docutils literal notranslate"><span class="pre">rotate_orbitals()</span></code></a> utility function to generate rotated orbitals for use as an initial guess in a subsequent <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation.</p>
+</section>
+<section id="related-classes">
+<h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="scf_solver.html"><span class="doc">ScfSolver</span></a>: Performs <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculations that produce wavefunctions for stability analysis</p></li>
+<li><p><a class="reference internal" href="../data/wavefunction.html"><span class="doc">Wavefunction</span></a>: Input wavefunction to analyze</p></li>
+<li><p><a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a>: Can be rotated based on stability analysis results</p></li>
+</ul>
+</section>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>The above examples can be downloaded as a complete <a class="reference external" href="../../../_static/examples/python/stability_checker_workflow.py">Python</a> script or <a class="reference external" href="../../../_static/examples/cpp/stability_checker_workflow.cpp">C++</a> source file.</p></li>
+<li><p><a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
+<li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Understanding algorithm creation</p></li>
+<li><p><span id="id3">[<a class="reference internal" href="../../../references.html#id34" title="H. B. Schlegel and J. J. W. McDouall. Do you have SCF stability and convergence problems?, pages 167–185. Springer Netherlands, Dordrecht, 1991. URL: https://doi.org/10.1007/978-94-011-3262-6_2, doi:10.1007/978-94-011-3262-6_2.">SM91</a>]</span>: Original reference for stability analysis in quantum chemistry</p></li>
+</ul>
+</section>
 </section>
 
 

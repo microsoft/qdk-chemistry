@@ -1,0 +1,17 @@
+qdk\_chemistry.algorithms.time\_evolution.controlled\_circuit\_mapper package
+=============================================================================
+
+.. automodule:: qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base
+   qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.pauli_sequence_mapper

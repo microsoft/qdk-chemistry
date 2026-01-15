@@ -1,0 +1,8 @@
+qdk\_chemistry.data.time\_evolution.controlled\_time\_evolution module
+======================================================================
+
+.. automodule:: qdk_chemistry.data.time_evolution.controlled_time_evolution
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

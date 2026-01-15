@@ -11,10 +11,14 @@ The factory pattern is a design pattern that encapsulates object creation logic.
 Instead of directly instantiating objects using constructors, clients request objects from a factory, typically by specifying a type identifier.
 This approach has several advantages:
 
-1. **Abstraction**: Clients work with abstract interfaces rather than concrete implementations
-2. **Flexibility**: The concrete implementation can be changed without affecting client code
-3. **Configuration**: Objects can be configured based on runtime parameters
-4. **Extension**: New implementations can be added without modifying existing code
+Abstraction
+  Clients work with abstract interfaces rather than concrete implementations
+Flexibility
+  The concrete implementation can be changed without affecting client code
+Configuration
+  Objects can be configured based on runtime parameters
+Extension
+  New implementations can be added without modifying existing code
 
 Factory pattern in QDK/Chemistry
 --------------------------------

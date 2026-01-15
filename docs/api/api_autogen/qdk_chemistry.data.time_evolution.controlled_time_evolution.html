@@ -1,0 +1,332 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.data.time_evolution.controlled_time_evolution module &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=06674eb4" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="qdk_chemistry.data.base module" href="qdk_chemistry.data.base.html" />
+    <link rel="prev" title="qdk_chemistry.data.time_evolution.base module" href="qdk_chemistry.data.time_evolution.base.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.data.html">qdk_chemistry.data package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.AOType"><code class="docutils literal notranslate"><span class="pre">AOType</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Ansatz"><code class="docutils literal notranslate"><span class="pre">Ansatz</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet"><code class="docutils literal notranslate"><span class="pre">BasisSet</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer"><code class="docutils literal notranslate"><span class="pre">CanonicalFourCenterHamiltonianContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.CasWavefunctionContainer"><code class="docutils literal notranslate"><span class="pre">CasWavefunctionContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Circuit"><code class="docutils literal notranslate"><span class="pre">Circuit</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration"><code class="docutils literal notranslate"><span class="pre">Configuration</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.ConfigurationSet"><code class="docutils literal notranslate"><span class="pre">ConfigurationSet</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.ControlledTimeEvolutionUnitary"><code class="docutils literal notranslate"><span class="pre">ControlledTimeEvolutionUnitary</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.CoupledClusterContainer"><code class="docutils literal notranslate"><span class="pre">CoupledClusterContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.DataClass"><code class="docutils literal notranslate"><span class="pre">DataClass</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.ElectronicStructureSettings"><code class="docutils literal notranslate"><span class="pre">ElectronicStructureSettings</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Element"><code class="docutils literal notranslate"><span class="pre">Element</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.EnergyExpectationResult"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian"><code class="docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.HamiltonianContainer"><code class="docutils literal notranslate"><span class="pre">HamiltonianContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.HamiltonianType"><code class="docutils literal notranslate"><span class="pre">HamiltonianType</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.MP2Container"><code class="docutils literal notranslate"><span class="pre">MP2Container</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.MeasurementData"><code class="docutils literal notranslate"><span class="pre">MeasurementData</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.ModelOrbitals"><code class="docutils literal notranslate"><span class="pre">ModelOrbitals</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.OrbitalType"><code class="docutils literal notranslate"><span class="pre">OrbitalType</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals"><code class="docutils literal notranslate"><span class="pre">Orbitals</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.PauliOperator"><code class="docutils literal notranslate"><span class="pre">PauliOperator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.PauliProductFormulaContainer"><code class="docutils literal notranslate"><span class="pre">PauliProductFormulaContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QpeResult"><code class="docutils literal notranslate"><span class="pre">QpeResult</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SciWavefunctionContainer"><code class="docutils literal notranslate"><span class="pre">SciWavefunctionContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingNotFound"><code class="docutils literal notranslate"><span class="pre">SettingNotFound</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingNotFoundError"><code class="docutils literal notranslate"><span class="pre">SettingNotFoundError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingTypeMismatch"><code class="docutils literal notranslate"><span class="pre">SettingTypeMismatch</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingTypeMismatchError"><code class="docutils literal notranslate"><span class="pre">SettingTypeMismatchError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingValue"><code class="docutils literal notranslate"><span class="pre">SettingValue</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Settings"><code class="docutils literal notranslate"><span class="pre">Settings</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingsAreLocked"><code class="docutils literal notranslate"><span class="pre">SettingsAreLocked</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingsAreLockedError"><code class="docutils literal notranslate"><span class="pre">SettingsAreLockedError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Shell"><code class="docutils literal notranslate"><span class="pre">Shell</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SlaterDeterminantContainer"><code class="docutils literal notranslate"><span class="pre">SlaterDeterminantContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SpinChannel"><code class="docutils literal notranslate"><span class="pre">SpinChannel</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.StabilityResult"><code class="docutils literal notranslate"><span class="pre">StabilityResult</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Structure"><code class="docutils literal notranslate"><span class="pre">Structure</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.TimeEvolutionUnitary"><code class="docutils literal notranslate"><span class="pre">TimeEvolutionUnitary</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.TimeEvolutionUnitaryContainer"><code class="docutils literal notranslate"><span class="pre">TimeEvolutionUnitaryContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction"><code class="docutils literal notranslate"><span class="pre">Wavefunction</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer"><code class="docutils literal notranslate"><span class="pre">WavefunctionContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionType"><code class="docutils literal notranslate"><span class="pre">WavefunctionType</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.get_current_ciaaw_version"><code class="docutils literal notranslate"><span class="pre">get_current_ciaaw_version()</span></code></a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.data.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#submodules">Submodules</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#plugins">Plugins</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#utilities">Utilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#constants">Constants</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../python_api.html">Python API</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.data.html">qdk_chemistry.data package</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.data.time_evolution.html">qdk_chemistry.data.time_evolution package</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.data.time_evolution.controlled_time_evolution module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api/api_autogen/qdk_chemistry.data.time_evolution.controlled_time_evolution.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-qdk_chemistry.data.time_evolution.controlled_time_evolution">
+<span id="qdk-chemistry-data-time-evolution-controlled-time-evolution-module"></span><h1>qdk_chemistry.data.time_evolution.controlled_time_evolution module<a class="headerlink" href="#module-qdk_chemistry.data.time_evolution.controlled_time_evolution" title="Link to this heading"></a></h1>
+<p>QDK/Chemistry controlled time evolution module.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.data.time_evolution.controlled_time_evolution.</span></span><span class="sig-name descname"><span class="pre">ControlledTimeEvolutionUnitary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time_evolution_unitary</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control_indices</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/time_evolution/controlled_time_evolution.html#ControlledTimeEvolutionUnitary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></p>
+<p>Data class for a controlled time evolution unitary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>time_evolution_unitary</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.TimeEvolutionUnitary" title="qdk_chemistry.data.time_evolution.base.TimeEvolutionUnitary"><em>TimeEvolutionUnitary</em></a>)</p></li>
+<li><p><strong>control_indices</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time_evolution_unitary</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">control_indices</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/time_evolution/controlled_time_evolution.html#ControlledTimeEvolutionUnitary.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize a ControlledTimeEvolutionUnitary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>time_evolution_unitary</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.TimeEvolutionUnitary" title="qdk_chemistry.data.time_evolution.base.TimeEvolutionUnitary"><em>TimeEvolutionUnitary</em></a>) – The time evolution unitary to be controlled.</p></li>
+<li><p><strong>control_indices</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>) – The control qubit indices.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary.get_unitary_container_type">
+<span class="sig-name descname"><span class="pre">get_unitary_container_type</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/time_evolution/controlled_time_evolution.html#ControlledTimeEvolutionUnitary.get_unitary_container_type"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary.get_unitary_container_type" title="Link to this definition"></a></dt>
+<dd><p>Get the type of the time evolution unitary container.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The type of the time evolution unitary container.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary.get_num_total_qubits">
+<span class="sig-name descname"><span class="pre">get_num_total_qubits</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/time_evolution/controlled_time_evolution.html#ControlledTimeEvolutionUnitary.get_num_total_qubits"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary.get_num_total_qubits" title="Link to this definition"></a></dt>
+<dd><p>Get the total number of qubits including control qubits.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The total number of qubits (time evolution qubits + control qubits).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/time_evolution/controlled_time_evolution.html#ControlledTimeEvolutionUnitary.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary.to_json" title="Link to this definition"></a></dt>
+<dd><p>Convert the ControlledTimeEvolutionUnitary to a dictionary for JSON serialization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary representation of the ControlledTimeEvolutionUnitary</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary.to_hdf5">
+<span class="sig-name descname"><span class="pre">to_hdf5</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">group</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/time_evolution/controlled_time_evolution.html#ControlledTimeEvolutionUnitary.to_hdf5"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary.to_hdf5" title="Link to this definition"></a></dt>
+<dd><p>Save the ControlledTimeEvolutionUnitary to an HDF5 group.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>group</strong> (<em>h5py.Group</em>) – HDF5 group or file to write the controlled time evolution unitary to</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary.from_json">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">json_data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/time_evolution/controlled_time_evolution.html#ControlledTimeEvolutionUnitary.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary.from_json" title="Link to this definition"></a></dt>
+<dd><p>Create ControlledTimeEvolutionUnitary from a JSON dictionary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary" title="qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">ControlledTimeEvolutionUnitary</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>json_data</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>]</em>) – Dictionary containing the serialized data</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ControlledTimeEvolutionUnitary</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary.from_hdf5">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">from_hdf5</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">group</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/time_evolution/controlled_time_evolution.html#ControlledTimeEvolutionUnitary.from_hdf5"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary.from_hdf5" title="Link to this definition"></a></dt>
+<dd><p>Load a ControlledTimeEvolutionUnitary from an HDF5 group.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary" title="qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">ControlledTimeEvolutionUnitary</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>group</strong> (<em>h5py.Group</em>) – The HDF5 group containing the serialized object.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ControlledTimeEvolutionUnitary</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary.get_summary">
+<span class="sig-name descname"><span class="pre">get_summary</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/time_evolution/controlled_time_evolution.html#ControlledTimeEvolutionUnitary.get_summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.time_evolution.controlled_time_evolution.ControlledTimeEvolutionUnitary.get_summary" title="Link to this definition"></a></dt>
+<dd><p>Get summary of controlled time evolution unitary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Summary string describing the ControlledTimeEvolutionUnitary’s contents and properties</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qdk_chemistry.data.time_evolution.base.html" class="btn btn-neutral float-left" title="qdk_chemistry.data.time_evolution.base module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.data.base.html" class="btn btn-neutral float-right" title="qdk_chemistry.data.base module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

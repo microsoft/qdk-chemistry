@@ -8,18 +8,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Settings &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=a64bac2b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=06674eb4" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
-      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../../_static/copybutton.js?v=f281be69"></script>
@@ -135,16 +135,16 @@ This unified configuration system simplifies saving, loading, and sharing settin
 <p>When working with an algorithm, it is often necessary to determine which settings are available and their current values.
 QDK/Chemistry provides several methods for discovering this information:</p>
 <dl class="simple">
-<dt><strong>Documentation</strong></dt><dd><p>Each algorithm’s documentation page includes an “Available settings” section that lists all supported parameters, their types, default values, and descriptions.
+<dt>Documentation</dt><dd><p>Each algorithm’s documentation page includes an “Available settings” section that lists all supported parameters, their types, default values, and descriptions.
 For examples, see <a class="reference internal" href="scf_solver.html"><span class="doc">ScfSolver</span></a> or <a class="reference internal" href="mc_calculator.html"><span class="doc">MultiConfigurationCalculator</span></a>.</p>
 </dd>
-<dt><strong>Runtime inspection</strong></dt><dd><p>Settings can be inspected programmatically using methods such as <code class="docutils literal notranslate"><span class="pre">keys()</span></code>, <code class="docutils literal notranslate"><span class="pre">items()</span></code>, or <code class="docutils literal notranslate"><span class="pre">print_settings()</span></code>.
+<dt>Runtime inspection</dt><dd><p>Settings can be inspected programmatically using methods such as <code class="docutils literal notranslate"><span class="pre">keys()</span></code>, <code class="docutils literal notranslate"><span class="pre">items()</span></code>, or <code class="docutils literal notranslate"><span class="pre">print_settings()</span></code>.
 This approach is particularly useful when exploring unfamiliar implementations or verifying configurations.</p>
 </dd>
 </dl>
 <p>The following example demonstrates how to discover available algorithms and inspect their settings:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry/algorithms/scf.hpp&gt;</span>
 
 <span class="c1">// List available implementations for a specific algorithm type</span>
@@ -162,7 +162,7 @@ This approach is particularly useful when exploring unfamiliar implementations o
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span><span class="p">,</span> <span class="n">inspect_settings</span><span class="p">,</span> <span class="n">print_settings</span>
 
 <span class="c1"># List all algorithm types and their implementations</span>
@@ -214,9 +214,9 @@ To run the same algorithm with different parameters, create a new algorithm inst
 </pre></div>
 </div>
 </div>
-<p><strong>Accessing and modifying settings:</strong></p>
+<p class="rubric">Accessing and modifying settings</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create an algorithm</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">algorithms</span><span class="o">::</span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
 
@@ -242,7 +242,7 @@ To run the same algorithm with different parameters, create a new algorithm inst
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>  <span class="c1"># noqa: E402</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>  <span class="c1"># noqa: E402</span>
 
@@ -272,7 +272,7 @@ To run the same algorithm with different parameters, create a new algorithm inst
 </div>
 </div>
 </div>
-<p><strong>Passing settings at creation time (Python only):</strong></p>
+<p class="rubric">Passing settings at creation time (Python only)</p>
 <p>The Python registry’s <code class="docutils literal notranslate"><span class="pre">create()</span></code> function accepts keyword arguments that are automatically applied to the algorithm’s settings.
 This provides a convenient shorthand for configuring algorithms in a single line:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>  <span class="c1"># noqa E402</span>
@@ -293,11 +293,11 @@ This provides a convenient shorthand for configuring algorithms in a single line
 </div>
 <p>This is equivalent to creating the algorithm and then calling <code class="docutils literal notranslate"><span class="pre">settings().set()</span></code> for each parameter, but is more concise for common use cases.
 The C++ API does not provide this shorthand; settings must be configured explicitly after algorithm creation.</p>
-<p><strong>Checking and retrieving values:</strong></p>
+<p class="rubric">Checking and retrieving values</p>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Settings" title="qdk_chemistry.data.Settings"><code class="xref py py-class docutils literal notranslate"><span class="pre">Settings</span></code></a> class provides methods for safely checking and retrieving values.
 Use <code class="docutils literal notranslate"><span class="pre">has()</span></code> to verify existence, <code class="docutils literal notranslate"><span class="pre">get()</span></code> for direct access (raises an exception if the key is missing), or <code class="docutils literal notranslate"><span class="pre">get_or_default()</span></code> to specify a fallback value.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Check if a setting exists</span>
 <span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">settings</span><span class="p">.</span><span class="n">has</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Basis set is configured: &quot;</span>
@@ -331,7 +331,7 @@ Use <code class="docutils literal notranslate"><span class="pre">has()</span></c
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Check if a setting exists</span>
 <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">):</span>
     <span class="c1"># Use the setting</span>
@@ -371,7 +371,7 @@ Use <code class="docutils literal notranslate"><span class="pre">has()</span></c
 <p>Settings can be serialized to JSON (human-readable) or HDF5 (efficient, type-preserving) formats to support reproducibility and configuration sharing.
 For additional information on data persistence, see <a class="reference internal" href="../data/serialization.html"><span class="doc">Serialization</span></a>.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Save settings to JSON file</span>
 <span class="n">settings</span><span class="p">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s">&quot;configuration.settings.json&quot;</span><span class="p">);</span>
 
@@ -392,7 +392,7 @@ For additional information on data persistence, see <a class="reference internal
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>  <span class="c1"># noqa E402</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>  <span class="c1"># noqa E402</span>
 
@@ -418,7 +418,7 @@ For additional information on data persistence, see <a class="reference internal
 </div>
 </div>
 </div>
-<p><strong>Example formats:</strong></p>
+<p class="rubric">Example formats</p>
 <div class="literal-block-wrapper docutils container" id="id1">
 <div class="code-block-caption"><span class="caption-text">JSON format</span><a class="headerlink" href="#id1" title="Link to this code"></a></div>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
@@ -447,7 +447,7 @@ For additional information on data persistence, see <a class="reference internal
 Default values are established during construction using the <code class="docutils literal notranslate"><span class="pre">set_default</span></code> method, ensuring that configurations are discoverable and well-documented.
 This pattern integrates with the <a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a> and <a class="reference internal" href="../plugins.html#plugin-system"><span class="std std-ref">plugin system</span></a>.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MySettings</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">data</span><span class="o">::</span><span class="n">Settings</span><span class="w"> </span><span class="p">{</span>
 <span class="w"> </span><span class="k">public</span><span class="o">:</span>
 <span class="w">  </span><span class="n">MySettings</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
@@ -460,7 +460,7 @@ This pattern integrates with the <a class="reference internal" href="factory_pat
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MySettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
@@ -522,9 +522,9 @@ The following types are supported:</p>
 </tr>
 </tbody>
 </table>
-<p><strong>C++ implementation:</strong></p>
+<p class="rubric">C++ implementation</p>
 <p>The C++ layer uses a <code class="docutils literal notranslate"><span class="pre">std::variant</span></code>-based storage that provides compile-time type checking through templates.</p>
-<p><strong>Python implementation:</strong></p>
+<p class="rubric">Python implementation</p>
 <p>The Python bindings automatically convert between native Python types and the underlying C++ types.
 When setting values, Python objects are validated against the expected type and converted appropriately—for example, Python <code class="docutils literal notranslate"><span class="pre">float</span></code> values become C++ <code class="docutils literal notranslate"><span class="pre">double</span></code>, and Python <code class="docutils literal notranslate"><span class="pre">list</span></code> objects become <code class="docutils literal notranslate"><span class="pre">std::vector</span></code> containers.
 When retrieving values, the reverse conversion occurs transparently.</p>
@@ -550,15 +550,15 @@ In Python, native <code class="docutils literal notranslate"><span class="pre">i
 <h2>Constraints<a class="headerlink" href="#constraints" title="Link to this heading"></a></h2>
 <p>Settings can define constraints that specify valid ranges or allowed values.
 Constraints are established when algorithm developers define settings using <code class="docutils literal notranslate"><span class="pre">set_default()</span></code>, and they serve two purposes: documentation and validation guidance.</p>
-<p><strong>Constraint types:</strong></p>
+<p class="rubric">Constraint types</p>
 <ul class="simple">
 <li><p><strong>Bound constraints</strong> — Define minimum and maximum values for numeric settings (e.g., <code class="docutils literal notranslate"><span class="pre">max_iterations</span></code> must be between 1 and 1000).</p></li>
 <li><p><strong>List constraints</strong> — Define an explicit set of allowed values for string or integer settings (e.g., <code class="docutils literal notranslate"><span class="pre">method</span></code> must be one of <code class="docutils literal notranslate"><span class="pre">[&quot;hf&quot;,</span> <span class="pre">&quot;dft&quot;]</span></code>).</p></li>
 </ul>
-<p><strong>Inspecting constraints:</strong></p>
+<p class="rubric">Inspecting constraints</p>
 <p>Constraints can be queried using <code class="docutils literal notranslate"><span class="pre">has_limits()</span></code> and <code class="docutils literal notranslate"><span class="pre">get_limits()</span></code>:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">settings</span><span class="p">.</span><span class="n">has_limits</span><span class="p">(</span><span class="s">&quot;max_iterations&quot;</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">limits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get_limits</span><span class="p">(</span><span class="s">&quot;max_iterations&quot;</span><span class="p">);</span>
 <span class="w">  </span><span class="c1">// limits is a Constraint variant (BoundConstraint or ListConstraint)</span>
@@ -566,7 +566,7 @@ Constraints are established when algorithm developers define settings using <cod
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has_limits</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">):</span>
     <span class="n">limits</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_limits</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>
     <span class="c1"># Returns (min, max) tuple for bounds, or list for allowed values</span>
@@ -590,7 +590,7 @@ Constraints are established when algorithm developers define settings using <cod
 <li><p><code class="docutils literal notranslate"><span class="pre">SettingsAreLocked</span></code>: Raised when attempting to modify settings after <code class="docutils literal notranslate"><span class="pre">run()</span></code> has been called.</p></li>
 </ul>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio"><label class="tab-label" for="tab-set--6-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Error handling example</span>
 <span class="k">try</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;non_existent_setting&quot;</span><span class="p">);</span>
@@ -603,7 +603,7 @@ Constraints are established when algorithm developers define settings using <cod
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio"><label class="tab-label" for="tab-set--6-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry</span>  <span class="c1"># noqa E402</span>
 
 <span class="c1"># Error handling example</span>

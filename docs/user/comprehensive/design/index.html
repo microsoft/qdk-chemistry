@@ -8,18 +8,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>High-level design &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=a64bac2b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=06674eb4" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
-      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
-      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../../_static/copybutton.js?v=f281be69"></script>
@@ -143,25 +143,33 @@ This design choice enables flexibility, extensibility, and maintainability of th
 <section id="data-classes">
 <span id="hl-data-class"></span><h3>Data classes<a class="headerlink" href="#data-classes" title="Link to this heading"></a></h3>
 <p>Data classes in QDK/Chemistry concretely represent intermediate quantities commonly encountered in quantum applications workflows. These classes are designed to be:</p>
-<ul class="simple">
-<li><p><strong>Immutable</strong>: Once created, the core data cannot be modified</p></li>
-<li><p><strong>Self-contained</strong>: Include all information necessary to represent the underlying quantum chemical quantity</p></li>
-<li><p><a class="reference internal" href="../data/serialization.html"><span class="doc">Serializable</span></a>: Can be easily saved to and loaded from files</p></li>
-<li><p><strong>Language-agnostic</strong>: Accessible through identical APIs in both C++ and Python</p></li>
-</ul>
+<dl class="simple">
+<dt>Immutable</dt><dd><p>Once created, the core data cannot be modified</p>
+</dd>
+<dt>Self-contained</dt><dd><p>Include all information necessary to represent the underlying quantum chemical quantity</p>
+</dd>
+<dt><a class="reference internal" href="../data/serialization.html"><span class="doc">Serializable</span></a></dt><dd><p>Can be easily saved to and loaded from files</p>
+</dd>
+<dt>Language-agnostic</dt><dd><p>Accessible through identical APIs in both C++ and Python</p>
+</dd>
+</dl>
 <p>See the <a class="reference internal" href="../data/index.html"><span class="doc">Data Classes</span></a> documentation for further details on the availability and usage of QDK/Chemistry’s data classes.</p>
 </section>
 <section id="algorithm-classes">
 <span id="hl-algorithm-class"></span><h3>Algorithm classes<a class="headerlink" href="#algorithm-classes" title="Link to this heading"></a></h3>
 <p>Algorithm classes represent mutations on data, such as the execution of quantum chemical methods and generation of circuit components commonly found in quantum applications workflows.
 These classes are designed to be:</p>
-<ul class="simple">
-<li><p><strong>Stateless</strong>: Their behavior depends only on their input data and configuration</p></li>
-<li><p><strong>Configurable</strong>: Through a standardized <code class="docutils literal notranslate"><span class="pre">Settings</span></code> interface</p></li>
-<li><p><strong>Conforming</strong>: Exposing a common interface for disparate implementations to enable a unified user experience.</p></li>
-<li><p><strong>Extensible</strong>: Allowing new implementations to be added without modifying existing code</p></li>
-</ul>
-<p>Programatically, Algorithms are specified as abstract interfaces which can be specialized downstream through concrete implementations.
+<dl class="simple">
+<dt>Stateless</dt><dd><p>Their behavior depends only on their input data and configuration</p>
+</dd>
+<dt>Configurable</dt><dd><p>Through a standardized <code class="docutils literal notranslate"><span class="pre">Settings</span></code> interface</p>
+</dd>
+<dt>Conforming</dt><dd><p>Exposing a common interface for disparate implementations to enable a unified user experience.</p>
+</dd>
+<dt>Extensible</dt><dd><p>Allowing new implementations to be added without modifying existing code</p>
+</dd>
+</dl>
+<p>Programmatically, Algorithms are specified as abstract interfaces which can be specialized downstream through concrete implementations.
 This allows QDK/Chemistry to be expressed as a <a class="reference internal" href="../plugins.html"><span class="doc">plugin architecture</span></a>, for which algorithm implementations may be specified either natively within QDK/Chemistry or through established third-party quantum chemistry packages:</p>
 <div class="graphviz"><img src="../../../_images/graphviz-425f73d86fb873b40e9ee4489a05e57b826832b4.png" alt="digraph PluginArchitecture {
     rankdir=LR;
@@ -181,14 +189,14 @@ This allows QDK/Chemistry to be expressed as a <a class="reference internal" hre
 </div>
 <p>This design allows users to benefit from specialized capabilities of “best-in-breed” software while maintaining a consistent user experience.
 See the <a class="reference internal" href="../plugins.html"><span class="doc">Plugin System</span></a> documentation for further details on how to contribute new algorithm implementations.</p>
-<p>Further details on the availablity and usage of QDK/Chemistry’s algorithm implementations can be found in the <a class="reference internal" href="../algorithms/index.html"><span class="doc">Algorithms</span></a> documentation.</p>
+<p>Further details on the availability and usage of QDK/Chemistry’s algorithm implementations can be found in the <a class="reference internal" href="../algorithms/index.html"><span class="doc">Algorithms</span></a> documentation.</p>
 </section>
 </section>
 <section id="factory-pattern">
 <span id="hl-factory-pattertn"></span><h2>Factory pattern<a class="headerlink" href="#factory-pattern" title="Link to this heading"></a></h2>
 <p>QDK/Chemistry’s <a class="reference internal" href="../plugins.html"><span class="doc">plugin architecture</span></a> leverages a <a class="reference internal" href="../algorithms/factory_pattern.html"><span class="doc">factory pattern</span></a> for algorithm creation:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
 
 <span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
@@ -198,8 +206,9 @@ See the <a class="reference internal" href="../plugins.html"><span class="doc">P
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
 
 <span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
@@ -218,14 +227,14 @@ See the <a class="reference internal" href="../plugins.html"><span class="doc">P
 <span id="hl-settings"></span><h2>Runtime configuration with settings<a class="headerlink" href="#runtime-configuration-with-settings" title="Link to this heading"></a></h2>
 <p>Algorithm configuration is managed through instances of <a class="reference internal" href="../algorithms/settings.html"><span class="doc">Settings</span></a> objects, which contain a type-safe data store of configuration parameters consistent between the python and C++ APIs:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Available settings: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">scf_solver</span><span class="p">.</span><span class="n">settings</span><span class="p">().</span><span class="n">get_summary</span><span class="p">()</span>
 <span class="w">          </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 <span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;max_iterations&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Available settings: </span><span class="si">{</span><span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get_summary</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
 </pre></div>
@@ -239,7 +248,7 @@ See the <a class="reference internal" href="../plugins.html"><span class="doc">P
 <span id="hl-dataflow-example"></span><h2>A complete dataflow example<a class="headerlink" href="#a-complete-dataflow-example" title="Link to this heading"></a></h2>
 <p>A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="c1">// Create molecular structure from an XYZ file</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">molecule</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Structure</span><span class="o">::</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s">&quot;molecule.xyz&quot;</span><span class="p">);</span>
@@ -269,10 +278,9 @@ See the <a class="reference internal" href="../plugins.html"><span class="doc">P
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create molecular structure from an XYZ file</span>
-<span class="n">coords</span> <span class="o">=</span> <span class="p">[[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]]</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Load a Structure from file (data classes in QDK/Chemistry are immutable by design)</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">&quot;../data/h2.structure.xyz&quot;</span><span class="p">)</span>
 
 <span class="c1"># Configure and run SCF calculation</span>
 <span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
