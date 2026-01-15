@@ -20,7 +20,30 @@ permissions:
   statuses: write
 
 jobs:
+  check-up-to-date:
+    name: Check if branch is up to date with main
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Check if branch is up to date with main
+      run: |
+        # Ensure origin/main is present (harmless if already fetched)
+        git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+
+        if ! git merge-base --is-ancestor origin/main "${{ github.sha }}"; then
+          echo "This branch is not up to date with main. Please merge the latest changes from main into your branch to continue."
+          exit 1
+        fi
+
+        echo "Branch is up to date, starting Build and Test workflow."
+
   coverage:
+    needs: check-up-to-date
     name: ${{ matrix.os-name }} Build, Test, and Coverage Analysis
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -41,6 +64,7 @@ jobs:
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
     steps:
+
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
@@ -48,7 +72,7 @@ jobs:
 
     - name: Check if branch is up to date with main
       run: |
-        if ! git merge-base --is-ancestor origin/main ${{ github.sha }};
+        if ! git merge-base --is-ancestor main ${{ github.sha }};
         then echo "This branch is not up to date with main. Please merge the latest changes from main into your branch to continue.";
         exit 1; fi
         echo "Branch is up to date, starting Build and Test workflow."
