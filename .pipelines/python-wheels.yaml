@@ -218,7 +218,7 @@ extends:
     - stage: Release
       displayName: Release
       dependsOn: Approval
-      condition: and( succeeded(), eq(variables['Build.Reason'], 'Manual'), ${{ parameters.publishEsrp }} )
+      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'), ${{ parameters.publishEsrp }})
       jobs:
       - job: Publish_Python_Packages
         pool:
