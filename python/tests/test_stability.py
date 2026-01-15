@@ -983,7 +983,6 @@ class TestStabilityWorkflow:
             ("qdk", "m06-2x", -109.24696612470082),
         ],
     )
-    
     def test_workflow_n2_uhf_instability(self, backend, method, ref_energy):
         """Test stability workflow on N2 at 1.4Å with internal instability of UHF."""
         n2 = create_stretched_n2_structure(distance_angstrom=1.4)
@@ -1009,6 +1008,7 @@ class TestStabilityWorkflow:
 
         # Check energy matches reference value - should converge to same UHF energy as manual rotation
         assert abs(energy - ref_energy) < scf_energy_tolerance, f"Energy {energy} should match reference {ref_energy}"
+
 
 def test_stability_result_data_type_name():
     """Test that StabilityResult has the correct _data_type_name class attribute."""
