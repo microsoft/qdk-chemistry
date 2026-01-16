@@ -21,6 +21,7 @@ from qdk_chemistry.algorithms.active_space_selector import (
     QdkOccupationActiveSpaceSelector,
     QdkValenceActiveSpaceSelector,
 )
+from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator
 from qdk_chemistry.algorithms.energy_estimator import EnergyEstimator
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
@@ -62,6 +63,7 @@ from qdk_chemistry.phase_estimation import (
 __all__ = [
     # Classes
     "ActiveSpaceSelector",
+    "CircuitExecutor",
     "ControlledEvolutionCircuitMapper",
     "DynamicalCorrelationCalculator",
     "EnergyEstimator",

@@ -1,0 +1,220 @@
+"""Standard (QFT-based) phase estimation implementation.
+
+This module implements the standard quantum phase estimation algorithm using the
+Quantum Fourier Transform (QFT), which measures all phase bits in parallel using
+multiple ancilla qubits.
+
+References:
+    Nielsen, M. A., & Chuang, I. L. (2010). :cite:`Nielsen-Chuang2010-QPE`
+
+"""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
+from qiskit.synthesis.qft.qft_decompose_full import synth_qft_full
+
+from qdk_chemistry.algorithms import ControlledEvolutionCircuitMapper, TimeEvolutionBuilder
+from qdk_chemistry.algorithms.circuit_executor import CircuitExecutor
+from qdk_chemistry.data import Circuit, ControlledTimeEvolutionUnitary, QpeResult, QubitHamiltonian, Settings
+from qdk_chemistry.utils import Logger
+
+from .base import PhaseEstimation
+
+__all__: list[str] = []
+
+
+class StandardPhaseEstimationSettings(Settings):
+    """Settings for the Standard Phase Estimation algorithm."""
+
+    def __init__(self):
+        """Initialize the settings for Standard Phase Estimation.
+
+        Args:
+            num_bits: The number of phase bits to estimate.
+            evolution_time: The evolution time for the phase estimation.
+
+        """
+        super().__init__()
+        self._set_default("num_bits", "int", 4, "The number of phase bits to estimate.")
+        self._set_default("evolution_time", "float", 0.1, "The evolution time for the phase estimation.")
+        self._set_default(
+            "qft_do_swaps",
+            "bool",
+            True,
+            "Whether to include the final swap layer in the inverse QFT.",
+        )
+        self._set_default(
+            "shots",
+            "int",
+            3,
+            "The number of shots to execute the circuit.",
+        )
+
+
+class StandardPhaseEstimation(PhaseEstimation):
+    """Standard QFT-based (non-iterative) phase estimation."""
+
+    def __init__(self, num_bits: int, evolution_time: float, qft_do_swaps: bool = True, shots: int = 3):
+        """Initialize the standard phase estimation routine.
+
+        Args:
+            num_bits: The number of phase bits to estimate.
+            evolution_time: Time parameter ``t`` for ``U = exp(-i H t)``.
+            qft_do_swaps: Whether to include the final swap layer in the inverse
+
+                QFT. Defaults to ``True`` so that the measured bit string is
+                ordered from most-significant to least-significant bit.
+
+            shots: The number of shots to execute the circuit.
+
+        """
+        Logger.trace_entering()
+        super().__init__()
+        self._settings = StandardPhaseEstimationSettings()
+        self._settings.set("num_bits", num_bits)
+        self._settings.set("evolution_time", evolution_time)
+        self._settings.set("qft_do_swaps", qft_do_swaps)
+        self._settings.set("shots", shots)
+
+    def _run_impl(
+        self,
+        state_preparation: Circuit,
+        qubit_hamiltonian: QubitHamiltonian,
+        *,
+        evolution_builder: TimeEvolutionBuilder,
+        circuit_mapper: ControlledEvolutionCircuitMapper,
+        circuit_executor: CircuitExecutor,
+    ) -> QpeResult:
+        """Prepare a quantum circuit that encodes the given wavefunction.
+
+        Args:
+            state_preparation: The circuit that prepares the initial state.
+            qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
+            evolution_builder: The time evolution builder to use.
+            circuit_mapper: The controlled evolution circuit mapper to use.
+            circuit_executor: The executor to run quantum circuits.
+
+        Returns:
+            A QpeResult object containing the results of the phase estimation.
+
+        """
+        Logger.trace_entering()
+        circuit = self.create_circuit(
+            state_preparation=state_preparation,
+            qubit_hamiltonian=qubit_hamiltonian,
+            evolution_builder=evolution_builder,
+            circuit_mapper=circuit_mapper,
+        )
+
+        shots = self._settings.get("shots")
+        execution_data = circuit_executor.run(circuit, shots=shots)
+        counts = execution_data.bitstring_counts
+
+        dominant_bitstring = max(counts, key=counts.get)
+        raw_phase = int(dominant_bitstring, 2) / (2 ** self._settings.get("num_bits"))
+
+        return QpeResult.from_phase_fraction(
+            method=self.name(),
+            phase_fraction=raw_phase,
+            evolution_time=self.settings().get("evolution_time"),
+            bits_msb_first=dominant_bitstring,
+        )
+
+    def create_circuit(
+        self,
+        state_preparation: Circuit,
+        qubit_hamiltonian: QubitHamiltonian,
+        *,
+        evolution_builder: TimeEvolutionBuilder,
+        circuit_mapper: ControlledEvolutionCircuitMapper,
+    ) -> Circuit:
+        """Build the traditional QPE circuit."""
+        Logger.trace_entering()
+        num_bits = self._settings.get("num_bits")
+        ancilla = QuantumRegister(num_bits, "ancilla")
+        system = QuantumRegister(state_preparation.num_qubits, "system")
+        classical = ClassicalRegister(num_bits, "c")
+        qc = QuantumCircuit(ancilla, system, classical)
+
+        Logger.debug(f"Creating traditional QPE circuit with {num_bits} ancilla qubits and measurements.")
+        state_prep = qasm3.load(state_preparation.qasm)
+        qc.compose(state_prep, qubits=system, inplace=True)
+
+        for idx in range(num_bits):
+            qc.h(ancilla[idx])
+
+        for ancilla_idx in range(num_bits):
+            power = 2**ancilla_idx
+            self._append_controlled_evolution(
+                circuit=qc,
+                qubit_hamiltonian=qubit_hamiltonian,
+                time=self._settings.get("evolution_time"),
+                control_qubit=ancilla[ancilla_idx],
+                target_qubits=system,
+                evolution_builder=evolution_builder,
+                circuit_mapper=circuit_mapper,
+                power=power,
+            )
+
+        inverse_qft = synth_qft_full(num_bits, do_swaps=self._settings.get("qft_do_swaps"), inverse=True)
+        qc.compose(inverse_qft, qubits=ancilla, inplace=True)
+
+        qc.barrier(label="iqft")
+        qc.measure(ancilla, classical)
+
+        Logger.debug(f"Completed standard QPE circuit with {qc.num_qubits} qubits.")
+
+        return Circuit(qasm3.dumps(qc))
+
+    def _append_controlled_evolution(
+        self,
+        circuit: QuantumCircuit,
+        qubit_hamiltonian: QubitHamiltonian,
+        control_qubit: int,
+        target_qubits: list,
+        *,
+        time: float,
+        power: int,
+        evolution_builder: TimeEvolutionBuilder,
+        circuit_mapper: ControlledEvolutionCircuitMapper,
+    ) -> None:
+        """Apply the controlled time evolution unitary to the circuit.
+
+        Args:
+            circuit: The quantum circuit to modify.
+            control_qubit: The control qubit.
+            target_qubits: List of target qubits.
+            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            time: The evolution time.
+            power: The power to which the controlled evolution unitary is raised.
+            evolution_builder: The time evolution builder to use.
+            circuit_mapper: The controlled evolution circuit mapper to use.
+            iteration: Current iteration index (0-based).
+            total_iterations: Total number of phase bits to measure.
+
+        """
+        time_evol_unitary = self._create_time_evolution(
+            qubit_hamiltonian=qubit_hamiltonian,
+            time=time,
+            evolution_builder=evolution_builder,
+        )
+        ctrl_time_evol = ControlledTimeEvolutionUnitary(
+            time_evolution_unitary=time_evol_unitary,
+            control_indices=[0],
+        )
+
+        ctrl_time_evol_circuit = self._create_ctrl_time_evol_circuit(
+            controlled_evolution=ctrl_time_evol, power=power, circuit_mapper=circuit_mapper
+        )
+        cu_circuit = qasm3.loads(ctrl_time_evol_circuit.qasm)
+
+        mapping = [control_qubit, *target_qubits]
+        circuit.compose(cu_circuit, qubits=mapping, inplace=True)
+
+    def name(self) -> str:
+        """Return the algorithm name as standard."""
+        return "standard"
