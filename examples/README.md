@@ -38,4 +38,3 @@ The [`interoperability/openFermion`](interoperability/openFermion/) directory co
 The [`interoperability/rdkit`](interoperability/rdkit/) directory contains example programs demonstrating interoperability between QDK/Chemistry and [RDKit](https://www.rdkit.org/), including:
 
 - [`sample_rdkit_geometry.py`](interoperability/rdkit/sample_rdkit_geometry.py): Example of obtaining geometry from RDKit and calculate a simple energy with QDK/Chemistry.
-
