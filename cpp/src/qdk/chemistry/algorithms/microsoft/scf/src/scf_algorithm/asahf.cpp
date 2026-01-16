@@ -27,43 +27,30 @@ namespace detail {
  */
 std::array<size_t, 4> get_core_config_from_ecp_shells(
     const BasisSet& basis_set) {
-      std::cout << "================\n\nGetting core config from ecp shells\n===================" << std::endl;
-  std::array<size_t, 4> core_config = {0, 0, 0, 0};
 
   size_t ecp_electrons = basis_set.n_ecp_electrons;
-  std::cout << "Total ECP electrons: " << ecp_electrons << std::endl;
+  // ecp map
+  std::unordered_map<int, std::array<size_t, 4>> ecp_map = {
+      { 0, {0,0,0,0}},  // []
+      { 2, {1,0,0,0}},  // [He]
+      {10, {2,1,0,0}},  // [Ne]
+      {18, {3,2,0,0}},  // [Ar]
+      {28, {3,2,1,0}},  // [Ar] + 3d
+      {36, {4,3,1,0}},  // [Kr]
+      {46, {4,3,2,0}},  // [Kr] + 4d
+      {54, {5,4,2,0}},  // [Xe]
+      {60, {4,3,2,1}},  // [Kr] + 4d + 4f
+      {68, {5,4,2,1}},  // [Xe] + 4f
+      {78, {5,4,3,1}}  // [Xe] + 4f + 5d
+  };
 
-  // switch for ecp electrons
-  switch (ecp_electrons) {
-    case 0:
-      // no core electrons
-      break;
-    case 2:
-      core_config[0] = 1;
-      break;
-    case 10:
-      core_config[0] = 2;
-      core_config[1] = 1;
-      break;
-    case 18:
-      core_config[0] = 3;
-      core_config[1] = 2;
-      break;
-    case 28:
-      core_config[0] = 3;
-      core_config[1] = 2;
-      core_config[2] = 1;
-      break;
-    case 36:
-      core_config[0] = 4;
-      core_config[1] = 3;
-      core_config[2] = 1;
-      break;
-    default:
-      throw std::runtime_error(
-          "ECP electrons not supported in core configuration extraction.");
+  // check if ecp_electrons is in map
+  if (ecp_map.find(ecp_electrons) == ecp_map.end()) {
+    throw std::runtime_error(
+        "ECP electron configuration not predefined for this number of ECP electrons.");
   }
 
+  std::array<size_t, 4> core_config = ecp_map[ecp_electrons];
   return core_config;
 }
 
