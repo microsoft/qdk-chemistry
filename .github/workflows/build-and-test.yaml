@@ -64,6 +64,7 @@ jobs:
 
   coverage:
     name: ${{ matrix.os-name }} Build, Test, and Coverage Analysis
+    needs: check-up-to-date
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
