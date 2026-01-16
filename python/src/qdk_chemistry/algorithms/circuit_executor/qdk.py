@@ -31,7 +31,7 @@ class QdkFullStateSimulatorSettings(Settings):
 class QdkFullStateSimulator(CircuitExecutor):
     """QDK Full State Simulator circuit executor implementation."""
 
-    def __init__(self, simulator_type: Literal["cpu", "gpu", "clifford"], seed: int = 42) -> None:
+    def __init__(self, simulator_type: Literal["cpu", "gpu", "clifford"] = "cpu", seed: int = 42) -> None:
         """Initialize the QDK Full State Simulator circuit executor.
 
         Args:
@@ -64,6 +64,7 @@ class QdkFullStateSimulator(CircuitExecutor):
         """
         Logger.trace_entering()
         qir = compile_qir(circuit.qasm)
+        Logger.debug("QIR compiled")
         noise_config = noise.to_qdk_noise_config() if noise is not None else None
         raw_results = run_qir(
             qir, shots=shots, noise=noise_config, seed=self._settings.get("seed"), type=self._settings.get("type")

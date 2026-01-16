@@ -17,8 +17,9 @@ References:
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
 from qiskit.synthesis.qft.qft_decompose_full import synth_qft_full
 
-from qdk_chemistry.algorithms import ControlledEvolutionCircuitMapper, TimeEvolutionBuilder
 from qdk_chemistry.algorithms.circuit_executor import CircuitExecutor
+from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
+from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
 from qdk_chemistry.data import Circuit, ControlledTimeEvolutionUnitary, QpeResult, QubitHamiltonian, Settings
 from qdk_chemistry.utils import Logger
 

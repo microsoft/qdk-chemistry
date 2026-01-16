@@ -7,9 +7,12 @@
 
 from abc import abstractmethod
 
-from qdk_chemistry.algorithms import ControlledEvolutionCircuitMapper, TimeEvolutionBuilder
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.algorithms.circuit_executor import CircuitExecutor
+from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
+from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import (
+    ControlledEvolutionCircuitMapper,
+)
 from qdk_chemistry.data import (
     Circuit,
     ControlledTimeEvolutionUnitary,
@@ -89,8 +92,10 @@ class PhaseEstimation(Algorithm):
             The controlled time evolution circuit.
 
         """
-        circuit_mapper.settings().update("power", power)
-        return circuit_mapper.run(controlled_evolution=controlled_evolution)
+        # Create a new instance of the mapper to avoid setting lock
+        circuit_mapper.settings().update("power", power)  # Update the power setting
+        # Avoid lock settings
+        return circuit_mapper._run_impl(controlled_evolution=controlled_evolution)  # noqa: SLF001
 
     @staticmethod
     def _validate_state_prep_qubits(state_preparation: Circuit, qubit_hamiltonian: QubitHamiltonian) -> None:

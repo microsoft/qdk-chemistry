@@ -6,7 +6,6 @@ using a single ancilla qubit and adaptive feedback corrections.
 
 References:
     Kitaev, A. (1995). arXiv:quant-ph/9511026. :cite:`Kitaev1995`
-    Dobšíček, M., Johansson, G., Shumeiko, V., & Wendin, G. (2007). Physical Review A, 76(3), 030306.
 
 """
 
@@ -16,7 +15,9 @@ References:
 # --------------------------------------------------------------------------------------------
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
 
-from qdk_chemistry.algorithms import CircuitExecutor, ControlledEvolutionCircuitMapper, TimeEvolutionBuilder
+from qdk_chemistry.algorithms.circuit_executor import CircuitExecutor
+from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
+from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
 from qdk_chemistry.data import Circuit, ControlledTimeEvolutionUnitary, QpeResult, QubitHamiltonian, Settings
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.phase import iterative_phase_feedback_update, phase_fraction_from_feedback
@@ -120,14 +121,17 @@ class IterativePhaseEstimation(PhaseEstimation):
                 phase_correction=phase_feedback,
             )
             iter_circuits.append(iteration_circuit)
+            Logger.info(f"Iteration {iteration + 1} / {self.settings().get('num_bits')}: circuit generated.")
             # Run the iteration circuit on the simulator
             executor_data = circuit_executor.run(iteration_circuit, shots=self.settings().get("shots_per_iteration"))
             bitstring_result = executor_data.bitstring_counts
-            print(f"Iteration {iteration + 1}: Measurement results: {bitstring_result}")
+            Logger.info(
+                f"Iteration {iteration + 1} / {self.settings().get('num_bits')}: "
+                f"Measurement results: {bitstring_result}"
+            )
             # Phase bit through majority vote
             measured_bit = 0 if bitstring_result.get("0", 0) >= bitstring_result.get("1", 0) else 1
-            print(f"Iteration {iteration + 1}: Measured bit: {measured_bit}")
-
+            Logger.debug(f"Majority measured bit: {measured_bit}")
             # Store the measured bit
             bits.append(measured_bit)
 
