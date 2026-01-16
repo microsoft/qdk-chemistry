@@ -241,7 +241,7 @@ jobs:
         python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
 
     - name: Run Python tests
-      env: 
+      env:
         OMP_NUM_THREADS: 8
       working-directory: python
       run: |
