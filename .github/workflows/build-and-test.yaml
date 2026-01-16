@@ -247,7 +247,6 @@ jobs:
 
         BUILD_TEMP=$(find . -type d -path "./build/cp*" | head -1)
         echo "Found build directory: $BUILD_TEMP"
-        echo "$BUILD_TEMP" > build_temp_path.txt
 
         set +e
         pytest \
