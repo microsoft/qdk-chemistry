@@ -243,9 +243,10 @@ jobs:
     - name: Run Python tests
       working-directory: python
       run: |
+        set -e
         mkdir -p ../test-results ../coverage-reports
 
-        BUILD_TEMP=$(find . -type d -path "./build/cp*" | head -1)
+        BUILD_TEMP=$(find . -type d -path './build/cp*' -print -quit)
         echo "Found build directory: $BUILD_TEMP"
 
         set +e
@@ -257,7 +258,7 @@ jobs:
           --junitxml=../test-results/pytest_report.xml \
           -v \
           --tb=short \
-          > ../coverage-reports/python_coverage.txt 2>&1
+          2>&1 > tee ../coverage-reports/python_coverage.txt
 
         PYTEST_EXIT_CODE=$?
         set -e
