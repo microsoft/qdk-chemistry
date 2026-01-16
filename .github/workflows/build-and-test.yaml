@@ -260,7 +260,7 @@ jobs:
           --junitxml=../test-results/pytest_report.xml \
           -v \
           --tb=short \
-          2>&1 > tee ../coverage-reports/python_coverage.txt
+          2>&1 | tee ../coverage-reports/python_coverage.txt
 
         PYTEST_EXIT_CODE=$?
         set -e
