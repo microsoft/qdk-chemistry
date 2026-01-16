@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
     - '**'
+  merge_group:
   workflow_dispatch:
 
 concurrency:
@@ -20,6 +21,47 @@ permissions:
   statuses: write
 
 jobs:
+  check-up-to-date:
+    name: Check if branch is up to date with main
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check if branch is up to date with main (Pull Request)
+      if: github.event_name == 'pull_request'
+      run: |
+        # Ensure origin/main is present
+        git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+
+        # Check if the current commit is ahead of main
+        # Kills pipeline if branch is not up to date with main
+        # For pull requests, we use github.event.pull_request.sha to get the commit SHA,
+        # as GitHub treats the current commit as one that would be produced by merging into main
+        if ! git merge-base --is-ancestor origin/main "${{ github.event.pull_request.sha }}"; then
+          echo "This branch is not up to date with main. Please merge the latest changes from main into your branch to continue."
+          exit 1
+        fi
+
+        echo "Branch is up to date, starting Build and Test workflow."
+
+    - name: Check if branch is up to date with main (Push)
+    if: github.event_name == 'push'
+    run: |
+      # Ensure origin/main is present
+      git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+
+      # Check if the current commit is ahead of main
+      # Kills pipeline if branch is not up to date with main
+      if ! git merge-base --is-ancestor origin/main "${{ github.sha }}"; then
+        echo "This branch is not up to date with main. Please merge the latest changes from main into your branch to continue."
+        exit 1
+      fi
+
+      echo "Branch is up to date, starting Build and Test workflow."
+
   coverage:
     name: ${{ matrix.os-name }} Build, Test, and Coverage Analysis
     runs-on: ${{ matrix.runner }}
