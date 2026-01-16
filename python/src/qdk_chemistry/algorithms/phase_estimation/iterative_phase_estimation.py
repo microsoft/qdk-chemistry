@@ -70,6 +70,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         self._settings.set("num_bits", num_bits)
         self._settings.set("evolution_time", evolution_time)
         self._settings.set("shots_per_iteration", shots_per_iteration)
+        self._iteration_circuits: list[Circuit] | None = None
 
     def _run_impl(
         self,
@@ -97,7 +98,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         # Initialize the parameters
         phase_feedback = 0.0
         bits: list[int] = []
-        iter_circuits: list[QuantumCircuit] = []
+        iter_circuits: list[Circuit] = []
 
         # Iterate over the number of phase bits
         for iteration in range(self.settings().get("num_bits")):
@@ -128,7 +129,7 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         # Compute the final phase fraction
         phase_fraction = phase_fraction_from_feedback(phase_feedback)
-
+        self._iteration_circuits = iter_circuits
         # Create and return the result
         return QpeResult.from_phase_fraction(
             method=self.name(),
@@ -253,9 +254,9 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         Args:
             circuit: The quantum circuit to modify.
+            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
             control_qubit: The control qubit.
             target_qubits: List of target qubits.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
             time: The evolution time.
             evolution_builder: The time evolution builder to use.
             circuit_mapper: The controlled evolution circuit mapper to use.
@@ -281,6 +282,20 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         mapping = [control_qubit, *target_qubits]
         circuit.compose(cu_circuit, qubits=mapping, inplace=True)
+
+    def get_circuits(self) -> list[Circuit]:
+        """Get the list of iteration circuits generated during algorithm execution.
+
+        Returns:
+            List of quantum circuits for each IQPE iteration.
+
+        Raises:
+            ValueError: If no iteration circuits are available.
+
+        """
+        if self._iteration_circuits is not None:
+            return self._iteration_circuits
+        raise ValueError("No iteration circuits have been generated. Please run the algorithm first.")
 
     def name(self) -> str:
         """Return the name of the phase estimation algorithm."""

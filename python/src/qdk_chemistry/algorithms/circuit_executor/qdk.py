@@ -8,10 +8,10 @@ from collections import Counter
 from typing import Literal
 
 from qdk.openqasm import compile as compile_qir
-from qdk.simulation import NoiseConfig, run_qir
+from qdk.simulation import run_qir
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.data import Circuit, CircuitExecutorData, Settings
+from qdk_chemistry.data import Circuit, CircuitExecutorData, QuantumErrorProfile, Settings
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
@@ -49,14 +49,14 @@ class QdkFullStateSimulator(CircuitExecutor):
         self,
         circuit: Circuit,
         shots: int,
-        noise: NoiseConfig | None = None,
+        noise: QuantumErrorProfile | None = None,
     ) -> None:
         """Execute the given quantum circuit using the QDK Full State Simulator.
 
         Args:
             circuit: The quantum circuit to execute.
             shots: The number of shots to execute the circuit.
-            noise: The noise configuration to apply during execution.
+            noise: Optional noise profile to apply during execution.
 
         Returns:
             CircuitExecutorData: Object containing the results of the circuit execution.
@@ -64,8 +64,9 @@ class QdkFullStateSimulator(CircuitExecutor):
         """
         Logger.trace_entering()
         qir = compile_qir(circuit.qasm)
+        noise_config = noise.to_qdk_noise_config() if noise is not None else None
         raw_results = run_qir(
-            qir, shots=shots, noise=noise, seed=self._settings.get("seed"), type=self._settings.get("type")
+            qir, shots=shots, noise=noise_config, seed=self._settings.get("seed"), type=self._settings.get("type")
         )
         Logger.debug(f"Measurement results obtained: {raw_results}")
         reversed_bitstrings = [

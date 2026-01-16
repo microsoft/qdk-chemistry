@@ -64,11 +64,9 @@ class StandardPhaseEstimation(PhaseEstimation):
         Args:
             num_bits: The number of phase bits to estimate.
             evolution_time: Time parameter ``t`` for ``U = exp(-i H t)``.
-            qft_do_swaps: Whether to include the final swap layer in the inverse
-
-                QFT. Defaults to ``True`` so that the measured bit string is
+            qft_do_swaps: Whether to include the final swap layer in the inverse QFT.
+                Defaults to ``True`` so that the measured bit string is
                 ordered from most-significant to least-significant bit.
-
             shots: The number of shots to execute the circuit.
 
         """
@@ -79,6 +77,7 @@ class StandardPhaseEstimation(PhaseEstimation):
         self._settings.set("evolution_time", evolution_time)
         self._settings.set("qft_do_swaps", qft_do_swaps)
         self._settings.set("shots", shots)
+        self._qpe_circuit: Circuit | None = None
 
     def _run_impl(
         self,
@@ -89,7 +88,7 @@ class StandardPhaseEstimation(PhaseEstimation):
         circuit_mapper: ControlledEvolutionCircuitMapper,
         circuit_executor: CircuitExecutor,
     ) -> QpeResult:
-        """Prepare a quantum circuit that encodes the given wavefunction.
+        """Run the standard phase estimation algorithm given the state preparation and qubit Hamiltonian.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
@@ -109,7 +108,7 @@ class StandardPhaseEstimation(PhaseEstimation):
             evolution_builder=evolution_builder,
             circuit_mapper=circuit_mapper,
         )
-
+        self._qpe_circuit = circuit
         shots = self._settings.get("shots")
         execution_data = circuit_executor.run(circuit, shots=shots)
         counts = execution_data.bitstring_counts
@@ -132,7 +131,18 @@ class StandardPhaseEstimation(PhaseEstimation):
         evolution_builder: TimeEvolutionBuilder,
         circuit_mapper: ControlledEvolutionCircuitMapper,
     ) -> Circuit:
-        """Build the traditional QPE circuit."""
+        """Build the standard QPE circuit.
+
+        Args:
+            state_preparation: The circuit that prepares the initial state.
+            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            evolution_builder: The time evolution builder to use.
+            circuit_mapper: The controlled evolution circuit mapper to use.
+
+        Returns:
+            The constructed QPE quantum circuit.
+
+        """
         Logger.trace_entering()
         num_bits = self._settings.get("num_bits")
         ancilla = QuantumRegister(num_bits, "ancilla")
@@ -186,15 +196,13 @@ class StandardPhaseEstimation(PhaseEstimation):
 
         Args:
             circuit: The quantum circuit to modify.
+            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
             control_qubit: The control qubit.
             target_qubits: List of target qubits.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
             time: The evolution time.
             power: The power to which the controlled evolution unitary is raised.
             evolution_builder: The time evolution builder to use.
             circuit_mapper: The controlled evolution circuit mapper to use.
-            iteration: Current iteration index (0-based).
-            total_iterations: Total number of phase bits to measure.
 
         """
         time_evol_unitary = self._create_time_evolution(
@@ -214,6 +222,20 @@ class StandardPhaseEstimation(PhaseEstimation):
 
         mapping = [control_qubit, *target_qubits]
         circuit.compose(cu_circuit, qubits=mapping, inplace=True)
+
+    def get_circuit(self) -> Circuit:
+        """Get the QPE circuit generated during algorithm execution.
+
+        Returns:
+            The quantum circuit used in the last execution.
+
+        Raises:
+            ValueError: If no QPE circuit is available.
+
+        """
+        if self._qpe_circuit is not None:
+            return self._qpe_circuit
+        raise ValueError("No QPE circuit has been generated. Please run the algorithm first.")
 
     def name(self) -> str:
         """Return the algorithm name as standard."""
