@@ -9,4 +9,4 @@ This module provides backend support for executing quantum circuits.
 # --------------------------------------------------------------------------------------------
 from .base import CircuitExecutor, CircuitExecutorFactory
 
-__all__ = ["CircuitExecutor", "CircuitExecutorFactory"]
+__all__: list[str] = ["CircuitExecutor", "CircuitExecutorFactory"]

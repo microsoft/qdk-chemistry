@@ -14,7 +14,7 @@ from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import Circuit, CircuitExecutorData, QuantumErrorProfile, Settings
 from qdk_chemistry.utils import Logger
 
-__all__: list[str] = []
+__all__: list[str] = ["QdkFullStateSimulator", "QdkFullStateSimulatorSettings"]
 
 
 class QdkFullStateSimulatorSettings(Settings):

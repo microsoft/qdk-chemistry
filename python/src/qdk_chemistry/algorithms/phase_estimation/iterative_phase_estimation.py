@@ -23,6 +23,8 @@ from qdk_chemistry.utils.phase import iterative_phase_feedback_update, phase_fra
 
 from .base import PhaseEstimation
 
+__all__: list[str] = ["IterativePhaseEstimation", "IterativePhaseEstimationSettings"]
+
 
 class IterativePhaseEstimationSettings(Settings):
     """Settings for the Iterative Phase Estimation algorithm."""
@@ -32,13 +34,18 @@ class IterativePhaseEstimationSettings(Settings):
 
         Args:
             num_bits: The number of phase bits to estimate.
-            evolution_time: The evolution time for the phase estimation.
+            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.
             shots_per_iteration: The number of shots to execute per iteration.
 
         """
         super().__init__()
         self._set_default("num_bits", "int", 4, "The number of phase bits to estimate.")
-        self._set_default("evolution_time", "float", 0.1, "The evolution time for the phase estimation.")
+        self._set_default(
+            "evolution_time",
+            "float",
+            0.1,
+            "Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.",
+        )
         self._set_default(
             "shots_per_iteration",
             "int",
@@ -52,15 +59,15 @@ class IterativePhaseEstimation(PhaseEstimation):
 
     def __init__(
         self,
-        num_bits: int,
-        evolution_time: float,
+        num_bits: int = 4,
+        evolution_time: float = 0.1,
         shots_per_iteration: int = 3,
     ):
         """Initialize IterativePhaseEstimation with the given settings.
 
         Args:
             num_bits: The number of phase bits to estimate.
-            evolution_time: The evolution time for the phase estimation.
+            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.
             shots_per_iteration: The number of shots to execute per iteration.
 
         """

@@ -24,7 +24,7 @@ from qdk_chemistry.utils import Logger
 
 from .base import PhaseEstimation
 
-__all__: list[str] = []
+__all__: list[str] = ["StandardPhaseEstimation", "StandardPhaseEstimationSettings"]
 
 
 class StandardPhaseEstimationSettings(Settings):
@@ -58,7 +58,7 @@ class StandardPhaseEstimationSettings(Settings):
 class StandardPhaseEstimation(PhaseEstimation):
     """Standard QFT-based (non-iterative) phase estimation."""
 
-    def __init__(self, num_bits: int, evolution_time: float, qft_do_swaps: bool = True, shots: int = 3):
+    def __init__(self, num_bits: int = 4, evolution_time: float = 0.1, qft_do_swaps: bool = True, shots: int = 3):
         """Initialize the standard phase estimation routine.
 
         Args:

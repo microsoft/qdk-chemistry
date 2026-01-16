@@ -40,6 +40,7 @@ from qdk_chemistry.algorithms.orbital_localizer import (
     QdkPipekMezeyLocalizer,
     QdkVVHVLocalizer,
 )
+from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation
 from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     ProjectedMultiConfigurationCalculator,
     QdkMacisPmc,
@@ -51,14 +52,6 @@ from qdk_chemistry.algorithms.stability_checker import QdkStabilityChecker, Stab
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
-from qdk_chemistry.phase_estimation import (
-    IterativePhaseEstimation,
-    IterativePhaseEstimationIteration,
-    PhaseEstimation,
-    PhaseEstimationAlgorithm,
-    TraditionalPhaseEstimation,
-    energy_from_phase,
-)
 
 __all__ = [
     # Classes
@@ -68,13 +61,10 @@ __all__ = [
     "DynamicalCorrelationCalculator",
     "EnergyEstimator",
     "HamiltonianConstructor",
-    "IterativePhaseEstimation",
-    "IterativePhaseEstimationIteration",
     "MultiConfigurationCalculator",
     "MultiConfigurationScf",
     "OrbitalLocalizer",
     "PhaseEstimation",
-    "PhaseEstimationAlgorithm",
     "ProjectedMultiConfigurationCalculator",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
@@ -95,7 +85,6 @@ __all__ = [
     "StabilityChecker",
     "StatePreparation",
     "TimeEvolutionBuilder",
-    "TraditionalPhaseEstimation",
     # Factory functions
     "available",
     "create",
