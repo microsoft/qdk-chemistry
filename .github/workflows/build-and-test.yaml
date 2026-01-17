@@ -21,6 +21,33 @@ permissions:
   statuses: write
 
 jobs:
+  check-up-to-date:
+    name: Check if branch is up to date with main
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Check if branch is up to date with main (Pull Request)
+      run: |
+        # Ensure origin/main is present
+        git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+
+        # Check if the current commit is ahead of main
+        # Kills pipeline if branch is not up to date with main
+        # For pull requests, we use github.event.pull_request.sha to get the commit SHA,
+        # as GitHub treats the current commit as one that would be produced by merging into main
+        if ! git merge-base --is-ancestor origin/main "${{ github.event.pull_request.head.sha }}"; then
+          echo "This branch is not up to date with main. Please merge the latest changes from main into your branch to continue."
+          exit 1
+        fi
+
+        echo "Branch is up to date, starting Build and Test workflow."
+
   coverage:
     name: ${{ matrix.os-name }} Build, Test, and Coverage Analysis
     runs-on: ${{ matrix.runner }}
@@ -242,13 +269,15 @@ jobs:
         python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
 
     - name: Run Python tests
+      env:
+        OMP_NUM_THREADS: 8
       working-directory: python
       run: |
+        set -e
         mkdir -p ../test-results ../coverage-reports
 
-        BUILD_TEMP=$(find . -type d -path "./build/cp*" | head -1)
+        BUILD_TEMP=$(find . -type d -path './build/cp*' -print -quit)
         echo "Found build directory: $BUILD_TEMP"
-        echo "$BUILD_TEMP" > build_temp_path.txt
 
         set +e
         pytest \
@@ -259,7 +288,7 @@ jobs:
           --junitxml=../test-results/pytest_report.xml \
           -v \
           --tb=short \
-          > ../coverage-reports/python_coverage.txt 2>&1
+          2>&1 | tee ../coverage-reports/python_coverage.txt
 
         PYTEST_EXIT_CODE=$?
         set -e
