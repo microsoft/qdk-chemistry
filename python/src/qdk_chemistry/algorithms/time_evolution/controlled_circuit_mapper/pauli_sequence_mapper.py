@@ -237,4 +237,4 @@ def append_controlled_time_evolution(
         power_evolution_circuit.append(ctrl_evol_gate, list(range(num_qubits)))
 
     # Convert to gate and append to original circuit
-    circuit.append(power_evolution_circuit.to_gate(), [control_qubit, *list(target_qubits)])
+    circuit.append(power_evolution_circuit.to_gate(), list(range(num_qubits)))

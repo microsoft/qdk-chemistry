@@ -11,12 +11,14 @@ from dataclasses import dataclass
 
 import numpy as np
 import pytest
-from qiskit import QuantumCircuit, transpile
-from qiskit.quantum_info import SparsePauliOp
-from qiskit_aer import AerSimulator
+from qiskit import QuantumCircuit, qasm3
+from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 
-from qdk_chemistry.algorithms import TraditionalPhaseEstimation, energy_from_phase
-from qdk_chemistry.data import QubitHamiltonian
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
+from qdk_chemistry.data import Circuit, QpeResult, QubitHamiltonian
+from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
+from qdk_chemistry.utils.phase import energy_from_phase
 
 from .reference_tolerances import (
     float_comparison_relative_tolerance,
@@ -45,17 +47,14 @@ class TraditionalProblem:
 @pytest.fixture
 def two_qubit_phase_problem() -> TraditionalProblem:
     """Return the canonical two-qubit phase estimation setup."""
-    sparse_pauli_op = SparsePauliOp.from_list([("XX", 0.25), ("ZZ", 0.5)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
     state_prep = QuantumCircuit(2, name="psi")
-    state_prep.initialize([0.6, 0.0, 0.0, 0.8], [0, 1])
+    state_prep.append(QiskitStatePreparation([0.6, 0.0, 0.0, 0.8]), list(range(2)))
 
     return TraditionalProblem(
         label="two_qubit_reference",
         hamiltonian=hamiltonian,
-        state_prep=state_prep,
+        state_prep=Circuit(qasm=qasm3.dumps(state_prep)),
         evolution_time=float(np.pi / 2.0),
         num_bits=4,
         shots=3,
@@ -68,20 +67,17 @@ def two_qubit_phase_problem() -> TraditionalProblem:
 @pytest.fixture
 def four_qubit_phase_problem() -> TraditionalProblem:
     """Return the documented four-qubit benchmark."""
-    sparse_pauli_op = SparsePauliOp.from_list([("XXXX", 0.25), ("ZZZZ", 4.5)])
-    hamiltonian = QubitHamiltonian(
-        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
-    )
+    hamiltonian = QubitHamiltonian(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
     state_prep = QuantumCircuit(4, name="psi_4q")
     state_vector = np.zeros(2**4, dtype=complex)
     state_vector[int("1000", 2)] = 0.8
     state_vector[int("0111", 2)] = -0.6
-    state_prep.initialize(state_vector, list(range(4)))
+    state_prep.append(QiskitStatePreparation(state_vector), list(range(4)))
 
     return TraditionalProblem(
         label="four_qubit_reference",
         hamiltonian=hamiltonian,
-        state_prep=state_prep,
+        state_prep=Circuit(qasm=qasm3.dumps(state_prep)),
         evolution_time=float(np.pi / 8.0),
         num_bits=6,
         shots=3,
@@ -91,38 +87,60 @@ def four_qubit_phase_problem() -> TraditionalProblem:
     )
 
 
-def _extract_traditional_results(problem: TraditionalProblem) -> tuple[str, float, float]:
-    """Run traditional phase estimation and return the dominant measurement."""
-    traditional = TraditionalPhaseEstimation(problem.hamiltonian, problem.evolution_time)
-    simulator = AerSimulator(seed_simulator=_SEED)
+def _extract_traditional_results(problem: TraditionalProblem) -> QpeResult:
+    """Run traditional phase estimation and return the dominant measurement.
 
-    circuit = traditional.create_circuit(problem.state_prep, num_bits=problem.num_bits)
-    compiled = transpile(circuit, simulator, optimization_level=0)
-    result = simulator.run(compiled, shots=problem.shots).result()
-    counts = result.get_counts()
+    Args:
+        problem: The traditional phase estimation benchmark problem.
 
-    dominant_bitstring = max(counts, key=counts.get)
-    raw_phase = int(dominant_bitstring, 2) / (2**problem.num_bits)
-    candidates = [raw_phase % 1.0, (1.0 - raw_phase) % 1.0]
-    energies = [energy_from_phase(candidate, evolution_time=problem.evolution_time) for candidate in candidates]
+    Returns:
+        QPE result including dominant bitstring, phase fraction, and energy.
 
-    index = 0 if abs(energies[0] - problem.expected_energy) <= abs(energies[1] - problem.expected_energy) else 1
-    return dominant_bitstring, candidates[index], energies[index]
+    """
+    qpe = StandardPhaseEstimation(num_bits=problem.num_bits, evolution_time=problem.evolution_time)
+    simulator = QiskitAerSimulator(seed=_SEED)
+
+    circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+    evolution_builder = create("time_evolution_builder", "trotter")
+
+    return qpe.run(
+        state_preparation=problem.state_prep,
+        qubit_hamiltonian=problem.hamiltonian,
+        evolution_builder=evolution_builder,
+        circuit_mapper=circuit_mapper,
+        circuit_executor=simulator,
+    )
 
 
 def test_traditional_phase_estimation_extracts_phase_and_energy(two_qubit_phase_problem: TraditionalProblem) -> None:
     """Validate traditional QPE on the two-qubit benchmark."""
-    dominant_bitstring, phase_fraction, energy = _extract_traditional_results(two_qubit_phase_problem)
+    results = _extract_traditional_results(two_qubit_phase_problem)
+    dominant_bitstring = results.bitstring_msb_first
+    phase_fraction = results.phase_fraction
+
+    # Resolve phase ambiguity
+    phase_fraction_candidates = [phase_fraction % 1.0, (1.0 - phase_fraction) % 1.0]
+    energies = [
+        energy_from_phase(candidate, evolution_time=two_qubit_phase_problem.evolution_time)
+        for candidate in phase_fraction_candidates
+    ]
+
+    index = (
+        0
+        if abs(energies[0] - two_qubit_phase_problem.expected_energy)
+        <= abs(energies[1] - two_qubit_phase_problem.expected_energy)
+        else 1
+    )
 
     assert dominant_bitstring == two_qubit_phase_problem.expected_bitstring
     assert np.isclose(
-        phase_fraction,
+        phase_fraction_candidates[index],
         two_qubit_phase_problem.expected_phase,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_phase_fraction_tolerance,
     )
     assert np.isclose(
-        energy,
+        energies[index],
         two_qubit_phase_problem.expected_energy,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
@@ -131,17 +149,33 @@ def test_traditional_phase_estimation_extracts_phase_and_energy(two_qubit_phase_
 
 def test_traditional_phase_estimation_four_qubit_problem(four_qubit_phase_problem: TraditionalProblem) -> None:
     """Validate traditional QPE on the documented four-qubit system."""
-    dominant_bitstring, phase_fraction, energy = _extract_traditional_results(four_qubit_phase_problem)
+    results = _extract_traditional_results(four_qubit_phase_problem)
+    dominant_bitstring = results.bitstring_msb_first
+    phase_fraction = results.phase_fraction
+
+    # Resolve phase ambiguity
+    phase_fraction_candidates = [phase_fraction % 1.0, (1.0 - phase_fraction) % 1.0]
+    energies = [
+        energy_from_phase(candidate, evolution_time=four_qubit_phase_problem.evolution_time)
+        for candidate in phase_fraction_candidates
+    ]
+
+    index = (
+        0
+        if abs(energies[0] - four_qubit_phase_problem.expected_energy)
+        <= abs(energies[1] - four_qubit_phase_problem.expected_energy)
+        else 1
+    )
 
     assert dominant_bitstring == four_qubit_phase_problem.expected_bitstring
     assert np.isclose(
-        phase_fraction,
+        phase_fraction_candidates[index],
         four_qubit_phase_problem.expected_phase,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_phase_fraction_tolerance,
     )
     assert np.isclose(
-        energy,
+        energies[index],
         four_qubit_phase_problem.expected_energy,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,

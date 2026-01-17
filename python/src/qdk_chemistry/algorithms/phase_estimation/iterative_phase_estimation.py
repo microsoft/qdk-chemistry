@@ -18,7 +18,14 @@ from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
 from qdk_chemistry.algorithms.circuit_executor import CircuitExecutor
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
-from qdk_chemistry.data import Circuit, ControlledTimeEvolutionUnitary, QpeResult, QubitHamiltonian, Settings
+from qdk_chemistry.data import (
+    Circuit,
+    ControlledTimeEvolutionUnitary,
+    QpeResult,
+    QuantumErrorProfile,
+    QubitHamiltonian,
+    Settings,
+)
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.phase import iterative_phase_feedback_update, phase_fraction_from_feedback
 
@@ -88,6 +95,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         evolution_builder: TimeEvolutionBuilder,
         circuit_mapper: ControlledEvolutionCircuitMapper,
         circuit_executor: CircuitExecutor,
+        noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
         """Run the iterative phase estimation algorithm with the given state preparation circuit and qubit Hamiltonian.
 
@@ -97,7 +105,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             evolution_builder: The time evolution builder to use.
             circuit_mapper: The controlled evolution circuit mapper to use.
             circuit_executor: The executor to run quantum circuits.
-            shots: The number of shots to execute the circuit.
+            noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
             QpeResult: The result of the phase estimation.
@@ -123,7 +131,9 @@ class IterativePhaseEstimation(PhaseEstimation):
             iter_circuits.append(iteration_circuit)
             Logger.info(f"Iteration {iteration + 1} / {self.settings().get('num_bits')}: circuit generated.")
             # Run the iteration circuit on the simulator
-            executor_data = circuit_executor.run(iteration_circuit, shots=self.settings().get("shots_per_iteration"))
+            executor_data = circuit_executor.run(
+                iteration_circuit, shots=self.settings().get("shots_per_iteration"), noise=noise
+            )
             bitstring_result = executor_data.bitstring_counts
             Logger.info(
                 f"Iteration {iteration + 1} / {self.settings().get('num_bits')}: "
@@ -242,6 +252,11 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         """
         state_prep_circuit = qasm3.loads(state_preparation.qasm)
+        if state_prep_circuit.num_qubits != len(system_target):
+            raise ValueError(
+                "state_preparation must prepare the same number of system qubits as the target register "
+                f"(expected {len(system_target)}, received {state_prep_circuit.num_qubits}).",
+            )
         state_prep_circuit.name = "state_preparation"
         try:
             circuit.compose(state_prep_circuit.to_gate(), qubits=system_target, inplace=True)

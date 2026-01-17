@@ -88,7 +88,6 @@ __all__ = [
     # Factory functions
     "available",
     "create",
-    "energy_from_phase",
     "inspect_settings",
     "print_settings",
     "register",

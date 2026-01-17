@@ -17,6 +17,7 @@ from qdk_chemistry.data import (
     Circuit,
     ControlledTimeEvolutionUnitary,
     QpeResult,
+    QuantumErrorProfile,
     QubitHamiltonian,
     TimeEvolutionUnitary,
 )
@@ -44,6 +45,7 @@ class PhaseEstimation(Algorithm):
         evolution_builder: TimeEvolutionBuilder,
         circuit_mapper: ControlledEvolutionCircuitMapper,
         circuit_executor: CircuitExecutor,
+        noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
         """Prepare a quantum circuit that encodes the given wavefunction.
 
@@ -53,6 +55,7 @@ class PhaseEstimation(Algorithm):
             evolution_builder: The time evolution builder to use.
             circuit_mapper: The controlled evolution circuit mapper to use.
             circuit_executor: The executor to run quantum circuits.
+            noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
             A QpeResult object containing the results of the phase estimation.
@@ -96,15 +99,6 @@ class PhaseEstimation(Algorithm):
         circuit_mapper.settings().update("power", power)  # Update the power setting
         # Avoid lock settings
         return circuit_mapper._run_impl(controlled_evolution=controlled_evolution)  # noqa: SLF001
-
-    @staticmethod
-    def _validate_state_prep_qubits(state_preparation: Circuit, qubit_hamiltonian: QubitHamiltonian) -> None:
-        """Ensure ``state_preparation`` matches the Hamiltonian system size."""
-        if state_preparation.num_qubits != qubit_hamiltonian.num_qubits:
-            raise ValueError(
-                "state_preparation must prepare the same number of system qubits as the Hamiltonian "
-                f"(expected {qubit_hamiltonian.num_qubits}, received {state_preparation.num_qubits}).",
-            )
 
 
 class PhaseEstimationFactory(AlgorithmFactory):

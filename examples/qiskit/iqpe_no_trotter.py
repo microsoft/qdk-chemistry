@@ -34,13 +34,14 @@ except ImportError as ex:
         "Please install via 'pip install qiskit qiskit-aer'.",
     ) from ex
 
-from qdk_chemistry.algorithms import (
-    IterativePhaseEstimation,
-    create,
-)
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import QpeResult, Structure
-from qdk_chemistry.utils.wavefunction import get_top_determinants
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.phase import (
+    iterative_phase_feedback_update,
+    phase_fraction_from_feedback,
+)
+from qdk_chemistry.utils.wavefunction import get_top_determinants
 
 if TYPE_CHECKING:
     from qiskit.quantum_info import SparsePauliOp
@@ -120,7 +121,6 @@ def create_exact_iteration_circuit(
 def run_iterative_exact_qpe(
     state_prep_circuit: QuantumCircuit,
     *,
-    iqpe: IterativePhaseEstimation,
     pauli_operator: SparsePauliOp,
     precision: int,
     evolution_time: float,
@@ -130,7 +130,7 @@ def run_iterative_exact_qpe(
 
     Args:
         state_prep_circuit: Trial-state preparation circuit.
-        iqpe: Configured iterative phase estimation instance.
+        qubit_hamiltonian: Qubit Hamiltonian describing the system.
         pauli_operator: Sparse Pauli operator describing the Hamiltonian.
         precision: Number of IQPE iterations to perform.
         evolution_time: Evolution time ``t`` used for a single application of ``U``.
@@ -172,9 +172,9 @@ def run_iterative_exact_qpe(
         measured_bit = 0 if counts.get("0", 0) >= counts.get("1", 0) else 1
 
         bits.append(measured_bit)
-        phase_feedback = iqpe.update_phase_feedback(phase_feedback, measured_bit)
+        phase_feedback = iterative_phase_feedback_update(phase_feedback, measured_bit)
 
-    phase_fraction = iqpe.phase_fraction_from_feedback(phase_feedback)
+    phase_fraction = phase_fraction_from_feedback(phase_feedback)
     return bits, phase_fraction
 
 
@@ -250,7 +250,6 @@ Logger.info(
 ########################################################################################
 # 4. Build and run the Qiskit iterative QPE circuit
 ########################################################################################
-iqpe = IterativePhaseEstimation(qubit_hamiltonian, T_TIME)
 matrix_exp = MatrixExponential()
 
 Logger.info("\n=== Running iterative phase estimation (exact evolution) ===")
@@ -260,7 +259,6 @@ Logger.info(f"  Electron sector (alpha, beta): ({n_alpha}, {n_beta})")
 
 bits, phase_fraction = run_iterative_exact_qpe(
     state_prep,
-    iqpe=iqpe,
     pauli_operator=qubit_pauli_op,
     precision=M_PRECISION,
     evolution_time=T_TIME,
@@ -272,7 +270,7 @@ bits, phase_fraction = run_iterative_exact_qpe(
 # 5. Process and display results
 ########################################################################################
 result = QpeResult.from_phase_fraction(
-    method=IterativePhaseEstimation.algorithm,
+    method="iterative_exact",
     phase_fraction=phase_fraction,
     evolution_time=T_TIME,
     bits_msb_first=bits,

@@ -20,7 +20,14 @@ from qiskit.synthesis.qft.qft_decompose_full import synth_qft_full
 from qdk_chemistry.algorithms.circuit_executor import CircuitExecutor
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
-from qdk_chemistry.data import Circuit, ControlledTimeEvolutionUnitary, QpeResult, QubitHamiltonian, Settings
+from qdk_chemistry.data import (
+    Circuit,
+    ControlledTimeEvolutionUnitary,
+    QpeResult,
+    QuantumErrorProfile,
+    QubitHamiltonian,
+    Settings,
+)
 from qdk_chemistry.utils import Logger
 
 from .base import PhaseEstimation
@@ -88,6 +95,7 @@ class StandardPhaseEstimation(PhaseEstimation):
         evolution_builder: TimeEvolutionBuilder,
         circuit_mapper: ControlledEvolutionCircuitMapper,
         circuit_executor: CircuitExecutor,
+        noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
         """Run the standard phase estimation algorithm given the state preparation and qubit Hamiltonian.
 
@@ -97,6 +105,7 @@ class StandardPhaseEstimation(PhaseEstimation):
             evolution_builder: The time evolution builder to use.
             circuit_mapper: The controlled evolution circuit mapper to use.
             circuit_executor: The executor to run quantum circuits.
+            noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
             A QpeResult object containing the results of the phase estimation.
@@ -111,7 +120,7 @@ class StandardPhaseEstimation(PhaseEstimation):
         )
         self._qpe_circuit = circuit
         shots = self._settings.get("shots")
-        execution_data = circuit_executor.run(circuit, shots=shots)
+        execution_data = circuit_executor.run(circuit, shots=shots, noise=noise)
         counts = execution_data.bitstring_counts
 
         dominant_bitstring = max(counts, key=counts.get)
@@ -147,12 +156,18 @@ class StandardPhaseEstimation(PhaseEstimation):
         Logger.trace_entering()
         num_bits = self._settings.get("num_bits")
         ancilla = QuantumRegister(num_bits, "ancilla")
-        system = QuantumRegister(state_preparation.num_qubits, "system")
+        system = QuantumRegister(qubit_hamiltonian.num_qubits, "system")
         classical = ClassicalRegister(num_bits, "c")
         qc = QuantumCircuit(ancilla, system, classical)
 
         Logger.debug(f"Creating traditional QPE circuit with {num_bits} ancilla qubits and measurements.")
-        state_prep = qasm3.load(state_preparation.qasm)
+        state_prep = qasm3.loads(state_preparation.qasm)
+        if state_prep.num_qubits != qubit_hamiltonian.num_qubits:
+            raise ValueError(
+                "state_preparation must prepare the same number of system qubits as the Hamiltonian "
+                f"(expected {qubit_hamiltonian.num_qubits}, received {state_prep.num_qubits}).",
+            )
+
         qc.compose(state_prep, qubits=system, inplace=True)
 
         for idx in range(num_bits):
@@ -172,11 +187,9 @@ class StandardPhaseEstimation(PhaseEstimation):
             )
 
         inverse_qft = synth_qft_full(num_bits, do_swaps=self._settings.get("qft_do_swaps"), inverse=True)
-        qc.compose(inverse_qft, qubits=ancilla, inplace=True)
-
-        qc.barrier(label="iqft")
+        inverse_qft.name = "Inverse QFT"
+        qc.compose(inverse_qft.to_gate(), qubits=ancilla, inplace=True)
         qc.measure(ancilla, classical)
-
         Logger.debug(f"Completed standard QPE circuit with {qc.num_qubits} qubits.")
 
         return Circuit(qasm3.dumps(qc))

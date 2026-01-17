@@ -13,14 +13,8 @@ import h5py
 import numpy as np
 
 from qdk_chemistry.data.base import DataClass
-from qdk_chemistry.phase_estimation.base import PhaseEstimationAlgorithm
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.phase import energy_alias_candidates, energy_from_phase, resolve_energy_aliases
-
-try:
-    from qdk_chemistry.phase_estimation.base import PhaseEstimationAlgorithm as _PhaseEstimationAlgorithm
-except ImportError:  # pragma: no cover - optional dependency at runtime
-    _PhaseEstimationAlgorithm = None  # type: ignore[assignment]
 
 __all__: list[str] = []
 
@@ -102,7 +96,7 @@ class QpeResult(DataClass):
     def from_phase_fraction(
         cls,
         *,
-        method: PhaseEstimationAlgorithm | str,
+        method: str,
         phase_fraction: float,
         evolution_time: float,
         branch_shifts: Iterable[int] = range(-2, 3),
@@ -114,13 +108,13 @@ class QpeResult(DataClass):
         """Construct a :class:`QpeResult` from a measured phase fraction.
 
         Args:
-            method (PhaseEstimationAlgorithm | str): Phase estimation algorithm or workflow label.
-            phase_fraction (float): Measured phase fraction in ``[0, 1)``.
-            evolution_time (float): Evolution time ``t`` used in ``U = exp(-i H t)``.
-            branch_shifts (Iterable[int]): Integer multiples of ``2π / t`` examined when forming alias candidates.
-            bits_msb_first (Sequence[int] | None): Optional measured bits ordered from MSB to LSB.
-            bitstring_msb_first (str | None): Optional string representation of the measured bits.
-            reference_energy (float | None): Optional target value used to select the canonical alias branch.
+            method: Phase estimation algorithm or workflow label.
+            phase_fraction: Measured phase fraction in ``[0, 1)``.
+            evolution_time: Evolution time ``t`` used in ``U = exp(-i H t)``.
+            branch_shifts: Integer multiples of ``2π / t`` examined when forming alias candidates.
+            bits_msb_first: Optional measured bits ordered from MSB to LSB.
+            bitstring_msb_first: Optional string representation of the measured bits.
+            reference_energy: Optional target value used to select the canonical alias branch.
             metadata (dict[str, object] | None): Optional dictionary copied into the result for caller-defined context.
 
         Returns:
@@ -181,22 +175,6 @@ class QpeResult(DataClass):
             bitstring_msb_first=bitstring,
             metadata=metadata_copy,
         )
-
-    @property
-    def algorithm(self) -> PhaseEstimationAlgorithm | None:
-        """Return the phase estimation algorithm that produced the result if available.
-
-        Returns:
-            PhaseEstimationAlgorithm | None: Phase estimation algorithm that produced the result or None.
-
-        """
-        if _PhaseEstimationAlgorithm is None:
-            return None
-
-        try:
-            return _PhaseEstimationAlgorithm(self.method)
-        except ValueError:
-            return None
 
     # DataClass interface implementation
     def get_summary(self) -> str:
