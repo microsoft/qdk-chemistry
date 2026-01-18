@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 from qdk.openqasm import compile
-from qdk.simulation import run_qir
+from qsharp._simulation import run_qir
 from qdk_chemistry.algorithms import IterativePhaseEstimation
 from qdk_chemistry.data import (
     QpeResult,
