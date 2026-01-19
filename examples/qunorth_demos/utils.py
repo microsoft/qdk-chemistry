@@ -132,7 +132,7 @@ def run_single_trial_iqpe(
         reference_energy=reference_energy,
     )
     if output_dir is not None:
-        Path(output_dir).mkdir(exist_ok=True)
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
         result.to_json_file(f"{output_dir}/iqpe_result_{trial_seed}.qpe_result.json")
     return result
 
