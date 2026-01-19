@@ -58,7 +58,7 @@ class QiskitAerSimulator(CircuitExecutor):
         circuit: Circuit,
         shots: int,
         noise: QuantumErrorProfile | None = None,
-    ) -> None:
+    ) -> CircuitExecutorData:
         """Execute the given quantum circuit using the Qiskit Aer Simulator.
 
         Args:

@@ -440,7 +440,6 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
             "s": {"type": "depolarizing_error", "rate": error_rate, "num_qubits": 1},
         },
     )
-    simulator = QiskitAerSimulator()
     simulator = QiskitAerSimulator(seed=_SEED)
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
     evolution_builder = create("time_evolution_builder", "trotter")

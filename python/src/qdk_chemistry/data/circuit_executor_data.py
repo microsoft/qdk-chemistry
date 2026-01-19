@@ -136,12 +136,12 @@ class CircuitExecutorData(DataClass):
         executor = group.attrs.get("executor", "")
         bitstring_keys = group["bitstring_keys"][()]
         bitstring_counts_values = group["bitstring_counts"][()]
-        bistring_counts = {
+        bitstring_counts = {
             key.decode("utf-8"): int(count) for key, count in zip(bitstring_keys, bitstring_counts_values, strict=False)
         }
 
         return cls(
-            bitstring_counts=bistring_counts,
+            bitstring_counts=bitstring_counts,
             total_shots=total_shots,
             executor=executor,
         )
