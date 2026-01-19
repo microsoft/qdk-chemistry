@@ -439,13 +439,13 @@ size_t factorial(size_t n) {
   // For 64-bit size_t: 20! = 2,432,902,008,176,640,000 is the largest
   // factorial that fits. 21! would overflow.
   constexpr size_t MAX_FACTORIAL_INPUT = 20;
-  
+
   if (n > MAX_FACTORIAL_INPUT) {
     throw std::overflow_error(
         "factorial(" + std::to_string(n) + ") would overflow size_t. " +
         "Maximum safe input is " + std::to_string(MAX_FACTORIAL_INPUT) + ".");
   }
-  
+
   size_t result = 1;
   for (size_t i = 2; i <= n; ++i) {
     result *= i;

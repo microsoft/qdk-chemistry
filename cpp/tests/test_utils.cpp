@@ -314,13 +314,14 @@ class MathUtilsTest : public ::testing::Test {
 // ========== Tests for factorial function ==========
 
 TEST_F(MathUtilsTest, FactorialEdgeCases) {
-  EXPECT_EQ(qdk::chemistry::utils::microsoft::factorial(0), 1);  // 0! = 1 by definition
+  EXPECT_EQ(qdk::chemistry::utils::microsoft::factorial(0),
+            1);  // 0! = 1 by definition
   EXPECT_EQ(qdk::chemistry::utils::microsoft::factorial(1), 1);  // 1! = 1
 }
 
 TEST_F(MathUtilsTest, FactorialValues) {
   using qdk::chemistry::utils::microsoft::factorial;
-  
+
   // Small values
   EXPECT_EQ(factorial(2), 2);
   EXPECT_EQ(factorial(3), 6);
@@ -328,19 +329,19 @@ TEST_F(MathUtilsTest, FactorialValues) {
   EXPECT_EQ(factorial(5), 120);
   EXPECT_EQ(factorial(6), 720);
   EXPECT_EQ(factorial(7), 5040);
-  
+
   // Medium values
   EXPECT_EQ(factorial(10), 3628800);
   EXPECT_EQ(factorial(12), 479001600);
   EXPECT_EQ(factorial(15), 1307674368000);
-  
+
   // Large values - 20! is the maximum safe value for 64-bit size_t
   EXPECT_EQ(factorial(20), 2432902008176640000ULL);
 }
 
 TEST_F(MathUtilsTest, FactorialOverflow) {
   using qdk::chemistry::utils::microsoft::factorial;
-  
+
   // Values > 20 should throw overflow_error
   EXPECT_THROW(factorial(21), std::overflow_error);
   EXPECT_THROW(factorial(25), std::overflow_error);
@@ -351,29 +352,29 @@ TEST_F(MathUtilsTest, FactorialOverflow) {
 
 TEST_F(MathUtilsTest, BinomialCoefficientEdgeCases) {
   using qdk::chemistry::utils::microsoft::binomial_coefficient;
-  
+
   // C(n, 0) = 1 for any n
   EXPECT_EQ(binomial_coefficient(0, 0), 1);
   EXPECT_EQ(binomial_coefficient(5, 0), 1);
   EXPECT_EQ(binomial_coefficient(10, 0), 1);
   EXPECT_EQ(binomial_coefficient(100, 0), 1);
-  
+
   // C(n, n) = 1 for any n
   EXPECT_EQ(binomial_coefficient(1, 1), 1);
   EXPECT_EQ(binomial_coefficient(5, 5), 1);
   EXPECT_EQ(binomial_coefficient(10, 10), 1);
   EXPECT_EQ(binomial_coefficient(50, 50), 1);
-  
+
   // C(n, k) = 0 when k > n
   EXPECT_EQ(binomial_coefficient(5, 6), 0);
   EXPECT_EQ(binomial_coefficient(10, 15), 0);
   EXPECT_EQ(binomial_coefficient(0, 1), 0);
   EXPECT_EQ(binomial_coefficient(3, 10), 0);
-  
+
   // C(1, 0) = 1, C(1, 1) = 1
   EXPECT_EQ(binomial_coefficient(1, 0), 1);
   EXPECT_EQ(binomial_coefficient(1, 1), 1);
-  
+
   // C(n, 1) = n for any n >= 1
   EXPECT_EQ(binomial_coefficient(1, 1), 1);
   EXPECT_EQ(binomial_coefficient(5, 1), 5);
@@ -383,7 +384,7 @@ TEST_F(MathUtilsTest, BinomialCoefficientEdgeCases) {
 
 TEST_F(MathUtilsTest, BinomialCoefficientValues) {
   using qdk::chemistry::utils::microsoft::binomial_coefficient;
-  
+
   // Small values
   EXPECT_EQ(binomial_coefficient(4, 2), 6);
   EXPECT_EQ(binomial_coefficient(5, 2), 10);
@@ -391,12 +392,12 @@ TEST_F(MathUtilsTest, BinomialCoefficientValues) {
   EXPECT_EQ(binomial_coefficient(6, 3), 20);
   EXPECT_EQ(binomial_coefficient(7, 3), 35);
   EXPECT_EQ(binomial_coefficient(8, 4), 70);
-  
+
   // Medium values
   EXPECT_EQ(binomial_coefficient(10, 5), 252);
   EXPECT_EQ(binomial_coefficient(15, 7), 6435);
   EXPECT_EQ(binomial_coefficient(20, 10), 184756);
-  
+
   // Large values
   EXPECT_EQ(binomial_coefficient(30, 15), 155117520);
   EXPECT_EQ(binomial_coefficient(40, 20), 137846528820ULL);
