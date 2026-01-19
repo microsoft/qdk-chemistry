@@ -178,6 +178,7 @@ nitpick_ignore_regex = [
     (r"py:class", r"qdk_chemistry._core.data.DataClass"),
     (r"py:class", r"qdk_chemistry._core\.data\.PauliOperatorExpression"),
     (r"py:class", r"qdk::chemistry::data::SumPauliOperatorExpression"),
+    (r"py:class", r"qdk::chemistry::algorithms::HamiltonianConstructor"),
     (r"py:class", r"^SumPauliOperatorExpression$"),
     (r"py:class", r"qsharp._native.*"),
     (r"py:class", r"qsharp._qsharp.*"),
