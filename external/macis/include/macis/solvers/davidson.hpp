@@ -182,6 +182,16 @@ void p_diagonal_guess(size_t N_local, const SpMatType& A, double* X) {
  */
 inline void gram_schmidt(int64_t N, int64_t K, const double* V_old, int64_t LDV,
                          double* V_new) {
+  // Early return if no vectors to orthogonalize against - just normalize
+  if (K <= 0) {
+    auto nrm = blas::nrm2(N, V_new, 1);
+    constexpr double min_norm = 1e-12;
+    if (nrm > min_norm) {
+      blas::scal(N, 1. / nrm, V_new, 1);
+    }
+    return;
+  }
+
   std::vector<double> inner(K);
   blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, K,
              1, N, 1., V_old, LDV, V_new, N, 0., inner.data(), K);
@@ -372,6 +382,18 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
  */
 inline void p_gram_schmidt(int64_t N_local, int64_t K, const double* V_old,
                            int64_t LDV, double* V_new, MPI_Comm comm) {
+  // Early return if no vectors to orthogonalize against - just normalize
+  if (K <= 0) {
+    double dot = blas::dot(N_local, V_new, 1, V_new, 1);
+    dot = allreduce(dot, MPI_SUM, comm);
+    double nrm = std::sqrt(dot);
+    constexpr double min_norm = 1e-12;
+    if (nrm > min_norm) {
+      blas::scal(N_local, 1. / nrm, V_new, 1);
+    }
+    return;
+  }
+
   std::vector<double> inner(K);
   // Compute local V_old**H * V_new
   blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, K,
@@ -467,6 +489,11 @@ inline void p_gram_schmidt(int64_t N_local, int64_t K, const double* V_old,
 inline void p_rayleigh_ritz(int64_t N_local, int64_t K, const double* X,
                             int64_t LDX, const double* AX, int64_t LDAX,
                             double* W, double* C, int64_t LDC, MPI_Comm comm) {
+  // Guard against zero-dimension matrices
+  if (K <= 0 || N_local <= 0) {
+    return;
+  }
+
   int world_rank;
   MPI_Comm_rank(comm, &world_rank);
 
