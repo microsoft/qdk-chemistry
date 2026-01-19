@@ -58,6 +58,8 @@ import os
 os.environ["QSHARP_PYTHON_TELEMETRY"] = "disabled"
 ```
 
+For more information and community discussion surrounding the library's usage of Telemetry, please see the [Discussion forum](https://github.com/microsoft/qdk-chemistry/discussions)
+
 ## Contributing
 
 There are many ways in which you can participate in this project, for example:
