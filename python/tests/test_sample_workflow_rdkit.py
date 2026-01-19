@@ -22,7 +22,7 @@ from .test_sample_workflow_utils import (
 def test_sample_rdkit_geometry():
     """Execute the RDKit geometry sample and validate reported SCF energy."""
     repo_root = Path(__file__).resolve().parents[2]
-    cmd = [sys.executable, "examples/rdkit/sample_rdkit_geometry.py"]
+    cmd = [sys.executable, "examples/interoperability/rdkit/sample_rdkit_geometry.py"]
 
     result = _run_workflow(cmd, repo_root)
 

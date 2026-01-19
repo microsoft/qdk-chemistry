@@ -32,7 +32,7 @@ from .test_sample_workflow_utils import (
 def test_openfermion_molecular_hamiltonian_jordan_wigner():
     """Execute the OpenFermion Jordan-Wigner sample and validate reported energies."""
     repo_root = Path(__file__).resolve().parents[2]
-    cmd = [sys.executable, "examples/openFermion/molecular_hamiltonian_jordan_wigner.py"]
+    cmd = [sys.executable, "examples/interoperability/openFermion/molecular_hamiltonian_jordan_wigner.py"]
 
     result = _run_workflow(cmd, repo_root)
     if result.returncode != 0 and "ModuleNotFoundError: No module named 'openfermion'" in result.stderr:

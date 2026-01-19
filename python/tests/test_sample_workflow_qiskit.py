@@ -32,7 +32,7 @@ from .test_sample_workflow_utils import (
 def test_qiskit_iqpe_model_hamiltonian():
     """Execute the non-commuting IQPE sample and validate reported results."""
     repo_root = Path(__file__).resolve().parents[2]
-    cmd = [sys.executable, "examples/qiskit/iqpe_model_hamiltonian.py"]
+    cmd = [sys.executable, "examples/interoperability/qiskit/iqpe_model_hamiltonian.py"]
 
     result = _run_workflow(cmd, repo_root)
     if result.returncode != 0:
@@ -54,7 +54,7 @@ def test_qiskit_iqpe_model_hamiltonian():
 def test_qiskit_iqpe_no_trotter():
     """Execute the exact-evolution IQPE sample and validate reported energies."""
     repo_root = Path(__file__).resolve().parents[2]
-    cmd = [sys.executable, "examples/qiskit/iqpe_no_trotter.py"]
+    cmd = [sys.executable, "examples/interoperability/qiskit/iqpe_no_trotter.py"]
 
     result = _run_workflow(cmd, repo_root)
     if result.returncode != 0:
@@ -96,7 +96,7 @@ def test_qiskit_iqpe_no_trotter():
 def test_qiskit_iqpe_trotter():
     """Execute the Trotterized IQPE sample and validate reported energies."""
     repo_root = Path(__file__).resolve().parents[2]
-    cmd = [sys.executable, "examples/qiskit/iqpe_trotter.py"]
+    cmd = [sys.executable, "examples/interoperability/qiskit/iqpe_trotter.py"]
 
     result = _run_workflow(cmd, repo_root)
     if result.returncode != 0:
