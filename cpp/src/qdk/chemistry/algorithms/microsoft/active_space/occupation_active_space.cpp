@@ -8,12 +8,15 @@
 #include <numeric>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <sstream>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
 std::shared_ptr<data::Wavefunction> OccupationActiveSpaceSelector::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
   QDK_LOG_TRACE_ENTERING();
+  QDK_LOGGER().info(
+      "OccupationActiveSpaceSelector::Starting active space selection.");
 
   // If orbitals already have an active space, we'll downselect from it
   // If not, we'll work with all orbitals
@@ -28,6 +31,8 @@ std::shared_ptr<data::Wavefunction> OccupationActiveSpaceSelector::_run_impl(
 
   // Get the occupation threshold from settings
   double occupation_threshold = _settings->get<double>("occupation_threshold");
+  QDK_LOGGER().debug("Settings:");
+  QDK_LOGGER().debug("  occupation_threshold: {:.6f}", occupation_threshold);
 
   // Get occupations
   auto [alpha_occupations, beta_occupations] =
@@ -54,6 +59,11 @@ std::shared_ptr<data::Wavefunction> OccupationActiveSpaceSelector::_run_impl(
   // Sort by occupation in descending order
   std::sort(orbital_occupations.begin(), orbital_occupations.end(),
             [](const auto& a, const auto& b) { return a.second > b.second; });
+  QDK_LOGGER().info("Orbital occupations:");
+  QDK_LOGGER().info("  Orbital index    Occupation");
+  for (const auto& [orbital_idx, occ] : orbital_occupations) {
+    QDK_LOGGER().info("         {:>6}      {:>.6f}", orbital_idx, occ);
+  }
 
   std::vector<size_t> active_space_indices;
   for (const auto& [orbital_idx, occ] : orbital_occupations) {
@@ -91,6 +101,14 @@ std::shared_ptr<data::Wavefunction> OccupationActiveSpaceSelector::_run_impl(
     throw std::runtime_error(
         "No orbitals selected for active space based on occupation threshold.");
   }
+  std::ostringstream oss;
+  for (size_t i = 0; i < active_space_indices.size(); ++i) {
+    if (i > 0) oss << ", ";
+    oss << active_space_indices[i];
+  }
+  QDK_LOGGER().info(
+      "OccupationActiveSpaceSelector::Selected active space of {} orbitals: {}",
+      active_space_indices.size(), oss.str());
 
   // Create new orbitals with the selected active space indices
   auto new_orbitals = detail::new_orbitals(wavefunction, active_space_indices);

@@ -86,6 +86,10 @@ mc_energy, mc_wavefunction = mc_calculator.run(
 
 # Select active space using AutoCAS
 autocas_selector = create("active_space_selector", "qdk_autocas_eos")
+entropies = mc_wavefunction.get_single_orbital_entropies()
+print("Single orbital entropies:")
+for idx, entropy in enumerate(entropies):
+    print(f"Orbital {idx + 1}: {entropy:.6f}")
 active_autocas_wfn = autocas_selector.run(mc_wavefunction)
 print("AutoCAS selected active orbitals summary:")
 print(active_autocas_wfn.get_orbitals().get_summary())

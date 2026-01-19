@@ -84,6 +84,11 @@ int main() {
 
   // Select active space using AutoCAS
   auto autocas_selector = ActiveSpaceSelectorFactory::create("qdk_autocas_eos");
+  auto entropies = mc_wavefunction->get_single_orbital_entropies();
+  std::cout << "Single orbital entropies:" << std::endl;
+  for (size_t idx = 0; idx < entropies.size(); ++idx) {
+    std::cout << "Orbital " << (idx + 1) << ": " << entropies[idx] << std::endl;
+  }
   auto active_autocas_wfn = autocas_selector->run(mc_wavefunction);
   std::cout << "AutoCAS selected active orbitals summary:\n"
             << active_autocas_wfn->get_orbitals()->get_summary() << std::endl;
