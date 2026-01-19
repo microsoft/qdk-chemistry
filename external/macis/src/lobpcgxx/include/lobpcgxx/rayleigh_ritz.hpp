@@ -70,10 +70,6 @@ namespace lobpcgxx {
 template <typename T>
 void rayleigh_ritz(int64_t N, int64_t K, const T* X, int64_t LDX, const T* AX,
                    int64_t LDAX, detail::real_t<T>* W, T* C, int64_t LDC) {
-  // Guard against zero-dimension matrices
-  if (K <= 0 || N <= 0) {
-    return;
-  }
   blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, K,
              K, N, T(1.), X, LDX, AX, LDAX, T(0.), C, LDC);
   lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, K, C, LDC, W);

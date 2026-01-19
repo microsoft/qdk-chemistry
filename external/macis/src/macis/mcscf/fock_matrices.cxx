@@ -165,11 +165,6 @@ void generalized_fock_matrix(NumOrbital _norb, NumInactive _ninact,
       F[i + p * LDF] = 2. * (Fi[p + i * LDFi] + Fa[p + i * LDFa]);
     }
 
-  // Guard against zero-dimension matrices
-  if (nact == 0) {
-    return;
-  }
-
   // Compute X(p,x) = Fi(p,y) * A1RDM(y,x)
   std::vector<double> X(norb * nact);
   blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, norb,

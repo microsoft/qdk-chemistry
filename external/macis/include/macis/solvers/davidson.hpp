@@ -489,11 +489,6 @@ inline void p_gram_schmidt(int64_t N_local, int64_t K, const double* V_old,
 inline void p_rayleigh_ritz(int64_t N_local, int64_t K, const double* X,
                             int64_t LDX, const double* AX, int64_t LDAX,
                             double* W, double* C, int64_t LDC, MPI_Comm comm) {
-  // Guard against zero-dimension matrices
-  if (K <= 0 || N_local <= 0) {
-    return;
-  }
-
   int world_rank;
   MPI_Comm_rank(comm, &world_rank);
 
