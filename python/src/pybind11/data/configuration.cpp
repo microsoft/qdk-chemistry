@@ -9,6 +9,7 @@
 #include <pybind11/stl.h>
 
 #include <qdk/chemistry.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "property_binding_helpers.hpp"
 
@@ -215,4 +216,7 @@ Returns:
     str: String representation of the Configuration as a orbital occupation string
 
 )");
+  // Data type name class attribute
+  configuration.attr("_data_type_name") =
+      DATACLASS_TO_SNAKE_CASE(Configuration);
 }

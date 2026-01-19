@@ -499,6 +499,12 @@ TEST_F(StabilityCheckerTest, StabilityResult_Validation) {
   EXPECT_FALSE(empty_result.has_external_result());
 }
 
+TEST_F(StabilityCheckerTest, StabilityResult_DataTypeName) {
+  // Test that StabilityResult has the correct data type name
+  StabilityResult result;
+  EXPECT_EQ(result.get_data_type_name(), "stability_result");
+}
+
 // Tests for QDK (first-party) stability checker implementation
 TEST_F(StabilityCheckerTest, QDK_RHF_Water_HF_Stable) {
   // Test internal and external stability analysis on stable RHF water molecule

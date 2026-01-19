@@ -87,7 +87,7 @@ TEST_F(AnsatzSerializationTest, JSONSerialization) {
 
 TEST_F(AnsatzSerializationTest, HDF5Serialization) {
   // Test that HDF5 serialization methods exist and can be called
-  std::string filename = "test_ansatz.h5";
+  std::string filename = "test_ansatz.ansatz.h5";
 
   // Test that the methods exist without requiring them to work perfectly
   EXPECT_NO_THROW(ansatz->to_hdf5_file(filename));
@@ -101,7 +101,7 @@ TEST_F(AnsatzSerializationTest, HDF5Serialization) {
 
 TEST_F(AnsatzSerializationTest, JSONFileIO) {
   // Test JSON file I/O
-  std::string filename = "test_ansatz.json";
+  std::string filename = "test_ansatz.ansatz.json";
 
   // Save to JSON file
   ansatz->to_json_file(filename);
@@ -121,8 +121,8 @@ TEST_F(AnsatzSerializationTest, JSONFileIO) {
 
 TEST_F(AnsatzSerializationTest, GenericFileIO) {
   // Test generic file I/O with different formats
-  std::string json_filename = "test_ansatz_generic.json";
-  std::string hdf5_filename = "test_ansatz_generic.h5";
+  std::string json_filename = "test_ansatz_generic.ansatz.json";
+  std::string hdf5_filename = "test_ansatz_generic.ansatz.h5";
 
   // Test JSON format
   ansatz->to_file(json_filename, "json");
@@ -137,8 +137,8 @@ TEST_F(AnsatzSerializationTest, GenericFileIO) {
   EXPECT_NE(ansatz_hdf5->get_wavefunction(), nullptr);
 
   // Test invalid format
-  EXPECT_THROW(ansatz->to_file("test.xyz", "xyz"), std::runtime_error);
-  EXPECT_THROW(Ansatz::from_file("test.xyz", "xyz"), std::runtime_error);
+  EXPECT_THROW(ansatz->to_file("test.ansatz.xyz", "xyz"), std::runtime_error);
+  EXPECT_THROW(Ansatz::from_file("test.ansatz.xyz", "xyz"), std::runtime_error);
 
   // Clean up
   std::remove(json_filename.c_str());
@@ -153,14 +153,21 @@ TEST_F(AnsatzSerializationTest, ErrorHandling) {
   EXPECT_THROW(Ansatz::from_json(bad_json), std::runtime_error);
 
   // Test error handling for non-existent files
-  EXPECT_THROW(Ansatz::from_json_file("non_existent.json"), std::runtime_error);
-  EXPECT_THROW(Ansatz::from_hdf5_file("non_existent.h5"), std::runtime_error);
+  EXPECT_THROW(Ansatz::from_json_file("non_existent.ansatz.json"),
+               std::runtime_error);
+  EXPECT_THROW(Ansatz::from_hdf5_file("non_existent.ansatz.h5"),
+               std::runtime_error);
 }
 
 class AnsatzEnergyCalculationTest : public ::testing::Test {
  protected:
   void SetUp() override {}
 };
+
+TEST_F(AnsatzSerializationTest, TestDataTypeName) {
+  // test the data_type_name property
+  EXPECT_EQ(ansatz->get_data_type_name(), "ansatz");
+}
 
 TEST_F(AnsatzEnergyCalculationTest, N2SingletCAS_6e6o) {
   // N2 structure
