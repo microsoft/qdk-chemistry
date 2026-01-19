@@ -1628,7 +1628,7 @@ class TestPyscfPlugin:
         assert json_num_elec == orig_num_elec
 
         # Test 2: HDF5 serialization
-        filename = tmp_path / "uccsd_wf.hdf5"
+        filename = tmp_path / "uccsd_wf.wavefunction.hdf5"
         cc_wavefunction.to_hdf5_file(str(filename))
         restored_hdf5 = data.Wavefunction.from_hdf5_file(str(filename))
 
@@ -1756,7 +1756,7 @@ class TestPyscfPlugin:
         assert json_num_elec == orig_num_elec
 
         # Test 2: HDF5 serialization
-        filename = tmp_path / "cc_wf.hdf5"
+        filename = tmp_path / "cc_wf.wavefunction.hdf5"
         cc_wavefunction.to_hdf5_file(str(filename))
         restored_hdf5 = data.Wavefunction.from_hdf5_file(str(filename))
 
