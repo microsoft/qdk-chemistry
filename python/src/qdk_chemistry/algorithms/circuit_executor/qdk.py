@@ -70,11 +70,8 @@ class QdkFullStateSimulator(CircuitExecutor):
             qir, shots=shots, noise=noise_config, seed=self._settings.get("seed"), type=self._settings.get("type")
         )
         Logger.debug(f"Measurement results obtained: {raw_results}")
-        reversed_bitstrings = [
-            "".join("0" if str(x) == "Zero" else "1" for x in reversed(one_run)) for one_run in raw_results
-        ]
-        Logger.debug(f"Bitstrings saved in Little-Endian format: {reversed_bitstrings}")
-        counts = dict(Counter(reversed_bitstrings))
+        bitstrings = ["".join("0" if str(x) == "Zero" else "1" for x in one_run) for one_run in raw_results]
+        counts = dict(Counter(bitstrings))
         return CircuitExecutorData(
             bitstring_counts=counts,
             total_shots=shots,

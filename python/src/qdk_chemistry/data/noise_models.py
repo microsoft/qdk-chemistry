@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, ClassVar, TypedDict
 
 import h5py
-from qdk.simulation import NoiseConfig
+import qdk.simulation
 from ruamel.yaml import YAML
 
 from qdk_chemistry.data.base import DataClass
@@ -400,11 +400,11 @@ class QuantumErrorProfile(DataClass):
         }
         return cls.from_json(data)
 
-    def to_qdk_noise_config(self) -> NoiseConfig:
+    def to_qdk_noise_config(self) -> qdk.simulation.NoiseConfig:
         """Convert the QuantumErrorProfile to a QDK-compatible noise configuration dictionary.
 
         Returns:
-            NoiseConfig: QDK-compatible noise configuration object.
+            :class:`~qdk.simulation.NoiseConfig`: QDK-compatible noise configuration object.
 
         """
         raise NotImplementedError("Conversion to QDK NoiseConfig is not yet implemented.")

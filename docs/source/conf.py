@@ -182,6 +182,7 @@ nitpick_ignore_regex = [
     (r"py:class", r"^SumPauliOperatorExpression$"),
     (r"py:class", r"qsharp._native.*"),
     (r"py:class", r"qsharp._qsharp.*"),
+    (r"py:class", r"qdk.*"),
 ]
 
 # Configure output for to-dos

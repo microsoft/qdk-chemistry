@@ -13,9 +13,10 @@ References:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
 
-from qdk_chemistry.algorithms.circuit_executor import CircuitExecutor
+from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
 from qdk_chemistry.data import (
@@ -173,21 +174,16 @@ class IterativePhaseEstimation(PhaseEstimation):
         """Construct a single IQPE iteration circuit.
 
         Args:
-            state_preparation: Trial-state preparation circuit that prepares the initial
-                quantum state on the system qubits.
+            state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
-            time: The evolution time.
             evolution_builder: The time evolution builder to use.
             circuit_mapper: The controlled evolution circuit mapper to use.
-            iteration: Current iteration index (0-based), where 0 corresponds to the
-                most-significant bit.
+            iteration: Current iteration index (0-based), where 0 corresponds to the most-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.
-            phase_correction: Feedback phase angle to apply before controlled evolution.
-                Defaults to 0.0 for the first iteration.
+            phase_correction: Feedback phase angle to apply before controlled evolution, defaults to 0.0.
 
         Returns:
-            A quantum circuit implementing one IQPE iteration with an ancilla qubit,
-            system qubits, and classical measurement register.
+            A quantum circuit implementing one IQPE iteration.
 
         """
         _validate_iteration_inputs(iteration, total_iterations)
@@ -334,11 +330,6 @@ def _validate_iteration_inputs(iteration: int, total_iterations: int) -> None:
     Args:
         iteration: The current iteration index (0-based).
         total_iterations: The total number of iterations.
-
-    Raises:
-        ValueError: If ``total_iterations`` is not positive, or if ``iteration``
-
-            is outside the valid range [0, total_iterations - 1].
 
     """
     if total_iterations <= 0:

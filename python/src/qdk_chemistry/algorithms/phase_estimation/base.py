@@ -8,7 +8,7 @@
 from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.algorithms.circuit_executor import CircuitExecutor
+from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import (
     ControlledEvolutionCircuitMapper,
@@ -22,7 +22,7 @@ from qdk_chemistry.data import (
     TimeEvolutionUnitary,
 )
 
-__all__: list[str] = []
+__all__: list[str] = ["PhaseEstimation", "PhaseEstimationFactory"]
 
 
 class PhaseEstimation(Algorithm):

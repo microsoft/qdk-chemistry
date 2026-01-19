@@ -17,7 +17,7 @@ References:
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
 from qiskit.synthesis.qft.qft_decompose_full import synth_qft_full
 
-from qdk_chemistry.algorithms.circuit_executor import CircuitExecutor
+from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
 from qdk_chemistry.data import (
@@ -44,6 +44,8 @@ class StandardPhaseEstimationSettings(Settings):
         Args:
             num_bits: The number of phase bits to estimate.
             evolution_time: The evolution time for the phase estimation.
+            qft_do_swaps: Whether to include the final swap layer in the inverse QFT.
+            shots: The number of shots to execute the circuit.
 
         """
         super().__init__()
