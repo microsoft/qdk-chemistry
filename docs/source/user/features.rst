@@ -275,7 +275,7 @@ Type-Aware Autocompletion for Factory Methods
 QDK/Chemistry dynamically generates type stubs that enable intelligent autocompletion in VS Code (via Pylance) for the :doc:`factory pattern <comprehensive/algorithms/factory_pattern>` used throughout the library.
 When calling ``registry.create()``, the editor provides:
 
-- **Algorithm type suggestions**: Autocompletion for valid ``algorithm_type`` values (e.g., ``"scf_solver"``, ``"localizer"``, ``"active_space_selector"``)
+- **Algorithm type suggestions**: Autocompletion for valid ``algorithm_type`` values (e.g., ``"scf_solver"``, ``"orbital_localizer"``, ``"active_space_selector"``)
 - **Algorithm name suggestions**: Context-aware suggestions for ``algorithm_name`` based on the selected algorithm type
 - **Settings parameter hints**: Typed parameter hints for algorithm-specific settings
 - **Return type inference**: Accurate return type information for the created algorithm instance
