@@ -127,8 +127,8 @@ class StabilityChecker
 struct StabilityCheckerFactory
     : public AlgorithmFactory<StabilityChecker, StabilityCheckerFactory> {
   static std::string algorithm_type_name() { return "stability_checker"; }
-  static void register_default_instances() {};
-  static std::string default_algorithm_name() { return "pyscf"; }
+  static void register_default_instances();
+  static std::string default_algorithm_name() { return "qdk"; }
 };
 
 }  // namespace qdk::chemistry::algorithms

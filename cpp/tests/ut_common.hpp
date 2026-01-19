@@ -268,6 +268,40 @@ inline std::shared_ptr<Structure> create_stretched_n2_structure() {
 }
 
 /**
+ * @brief Create a stretched N2 structure
+ * @param distance_angstrom Distance between nitrogen atoms in Angstrom
+ */
+inline std::shared_ptr<Structure> create_stretched_n2_structure(
+    double distance_angstrom) {
+  std::vector<Eigen::Vector3d> coords = {
+      {0.000000000, 0.000000000, 0.000000000},
+      {distance_angstrom * qdk::chemistry::constants::angstrom_to_bohr,
+       0.000000000, 0.000000000}};
+
+  std::vector<Element> elements = {qdk::chemistry::data::Element::N,
+                                   qdk::chemistry::data::Element::N};
+
+  return std::make_shared<Structure>(coords, elements);
+}
+
+/**
+ * @brief Create a BN+ cation structure
+ */
+inline std::shared_ptr<Structure> create_bn_plus_structure() {
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.2765}};
+
+  // Convert to Bohr
+  for (auto& coord : coords) {
+    coord *= qdk::chemistry::constants::angstrom_to_bohr;
+  }
+
+  std::vector<Element> elements = {qdk::chemistry::data::Element::B,
+                                   qdk::chemistry::data::Element::N};
+
+  return std::make_shared<Structure>(coords, elements);
+}
+
+/**
  * @brief Create a single O structure
  */
 inline std::shared_ptr<Structure> create_oxygen_structure() {

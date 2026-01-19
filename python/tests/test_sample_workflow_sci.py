@@ -59,10 +59,10 @@ class WorkflowCase:
 TEST_CASES: tuple[WorkflowCase, ...] = (
     WorkflowCase(
         identifier="valence_overrides",
-        script="sample_sci_workflow.py",
+        script="examples/language/sample_sci_workflow.py",
         args=[
             "--xyz",
-            "data/water.structure.xyz",
+            "examples/data/water.structure.xyz",
             "--num-active-electrons",
             "6",
             "--num-active-orbitals",
@@ -70,14 +70,14 @@ TEST_CASES: tuple[WorkflowCase, ...] = (
             "--initial-active-space-solver",
             "macis_cas",
         ],
-        cwd_relative=Path("examples"),
+        cwd_relative=Path("."),
         expected_energy=-76.03203471,
         expected_det_count=13,
         summary_det_count=13,
     ),
     WorkflowCase(
         identifier="valence_defaults",
-        script="examples/sample_sci_workflow.py",
+        script="examples/language/sample_sci_workflow.py",
         args=[
             "--xyz",
             "examples/data/water.structure.xyz",
@@ -90,7 +90,7 @@ TEST_CASES: tuple[WorkflowCase, ...] = (
     ),
     WorkflowCase(
         identifier="valence_autocas_fallback",
-        script="examples/sample_sci_workflow.py",
+        script="examples/language/sample_sci_workflow.py",
         args=[
             "--xyz",
             "examples/data/water.structure.xyz",
@@ -104,7 +104,7 @@ TEST_CASES: tuple[WorkflowCase, ...] = (
     ),
     WorkflowCase(
         identifier="valence_autocas_threshold",
-        script="examples/sample_sci_workflow.py",
+        script="examples/language/sample_sci_workflow.py",
         args=[
             "--xyz",
             "examples/data/water.structure.xyz",
@@ -171,7 +171,7 @@ def test_sample_sci_workflow_macis_asci_autocas_with_limits():
     repo_root = Path(__file__).resolve().parents[2]
     cmd = [
         sys.executable,
-        "examples/sample_sci_workflow.py",
+        "examples/language/sample_sci_workflow.py",
         "--xyz",
         "examples/data/water.structure.xyz",
         "--num-active-electrons",
