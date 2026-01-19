@@ -198,6 +198,9 @@ class QubitHamiltonian(DataClass):
         pauli_strings = [s.decode() for s in group["pauli_strings"][:]]
         coefficients = np.array(group["coefficients"])
         encoding = group.attrs.get("encoding")
+        # Decode encoding if it's stored as bytes (HDF5 behavior can vary)
+        if encoding is not None and isinstance(encoding, bytes):
+            encoding = encoding.decode("utf-8")
         return cls(pauli_strings=pauli_strings, coefficients=coefficients, encoding=encoding)
 
 

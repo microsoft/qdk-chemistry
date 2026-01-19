@@ -237,7 +237,11 @@ class Circuit(DataClass):
 
         """
         cls._validate_hdf5_version(cls._serialization_version, group)
+        encoding = group.attrs.get("encoding")
+        # Decode encoding if it's stored as bytes (HDF5 behavior can vary)
+        if encoding is not None and isinstance(encoding, bytes):
+            encoding = encoding.decode("utf-8")
         return cls(
             qasm=group.attrs.get("qasm"),
-            encoding=group.attrs.get("encoding"),
+            encoding=encoding,
         )
