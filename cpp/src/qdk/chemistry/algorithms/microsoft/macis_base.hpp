@@ -18,7 +18,7 @@ namespace qdk::chemistry::algorithms::microsoft {
  *
  * Recognizes native MACIS keys (`ci_res_tol`, `ci_max_subspace`) when present,
  * otherwise falls back to QDK synonyms (`ci_residual_tolerance`,
- * `davidson_iterations`). Additional tolerances are copied verbatim.
+ * `max_solver_iterations`). Additional tolerances are copied verbatim.
  *
  * @param settings_ Source settings.
  * @return Populated `macis::MCSCFSettings` respecting defaults for missing

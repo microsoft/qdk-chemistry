@@ -20,7 +20,7 @@ using namespace qdk::chemistry::algorithms;
 
 namespace macis_params {  // namespace for MACIS specific test parameters
 ///@brief # Davidson iterations
-inline static constexpr size_t davidson_iterations = 200;
+inline static constexpr size_t max_solver_iterations = 200;
 
 ///@brief Small wfn size for quick tests
 inline static constexpr size_t ntdets_max_small = 10;
@@ -320,7 +320,7 @@ TEST_F(MacisAsciTest, MultiConfigurationScfSettingsConversion) {
 
   // Test QDK-style MultiConfigurationScf settings names
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations", macis_params::davidson_iterations);
+  settings.set("max_solver_iterations", macis_params::max_solver_iterations);
   // Note: ci_matel_tol is not available in current settings schema
 
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
@@ -334,7 +334,7 @@ TEST_F(MacisAsciTest, MultiConfigurationScfSettingsConversion) {
   settings2.set("max_refine_iter", macis_params::refine_off);
   settings2.set("core_selection_strategy", "fixed");
   settings2.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings2.set("davidson_iterations", macis_params::davidson_iterations);
+  settings2.set("max_solver_iterations", macis_params::max_solver_iterations);
 
   auto result2 = calculator2->run(hamiltonian, 3, 3);
   EXPECT_TRUE(std::isfinite(result2.first));
@@ -492,7 +492,7 @@ TEST_F(MacisAsciTest, MultiConfigurationScfSettingsWithMACISNames) {
   // Set MACIS-style MultiConfigurationScf settings to test the other branch in
   // get_mcscf_settings_
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations", macis_params::davidson_iterations);
+  settings.set("max_solver_iterations", macis_params::max_solver_iterations);
 
   // Use standard ASCI parameter name
   settings.set("ntdets_max", macis_params::ntdets_max_small);
@@ -673,7 +673,7 @@ TEST_F(MacisAsciTest, MacisCasBasicCalculation) {
   // Set basic MultiConfigurationScf settings for CASCI
   auto& settings = calculator->settings();
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations", macis_params::davidson_iterations);
+  settings.set("max_solver_iterations", macis_params::max_solver_iterations);
   // Note: ci_matel_tol is not available in current settings schema
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
@@ -705,7 +705,7 @@ TEST_F(MacisAsciTest, MacisCasWithOneRDM) {
 
   auto& settings = calculator->settings();
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations", macis_params::davidson_iterations);
+  settings.set("max_solver_iterations", macis_params::max_solver_iterations);
   settings.set("calculate_one_rdm", true);  // Enable 1-RDM calculation
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
@@ -739,7 +739,7 @@ TEST_F(MacisAsciTest, MacisCasWithTwoRDM) {
 
   auto& settings = calculator->settings();
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations", macis_params::davidson_iterations);
+  settings.set("max_solver_iterations", macis_params::max_solver_iterations);
   settings.set("calculate_two_rdm", true);  // Enable 2-RDM calculation
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
@@ -772,7 +772,7 @@ TEST_F(MacisAsciTest, MacisCasWithBothRDMs) {
 
   auto& settings = calculator->settings();
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations", macis_params::davidson_iterations);
+  settings.set("max_solver_iterations", macis_params::max_solver_iterations);
   settings.set("calculate_one_rdm", true);
   settings.set("calculate_two_rdm", true);  // Enable both RDMs
 
@@ -810,7 +810,7 @@ TEST_F(MacisAsciTest, MacisCasDifferentActiveSizes) {
 
   auto& settings = calculator->settings();
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations", macis_params::davidson_iterations);
+  settings.set("max_solver_iterations", macis_params::max_solver_iterations);
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian = hamiltonian_constructor->run(orbitals_small);
@@ -852,7 +852,7 @@ TEST_F(MacisAsciTest, MacisCasFullActiveSpace) {
   auto& settings = calculator->settings();
   settings.set("ci_residual_tolerance",
                1e-6);  // Looser tolerance for larger calculation
-  settings.set("davidson_iterations", macis_params::davidson_iterations);
+  settings.set("max_solver_iterations", macis_params::max_solver_iterations);
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian = hamiltonian_constructor->run(orbitals_full);
@@ -883,7 +883,7 @@ TEST_F(MacisAsciTest, MacisCasSettingsHandling) {
   // Should map to ci_res_tol
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
   // Should map to ci_max_subspace
-  settings.set("davidson_iterations", macis_params::davidson_iterations);
+  settings.set("max_solver_iterations", macis_params::max_solver_iterations);
   // Note: ci_matel_tol is not available in current settings schema
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
@@ -910,7 +910,7 @@ TEST_F(MacisAsciTest, MacisCasMACISStyleSettings) {
 
   // Test MACIS-style settings names directly
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations", macis_params::davidson_iterations);
+  settings.set("max_solver_iterations", macis_params::max_solver_iterations);
   // Note: ci_matel_tol is not available in current settings schema
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
@@ -941,7 +941,7 @@ TEST_F(MacisAsciTest, MacisCasDeterminantHandling) {
 
   auto& settings = calculator->settings();
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations", macis_params::davidson_iterations);
+  settings.set("max_solver_iterations", macis_params::max_solver_iterations);
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian = hamiltonian_constructor->run(orbitals_small);
@@ -980,7 +980,7 @@ TEST_F(MacisAsciTest, MacisCasSelectiveRDMEvaluation) {
     ASSERT_NE(c, nullptr);
     auto& s = c->settings();
     s.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-    s.set("davidson_iterations", macis_params::davidson_iterations);
+    s.set("max_solver_iterations", macis_params::max_solver_iterations);
     s.set("calculate_one_rdm", calc_one_rdm);
     s.set("calculate_two_rdm", calc_two_rdm);
     auto [E, wfn] = c->run(hamiltonian, 2, 2);
@@ -1149,8 +1149,8 @@ TEST_F(MacisPmcTest, PMCSettingsConfiguration) {
   EXPECT_NO_THROW(settings.set("h_el_tol", macis_params::h_el_tol));
   EXPECT_NO_THROW(
       settings.set("ci_residual_tolerance", testing::ci_energy_tolerance));
-  EXPECT_NO_THROW(
-      settings.set("davidson_iterations", macis_params::davidson_iterations));
+  EXPECT_NO_THROW(settings.set("max_solver_iterations",
+                               macis_params::max_solver_iterations));
 
   // Test that settings with these values can be used in a calculation
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);

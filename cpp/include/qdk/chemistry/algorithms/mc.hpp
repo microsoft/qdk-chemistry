@@ -40,7 +40,7 @@ class MultiConfigurationSettings : public data::Settings {
     // energy convergence threshold
     set_default<double>("ci_residual_tolerance", 1.0e-6);
     // maximum number of iterations any Davidson
-    set_default<int64_t>("davidson_iterations", 200,
+    set_default<int64_t>("max_solver_iterations", 200,
                          "Maximum number of Davidson iterations",
                          qdk::chemistry::data::BoundConstraint<int64_t>{
                              1, std::numeric_limits<int64_t>::max()});

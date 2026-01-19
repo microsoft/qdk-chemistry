@@ -104,7 +104,7 @@ All implementations share a common base set of settings from ``MultiConfiguratio
      - float
      - ``1e-6``
      - Convergence threshold for :term:`CI` Davidson solver
-   * - ``davidson_iterations``
+   * - ``max_solver_iterations``
      - int
      - ``200``
      - Maximum number of Davidson iterations

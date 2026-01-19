@@ -46,7 +46,7 @@ macis::MCSCFSettings get_mcscf_settings_(const data::Settings& settings_) {
     SET_MACIS_SETTING(settings_, mcscf_settings, ci_max_subspace, size_t);
   } else {
     mcscf_settings.ci_max_subspace =
-        settings_.get<int64_t>("davidson_iterations");
+        settings_.get<int64_t>("max_solver_iterations");
   }
   SET_MACIS_SETTING(settings_, mcscf_settings, ci_matel_tol, double);
   return mcscf_settings;
