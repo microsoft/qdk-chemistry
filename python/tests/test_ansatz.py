@@ -121,7 +121,7 @@ class TestAnsatzSerialization:
 
     def test_hdf5_serialization(self, test_ansatz, tmp_path):
         """Test HDF5 serialization for ansatz."""
-        filename = tmp_path / "test_ansatz.h5"
+        filename = tmp_path / "test_ansatz.ansatz.h5"
 
         # Save to HDF5 file
         test_ansatz.to_hdf5_file(str(filename))
@@ -153,7 +153,7 @@ class TestAnsatzSerialization:
 
     def test_json_file_io(self, test_ansatz, tmp_path):
         """Test JSON file I/O."""
-        filename = tmp_path / "test_ansatz.json"
+        filename = tmp_path / "test_ansatz.ansatz.json"
 
         # Save to JSON file
         test_ansatz.to_json_file(str(filename))
@@ -167,8 +167,8 @@ class TestAnsatzSerialization:
 
     def test_generic_file_io(self, test_ansatz, tmp_path):
         """Test generic file I/O with different formats."""
-        json_filename = tmp_path / "test_ansatz_generic.json"
-        hdf5_filename = tmp_path / "test_ansatz_generic.h5"
+        json_filename = tmp_path / "test_ansatz_generic.ansatz.json"
+        hdf5_filename = tmp_path / "test_ansatz_generic.ansatz.h5"
 
         # Test JSON format
         test_ansatz.to_file(str(json_filename), "json")
@@ -182,10 +182,10 @@ class TestAnsatzSerialization:
 
         # Test invalid format
         with pytest.raises(RuntimeError, match="Unsupported file type"):
-            test_ansatz.to_file(str(tmp_path / "test.xyz"), "xyz")
+            test_ansatz.to_file(str(tmp_path / "test.ansatz.xyz"), "xyz")
 
         with pytest.raises(RuntimeError, match="Unsupported file type"):
-            Ansatz.from_file(str(tmp_path / "test.xyz"), "xyz")
+            Ansatz.from_file(str(tmp_path / "test.ansatz.xyz"), "xyz")
 
     def test_error_handling(self):
         """Test error handling for malformed data."""
@@ -197,10 +197,10 @@ class TestAnsatzSerialization:
 
         # Test non-existent files
         with pytest.raises(RuntimeError):
-            Ansatz.from_json_file("non_existent.json")
+            Ansatz.from_json_file("non_existent.ansatz.json")
 
         with pytest.raises(RuntimeError):
-            Ansatz.from_hdf5_file("non_existent.h5")
+            Ansatz.from_hdf5_file("non_existent.ansatz.h5")
 
     def test_nested_serialization_consistency(self, test_ansatz):
         """Test that nested objects maintain consistency through serialization."""
@@ -338,3 +338,9 @@ class TestAnsatzSerialization:
         e_rohf = ansatz.calculate_energy()
         # energy from ansatz should reproduce scf energy
         assert np.isclose(e_rohf, e_scf, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
+
+
+def test_ansatz_data_type_name():
+    """Test that Ansatz has the correct _data_type_name class attribute."""
+    assert hasattr(Ansatz, "_data_type_name")
+    assert Ansatz._data_type_name == "ansatz"
