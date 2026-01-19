@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include <qdk/chemistry/algorithms/microsoft/utils.hpp>
+#include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include <stdexcept>
 
 using namespace qdk::chemistry::utils::microsoft;
