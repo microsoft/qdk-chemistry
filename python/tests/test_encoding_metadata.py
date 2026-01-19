@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import h5py
 import numpy as np
 import pytest
 
@@ -70,8 +71,6 @@ def test_circuit_encoding_serialization_json():
 
 def test_circuit_encoding_serialization_hdf5(tmp_path):
     """Test that Circuit encoding is preserved through HDF5 serialization."""
-    import h5py
-
     circuit = Circuit(qasm="OPENQASM 3.0; qubit[2] q;", encoding="jordan-wigner")
 
     # Save to HDF5
@@ -107,8 +106,6 @@ def test_qubit_hamiltonian_encoding_serialization_json():
 
 def test_qubit_hamiltonian_encoding_serialization_hdf5(tmp_path):
     """Test that QubitHamiltonian encoding is preserved through HDF5 serialization."""
-    import h5py
-
     pauli_strings = ["II", "ZI", "IZ"]
     coefficients = np.array([1.0, 0.5, 0.5])
     ham = QubitHamiltonian(pauli_strings, coefficients, encoding="jordan-wigner")

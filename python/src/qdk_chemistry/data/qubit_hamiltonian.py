@@ -297,7 +297,9 @@ def _filter_and_group_pauli_ops_from_statevector(
         reduced_pauli.append(best_pauli)
         reduced_coeffs.append(coeff_sum)
 
-    reduced_hamiltonian = QubitHamiltonian(reduced_pauli, np.array(reduced_coeffs), encoding=hamiltonian.encoding)
+    reduced_hamiltonian = QubitHamiltonian(
+        reduced_pauli, np.array(reduced_coeffs), encoding=hamiltonian.encoding
+    )
 
     grouped_hamiltonians = (
         reduced_hamiltonian.group_commuting(qubit_wise=abelian_grouping) if abelian_grouping else [reduced_hamiltonian]
