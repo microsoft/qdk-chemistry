@@ -5,8 +5,10 @@
 #include <H5Cpp.h>
 
 #include <Eigen/Dense>
+#include <algorithm>
 #include <fstream>
 #include <memory>
+#include <numeric>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
@@ -1339,6 +1341,45 @@ Configuration Wavefunction::get_total_determinant(
 size_t Wavefunction::size() const {
   QDK_LOG_TRACE_ENTERING();
   return _container->size();
+}
+
+Wavefunction::TopDeterminantsResult Wavefunction::get_top_determinants(
+    std::optional<size_t> max_determinants) const {
+  QDK_LOG_TRACE_ENTERING();
+  const auto& determinants = get_active_determinants();
+  const auto& coeffs = get_coefficients();
+
+  // Create indices and sort by coefficient magnitude
+  std::vector<size_t> indices(determinants.size());
+  std::iota(indices.begin(), indices.end(), 0);
+
+  std::visit(
+      [&indices](const auto& vec) {
+        std::sort(indices.begin(), indices.end(), [&vec](size_t i1, size_t i2) {
+          return std::abs(vec[i1]) > std::abs(vec[i2]);
+        });
+      },
+      coeffs);
+
+  // Determine how many determinants to return
+  size_t n = determinants.size();
+  if (max_determinants.has_value()) {
+    n = std::min(max_determinants.value(), n);
+  }
+
+  // Build result vector preserving the original coefficient type
+  return std::visit(
+      [&determinants, &indices, n](const auto& vec) -> TopDeterminantsResult {
+        using CoeffType = typename std::decay_t<decltype(vec)>::Scalar;
+        std::vector<std::pair<Configuration, CoeffType>> result;
+        result.reserve(n);
+        for (size_t i = 0; i < n; ++i) {
+          size_t idx = indices[i];
+          result.emplace_back(determinants[idx], vec[idx]);
+        }
+        return result;
+      },
+      coeffs);
 }
 
 double Wavefunction::norm() const {

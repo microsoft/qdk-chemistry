@@ -267,7 +267,7 @@ def test_filter_and_group_both_trimming_modes():
 class TestQubitHamiltonianSerialization:
     """Test suite for QubitHamiltonian serialization (JSON and HDF5)."""
 
-    def test_json_serialization_real_coefficients(self, tmp_path):
+    def test_json_serialization_real_coefficients(self):
         """Test JSON serialization with real coefficients."""
         pauli_strings = ["IX", "YY", "ZZ"]
         coefficients = np.array([1.0, -0.5, 0.75])
@@ -289,7 +289,7 @@ class TestQubitHamiltonianSerialization:
         parsed = json.loads(json_string)
         assert parsed == json_data
 
-    def test_json_serialization_complex_coefficients(self, tmp_path):
+    def test_json_serialization_complex_coefficients(self):
         """Test JSON serialization with complex coefficients."""
         pauli_strings = ["IX", "YY", "ZZ", "XY"]
         coefficients = np.array([1.0 + 0.5j, -0.5 - 0.25j, 0.75j, 2.0])
@@ -307,7 +307,7 @@ class TestQubitHamiltonianSerialization:
         assert parsed["coefficients"]["real"] == [1.0, -0.5, 0.0, 2.0]
         assert parsed["coefficients"]["imag"] == [0.5, -0.25, 0.75, 0.0]
 
-    def test_json_roundtrip_real_coefficients(self, tmp_path):
+    def test_json_roundtrip_real_coefficients(self):
         """Test JSON roundtrip with real coefficients."""
         pauli_strings = ["IX", "YY", "ZZ"]
         coefficients = np.array([1.0, -0.5, 0.75])
@@ -320,7 +320,7 @@ class TestQubitHamiltonianSerialization:
         assert reconstructed.pauli_strings == original.pauli_strings
         np.testing.assert_array_almost_equal(reconstructed.coefficients, original.coefficients)
 
-    def test_json_roundtrip_complex_coefficients(self, tmp_path):
+    def test_json_roundtrip_complex_coefficients(self):
         """Test JSON roundtrip with complex coefficients."""
         pauli_strings = ["IX", "YY", "ZZ", "XY"]
         coefficients = np.array([1.0 + 0.5j, -0.5 - 0.25j, 0.75j, 2.0])

@@ -19,7 +19,6 @@ from qdk_chemistry.data import (
     Wavefunction,
 )
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.wavefunction import get_top_determinants
 from qiskit import QuantumCircuit, qasm3
 
 
@@ -39,7 +38,7 @@ def prepare_2_dets_trial_state(
         fidelity: Fidelity with respect to the exact wavefunction
 
     """
-    dets = get_top_determinants(wf, max_determinants=2)
+    dets = wf.get_top_determinants(max_determinants=2)
     orbitals = wf.get_orbitals()
 
     c1_new = np.cos(round(rotation_angle, 4))

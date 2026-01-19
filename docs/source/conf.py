@@ -5,6 +5,7 @@
 
 import importlib
 import os
+import re
 import shutil
 import sys
 from contextlib import suppress
@@ -307,8 +308,6 @@ def on_builder_inited(app):
                     obj.__module__ = public_mod  # docs-only shim
 
 
-import re
-
 # Pattern to match :cite:`key` in text nodes (handles the raw text form)
 _CITE_TEXT_PATTERN = re.compile(r":cite:`([^`]+)`")
 
@@ -324,7 +323,7 @@ def _create_pending_citation(app, docname, key):
     the final reference resolution phase, ensuring proper bibliography
     inclusion and link generation.
     """
-    from docutils import nodes
+    from docutils import nodes  # type: ignore[import-untyped]
     from sphinx.addnodes import pending_xref
 
     key = key.strip()
@@ -351,7 +350,7 @@ def _create_fallback_citation(app, docname, key):
 
     Creates a simple reference node linking to the references page.
     """
-    from docutils import nodes
+    from docutils import nodes  # type: ignore[import-untyped]
 
     key = key.strip()
     cite_text = nodes.inline("", f"[{key}]", classes=["bibtex-fallback"])
@@ -374,7 +373,7 @@ def transform_doctree_citations(app, doctree):
     in a literal/code node, and replaces them with proper citation nodes
     that sphinxcontrib-bibtex will process.
     """
-    from docutils import nodes
+    from docutils import nodes  # type: ignore[import-untyped]
 
     # Get current document name for reference resolution
     docname = app.env.docname if hasattr(app.env, "docname") else ""

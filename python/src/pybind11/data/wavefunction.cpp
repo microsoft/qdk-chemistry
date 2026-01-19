@@ -377,6 +377,37 @@ Examples:
     >>> print(f"Wavefunction dimension: {dim}")
 )");
 
+  wavefunction.def(
+      "get_top_determinants",
+      [](const Wavefunction& self, std::optional<size_t> max_determinants) {
+        auto result = self.get_top_determinants(max_determinants);
+        py::dict py_result;
+        std::visit(
+            [&py_result](const auto& vec) {
+              for (const auto& [config, coeff] : vec) {
+                py_result[py::cast(config)] = py::cast(coeff);
+              }
+            },
+            result);
+        return py_result;
+      },
+      R"(
+Return determinants ranked by absolute CI coefficient.
+
+Args:
+    max_determinants (int | None): Number of top determinants to return. If None, return all.
+
+Returns:
+    dict[Configuration, complex | float]: A dictionary containing (Configuration, CI coefficient) pairs
+        consisting of the top determinants sorted by descending absolute coefficient value.
+
+Examples:
+    >>> top_dets = wf.get_top_determinants(max_determinants=2)
+    >>> for config, coeff in top_dets.items():
+    ...     print(f"{config}: {coeff}")
+)",
+      py::arg("max_determinants") = py::none());
+
   wavefunction.def("norm", &Wavefunction::norm,
                    R"(
 Calculate norm of the wavefunction.
