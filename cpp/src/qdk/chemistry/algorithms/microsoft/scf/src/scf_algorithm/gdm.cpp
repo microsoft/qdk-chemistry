@@ -503,13 +503,18 @@ void GDM::generate_pseudo_canonical_orbital_(
   Uvv_ = F_MO.block(num_occupied_orbitals, num_occupied_orbitals,
                     num_virtual_orbitals, num_virtual_orbitals);
 
-  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_occupied_orbitals,
-               Uoo_.data(), num_occupied_orbitals,
-               pseudo_canonical_eigenvalues_.data());
-
-  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_virtual_orbitals,
-               Uvv_.data(), num_virtual_orbitals,
-               pseudo_canonical_eigenvalues_.data() + num_occupied_orbitals);
+  // Handle edge cases where num_occupied_orbitals or num_virtual_orbitals is 0
+  // because LAPACK syev fails with N == 0
+  if (num_occupied_orbitals > 0) {
+    lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_occupied_orbitals,
+                 Uoo_.data(), num_occupied_orbitals,
+                 pseudo_canonical_eigenvalues_.data());
+  }
+  if (num_virtual_orbitals > 0) {
+    lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_virtual_orbitals,
+                 Uvv_.data(), num_virtual_orbitals,
+                 pseudo_canonical_eigenvalues_.data() + num_occupied_orbitals);
+  }
 
   // Transpose to convert column-major eigenvectors to row-major format
   Uoo_.transposeInPlace();
