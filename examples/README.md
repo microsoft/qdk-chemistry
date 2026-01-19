@@ -8,7 +8,7 @@ This directory contains example scripts demonstrating how to use QDK/Chemistry f
 - `factory_list.ipynb`: Jupyter notebook that lists available factory methods in QDK/Chemistry along with their descriptions and settings
 - `language/cpp`: C++ example programs using the QDK/Chemistry C++ API
 - `language/sample_sci_workflow.py`: Python script demonstrating a sample classical workflow for selected CI quantum chemistry calculations.
-- `qpe_stretched_n2`: Jupyter notebook demonstrating multi-reference quantum chemistry state preparation and iterative quantum phase estimation
+- `qpe_stretched_n2.ipynb`: Jupyter notebook demonstrating multi-reference quantum chemistry state preparation and iterative quantum phase estimation
 - `state_prep_energy.ipynb`: Jupyter notebook demonstrating quantum state preparation and energy calculation using quantum simulators.
 
 ## Examples of interoperability with other quantum computing frameworks
