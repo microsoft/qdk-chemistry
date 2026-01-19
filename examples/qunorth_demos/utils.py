@@ -168,6 +168,7 @@ def run_iqpe(
     """
     results = []
     for trial in range(trials):
+        print(f"Starting trial {trial + 1}/{trials}...")
         trial_seed = seed + trial  # Different seed per trial
         result = run_single_trial_iqpe(
             qubit_hamiltonian,
