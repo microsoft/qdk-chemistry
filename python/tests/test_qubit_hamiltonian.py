@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import re
+
 import numpy as np
 import pytest
 
@@ -72,6 +74,62 @@ class TestQubitHamiltonian:
             assert len(group.pauli_strings) == 1  # Each group should contain only one Pauli string
             all_grouped_strings.extend(group.pauli_strings)
         assert set(all_grouped_strings) == {"XX", "YY", "ZZ", "XY"}
+
+    def test_reorder_qubits_identity(self):
+        """Test that identity permutation returns equivalent Hamiltonian."""
+        qh = QubitHamiltonian(["XIZI", "IYII"], np.array([0.5, 0.3], dtype=complex))
+        reordered = qh.reorder_qubits([0, 1, 2, 3])
+        assert reordered.pauli_strings == qh.pauli_strings
+        assert np.allclose(reordered.coefficients, qh.coefficients)
+
+    def test_reorder_qubits_swap(self):
+        """Test swapping two adjacent qubits."""
+        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
+        reordered = qh.reorder_qubits([1, 0, 2, 3])
+        assert reordered.pauli_strings == ["IXZI"]
+
+    def test_reorder_qubits_reverse(self):
+        """Test reversing all qubit indices."""
+        qh = QubitHamiltonian(["XYZI"], np.array([1.0], dtype=complex))
+        reordered = qh.reorder_qubits([3, 2, 1, 0])
+        assert reordered.pauli_strings == ["IZYX"]
+
+    def test_reorder_qubits_invalid_length(self):
+        """Test that invalid permutation length raises error."""
+        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
+        with pytest.raises(ValueError, match="Permutation length"):
+            qh.reorder_qubits([0, 1, 2])
+
+    def test_reorder_qubits_invalid_values(self):
+        """Test that invalid permutation values raise error."""
+        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
+        with pytest.raises(ValueError, match="Invalid permutation"):
+            qh.reorder_qubits([0, 1, 1, 3])
+
+    def test_to_interleaved_4_qubits(self):
+        """Test blocked to interleaved conversion for 4 qubits."""
+        # Blocked: [α₀, α₁, β₀, β₁] -> Interleaved: [α₀, β₀, α₁, β₁]
+        qh = QubitHamiltonian(["XYZZ"], np.array([1.0], dtype=complex))
+        interleaved = qh.to_interleaved(n_spatial=2)
+        assert interleaved.pauli_strings == ["XZYZ"]
+
+    def test_to_interleaved_preserves_coefficients(self):
+        """Test that interleaving preserves coefficient values."""
+        qh = QubitHamiltonian(["XIZI", "IYII"], np.array([0.5 + 0.1j, 0.3], dtype=complex))
+        interleaved = qh.to_interleaved(n_spatial=2)
+        assert np.allclose(interleaved.coefficients, qh.coefficients)
+
+    def test_to_interleaved_invalid_n_spatial(self):
+        """Test that invalid n_spatial raises error."""
+        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
+        with pytest.raises(ValueError, match=re.escape("must be 2 * n_spatial")):
+            qh.to_interleaved(n_spatial=3)
+
+    def test_to_interleaved_single_orbital(self):
+        """Test that single spatial orbital (2 qubits) is unchanged."""
+        qh = QubitHamiltonian(["XY"], np.array([1.0], dtype=complex))
+        interleaved = qh.to_interleaved(n_spatial=1)
+        assert interleaved.pauli_strings == ["XY"]
 
 
 def test_filter_and_group_raises_on_zero_norm():

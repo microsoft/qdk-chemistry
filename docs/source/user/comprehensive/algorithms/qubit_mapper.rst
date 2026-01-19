@@ -86,6 +86,56 @@ You can discover available implementations programmatically:
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
 
+.. _qdk-qubit-mapper:
+
+QDK
+~~~
+
+.. rubric:: Factory name: ``"qdk"``
+
+Native QDK/Chemistry qubit mapping implementation built on the :doc:`PauliOperator <../data/pauli_operator>` expression layer.
+This implementation provides high-performance fermion-to-qubit transformations without external dependencies.
+
+Jordan-Wigner mapping :cite:`Jordan-Wigner1928`
+   Encodes each fermionic mode in a single qubit whose state directly represents the orbital occupation.
+   Fermionic antisymmetry is enforced through a Z-string on all lower-indexed qubits.
+
+Bravyi-Kitaev mapping :cite:`Seeley2012`
+   Distributes both occupation and parity information across qubits using a binary-tree structure, achieving O(log n) Pauli weight compared to O(n) for Jordan-Wigner.
+
+The native mapper uses blocked spin-orbital ordering internally (alpha orbitals first, then beta orbitals).
+Use ``QubitHamiltonian.reorder_qubits()`` or ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if needed.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Setting
+     - Type
+     - Description
+   * - ``encoding``
+     - string
+     - Fermion-to-qubit encoding (``jordan_wigner``, ``bravyi_kitaev``). Default: ``jordan_wigner``
+   * - ``threshold``
+     - double
+     - Threshold for pruning small Pauli coefficients. Default: ``1e-12``
+   * - ``integral_threshold``
+     - double
+     - Threshold for filtering small integrals before transformation. Default: ``1e-12``
+
+.. rubric:: Example
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/qubit_mapper.py
+      :language: python
+      :start-after: # start-cell-qdk-mapper
+      :end-before: # end-cell-qdk-mapper
+
+.. _qiskit-qubit-mapper:
+
 Qiskit
 ~~~~~~
 
@@ -95,9 +145,9 @@ Qubit mapping implementation integrated through the Qiskit plugin. This module s
 
 Jordan-Wigner mapping** :cite:`Jordan-Wigner1928`
    Encodes each fermionic mode in a single qubit whose state directly represents the orbital occupation.
-Parity mapping** :cite:`Love2012`
+Parity mapping** :cite:`Seeley2012`
    Encodes qubits with cumulative electron-number parities of the orbitals.
-Bravyi-Kitaev mapping** :cite:`Bravyi-Kitaev2002`
+Bravyi-Kitaev mapping** :cite:`Seeley2012`
    Distributes both occupation and parity information across qubits using a binary-tree (Fenwick tree) structure, reducing the average Pauli-string length to logarithmic scaling.
 
 .. rubric:: Settings

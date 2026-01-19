@@ -6,12 +6,64 @@
 #include <complex>
 #include <concepts>
 #include <cstdint>
+#include <list>
 #include <memory>
+#include <qdk/chemistry/utils/hash.hpp>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 namespace qdk::chemistry::data {
+
+/**
+ * @brief A sparse representation of a Pauli string (tensor product of Pauli
+ * operators).
+ *
+ * Each element is a (qubit_index, operator_type) pair where operator_type is:
+ * - 0: Identity (I) - typically not stored in sparse representation
+ * - 1: Pauli X
+ * - 2: Pauli Y
+ * - 3: Pauli Z
+ *
+ * The vector is kept sorted by qubit_index for efficient comparison and
+ * hashing. An empty SparsePauliWord represents the identity operator.
+ *
+ * Example: X(0) * Z(2) * Y(5) would be represented as:
+ *   [(0, 1), (2, 3), (5, 2)]
+ */
+using SparsePauliWord = std::vector<std::pair<std::uint64_t, std::uint8_t>>;
+
+/**
+ * @brief Hash function for SparsePauliWord.
+ *
+ * Uses boost-style hash_combine for portable and efficient hash computation.
+ */
+struct SparsePauliWordHash {
+  std::size_t operator()(const SparsePauliWord& word) const noexcept {
+    std::size_t seed = 0;
+    for (const auto& [qubit, op_type] : word) {
+      seed = utils::hash_combine(seed, qubit, op_type);
+    }
+    return seed;
+  }
+};
+
+/**
+ * @brief Hash function for pairs of SparsePauliWord (used for multiplication
+ * caching).
+ *
+ * Combines two SparsePauliWordHash results using hash_combine.
+ */
+struct SparsePauliWordPairHash {
+  std::size_t operator()(
+      const std::pair<SparsePauliWord, SparsePauliWord>& pair) const noexcept {
+    SparsePauliWordHash hasher;
+    std::size_t h1 = hasher(pair.first);
+    std::size_t h2 = hasher(pair.second);
+    return utils::hash_combine(h1, h2);
+  }
+};
 
 // Forward declarations
 class PauliOperator;
@@ -619,6 +671,12 @@ class ProductPauliOperatorExpression : public PauliOperatorExpression {
   void add_factor(std::unique_ptr<PauliOperatorExpression> factor);
 
   /**
+   * @brief Pre-allocates capacity for the factor list.
+   * @param capacity The number of factors to reserve space for.
+   */
+  void reserve_capacity(std::size_t capacity);
+
+  /**
    * @brief Returns a const reference to the internal factor list.
    * @return Vector of expression factors in multiplication order.
    */
@@ -805,6 +863,12 @@ class SumPauliOperatorExpression : public PauliOperatorExpression {
   void add_term(std::unique_ptr<PauliOperatorExpression> term);
 
   /**
+   * @brief Pre-allocates capacity for the term list.
+   * @param capacity The number of terms to reserve space for.
+   */
+  void reserve_capacity(std::size_t capacity);
+
+  /**
    * @brief Returns a const reference to the internal term list.
    * @return Vector of expression terms in addition order.
    */
@@ -883,6 +947,202 @@ class SumPauliOperatorExpression : public PauliOperatorExpression {
 
  private:
   std::vector<std::unique_ptr<PauliOperatorExpression>> terms_;
+};
+
+/**
+ * @brief High-performance accumulator for Pauli terms with coefficient
+ * combining.
+ *
+ * This class provides efficient accumulation of Pauli terms represented in
+ * sparse format, with automatic coefficient combination for identical terms.
+ * It is optimized for use cases like fermion-to-qubit mappings where many
+ * term products are accumulated.
+ *
+ * Example usage:
+ * @code
+ *   PauliTermAccumulator acc;
+ *   SparsePauliWord x0 = {{0, 1}};  // X(0)
+ *   SparsePauliWord z1 = {{1, 3}};  // Z(1)
+ *   acc.accumulate(x0, 0.5);         // Add 0.5 * X(0)
+ *   acc.accumulate_product(x0, z1, 1.0);  // Add 1.0 * X(0) * Z(1)
+ *   auto terms = acc.get_terms(1e-12);
+ * @endcode
+ */
+class PauliTermAccumulator {
+ public:
+  /**
+   * @brief Constructs an empty accumulator.
+   */
+  PauliTermAccumulator() = default;
+
+  /**
+   * @brief Accumulate a single term with the given coefficient.
+   *
+   * If a term with the same SparsePauliWord already exists, the coefficients
+   * are added together.
+   *
+   * @param word The sparse Pauli word to accumulate.
+   * @param coeff The coefficient to add.
+   */
+  void accumulate(const SparsePauliWord& word, std::complex<double> coeff);
+
+  /**
+   * @brief Accumulate the product of two terms with a scale factor.
+   *
+   * Computes word1 * word2 using Pauli algebra (with cached multiplication),
+   * then accumulates the result scaled by the given factor.
+   *
+   * @param word1 The first sparse Pauli word.
+   * @param word2 The second sparse Pauli word.
+   * @param scale The scale factor to apply to the product.
+   */
+  void accumulate_product(const SparsePauliWord& word1,
+                          const SparsePauliWord& word2,
+                          std::complex<double> scale);
+
+  /**
+   * @brief Get all accumulated terms with coefficients above threshold.
+   *
+   * @param threshold Terms with |coefficient| < threshold are excluded.
+   * @return Vector of (coefficient, SparsePauliWord) pairs.
+   */
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> get_terms(
+      double threshold = 0.0) const;
+
+  /**
+   * @brief Get accumulated terms as canonical strings.
+   *
+   * @param num_qubits The total number of qubits for string representation.
+   * @param threshold Terms with |coefficient| < threshold are excluded.
+   * @return Vector of (coefficient, canonical_string) pairs.
+   */
+  std::vector<std::pair<std::complex<double>, std::string>>
+  get_terms_as_strings(std::uint64_t num_qubits, double threshold = 0.0) const;
+
+  /**
+   * @brief Clear all accumulated terms.
+   */
+  void clear();
+
+  /**
+   * @brief Get the number of unique terms currently accumulated.
+   * @return The number of terms in the accumulator.
+   */
+  std::size_t size() const { return terms_.size(); }
+
+  /// Default cache capacity
+  static constexpr std::size_t kDefaultCacheCapacity = 10000;
+
+  /**
+   * @brief Set the capacity of the multiplication cache.
+   *
+   * The cache stores results of SparsePauliWord multiplications to avoid
+   * redundant computation. When the cache exceeds capacity, oldest entries
+   * are evicted (LRU policy).
+   *
+   * @param capacity Maximum number of entries in the cache.
+   */
+  void set_cache_capacity(std::size_t capacity);
+
+  /**
+   * @brief Clear the multiplication cache.
+   */
+  void clear_cache();
+
+  /**
+   * @brief Get the current number of entries in the multiplication cache.
+   * @return The number of cached multiplications.
+   */
+  std::size_t cache_size() const;
+
+  /**
+   * @brief Multiply two SparsePauliWords using Pauli algebra.
+   *
+   * Computes word1 * word2, returning the phase factor and resulting word.
+   * This method uses the instance cache for efficiency.
+   *
+   * @param word1 The first sparse Pauli word.
+   * @param word2 The second sparse Pauli word.
+   * @return A pair of (phase, result_word) where phase is the complex phase
+   *         from Pauli multiplication rules.
+   */
+  std::pair<std::complex<double>, SparsePauliWord> multiply(
+      const SparsePauliWord& word1, const SparsePauliWord& word2);
+
+  /**
+   * @brief Multiply two SparsePauliWords without caching.
+   *
+   * This is the core Pauli algebra implementation.
+   *
+   * @param word1 The first sparse Pauli word.
+   * @param word2 The second sparse Pauli word.
+   * @return A pair of (phase, result_word).
+   */
+  static std::pair<std::complex<double>, SparsePauliWord> multiply_uncached(
+      const SparsePauliWord& word1, const SparsePauliWord& word2);
+
+  /**
+   * @brief Compute all Jordan-Wigner excitation operator terms.
+   *
+   * Computes E_pq = a†_p a_q for all (p, q) pairs in sparse format.
+   * This is optimized to compute all N² terms in one call, avoiding
+   * repeated pybind11 boundary crossings when invoked from Python.
+   *
+   * @param n_spin_orbitals Total number of spin orbitals (N).
+   * @return Map from (p, q) indices to list of (coefficient, SparsePauliWord)
+   * terms.
+   */
+  static std::unordered_map<
+      std::pair<std::uint64_t, std::uint64_t>,
+      std::vector<std::pair<std::complex<double>, SparsePauliWord>>,
+      std::function<
+          std::size_t(const std::pair<std::uint64_t, std::uint64_t>&)>>
+  compute_all_jw_excitation_terms(std::uint64_t n_spin_orbitals);
+
+  /**
+   * @brief Compute all Bravyi-Kitaev excitation operator terms.
+   *
+   * Computes E_pq = a†_p a_q for all (p, q) pairs in sparse format.
+   * Uses the provided BK index sets (parity, update, remainder) for each
+   * orbital.
+   *
+   * @param n_spin_orbitals Total number of spin orbitals (N).
+   * @param parity_sets Map from orbital index to parity set P(j).
+   * @param update_sets Map from orbital index to update set U(j).
+   * @param remainder_sets Map from orbital index to remainder set R(j).
+   * @return Map from (p, q) indices to list of (coefficient, SparsePauliWord)
+   * terms.
+   */
+  static std::unordered_map<
+      std::pair<std::uint64_t, std::uint64_t>,
+      std::vector<std::pair<std::complex<double>, SparsePauliWord>>,
+      std::function<
+          std::size_t(const std::pair<std::uint64_t, std::uint64_t>&)>>
+  compute_all_bk_excitation_terms(
+      std::uint64_t n_spin_orbitals,
+      const std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>&
+          parity_sets,
+      const std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>&
+          update_sets,
+      const std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>&
+          remainder_sets);
+
+ private:
+  /// Accumulated terms: SparsePauliWord -> coefficient
+  std::unordered_map<SparsePauliWord, std::complex<double>, SparsePauliWordHash>
+      terms_;
+
+  /// Cache types for LRU multiplication cache
+  using CacheKey = std::pair<SparsePauliWord, SparsePauliWord>;
+  using CacheValue = std::pair<std::complex<double>, SparsePauliWord>;
+  using LRUIterator = std::list<CacheKey>::iterator;
+
+  /// LRU cache for Pauli multiplication results
+  std::unordered_map<CacheKey, std::pair<CacheValue, LRUIterator>,
+                     SparsePauliWordPairHash>
+      cache_map_;
+  std::list<CacheKey> lru_list_;
+  std::size_t cache_capacity_ = kDefaultCacheCapacity;
 };
 
 // --- Inline member function definitions moved out of class body ---

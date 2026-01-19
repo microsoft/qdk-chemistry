@@ -6,13 +6,95 @@
 #include <cmath>
 #include <functional>
 #include <limits>
+#include <list>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <stdexcept>
 #include <tuple>
+#include <unordered_map>
 
 namespace qdk::chemistry::data {
 
 namespace detail {
+
+/**
+ * @brief Internal implementation of Pauli algebra.
+ *
+ * This class provides the core Pauli multiplication logic shared between
+ * PauliTermAccumulator and excitation term computation.
+ */
+class PauliAlgebraImpl {
+ public:
+  /**
+   * @brief Multiply two SparsePauliWords, returning phase and result.
+   *
+   * This is the core Pauli algebra implementation using merge-style algorithm.
+   */
+  static std::pair<std::complex<double>, SparsePauliWord> multiply(
+      const SparsePauliWord& word1, const SparsePauliWord& word2) {
+    const std::complex<double> imag_unit(0.0, 1.0);
+    std::complex<double> phase(1.0, 0.0);
+    SparsePauliWord result;
+    result.reserve(word1.size() + word2.size());
+
+    // Merge-style algorithm: both inputs are sorted by qubit index
+    auto it1 = word1.begin();
+    auto it2 = word2.begin();
+
+    while (it1 != word1.end() && it2 != word2.end()) {
+      if (it1->first < it2->first) {
+        // Qubit only in word1
+        result.push_back(*it1);
+        ++it1;
+      } else if (it2->first < it1->first) {
+        // Qubit only in word2
+        result.push_back(*it2);
+        ++it2;
+      } else {
+        // Same qubit: multiply operators
+        std::uint8_t op1 = it1->second;
+        std::uint8_t op2 = it2->second;
+        std::uint64_t qubit = it1->first;
+
+        if (op1 == 0) {
+          // I * P = P
+          if (op2 != 0) result.emplace_back(qubit, op2);
+        } else if (op2 == 0) {
+          // P * I = P
+          result.emplace_back(qubit, op1);
+        } else if (op1 == op2) {
+          // P * P = I (don't add to result, identity)
+        } else {
+          // Different non-identity Paulis: use Levi-Civita
+          int a = op1;
+          int b = op2;
+          int c = 6 - a - b;  // 1+2+3 = 6, so third Pauli type
+          // Cyclic: X*Y=iZ, Y*Z=iX, Z*X=iY
+          // Anti-cyclic: Y*X=-iZ, Z*Y=-iX, X*Z=-iY
+          if ((a == 1 && b == 2) || (a == 2 && b == 3) || (a == 3 && b == 1)) {
+            phase *= imag_unit;
+          } else {
+            phase *= -imag_unit;
+          }
+          result.emplace_back(qubit, static_cast<std::uint8_t>(c));
+        }
+        ++it1;
+        ++it2;
+      }
+    }
+
+    // Append remaining elements
+    while (it1 != word1.end()) {
+      result.push_back(*it1);
+      ++it1;
+    }
+    while (it2 != word2.end()) {
+      result.push_back(*it2);
+      ++it2;
+    }
+
+    return {phase, result};
+  }
+};
 
 std::string pauli_operator_scalar_to_string(std::complex<double> coefficient) {
   constexpr double zero_tolerance = std::numeric_limits<double>::epsilon();
@@ -220,50 +302,81 @@ std::unique_ptr<PauliOperatorExpression> ProductPauliOperatorExpression::clone()
 
 std::unique_ptr<SumPauliOperatorExpression>
 ProductPauliOperatorExpression::distribute() const {
-  // Start with a sum containing a single empty product
-  auto result = std::make_unique<SumPauliOperatorExpression>();
-  auto initial = std::make_unique<ProductPauliOperatorExpression>(coefficient_);
-  result->add_term(std::move(initial));
+  // Short-circuit: if already distributed (all factors are Pauli or flat
+  // products), just wrap in a sum
+  if (this->is_distributed()) {
+    auto result = std::make_unique<SumPauliOperatorExpression>();
+    result->add_term(this->clone());
+    return result;
+  }
 
-  // For each factor, distribute it across existing terms
+  using FlatTerm =
+      std::pair<std::complex<double>,
+                std::vector<std::pair<std::uint64_t, std::uint8_t>>>;
+  std::vector<FlatTerm> flat_terms;
+  flat_terms.emplace_back(
+      coefficient_, std::vector<std::pair<std::uint64_t, std::uint8_t>>{});
+
+  // Helper to extract flat Pauli operators from an expression
+  std::function<void(const PauliOperatorExpression*,
+                     std::vector<std::pair<std::uint64_t, std::uint8_t>>&)>
+      extract_paulis;
+  extract_paulis =
+      [&extract_paulis](
+          const PauliOperatorExpression* expr,
+          std::vector<std::pair<std::uint64_t, std::uint8_t>>& out) {
+        if (const auto* pauli = expr->as_pauli_operator()) {
+          out.emplace_back(pauli->get_qubit_index(),
+                           pauli->get_operator_type());
+        } else if (const auto* prod = expr->as_product_expression()) {
+          for (const auto& f : prod->get_factors()) {
+            extract_paulis(f.get(), out);
+          }
+        }
+      };
+
   for (const auto& factor : factors_) {
     auto factor_dist = factor->distribute();
-    auto new_result = std::make_unique<SumPauliOperatorExpression>();
+    const auto& factor_terms = factor_dist->get_terms();
 
-    // Multiply each existing term with each term from factor distribution
-    for (const auto& existing_term : result->get_terms()) {
-      for (const auto& factor_term : factor_dist->get_terms()) {
-        auto new_product = std::make_unique<ProductPauliOperatorExpression>();
+    std::vector<FlatTerm> new_flat_terms;
+    new_flat_terms.reserve(flat_terms.size() * factor_terms.size());
 
-        // Get coefficient from existing term
-        std::complex<double> coeff(1.0);
-        if (auto* prod = existing_term->as_product_expression()) {
-          coeff = prod->get_coefficient();
-          // Copy factors from existing term
-          for (const auto& f : prod->get_factors()) {
-            new_product->add_factor(f->clone());
-          }
-        } else {
-          new_product->add_factor(existing_term->clone());
+    for (const auto& existing : flat_terms) {
+      for (const auto& factor_term : factor_terms) {
+        FlatTerm new_term;
+        new_term.first = existing.first;
+        new_term.second = existing.second;
+
+        if (const auto* prod = factor_term->as_product_expression()) {
+          new_term.first *= prod->get_coefficient();
+          new_term.second.reserve(new_term.second.size() +
+                                  prod->get_factors().size());
+          extract_paulis(factor_term.get(), new_term.second);
+        } else if (const auto* pauli = factor_term->as_pauli_operator()) {
+          new_term.second.emplace_back(pauli->get_qubit_index(),
+                                       pauli->get_operator_type());
         }
 
-        // Multiply coefficient from factor term
-        if (auto* prod = factor_term->as_product_expression()) {
-          coeff *= prod->get_coefficient();
-          // Add factors from factor term
-          for (const auto& f : prod->get_factors()) {
-            new_product->add_factor(f->clone());
-          }
-        } else {
-          new_product->add_factor(factor_term->clone());
-        }
-
-        new_product->set_coefficient(coeff);
-        new_result->add_term(std::move(new_product));
+        new_flat_terms.push_back(std::move(new_term));
       }
     }
 
-    result = std::move(new_result);
+    flat_terms = std::move(new_flat_terms);
+  }
+
+  // Convert flat representation back to expression tree
+  auto result = std::make_unique<SumPauliOperatorExpression>();
+  result->reserve_capacity(flat_terms.size());
+
+  for (const auto& flat_term : flat_terms) {
+    auto prod =
+        std::make_unique<ProductPauliOperatorExpression>(flat_term.first);
+    prod->reserve_capacity(flat_term.second.size());
+    for (const auto& [qubit, op_type] : flat_term.second) {
+      prod->add_factor(std::make_unique<PauliOperator>(op_type, qubit));
+    }
+    result->add_term(std::move(prod));
   }
 
   return result;
@@ -413,6 +526,10 @@ void ProductPauliOperatorExpression::add_factor(
   factors_.push_back(std::move(factor));
 }
 
+void ProductPauliOperatorExpression::reserve_capacity(std::size_t capacity) {
+  factors_.reserve(capacity);
+}
+
 const std::vector<std::unique_ptr<PauliOperatorExpression>>&
 ProductPauliOperatorExpression::get_factors() const {
   return factors_;
@@ -512,7 +629,12 @@ std::string ProductPauliOperatorExpression::to_canonical_string(
 std::vector<std::pair<std::complex<double>, std::string>>
 ProductPauliOperatorExpression::to_canonical_terms(
     std::uint64_t num_qubits) const {
-  return {{coefficient_, to_canonical_string(num_qubits)}};
+  // Simplify first to compute phase factors from Pauli multiplication
+  // simplify() already includes the original coefficient_ in the result
+  auto simplified = this->simplify();
+  auto* simplified_product = simplified->as_product_expression();
+  return {{simplified_product->get_coefficient(),
+           simplified_product->to_canonical_string(num_qubits)}};
 }
 
 std::vector<std::pair<std::complex<double>, std::string>>
@@ -565,10 +687,16 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::clone()
 
 std::unique_ptr<SumPauliOperatorExpression>
 SumPauliOperatorExpression::distribute() const {
+  // Short-circuit: if already distributed, just clone
+  if (this->is_distributed()) {
+    return std::make_unique<SumPauliOperatorExpression>(*this);
+  }
+
   auto result = std::make_unique<SumPauliOperatorExpression>();
+  result->reserve_capacity(terms_.size() * 2);
+
   for (const auto& term : terms_) {
     auto distributed_term = term->distribute();
-    // Add all terms from the distributed result to our result
     for (const auto& dist_term : distributed_term->get_terms()) {
       result->add_term(dist_term->clone());
     }
@@ -580,20 +708,21 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
     const {
   // Helper function to create a term key from a simplified product
   // The key is a sorted vector of (qubit_index, operator_type) pairs
-  auto make_term_key = [](const ProductPauliOperatorExpression* prod)
-      -> std::vector<std::pair<std::uint64_t, std::uint8_t>> {
-    std::vector<std::pair<std::uint64_t, std::uint8_t>> key;
+  auto make_term_key =
+      [](const ProductPauliOperatorExpression* prod) -> SparsePauliWord {
+    SparsePauliWord key;
+    key.reserve(prod->get_factors().size());
     for (const auto& factor : prod->get_factors()) {
       if (auto* pauli = factor->as_pauli_operator()) {
         key.emplace_back(pauli->get_qubit_index(), pauli->get_operator_type());
       }
     }
-    // Key should already be sorted since simplify() sorts factors by qubit
     return key;
   };
 
   // First simplify all terms individually
   std::vector<std::unique_ptr<ProductPauliOperatorExpression>> simplified_terms;
+  simplified_terms.reserve(terms_.size());
 
   // Helper function to add a simplified expression to simplified_terms
   std::function<void(std::unique_ptr<PauliOperatorExpression>)>
@@ -604,48 +733,52 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
       simplified_terms.push_back(
           std::make_unique<ProductPauliOperatorExpression>(*prod));
     } else if (auto* pauli = expr->as_pauli_operator()) {
-      // Wrap single PauliOperator in a ProductPauliOperatorExpression
       auto wrapped = std::make_unique<ProductPauliOperatorExpression>();
       wrapped->add_factor(std::make_unique<PauliOperator>(*pauli));
       simplified_terms.push_back(std::move(wrapped));
     } else if (auto* sum = expr->as_sum_expression()) {
-      // Recursively add terms from the sum
       for (const auto& term : sum->get_terms()) {
         add_simplified_term(term->clone());
       }
     }
   };
 
-  // Distribute first to ensure all terms are products
-  auto distributed = this->distribute();
+  // Check if already distributed - if so, we can skip the expensive
+  // distribute() call
+  const bool already_distributed = this->is_distributed();
 
-  for (const auto& term : distributed->get_terms()) {
-    auto simplified_term = term->simplify();
-    add_simplified_term(std::move(simplified_term));
+  if (already_distributed) {
+    // Skip distribute(), simplify terms directly from this sum
+    for (const auto& term : terms_) {
+      add_simplified_term(term->simplify());
+    }
+  } else {
+    auto distributed = this->distribute();
+    for (const auto& term : distributed->get_terms()) {
+      auto simplified_term = term->simplify();
+      add_simplified_term(std::move(simplified_term));
+    }
   }
 
-  // Collect like terms using a vector to preserve insertion order
-  // Each entry: (key, coefficient, term)
-  using TermKey = std::vector<std::pair<std::uint64_t, std::uint8_t>>;
-  std::vector<std::tuple<TermKey, std::complex<double>,
+  // Use SparsePauliWord (same as TermKey) with SparsePauliWordHash from header
+  std::unordered_map<SparsePauliWord, std::size_t, SparsePauliWordHash>
+      term_index_map;
+  std::vector<std::tuple<SparsePauliWord, std::complex<double>,
                          std::unique_ptr<ProductPauliOperatorExpression>>>
       collected_terms;
 
   for (auto& term : simplified_terms) {
     auto key = make_term_key(term.get());
-    // Linear search for existing term with same key
-    auto it = std::ranges::find_if(collected_terms, [&key](const auto& entry) {
-      return std::get<0>(entry) == key;
-    });
+    auto it = term_index_map.find(key);
 
-    if (it == collected_terms.end()) {
-      // First occurrence of this Pauli string
+    if (it == term_index_map.end()) {
       auto coeff = term->get_coefficient();
-      term->set_coefficient(1.0);  // Store with unit coefficient
+      term->set_coefficient(1.0);
+      std::size_t idx = collected_terms.size();
+      term_index_map.emplace(key, idx);
       collected_terms.emplace_back(std::move(key), coeff, std::move(term));
     } else {
-      // Add coefficient to existing term
-      std::get<1>(*it) += term->get_coefficient();
+      std::get<1>(collected_terms[it->second]) += term->get_coefficient();
     }
   }
 
@@ -700,6 +833,10 @@ SumPauliOperatorExpression::prune_threshold(double epsilon) const {
 void SumPauliOperatorExpression::add_term(
     std::unique_ptr<PauliOperatorExpression> term) {
   terms_.push_back(std::move(term));
+}
+
+void SumPauliOperatorExpression::reserve_capacity(std::size_t capacity) {
+  terms_.reserve(capacity);
 }
 
 const std::vector<std::unique_ptr<PauliOperatorExpression>>&
@@ -790,22 +927,24 @@ SumPauliOperatorExpression::to_canonical_terms(std::uint64_t num_qubits) const {
   std::vector<std::pair<std::complex<double>, std::string>> result;
 
   for (const auto& term : terms_) {
-    std::complex<double> coeff(1.0, 0.0);
-    std::string term_str;
-
     if (auto* prod = term->as_product_expression()) {
-      coeff = prod->get_coefficient();
-      term_str = prod->to_canonical_string(num_qubits);
+      // Use the product's to_canonical_terms which handles phase computation
+      auto terms = prod->to_canonical_terms(num_qubits);
+      for (auto& t : terms) {
+        result.push_back(std::move(t));
+      }
     } else if (auto* pauli = term->as_pauli_operator()) {
       // Wrap in a product to get canonical string
       ProductPauliOperatorExpression temp_prod;
       temp_prod.add_factor(pauli->clone());
-      term_str = temp_prod.to_canonical_string(num_qubits);
+      auto terms = temp_prod.to_canonical_terms(num_qubits);
+      for (auto& t : terms) {
+        result.push_back(std::move(t));
+      }
     } else {
-      term_str = term->to_string();
+      // Fallback for other expression types
+      result.emplace_back(std::complex<double>(1.0, 0.0), term->to_string());
     }
-
-    result.emplace_back(coeff, term_str);
   }
 
   return result;
@@ -821,6 +960,386 @@ SumPauliOperatorExpression::to_canonical_terms() const {
   // Adjust num_qubits to cover from 0 to max_qubit
   std::uint64_t effective_num_qubits = min_q + n;
   return to_canonical_terms(effective_num_qubits);
+}
+
+// ============================================================================
+// PauliTermAccumulator implementation
+// ============================================================================
+
+void PauliTermAccumulator::accumulate(const SparsePauliWord& word,
+                                      std::complex<double> coeff) {
+  auto it = terms_.find(word);
+  if (it != terms_.end()) {
+    it->second += coeff;
+  } else {
+    terms_[word] = coeff;
+  }
+}
+
+void PauliTermAccumulator::accumulate_product(const SparsePauliWord& word1,
+                                              const SparsePauliWord& word2,
+                                              std::complex<double> scale) {
+  auto [phase, result_word] = multiply(word1, word2);
+  accumulate(result_word, scale * phase);
+}
+
+std::vector<std::pair<std::complex<double>, SparsePauliWord>>
+PauliTermAccumulator::get_terms(double threshold) const {
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> result;
+  result.reserve(terms_.size());
+  for (const auto& [word, coeff] : terms_) {
+    if (std::abs(coeff) >= threshold) {
+      result.emplace_back(coeff, word);
+    }
+  }
+  return result;
+}
+
+std::vector<std::pair<std::complex<double>, std::string>>
+PauliTermAccumulator::get_terms_as_strings(std::uint64_t num_qubits,
+                                           double threshold) const {
+  std::vector<std::pair<std::complex<double>, std::string>> result;
+  result.reserve(terms_.size());
+
+  for (const auto& [word, coeff] : terms_) {
+    if (std::abs(coeff) >= threshold) {
+      // Convert SparsePauliWord to canonical string
+      std::string pauli_str(num_qubits, 'I');
+      for (const auto& [qubit, op_type] : word) {
+        if (qubit < num_qubits) {
+          switch (op_type) {
+            case 1:
+              pauli_str[qubit] = 'X';
+              break;
+            case 2:
+              pauli_str[qubit] = 'Y';
+              break;
+            case 3:
+              pauli_str[qubit] = 'Z';
+              break;
+            default:
+              break;  // Identity, already 'I'
+          }
+        }
+      }
+      result.emplace_back(coeff, std::move(pauli_str));
+    }
+  }
+  return result;
+}
+
+void PauliTermAccumulator::clear() {
+  terms_.clear();
+  clear_cache();
+}
+
+void PauliTermAccumulator::set_cache_capacity(std::size_t capacity) {
+  cache_capacity_ = capacity;
+  // Evict excess entries
+  while (cache_map_.size() > capacity && !lru_list_.empty()) {
+    auto oldest = lru_list_.back();
+    cache_map_.erase(oldest);
+    lru_list_.pop_back();
+  }
+}
+
+void PauliTermAccumulator::clear_cache() {
+  cache_map_.clear();
+  lru_list_.clear();
+}
+
+std::size_t PauliTermAccumulator::cache_size() const {
+  return cache_map_.size();
+}
+
+std::pair<std::complex<double>, SparsePauliWord> PauliTermAccumulator::multiply(
+    const SparsePauliWord& word1, const SparsePauliWord& word2) {
+  // Check cache first
+  auto key = std::make_pair(word1, word2);
+  auto it = cache_map_.find(key);
+  if (it != cache_map_.end()) {
+    // Move to front of LRU list (most recently used)
+    lru_list_.splice(lru_list_.begin(), lru_list_, it->second.second);
+    return it->second.first;
+  }
+
+  // Compute multiplication
+  auto result = multiply_uncached(word1, word2);
+
+  // Add to cache with LRU eviction
+  if (cache_capacity_ > 0) {
+    // Evict if at capacity
+    while (cache_map_.size() >= cache_capacity_ && !lru_list_.empty()) {
+      auto oldest = lru_list_.back();
+      cache_map_.erase(oldest);
+      lru_list_.pop_back();
+    }
+
+    // Insert new entry
+    lru_list_.push_front(key);
+    cache_map_[key] = {result, lru_list_.begin()};
+  }
+
+  return result;
+}
+
+std::pair<std::complex<double>, SparsePauliWord>
+PauliTermAccumulator::multiply_uncached(const SparsePauliWord& word1,
+                                        const SparsePauliWord& word2) {
+  return detail::PauliAlgebraImpl::multiply(word1, word2);
+}
+
+// ============================================================================
+// Excitation Term Computation
+// ============================================================================
+
+namespace {
+
+// Pauli operator type constants
+constexpr std::uint8_t OP_X = 1;
+constexpr std::uint8_t OP_Y = 2;
+constexpr std::uint8_t OP_Z = 3;
+
+// Hash function for (p, q) pairs
+struct PairHash {
+  std::size_t operator()(
+      const std::pair<std::uint64_t, std::uint64_t>& p) const noexcept {
+    return p.first * 0x9e3779b97f4a7c15ULL + p.second;
+  }
+};
+
+/**
+ * @brief Compute JW excitation terms E_pq = a†_p a_q for a single (p, q) pair.
+ */
+std::vector<std::pair<std::complex<double>, SparsePauliWord>>
+compute_jw_excitation_terms_single(std::uint64_t p, std::uint64_t q) {
+  const std::complex<double> imag_unit(0.0, 1.0);
+
+  if (p == q) {
+    // Number operator: a†_p a_p = (1/2)(I - Z_p)
+    return {
+        {std::complex<double>(0.5, 0.0), {}},           // 0.5 * I
+        {std::complex<double>(-0.5, 0.0), {{p, OP_Z}}}  // -0.5 * Z_p
+    };
+  }
+
+  // For p != q, the Z strings partially cancel
+  std::uint64_t lo = std::min(p, q);
+  std::uint64_t hi = std::max(p, q);
+
+  // Build Z-string for qubits between lo+1 and hi-1
+  SparsePauliWord z_middle;
+  for (std::uint64_t j = lo + 1; j < hi; ++j) {
+    z_middle.emplace_back(j, OP_Z);
+  }
+
+  // Construct words directly in sorted order
+  // Format: [(lo, op_lo), z_middle..., (hi, op_hi)]
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> terms;
+  terms.reserve(4);
+
+  // XX and YY terms always have the same structure
+  SparsePauliWord xx_word, yy_word, xy_word, yx_word;
+  xx_word.reserve(2 + z_middle.size());
+  yy_word.reserve(2 + z_middle.size());
+  xy_word.reserve(2 + z_middle.size());
+  yx_word.reserve(2 + z_middle.size());
+
+  xx_word.emplace_back(lo, OP_X);
+  xx_word.insert(xx_word.end(), z_middle.begin(), z_middle.end());
+  xx_word.emplace_back(hi, OP_X);
+
+  yy_word.emplace_back(lo, OP_Y);
+  yy_word.insert(yy_word.end(), z_middle.begin(), z_middle.end());
+  yy_word.emplace_back(hi, OP_Y);
+
+  if (p < q) {
+    // X_p at lo, Y_q at hi for xy; Y_p at lo, X_q at hi for yx
+    xy_word.emplace_back(lo, OP_X);
+    xy_word.insert(xy_word.end(), z_middle.begin(), z_middle.end());
+    xy_word.emplace_back(hi, OP_Y);
+
+    yx_word.emplace_back(lo, OP_Y);
+    yx_word.insert(yx_word.end(), z_middle.begin(), z_middle.end());
+    yx_word.emplace_back(hi, OP_X);
+  } else {
+    // p > q: X_p at hi, Y_q at lo for xy -> means Y at lo, X at hi
+    xy_word.emplace_back(lo, OP_Y);
+    xy_word.insert(xy_word.end(), z_middle.begin(), z_middle.end());
+    xy_word.emplace_back(hi, OP_X);
+
+    yx_word.emplace_back(lo, OP_X);
+    yx_word.insert(yx_word.end(), z_middle.begin(), z_middle.end());
+    yx_word.emplace_back(hi, OP_Y);
+  }
+
+  terms.emplace_back(std::complex<double>(0.25, 0.0), std::move(xx_word));
+  terms.emplace_back(std::complex<double>(0.25, 0.0), std::move(yy_word));
+  terms.emplace_back(std::complex<double>(0.0, 0.25), std::move(xy_word));
+  terms.emplace_back(std::complex<double>(0.0, -0.25), std::move(yx_word));
+
+  return terms;
+}
+
+/**
+ * @brief Build X-component of BK ladder operator: Z_{P(j)} * X_j * X_{U(j)}
+ */
+SparsePauliWord build_bk_x_component(
+    std::uint64_t j, const std::vector<std::uint64_t>& parity_set,
+    const std::vector<std::uint64_t>& update_set) {
+  SparsePauliWord word;
+  word.reserve(1 + parity_set.size() + update_set.size());
+
+  word.emplace_back(j, OP_X);
+  for (auto q : parity_set) {
+    word.emplace_back(q, OP_Z);
+  }
+  for (auto q : update_set) {
+    word.emplace_back(q, OP_X);
+  }
+  std::sort(word.begin(), word.end());
+  return word;
+}
+
+/**
+ * @brief Build Y-component of BK ladder operator: Z_{R(j)} * Y_j * X_{U(j)}
+ */
+SparsePauliWord build_bk_y_component(
+    std::uint64_t j, const std::vector<std::uint64_t>& remainder_set,
+    const std::vector<std::uint64_t>& update_set) {
+  SparsePauliWord word;
+  word.reserve(1 + remainder_set.size() + update_set.size());
+
+  word.emplace_back(j, OP_Y);
+  for (auto q : remainder_set) {
+    word.emplace_back(q, OP_Z);
+  }
+  for (auto q : update_set) {
+    word.emplace_back(q, OP_X);
+  }
+  std::sort(word.begin(), word.end());
+  return word;
+}
+
+/**
+ * @brief Compute BK excitation terms E_pq = a†_p a_q for a single (p, q) pair.
+ */
+std::vector<std::pair<std::complex<double>, SparsePauliWord>>
+compute_bk_excitation_terms_single(
+    std::uint64_t p, std::uint64_t q,
+    const std::vector<std::uint64_t>& parity_p,
+    const std::vector<std::uint64_t>& update_p,
+    const std::vector<std::uint64_t>& remainder_p,
+    const std::vector<std::uint64_t>& parity_q,
+    const std::vector<std::uint64_t>& update_q,
+    const std::vector<std::uint64_t>& remainder_q) {
+  const std::complex<double> imag_unit(0.0, 1.0);
+
+  // Build X and Y components for both p and q
+  SparsePauliWord x_p = build_bk_x_component(p, parity_p, update_p);
+  SparsePauliWord y_p = build_bk_y_component(p, remainder_p, update_p);
+  SparsePauliWord x_q = build_bk_x_component(q, parity_q, update_q);
+  SparsePauliWord y_q = build_bk_y_component(q, remainder_q, update_q);
+
+  // a†_p = (1/2)(X_p - i*Y_p), a_q = (1/2)(X_q + i*Y_q)
+  // a†_p * a_q = (1/4)(X_p*X_q + i*X_p*Y_q - i*Y_p*X_q + Y_p*Y_q)
+
+  auto [phase_xx, word_xx] = detail::PauliAlgebraImpl::multiply(x_p, x_q);
+  auto [phase_xy, word_xy] = detail::PauliAlgebraImpl::multiply(x_p, y_q);
+  auto [phase_yx, word_yx] = detail::PauliAlgebraImpl::multiply(y_p, x_q);
+  auto [phase_yy, word_yy] = detail::PauliAlgebraImpl::multiply(y_p, y_q);
+
+  // Combine terms with same word
+  std::unordered_map<SparsePauliWord, std::complex<double>, SparsePauliWordHash>
+      combined;
+
+  combined[word_xx] += std::complex<double>(0.25, 0.0) * phase_xx;
+  combined[word_xy] += std::complex<double>(0.0, 0.25) * phase_xy;
+  combined[word_yx] += std::complex<double>(0.0, -0.25) * phase_yx;
+  combined[word_yy] += std::complex<double>(0.25, 0.0) * phase_yy;
+
+  // Filter out zero terms
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> result;
+  result.reserve(combined.size());
+  for (auto& [word, coeff] : combined) {
+    if (std::abs(coeff) > std::numeric_limits<double>::epsilon()) {
+      result.emplace_back(coeff, word);
+    }
+  }
+
+  return result;
+}
+
+}  // anonymous namespace
+
+std::unordered_map<
+    std::pair<std::uint64_t, std::uint64_t>,
+    std::vector<std::pair<std::complex<double>, SparsePauliWord>>,
+    std::function<std::size_t(const std::pair<std::uint64_t, std::uint64_t>&)>>
+PauliTermAccumulator::compute_all_jw_excitation_terms(
+    std::uint64_t n_spin_orbitals) {
+  // Use a proper hash function
+  auto hash_fn = [](const std::pair<std::uint64_t, std::uint64_t>& p) {
+    return p.first * 0x9e3779b97f4a7c15ULL + p.second;
+  };
+
+  std::unordered_map<
+      std::pair<std::uint64_t, std::uint64_t>,
+      std::vector<std::pair<std::complex<double>, SparsePauliWord>>,
+      std::function<std::size_t(
+          const std::pair<std::uint64_t, std::uint64_t>&)>>
+      result(n_spin_orbitals * n_spin_orbitals, hash_fn);
+
+  for (std::uint64_t p = 0; p < n_spin_orbitals; ++p) {
+    for (std::uint64_t q = 0; q < n_spin_orbitals; ++q) {
+      result[{p, q}] = compute_jw_excitation_terms_single(p, q);
+    }
+  }
+
+  return result;
+}
+
+std::unordered_map<
+    std::pair<std::uint64_t, std::uint64_t>,
+    std::vector<std::pair<std::complex<double>, SparsePauliWord>>,
+    std::function<std::size_t(const std::pair<std::uint64_t, std::uint64_t>&)>>
+PauliTermAccumulator::compute_all_bk_excitation_terms(
+    std::uint64_t n_spin_orbitals,
+    const std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>&
+        parity_sets,
+    const std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>&
+        update_sets,
+    const std::unordered_map<std::uint64_t, std::vector<std::uint64_t>>&
+        remainder_sets) {
+  // Use a proper hash function
+  auto hash_fn = [](const std::pair<std::uint64_t, std::uint64_t>& p) {
+    return p.first * 0x9e3779b97f4a7c15ULL + p.second;
+  };
+
+  std::unordered_map<
+      std::pair<std::uint64_t, std::uint64_t>,
+      std::vector<std::pair<std::complex<double>, SparsePauliWord>>,
+      std::function<std::size_t(
+          const std::pair<std::uint64_t, std::uint64_t>&)>>
+      result(n_spin_orbitals * n_spin_orbitals, hash_fn);
+
+  for (std::uint64_t p = 0; p < n_spin_orbitals; ++p) {
+    const auto& parity_p = parity_sets.at(p);
+    const auto& update_p = update_sets.at(p);
+    const auto& remainder_p = remainder_sets.at(p);
+
+    for (std::uint64_t q = 0; q < n_spin_orbitals; ++q) {
+      const auto& parity_q = parity_sets.at(q);
+      const auto& update_q = update_sets.at(q);
+      const auto& remainder_q = remainder_sets.at(q);
+
+      result[{p, q}] = compute_bk_excitation_terms_single(
+          p, q, parity_p, update_p, remainder_p, parity_q, update_q,
+          remainder_q);
+    }
+  }
+
+  return result;
 }
 
 }  // namespace qdk::chemistry::data
