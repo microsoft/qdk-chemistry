@@ -8,6 +8,7 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/stability_result.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -665,4 +666,8 @@ Examples:
             StabilityResult::from_json(nlohmann::json::parse(json_str));
         return *result;
       }));
+
+  // Data type name class attribute
+  stability_result.attr("_data_type_name") =
+      DATACLASS_TO_SNAKE_CASE(StabilityResult);
 }

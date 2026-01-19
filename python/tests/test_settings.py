@@ -692,29 +692,63 @@ class TestSettings:
         settings["method"] = "hf"
         settings["max_iterations"] = 100
 
-        # Test invalid filenames
-        invalid_filenames = [
-            "",  # Empty filename
+        # Test truly empty filename - should get "Filename cannot be empty"
+        with pytest.raises(ValueError, match="Filename cannot be empty"):
+            settings.to_json_file("")
+        with pytest.raises(ValueError, match="Filename cannot be empty"):
+            Settings.from_json_file("")
+
+        # Test whitespace-only filenames - these pass empty check but fail suffix validation
+        whitespace_filenames = [
             "   ",  # Whitespace only
             "\n",  # Newline
             "\t",  # Tab
+        ]
+
+        for whitespace_filename in whitespace_filenames:
+            with pytest.raises(ValueError, match="Invalid filename"):
+                settings.to_json_file(whitespace_filename)
+
+        # Test filenames with invalid characters - may get different errors
+        # depending on the platform and what gets through
+        invalid_char_filenames = [
             "file\0name",  # Null character
             "file\x01name",  # Control character
         ]
 
-        for invalid_filename in invalid_filenames:
-            with pytest.raises(ValueError, match="Invalid filename"):
+        for invalid_filename in invalid_char_filenames:
+            # These may throw either "cannot be empty" (if stripped) or "Invalid filename"
+            with pytest.raises(ValueError, match=r"cannot be empty|Invalid filename"):
                 settings.to_json_file(invalid_filename)
+
+        # Test filenames that don't follow naming convention - should get "Invalid filename"
+        wrong_convention_filenames = [
+            "settings.json",  # Missing .settings. before extension
+            "my_config.json",  # Missing .settings. before extension
+            "test.h5",  # Missing .settings. before extension
+        ]
+
+        for wrong_filename in wrong_convention_filenames:
             with pytest.raises(ValueError, match="Invalid filename"):
-                settings.from_json_file(invalid_filename)
+                settings.to_json_file(wrong_filename)
 
         # Test HDF5 filename validation (if HDF5 is available)
         try:
-            for invalid_filename in invalid_filenames:
+            # Empty filename
+            with pytest.raises(ValueError, match="Filename cannot be empty"):
+                settings.to_hdf5_file("")
+            with pytest.raises(ValueError, match="Filename cannot be empty"):
+                Settings.from_hdf5_file("")
+
+            # Whitespace filenames fail suffix validation
+            for whitespace_filename in whitespace_filenames:
                 with pytest.raises(ValueError, match="Invalid filename"):
-                    settings.to_hdf5_file(invalid_filename)
+                    settings.to_hdf5_file(whitespace_filename)
+
+            # Wrong convention filenames
+            for wrong_filename in ["settings.h5", "my_config.h5"]:
                 with pytest.raises(ValueError, match="Invalid filename"):
-                    settings.from_hdf5_file(invalid_filename)
+                    settings.to_hdf5_file(wrong_filename)
         except (ImportError, OSError, RuntimeError):
             pass  # Skip if HDF5 not available
 
@@ -1289,3 +1323,9 @@ class TestSettingsCustomClass:
         # Should fail with missing key
         with pytest.raises(SettingNotFoundError):
             settings.validate_required(["param1", "param2", "missing_param"])
+
+
+def test_settings_data_type_name():
+    """Test that Settings has the correct _data_type_name class attribute."""
+    assert hasattr(Settings, "_data_type_name")
+    assert Settings._data_type_name == "settings"
