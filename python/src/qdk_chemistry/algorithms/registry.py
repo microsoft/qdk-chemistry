@@ -498,7 +498,7 @@ def _register_python_factories():
 
     This internal initialization function registers all the Python-implemented
     algorithm factories. This includes factories for energy estimators, qubit Hamiltonian solver,
-    qubit mappers, and state preparation algorithms that are implemented in Python.
+    qubit mappers, time evolution algorithms, and state preparation algorithms that are implemented in Python.
 
     This function is automatically called during module import and should not
     be called by users.
@@ -507,11 +507,17 @@ def _register_python_factories():
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolverFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.time_evolution.builder import TimeEvolutionBuilderFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import (  # noqa: PLC0415
+        ControlledEvolutionCircuitMapperFactory,
+    )
 
     register_factory(EnergyEstimatorFactory())
     register_factory(StatePreparationFactory())
     register_factory(QubitMapperFactory())
     register_factory(QubitHamiltonianSolverFactory())
+    register_factory(TimeEvolutionBuilderFactory())
+    register_factory(ControlledEvolutionCircuitMapperFactory())
 
 
 _ = _register_cpp_factories()
@@ -558,7 +564,7 @@ def _register_python_algorithms():
 
     This internal initialization function registers specific Python-implemented
     algorithm instances as built-in algorithms. This includes the default QDK
-    energy estimator, qubit Hamiltonian solvers, and state preparation algorithms.
+    energy estimator, qubit Hamiltonian solvers, time evolution algorithms, and state preparation algorithms.
 
     This function is automatically called during module import and should not
     be called by users.
@@ -566,11 +572,19 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.time_evolution.builder.trotter import (  # noqa: PLC0415
+        Trotter,
+    )
+    from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import (  # noqa: PLC0415
+        PauliSequenceMapper,
+    )
 
     register(lambda: QDKEnergyEstimator())
     register(lambda: SparseIsometryGF2XStatePreparation())
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
+    register(lambda: Trotter())
+    register(lambda: PauliSequenceMapper())
 
 
 _register_python_algorithms()

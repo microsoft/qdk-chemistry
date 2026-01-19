@@ -119,6 +119,7 @@ def _run_iterative(problem: PhaseEstimationProblem) -> QpeResult:
             iteration=iteration,
             total_iterations=problem.num_bits,
             phase_correction=phase_feedback,
+            circuit_folding=False,
         )
         compiled = transpile(iteration_data.circuit, simulator, optimization_level=0)
         result = simulator.run(compiled, shots=problem.shots_iterative).result()
@@ -218,6 +219,7 @@ def _run_iterative_with_parameters(
             iteration=iteration,
             total_iterations=num_bits,
             phase_correction=phase_feedback,
+            circuit_folding=False,
         )
         compiled = transpile(iteration_info.circuit, simulator, optimization_level=0)
         result = simulator.run(compiled, shots=shots_per_iteration).result()
@@ -457,7 +459,7 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
     )
 
     # Create noise model with depolarizing error on cx gates
-    error_rate = 0.2
+    error_rate = 0.1
     error_profile = QuantumErrorProfile(
         name="qpe_noise_test",
         description="Depolarizing noise for QPE integration test",
@@ -479,9 +481,14 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
             iteration=iteration,
             total_iterations=two_qubit_phase_problem.num_bits,
             phase_correction=phase_feedback,
+            circuit_folding=False,
         )
         # Run noisy simulation with more shots to see noise impact despite statistics
-        result = simulator.run(iteration_data.circuit, shots=100).result()
+        circuit = iteration_data.circuit.decompose(reps=4)
+        transpiled_circuit = transpile(
+            circuit, basis_gates=["cx", "rz", "h", "x", "s", "sdg", "crz"], optimization_level=1
+        )
+        result = simulator.run(transpiled_circuit, shots=100).result()
         counts = result.get_counts()
         measured_bit = 0 if counts.get("0", 0) >= counts.get("1", 0) else 1
 
@@ -499,29 +506,15 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
     )
 
     # Verify that noisy results deviate from expected values
-    expected_noisy_phase = 0.0625
-    expected_noisy_energy = 0.25
     assert noisy_result.bits_msb_first is not None
-    assert np.isclose(
-        noisy_result.phase_fraction,
-        expected_noisy_phase,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
     assert not np.isclose(
-        expected_noisy_phase,
+        noisy_result.phase_fraction,
         two_qubit_phase_problem.expected_phase,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_phase_fraction_tolerance,
     )
-    assert np.isclose(
-        noisy_result.resolved_energy,
-        expected_noisy_energy,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_energy_tolerance,
-    )
     assert not np.isclose(
-        expected_noisy_energy,
+        noisy_result.resolved_energy,
         two_qubit_phase_problem.expected_energy,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
@@ -535,7 +528,7 @@ def test_create_iterations_generates_correct_number_of_circuits(
     """Test that create_iterations generates the correct number of iteration circuits."""
     iqpe = IterativePhaseEstimation(two_qubit_phase_problem.hamiltonian, two_qubit_phase_problem.evolution_time)
 
-    iterations = iqpe.create_iterations(two_qubit_phase_problem.state_prep, num_bits=5)
+    iterations = iqpe.create_iterations(two_qubit_phase_problem.state_prep, num_bits=5, circuit_folding=False)
 
     assert len(iterations) == 5
     for idx, iteration in enumerate(iterations):
@@ -552,7 +545,9 @@ def test_create_iterations_with_phase_corrections() -> None:
     iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
 
     phase_corrections = [0.0, np.pi / 4, np.pi / 2, np.pi]
-    iterations = iqpe.create_iterations(state_prep, num_bits=4, phase_corrections=phase_corrections)
+    iterations = iqpe.create_iterations(
+        state_prep, num_bits=4, phase_corrections=phase_corrections, circuit_folding=False
+    )
 
     assert len(iterations) == 4
     for idx, iteration in enumerate(iterations):
@@ -568,7 +563,9 @@ def test_create_iterations_with_custom_measurement_registers() -> None:
     iqpe = IterativePhaseEstimation(hamiltonian, np.pi / 2)
 
     custom_registers = [ClassicalRegister(1, f"custom_{i}") for i in range(3)]
-    iterations = iqpe.create_iterations(state_prep, num_bits=3, measurement_registers=custom_registers)
+    iterations = iqpe.create_iterations(
+        state_prep, num_bits=3, measurement_registers=custom_registers, circuit_folding=False
+    )
 
     assert len(iterations) == 3
     for idx, iteration in enumerate(iterations):
@@ -584,7 +581,7 @@ def test_create_iterations_with_iteration_names() -> None:
     iqpe = IterativePhaseEstimation(hamiltonian, np.pi / 4)
 
     names = ["iteration_0", "iteration_1", "iteration_2"]
-    iterations = iqpe.create_iterations(state_prep, num_bits=3, iteration_names=names)
+    iterations = iqpe.create_iterations(state_prep, num_bits=3, iteration_names=names, circuit_folding=False)
 
     assert len(iterations) == 3
     for idx, iteration in enumerate(iterations):
@@ -816,3 +813,26 @@ def test_iterative_qpe_initialization() -> None:
     assert iqpe.hamiltonian == hamiltonian
     assert iqpe.evolution_time == evolution_time
     assert iqpe.algorithm == PhaseEstimationAlgorithm.ITERATIVE
+
+
+def test_create_folding_circuits() -> None:
+    """Test circuit folding in create_iteration_circuit."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
+    state_prep = QuantumCircuit(1)
+    state_prep.h(0)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    # Create circuit without folding
+    circuit_no_folding = iqpe.create_iteration_circuit(
+        state_prep, iteration=1, total_iterations=3, circuit_folding=False
+    )
+
+    # Create circuit with folding
+    circuit_with_folding = iqpe.create_iteration_circuit(
+        state_prep, iteration=1, total_iterations=3, circuit_folding=True
+    )
+
+    # The folded circuit should have state_prep operations included
+    assert "state_prep" not in circuit_no_folding.count_ops()
+    assert "state_prep" in circuit_with_folding.count_ops()
