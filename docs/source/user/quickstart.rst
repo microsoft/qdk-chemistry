@@ -254,7 +254,7 @@ For more information, see:
 - :doc:`comprehensive/index` for links to more detailed documentation on specific components of QDK/Chemistry.
 
 Compiling C++ examples
-^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 To compile the C++ examples, the QDK/Chemistry C++ library must be installed on your system.
 See the `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_ for details on building and installing the library.
