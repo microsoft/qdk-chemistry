@@ -34,10 +34,10 @@ cmake --build build
 
 ### Using the Command Line
 
-Alternatively, compile directly with a C++20 compiler:
+Alternatively, compile directly with a C++20 compiler (though using CMake, as shown above, is recommended to pick up transitive dependencies):
 
 ```bash
-g++ -std=c++20 -I/path/to/qdk/include example.cpp -o example -L/path/to/qdk/lib -lqdk-chemistry
+g++ -std=c++20 -I/path/to/qdk/include example.cpp -o example -L/path/to/qdk/lib -lqdk_chemistry
 ```
 
 ## Further Reading
