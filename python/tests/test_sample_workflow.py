@@ -41,20 +41,8 @@ def test_state_prep_energy():
 ################################################################################
 
 
-@pytest.mark.xfail(reason="Skipping unimplemented examples/pennylane/qpe_no_trotter.py test.")
+@pytest.mark.xfail(reason="Skipping unimplemented examples/interoperability/pennylane/qpe_no_trotter.py test.")
 def test_pennylane_qpe_no_trotter():
-    """Test the examples/pennylane/qpe_no_trotter.py script."""
+    """Test the examples/interoperability/pennylane/qpe_no_trotter.py script."""
     # TODO: Need to implement this test (see https://github.com/microsoft/qdk-chemistry/issues/199)
     raise NotImplementedError("TODO: add pennylane/qpe_no_trotter.py test.")
-
-
-################################################################################
-# Qsharp interoperability sample testing
-################################################################################
-
-
-@pytest.mark.xfail(reason="Skipping unimplemented examples/qsharp/iqpe_no_trotter.qs test.")
-def test_qsharp_iqpe_no_trotter():
-    """Test the examples/qsharp/iqpe_no_trotter.qs script."""
-    # TODO: Need to implement this test (see https://github.com/microsoft/qdk-chemistry/issues/200)
-    raise NotImplementedError("TODO: add qsharp/iqpe_no_trotter.qs test.")
