@@ -15,6 +15,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -277,6 +278,14 @@ class Settings : public DataClass,
    * @brief Move assignment operator
    */
   Settings& operator=(Settings&& other) noexcept = default;
+
+  /**
+   * @brief Get the data type name for this class
+   * @return "settings"
+   */
+  std::string get_data_type_name() const override {
+    return DATACLASS_TO_SNAKE_CASE(Settings);
+  }
 
   /**
    * @brief Set a setting value

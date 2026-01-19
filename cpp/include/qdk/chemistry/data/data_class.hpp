@@ -27,6 +27,17 @@ class DataClass {
   virtual ~DataClass() = default;
 
   /**
+   * @brief Get the data type name for this class
+   *
+   * This is used for file naming conventions and serialization.
+   * Derived classes must override this to return their specific type name.
+   *
+   * @return String containing the data type name (e.g., "structure",
+   * "wavefunction")
+   */
+  virtual std::string get_data_type_name() const = 0;
+
+  /**
    * @brief Get a summary string describing the object
    * @return String containing object summary information
    */

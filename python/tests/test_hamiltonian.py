@@ -592,3 +592,9 @@ class TestHamiltonian:
         alpha_indices_unres, beta_indices_unres = model_orbitals_unrestricted.get_active_space_indices()
         assert len(alpha_indices_unres) == 4  # All orbitals active by default
         assert len(beta_indices_unres) == 4
+
+
+def test_hamiltonian_data_type_name():
+    """Test that Hamiltonian has the correct _data_type_name class attribute."""
+    assert hasattr(Hamiltonian, "_data_type_name")
+    assert Hamiltonian._data_type_name == "hamiltonian"

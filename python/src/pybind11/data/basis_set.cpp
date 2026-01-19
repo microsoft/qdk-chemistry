@@ -10,6 +10,7 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -191,8 +192,8 @@ Examples:
     ...     print("This is an ECP shell")
 )");
 
-  py::class_<BasisSet, DataClass, py::smart_holder>(m, "BasisSet",
-                                                    R"(
+  py::class_<BasisSet, DataClass, py::smart_holder> basis_set(m, "BasisSet",
+                                                              R"(
 Represents an atomic orbital basis set using shell-based organization.
 
 This class stores and manages atomic orbital basis set information using shells as the primary organizational unit.
@@ -205,9 +206,10 @@ Examples:
     >>> basis = BasisSet("STO-3G")
     >>> basis.add_shell(0, OrbitalType.S, 1.0, 1.0)  # s orbital on atom 0
     >>> print(f"Number of atomic orbitals: {basis.get_num_atomic_orbitals()}")
-)")
-      .def(py::init<const std::string&, const Structure&, AOType>(),
-           R"(
+)");
+
+  basis_set.def(py::init<const std::string&, const Structure&, AOType>(),
+                R"(
 Constructor with basis set name, structure, and basis type.
 
 Creates a basis set associated with a molecular structure.
@@ -223,10 +225,12 @@ Examples:
     >>> basis = BasisSet("cc-pVDZ", structure, AOType.Spherical)
     >>> print(f"Basis set for {structure.get_num_atoms()} atoms")
 )",
-           py::arg("name"), py::arg("structure"),
-           py::arg("atomic_orbital_type") = AOType::Spherical)
-      .def(py::init<const std::string&, const std::vector<Shell>&, AOType>(),
-           R"(
+                py::arg("name"), py::arg("structure"),
+                py::arg("atomic_orbital_type") = AOType::Spherical);
+
+  basis_set.def(
+      py::init<const std::string&, const std::vector<Shell>&, AOType>(),
+      R"(
 Constructor with basis set name, shells, and basis type.
 
 Creates a basis set with predefined shells.
@@ -242,11 +246,11 @@ Examples:
     >>> basis = BasisSet("custom", shells)
     >>> print(f"Created basis with {len(shells)} shells")
 )",
-           py::arg("name"), py::arg("shells"),
-           py::arg("atomic_orbital_type") = AOType::Spherical)
-      .def(py::init<const std::string&, const std::vector<Shell>&,
-                    const Structure&, AOType>(),
-           R"(
+      py::arg("name"), py::arg("shells"),
+      py::arg("atomic_orbital_type") = AOType::Spherical);
+  basis_set.def(py::init<const std::string&, const std::vector<Shell>&,
+                         const Structure&, AOType>(),
+                R"(
 Constructor with basis set name, shells, structure, and basis type.
 
 Creates a complete basis set with shells and molecular structure.
@@ -265,11 +269,11 @@ Examples:
     >>> basis = BasisSet("custom", shells, structure)
     >>> print(f"Complete basis set with {len(shells)} shells")
 )",
-           py::arg("name"), py::arg("shells"), py::arg("structure"),
-           py::arg("atomic_orbital_type") = AOType::Spherical)
-      .def(py::init<const std::string&, const std::vector<Shell>&,
-                    const std::vector<Shell>&, const Structure&, AOType>(),
-           R"(
+                py::arg("name"), py::arg("shells"), py::arg("structure"),
+                py::arg("atomic_orbital_type") = AOType::Spherical);
+  basis_set.def(py::init<const std::string&, const std::vector<Shell>&,
+                         const std::vector<Shell>&, const Structure&, AOType>(),
+                R"(
 Constructor with basis set name, shells, ECP shells, structure, and basis type.
 
 Creates a complete basis set with regular shells, ECP shells, and molecular structure.
@@ -290,13 +294,14 @@ Examples:
     >>> basis = BasisSet("custom-ecp", shells, ecp_shells, structure)
     >>> print(f"Basis with {len(shells)} shells and {len(ecp_shells)} ECP shells")
 )",
-           py::arg("name"), py::arg("shells"), py::arg("ecp_shells"),
-           py::arg("structure"),
-           py::arg("atomic_orbital_type") = AOType::Spherical)
-      .def(py::init<const std::string&, const std::vector<Shell>&,
-                    const std::string&, const std::vector<Shell>&,
-                    const std::vector<size_t>&, const Structure&, AOType>(),
-           R"(
+                py::arg("name"), py::arg("shells"), py::arg("ecp_shells"),
+                py::arg("structure"),
+                py::arg("atomic_orbital_type") = AOType::Spherical);
+  basis_set.def(
+      py::init<const std::string&, const std::vector<Shell>&,
+               const std::string&, const std::vector<Shell>&,
+               const std::vector<size_t>&, const Structure&, AOType>(),
+      R"(
 Constructor with basis set name, shells, ECP name, ECP shells, ECP electrons, structure, and basis type.
 
 Creates a complete basis set with regular shells, ECP shells, ECP metadata, and molecular structure.
@@ -320,12 +325,11 @@ Examples:
     >>> basis = BasisSet("custom-ecp", shells, "custom-ecp", ecp_shells, ecp_electrons, structure)
     >>> print(f"Basis with {len(shells)} shells, {len(ecp_shells)} ECP shells, ECP: {basis.get_ecp_name()}")
 )",
-           py::arg("name"), py::arg("shells"), py::arg("ecp_name"),
-           py::arg("ecp_shells"), py::arg("ecp_electrons"),
-           py::arg("structure"),
-           py::arg("atomic_orbital_type") = AOType::Spherical)
-      .def(py::init<const BasisSet&>(),
-           R"(
+      py::arg("name"), py::arg("shells"), py::arg("ecp_name"),
+      py::arg("ecp_shells"), py::arg("ecp_electrons"), py::arg("structure"),
+      py::arg("atomic_orbital_type") = AOType::Spherical);
+  basis_set.def(py::init<const BasisSet&>(),
+                R"(
 Copy constructor.
 
 Creates a deep copy of another basis set.
@@ -337,11 +341,11 @@ Examples:
     >>> original = BasisSet("cc-pVDZ")
     >>> copy = BasisSet(original)
     >>> print(f"Copied basis set: {copy.get_name()}")
-)")
+)");
 
-      // Basis type management
-      .def("get_atomic_orbital_type", &BasisSet::get_atomic_orbital_type,
-           R"(
+  // Basis type management
+  basis_set.def("get_atomic_orbital_type", &BasisSet::get_atomic_orbital_type,
+                R"(
 Get the basis type.
 
 Returns:
@@ -350,11 +354,11 @@ Returns:
 Examples:
     >>> atomic_orbital_type = basis_set.get_atomic_orbital_type()
     >>> print(f"Basis type: {atomic_orbital_type}")
-)")
+)");
 
-      // Shell access (read-only)
-      .def("get_shells", &BasisSet::get_shells,
-           R"(
+  // Shell access (read-only)
+  basis_set.def("get_shells", &BasisSet::get_shells,
+                R"(
 Get all shells (flattened from per-atom storage).
 
 Returns:
@@ -363,10 +367,10 @@ Returns:
 Examples:
     >>> shells = basis_set.get_shells()
     >>> print(f"Total shells: {len(shells)}")
-)")
+)");
 
-      .def("get_shells_for_atom", &BasisSet::get_shells_for_atom,
-           R"(
+  basis_set.def("get_shells_for_atom", &BasisSet::get_shells_for_atom,
+                R"(
 Get shells for a specific atom.
 
 Args:
@@ -379,10 +383,11 @@ Examples:
     >>> atom_shells = basis_set.get_shells_for_atom(0)
     >>> print(f"Atom 0 has {len(atom_shells)} shells")
 )",
-           py::arg("atom_index"), py::return_value_policy::reference_internal)
+                py::arg("atom_index"),
+                py::return_value_policy::reference_internal);
 
-      .def("get_shell", &BasisSet::get_shell,
-           R"(
+  basis_set.def("get_shell", &BasisSet::get_shell,
+                R"(
 Get a specific shell by global index.
 
 Args:
@@ -398,10 +403,11 @@ Examples:
     >>> shell = basis_set.get_shell(0)
     >>> print(f"First shell type: {shell.orbital_type}")
 )",
-           py::arg("shell_index"), py::return_value_policy::reference_internal)
+                py::arg("shell_index"),
+                py::return_value_policy::reference_internal);
 
-      .def("get_num_shells", &BasisSet::get_num_shells,
-           R"(
+  basis_set.def("get_num_shells", &BasisSet::get_num_shells,
+                R"(
 Get total number of shells across all atoms.
 
 Returns:
@@ -410,10 +416,10 @@ Returns:
 Examples:
     >>> n_shells = basis_set.get_num_shells()
     >>> print(f"Total shells: {n_shells}")
-)")
+)");
 
-      .def("get_num_atoms", &BasisSet::get_num_atoms,
-           R"(
+  basis_set.def("get_num_atoms", &BasisSet::get_num_atoms,
+                R"(
 Get number of atoms that have shells.
 
 Returns:
@@ -422,11 +428,11 @@ Returns:
 Examples:
     >>> n_atoms = basis_set.get_num_atoms()
     >>> print(f"Atoms with atomic orbitals: {n_atoms}")
-)")
+)");
 
-      // ECP shell access
-      .def("get_ecp_shells", &BasisSet::get_ecp_shells,
-           R"(
+  // ECP shell access
+  basis_set.def("get_ecp_shells", &BasisSet::get_ecp_shells,
+                R"(
 Get all ECP shells (flattened from per-atom storage).
 
 Returns:
@@ -435,10 +441,10 @@ Returns:
 Examples:
     >>> ecp_shells = basis_set.get_ecp_shells()
     >>> print(f"Total ECP shells: {len(ecp_shells)}")
-)")
+)");
 
-      .def("get_ecp_shells_for_atom", &BasisSet::get_ecp_shells_for_atom,
-           R"(
+  basis_set.def("get_ecp_shells_for_atom", &BasisSet::get_ecp_shells_for_atom,
+                R"(
 Get ECP shells for a specific atom.
 
 Args:
@@ -451,10 +457,11 @@ Examples:
     >>> ecp_atom_shells = basis_set.get_ecp_shells_for_atom(0)
     >>> print(f"Atom 0 has {len(ecp_atom_shells)} ECP shells")
 )",
-           py::arg("atom_index"), py::return_value_policy::reference_internal)
+                py::arg("atom_index"),
+                py::return_value_policy::reference_internal);
 
-      .def("get_ecp_shell", &BasisSet::get_ecp_shell,
-           R"(
+  basis_set.def("get_ecp_shell", &BasisSet::get_ecp_shell,
+                R"(
 Get a specific ECP shell by global index.
 
 Args:
@@ -470,10 +477,11 @@ Examples:
     >>> ecp_shell = basis_set.get_ecp_shell(0)
     >>> print(f"First ECP shell has {ecp_shell.get_num_primitives()} primitives")
 )",
-           py::arg("shell_index"), py::return_value_policy::reference_internal)
+                py::arg("shell_index"),
+                py::return_value_policy::reference_internal);
 
-      .def("get_num_ecp_shells", &BasisSet::get_num_ecp_shells,
-           R"(
+  basis_set.def("get_num_ecp_shells", &BasisSet::get_num_ecp_shells,
+                R"(
 Get total number of ECP shells across all atoms.
 
 Returns:
@@ -482,10 +490,10 @@ Returns:
 Examples:
     >>> n_ecp_shells = basis_set.get_num_ecp_shells()
     >>> print(f"Total ECP shells: {n_ecp_shells}")
-)")
+)");
 
-      .def("has_ecp_shells", &BasisSet::has_ecp_shells,
-           R"(
+  basis_set.def("has_ecp_shells", &BasisSet::has_ecp_shells,
+                R"(
 Check if this basis set has ECP shells.
 
 Returns:
@@ -494,11 +502,11 @@ Returns:
 Examples:
     >>> if basis_set.has_ecp_shells():
     ...     print("This basis set includes ECP shells")
-)")
+)");
 
-      // atomic orbital management
-      .def("get_atomic_orbital_info", &BasisSet::get_atomic_orbital_info,
-           R"(
+  // atomic orbital management
+  basis_set.def("get_atomic_orbital_info", &BasisSet::get_atomic_orbital_info,
+                R"(
 Get shell index and magnetic quantum number for a atomic orbital.
 
 Args:
@@ -511,9 +519,9 @@ Examples:
     >>> shell_idx, m_l = basis_set.get_atomic_orbital_info(5)
     >>> print(f"atomic orbital 5: shell {shell_idx}, m_l = {m_l}")
 )",
-           py::arg("atomic_orbital_index"))
-      .def("get_num_atomic_orbitals", &BasisSet::get_num_atomic_orbitals,
-           R"(
+                py::arg("atomic_orbital_index"));
+  basis_set.def("get_num_atomic_orbitals", &BasisSet::get_num_atomic_orbitals,
+                R"(
 Get total number of atomic orbitals in the basis set.
 
 Returns:
@@ -522,12 +530,12 @@ Returns:
 Examples:
     >>> n_basis = basis_set.get_num_atomic_orbitals()
     >>> print(f"Total atomic orbitals: {n_basis}")
-)")
+)");
 
-      // Atom mapping
-      .def("get_atom_index_for_atomic_orbital",
-           &BasisSet::get_atom_index_for_atomic_orbital,
-           R"(
+  // Atom mapping
+  basis_set.def("get_atom_index_for_atomic_orbital",
+                &BasisSet::get_atom_index_for_atomic_orbital,
+                R"(
 Get the atom index for a given atomic orbital.
 
 Args:
@@ -541,10 +549,10 @@ Examples:
     >>> atom_idx = basis_set.get_atom_index_for_atomic_orbital(3)
     >>> print(f"atomic orbital 3 belongs to atom {atom_idx}")
 )",
-           py::arg("atomic_orbital_index"))
-      .def("get_atomic_orbital_indices_for_atom",
-           &BasisSet::get_atomic_orbital_indices_for_atom,
-           R"(
+                py::arg("atomic_orbital_index"));
+  basis_set.def("get_atomic_orbital_indices_for_atom",
+                &BasisSet::get_atomic_orbital_indices_for_atom,
+                R"(
         Get all atomic orbital indices for a specific atom.
 
 Args:
@@ -557,9 +565,10 @@ Examples:
     >>> atomic_orbital_indices = basis_set.get_atomic_orbital_indices_for_atom(0)
     >>> print(f"Atom 0 has atomic orbitals: {atomic_orbital_indices}")
 )",
-           py::arg("atom_index"))
-      .def("get_shell_indices_for_atom", &BasisSet::get_shell_indices_for_atom,
-           R"(
+                py::arg("atom_index"));
+  basis_set.def("get_shell_indices_for_atom",
+                &BasisSet::get_shell_indices_for_atom,
+                R"(
 Get shell indices for a specific atom.
 
 Args:
@@ -572,10 +581,10 @@ Examples:
     >>> shell_indices = basis_set.get_shell_indices_for_atom(0)
     >>> print(f"Atom 0 has shells: {shell_indices}")
 )",
-           py::arg("atom_index"))
-      .def("get_num_atomic_orbitals_for_atom",
-           &BasisSet::get_num_atomic_orbitals_for_atom,
-           R"(
+                py::arg("atom_index"));
+  basis_set.def("get_num_atomic_orbitals_for_atom",
+                &BasisSet::get_num_atomic_orbitals_for_atom,
+                R"(
 Get number of atomic orbitals for a specific atom.
 
 Args:
@@ -588,16 +597,16 @@ Examples:
     >>> n_funcs = basis_set.get_num_atomic_orbitals_for_atom(0)
     >>> print(f"Atom 0 has {n_funcs} atomic orbitals")
 )",
-           py::arg("atom_index"))
+                py::arg("atom_index"));
 
-      // Orbital type mapping
-      .def("get_shell_indices_for_orbital_type",
-           &BasisSet::get_shell_indices_for_orbital_type,
-           R"(
+  // Orbital type mapping
+  basis_set.def("get_shell_indices_for_orbital_type",
+                &BasisSet::get_shell_indices_for_orbital_type,
+                R"(
 Get shell indices for a specific orbital type.
 
 Args:
-    orbital_type (OrbitalType): Type of orbital (S, P, D, F, etc.)
+    orbital_type (OrbitalType): Type of orbital (S, P, D, F, etc.);
 
 Returns:
     list[int]: Vector of shell indices with the specified orbital type
@@ -606,14 +615,14 @@ Examples:
     >>> p_shells = basis_set.get_shell_indices_for_orbital_type(OrbitalType.P)
     >>> print(f"P-shell indices: {p_shells}")
 )",
-           py::arg("orbital_type"))
-      .def("get_num_atomic_orbitals_for_orbital_type",
-           &BasisSet::get_num_atomic_orbitals_for_orbital_type,
-           R"(
+                py::arg("orbital_type"));
+  basis_set.def("get_num_atomic_orbitals_for_orbital_type",
+                &BasisSet::get_num_atomic_orbitals_for_orbital_type,
+                R"(
 Get total number of atomic orbitals for a specific orbital type.
 
 Args:
-    orbital_type (OrbitalType): Type of orbital (S, P, D, F, etc.)
+    orbital_type (OrbitalType): Type of orbital (S, P, D, F, etc.);
 
 Returns:
     int: Total number of atomic orbitals of the specified type
@@ -622,17 +631,17 @@ Examples:
     >>> n_p_funcs = basis_set.get_num_atomic_orbitals_for_orbital_type(OrbitalType.P)
     >>> print(f"Total P-type atomic orbitals: {n_p_funcs}")
 )",
-           py::arg("orbital_type"))
+                py::arg("orbital_type"));
 
-      // Combined queries
-      .def("get_shell_indices_for_atom_and_orbital_type",
-           &BasisSet::get_shell_indices_for_atom_and_orbital_type,
-           R"(
+  // Combined queries
+  basis_set.def("get_shell_indices_for_atom_and_orbital_type",
+                &BasisSet::get_shell_indices_for_atom_and_orbital_type,
+                R"(
 Get shell indices for a specific atom and orbital type.
 
 Args:
     atom_index (int): Index of the atom
-    orbital_type (OrbitalType): Type of orbital (S, P, D, F, etc.)
+    orbital_type (OrbitalType): Type of orbital (S, P, D, F, etc.);
 
 Returns:
     list[int]: Vector of shell indices matching both criteria
@@ -641,12 +650,12 @@ Examples:
     >>> p_shell_indices = basis_set.get_shell_indices_for_atom_and_orbital_type(0, OrbitalType.P)
     >>> print(f"P-shells on atom 0: {p_shell_indices}")
 )",
-           py::arg("atom_index"), py::arg("orbital_type"))
+                py::arg("atom_index"), py::arg("orbital_type"));
 
-      // ECP shell index queries
-      .def("get_ecp_shell_indices_for_atom",
-           &BasisSet::get_ecp_shell_indices_for_atom,
-           R"(
+  // ECP shell index queries
+  basis_set.def("get_ecp_shell_indices_for_atom",
+                &BasisSet::get_ecp_shell_indices_for_atom,
+                R"(
 Get ECP shell indices for a specific atom.
 
 Args:
@@ -659,15 +668,15 @@ Examples:
     >>> ecp_indices = basis_set.get_ecp_shell_indices_for_atom(0)
     >>> print(f"Atom 0 ECP shell indices: {ecp_indices}")
 )",
-           py::arg("atom_index"))
+                py::arg("atom_index"));
 
-      .def("get_ecp_shell_indices_for_orbital_type",
-           &BasisSet::get_ecp_shell_indices_for_orbital_type,
-           R"(
+  basis_set.def("get_ecp_shell_indices_for_orbital_type",
+                &BasisSet::get_ecp_shell_indices_for_orbital_type,
+                R"(
 Get ECP shell indices for a specific orbital type.
 
 Args:
-    orbital_type (OrbitalType): Type of orbital (S, P, D, F, etc.)
+    orbital_type (OrbitalType): Type of orbital (S, P, D, F, etc.);
 
 Returns:
     list[int]: Vector of ECP shell indices of this type
@@ -676,16 +685,16 @@ Examples:
     >>> s_ecp_indices = basis_set.get_ecp_shell_indices_for_orbital_type(OrbitalType.S)
     >>> print(f"S-type ECP shell indices: {s_ecp_indices}")
 )",
-           py::arg("orbital_type"))
+                py::arg("orbital_type"));
 
-      .def("get_ecp_shell_indices_for_atom_and_orbital_type",
-           &BasisSet::get_ecp_shell_indices_for_atom_and_orbital_type,
-           R"(
+  basis_set.def("get_ecp_shell_indices_for_atom_and_orbital_type",
+                &BasisSet::get_ecp_shell_indices_for_atom_and_orbital_type,
+                R"(
 Get ECP shell indices for a specific atom and orbital type.
 
 Args:
     atom_index (int): Index of the atom
-    orbital_type (OrbitalType): Type of orbital (S, P, D, F, etc.)
+    orbital_type (OrbitalType): Type of orbital (S, P, D, F, etc.);
 
 Returns:
     list[int]: Vector of ECP shell indices matching both criteria
@@ -694,23 +703,23 @@ Examples:
     >>> p_ecp_indices = basis_set.get_ecp_shell_indices_for_atom_and_orbital_type(0, OrbitalType.P)
     >>> print(f"P-type ECP shells on atom 0: {p_ecp_indices}")
 )",
-           py::arg("atom_index"), py::arg("orbital_type"))
+                py::arg("atom_index"), py::arg("orbital_type"));
 
-      // Basis set metadata
-      .def("get_name", &BasisSet::get_name,
-           R"(
+  // Basis set metadata
+  basis_set.def("get_name", &BasisSet::get_name,
+                R"(
 Get the basis set name.
 
 Returns:
-    str: Name of the basis set (e.g., "6-31G", "cc-pVDZ")
+    str: Name of the basis set (e.g., "6-31G", "cc-pVDZ");
 
 Examples:
     >>> name = basis_set.get_name()
     >>> print(f"Using basis set: {name}")
-)")
+)");
 
-      .def("get_structure", &BasisSet::get_structure,
-           R"(
+  basis_set.def("get_structure", &BasisSet::get_structure,
+                R"(
 Get the molecular structure.
 
 Returns:
@@ -723,10 +732,10 @@ Examples:
     >>> structure = basis_set.get_structure()
     >>> print(f"Number of atoms: {structure.get_num_atoms()}")
 )",
-           py::return_value_policy::reference_internal)
+                py::return_value_policy::reference_internal);
 
-      .def("has_structure", &BasisSet::has_structure,
-           R"(
+  basis_set.def("has_structure", &BasisSet::has_structure,
+                R"(
 Check if a structure is associated with this basis set.
 
 Returns:
@@ -737,22 +746,22 @@ Examples:
     ...     structure = basis_set.get_structure()
     ... else:
     ...     print("No structure associated with basis set")
-)")
+)");
 
-      .def("get_ecp_name", &BasisSet::get_ecp_name,
-           R"(
+  basis_set.def("get_ecp_name", &BasisSet::get_ecp_name,
+                R"(
 Get the ECP (Effective Core Potential) name.
 
 Returns:
-    str: Name of the ECP (basis set)
+    str: Name of the ECP (basis set);
 
 Examples:
     >>> ecp_name = basis_set.get_ecp_name()
     >>> print(f"ECP: {ecp_name}")
-)")
+)");
 
-      .def("get_ecp_electrons", &BasisSet::get_ecp_electrons,
-           R"(
+  basis_set.def("get_ecp_electrons", &BasisSet::get_ecp_electrons,
+                R"(
 Get the ECP (Effective Core Potential) electrons vector.
 
 Returns:
@@ -761,10 +770,10 @@ Returns:
 Examples:
     >>> ecp_electrons = basis_set.get_ecp_electrons()
     >>> print(f"ECP electrons per atom: {ecp_electrons}")
-)")
+)");
 
-      .def("has_ecp_electrons", &BasisSet::has_ecp_electrons,
-           R"(
+  basis_set.def("has_ecp_electrons", &BasisSet::has_ecp_electrons,
+                R"(
 Check if ECP (Effective Core Potential) electrons are present.
 
 Returns:
@@ -774,10 +783,10 @@ Examples:
     >>> if basis_set.has_ecp_electrons():
     ...     ecp_electrons = basis_set.get_ecp_electrons()
     ...     print(f"ECP electrons per atom: {ecp_electrons}")
-)")
+)");
 
-      .def("get_summary", &BasisSet::get_summary,
-           R"(
+  basis_set.def("get_summary", &BasisSet::get_summary,
+                R"(
 Get summary string of basis set information.
 
 Returns:
@@ -786,15 +795,13 @@ Returns:
 Examples:
     >>> summary = basis_set.get_summary()
     >>> print(summary)
-)")
+)");
 
-      // Serialization
-      .def(
-          "to_json",
-          [](const BasisSet& self) -> std::string {
-            return self.to_json().dump();
-          },
-          R"(
+  // Serialization
+  basis_set.def(
+      "to_json",
+      [](const BasisSet& self) -> std::string { return self.to_json().dump(); },
+      R"(
 Convert basis set to JSON string.
 
 Serializes all basis set information to a JSON string format.
@@ -809,13 +816,13 @@ Raises:
 Examples:
     >>> json_str = basis_set.to_json()
     >>> print(json_str)  # Pretty-printed JSON
-)")
-      .def_static(
-          "from_json",
-          [](const std::string& json_str) -> BasisSet {
-            return *BasisSet::from_json(nlohmann::json::parse(json_str));
-          },
-          R"(
+)");
+  basis_set.def_static(
+      "from_json",
+      [](const std::string& json_str) -> BasisSet {
+        return *BasisSet::from_json(nlohmann::json::parse(json_str));
+      },
+      R"(
 Load basis set from JSON string.
 
 Parses basis set data from a JSON string and returns a new BasisSet instance.
@@ -833,10 +840,10 @@ Raises:
 Examples:
     >>> basis_set = BasisSet.from_json('{"name": "STO-3G", "shells": [...]}')
 )",
-          py::arg("json_str"))
-      // Serialization
-      .def("to_file", basis_set_to_file_wrapper,
-           R"(
+      py::arg("json_str"));
+  // Serialization
+  basis_set.def("to_file", basis_set_to_file_wrapper,
+                R"(
 Save basis set to file with specified format.
 
 Generic method to save basis set data to a file. The format is determined by
@@ -844,8 +851,8 @@ the 'type' parameter.
 
 Args:
     filename (str | pathlib.Path): Path to the file to write.
-        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.json``, ``cc-pvdz.basis_set.h5``)
-    type (str): File format type ("json" or "hdf5")
+        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.json``, ``cc-pvdz.basis_set.h5``);
+    type (str): File format type ("json" or "hdf5");
 
 Raises:
     RuntimeError: If the basis set data is invalid, unsupported type, or file cannot be opened/written
@@ -856,9 +863,9 @@ Examples:
     >>> from pathlib import Path
     >>> basis_set.to_file(Path("sto-3g.basis_set.json"), "json")
 )",
-           py::arg("filename"), py::arg("type"))
-      .def_static("from_file", basis_set_from_file_wrapper,
-                  R"(
+                py::arg("filename"), py::arg("type"));
+  basis_set.def_static("from_file", basis_set_from_file_wrapper,
+                       R"(
 Load basis set from file with specified format.
 
 Generic method to load basis set data from a file. The format is determined by
@@ -866,8 +873,8 @@ the 'type' parameter.
 
 Args:
     filename (str | pathlib.Path): Path to the file to read.
-        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.json``, ``cc-pvdz.basis_set.h5``)
-    type (str): File format type ("json" or "hdf5")
+        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.json``, ``cc-pvdz.basis_set.h5``);
+    type (str): File format type ("json" or "hdf5");
 
 Returns:
     BasisSet: New BasisSet instance loaded from file
@@ -879,9 +886,9 @@ Examples:
     >>> basis_set = BasisSet.from_file("sto-3g.basis_set.json", "json")
     >>> basis_set = BasisSet.from_file("cc-pvdz.basis_set.h5", "hdf5")
 )",
-                  py::arg("filename"), py::arg("type"))
-      .def("to_hdf5_file", basis_set_to_hdf5_file_wrapper,
-           R"(
+                       py::arg("filename"), py::arg("type"));
+  basis_set.def("to_hdf5_file", basis_set_to_hdf5_file_wrapper,
+                R"(
 Save basis set to HDF5 file (with validation).
 
 Writes all basis set data to an HDF5 file, preserving numerical precision.
@@ -890,7 +897,7 @@ data structures, making it ideal for storing basis set information.
 
 Args:
     filename (str | pathlib.Path): Path to the HDF5 file to write.
-        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.h5``, ``cc-pvdz.basis_set.hdf5``)
+        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.h5``, ``cc-pvdz.basis_set.hdf5``);
 
 Raises:
     ValueError: If filename doesn't follow the required naming convention
@@ -902,9 +909,9 @@ Examples:
     >>> from pathlib import Path
     >>> basis_set.to_hdf5_file(Path("sto-3g.basis_set.h5"))
 )",
-           py::arg("filename"))
-      .def_static("from_hdf5_file", basis_set_from_hdf5_file_wrapper,
-                  R"(
+                py::arg("filename"));
+  basis_set.def_static("from_hdf5_file", basis_set_from_hdf5_file_wrapper,
+                       R"(
 Load basis set from HDF5 file (with validation).
 
 Reads basis set data from an HDF5 file and returns a new BasisSet instance.
@@ -912,7 +919,7 @@ The file should contain data in the format produced by ``to_hdf5_file()``.
 
 Args:
     filename (str | pathlib.Path): Path to the HDF5 file to read.
-        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.h5``, ``cc-pvdz.basis_set.hdf5``)
+        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.h5``, ``cc-pvdz.basis_set.hdf5``);
 
 Returns:
     BasisSet: New ``BasisSet`` instance loaded from file
@@ -925,9 +932,9 @@ Examples:
     >>> basis_set = BasisSet.from_hdf5_file("sto-3g.basis_set.h5")
     >>> basis_set = BasisSet.from_hdf5_file("cc-pvdz.basis_set.hdf5")
 )",
-                  py::arg("filename"))
-      .def("to_json_file", basis_set_to_json_file_wrapper,
-           R"(
+                       py::arg("filename"));
+  basis_set.def("to_json_file", basis_set_to_json_file_wrapper,
+                R"(
 Save basis set to JSON file (with validation).
 
 Writes all basis set data to a JSON file with pretty formatting.
@@ -935,7 +942,7 @@ The file will be created or overwritten if it already exists.
 
 Args:
     filename (str): Path to the JSON file to write.
-        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.json``, ``cc-pvdz.basis_set.json``)
+        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.json``, ``cc-pvdz.basis_set.json``);
 
 Raises:
     ValueError: If filename doesn't follow the required naming convention
@@ -945,10 +952,10 @@ Examples:
     >>> basis_set.to_json_file("sto-3g.basis_set.json")
     >>> basis_set.to_json_file("my_basis.basis_set.json")
 )",
-           py::arg("filename"))
+                py::arg("filename"));
 
-      .def_static("from_json_file", basis_set_from_json_file_wrapper,
-                  R"(
+  basis_set.def_static("from_json_file", basis_set_from_json_file_wrapper,
+                       R"(
 Load basis set from JSON file (with validation).
 
 Reads basis set data from a JSON file and returns a new BasisSet instance.
@@ -956,7 +963,7 @@ The file should contain JSON data in the format produced by ``to_json_file()``.
 
 Args:
     filename (str): Path to the JSON file to read.
-        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.json``, ``cc-pvdz.basis_set.json``)
+        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.json``, ``cc-pvdz.basis_set.json``);
 
 Returns:
     BasisSet: New ``BasisSet`` instance loaded from file
@@ -969,11 +976,11 @@ Examples:
     >>> basis_set = BasisSet.from_json_file("sto-3g.basis_set.json")
     >>> basis_set = BasisSet.from_json_file("my_basis.basis_set.json")
 )",
-                  py::arg("filename"))
+                       py::arg("filename"));
 
-      .def_static("get_supported_basis_set_names",
-                  &BasisSet::get_supported_basis_set_names,
-                  R"(
+  basis_set.def_static("get_supported_basis_set_names",
+                       &BasisSet::get_supported_basis_set_names,
+                       R"(
 Get list of supported basis set names.
 
 Returns:
@@ -981,16 +988,16 @@ Returns:
 
 Examples:
     >>> supported = BasisSet.get_supported_basis_set_names()
-)")
-      .def_static("get_supported_elements_for_basis_set",
-                  &BasisSet::get_supported_elements_for_basis_set,
-                  R"(
+)");
+  basis_set.def_static("get_supported_elements_for_basis_set",
+                       &BasisSet::get_supported_elements_for_basis_set,
+                       R"(
 Get list of supported elements for a given basis set.
 
 Returns all elements that are defined for the specified basis set.
 
 Args:
-    basis_name (str): Name of the basis set (e.g., "sto-3g", "cc-pvdz")
+    basis_name (str): Name of the basis set (e.g., "sto-3g", "cc-pvdz");
 
 Returns:
     list[Element]: Vector of supported elements as Element enum values
@@ -999,18 +1006,18 @@ Examples:
     >>> elements = BasisSet.get_supported_elements_for_basis_set("sto-3g")
     >>> print(f"STO-3G supports: {[elem.name for elem in elements]}")
 )",
-                  py::arg("basis_name"))
-      .def_static("from_basis_name",
-                  py::overload_cast<const std::string&, const Structure&,
-                                    const std::string&, AOType>(
-                      &BasisSet::from_basis_name),
-                  R"(
+                       py::arg("basis_name"));
+  basis_set.def_static(
+      "from_basis_name",
+      py::overload_cast<const std::string&, const Structure&,
+                        const std::string&, AOType>(&BasisSet::from_basis_name),
+      R"(
 Create a basis set by name for a molecular structure.
 
 Loads a standard basis set (e.g., "sto-3g", "cc-pvdz") for all atoms in the structure.
 
 Args:
-    basis_name (str): Name of the basis set (e.g., "sto-3g", "cc-pvdz", "6-31g")
+    basis_name (str): Name of the basis set (e.g., "sto-3g", "cc-pvdz", "6-31g");
     structure (Structure): Molecular structure
     ecp_name (str, optional): Name of the ECP basis set. Default is "default_ecp"
     atomic_orbital_type (AOType, optional): Whether to use spherical or Cartesian atomic orbitals.
@@ -1028,16 +1035,16 @@ Examples:
     >>> basis = BasisSet.from_basis_name("sto-3g", structure)
     >>> print(f"Created {basis.get_name()} basis with {basis.get_num_shells()} shells")
 )",
-                  py::arg("basis_name"), py::arg("structure"),
-                  py::arg("ecp_name") = BasisSet::default_ecp_name,
-                  py::arg("atomic_orbital_type") = AOType::Spherical)
-      .def_static(
-          "from_element_map",
-          py::overload_cast<const std::map<std::string, std::string>&,
-                            const Structure&,
-                            const std::map<std::string, std::string>&, AOType>(
-              &BasisSet::from_element_map),
-          R"(
+      py::arg("basis_name"), py::arg("structure"),
+      py::arg("ecp_name") = BasisSet::default_ecp_name,
+      py::arg("atomic_orbital_type") = AOType::Spherical);
+  basis_set.def_static(
+      "from_element_map",
+      py::overload_cast<const std::map<std::string, std::string>&,
+                        const Structure&,
+                        const std::map<std::string, std::string>&, AOType>(
+          &BasisSet::from_element_map),
+      R"(
 Create a basis set with different basis sets per element.
 
 Allows specifying different basis sets for different elements in the structure.
@@ -1064,16 +1071,15 @@ Examples:
     >>> basis = BasisSet.from_element_map(basis_map, structure)
     >>> print(f"Created custom basis with {basis.get_num_shells()} shells")
 )",
-          py::arg("element_to_basis_map"), py::arg("structure"),
-          py::arg("element_to_ecp_map") = std::map<std::string, std::string>{},
-          py::arg("atomic_orbital_type") = AOType::Spherical)
-      .def_static(
-          "from_index_map",
-          py::overload_cast<const std::map<size_t, std::string>&,
-                            const Structure&,
-                            const std::map<size_t, std::string>&, AOType>(
-              &BasisSet::from_index_map),
-          R"(
+      py::arg("element_to_basis_map"), py::arg("structure"),
+      py::arg("element_to_ecp_map") = std::map<std::string, std::string>{},
+      py::arg("atomic_orbital_type") = AOType::Spherical);
+  basis_set.def_static(
+      "from_index_map",
+      py::overload_cast<const std::map<size_t, std::string>&, const Structure&,
+                        const std::map<size_t, std::string>&, AOType>(
+          &BasisSet::from_index_map),
+      R"(
 Create a basis set with different basis sets per atom index.
 
 Allows specifying different basis sets for individual atoms by their index.
@@ -1100,32 +1106,34 @@ Examples:
     >>> basis = BasisSet.from_index_map(basis_map, structure)
     >>> print(f"Created custom basis with {basis.get_num_shells()} shells")
 )",
-          py::arg("index_to_basis_map"), py::arg("structure"),
-          py::arg("index_to_ecp_map") = std::map<size_t, std::string>{},
-          py::arg("atomic_orbital_type") = AOType::Spherical)
+      py::arg("index_to_basis_map"), py::arg("structure"),
+      py::arg("index_to_ecp_map") = std::map<size_t, std::string>{},
+      py::arg("atomic_orbital_type") = AOType::Spherical);
 
-      // Utility functions (static methods)
-      .def_static("orbital_type_to_string", &BasisSet::orbital_type_to_string,
-                  R"(
+  // Utility functions (static methods);
+  basis_set.def_static("orbital_type_to_string",
+                       &BasisSet::orbital_type_to_string,
+                       R"(
 Convert orbital type enum to string representation.
 
 Args:
     orbital_type (OrbitalType): The orbital type enum value
 
 Returns:
-    str: String representation (e.g., "S", "P", "D", "F")
+    str: String representation (e.g., "S", "P", "D", "F");
 
 Examples:
     >>> orbital_str = BasisSet.orbital_type_to_string(OrbitalType.P)
     >>> print(f"Orbital type: {orbital_str}")  # Prints "P"
 )",
-                  py::arg("orbital_type"))
-      .def_static("string_to_orbital_type", &BasisSet::string_to_orbital_type,
-                  R"(
+                       py::arg("orbital_type"));
+  basis_set.def_static("string_to_orbital_type",
+                       &BasisSet::string_to_orbital_type,
+                       R"(
 Convert string to orbital type enum.
 
 Args:
-    orbital_string (str): String representation of orbital type (e.g., "S", "P", "D")
+    orbital_string (str): String representation of orbital type (e.g., "S", "P", "D");
 
 Returns:
     OrbitalType: Corresponding orbital type enum
@@ -1137,16 +1145,16 @@ Examples:
     >>> orbital_type = BasisSet.string_to_orbital_type("P")
     >>> print(orbital_type)  # OrbitalType.P
 )",
-                  py::arg("orbital_string"))
-      .def_static("l_to_orbital_type", &BasisSet::l_to_orbital_type,
-                  R"(
+                       py::arg("orbital_string"));
+  basis_set.def_static("l_to_orbital_type", &BasisSet::l_to_orbital_type,
+                       R"(
 Get orbital type for angular momentum quantum number.
 
 Args:
     l (int): Angular momentum quantum number
 
 Returns:
-    OrbitalType: Corresponding orbital type (S, P, D, etc.)
+    OrbitalType: Corresponding orbital type (S, P, D, etc.);
 
 Raises:
     ValueError: If l is negative or exceeds supported range
@@ -1155,24 +1163,25 @@ Examples:
     >>> orbital_type = BasisSet.l_to_orbital_type(2)
     >>> print(f"l=2 corresponds to orbital type: {orbital_type}")  # D
 )",
-                  py::arg("l"))
-      .def_static("get_angular_momentum", &BasisSet::get_angular_momentum,
-                  R"(
+                       py::arg("l"));
+  basis_set.def_static("get_angular_momentum", &BasisSet::get_angular_momentum,
+                       R"(
 Get angular momentum quantum number for orbital type.
 
 Args:
     orbital_type (OrbitalType): The orbital type
 
 Returns:
-    int: Angular momentum quantum number l (0=s, 1=p, 2=d, etc.)
+    int: Angular momentum quantum number l (0=s, 1=p, 2=d, etc.);
 
 Examples:
     >>> l = BasisSet.get_angular_momentum(OrbitalType.D)
     >>> print(f"D orbital has l = {l}")  # l = 2
 )",
-                  py::arg("orbital_type"))
-      .def_static("get_num_orbitals_for_l", &BasisSet::get_num_orbitals_for_l,
-                  R"(
+                       py::arg("orbital_type"));
+  basis_set.def_static(
+      "get_num_orbitals_for_l", &BasisSet::get_num_orbitals_for_l,
+      R"(
 Get number of orbitals for given angular momentum.
 
 Args:
@@ -1189,31 +1198,30 @@ Examples:
     >>> n_cart = BasisSet.get_num_orbitals_for_l(2, AOType.Cartesian)  # 6
     >>> print(f"d orbitals: {n_sph} spherical, {n_cart} Cartesian")
 )",
-                  py::arg("l"),
-                  py::arg("atomic_orbital_type") = AOType::Spherical)
-      .def_static("atomic_orbital_type_to_string",
-                  &BasisSet::atomic_orbital_type_to_string,
-                  R"(
+      py::arg("l"), py::arg("atomic_orbital_type") = AOType::Spherical);
+  basis_set.def_static("atomic_orbital_type_to_string",
+                       &BasisSet::atomic_orbital_type_to_string,
+                       R"(
 Convert basis type enum to string representation.
 
 Args:
     atomic_orbital_type (AOType): The basis type enum value
 
 Returns:
-    str: String representation ("Spherical" or "Cartesian")
+    str: String representation ("Spherical" or "Cartesian");
 
 Examples:
     >>> basis_str = BasisSet.atomic_orbital_type_to_string(AOType.Spherical)
     >>> print(f"Basis type: {basis_str}")  # Prints "Spherical"
 )",
-                  py::arg("atomic_orbital_type"))
-      .def_static("string_to_atomic_orbital_type",
-                  &BasisSet::string_to_atomic_orbital_type,
-                  R"(
+                       py::arg("atomic_orbital_type"));
+  basis_set.def_static("string_to_atomic_orbital_type",
+                       &BasisSet::string_to_atomic_orbital_type,
+                       R"(
 Convert string to basis type enum.
 
 Args:
-    basis_string (str): String representation ("Spherical" or "Cartesian")
+    basis_string (str): String representation ("Spherical" or "Cartesian");
 
 Returns:
     AOType: Corresponding basis type enum
@@ -1225,11 +1233,11 @@ Examples:
     >>> atomic_orbital_type = BasisSet.string_to_atomic_orbital_type("Cartesian")
     >>> print(atomic_orbital_type)  # AOType.Cartesian
 )",
-                  py::arg("basis_string"))
+                       py::arg("basis_string"));
 
-      // Index conversion utilities
-      .def("basis_to_shell_index", &BasisSet::basis_to_shell_index,
-           R"(
+  // Index conversion utilities
+  basis_set.def("basis_to_shell_index", &BasisSet::basis_to_shell_index,
+                R"(
 Convert atomic orbital index to shell index and local function index.
 
 Args:
@@ -1242,44 +1250,47 @@ Examples:
     >>> shell_idx, local_idx = basis_set.basis_to_shell_index(7)
     >>> print(f"atomic orbital 7: shell {shell_idx}, local index {local_idx}")
 )",
-           py::arg("atomic_orbital_index"))
+                py::arg("atomic_orbital_index"));
 
-      // String representation - bind summary to __repr__
-      .def("__repr__", [](const BasisSet& b) { return b.get_summary(); })
+  // String representation - bind summary to __repr__
+  basis_set.def("__repr__", [](const BasisSet& b) { return b.get_summary(); });
 
-      .def("__str__", [](const BasisSet& b) { return b.get_summary(); })
+  basis_set.def("__str__", [](const BasisSet& b) { return b.get_summary(); });
 
-      // Pickling support using JSON serialization
-      .def(py::pickle(
-          [](const BasisSet& b) -> std::string {
-            // Return JSON string for pickling
-            return b.to_json().dump();
-          },
-          [](const std::string& json_str) -> BasisSet {
-            // Reconstruct from JSON string
-            return *BasisSet::from_json(nlohmann::json::parse(json_str));
-          }))
+  // Pickling support using JSON serialization
+  basis_set.def(py::pickle(
+      [](const BasisSet& b) -> std::string {
+        // Return JSON string for pickling
+        return b.to_json().dump();
+      },
+      [](const std::string& json_str) -> BasisSet {
+        // Reconstruct from JSON string
+        return *BasisSet::from_json(nlohmann::json::parse(json_str));
+      }));
 
-      // Static constant variables
-      .def_readonly_static("custom_name", &BasisSet::custom_name,
-                           R"(
+  // Static constant variables
+  basis_set.def_readonly_static("custom_name", &BasisSet::custom_name,
+                                R"(
 Name used for custom basis sets.
 
 Type:
     str
-)")
-      .def_readonly_static("custom_ecp_name", &BasisSet::custom_ecp_name,
-                           R"(
+)");
+  basis_set.def_readonly_static("custom_ecp_name", &BasisSet::custom_ecp_name,
+                                R"(
 Name used for custom ECP basis sets.
 
 Type:
     str
-)")
-      .def_readonly_static("default_ecp_name", &BasisSet::default_ecp_name,
-                           R"(
+)");
+  basis_set.def_readonly_static("default_ecp_name", &BasisSet::default_ecp_name,
+                                R"(
 Default name for ECP basis sets.
 
 Type:
     str
 )");
+
+  // Data type name class attribute
+  basis_set.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(BasisSet);
 }

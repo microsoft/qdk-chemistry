@@ -1807,3 +1807,16 @@ TEST_F(BasisSetTest, BasisSetNameNormalization) {
   EXPECT_EQ("def2-TZVP", detail::normalize_basis_set_name("def2-TZVP"));
   EXPECT_EQ("def2-TZVP", detail::denormalize_basis_set_name("def2-TZVP"));
 }
+
+TEST_F(BasisSetTest, DataTypeName) {
+  // Test that BasisSet has the correct data type name
+  std::vector<Shell> shells;
+  shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{2.0}));
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}};
+  std::vector<std::string> symbols = {"H"};
+  Structure structure(coords, symbols);
+  BasisSet basis("6-31G", shells, structure);
+
+  EXPECT_EQ(basis.get_data_type_name(), "basis_set");
+}

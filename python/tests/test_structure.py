@@ -850,3 +850,9 @@ class TestStructurePicklingAndRepr:
         assert original_repr == unpickled_repr
         assert "Number of atoms: 2" in unpickled_repr
         assert "N" in unpickled_repr
+
+
+def test_structure_data_type_name():
+    """Test that Structure has the correct _data_type_name class attribute."""
+    assert hasattr(Structure, "_data_type_name")
+    assert Structure._data_type_name == "structure"

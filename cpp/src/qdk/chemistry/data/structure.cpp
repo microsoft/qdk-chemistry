@@ -11,6 +11,7 @@
 #include <qdk/chemistry/data/element_data.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
@@ -474,9 +475,12 @@ std::shared_ptr<Structure> Structure::from_json(const nlohmann::json& j) {
 
 void Structure::to_json_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, "structure");
+  std::string validated_filename = DataTypeFilename::validate_write_suffix(
+      filename, DATACLASS_TO_SNAKE_CASE(Structure));
 
   _to_json_file(validated_filename);
 }
@@ -484,6 +488,9 @@ void Structure::to_json_file(const std::string& filename) const {
 std::shared_ptr<Structure> Structure::from_json_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "structure");
@@ -1052,9 +1059,12 @@ std::shared_ptr<Structure> Structure::from_hdf5(H5::Group& group) {
 
 void Structure::to_hdf5_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, "structure");
+  std::string validated_filename = DataTypeFilename::validate_write_suffix(
+      filename, DATACLASS_TO_SNAKE_CASE(Structure));
 
   _to_hdf5_file(validated_filename);
 }
@@ -1062,6 +1072,9 @@ void Structure::to_hdf5_file(const std::string& filename) const {
 std::shared_ptr<Structure> Structure::from_hdf5_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "structure");

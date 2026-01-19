@@ -8,6 +8,7 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -383,4 +384,7 @@ Raises:
         // __setstate__ - deserialize from JSON string
         return *Ansatz::from_json(nlohmann::json::parse(json_str));
       }));
+
+  // Data type name class attribute
+  ansatz.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Ansatz);
 }

@@ -534,7 +534,7 @@ TEST_F(WavefunctionSerializationTest, JSONSerializationSCIComplex) {
 
 TEST_F(WavefunctionSerializationTest, HDF5SerializationCASReal) {
   // Test HDF5 serialization for real CAS wavefunction
-  std::string filename = "test_wavefunction_cas_real.h5";
+  std::string filename = "test_wavefunction_cas_real.wavefunction.h5";
 
   // Save to HDF5 file
   cas_real->to_hdf5_file(filename);
@@ -560,7 +560,7 @@ TEST_F(WavefunctionSerializationTest, HDF5SerializationCASReal) {
 
 TEST_F(WavefunctionSerializationTest, HDF5SerializationCASComplex) {
   // Test HDF5 serialization for complex CAS wavefunction
-  std::string filename = "test_wavefunction_cas_complex.h5";
+  std::string filename = "test_wavefunction_cas_complex.wavefunction.h5";
 
   // Save to HDF5 file
   cas_complex->to_hdf5_file(filename);
@@ -581,7 +581,7 @@ TEST_F(WavefunctionSerializationTest, HDF5SerializationCASComplex) {
 
 TEST_F(WavefunctionSerializationTest, HDF5SerializationSlaterDeterminant) {
   // Test HDF5 serialization for Slater determinant wavefunction
-  std::string filename = "test_wavefunction_sd.h5";
+  std::string filename = "test_wavefunction_sd.wavefunction.h5";
 
   // Save to HDF5 file
   sd_wavefunction->to_hdf5_file(filename);
@@ -601,7 +601,7 @@ TEST_F(WavefunctionSerializationTest, HDF5SerializationSlaterDeterminant) {
 
 TEST_F(WavefunctionSerializationTest, HDF5SerializationSCIReal) {
   // Test HDF5 serialization for real SCI wavefunction
-  std::string filename = "test_wavefunction_sci_real.h5";
+  std::string filename = "test_wavefunction_sci_real.wavefunction.h5";
 
   // Save to HDF5 file
   sci_real->to_hdf5_file(filename);
@@ -630,7 +630,7 @@ TEST_F(WavefunctionSerializationTest, HDF5SerializationSCIReal) {
 
 TEST_F(WavefunctionSerializationTest, HDF5SerializationSCIComplex) {
   // Test HDF5 serialization for complex SCI wavefunction
-  std::string filename = "test_wavefunction_sci_complex.h5";
+  std::string filename = "test_wavefunction_sci_complex.wavefunction.h5";
 
   // Save to HDF5 file
   sci_complex->to_hdf5_file(filename);
@@ -658,7 +658,7 @@ TEST_F(WavefunctionSerializationTest, HDF5SerializationSCIComplex) {
 
 TEST_F(WavefunctionSerializationTest, JSONFileIO) {
   // Test JSON file I/O
-  std::string filename = "test_wavefunction.json";
+  std::string filename = "test_wavefunction.wavefunction.json";
 
   // Save to JSON file
   cas_real->to_json_file(filename);
@@ -678,8 +678,8 @@ TEST_F(WavefunctionSerializationTest, JSONFileIO) {
 
 TEST_F(WavefunctionSerializationTest, GenericFileIO) {
   // Test generic file I/O with different formats
-  std::string json_filename = "test_wavefunction_generic.json";
-  std::string hdf5_filename = "test_wavefunction_generic.h5";
+  std::string json_filename = "test_wavefunction_generic.wavefunction.json";
+  std::string hdf5_filename = "test_wavefunction_generic.wavefunction.h5";
 
   // Test JSON format
   cas_real->to_file(json_filename, "json");
@@ -694,8 +694,9 @@ TEST_F(WavefunctionSerializationTest, GenericFileIO) {
   EXPECT_NEAR(wf_hdf5->norm(), cas_real->norm(), testing::wf_tolerance);
 
   // Test invalid format
-  EXPECT_THROW(cas_real->to_file("test.xyz", "xyz"), std::invalid_argument);
-  EXPECT_THROW(Wavefunction::from_file("test.xyz", "xyz"),
+  EXPECT_THROW(cas_real->to_file("test.wavefunction.xyz", "xyz"),
+               std::invalid_argument);
+  EXPECT_THROW(Wavefunction::from_file("test.wavefunction.xyz", "xyz"),
                std::invalid_argument);
 
   // Clean up
@@ -911,4 +912,9 @@ TEST_F(WavefunctionActiveSpaceConversionTest, SlaterDeterminantContainer) {
   // Convert back to active
   Configuration recovered_active = wf->get_active_determinant(total_det);
   EXPECT_EQ(recovered_active.to_string(), active_det1.to_string());
+}
+
+TEST_F(WavefunctionCoreTest, DataTypeName) {
+  // Test that Wavefunction has the correct data type name
+  EXPECT_EQ(wf->get_data_type_name(), "wavefunction");
 }

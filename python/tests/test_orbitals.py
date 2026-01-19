@@ -952,3 +952,9 @@ def test_model_orbitals_pickling_and_repr():
 
     assert unpickled_unres.is_unrestricted() == original_unres.is_unrestricted()
     assert not unpickled_unres.is_restricted()
+
+
+def test_orbitals_data_type_name():
+    """Test that Orbitals has the correct _data_type_name class attribute."""
+    assert hasattr(Orbitals, "_data_type_name")
+    assert Orbitals._data_type_name == "orbitals"

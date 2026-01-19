@@ -1669,3 +1669,11 @@ TEST_F(HamiltonianTest, GetContainerTypedAccess) {
   // Test that accessing with incorrect container type throws std::bad_cast
   EXPECT_THROW(h.get_container<DummyHamiltonianContainer>(), std::bad_cast);
 }
+
+TEST_F(HamiltonianTest, DataTypeName) {
+  // Test that Hamiltonian has the correct data type name
+  Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
+
+  EXPECT_EQ(h.get_data_type_name(), "hamiltonian");
+}

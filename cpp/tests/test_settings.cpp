@@ -959,3 +959,9 @@ TEST_F(SettingsTest, MetadataFunctions) {
   EXPECT_FALSE(meta_settings.is_documented("undocumented"));
   EXPECT_THROW(meta_settings.is_documented("nonexistent"), SettingNotFound);
 }
+
+TEST(SettingsDataTypeNameTest, DataTypeName) {
+  // Test that Settings has the correct data type name
+  BasicTestSettings settings;
+  EXPECT_EQ(settings.get_data_type_name(), "settings");
+}

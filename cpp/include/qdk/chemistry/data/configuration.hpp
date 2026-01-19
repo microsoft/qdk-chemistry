@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <nlohmann/json_fwd.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -174,6 +175,14 @@ class Configuration : public DataClass {
    * @return Number of spatial orbitals the configuration can represent
    */
   size_t get_orbital_capacity() const;
+
+  /**
+   * @brief Get the data type name for this class
+   * @return "configuration"
+   */
+  std::string get_data_type_name() const override {
+    return DATACLASS_TO_SNAKE_CASE(Configuration);
+  }
 
   /**
    * @brief Check if a specific orbital has an alpha electron

@@ -11,6 +11,7 @@
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/settings.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 
@@ -2420,6 +2421,9 @@ Examples:
     >>> settings.from_file(Path("config.settings.json"), "json")
 )",
                       py::arg("filename"), py::arg("format_type"));
+
+  // Data type name class attribute
+  settings.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Settings);
 
   // Bind ElectronicStructureSettings class
   py::class_<qdk::chemistry::algorithms::ElectronicStructureSettings, Settings,

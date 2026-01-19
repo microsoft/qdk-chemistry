@@ -446,3 +446,17 @@ TEST_F(ConfigurationSetTest, NullOrbitalsRejected) {
   // Should throw - null orbitals pointer
   EXPECT_THROW(ConfigurationSet(configs, nullptr), std::invalid_argument);
 }
+
+TEST_F(ConfigurationTest, DataTypeName) {
+  // Test that Configuration has the correct data type name
+  Configuration config("ud0000");
+  EXPECT_EQ(config.get_data_type_name(), "configuration");
+}
+
+TEST_F(ConfigurationSetTest, DataTypeName) {
+  // Test that ConfigurationSet has the correct data type name
+  std::vector<Configuration> configs = {Configuration("2ud0")};
+  ConfigurationSet config_set(configs, orbitals_with_active);
+
+  EXPECT_EQ(config_set.get_data_type_name(), "configuration_set");
+}

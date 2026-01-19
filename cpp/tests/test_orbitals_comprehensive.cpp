@@ -781,3 +781,9 @@ TEST_F(OrbitalsTest, FileIORoundTrip) {
   EXPECT_TRUE(orb.get_overlap_matrix().isApprox(orb_hdf5->get_overlap_matrix(),
                                                 testing::json_tolerance));
 }
+
+TEST_F(OrbitalsTest, DataTypeName) {
+  // Test that Orbitals has the correct data type name
+  auto orbitals = testing::create_test_orbitals();
+  EXPECT_EQ(orbitals->get_data_type_name(), "orbitals");
+}

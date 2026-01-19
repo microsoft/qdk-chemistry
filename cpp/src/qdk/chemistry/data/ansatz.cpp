@@ -7,6 +7,7 @@
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
 #include <stdexcept>
 
@@ -544,41 +545,41 @@ std::shared_ptr<Ansatz> Ansatz::from_file(const std::string& filename,
 
 void Ansatz::to_hdf5_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
-
-  // Validate filename
   if (filename.empty()) {
-    throw std::runtime_error("Filename cannot be empty");
+    throw std::invalid_argument("Filename cannot be empty");
   }
+  DataTypeFilename::validate_write_suffix(filename,
+                                          DATACLASS_TO_SNAKE_CASE(Ansatz));
   _to_hdf5_file(filename);
 }
 
 std::shared_ptr<Ansatz> Ansatz::from_hdf5_file(const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
-
-  // Validate filename
   if (filename.empty()) {
-    throw std::runtime_error("Filename cannot be empty");
+    throw std::invalid_argument("Filename cannot be empty");
   }
+  DataTypeFilename::validate_read_suffix(filename,
+                                         DATACLASS_TO_SNAKE_CASE(Ansatz));
   return _from_hdf5_file(filename);
 }
 
 void Ansatz::to_json_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
-
-  // Validate filename
   if (filename.empty()) {
-    throw std::runtime_error("Filename cannot be empty");
+    throw std::invalid_argument("Filename cannot be empty");
   }
+  DataTypeFilename::validate_write_suffix(filename,
+                                          DATACLASS_TO_SNAKE_CASE(Ansatz));
   _to_json_file(filename);
 }
 
 std::shared_ptr<Ansatz> Ansatz::from_json_file(const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
-
-  // Validate filename
   if (filename.empty()) {
-    throw std::runtime_error("Filename cannot be empty");
+    throw std::invalid_argument("Filename cannot be empty");
   }
+  DataTypeFilename::validate_read_suffix(filename,
+                                         DATACLASS_TO_SNAKE_CASE(Ansatz));
   return _from_json_file(filename);
 }
 

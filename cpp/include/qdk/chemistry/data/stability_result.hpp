@@ -7,6 +7,7 @@
 
 #include <Eigen/Dense>
 #include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 namespace qdk::chemistry::data {
 
@@ -319,6 +320,14 @@ class StabilityResult : public DataClass,
   std::pair<double, Eigen::VectorXd> get_smallest_eigenvalue_and_vector() const;
 
   // === DataClass interface implementation ===
+
+  /**
+   * @brief Get the data type name for this class
+   * @return "stability_result"
+   */
+  std::string get_data_type_name() const override {
+    return DATACLASS_TO_SNAKE_CASE(StabilityResult);
+  }
 
   /**
    * @brief Get summary string of stability result information
