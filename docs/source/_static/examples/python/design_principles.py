@@ -8,6 +8,7 @@
 ################################################################################
 # start-cell-scf-create
 from pathlib import Path
+
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
@@ -48,7 +49,7 @@ ham_constructor = create("hamiltonian_constructor")
 hamiltonian = ham_constructor.run(active_orbitals)
 
 mc = create("multi_configuration_calculator")
-mc.settings().set("davidson_iterations", 300)
+mc.settings().set("max_solver_iterations", 300)
 E_cas, wfn_cas = mc.run(
     hamiltonian, n_active_alpha_electrons=1, n_active_beta_electrons=1
 )

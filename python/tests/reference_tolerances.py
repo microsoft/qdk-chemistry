@@ -71,3 +71,7 @@ xyz_file_structure_tolerance = 1e-6
 
 # This is the tolerance to check the mp2 energies against pyscf
 mp2_energy_tolerance = 1e-8
+
+# This is the tolerance to check the minimum eigenvalue of Hessian
+# of orbital rotation, used in stability checker.
+min_hessian_eig_tolerance = 1e-6

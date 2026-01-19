@@ -1151,3 +1151,12 @@ TEST_F(StructureBasicTest, MixedSymbolNotation) {
   // O should use standard atomic weight
   EXPECT_NEAR(s.get_atom_mass(3), 15.999, testing::numerical_zero_tolerance);
 }
+
+TEST_F(StructureBasicTest, DataTypeName) {
+  // Test that Structure has the correct data type name
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.74}};
+  std::vector<std::string> symbols = {"H", "H"};
+  Structure s(coords, symbols);
+
+  EXPECT_EQ(s.get_data_type_name(), "structure");
+}

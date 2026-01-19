@@ -104,23 +104,46 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
     // Beta spin channel - localize selected orbitals
     Eigen::MatrixXd C_beta = do_loc(coeffs_beta, loc_indices_b);
 
+    // Preserve active space indices from input orbitals if they exist
+    std::optional<data::Orbitals::UnrestrictedCASIndices> unrestricted_indices;
+    if (orbitals->has_active_space()) {
+      auto [active_a, active_b] = orbitals->get_active_space_indices();
+      auto [inactive_a, inactive_b] = orbitals->get_inactive_space_indices();
+      // Order: (active_alpha, active_beta, inactive_alpha, inactive_beta)
+      unrestricted_indices = std::make_tuple(
+          std::vector<size_t>(active_a.begin(), active_a.end()),
+          std::vector<size_t>(active_b.begin(), active_b.end()),
+          std::vector<size_t>(inactive_a.begin(), inactive_a.end()),
+          std::vector<size_t>(inactive_b.begin(), inactive_b.end()));
+    }
+
     auto new_orbitals = std::make_shared<data::Orbitals>(
         C_alpha, C_beta, std::nullopt,
-        std::nullopt,   // no energies for localized orbitals
-        ao_overlap,     // Atomic Orbital overlap
-        basis_set,      // basis set
-        std::nullopt);  // no active space indices
+        std::nullopt,           // no energies for localized orbitals
+        ao_overlap,             // Atomic Orbital overlap
+        basis_set,              // basis set
+        unrestricted_indices);  // preserve active space indices from input
     return detail::new_wavefunction(wavefunction, new_orbitals);
   } else {
     // Localize selected orbitals
     Eigen::MatrixXd C_lmo = do_loc(coeffs_alpha, loc_indices_a);
 
+    // Preserve active space indices from input orbitals if they exist
+    std::optional<data::Orbitals::RestrictedCASIndices> restricted_indices;
+    if (orbitals->has_active_space()) {
+      auto [active_a, active_b] = orbitals->get_active_space_indices();
+      auto [inactive_a, inactive_b] = orbitals->get_inactive_space_indices();
+      restricted_indices = std::make_tuple(
+          std::vector<size_t>(active_a.begin(), active_a.end()),
+          std::vector<size_t>(inactive_a.begin(), inactive_a.end()));
+    }
+
     auto new_orbitals = std::make_shared<data::Orbitals>(
         C_lmo,
-        std::nullopt,   // no energies for localized orbitals
-        ao_overlap,     // Atomic Orbital overlap
-        basis_set,      // basis set
-        std::nullopt);  // no active space indices
+        std::nullopt,         // no energies for localized orbitals
+        ao_overlap,           // Atomic Orbital overlap
+        basis_set,            // basis set
+        restricted_indices);  // preserve active space indices from input
     return detail::new_wavefunction(wavefunction, new_orbitals);
   }
 }

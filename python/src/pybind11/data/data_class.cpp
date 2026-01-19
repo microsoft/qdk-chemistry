@@ -16,6 +16,10 @@ using namespace qdk::chemistry::data;
 // Trampoline class for enabling Python inheritance
 class PyDataClass : public DataClass, public py::trampoline_self_life_support {
  public:
+  std::string get_data_type_name() const override {
+    PYBIND11_OVERRIDE_PURE(std::string, DataClass, get_data_type_name);
+  }
+
   std::string get_summary() const override {
     PYBIND11_OVERRIDE_PURE(std::string, DataClass, get_summary);
   }
@@ -215,6 +219,16 @@ Note:
 )")
 
       // Core interface methods
+      .def("get_data_type_name", &DataClass::get_data_type_name, R"(
+Get the data type name for this class.
+
+This is used for file naming conventions and serialization.
+
+Returns:
+    str: The data type name (e.g., "structure", "wavefunction")
+
+)")
+
       .def("get_summary", &DataClass::get_summary, R"(
 Get a human-readable summary of the object.
 
