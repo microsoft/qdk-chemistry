@@ -227,6 +227,13 @@ inline void gram_schmidt(int64_t N, int64_t K, const double* V_old, int64_t LDV,
         break;
       }
     }
+    // If all canonical basis vectors failed, the subspace already spans the
+    // entire space (K >= N). This should not happen in normal use.
+    if (nrm <= min_norm) {
+      throw std::runtime_error(
+          "gram_schmidt: Unable to find orthogonal vector - subspace may "
+          "already span the entire space");
+    }
   }
 }
 
@@ -267,9 +274,8 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
 
   // Handle trivial case of 1x1 matrix
   if (N == 1) {
-    std::vector<double> AX(1);
-    op.operator_action(1, 1., X, N, 0., AX.data(), N);
-    double eigenvalue = AX[0] / X[0];
+    // For a 1x1 matrix, the eigenvalue is simply the diagonal element
+    double eigenvalue = D[0];
     X[0] = 1.0;  // Normalized eigenvector
     logger->info(
         "iter =    0, LAM(0) = {:20.12e}, RNORM =   0.000000000000e+00",
@@ -354,7 +360,7 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
       R[j] = -R[j] / denom;
     }
 
-    // Project new vector out form old vectors
+    // Project new vector out from old vectors
     gram_schmidt(N, k, V.data(), N, R);
 
   }  // Davidson iterations
@@ -437,9 +443,7 @@ inline void p_gram_schmidt(int64_t N_local, int64_t K, const double* V_old,
                   comm);
     int64_t global_offset = 0;
     for (int r = 0; r < rank; ++r) global_offset += local_sizes[r];
-    int64_t N_global = global_offset + N_local;
-    for (int r = rank; r < size; ++r) N_global += local_sizes[r];
-    N_global = global_offset;
+    int64_t N_global = 0;
     for (int r = 0; r < size; ++r) N_global += local_sizes[r];
 
     for (int64_t idx = 0; idx < N_global; ++idx) {
@@ -463,6 +467,13 @@ inline void p_gram_schmidt(int64_t N_local, int64_t K, const double* V_old,
         blas::scal(N_local, 1. / nrm, V_new, 1);
         break;
       }
+    }
+    // If all canonical basis vectors failed, the subspace already spans the
+    // entire space (K >= N_global). This should not happen in normal use.
+    if (nrm <= min_norm) {
+      throw std::runtime_error(
+          "p_gram_schmidt: Unable to find orthogonal vector - subspace may "
+          "already span the entire space");
     }
   }
 }
@@ -660,7 +671,7 @@ auto p_davidson(int64_t N_local, int64_t max_m, const Functor& op,
       R_local[j] += E1 * X_local[j] / denom;
     }
 
-    // Project new vector out form old vectors
+    // Project new vector out from old vectors
     p_gram_schmidt(N_local, k, V_local.data(), N_local, R_local, comm);
 
   }  // Davidson iterations
