@@ -5,7 +5,6 @@
 #include <gtest/gtest.h>
 
 #include <qdk/chemistry/algorithms/microsoft/utils.hpp>
-#include <limits>
 #include <stdexcept>
 
 using namespace qdk::chemistry::utils::microsoft;
