@@ -70,7 +70,7 @@ class TestRegistryShowDefault:
         # Test for qubit mapper
         default_qubit_mapper = registry.show_default("qubit_mapper")
         assert isinstance(default_qubit_mapper, str)
-        assert default_qubit_mapper == "qiskit"
+        assert default_qubit_mapper == "qdk"
 
         # Test for SCF solver
         default_scf = registry.show_default("scf_solver")
