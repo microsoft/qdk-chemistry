@@ -17,8 +17,6 @@ class StatePreparationSettings(Settings):
     def __init__(self):
         """Initialize the StatePreparationSettings."""
         super().__init__()
-        # TODO(DBWY): These are "magic" but they come from the injected_rotation model, should find a general way to
-        # handle these
         self._set_default("basis_gates", "vector<string>", ["x", "y", "z", "cx", "cz", "id", "h", "s", "sdg", "rz"])
         self._set_default("transpile", "bool", True)
         self._set_default("transpile_optimization_level", "int", 0)
