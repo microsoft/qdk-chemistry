@@ -58,6 +58,8 @@ from qdk_chemistry.phase_estimation import (
     TraditionalPhaseEstimation,
     energy_from_phase,
 )
+from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
+from qdk_chemistry.utils.telemetry_events import telemetry_tracker
 
 __all__ = [
     # Classes
@@ -152,3 +154,18 @@ def __getattr__(name: str) -> Any:
 def __dir__() -> list[str]:
     """Ensure dir() lists lazily resolved registry helpers."""
     return sorted(set(globals()) | _REGISTRY_EXPORTS)
+
+
+if TELEMETRY_ENABLED:
+
+    def apply_telemetry_to_classes():
+        """Apply telemetry tracking to the 'run' methods of all algorithm classes."""
+        with contextlib.suppress(NameError):
+            for name in __all__:
+                cls = globals().get(name)
+                if isinstance(cls, type) and hasattr(cls, "run"):
+                    cls.run = telemetry_tracker()(cls.run)
+
+    apply_telemetry_to_classes()
+    # Delete the function to avoid namespace pollution
+    del apply_telemetry_to_classes

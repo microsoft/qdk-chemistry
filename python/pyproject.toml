@@ -63,6 +63,7 @@ dev = [
   "coverage",
   "mypy",
   "pytest",
+  "pytest-env",
   "ruff"
 ]
 docs = [
@@ -147,6 +148,9 @@ filterwarnings = [
   "ignore::DeprecationWarning:qiskit_aer"
 ]
 testpaths = ["tests"]
+env = [
+  "QSHARP_PYTHON_TELEMETRY=none"
+]
 
 [tool.ruff]
 line-length = 120
