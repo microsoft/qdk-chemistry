@@ -819,7 +819,6 @@ void CanonicalFourCenterHamiltonianContainer::_to_fcidump_file(
 
   // Write permutationally unique MO ERIs
   // TODO: This is only valid for integrals with 8 fold symmetry
-  // TODO (NAB):  will this TODO be resolved before the release?
   for (size_t i = 0, ij = 0; i < num_molecular_orbitals; ++i)
     for (size_t j = i; j < num_molecular_orbitals; ++j, ij++) {
       for (size_t k = 0, kl = 0; k < num_molecular_orbitals; ++k)

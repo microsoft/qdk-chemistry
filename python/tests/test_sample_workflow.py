@@ -8,6 +8,9 @@ See Also:
 - test_sample_workflow_rdkit.py - RDKit geometry tests
 - test_sample_workflow_qiskit.py - Qiskit IQPE tests
 
+To run the slow tests (including notebook e2e tests), set the environment variable:
+    QDK_CHEMISTRY_RUN_SLOW_TESTS=1 pytest
+
 """
 
 # --------------------------------------------------------------------------------------------
@@ -15,34 +18,133 @@ See Also:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
+from pathlib import Path
+
+import nbformat
 import pytest
+from nbclient import NotebookClient
 
-################################################################################
-# Sample notebook testing
-################################################################################
+# Environment variable to enable slow tests (including notebook e2e tests)
+_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
+
+# Patterns that indicate a line contains visualization code that should be skipped
+VISUALIZATION_LINE_PATTERNS = [
+    "MoleculeViewer",
+    "Histogram(",
+    "display(Histogram",
+    "display(MoleculeViewer",
+    "display(Circuit",
+    "display_html_table",
+    "display_warning",
+]
+
+# Import patterns that should be removed (visualization-only imports)
+VISUALIZATION_IMPORT_PATTERNS = [
+    "from qdk.widgets import MoleculeViewer",
+    "from qdk.widgets import Histogram",
+    "from qdk.widgets import Circuit",
+]
 
 
-@pytest.mark.xfail(reason="Skipping unimplemented examples/factory_list.ipynb test.")
+def _strip_visualization_lines(cell_source: str) -> str:
+    """Remove visualization-related lines from cell source code.
+
+    This preserves the rest of the cell's logic while removing only
+    lines that contain visualization code.
+    """
+    lines = cell_source.split("\n")
+    filtered_lines = []
+
+    for line in lines:
+        # Check if this line contains visualization code
+        should_skip = any(pattern in line for pattern in VISUALIZATION_LINE_PATTERNS)
+
+        # Also check for visualization-only imports
+        if not should_skip:
+            should_skip = any(pattern in line for pattern in VISUALIZATION_IMPORT_PATTERNS)
+
+        if should_skip:
+            # Replace with a comment to maintain line count for debugging
+            filtered_lines.append(f"# [test] Skipped: {line.strip()[:50]}")
+        else:
+            filtered_lines.append(line)
+
+    return "\n".join(filtered_lines)
+
+
+def _execute_notebook_skip_visualizations(notebook_path: Path, timeout: int = 600) -> None:
+    """Execute a notebook, stripping visualization code from cells.
+
+    Args:
+        notebook_path: Path to the notebook file.
+        timeout: Maximum time in seconds to wait for each cell execution.
+
+    Raises:
+        CellExecutionError: If a cell fails to execute.
+
+    """
+    with open(notebook_path, encoding="utf-8") as f:
+        nb = nbformat.read(f, as_version=4)
+
+    # Process cells to strip visualization lines
+    for cell in nb.cells:
+        if cell.cell_type != "code":
+            continue
+
+        cell_source = cell.source
+
+        # Skip empty cells
+        if not cell_source.strip():
+            continue
+
+        # Strip visualization lines from the cell
+        cell.source = _strip_visualization_lines(cell_source)
+
+    # Set the working directory to the notebook's directory for relative paths
+    notebook_dir = notebook_path.parent
+
+    # Create a notebook client with appropriate kernel and execute
+    client = NotebookClient(
+        nb,
+        timeout=timeout,
+        kernel_name="python3",
+        resources={"metadata": {"path": str(notebook_dir)}},
+    )
+
+    # Execute the entire notebook
+    client.execute()
+
+
+EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
+
+
 def test_factory_list():
-    """Test the examples/factory_list.ipynb script."""
-    # TODO: Need to implement this test (see https://github.com/microsoft/qdk-chemistry/issues/196)
-    raise NotImplementedError("TODO: add factory_list.ipynb test.")
+    """Test the examples/factory_list.ipynb notebook executes without errors."""
+    notebook_path = EXAMPLES_DIR / "factory_list.ipynb"
+    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
+    _execute_notebook_skip_visualizations(notebook_path)
 
 
-@pytest.mark.xfail(reason="Skipping unimplemented examples/state_prep_energy.ipynb test.")
+@pytest.mark.slow
+@pytest.mark.skipif(
+    not _RUN_SLOW_TESTS,
+    reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+)
 def test_state_prep_energy():
-    """Test the examples/state_prep_energy.ipynb script."""
-    # TODO: Need to implement this test (see https://github.com/microsoft/qdk-chemistry/issues/196)
-    raise NotImplementedError("TODO: add state_prep_energy.ipynb test.")
+    """Test the examples/state_prep_energy.ipynb notebook executes without errors."""
+    notebook_path = EXAMPLES_DIR / "state_prep_energy.ipynb"
+    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
+    _execute_notebook_skip_visualizations(notebook_path)
 
 
-################################################################################
-# Pennylane interoperability sample testing
-################################################################################
-
-
-@pytest.mark.xfail(reason="Skipping unimplemented examples/interoperability/pennylane/qpe_no_trotter.py test.")
-def test_pennylane_qpe_no_trotter():
-    """Test the examples/interoperability/pennylane/qpe_no_trotter.py script."""
-    # TODO: Need to implement this test (see https://github.com/microsoft/qdk-chemistry/issues/199)
-    raise NotImplementedError("TODO: add pennylane/qpe_no_trotter.py test.")
+@pytest.mark.slow
+@pytest.mark.skipif(
+    not _RUN_SLOW_TESTS,
+    reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+)
+def test_qpe_stretched_n2():
+    """Test the examples/qpe_stretched_n2.ipynb notebook executes without errors."""
+    notebook_path = EXAMPLES_DIR / "qpe_stretched_n2.ipynb"
+    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
+    _execute_notebook_skip_visualizations(notebook_path)

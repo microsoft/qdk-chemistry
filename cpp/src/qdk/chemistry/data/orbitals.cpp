@@ -21,9 +21,6 @@
 namespace qdk::chemistry {
 namespace data {
 
-// TODO (NAB):  this is a huge file.  Is there a way to break it up into smaller
-// pieces? Workitem: 41350
-
 Orbitals::Orbitals(
     const Eigen::MatrixXd& coefficients,
     const std::optional<Eigen::VectorXd>& energies,
