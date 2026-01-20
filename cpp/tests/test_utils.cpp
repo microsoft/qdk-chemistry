@@ -16,8 +16,10 @@
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
 #include <qdk/chemistry/utils/valence_space.hpp>
+#include <stdexcept>
 #include <vector>
 
+#include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::data;
@@ -300,4 +302,105 @@ TEST_F(OrbitalRotationTest, UnitaryRotationTest) {
 
   EXPECT_NEAR(0.0, (should_be_identity - identity).norm(),
               testing::numerical_zero_tolerance);
+}
+
+// Test fixture for mathematical utility functions
+class MathUtilsTest : public ::testing::Test {
+ protected:
+  void SetUp() override {}
+  void TearDown() override {}
+};
+
+// ========== Tests for factorial function ==========
+
+TEST_F(MathUtilsTest, FactorialEdgeCases) {
+  EXPECT_EQ(qdk::chemistry::utils::microsoft::factorial(0),
+            1);  // 0! = 1 by definition
+  EXPECT_EQ(qdk::chemistry::utils::microsoft::factorial(1), 1);  // 1! = 1
+}
+
+TEST_F(MathUtilsTest, FactorialValues) {
+  using qdk::chemistry::utils::microsoft::factorial;
+
+  // Small values
+  EXPECT_EQ(factorial(2), 2);
+  EXPECT_EQ(factorial(3), 6);
+  EXPECT_EQ(factorial(4), 24);
+  EXPECT_EQ(factorial(5), 120);
+  EXPECT_EQ(factorial(6), 720);
+  EXPECT_EQ(factorial(7), 5040);
+
+  // Medium values
+  EXPECT_EQ(factorial(10), 3628800);
+  EXPECT_EQ(factorial(12), 479001600);
+  EXPECT_EQ(factorial(15), 1307674368000);
+
+  // Large values - 20! is the maximum safe value for 64-bit size_t
+  EXPECT_EQ(factorial(20), 2432902008176640000ULL);
+}
+
+TEST_F(MathUtilsTest, FactorialOverflow) {
+  using qdk::chemistry::utils::microsoft::factorial;
+
+  // Values > 20 should throw overflow_error
+  EXPECT_THROW(factorial(21), std::overflow_error);
+  EXPECT_THROW(factorial(25), std::overflow_error);
+  EXPECT_THROW(factorial(100), std::overflow_error);
+}
+
+// ========== Tests for binomial_coefficient function ==========
+
+TEST_F(MathUtilsTest, BinomialCoefficientEdgeCases) {
+  using qdk::chemistry::utils::microsoft::binomial_coefficient;
+
+  // C(n, 0) = 1 for any n
+  EXPECT_EQ(binomial_coefficient(0, 0), 1);
+  EXPECT_EQ(binomial_coefficient(5, 0), 1);
+  EXPECT_EQ(binomial_coefficient(10, 0), 1);
+  EXPECT_EQ(binomial_coefficient(100, 0), 1);
+
+  // C(n, n) = 1 for any n
+  EXPECT_EQ(binomial_coefficient(1, 1), 1);
+  EXPECT_EQ(binomial_coefficient(5, 5), 1);
+  EXPECT_EQ(binomial_coefficient(10, 10), 1);
+  EXPECT_EQ(binomial_coefficient(50, 50), 1);
+
+  // C(n, k) = 0 when k > n
+  EXPECT_EQ(binomial_coefficient(5, 6), 0);
+  EXPECT_EQ(binomial_coefficient(10, 15), 0);
+  EXPECT_EQ(binomial_coefficient(0, 1), 0);
+  EXPECT_EQ(binomial_coefficient(3, 10), 0);
+
+  // C(1, 0) = 1, C(1, 1) = 1
+  EXPECT_EQ(binomial_coefficient(1, 0), 1);
+  EXPECT_EQ(binomial_coefficient(1, 1), 1);
+
+  // C(n, 1) = n for any n >= 1
+  EXPECT_EQ(binomial_coefficient(1, 1), 1);
+  EXPECT_EQ(binomial_coefficient(5, 1), 5);
+  EXPECT_EQ(binomial_coefficient(10, 1), 10);
+  EXPECT_EQ(binomial_coefficient(100, 1), 100);
+}
+
+TEST_F(MathUtilsTest, BinomialCoefficientValues) {
+  using qdk::chemistry::utils::microsoft::binomial_coefficient;
+
+  // Small values
+  EXPECT_EQ(binomial_coefficient(4, 2), 6);
+  EXPECT_EQ(binomial_coefficient(5, 2), 10);
+  EXPECT_EQ(binomial_coefficient(5, 3), 10);
+  EXPECT_EQ(binomial_coefficient(6, 3), 20);
+  EXPECT_EQ(binomial_coefficient(7, 3), 35);
+  EXPECT_EQ(binomial_coefficient(8, 4), 70);
+
+  // Medium values
+  EXPECT_EQ(binomial_coefficient(10, 5), 252);
+  EXPECT_EQ(binomial_coefficient(15, 7), 6435);
+  EXPECT_EQ(binomial_coefficient(20, 10), 184756);
+
+  // Large values
+  EXPECT_EQ(binomial_coefficient(30, 15), 155117520);
+  EXPECT_EQ(binomial_coefficient(40, 20), 137846528820ULL);
+  EXPECT_EQ(binomial_coefficient(50, 25), 126410606437752ULL);
+  EXPECT_EQ(binomial_coefficient(60, 30), 118264581564861424ULL);
 }
