@@ -13,7 +13,7 @@ from collections import Counter
 from typing import Literal
 
 from qdk.openqasm import compile as compile_qir
-from qdk.simulation import run_qir
+from qsharp._simulation import run_qir
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import Circuit, CircuitExecutorData, QuantumErrorProfile, Settings

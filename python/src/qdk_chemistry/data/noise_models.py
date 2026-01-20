@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, ClassVar, TypedDict
 
 import h5py
-from qdk.simulation import NoiseConfig
+from qsharp._simulation import NoiseConfig
 from ruamel.yaml import YAML
 
 from qdk_chemistry.data.base import DataClass
