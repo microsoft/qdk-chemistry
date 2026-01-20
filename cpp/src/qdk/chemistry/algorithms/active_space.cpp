@@ -70,7 +70,7 @@ _sort_entropies_and_indices(std::shared_ptr<data::Wavefunction> wavefunction,
     sorted_entropies /= max_entropy;
   }
 
-  QDK_LOGGER().info("max entropy: {:.6f}", max_entropy);
+  QDK_LOGGER().info("Max entropy: {:.6f}", max_entropy);
   if (normalize_entropies) {
     QDK_LOGGER().info("Normalized orbital entropies:");
     QDK_LOGGER().info("  Orbital index   Normalized Entropy   Raw Entropy");
