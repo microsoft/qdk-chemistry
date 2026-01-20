@@ -15,32 +15,27 @@ See Also:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import subprocess
+import importlib.util
 import sys
 from pathlib import Path
-import importlib.util
 
 import pytest
 
-# Check if pennylane is available
+from .test_sample_workflow_utils import _run_workflow, _skip_for_mpi_failure
+
+# Check if PennyLane is available
 _PENNYLANE_AVAILABLE = importlib.util.find_spec("pennylane") is not None
-EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
 
 
 @pytest.mark.skipif(not _PENNYLANE_AVAILABLE, reason="PennyLane is not installed")
 def test_pennylane_qpe_no_trotter():
     """Test the examples/interoperability/pennylane/qpe_no_trotter.py script."""
-    script_path = EXAMPLES_DIR / "interoperability" / "pennylane" / "qpe_no_trotter.py"
-    assert script_path.exists(), f"Script not found: {script_path}"
+    repo_root = Path(__file__).resolve().parents[2]
+    cmd = [sys.executable, "examples/interoperability/pennylane/qpe_no_trotter.py"]
 
-    result = subprocess.run(
-        [sys.executable, str(script_path)],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=script_path.parent,
-    )
-
-    assert result.returncode == 0, (
-        f"Script failed with exit code {result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    )
+    result = _run_workflow(cmd, repo_root)
+    if result.returncode != 0:
+        _skip_for_mpi_failure(result)
+        pytest.fail(
+            f"qpe_no_trotter.py exited with {result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+        )
