@@ -76,6 +76,20 @@ class QubitHamiltonian(DataClass):
         """
         return self.pauli_ops.num_qubits
 
+    @property
+    def schatten_norm(self) -> float:
+        """Calculate the Schatten norm (L1 norm) of the Hamiltonian.
+
+        The Schatten norm is the sum of the absolute values of all coefficients
+        in the Hamiltonian. This quantity is commonly used in estimating parameters
+        for quantum algorithms, most notably Quantum Phase Estimation (QPE).
+
+        Returns:
+            float: The Schatten norm (L1 norm) of the Hamiltonian.
+
+        """
+        return float(np.sum(np.abs(self.coefficients)))
+
     @cached_property
     def pauli_ops(self) -> SparsePauliOp:
         """Get the qubit Hamiltonian as a ``SparsePauliOp``.

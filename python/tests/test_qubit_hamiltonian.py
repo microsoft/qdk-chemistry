@@ -76,6 +76,74 @@ class TestQubitHamiltonian:
             all_grouped_strings.extend(group.pauli_strings)
         assert set(all_grouped_strings) == {"XX", "YY", "ZZ", "XY"}
 
+    def test_schatten_norm_basic(self):
+        """Test Schatten norm with basic Hamiltonian."""
+        pauli_strings = ["IX", "YY", "ZZ"]
+        coefficients = np.array([1.0, -0.5, 0.75])
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+        # Schatten norm = |1.0| + |-0.5| + |0.75| = 2.25
+        expected_norm = 2.25
+        assert np.isclose(
+            qubit_hamiltonian.schatten_norm,
+            expected_norm,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+    def test_schatten_norm_with_negative_coefficients(self):
+        """Test Schatten norm handles negative coefficients correctly."""
+        pauli_strings = ["X", "Y", "Z"]
+        coefficients = np.array([-2.0, -1.5, -0.5])
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+        # Schatten norm = |-2.0| + |-1.5| + |-0.5| = 4.0
+        expected_norm = 4.0
+        assert np.isclose(
+            qubit_hamiltonian.schatten_norm,
+            expected_norm,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+    def test_schatten_norm_with_complex_coefficients(self):
+        """Test Schatten norm with complex coefficients."""
+        pauli_strings = ["XX", "YY"]
+        coefficients = np.array([3.0 + 4.0j, -1.0 + 0.0j])
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+        # Schatten norm = |3.0+4.0j| + |-1.0| = 5.0 + 1.0 = 6.0
+        expected_norm = 6.0
+        assert np.isclose(
+            qubit_hamiltonian.schatten_norm,
+            expected_norm,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+    def test_schatten_norm_single_term(self):
+        """Test Schatten norm with single term Hamiltonian."""
+        pauli_strings = ["Z"]
+        coefficients = np.array([3.5])
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+        expected_norm = 3.5
+        assert np.isclose(
+            qubit_hamiltonian.schatten_norm,
+            expected_norm,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+    def test_schatten_norm_zero_coefficients(self):
+        """Test Schatten norm with zero coefficients."""
+        pauli_strings = ["X", "Y", "Z"]
+        coefficients = np.array([0.0, 0.0, 0.0])
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+        expected_norm = 0.0
+        assert np.isclose(
+            qubit_hamiltonian.schatten_norm,
+            expected_norm,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
     def test_reorder_qubits_identity(self):
         """Test that identity permutation returns equivalent Hamiltonian."""
         qh = QubitHamiltonian(["XIZI", "IYII"], np.array([0.5, 0.3], dtype=complex))
