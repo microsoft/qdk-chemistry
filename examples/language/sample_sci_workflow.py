@@ -107,7 +107,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     ########################################################################################
     # 1. Load the target structure (fallback to the water example bundled with these demos).
     ########################################################################################
-    default_structure = Path(__file__).resolve().parent / "data" / "water.structure.xyz"
+    default_structure = (
+        Path(__file__).resolve().parent.parent / "data" / "water.structure.xyz"
+    )
     structure_path = args.xyz or default_structure
     if not structure_path.is_file():
         raise FileNotFoundError(f"XYZ file {structure_path} not found.")
