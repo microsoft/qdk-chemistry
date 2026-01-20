@@ -28,10 +28,9 @@ from nbclient import NotebookClient
 # Environment variable to enable slow tests (including notebook e2e tests)
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
-# Patterns that indicate a line contains visualization code that should be skipped
+# Patterns that indicate a line starts a visualization block that should be skipped
 VISUALIZATION_LINE_PATTERNS = [
     "MoleculeViewer",
-    "Histogram(",
     "display(Histogram",
     "display(MoleculeViewer",
     "display(Circuit",
@@ -51,12 +50,20 @@ def _strip_visualization_lines(cell_source: str) -> str:
     """Remove visualization-related lines from cell source code.
 
     This preserves the rest of the cell's logic while removing only
-    lines that contain visualization code.
+    lines that contain visualization code. Handles multi-line statements
+    by tracking parenthesis depth.
     """
     lines = cell_source.split("\n")
     filtered_lines = []
+    skip_depth = 0  # Track parenthesis depth when skipping multi-line statements
 
     for line in lines:
+        # If we're in a skip block, continue skipping until parentheses balance
+        if skip_depth > 0:
+            skip_depth += line.count("(") - line.count(")")
+            filtered_lines.append(f"# [test] Skipped: {line.strip()[:50]}")
+            continue
+
         # Check if this line contains visualization code
         should_skip = any(pattern in line for pattern in VISUALIZATION_LINE_PATTERNS)
 
@@ -65,7 +72,8 @@ def _strip_visualization_lines(cell_source: str) -> str:
             should_skip = any(pattern in line for pattern in VISUALIZATION_IMPORT_PATTERNS)
 
         if should_skip:
-            # Replace with a comment to maintain line count for debugging
+            # Start tracking parenthesis depth for multi-line statements
+            skip_depth = line.count("(") - line.count(")")
             filtered_lines.append(f"# [test] Skipped: {line.strip()[:50]}")
         else:
             filtered_lines.append(line)
