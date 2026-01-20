@@ -62,6 +62,8 @@ coverage = [
 dev = [
   "coverage",
   "mypy",
+  "nbclient",
+  "nbformat",
   "pytest",
   "pytest-env",
   "ruff"
@@ -81,12 +83,11 @@ plugins = [
   "pyscf>=2.9.0"
 ]
 
-# TODO (NAB): update these URLs with final ones, workitem: 41430
 [project.urls]
-Documentation = "https://qdk-chemistry.readthedocs.io"
-Homepage = "https://github.com/example/qdk-chemistry"
-Issues = "https://github.com/example/qdk-chemistry/issues"
-Repository = "https://github.com/example/qdk-chemistry"
+Documentation = "https://microsoft.github.io/qdk-chemistry"
+Homepage = "https://github.com/microsoft/qdk-chemistry"
+Issues = "https://github.com/microsoft/qdk-chemistry/issues"
+Repository = "https://github.com/microsoft/qdk-chemistry"
 
 # Configuration for C++ coverage reporting
 [tool.coverage.cpp]
@@ -146,6 +147,9 @@ addopts = [
 filterwarnings = [
   "ignore::DeprecationWarning:qiskit",
   "ignore::DeprecationWarning:qiskit_aer"
+]
+markers = [
+  "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
 testpaths = ["tests"]
 env = [
