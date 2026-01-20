@@ -420,6 +420,29 @@ TEST_P(HamiltonianTest, TwoBodyElementAccess) {
     EXPECT_THROW(h.get_two_body_element(0, 2, 0, 0), std::out_of_range);
     EXPECT_THROW(h.get_two_body_element(0, 0, 2, 0), std::out_of_range);
     EXPECT_THROW(h.get_two_body_element(0, 0, 0, 2), std::out_of_range);
+
+    // Test with larger system to verify get_two_body_index scaling
+    Eigen::MatrixXd large_inact_f = Eigen::MatrixXd::Identity(0, 0);
+    Eigen::MatrixXd large_one_body = Eigen::MatrixXd::Identity(3, 3);
+    Eigen::MatrixXd large_three_center =
+        Eigen::MatrixXd::Zero(81, 9);  // 3^2 = 9
+
+    // Test specific indices: (aux,1,2) should give index 1*3 + 2 =
+    large_three_center(78, 5) = 7.0;
+    // Test (aux,1,0) should give index 1*3 + 0 = 27 + 18 + 6 + 1 =
+    // 52
+    large_three_center(52, 3) = 8.0;
+
+    // Create orbitals for the larger system
+    auto large_orbitals =
+        std::make_shared<ModelOrbitals>(3, true);  // 3 orbitals, restricted
+
+    Hamiltonian h_large(std::make_unique<DensityFittedHamiltonianContainer>(
+        large_one_body, large_three_center, large_orbitals, 0.0,
+        large_inact_f));
+
+    EXPECT_DOUBLE_EQ(h_large.get_two_body_element(1, 2, 1, 2), 49.0);
+    EXPECT_DOUBLE_EQ(h_large.get_two_body_element(1, 0, 1, 0), 64.0);
   }
 }
 
@@ -1074,10 +1097,23 @@ TEST_P(HamiltonianTest, UnrestrictedSpinChannelAccess) {
   Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Zero(16);
   Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Zero(16);
 
-  // Set specific values for each spin channel
+  Eigen::MatrixXd three_center_aaaa = Eigen::MatrixXd::Zero(3, 4);
+  Eigen::MatrixXd three_center_aabb = Eigen::MatrixXd::Zero(3, 4);
+  Eigen::MatrixXd three_center_bbbb = Eigen::MatrixXd::Zero(3, 4);
+
+  // canonical four center case
   two_body_aaaa[0] = 1.0;   // (0,0,0,0) in aaaa channel
   two_body_aabb[5] = 2.0;   // (0,1,0,1) in aabb channel
   two_body_bbbb[15] = 3.0;  // (1,1,1,1) in bbbb channel
+
+  // three center case
+  // (a,a,a,a) (a,a,b,b) (b,b,b,b)
+  // (0,1,0,0) (0,0,0,0) (0,0,0,0)
+  // (0,0,0,0) (0,0,2,0) (0,0,0,0)
+  // (0,0,0,0) (0,0,0,0) (0,0,3,0)
+  three_center_aaaa(1, 0) = 1.0;
+  three_center_aabb(1, 2) = 2.0;
+  three_center_bbbb(2, 2) = 3.0;
 
   Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
 
@@ -1101,7 +1137,24 @@ TEST_P(HamiltonianTest, UnrestrictedSpinChannelAccess) {
     EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::bbbb),
                      0.0);
   } else if (test_p == "density_fitted") {
-    // TODO: implement this!
+    Hamiltonian h(std::make_unique<DensityFittedHamiltonianContainer>(
+        one_body_alpha, one_body_beta, three_center_aaaa, three_center_aabb,
+        three_center_bbbb, unrestricted_orbitals, core_energy, empty_fock,
+        empty_fock));
+
+    // Test accessing elements through different spin channels
+    EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::aaaa),
+                     1.0);
+    EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 0, 1, 0, SpinChannel::aabb),
+                     4.0);
+    EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 0, 1, 0, SpinChannel::bbbb),
+                     9.0);
+
+    // Verify other elements are zero
+    EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::aabb),
+                     0.0);
+    EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::bbbb),
+                     0.0);
   }
 }
 
