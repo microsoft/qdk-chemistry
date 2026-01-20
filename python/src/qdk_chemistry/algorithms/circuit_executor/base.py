@@ -31,7 +31,7 @@ class CircuitExecutor(Algorithm):
         shots: int,
         noise: QuantumErrorProfile | None = None,
     ) -> CircuitExecutorData:
-        """Prepare a quantum circuit that encodes the given wavefunction.
+        """Execute the given quantum circuit and get measurement results.
 
         Args:
             circuit: The circuit that prepares the initial state.

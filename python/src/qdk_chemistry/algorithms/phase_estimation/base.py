@@ -19,18 +19,43 @@ from qdk_chemistry.data import (
     QpeResult,
     QuantumErrorProfile,
     QubitHamiltonian,
+    Settings,
     TimeEvolutionUnitary,
 )
 
-__all__: list[str] = ["PhaseEstimation", "PhaseEstimationFactory"]
+__all__: list[str] = ["PhaseEstimation", "PhaseEstimationFactory", "PhaseEstimationSettings"]
+
+
+class PhaseEstimationSettings(Settings):
+    """Settings for the Phase Estimation algorithm."""
+
+    def __init__(self):
+        """Initialize the settings for Phase Estimation.
+
+        Args:
+            num_bits: The number of phase bits to estimate.
+            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.
+
+        """
+        super().__init__()
+        self._set_default("num_bits", "int", -1, "The number of phase bits to estimate.")
+        self._set_default(
+            "evolution_time",
+            "float",
+            0.0,
+            "Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.",
+        )
 
 
 class PhaseEstimation(Algorithm):
     """Abstract base class for phase estimation algorithms."""
 
-    def __init__(self):
+    def __init__(self, num_bits: int, evolution_time: float):
         """Initialize the PhaseEstimation with default settings."""
         super().__init__()
+        self._settings = PhaseEstimationSettings()
+        self._settings.set("num_bits", num_bits)
+        self._settings.set("evolution_time", evolution_time)
 
     def type_name(self) -> str:
         """Return the algorithm type name as phase_estimation."""
@@ -47,18 +72,26 @@ class PhaseEstimation(Algorithm):
         circuit_executor: CircuitExecutor,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
-        """Prepare a quantum circuit that encodes the given wavefunction.
+        r"""Run the phase estimation algorithm with the given state preparation circuit and qubit Hamiltonian.
+
+        This method implements the quantum phase estimation procedure:
+        1. The state preparation circuit initializes the system in the desired quantum state.
+        2. The evolution_builder constructs a time evolution unitary :math:`U = \exp(-iHt)` from the qubit Hamiltonian.
+        3. The circuit_mapper transforms the time evolution unitary into controlled-U operations,
+           where the control qubits are ancilla qubits used for phase readout.
+        4. The circuit_executor runs the resulting quantum circuits on the target backend.
+        5. Measurement results are processed to extract the eigenvalue phase estimates.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
-            evolution_builder: The time evolution builder to use.
-            circuit_mapper: The controlled evolution circuit mapper to use.
-            circuit_executor: The executor to run quantum circuits.
+            evolution_builder: Builder that constructs time evolution unitaries from the Hamiltonian.
+            circuit_mapper: Maps controlled time evolution unitaries to circuit operations.
+            circuit_executor: The executor to run quantum circuits on a backend or simulator.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
-            A QpeResult object containing the results of the phase estimation.
+            A QpeResult object containing the estimated phases and associated metadata.
 
         """
 

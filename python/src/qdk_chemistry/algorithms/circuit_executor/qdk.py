@@ -24,8 +24,8 @@ class QdkFullStateSimulatorSettings(Settings):
         """Initialize QDK Full State Simulator settings."""
         Logger.trace_entering()
         super().__init__()
-        self._set_default("type", "string", "cpu")
-        self._set_default("seed", "int", 42)
+        self._set_default("type", "string", "cpu", "Type of simulator to use: 'cpu', 'gpu', or 'clifford'")
+        self._set_default("seed", "int", 42, "Random seed for simulation reproducibility")
 
 
 class QdkFullStateSimulator(CircuitExecutor):

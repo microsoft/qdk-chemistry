@@ -26,31 +26,26 @@ from qdk_chemistry.data import (
     QpeResult,
     QuantumErrorProfile,
     QubitHamiltonian,
-    Settings,
 )
 from qdk_chemistry.utils import Logger
 
-from .base import PhaseEstimation
+from .base import PhaseEstimation, PhaseEstimationSettings
 
 __all__: list[str] = ["StandardPhaseEstimation", "StandardPhaseEstimationSettings"]
 
 
-class StandardPhaseEstimationSettings(Settings):
+class StandardPhaseEstimationSettings(PhaseEstimationSettings):
     """Settings for the Standard Phase Estimation algorithm."""
 
     def __init__(self):
         """Initialize the settings for Standard Phase Estimation.
 
         Args:
-            num_bits: The number of phase bits to estimate.
-            evolution_time: The evolution time for the phase estimation.
             qft_do_swaps: Whether to include the final swap layer in the inverse QFT.
             shots: The number of shots to execute the circuit.
 
         """
         super().__init__()
-        self._set_default("num_bits", "int", 4, "The number of phase bits to estimate.")
-        self._set_default("evolution_time", "float", 0.1, "The evolution time for the phase estimation.")
         self._set_default(
             "qft_do_swaps",
             "bool",
@@ -68,7 +63,7 @@ class StandardPhaseEstimationSettings(Settings):
 class StandardPhaseEstimation(PhaseEstimation):
     """Standard QFT-based (non-iterative) phase estimation."""
 
-    def __init__(self, num_bits: int = 4, evolution_time: float = 0.1, qft_do_swaps: bool = True, shots: int = 3):
+    def __init__(self, num_bits: int, evolution_time: float, qft_do_swaps: bool = True, shots: int = 3):
         """Initialize the standard phase estimation routine.
 
         Args:
@@ -81,7 +76,6 @@ class StandardPhaseEstimation(PhaseEstimation):
 
         """
         Logger.trace_entering()
-        super().__init__()
         self._settings = StandardPhaseEstimationSettings()
         self._settings.set("num_bits", num_bits)
         self._settings.set("evolution_time", evolution_time)

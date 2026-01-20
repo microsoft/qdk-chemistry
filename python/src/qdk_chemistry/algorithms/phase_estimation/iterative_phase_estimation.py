@@ -25,41 +25,31 @@ from qdk_chemistry.data import (
     QpeResult,
     QuantumErrorProfile,
     QubitHamiltonian,
-    Settings,
 )
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.phase import iterative_phase_feedback_update, phase_fraction_from_feedback
 
-from .base import PhaseEstimation
+from .base import PhaseEstimation, PhaseEstimationSettings
 
 __all__: list[str] = ["IterativePhaseEstimation", "IterativePhaseEstimationSettings"]
 
 
-class IterativePhaseEstimationSettings(Settings):
+class IterativePhaseEstimationSettings(PhaseEstimationSettings):
     """Settings for the Iterative Phase Estimation algorithm."""
 
     def __init__(self):
         """Initialize the settings for Iterative Phase Estimation.
 
         Args:
-            num_bits: The number of phase bits to estimate.
-            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.
-            shots_per_iteration: The number of shots to execute per iteration.
+            shots_per_bit: The number of shots to execute per measuring a bit in the iterative phase estimation.
 
         """
         super().__init__()
-        self._set_default("num_bits", "int", 4, "The number of phase bits to estimate.")
         self._set_default(
-            "evolution_time",
-            "float",
-            0.1,
-            "Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.",
-        )
-        self._set_default(
-            "shots_per_iteration",
+            "shots_per_bit",
             "int",
             3,
-            "The number of shots to execute per iteration.",
+            "The number of shots to execute per measuring a bit in the iterative phase estimation.",
         )
 
 
@@ -68,24 +58,23 @@ class IterativePhaseEstimation(PhaseEstimation):
 
     def __init__(
         self,
-        num_bits: int = 4,
-        evolution_time: float = 0.1,
-        shots_per_iteration: int = 3,
+        num_bits: int,
+        evolution_time: float,
+        shots_per_bit: int = 3,
     ):
         """Initialize IterativePhaseEstimation with the given settings.
 
         Args:
             num_bits: The number of phase bits to estimate.
             evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.
-            shots_per_iteration: The number of shots to execute per iteration.
+            shots_per_bit: The number of shots to execute per measuring a bit in the iterative phase estimation.
 
         """
         Logger.trace_entering()
-        super().__init__()
         self._settings = IterativePhaseEstimationSettings()
         self._settings.set("num_bits", num_bits)
         self._settings.set("evolution_time", evolution_time)
-        self._settings.set("shots_per_iteration", shots_per_iteration)
+        self._settings.set("shots_per_bit", shots_per_bit)
         self._iteration_circuits: list[Circuit] | None = None
 
     def _run_impl(
@@ -133,7 +122,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             Logger.info(f"Iteration {iteration + 1} / {self.settings().get('num_bits')}: circuit generated.")
             # Run the iteration circuit on the simulator
             executor_data = circuit_executor.run(
-                iteration_circuit, shots=self.settings().get("shots_per_iteration"), noise=noise
+                iteration_circuit, shots=self.settings().get("shots_per_bit"), noise=noise
             )
             bitstring_result = executor_data.bitstring_counts
             Logger.info(
