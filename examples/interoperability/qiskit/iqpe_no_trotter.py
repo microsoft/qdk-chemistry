@@ -41,7 +41,6 @@ from qdk_chemistry.utils.phase import (
     iterative_phase_feedback_update,
     phase_fraction_from_feedback,
 )
-from qdk_chemistry.utils.wavefunction import get_top_determinants
 
 if TYPE_CHECKING:
     from qiskit.quantum_info import SparsePauliOp
@@ -226,7 +225,7 @@ qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
 qubit_pauli_op = qubit_hamiltonian.pauli_ops
 num_spin_orbitals = qubit_hamiltonian.num_qubits
 
-top_configurations = get_top_determinants(casci_wavefunction, max_determinants=2)
+top_configurations = casci_wavefunction.get_top_determinants(max_determinants=2)
 pmc = create("projected_multi_configuration_calculator")
 E_sparse, sparse_wavefunction = pmc.run(
     active_hamiltonian, list(top_configurations.keys())

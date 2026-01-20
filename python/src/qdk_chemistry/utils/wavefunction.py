@@ -8,36 +8,13 @@
 import numpy as np
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Configuration, Hamiltonian, SciWavefunctionContainer, Wavefunction
+from qdk_chemistry.data import Hamiltonian, SciWavefunctionContainer, Wavefunction
 from qdk_chemistry.utils import Logger
 
 __all__ = [
     "calculate_sparse_wavefunction",
     "get_active_determinants_info",
-    "get_top_determinants",
 ]
-
-
-def get_top_determinants(
-    wavefunction: Wavefunction, max_determinants: int | None = None
-) -> dict[Configuration, float | complex]:
-    """Return a list of determinants ranked by absolute CI coefficient.
-
-    Args:
-        wavefunction: The wavefunction from which to extract determinants.
-        max_determinants: Number of top determinants to return. If None, return all.
-
-    Returns:
-        A dictionary containing (Configuration, CI coefficient) pairs consisting of the top determinants.
-
-    """
-    Logger.trace_entering()
-    coefficients = list(wavefunction.get_coefficients())
-    determinants = wavefunction.get_active_determinants()
-    pairs = sorted(zip(coefficients, determinants, strict=True), key=lambda pair: -abs(pair[0]))
-    if max_determinants is not None:
-        pairs = pairs[:max_determinants]
-    return {det: coeff for coeff, det in pairs}
 
 
 def get_active_determinants_info(wavefunction: Wavefunction, max_determinants: int | None = None) -> str:
@@ -61,7 +38,7 @@ def get_active_determinants_info(wavefunction: Wavefunction, max_determinants: i
         alpha_indices = orbitals.get_active_space_indices()[0]
         num_orbital_chars = len(alpha_indices)
 
-    for det, coeff in get_top_determinants(wavefunction, max_determinants=max_determinants).items():
+    for det, coeff in wavefunction.get_top_determinants(max_determinants=max_determinants).items():
         det_string = det.to_string()
         if num_orbital_chars:
             det_string = det_string[:num_orbital_chars]
@@ -96,7 +73,7 @@ def calculate_sparse_wavefunction(
 
     """
     Logger.trace_entering()
-    ranked = get_top_determinants(reference_wavefunction, max_determinants)
+    ranked = reference_wavefunction.get_top_determinants(max_determinants=max_determinants)
     if not ranked:
         Logger.warn("No determinants found; returning an empty wavefunction.")
         return Wavefunction(SciWavefunctionContainer(np.array([]), [], reference_wavefunction.get_orbitals()))

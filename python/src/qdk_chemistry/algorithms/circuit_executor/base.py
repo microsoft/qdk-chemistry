@@ -1,4 +1,10 @@
-"""QDK/Chemistry circuit executor abstractions and utilities."""
+"""QDK/Chemistry circuit executor abstractions and utilities.
+
+This module defines the abstract base class for circuit executor algorithms
+that execute quantum circuits on various quantum hardware or simulators and
+return bitstring measurement results. The module supports implementation of
+custom circuit execution strategies, backends, and noise models.
+"""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
