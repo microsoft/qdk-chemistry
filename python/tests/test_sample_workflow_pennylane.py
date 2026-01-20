@@ -1,7 +1,7 @@
-"""End-to-end tests for Pennylane interoperability sample workflows.
+"""End-to-end tests for PennyLane interoperability sample workflows.
 
-This module contains tests for Pennylane interoperability samples.
-Tests are skipped if Pennylane is not installed.
+This module contains tests for PennyLane interoperability samples.
+Tests are skipped if PennyLane is not installed.
 
 See Also:
 - test_sample_workflow_sci.py - Sparse-CI workflow tests
