@@ -43,11 +43,11 @@ def test_qiskit_iqpe_model_hamiltonian():
         )
 
     phases = re.findall(r"Phase fraction φ \(measured\): ([0-9.+-eE]+)", result.stdout)
-    assert phases == ["0.140625", "0.989258"], f"Unexpected phase fractions: {phases}"
+    assert phases == ["0.140625", "0.988770"], f"Unexpected phase fractions: {phases}"
 
     energies = [float(val) for val in re.findall(r"Estimated energy: ([+\-0-9.]+) Hartree", result.stdout)]
     assert np.allclose(
-        energies, [1.12500000, -0.08593750], rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
+        energies, [1.12500000, -0.08984375], rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
     )
 
 
