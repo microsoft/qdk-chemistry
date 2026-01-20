@@ -20,6 +20,7 @@ Algorithm classes
    localizer
    mc_calculator
    mcscf
+   pmc
    qubit_mapper
    scf_solver
    stability_checker
@@ -54,6 +55,9 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
      - Orbitals → Hamiltonian
    * - :doc:`MultiConfigurationCalculator <mc_calculator>`
      - Many-body wavefunction calculations
+     - Hamiltonian → Wavefunction
+   * - :doc:`ProjectedMultiConfigurationCalculator <pmc>`
+     - Projected many-body wavefunction calculations
      - Hamiltonian → Wavefunction
    * - :doc:`MultiConfigurationScf <mcscf>`
      - Coupled `Orbital`-`Wavefunction` calculations.
