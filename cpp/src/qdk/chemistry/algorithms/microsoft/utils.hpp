@@ -145,8 +145,14 @@ std::vector<unsigned> compute_shell_map(
 /**
  * @brief Compute the factorial of a non-negative integer
  *
- * @param n The non-negative integer to compute the factorial of.
+ * For 64-bit size_t, the maximum safe input is n=20, as 21! exceeds the
+ * maximum value representable in 64 bits. Attempting to compute factorial
+ * for n > 20 will throw std::overflow_error.
+ *
+ * @param n The non-negative integer to compute the factorial of (must be <= 20
+ * for 64-bit size_t).
  * @return The factorial of n (n!).
+ * @throws std::overflow_error if n > 20 (for 64-bit size_t).
  */
 size_t factorial(size_t n);
 
