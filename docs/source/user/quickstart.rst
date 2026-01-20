@@ -155,11 +155,6 @@ By identifying and retaining only the dominant configurations (those with the la
 
    .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
       :language: cpp
-      :start-after: // start-cell-wfn-fn-select-configs
-      :end-before: // end-cell-wfn-fn-select-configs
-
-   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
-      :language: cpp
       :start-after: // start-cell-wfn-select-configs
       :end-before: // end-cell-wfn-select-configs
 
