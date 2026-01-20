@@ -23,8 +23,6 @@ __all__ = ["validate_encoding_compatibility", "EncodingMismatchError"]
 class EncodingMismatchError(ValueError):
     """Exception raised when Circuit and QubitHamiltonian have incompatible encodings."""
 
-    pass
-
 
 def validate_encoding_compatibility(circuit: Circuit, hamiltonian: QubitHamiltonian) -> None:
     """Validate that a Circuit and QubitHamiltonian use compatible encodings.
