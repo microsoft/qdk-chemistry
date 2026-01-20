@@ -1,4 +1,4 @@
-"""Tests for traditional phase estimation circuits."""
+"""Tests for qiskit standard phase estimation circuits."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -15,9 +15,9 @@ from qiskit import QuantumCircuit, qasm3
 from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
 from qdk_chemistry.data import Circuit, QpeResult, QubitHamiltonian
 from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
+from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
 from qdk_chemistry.utils.phase import energy_from_phase
 
 from .reference_tolerances import (
@@ -97,7 +97,7 @@ def _extract_traditional_results(problem: TraditionalProblem) -> QpeResult:
         QPE result including dominant bitstring, phase fraction, and energy.
 
     """
-    qpe = StandardPhaseEstimation(num_bits=problem.num_bits, evolution_time=problem.evolution_time)
+    qpe = QiskitStandardPhaseEstimation(num_bits=problem.num_bits, evolution_time=problem.evolution_time)
     simulator = QiskitAerSimulator(seed=_SEED)
 
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")

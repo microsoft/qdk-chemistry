@@ -1,7 +1,7 @@
-"""Standard (QFT-based) phase estimation implementation.
+"""Standard (QFT-based) phase estimation implementation via qiskit.
 
-This module implements the standard quantum phase estimation algorithm using the
-Quantum Fourier Transform (QFT), which measures all phase bits in parallel using
+This module implements the standard quantum phase estimation algorithm using the qiskit synthesis
+of the inverse Quantum Fourier Transform (QFT), which measures all phase bits in parallel using
 multiple ancilla qubits.
 
 References:
@@ -18,6 +18,7 @@ from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
 from qiskit.synthesis.qft.qft_decompose_full import synth_qft_full
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
+from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation, PhaseEstimationSettings
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
 from qdk_chemistry.data import (
@@ -29,16 +30,14 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.utils import Logger
 
-from .base import PhaseEstimation, PhaseEstimationSettings
-
-__all__: list[str] = ["StandardPhaseEstimation", "StandardPhaseEstimationSettings"]
+__all__: list[str] = ["QiskitStandardPhaseEstimation", "QiskitStandardPhaseEstimationSettings"]
 
 
-class StandardPhaseEstimationSettings(PhaseEstimationSettings):
-    """Settings for the Standard Phase Estimation algorithm."""
+class QiskitStandardPhaseEstimationSettings(PhaseEstimationSettings):
+    """Settings for the Qiskit Standard Phase Estimation algorithm."""
 
     def __init__(self):
-        """Initialize the settings for Standard Phase Estimation.
+        """Initialize the settings for Qiskit Standard Phase Estimation.
 
         Args:
             qft_do_swaps: Whether to include the final swap layer in the inverse QFT.
@@ -60,11 +59,11 @@ class StandardPhaseEstimationSettings(PhaseEstimationSettings):
         )
 
 
-class StandardPhaseEstimation(PhaseEstimation):
+class QiskitStandardPhaseEstimation(PhaseEstimation):
     """Standard QFT-based (non-iterative) phase estimation."""
 
     def __init__(self, num_bits: int = -1, evolution_time: float = 0.0, qft_do_swaps: bool = True, shots: int = 3):
-        """Initialize the standard phase estimation routine.
+        """Initialize the Qiskit standard phase estimation routine.
 
         Args:
             num_bits: The number of phase bits to estimate. Default to -1 for user to set a valid value.
@@ -78,7 +77,7 @@ class StandardPhaseEstimation(PhaseEstimation):
         """
         Logger.trace_entering()
         super().__init__(num_bits=num_bits, evolution_time=evolution_time)
-        self._settings = StandardPhaseEstimationSettings()
+        self._settings = QiskitStandardPhaseEstimationSettings()
         self._settings.set("num_bits", num_bits)
         self._settings.set("evolution_time", evolution_time)
         self._settings.set("qft_do_swaps", qft_do_swaps)
@@ -184,8 +183,9 @@ class StandardPhaseEstimation(PhaseEstimation):
                 power=power,
             )
 
-        inverse_qft = synth_qft_full(num_bits, do_swaps=self._settings.get("qft_do_swaps"), inverse=True)
-        inverse_qft.name = "Inverse QFT"
+        inverse_qft = synth_qft_full(
+            num_bits, do_swaps=self._settings.get("qft_do_swaps"), inverse=True, name="Inverse QFT"
+        )
         qc.compose(inverse_qft.to_gate(), qubits=ancilla, inplace=True)
         qc.measure(ancilla, classical)
         Logger.debug(f"Completed standard QPE circuit with {qc.num_qubits} qubits.")
@@ -250,5 +250,5 @@ class StandardPhaseEstimation(PhaseEstimation):
         raise ValueError("No QPE circuit has been generated. Please run the algorithm first.")
 
     def name(self) -> str:
-        """Return the algorithm name as standard."""
-        return "standard"
+        """Return the algorithm name as qiskit_standard."""
+        return "qiskit_standard"

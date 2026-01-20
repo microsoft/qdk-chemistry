@@ -19,9 +19,9 @@ from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import
     IterativePhaseEstimation,
     _validate_iteration_inputs,
 )
-from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
 from qdk_chemistry.data import Circuit, QpeResult, QuantumErrorProfile, QubitHamiltonian
 from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
+from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
 from qdk_chemistry.utils.phase import (
     accumulated_phase_from_bits,
     energy_from_phase,
@@ -138,7 +138,7 @@ def _run_traditional(problem: PhaseEstimationProblem) -> QpeResult:
         :class:`QpeResult` instance summarizing the traditional run.
 
     """
-    qpe = StandardPhaseEstimation(
+    qpe = QiskitStandardPhaseEstimation(
         num_bits=problem.num_bits, evolution_time=problem.evolution_time, shots=problem.shots_traditional
     )
     simulator = QiskitAerSimulator(seed=_SEED)
@@ -455,7 +455,7 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
         noise=error_profile,
     )
 
-    # Verify that noisy results deviate from expected values
+    # Verify that noisy results deviate from expected values and noiseless results
     assert noisy_result.bits_msb_first is not None
     assert not np.isclose(
         noisy_result.phase_fraction,
@@ -466,6 +466,18 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
     assert not np.isclose(
         noisy_result.raw_energy,
         two_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
+    assert not np.isclose(
+        noisy_result.phase_fraction,
+        noiseless_result.phase_fraction,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
+    )
+    assert not np.isclose(
+        noisy_result.raw_energy,
+        noiseless_result.raw_energy,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
     )
