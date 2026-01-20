@@ -8,12 +8,15 @@
 #include <iostream>
 #include <numeric>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <sstream>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
 std::shared_ptr<data::Wavefunction> ValenceActiveSpaceSelector::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
   QDK_LOG_TRACE_ENTERING();
+  QDK_LOGGER().info(
+      "ValenceActiveSpaceSelector::Starting active space selection.");
 
   // If orbitals already have an active space, we'll downselect from it
   // If not, we'll work with all orbitals
@@ -37,6 +40,9 @@ std::shared_ptr<data::Wavefunction> ValenceActiveSpaceSelector::_run_impl(
   int64_t num_active_electrons =
       _settings->get<int64_t>("num_active_electrons");
   int64_t num_active_orbitals = _settings->get<int64_t>("num_active_orbitals");
+  QDK_LOGGER().debug("Settings:");
+  QDK_LOGGER().debug("  num_active_electrons: {}", num_active_electrons);
+  QDK_LOGGER().debug("  num_active_orbitals: {}", num_active_orbitals);
 
   // Validate settings
   if (num_active_electrons <= 0) {
@@ -62,6 +68,8 @@ std::shared_ptr<data::Wavefunction> ValenceActiveSpaceSelector::_run_impl(
     candidate_indices.resize(orbitals->get_num_molecular_orbitals());
     std::iota(candidate_indices.begin(), candidate_indices.end(), 0);
   }
+  QDK_LOGGER().debug("Number of candidate orbitals: {}",
+                     candidate_indices.size());
 
   // Validate against candidate orbitals
   if (num_active_orbitals > static_cast<int>(candidate_indices.size())) {
@@ -117,6 +125,15 @@ std::shared_ptr<data::Wavefunction> ValenceActiveSpaceSelector::_run_impl(
         "Could not select the desired number of active orbitals.");
   }
   std::sort(active_space_indices.begin(), active_space_indices.end());
+  std::ostringstream oss;
+  for (size_t i = 0; i < active_space_indices.size(); ++i) {
+    if (i > 0) oss << ", ";
+    oss << active_space_indices[i];
+  }
+  QDK_LOGGER().info(
+      "ValenceActiveSpaceSelector::Selected active space of {} orbitals: {}",
+      active_space_indices.size(), oss.str());
+
   // Create new orbitals with the selected active space indices
   auto new_orbitals = detail::new_orbitals(wavefunction, active_space_indices);
   return detail::new_wavefunction(wavefunction, new_orbitals);
