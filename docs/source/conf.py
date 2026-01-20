@@ -5,6 +5,7 @@
 
 import importlib
 import os
+import re
 import shutil
 import sys
 from contextlib import suppress
@@ -307,6 +308,200 @@ def on_builder_inited(app):
                     obj.__module__ = public_mod  # docs-only shim
 
 
+# Pattern to match :cite:`key` in text nodes (handles the raw text form)
+_CITE_TEXT_PATTERN = re.compile(r":cite:`([^`]+)`")
+
+# Pattern to match ":cite:" followed by inline literal containing the key
+# This matches what Breathe produces: ":cite:" as text + <literal> node with key
+_CITE_PREFIX = ":cite:"
+
+
+def _create_pending_citation(app, docname, key):
+    """Create a pending cross-reference node for a bibtex citation.
+
+    This creates a node that sphinxcontrib-bibtex will resolve during
+    the final reference resolution phase, ensuring proper bibliography
+    inclusion and link generation.
+    """
+    from docutils import nodes  # type: ignore[import-untyped]
+    from sphinx.addnodes import pending_xref
+
+    key = key.strip()
+
+    # Create a pending cross-reference that Sphinx/bibtex will resolve
+    # The 'cite' role in sphinxcontrib-bibtex uses 'cite:p' or similar
+    # We create a pending_xref that will be resolved by the bibtex extension
+    pxref = pending_xref(
+        "",
+        nodes.Text(f"[{key}]"),
+        refdomain="cite",
+        reftype="p",  # parenthetical citation
+        reftarget=key,
+        refwarn=True,
+    )
+    pxref["ids"] = []
+    pxref["classes"] = ["bibtex"]
+
+    return pxref
+
+
+def _create_fallback_citation(app, docname, key):
+    """Create a fallback citation reference when bibtex pending_xref fails.
+
+    Creates a simple reference node linking to the references page.
+    """
+    from docutils import nodes  # type: ignore[import-untyped]
+
+    key = key.strip()
+    cite_text = nodes.inline("", f"[{key}]", classes=["bibtex-fallback"])
+    ref_node = nodes.reference(
+        "",
+        "",
+        cite_text,
+        internal=True,
+        refuri=f"references.html#id-{key.lower()}",
+        classes=["bibtex", "internal"],
+    )
+    return ref_node
+
+
+def transform_doctree_citations(app, doctree):
+    """Transform :cite:`key` markers in the doctree after reading.
+
+    This runs after Breathe has processed all Doxygen content, finding
+    patterns where `:cite:` appears as literal text followed by the key
+    in a literal/code node, and replaces them with proper citation nodes
+    that sphinxcontrib-bibtex will process.
+    """
+    from docutils import nodes  # type: ignore[import-untyped]
+
+    # Get current document name for reference resolution
+    docname = app.env.docname if hasattr(app.env, "docname") else ""
+
+    # Collect citation keys for later registration with bibtex
+    citation_keys = set()
+
+    # First pass: find patterns where ":cite:" text is followed by a literal node
+    # This is how Breathe renders the Doxygen :cite:`key` text
+    parents_to_process = set()
+
+    for node in doctree.traverse(nodes.literal):
+        parent = node.parent
+        if parent is None:
+            continue
+
+        try:
+            idx = parent.index(node)
+        except (ValueError, TypeError):
+            continue
+
+        # Check if previous sibling is a text node ending with ":cite:"
+        if idx > 0:
+            prev_node = parent[idx - 1]
+            if isinstance(prev_node, nodes.Text):
+                text = str(prev_node)
+                if text.rstrip().endswith(_CITE_PREFIX):
+                    parents_to_process.add(id(parent))
+
+    # Second pass: process and replace nodes in affected parents
+    for node in doctree.traverse(nodes.Element):
+        if id(node) not in parents_to_process:
+            continue
+
+        # Work through children looking for ":cite:" + literal patterns
+        i = 0
+        while i < len(node.children) - 1:
+            child = node.children[i]
+            next_child = node.children[i + 1] if i + 1 < len(node.children) else None
+
+            if (
+                isinstance(child, nodes.Text)
+                and next_child is not None
+                and isinstance(next_child, nodes.literal)
+            ):
+                text = str(child)
+                if text.rstrip().endswith(_CITE_PREFIX):
+                    # Found the pattern - extract citation key from literal
+                    cite_key = next_child.astext().strip()
+                    citation_keys.add(cite_key)
+
+                    # Create new text without ":cite:" suffix
+                    prefix_pos = text.rstrip().rfind(_CITE_PREFIX)
+                    new_text = text[:prefix_pos]
+
+                    # Create citation reference
+                    cite_ref = _create_pending_citation(app, docname, cite_key)
+
+                    # Replace nodes
+                    node.remove(child)
+                    node.remove(next_child)
+
+                    insert_pos = i
+                    if new_text:
+                        node.insert(insert_pos, nodes.Text(new_text))
+                        insert_pos += 1
+                    node.insert(insert_pos, cite_ref)
+
+                    # Don't increment i, process same position again
+                    continue
+
+            i += 1
+
+    # Third pass: handle any remaining :cite:`key` in plain text nodes
+    text_nodes_to_process = []
+    for node in doctree.traverse(nodes.Text):
+        text = str(node)
+        if _CITE_TEXT_PATTERN.search(text):
+            text_nodes_to_process.append(node)
+
+    for node in text_nodes_to_process:
+        text = str(node)
+        parent = node.parent
+        if parent is None:
+            continue
+
+        try:
+            idx = parent.index(node)
+        except (ValueError, TypeError):
+            continue
+
+        # Build replacement nodes
+        new_nodes = []
+        last_end = 0
+
+        for match in _CITE_TEXT_PATTERN.finditer(text):
+            # Text before citation
+            if match.start() > last_end:
+                new_nodes.append(nodes.Text(text[last_end : match.start()]))
+
+            # Citation reference
+            cite_key = match.group(1).strip()
+            citation_keys.add(cite_key)
+            new_nodes.append(_create_pending_citation(app, docname, cite_key))
+            last_end = match.end()
+
+        # Remaining text
+        if last_end < len(text):
+            new_nodes.append(nodes.Text(text[last_end:]))
+
+        # Replace original node
+        if new_nodes and last_end > 0:  # Only if we found matches
+            parent.remove(node)
+            for i, new_node in enumerate(new_nodes):
+                parent.insert(idx + i, new_node)
+
+
+def process_breathe_docstring(app, what, name, obj, options, lines):
+    """Process :cite:`key` markers that appear in docstrings.
+
+    For Python docstrings processed by autodoc, the :cite: role should work
+    natively with sphinxcontrib-bibtex. This hook is available for any
+    additional processing needs.
+    """
+    # The :cite:`key` syntax works as-is for autodoc docstrings
+    pass
+
+
 def setup(app):
     """Setup function to connect autodoc-skip-member and viewcode filters."""
     import sys
@@ -316,4 +511,8 @@ def setup(app):
     app.connect("autodoc-skip-member", autodoc_skip_imports)
     app.connect("autodoc-process-signature", normalize_autodoc_signature)
     app.connect("autodoc-process-docstring", normalize_autodoc_docstring)
+    app.connect("autodoc-process-docstring", process_breathe_docstring)
     app.connect("builder-inited", on_builder_inited)
+    # Transform :cite:`key` markers in Doxygen/Breathe content before reference resolution
+    # Using doctree-read so pending_xref nodes get resolved by bibtex extension
+    app.connect("doctree-read", transform_doctree_citations)

@@ -8,13 +8,13 @@
 ################################################################################
 # start-cell-structure
 from pathlib import Path
+
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 from qdk_chemistry.data.qubit_hamiltonian import (
     filter_and_group_pauli_ops_from_wavefunction,
 )
-from qdk_chemistry.utils.wavefunction import get_top_determinants
 
 # Load para-benzyne structure from XYZ file
 structure = Structure.from_xyz_file(
@@ -83,7 +83,7 @@ print(
 ################################################################################
 # start-cell-wfn-select-configs
 # Get top 2 determinants from the CASCI wavefunction to form a sparse wavefunction
-top_configurations = get_top_determinants(wfn_cas, max_determinants=2)
+top_configurations = wfn_cas.get_top_determinants(max_determinants=2)
 
 # Compute the reference energy of the sparse wavefunction
 pmc_calculator = create("projected_multi_configuration_calculator")
