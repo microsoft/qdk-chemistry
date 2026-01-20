@@ -27,7 +27,7 @@ _PENNYLANE_AVAILABLE = importlib.util.find_spec("pennylane") is not None
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
 
 
-@pytest.mark.skipif(not _PENNYLANE_AVAILABLE, reason="Pennylane is not installed")
+@pytest.mark.skipif(not _PENNYLANE_AVAILABLE, reason="PennyLane is not installed")
 def test_pennylane_qpe_no_trotter():
     """Test the examples/interoperability/pennylane/qpe_no_trotter.py script."""
     script_path = EXAMPLES_DIR / "interoperability" / "pennylane" / "qpe_no_trotter.py"
