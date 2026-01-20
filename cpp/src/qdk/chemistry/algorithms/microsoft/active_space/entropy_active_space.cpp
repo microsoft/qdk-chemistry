@@ -21,8 +21,8 @@ std::shared_ptr<data::Wavefunction> AutocasEosActiveSpaceSelector::_run_impl(
   const double plateau_threshold = _settings->get<double>("diff_threshold");
   const bool normalize_entropies = _settings->get<bool>("normalize_entropies");
   QDK_LOGGER().debug("Settings:");
-  QDK_LOGGER().debug("  entropy_threshold: {:.6f}", entropy_threshold);
-  QDK_LOGGER().debug("  diff_threshold: {:.6f}", plateau_threshold);
+  QDK_LOGGER().debug("  entropy_threshold: {}", entropy_threshold);
+  QDK_LOGGER().debug("  diff_threshold: {}", plateau_threshold);
   QDK_LOGGER().debug("  normalize_entropies: {}", normalize_entropies);
 
   // get max entropy, sorted entropies and corresponding orbital indices

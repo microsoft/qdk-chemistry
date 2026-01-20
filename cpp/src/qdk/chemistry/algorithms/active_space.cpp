@@ -73,17 +73,17 @@ _sort_entropies_and_indices(std::shared_ptr<data::Wavefunction> wavefunction,
   QDK_LOGGER().info("max entropy: {:.6f}", max_entropy);
   if (normalize_entropies) {
     QDK_LOGGER().info("Normalized orbital entropies:");
-    QDK_LOGGER().info("  Orbital index   Normalized Entropy  Raw Entropy");
+    QDK_LOGGER().info("  Orbital index   Normalized Entropy   Raw Entropy");
     for (size_t i = 0; i < sorted_entropies.size(); ++i) {
-      QDK_LOGGER().info("         {:>6}             {:>.6f}     {:>.6f}",
+      QDK_LOGGER().info("         {:>6}         {:>12.6f}    {:>10.6f}",
                         selected_active_space_indices[i], sorted_entropies[i],
                         sorted_entropies[i] * max_entropy);
     }
   } else {
     QDK_LOGGER().info("Orbital entropies:");
-    QDK_LOGGER().info("  Orbital index    Raw Entropy");
+    QDK_LOGGER().info("  Orbital index   Raw Entropy");
     for (size_t i = 0; i < sorted_entropies.size(); ++i) {
-      QDK_LOGGER().info("         {:>6}       {:>.6f}",
+      QDK_LOGGER().info("         {:>6}  {:>12.6f}",
                         selected_active_space_indices[i], sorted_entropies[i]);
     }
   }

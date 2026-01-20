@@ -32,7 +32,7 @@ std::shared_ptr<data::Wavefunction> OccupationActiveSpaceSelector::_run_impl(
   // Get the occupation threshold from settings
   double occupation_threshold = _settings->get<double>("occupation_threshold");
   QDK_LOGGER().debug("Settings:");
-  QDK_LOGGER().debug("  occupation_threshold: {:.6f}", occupation_threshold);
+  QDK_LOGGER().debug("  occupation_threshold: {}", occupation_threshold);
 
   // Get occupations
   auto [alpha_occupations, beta_occupations] =
@@ -62,7 +62,7 @@ std::shared_ptr<data::Wavefunction> OccupationActiveSpaceSelector::_run_impl(
   QDK_LOGGER().info("Orbital occupations:");
   QDK_LOGGER().info("  Orbital index    Occupation");
   for (const auto& [orbital_idx, occ] : orbital_occupations) {
-    QDK_LOGGER().info("         {:>6}      {:>.6f}", orbital_idx, occ);
+    QDK_LOGGER().info("         {:>6}  {:>12.6f}", orbital_idx, occ);
   }
 
   std::vector<size_t> active_space_indices;

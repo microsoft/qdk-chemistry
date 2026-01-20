@@ -65,9 +65,9 @@ std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
     orbitals_above_bin[i] = entropy_idx;
   }
   QDK_LOGGER().debug("Orbitals above each bin threshold:");
-  QDK_LOGGER().debug("   Bin   Bin Threshold    #Orbitals Above");
+  QDK_LOGGER().debug("    Bin   Bin Threshold    #Orbitals Above");
   for (size_t i = 0; i < num_bins; ++i) {
-    QDK_LOGGER().debug("  {:>4}   {:>13.6f}    {:>15}", i, bins[i],
+    QDK_LOGGER().debug("  {:>5}    {:>12.6f}    {:>15}", i, bins[i],
                        orbitals_above_bin[i]);
   }
 
