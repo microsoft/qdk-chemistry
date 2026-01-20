@@ -302,6 +302,26 @@ inline std::shared_ptr<Structure> create_bn_plus_structure() {
 }
 
 /**
+ * @brief Create a single H atom structure
+ */
+inline std::shared_ptr<Structure> create_hydrogen_structure() {
+  std::vector<Eigen::Vector3d> coords = {
+      {0.00000000000, 0.00000000000, 0.00000000000}};
+  std::vector<Element> elements = {qdk::chemistry::data::Element::H};
+  return std::make_shared<Structure>(coords, elements);
+}
+
+/**
+ * @brief Create a single N atom structure
+ */
+inline std::shared_ptr<Structure> create_nitrogen_structure() {
+  std::vector<Eigen::Vector3d> coords = {
+      {0.00000000000, 0.00000000000, 0.00000000000}};
+  std::vector<Element> elements = {qdk::chemistry::data::Element::N};
+  return std::make_shared<Structure>(coords, elements);
+}
+
+/**
  * @brief Create a single O structure
  */
 inline std::shared_ptr<Structure> create_oxygen_structure() {

@@ -424,6 +424,23 @@ StabilityChecker::_run_impl(
       wavefunction->get_total_num_electrons();
   bool unrestricted = orbitals->is_unrestricted();
 
+  // Handle zero-electron systems (e.g., H+)
+  // There are no occupied orbitals, so stability analysis is trivially stable
+  if (n_alpha_electrons == 0 && n_beta_electrons == 0) {
+    QDK_LOGGER().info(
+        "Zero-electron system detected: stability analysis is trivially "
+        "stable.");
+    auto stability_result = std::make_shared<data::StabilityResult>(
+        true,                         // internal_stable
+        true,                         // external_stable
+        Eigen::VectorXd::Zero(0),     // internal_eigenvalues
+        Eigen::MatrixXd::Zero(0, 0),  // internal_eigenvectors
+        Eigen::VectorXd::Zero(0),     // external_eigenvalues
+        Eigen::MatrixXd::Zero(0, 0)   // external_eigenvectors
+    );
+    return std::make_pair(true, stability_result);
+  }
+
   // Throw error if the scf is ROHF/ROKS
   if (!unrestricted && n_alpha_electrons != n_beta_electrons) {
     throw std::runtime_error(
