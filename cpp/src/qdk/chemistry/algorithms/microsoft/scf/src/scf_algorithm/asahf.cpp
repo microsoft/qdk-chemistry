@@ -27,27 +27,27 @@ namespace detail {
  */
 std::array<size_t, 4> get_core_config_from_ecp_shells(
     const BasisSet& basis_set) {
-
   size_t ecp_electrons = basis_set.n_ecp_electrons;
   // ecp map
   std::unordered_map<int, std::array<size_t, 4>> ecp_map = {
-      { 0, {0,0,0,0}},  // []
-      { 2, {1,0,0,0}},  // [He]
-      {10, {2,1,0,0}},  // [Ne]
-      {18, {3,2,0,0}},  // [Ar]
-      {28, {3,2,1,0}},  // [Ar] + 3d
-      {36, {4,3,1,0}},  // [Kr]
-      {46, {4,3,2,0}},  // [Kr] + 4d
-      {54, {5,4,2,0}},  // [Xe]
-      {60, {4,3,2,1}},  // [Kr] + 4d + 4f
-      {68, {5,4,2,1}},  // [Xe] + 4f
-      {78, {5,4,3,1}}  // [Xe] + 4f + 5d
+      {0, {0, 0, 0, 0}},   // []
+      {2, {1, 0, 0, 0}},   // [He]
+      {10, {2, 1, 0, 0}},  // [Ne]
+      {18, {3, 2, 0, 0}},  // [Ar]
+      {28, {3, 2, 1, 0}},  // [Ar] + 3d
+      {36, {4, 3, 1, 0}},  // [Kr]
+      {46, {4, 3, 2, 0}},  // [Kr] + 4d
+      {54, {5, 4, 2, 0}},  // [Xe]
+      {60, {4, 3, 2, 1}},  // [Kr] + 4d + 4f
+      {68, {5, 4, 2, 1}},  // [Xe] + 4f
+      {78, {5, 4, 3, 1}}   // [Xe] + 4f + 5d
   };
 
   // check if ecp_electrons is in map
   if (ecp_map.find(ecp_electrons) == ecp_map.end()) {
     throw std::runtime_error(
-        "ECP electron configuration not predefined for this number of ECP electrons.");
+        "ECP electron configuration not predefined for this number of ECP "
+        "electrons.");
   }
 
   std::array<size_t, 4> core_config = ecp_map[ecp_electrons];
@@ -159,17 +159,6 @@ std::shared_ptr<BasisSet> make_atom_basis_set(size_t index,
     mol->total_nuclear_charge = mol->atomic_charges[0];
     mol->n_electrons = mol->total_nuclear_charge - mol->charge;
   }
-
-  // print ecp info
-  std::cout << "Created atomic basis set for atomic number "
-            << atomic_number << " with " << atom_basis->shells.size()
-            << " shells and " << atom_basis->ecp_shells.size()
-            << " ECP shells." << std::endl;
-    std::cout << "Element ECP electrons map: ";
-    for (const auto& [k, v] : ecp_electrons) {
-        std::cout << k << "->" << v << " ";
-    }
-    std::cout << std::endl;
 
   return atom_basis;
 }
@@ -461,7 +450,7 @@ void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
     size_t degeneracy = 2 * l + 1;
     size_t n_shells = idx.size() / degeneracy;
 
-    // Get full configuration for this atom using atomic number (not adjusted for ECPs)
+    // Get full configuration for this atom using atomic number
     auto [n_double_occ, frac_occ] =
         detail::get_num_frac_occ_orbs(l, ctx_.mol->atomic_nums[0]);
 
@@ -469,7 +458,7 @@ void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
     if (l < 4 && core_config[l] > 0) {
       // core_config[l] is already the number of core shells for this l
       size_t core_shells = core_config[l];
-      if (n_double_occ > core_shells) {
+      if (n_double_occ >= core_shells) {
         n_double_occ -= core_shells;
       } else {
         // All electrons for this l are in the core

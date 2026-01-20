@@ -39,8 +39,7 @@ inline std::shared_ptr<Molecule> make_HI() {
   mol->total_nuclear_charge =
       std::accumulate(mol->atomic_nums.begin(), mol->atomic_nums.end(), 0ul);
   mol->n_electrons = mol->total_nuclear_charge;
-  mol->coords = {{0.0, 0.0, 0.0},
-                {0.0, 0.0, 1.6019}};
+  mol->coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.6019}};
 
   const auto bohr_to_ang = 0.52917721092;  // Local def of conversion factor
                                            // consistent with unit tests
