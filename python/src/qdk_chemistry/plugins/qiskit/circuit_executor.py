@@ -1,4 +1,9 @@
-"""QDK/Chemistry Circuit Executor QDK implementation."""
+"""Qiskit Aer Simulator circuit executor for QDK/Chemistry.
+
+This module provides a CircuitExecutor implementation that uses Qiskit Aer Simulator
+to execute quantum circuits. It accepts QDK/Chemistry Circuit and QuantumErrorProfile
+data classes and returns measurement bitstring results via CircuitExecutorData.
+"""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

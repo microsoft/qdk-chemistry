@@ -33,8 +33,9 @@ class PhaseEstimationSettings(Settings):
         """Initialize the settings for Phase Estimation.
 
         Args:
-            num_bits: The number of phase bits to estimate.
-            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.
+            num_bits: The number of phase bits to estimate. Default to -1 for user to set a valid value.
+            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``,
+                default to 0.0 for user to set a valid value.
 
         """
         super().__init__()
@@ -109,8 +110,8 @@ class PhaseEstimation(Algorithm):
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to evolve under.
-            evolution_builder: The time evolution builder to use.
             time: The evolution time.
+            evolution_builder: The time evolution builder to use.
 
         Returns:
             The time evolution unitary circuit.

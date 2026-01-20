@@ -72,6 +72,7 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         """
         Logger.trace_entering()
+        super().__init__(num_bits=num_bits, evolution_time=evolution_time)
         self._settings = IterativePhaseEstimationSettings()
         self._settings.set("num_bits", num_bits)
         self._settings.set("evolution_time", evolution_time)

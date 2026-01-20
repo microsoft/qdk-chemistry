@@ -1,4 +1,9 @@
-"""QDK/Chemistry Circuit Executor QDK implementation."""
+"""QDK/Chemistry Circuit Executor QDK implementation.
+
+This module provides a CircuitExecutor implementation that uses the QDK Full State Simulator
+to execute quantum circuits. It accepts QDK/Chemistry Circuit and QuantumErrorProfile
+data classes and returns measurement bitstring results via CircuitExecutorData.
+"""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

@@ -20,23 +20,7 @@ __all__: list[str] = []
 
 
 class QpeResult(DataClass):
-    """Structured output for quantum phase estimation workflows.
-
-    Attributes:
-        method (str): Identifier for the algorithm or workflow that produced the result.
-        evolution_time (float): Evolution time ``t`` used in ``U = exp(-i H t)``.
-        phase_fraction (float): Raw measured phase fraction in ``[0, 1)``.
-        phase_angle (float): Raw measured phase angle in radians.
-        canonical_phase_fraction (float): Alias-resolved phase fraction consistent with the selected energy branch.
-        canonical_phase_angle (float): Alias-resolved phase angle in radians.
-        raw_energy (float): Energy computed directly from ``phase_fraction``.
-        branching (tuple[float, ...]): Sorted tuple of all alias energy candidates considered.
-        resolved_energy (float | None): Alias energy selected with the optional reference value, if available.
-        bits_msb_first (tuple[int, ...] | None): Tuple of measured bits ordered from MSB to LSB, when provided.
-        bitstring_msb_first (str | None): Measured bitstring representation, when provided.
-        metadata (dict[str, object] | None): Optional free-form metadata copied from the caller.
-
-    """
+    """Structured output for quantum phase estimation workflows."""
 
     # Class attribute for filename validation
     _data_type_name = "qpe_result"
@@ -62,18 +46,18 @@ class QpeResult(DataClass):
         """Initialize a QPE result.
 
         Args:
-            method (str): Identifier for the algorithm or workflow.
-            evolution_time (float): Evolution time used in the simulation.
-            phase_fraction (float): Raw measured phase fraction.
-            phase_angle (float): Raw measured phase angle in radians.
-            canonical_phase_fraction (float): Alias-resolved phase fraction.
-            canonical_phase_angle (float): Alias-resolved phase angle.
-            raw_energy (float): Energy computed from phase_fraction.
-            branching (tuple[float, ...]): Tuple of alias energy candidates.
-            resolved_energy (float | None): Alias energy selected with reference.
-            bits_msb_first (tuple[int, ...] | None): Measured bits from MSB to LSB.
-            bitstring_msb_first (str | None): Bitstring representation.
-            metadata (dict[str, object] | None): Optional metadata dictionary.
+            method: Identifier for the algorithm or workflow that produced the result.
+            evolution_time: Evolution time ``t`` used in ``U = exp(-i H t)``.
+            phase_fraction:  Raw measured phase fraction in ``[0, 1)``.
+            phase_angle: Raw measured phase angle in radians.
+            canonical_phase_fraction:  Alias-resolved phase fraction consistent with the selected energy branch.
+            canonical_phase_angle: Alias-resolved phase angle in radians.
+            raw_energy: Energy computed directly from ``phase_fraction``.
+            branching: Sorted tuple of all alias energy candidates considered.
+            resolved_energy: Alias energy selected with the optional reference value, if available.
+            bits_msb_first: Tuple of measured bits ordered from MSB to LSB, when provided.
+            bitstring_msb_first: Measured bitstring representation, when provided.
+            metadata: Optional metadata dictionary.
 
         """
         Logger.trace_entering()
@@ -115,7 +99,7 @@ class QpeResult(DataClass):
             bits_msb_first: Optional measured bits ordered from MSB to LSB.
             bitstring_msb_first: Optional string representation of the measured bits.
             reference_energy: Optional target value used to select the canonical alias branch.
-            metadata (dict[str, object] | None): Optional dictionary copied into the result for caller-defined context.
+            metadata: Optional dictionary copied into the result for caller-defined context.
 
         Returns:
             QpeResult: Populated :class:`QpeResult` instance reflecting the supplied data.
