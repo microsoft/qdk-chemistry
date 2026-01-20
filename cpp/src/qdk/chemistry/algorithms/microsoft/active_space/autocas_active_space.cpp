@@ -8,18 +8,25 @@
 #include <numeric>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <set>
+#include <sstream>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
 std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
   QDK_LOG_TRACE_ENTERING();
+  QDK_LOGGER().info("AutoCAS::Starting active space selection.");
 
   // get settings
   const int64_t min_plateau_size = _settings->get<int64_t>("min_plateau_size");
   const int64_t num_bins = _settings->get<int64_t>("num_bins");
   const double entropy_threshold = _settings->get<double>("entropy_threshold");
   const bool normalize_entropies = _settings->get<bool>("normalize_entropies");
+  QDK_LOGGER().debug("Settings:");
+  QDK_LOGGER().debug("  min_plateau_size: {}", min_plateau_size);
+  QDK_LOGGER().debug("  num_bins: {}", num_bins);
+  QDK_LOGGER().debug("  entropy_threshold: {}", entropy_threshold);
+  QDK_LOGGER().debug("  normalize_entropies: {}", normalize_entropies);
 
   // get max entropy, sorted entropies and corresponding orbital indices
   auto [max_entropy, selected_active_space_indices, sorted_entropies] =
@@ -29,11 +36,16 @@ std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
   if (max_entropy < entropy_threshold) {
     // create new orbitals with active space
     auto new_orbitals = detail::new_orbitals(wavefunction, {});
+    QDK_LOGGER().warn(
+        "Max entropy {:.6f} is below threshold {:.6f}. "
+        "No active space selected.",
+        max_entropy, entropy_threshold);
     return detail::new_wavefunction(wavefunction, new_orbitals);
   }
 
   // create discrete bins
   const double bin_width = 1.0 / num_bins;
+  QDK_LOGGER().debug("Bin width: {:.6f}", bin_width);
   std::vector<double> bins(num_bins);
   for (size_t i = 0; i < num_bins; ++i) {
     bins[i] = i * bin_width;
@@ -51,6 +63,12 @@ std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
     }
     // All entropies from 0 to entropy_idx-1 are > bin_threshold
     orbitals_above_bin[i] = entropy_idx;
+  }
+  QDK_LOGGER().debug("Orbitals above each bin threshold:");
+  QDK_LOGGER().debug("    Bin   Bin Threshold    #Orbitals Above");
+  for (size_t i = 0; i < num_bins; ++i) {
+    QDK_LOGGER().debug("  {:>5}    {:>12.6f}    {:>15}", i, bins[i],
+                       orbitals_above_bin[i]);
   }
 
   // find plateaus
@@ -74,6 +92,19 @@ std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
   if (plateau_size >= min_plateau_size) {
     plateaus.emplace_back(current_bin, bins.size() - 1);
   }
+  // Logging
+  QDK_LOGGER().info("Identified {} plateaus.", plateaus.size());
+  for (const auto& plateau : plateaus) {
+    QDK_LOGGER().debug(
+        "Plateau from bin {} to bin {}: Orbitals above bin start = {}",
+        plateau.first, plateau.second, orbitals_above_bin[plateau.first]);
+  }
+  if (plateaus.empty()) {
+    QDK_LOGGER().warn(
+        "No plateaus found with min_plateau_size {}. "
+        "No active space selected.",
+        min_plateau_size);
+  }
 
   // get number of orbitals from each plateau
   std::vector<size_t> active_space_sizes;
@@ -84,6 +115,11 @@ std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
     if (orbitals_above_bin[plateau.first] > 0) {
       size_t index = orbitals_above_bin[plateau.first] - 1;
       active_space_sizes.push_back(orbitals_above_bin[plateau.first]);
+      QDK_LOGGER().debug(
+          "Plateau from bin {} to bin {} selects {} orbitals "
+          "with smallest entropy {:.6f}.",
+          plateau.first, plateau.second, orbitals_above_bin[plateau.first],
+          sorted_entropies[index]);
     }
   }
 
@@ -93,6 +129,12 @@ std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
                          ? 0
                          : *std::max_element(active_space_sizes.begin(),
                                              active_space_sizes.end());
+  if (max_space == 0) {
+    QDK_LOGGER().warn(
+        "No plateau identified with orbitals above entropy threshold {:.6f}. "
+        "No active space selected.",
+        entropy_threshold);
+  }
 
   // Reuse selected_active_space_indices, keeping only the first max_space
   // elements
@@ -101,6 +143,14 @@ std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
   // sort selected_active_orbitals
   std::sort(selected_active_space_indices.begin(),
             selected_active_space_indices.end());
+
+  std::ostringstream oss;
+  for (size_t i = 0; i < selected_active_space_indices.size(); ++i) {
+    if (i > 0) oss << ", ";
+    oss << selected_active_space_indices[i];
+  }
+  QDK_LOGGER().info("AutoCAS::Selected active space of {} orbitals: {}",
+                    selected_active_space_indices.size(), oss.str());
 
   // create new orbitals with active space
   auto new_orbitals =
