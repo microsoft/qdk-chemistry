@@ -663,6 +663,9 @@ auto p_davidson(int64_t N_local, int64_t max_m, const Functor& op,
       E1_denom += X_local[j] * X_local[j] / denom;
     }
     E1_denom = allreduce(E1_denom, MPI_SUM, comm);
+    if (std::abs(E1_denom) < min_abs_denominator) {
+      E1_denom = (E1_denom >= 0) ? min_abs_denominator : -min_abs_denominator;
+    }
     E1_num = allreduce(E1_num, MPI_SUM, comm);
     const double E1 = E1_num / E1_denom;
 

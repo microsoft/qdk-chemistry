@@ -1074,7 +1074,7 @@ TEST_F(ScfTest, AtomInitGuessEnergyConvergence) {
 }
 
 /**
- * @brief Test SCF on H+ ion (0 electron edge case)
+ * @brief Test SCF on H+ ion (zero electron edge case)
  *
  */
 TEST_F(ScfTest, HydrogenIon_CCPVDZ_SCF) {

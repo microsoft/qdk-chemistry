@@ -501,7 +501,7 @@ void SCFImpl::iterate_() {
     // Initialize coefficient matrix with identity (virtual orbitals only)
     C_ = RowMajorMatrix::Identity(num_molecular_orbitals_,
                                   num_molecular_orbitals_);
-    // Initialize eigenvalues from one-electron Hamiltonian
+    // Initialize eigenvalues to zero for zero-electron system
     eigenvalues_ =
         RowMajorMatrix::Zero(num_density_matrices_, num_molecular_orbitals_);
     QDK_LOGGER().info(
