@@ -50,5 +50,5 @@ class QubitMapperFactory(AlgorithmFactory):
         return "qubit_mapper"
 
     def default_algorithm_name(self) -> str:
-        """Return ``qiskit`` as the default algorithm name."""
-        return "qiskit"
+        """Return ``qdk`` as the default algorithm name."""
+        return "qdk"
