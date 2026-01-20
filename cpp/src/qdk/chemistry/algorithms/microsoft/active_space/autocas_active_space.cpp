@@ -132,7 +132,8 @@ std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
   if (max_space == 0) {
     QDK_LOGGER().warn(
         "No plateau identified with orbitals above entropy threshold {:.6f}. "
-        "No active space selected.");
+        "No active space selected.",
+        entropy_threshold);
   }
 
   // Reuse selected_active_space_indices, keeping only the first max_space
