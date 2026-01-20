@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from qdk_chemistry.data.circuit import Circuit
     from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 
-__all__ = ["validate_encoding_compatibility", "EncodingMismatchError"]
+__all__ = ["EncodingMismatchError", "validate_encoding_compatibility"]
 
 
 class EncodingMismatchError(ValueError):

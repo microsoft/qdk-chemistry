@@ -234,7 +234,9 @@ class QubitHamiltonian(DataClass):
             str: Summary string describing the qubit Hamiltonian.
 
         """
-        summary = f"Qubit Hamiltonian\n  Number of qubits: {self.num_qubits}\n  Number of terms: {len(self.pauli_strings)}\n"
+        summary = (
+            f"Qubit Hamiltonian\n  Number of qubits: {self.num_qubits}\n  Number of terms: {len(self.pauli_strings)}\n"
+        )
         if self.encoding is not None:
             summary += f"  Encoding: {self.encoding}\n"
         return summary
@@ -418,9 +420,7 @@ def _filter_and_group_pauli_ops_from_statevector(
         reduced_pauli.append(best_pauli)
         reduced_coeffs.append(coeff_sum)
 
-    reduced_hamiltonian = QubitHamiltonian(
-        reduced_pauli, np.array(reduced_coeffs), encoding=hamiltonian.encoding
-    )
+    reduced_hamiltonian = QubitHamiltonian(reduced_pauli, np.array(reduced_coeffs), encoding=hamiltonian.encoding)
 
     grouped_hamiltonians = (
         reduced_hamiltonian.group_commuting(qubit_wise=abelian_grouping) if abelian_grouping else [reduced_hamiltonian]
