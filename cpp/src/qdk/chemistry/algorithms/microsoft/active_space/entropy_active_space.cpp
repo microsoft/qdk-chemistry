@@ -7,17 +7,23 @@
 #include <algorithm>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <set>
+#include <sstream>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
 std::shared_ptr<data::Wavefunction> AutocasEosActiveSpaceSelector::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
   QDK_LOG_TRACE_ENTERING();
+  QDK_LOGGER().info("AutoCAS-EOS::Starting active space selection.");
 
   // get settings
   const double entropy_threshold = _settings->get<double>("entropy_threshold");
   const double plateau_threshold = _settings->get<double>("diff_threshold");
   const bool normalize_entropies = _settings->get<bool>("normalize_entropies");
+  QDK_LOGGER().debug("Settings:");
+  QDK_LOGGER().debug("  entropy_threshold: {}", entropy_threshold);
+  QDK_LOGGER().debug("  diff_threshold: {}", plateau_threshold);
+  QDK_LOGGER().debug("  normalize_entropies: {}", normalize_entropies);
 
   // get max entropy, sorted entropies and corresponding orbital indices
   auto [max_entropy, selected_active_space_indices, sorted_entropies] =
@@ -35,6 +41,13 @@ std::shared_ptr<data::Wavefunction> AutocasEosActiveSpaceSelector::_run_impl(
       active_space_sizes.push_back(i + 1);
     }
   }
+  std::ostringstream oss1;
+  for (size_t i = 0; i < active_space_sizes.size(); ++i) {
+    if (i > 0) oss1 << ", ";
+    oss1 << active_space_sizes[i];
+  }
+  QDK_LOGGER().debug("Found {} candidate active spaces of sizes: {}",
+                     active_space_sizes.size(), oss1.str());
 
   // Select plateau with largest number of orbitals (which is above entropy
   // threshold)
@@ -49,6 +62,13 @@ std::shared_ptr<data::Wavefunction> AutocasEosActiveSpaceSelector::_run_impl(
   // sort selected orbitals
   std::sort(selected_active_space_indices.begin(),
             selected_active_space_indices.end());
+  std::ostringstream oss2;
+  for (size_t i = 0; i < selected_active_space_indices.size(); ++i) {
+    if (i > 0) oss2 << ", ";
+    oss2 << selected_active_space_indices[i];
+  }
+  QDK_LOGGER().info("AutoCAS-EOS::Selected active space of {} orbitals: {}",
+                    selected_active_space_indices.size(), oss2.str());
 
   // create new orbitals with active space
   auto new_orbitals =
