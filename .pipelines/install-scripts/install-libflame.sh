@@ -6,7 +6,7 @@ MARCH=${2:-x86-64-v3}
 LIBFLAME_VERSION=${3:-5.2.0}
 CFLAGS=${4:-"-fPIC -O3"}
 
-# Select architectures to build BLIS for
+# Select architectures to build libflame for
 if [[ ${MARCH} == 'armv8-a' ]]; then
     # Compile for armsve, firestorm, thunderx2, cortexa57, cortexa53, and generic architectures
     export LIBFLAME_ARCH=arm64
@@ -28,8 +28,9 @@ mv libflame-${LIBFLAME_VERSION} libflame
 
 # Configure and build libflame
 cd libflame
-ln -s /usr/bin/python3 /usr/bin/python
-CFLAGS=${CFLAGS} ./configure \
+
+export PYTHON=/usr/bin/python3
+CFLAGS="${CFLAGS}" ./configure \
     --build=$LIBFLAME_BUILD \
     --enable-static-build \
     --prefix=${INSTALL_PREFIX} \
@@ -37,7 +38,6 @@ CFLAGS=${CFLAGS} ./configure \
     --enable-legacy-lapack \
     --enable-max-arg-list-hack \
     --target=$LIBFLAME_ARCH
-
 make -j$(nproc)
 make install
 

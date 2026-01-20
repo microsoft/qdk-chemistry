@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 INSTALL_PREFIX=${1:-/usr/local}
 MARCH=${2:-x86-64-v3}
 BLIS_VERSION=${3:-2.0}
@@ -20,7 +22,7 @@ if [[ ${MARCH} == 'armv8-a' ]]; then
     # Compile for generic architecture due to issues with block
     # size allocations for certain ARM instruction sets
     export BLIS_ARCH=generic
-    CFLAGS=${CFLAGS} ./configure \
+    CFLAGS="${CFLAGS}" ./configure \
     --disable-shared \
     --enable-static \
     --enable-cblas \
@@ -29,7 +31,7 @@ if [[ ${MARCH} == 'armv8-a' ]]; then
 elif [[ ${MARCH} == 'x86-64-v3' ]]; then
     # Compile for intel64, amd64, and amd64_legacy architectures
     export BLIS_ARCH=x86_64
-    CFLAGS=${CFLAGS} ./configure \
+    CFLAGS="${CFLAGS}" ./configure \
     --disable-shared \
     --enable-static \
     --enable-cblas \

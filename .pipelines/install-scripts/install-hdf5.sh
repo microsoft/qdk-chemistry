@@ -5,6 +5,7 @@ INSTALL_PREFIX=${1:-/usr/local}
 BUILD_TYPE=${2:-Release}
 HDF5_PARENT_DIR=${3:-/ext}
 CXX_FLAGS=${4:-"-fPIC -O3"}
+MAC_BUILD=${5:-OFF}
 
 echo "Installing HDF5 to ${INSTALL_PREFIX}..."
 
@@ -35,10 +36,19 @@ CXXFLAGS=${CXX_FLAGS} ./configure --prefix=${INSTALL_PREFIX} \
     --enable-shared=no \
     --with-pic
 
-make -j${nproc}
+if [ "$MAC_BUILD" == "ON" ]; then
+    JOBS=$(sysctl -n hw.ncpu)
+else
+    JOBS=$(nproc)
+fi
+make -j${JOBS}
 
 echo "Installing HDF5..."
-make install
+if [ "$MAC_BUILD" == "ON" ]; then
+    sudo make install
+elif [ "$MAC_BUILD" == "OFF" ]; then
+    make install
+fi
 
 # Cleanup (return to HDF5 parent directory but leave source for potential reuse)
 cd ${HDF5_PARENT_DIR}
