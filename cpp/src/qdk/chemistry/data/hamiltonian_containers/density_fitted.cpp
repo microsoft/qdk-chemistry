@@ -85,7 +85,7 @@ std::unique_ptr<HamiltonianContainer> DensityFittedHamiltonianContainer::clone()
 
 std::string DensityFittedHamiltonianContainer::get_container_type() const {
   QDK_LOG_TRACE_ENTERING();
-  return "denisity_fitted";
+  return "density_fitted";
 }
 
 std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
@@ -107,7 +107,7 @@ DensityFittedHamiltonianContainer::get_two_body_integrals() const {
       std::cref(*std::get<2>(*_cached_four_center_integrals)));
 }
 
-void DensityFittedHamiltonianContainer::_build_two_body_cache() const {
+void DensityFittedHamiltonianContainer::_build_four_center_cache() const {
   QDK_LOG_TRACE_ENTERING();
 
   size_t norb = _orbitals->get_active_space_indices().first.size();
@@ -251,41 +251,45 @@ void DensityFittedHamiltonianContainer::validate_integral_dimensions() const {
   }
 
   // Check two-body integrals dimensions
+  // Three-center integrals have shape [n_aux x n_geminals] where n_geminals =
+  // norb^2
   size_t norb_alpha = _one_body_integrals.first->rows();
   unsigned geminal_size = norb_alpha * norb_alpha;
 
-  // Check alpha-alpha integrals
-  if (static_cast<unsigned>(std::get<0>(_three_center_integrals)->rows()) !=
+  // Check alpha-alpha integrals - cols should equal geminal_size
+  if (static_cast<unsigned>(std::get<0>(_three_center_integrals)->cols()) !=
       geminal_size) {
     throw std::invalid_argument(
-        "Alpha-alpha two-body integrals size (" +
-        std::to_string(std::get<0>(_three_center_integrals)->rows()) +
-        ") does not match expected size (" + std::to_string(geminal_size) +
-        " for " + std::to_string(norb_alpha) + " orbitals");
+        "Alpha-alpha three-center integrals columns (" +
+        std::to_string(std::get<0>(_three_center_integrals)->cols()) +
+        ") does not match expected geminal size (" +
+        std::to_string(geminal_size) + " for " + std::to_string(norb_alpha) +
+        " orbitals)");
   }
 
   // Check alpha-beta integrals (if different from alpha-alpha)
   if (std::get<1>(_three_center_integrals) !=
       std::get<0>(_three_center_integrals)) {
-    if (static_cast<unsigned>(std::get<1>(_three_center_integrals)->rows()) !=
+    if (static_cast<unsigned>(std::get<1>(_three_center_integrals)->cols()) !=
             geminal_size or
-        static_cast<unsigned>(std::get<1>(_three_center_integrals)->cols()) !=
+        static_cast<unsigned>(std::get<1>(_three_center_integrals)->rows()) !=
             static_cast<unsigned>(
-                std::get<0>(_three_center_integrals)->cols())) {
+                std::get<0>(_three_center_integrals)->rows())) {
       throw std::invalid_argument(
-          "Alpha-beta two-body integrals size mismatch");
+          "Alpha-beta three-center integrals size mismatch");
     }
   }
 
   // Check beta-beta integrals (if different from alpha-alpha)
   if (std::get<2>(_three_center_integrals) !=
       std::get<0>(_three_center_integrals)) {
-    if (static_cast<unsigned>(std::get<2>(_three_center_integrals)->rows()) !=
+    if (static_cast<unsigned>(std::get<2>(_three_center_integrals)->cols()) !=
             geminal_size or
-        static_cast<unsigned>(std::get<2>(_three_center_integrals)->cols()) !=
+        static_cast<unsigned>(std::get<2>(_three_center_integrals)->rows()) !=
             static_cast<unsigned>(
-                std::get<0>(_three_center_integrals)->cols())) {
-      throw std::invalid_argument("Beta-beta two-body integrals size mismatch");
+                std::get<0>(_three_center_integrals)->rows())) {
+      throw std::invalid_argument(
+          "Beta-beta three-center integrals size mismatch");
     }
   }
 }
@@ -365,26 +369,38 @@ nlohmann::json DensityFittedHamiltonianContainer::to_json() const {
     nlohmann::json two_body_obj;
 
     // Store aaaa
-    std::vector<double> three_center_aaaa_vec;
-    for (int i = 0; i < std::get<0>(_three_center_integrals)->size(); ++i) {
-      three_center_aaaa_vec.push_back(
-          (*std::get<0>(_three_center_integrals))(i));
+    std::vector<std::vector<double>> three_center_aaaa_vec;
+    for (int i = 0; i < std::get<0>(_three_center_integrals)->rows(); ++i) {
+      std::vector<double> row;
+      for (int j_idx = 0; j_idx < std::get<0>(_three_center_integrals)->cols();
+           ++j_idx) {
+        row.push_back((*std::get<0>(_three_center_integrals))(i, j_idx));
+      }
+      three_center_aaaa_vec.push_back(row);
     }
     two_body_obj["aaaa"] = three_center_aaaa_vec;
 
     // Store aabb
-    std::vector<double> three_center_aabb_vec;
-    for (int i = 0; i < std::get<1>(_three_center_integrals)->size(); ++i) {
-      three_center_aabb_vec.push_back(
-          (*std::get<1>(_three_center_integrals))(i));
+    std::vector<std::vector<double>> three_center_aabb_vec;
+    for (int i = 0; i < std::get<1>(_three_center_integrals)->rows(); ++i) {
+      std::vector<double> row;
+      for (int j_idx = 0; j_idx < std::get<1>(_three_center_integrals)->cols();
+           ++j_idx) {
+        row.push_back((*std::get<1>(_three_center_integrals))(i, j_idx));
+      }
+      three_center_aabb_vec.push_back(row);
     }
     two_body_obj["aabb"] = three_center_aabb_vec;
 
     // Store bbbb
-    std::vector<double> three_center_bbbb_vec;
-    for (int i = 0; i < std::get<2>(_three_center_integrals)->size(); ++i) {
-      three_center_bbbb_vec.push_back(
-          (*std::get<2>(_three_center_integrals))(i));
+    std::vector<std::vector<double>> three_center_bbbb_vec;
+    for (int i = 0; i < std::get<2>(_three_center_integrals)->rows(); ++i) {
+      std::vector<double> row;
+      for (int j_idx = 0; j_idx < std::get<2>(_three_center_integrals)->cols();
+           ++j_idx) {
+        row.push_back((*std::get<2>(_three_center_integrals))(i, j_idx));
+      }
+      three_center_bbbb_vec.push_back(row);
     }
     two_body_obj["bbbb"] = three_center_bbbb_vec;
 

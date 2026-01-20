@@ -8,6 +8,7 @@
 #include <macis/util/fcidump.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/density_fitted.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
@@ -359,6 +360,8 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_json(
   // Forward to appropriate container implementation
   if (container_type == "canonical_four_center") {
     return CanonicalFourCenterHamiltonianContainer::from_json(j);
+  } else if (container_type == "density_fitted") {
+    return DensityFittedHamiltonianContainer::from_json(j);
   } else {
     throw std::runtime_error("Unknown container type: " + container_type);
   }
@@ -382,8 +385,13 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_hdf5(
     // Forward to appropriate container implementation
     if (container_type == "canonical_four_center") {
       return CanonicalFourCenterHamiltonianContainer::from_hdf5(group);
+    } else if (container_type == "density_fitted") {
+      return DensityFittedHamiltonianContainer::from_hdf5(group);
+    } else {
+      throw std::runtime_error("Unknown container type: " + container_type);
     }
 
+  } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
 }
@@ -563,7 +571,6 @@ void Hamiltonian::to_hdf5(H5::Group& group) const {
         "version", string_type, H5::DataSpace(H5S_SCALAR));
     std::string version_str(SERIALIZATION_VERSION);
     version_attr.write(string_type, version_str);
-    version_attr.close();
 
     // Delegate to container serialization (orbitals are included within the
     // container)
