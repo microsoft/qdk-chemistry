@@ -39,6 +39,17 @@ int main() {
   // --------------------------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------------------------
+  // start-cell-alternative-run
+  // Run scf with an initial guess from previous orbitals
+  auto [E_scf2, wfn2] = scf_solver->run(structure, 0, 1, scf_orbitals);
+
+  // Run scf with a custom basis set
+  auto basis_set = BasisSet::from_basis_name("def2-tzvpp", structure);
+  auto [E_scf3, wfn3] = scf_solver->run(structure, 0, 1, basis_set);
+  // end-cell-alternative-run
+  // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
   // start-cell-list-implementations
   auto names = ScfSolverFactory::available();
   for (const auto& name : names) {

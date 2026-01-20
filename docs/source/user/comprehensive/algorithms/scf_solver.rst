@@ -101,6 +101,24 @@ See `Available settings`_ below for a complete list of options.
       :start-after: # start-cell-run
       :end-before: # end-cell-run
 
+.. rubric:: Alternative run options
+
+The ``run`` method also accepts either :doc:`Orbitals <../data/orbitals>` as an initial guess or a :doc:`BasisSet <../data/basis_set>` object.
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
+      :language: cpp
+      :start-after: // start-cell-alternative-run
+      :end-before: // end-cell-alternative-run
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/scf_solver.py
+      :language: python
+      :start-after: # start-cell-alternative-run
+      :end-before: # end-cell-alternative-run
+
 
 Available settings
 ------------------

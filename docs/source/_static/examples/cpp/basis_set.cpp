@@ -3,138 +3,180 @@
 // license information.
 
 // Basis Set usage examples.
-// --------------------------------------------------------------------------------------------
-// start-cell-basis-set-create
-// Create an empty basis set with a name
-BasisSet basis_set("6-31G", AOType::Spherical);
+#include <qdk/chemistry.hpp>
+using namespace qdk::chemistry::data;
 
-// Add a shell with multiple primitives
-size_t atom_index = 0;                      // First atom
-OrbitalType orbital_type = OrbitalType::P;  // p orbital
-Eigen::VectorXd exponents(2);
-exponents << 0.16871439, 0.62391373;
-Eigen::VectorXd coefficients(2);
-coefficients << 0.43394573, 0.56604777;
-basis_set.add_shell(atom_index, orbital_type, exponents, coefficients);
+int main() {
+  // --------------------------------------------------------------------------------------------
+  // start-cell-loading
+  // Create a water molecule structure
+  std::vector<Eigen::Vector3d> coords = {
+      {0.0, 0.0, 0.0}, {0.757, 0.586, 0.0}, {-0.757, 0.586, 0.0}};
+  std::vector<std::string> symbols = {"O", "H", "H"};
+  Structure structure(coords, symbols);
 
-// Add a shell with a single primitive
-basis_set.add_shell(1, OrbitalType::S, 0.5, 1.0);
+  // Create basis sets from the library using basis set name
+  auto basis_from_name = BasisSet::from_basis_name("sto-3g", structure);
+  // With explicit ECP
+  auto basis_from_name_ecp =
+      BasisSet::from_basis_name("def2-svp", structure, "def2-svp");
+  // Without ECP
+  auto basis_from_name_no_ecp =
+      BasisSet::from_basis_name("cc-pvdz", structure, "");
 
-// Set molecular structure
-basis_set.set_structure(structure);
-// end-cell-basis-set-create
-// --------------------------------------------------------------------------------------------
+  // Create basis sets from the library using element-based mapping
+  std::map<std::string, std::string> basis_map = {{"H", "sto-3g"},
+                                                  {"O", "def2-svp"}};
+  auto basis_from_element = BasisSet::from_element_map(basis_map, structure);
+  // With explicit ECP per element
+  std::map<std::string, std::string> ecp_map = {{"O", "def2-svp"}};
+  auto basis_from_element_ecp =
+      BasisSet::from_element_map(basis_map, structure, ecp_map);
 
-// --------------------------------------------------------------------------------------------
-// start-cell-basis-set-get
-// Get basis set type and name (returns AOType)
-auto atomic_orbital_type = basis_set.get_atomic_orbital_type();
-// Get basis set name (returns std::string)
-auto name = basis_set.get_name();
+  // Create basis sets from the library using index-based mapping
+  std::map<size_t, std::string> index_basis_map = {
+      {0, "def2-svp"}, {1, "sto-3g"}, {2, "sto-3g"}};  // O at 0, H at 1 and 2
+  auto basis_from_index = BasisSet::from_index_map(index_basis_map, structure);
+  // With explicit ECP per atom index
+  std::map<size_t, std::string> index_ecp_map = {
+      {0, "def2-svp"}};  // ECP only for atom at index 0
+  auto basis_from_index_ecp =
+      BasisSet::from_index_map(index_basis_map, structure, index_ecp_map);
+  // end-cell-loading
+  // --------------------------------------------------------------------------------------------
 
-// Get all shells (returns const std::vector<Shell>&)
-auto all_shells = basis_set.get_shells();
-// Get shells for specific atom (returns const std::vector<const Shell>&)
-auto shells_for_atom = basis_set.get_shells_for_atom(0);
-// Get specific shell by index (returns const Shell&)
-const Shell& specific_shell = basis_set.get_shell(3);
+  // --------------------------------------------------------------------------------------------
+  // start-cell-create
+  // Create a shell with multiple primitives
+  size_t atom_index = 0;                      // First atom
+  OrbitalType orbital_type = OrbitalType::P;  // p orbital
+  Eigen::VectorXd exponents(2);
+  exponents << 0.16871439, 0.62391373;
+  Eigen::VectorXd coefficients(2);
+  coefficients << 0.43394573, 0.56604777;
+  Shell shell1(atom_index, orbital_type, exponents, coefficients);
 
-// Get counts
-size_t num_shells = basis_set.get_num_shells();
-size_t num_atomic_orbitals = basis_set.get_num_atomic_orbitals();
-size_t num_atoms = basis_set.get_num_atoms();
+  // Add a shell with a single primitive
+  Shell shell2(1, OrbitalType::S, Eigen::VectorXd::Constant(1, 0.5),
+               Eigen::VectorXd::Constant(1, 1.0));
 
-// Get atomic orbital information (returns std::pair<size_t, int>)
-auto [shell_index, m_quantum_number] = basis_set.get_atomic_orbital_info(5);
-size_t atom_index = basis_set.get_atom_index_for_atomic_orbital(5);
+  // Create a basis set from the shells
+  std::vector<Shell> shells = {shell1, shell2};
+  std::string name = "6-31G";
+  BasisSet basis_set(name, shells, structure, AOType::Spherical);
+  // end-cell-create
+  // --------------------------------------------------------------------------------------------
 
-// Get indices for specific atoms or orbital types
-// Returns std::vector<size_t>
-auto atomic_orbital_indices = basis_set.get_atomic_orbital_indices_for_atom(1);
-// Returns std::vector<size_t>
-auto shell_indices =
-    basis_set.get_shell_indices_for_orbital_type(OrbitalType::P);
-// Returns std::vector<size_t>
-auto shell_indices_specific =
-    basis_set.get_shell_indices_for_atom_and_orbital_type(0, OrbitalType::D);
+  // --------------------------------------------------------------------------------------------
+  // start-cell-access
+  // Get basis set type and name (returns AOType)
+  auto basis_atomic_orbital_type = basis_set.get_atomic_orbital_type();
+  // Get basis set name (returns std::string)
+  auto basis_name = basis_set.get_name();
 
-// Validation
-bool is_valid = basis_set.is_valid();
-bool is_consistent = basis_set.is_consistent_with_structure();
-// end-cell-basis-set-get
-// --------------------------------------------------------------------------------------------
+  // Get all shells (returns const std::vector<Shell>&)
+  auto all_shells = basis_set.get_shells();
+  // Get shells for specific atom (returns const std::vector<const Shell>&)
+  auto shells_for_atom = basis_set.get_shells_for_atom(0);
+  // Get specific shell by index (returns const Shell&)
+  const Shell& specific_shell = basis_set.get_shell(1);
 
-// --------------------------------------------------------------------------------------------
-// start-cell-shells
-// Get shell by index (returns const Shell&)
-const Shell& shell = basis_set.get_shell(0);
-size_t atom_idx = shell.atom_index;
-OrbitalType orb_type = shell.orbital_type;
-// Get exponents (returns const Eigen::VectorXd&)
-const Eigen::VectorXd& exps = shell.exponents;
-// Get coefficients (returns const Eigen::VectorXd&)
-const Eigen::VectorXd& coeffs = shell.coefficients;
+  // Get counts
+  size_t num_shells = basis_set.get_num_shells();
+  size_t num_atomic_orbitals = basis_set.get_num_atomic_orbitals();
+  size_t num_atoms = basis_set.get_num_atoms();
 
-// Get information from shell
-size_t num_primitives = shell.get_num_primitives();
-size_t num_atomic_orbitals = shell.get_num_atomic_orbitals(AOType::Spherical);
-int angular_momentum = shell.get_angular_momentum();
-// end-cell-shells
-// --------------------------------------------------------------------------------------------
+  // Get atomic orbital information (returns std::pair<size_t, int>)
+  auto [shell_index, m_quantum_number] = basis_set.get_atomic_orbital_info(2);
+  size_t atom_index = basis_set.get_atom_index_for_atomic_orbital(2);
 
-// --------------------------------------------------------------------------------------------
-// start-cell-serialization
-// Generic serialization with format specification
-basis_set.to_file("molecule.basis.json", "json");
-basis_set.from_file("molecule.basis.json", "json");
+  // Get indices for specific atoms or orbital types
+  // Returns std::vector<size_t>
+  auto atomic_orbital_indices =
+      basis_set.get_atomic_orbital_indices_for_atom(1);
+  // Returns std::vector<size_t>
+  auto shell_indices =
+      basis_set.get_shell_indices_for_orbital_type(OrbitalType::P);
+  // Returns std::vector<size_t>
+  auto shell_indices_specific =
+      basis_set.get_shell_indices_for_atom_and_orbital_type(0, OrbitalType::D);
+  // end-cell-access
+  // --------------------------------------------------------------------------------------------
 
-// JSON serialization
-basis_set.to_json_file("molecule.basis.json");
-basis_set.from_json_file("molecule.basis.json");
+  // --------------------------------------------------------------------------------------------
+  // start-cell-shells
+  // Get shell by index (returns const Shell&)
+  const Shell& shell = basis_set.get_shell(0);
+  size_t atom_idx = shell.atom_index;
+  OrbitalType orb_type = shell.orbital_type;
+  // Get exponents (returns const Eigen::VectorXd&)
+  const Eigen::VectorXd& exps = shell.exponents;
+  // Get coefficients (returns const Eigen::VectorXd&)
+  const Eigen::VectorXd& coeffs = shell.coefficients;
 
-// Direct JSON conversion
-nlohmann::json j = basis_set.to_json();
-basis_set.from_json(j);
+  // Get information from shell
+  size_t num_primitives = shell.get_num_primitives();
+  size_t num_aos = shell.get_num_atomic_orbitals(AOType::Spherical);
+  int angular_momentum = shell.get_angular_momentum();
+  // end-cell-shells
+  // --------------------------------------------------------------------------------------------
 
-// HDF5 serialization
-basis_set.to_hdf5_file("molecule.basis.h5");
-basis_set.from_hdf5_file("molecule.basis.h5");
-// end-cell-serialization
-// --------------------------------------------------------------------------------------------
+  // --------------------------------------------------------------------------------------------
+  // start-cell-serialization
+  // Generic serialization with format specification
+  basis_set.to_file("molecule.basis_set.json", "json");
+  auto basis_set_from_file =
+      BasisSet::from_file("molecule.basis_set.json", "json");
 
-// --------------------------------------------------------------------------------------------
-// start-cell-utility-functions
-// Convert orbital type to string (returns std::string)
-std::string orbital_str =
-    BasisSet::orbital_type_to_string(OrbitalType::D);  // "d"
-// Convert string to orbital type (returns OrbitalType)
-OrbitalType orbital_type =
-    BasisSet::string_to_orbital_type("f");  // OrbitalType::F
+  // JSON serialization
+  basis_set.to_json_file("molecule.basis_set.json");
+  auto basis_set_from_json_file =
+      BasisSet::from_json_file("molecule.basis_set.json");
 
-// Get angular momentum (returns int)
-int l_value = BasisSet::get_angular_momentum(OrbitalType::P);  // 1
-// Get number of orbitals for angular momentum (returns int)
-int num_orbitals = BasisSet::get_num_orbitals_for_l(2, AOType::Spherical);  // 5
+  // Direct JSON conversion
+  nlohmann::json j = basis_set.to_json();
+  auto basis_set_from_json = BasisSet::from_json(j);
 
-// Convert basis type to string (returns std::string)
-std::string basis_str =
-    BasisSet::atomic_orbital_type_to_string(AOType::Cartesian);  // "cartesian"
-// Convert string to basis type (returns AOType)
-AOType atomic_orbital_type =
-    BasisSet::string_to_atomic_orbital_type("spherical");  // AOType::Spherical
-// end-cell-utility-functions
-// --------------------------------------------------------------------------------------------
+  // HDF5 serialization
+  basis_set.to_hdf5_file("molecule.basis_set.h5");
+  auto basis_set_from_hdf5 = BasisSet::from_hdf5_file("molecule.basis_set.h5");
+  // end-cell-serialization
+  // --------------------------------------------------------------------------------------------
 
-// --------------------------------------------------------------------------------------------
-// start-cell-library
-// Create a basis set from a predefined library (returns
-// std::unique_ptr<BasisSet>)
-auto basis_set = BasisSet::create("6-31G");
+  // --------------------------------------------------------------------------------------------
+  // start-cell-utility-functions
+  // Convert orbital type to string (returns std::string)
+  std::string orbital_str =
+      BasisSet::orbital_type_to_string(OrbitalType::D);  // "d"
+  // Convert string to orbital type (returns OrbitalType)
+  OrbitalType orbital_type =
+      BasisSet::string_to_orbital_type("f");  // OrbitalType::F
 
-// List all available basis sets (returns std::vector<std::string>)
-auto available_basis_sets = BasisSet::get_available_basis_sets();
+  // Get angular momentum (returns int)
+  int l_value = BasisSet::get_angular_momentum(OrbitalType::P);  // 1
+  // Get number of orbitals for angular momentum (returns int)
+  int num_orbitals =
+      BasisSet::get_num_orbitals_for_l(2, AOType::Spherical);  // 5
 
-// Check if a basis set exists in the library (returns bool)
-bool has_basis = BasisSet::has_basis_set("cc-pvdz");
-// end-cell-library
-// --------------------------------------------------------------------------------------------
+  // Convert basis type to string (returns std::string)
+  std::string basis_str = BasisSet::atomic_orbital_type_to_string(
+      AOType::Cartesian);  // "cartesian"
+  // Convert string to basis type (returns AOType)
+  AOType atomic_orbital_type = BasisSet::string_to_atomic_orbital_type(
+      "spherical");  // AOType::Spherical
+  // end-cell-utility-functions
+  // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-library
+  // Check supported basis sets
+  auto supported_basis_sets = BasisSet::get_supported_basis_set_names();
+
+  // Check supported elements for basis set
+  auto supported_elements =
+      BasisSet::get_supported_elements_for_basis_set("sto-3g");
+  // end-cell-library
+  // --------------------------------------------------------------------------------------------
+
+  return 0;
+}
