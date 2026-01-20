@@ -436,6 +436,21 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
     const int num_occupied_orbitals = num_electrons_[spin_index];
     const int num_virtual_orbitals =
         num_molecular_orbitals - num_occupied_orbitals;
+    // Validate dimensions (negative values indicate invalid input)
+    // Zero occupied or virtual orbitals is valid for unrestricted calculations
+    // (e.g., H atom has 0 beta electrons)
+    if (num_occupied_orbitals < 0) {
+      throw std::invalid_argument(
+          std::string("GDM: num_occupied_orbitals must be non-negative, got ") +
+          std::to_string(num_occupied_orbitals) + " for spin " +
+          std::to_string(spin_index));
+    }
+    if (num_virtual_orbitals < 0) {
+      throw std::invalid_argument(
+          std::string("GDM: num_virtual_orbitals must be non-negative, got ") +
+          std::to_string(num_virtual_orbitals) + " for spin " +
+          std::to_string(spin_index));
+    }
     rotation_size_[spin_index] = num_occupied_orbitals * num_virtual_orbitals;
     rotation_offset_[spin_index] = total_rotation_size_;
     total_rotation_size_ += rotation_size_[spin_index];
@@ -458,8 +473,17 @@ void GDM::transform_history_(Eigen::Block<RowMajorMatrix>& history,
   QDK_LOG_TRACE_ENTERING();
   const int num_virtual_orbitals =
       num_molecular_orbitals - num_occupied_orbitals;
-  // Early return if either dimension is zero to avoid BLAS calls with LDA=0
-  if (num_occupied_orbitals <= 0 || num_virtual_orbitals <= 0) {
+  // Validate dimensions (negative values indicate invalid input)
+  if (num_occupied_orbitals < 0 || num_virtual_orbitals < 0) {
+    throw std::invalid_argument(
+        std::string(
+            "transform_history_: invalid dimensions (num_occupied_orbitals=") +
+        std::to_string(num_occupied_orbitals) +
+        ", num_virtual_orbitals=" + std::to_string(num_virtual_orbitals) + ")");
+  }
+  // Skip transformation if either dimension is zero (no rotations for this
+  // spin)
+  if (num_occupied_orbitals == 0 || num_virtual_orbitals == 0) {
     return;
   }
   RowMajorMatrix temp =
@@ -489,6 +513,18 @@ void GDM::generate_pseudo_canonical_orbital_(
   const int num_occupied_orbitals = num_electrons_[spin_index];
   const int num_virtual_orbitals =
       num_molecular_orbitals - num_occupied_orbitals;
+  // Validate dimensions (negative values indicate invalid input)
+  if (num_occupied_orbitals < 0 || num_virtual_orbitals < 0) {
+    throw std::invalid_argument(
+        std::string("generate_pseudo_canonical_orbital_: invalid dimensions "
+                    "(num_occupied_orbitals=") +
+        std::to_string(num_occupied_orbitals) +
+        ", num_virtual_orbitals=" + std::to_string(num_virtual_orbitals) + ")");
+  }
+  // Skip if either dimension is zero (no rotations for this spin)
+  if (num_occupied_orbitals == 0 || num_virtual_orbitals == 0) {
+    return;
+  }
   const int rotation_size = num_occupied_orbitals * num_virtual_orbitals;
 
   RowMajorMatrix F_MO =
@@ -507,47 +543,39 @@ void GDM::generate_pseudo_canonical_orbital_(
   Uvv_ = F_MO.block(num_occupied_orbitals, num_occupied_orbitals,
                     num_virtual_orbitals, num_virtual_orbitals);
 
-  // Handle edge cases where num_occupied_orbitals or num_virtual_orbitals is 0
-  // because LAPACK syev fails with N == 0
-  if (num_occupied_orbitals > 0) {
-    lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_occupied_orbitals,
-                 Uoo_.data(), num_occupied_orbitals,
-                 pseudo_canonical_eigenvalues_.data());
-  }
-  if (num_virtual_orbitals > 0) {
-    lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_virtual_orbitals,
-                 Uvv_.data(), num_virtual_orbitals,
-                 pseudo_canonical_eigenvalues_.data() + num_occupied_orbitals);
-  }
+  // Compute eigenvalues/eigenvectors of occupied-occupied and virtual-virtual
+  // blocks for pseudo-canonical orbital transformation
+  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_occupied_orbitals,
+               Uoo_.data(), num_occupied_orbitals,
+               pseudo_canonical_eigenvalues_.data());
+  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_virtual_orbitals,
+               Uvv_.data(), num_virtual_orbitals,
+               pseudo_canonical_eigenvalues_.data() + num_occupied_orbitals);
 
   // Transpose to convert column-major eigenvectors to row-major format
   Uoo_.transposeInPlace();
   Uvv_.transposeInPlace();
 
   // Transform occupied orbitals
-  if (num_occupied_orbitals > 0) {
-    auto C_occ_view = C.block(num_molecular_orbitals * spin_index, 0,
-                              num_molecular_orbitals, num_occupied_orbitals);
-    RowMajorMatrix C_occ = C_occ_view.eval();
-    blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-               num_molecular_orbitals, num_occupied_orbitals,
-               num_occupied_orbitals, 1.0, C_occ.data(), num_occupied_orbitals,
-               Uoo_.data(), num_occupied_orbitals, 0.0, C_occ_view.data(),
-               num_molecular_orbitals);
-  }
+  auto C_occ_view = C.block(num_molecular_orbitals * spin_index, 0,
+                            num_molecular_orbitals, num_occupied_orbitals);
+  RowMajorMatrix C_occ = C_occ_view.eval();
+  blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_molecular_orbitals, num_occupied_orbitals,
+             num_occupied_orbitals, 1.0, C_occ.data(), num_occupied_orbitals,
+             Uoo_.data(), num_occupied_orbitals, 0.0, C_occ_view.data(),
+             num_molecular_orbitals);
 
   // Transform virtual orbitals
-  if (num_virtual_orbitals > 0) {
-    auto C_virt_view =
-        C.block(num_molecular_orbitals * spin_index, num_occupied_orbitals,
-                num_molecular_orbitals, num_virtual_orbitals);
-    RowMajorMatrix C_virt = C_virt_view.eval();
-    blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-               num_molecular_orbitals, num_virtual_orbitals,
-               num_virtual_orbitals, 1.0, C_virt.data(), num_virtual_orbitals,
-               Uvv_.data(), num_virtual_orbitals, 0.0, C_virt_view.data(),
-               num_molecular_orbitals);
-  }
+  auto C_virt_view =
+      C.block(num_molecular_orbitals * spin_index, num_occupied_orbitals,
+              num_molecular_orbitals, num_virtual_orbitals);
+  RowMajorMatrix C_virt = C_virt_view.eval();
+  blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_molecular_orbitals, num_virtual_orbitals, num_virtual_orbitals,
+             1.0, C_virt.data(), num_virtual_orbitals, Uvv_.data(),
+             num_virtual_orbitals, 0.0, C_virt_view.data(),
+             num_molecular_orbitals);
 
   // Transform the vectors in history_kappa and history_dgrad to
   // accommodate current pseudo-canonical orbitals

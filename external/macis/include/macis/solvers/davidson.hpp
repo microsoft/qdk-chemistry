@@ -179,13 +179,14 @@ void p_diagonal_guess(size_t N_local, const SpMatType& A, double* X) {
  * @param[in] V_old Matrix containing K orthonormal columns
  * @param[in] LDV   Leading dimension of V_old
  * @param[in,out] V_new Vector to orthogonalize and normalize
+ * @param[in] min_norm Minimum norm threshold below which a vector is considered
+ * as zero vector
  */
 inline void gram_schmidt(int64_t N, int64_t K, const double* V_old, int64_t LDV,
-                         double* V_new) {
+                         double* V_new, double min_norm = 1e-12) {
   // Early return if no vectors to orthogonalize against - just normalize
   if (K <= 0) {
     auto nrm = blas::nrm2(N, V_new, 1);
-    constexpr double min_norm = 1e-12;
     if (nrm > min_norm) {
       blas::scal(N, 1. / nrm, V_new, 1);
     }
@@ -206,7 +207,6 @@ inline void gram_schmidt(int64_t N, int64_t K, const double* V_old, int64_t LDV,
   auto nrm = blas::nrm2(N, V_new, 1);
   // Protect against division by zero when the new vector is linearly dependent
   // on existing vectors (can happen with very small Hilbert spaces)
-  constexpr double min_norm = 1e-12;
   if (nrm > min_norm) {
     blas::scal(N, 1. / nrm, V_new, 1);
   } else {
@@ -252,11 +252,13 @@ inline void gram_schmidt(int64_t N, int64_t K, const double* V_old, int64_t LDV,
  * @param[in] D      Diagonal elements for preconditioning
  * @param[in] tol    Convergence tolerance for residual norm
  * @param[in,out] X  Input: initial guess vector, Output: converged eigenvector
+ * @param[in] min_abs_denominator  Minimum absolute value for preconditioner
+ * denominator to avoid division by zero
  * @return Pair containing (number of iterations, converged eigenvalue)
  */
 template <typename Functor>
 auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
-              double tol, double* X) {
+              double tol, double* X, double min_abs_denominator = 1e-12) {
   using hrt_t = std::chrono::high_resolution_clock;
   using dur_t = std::chrono::duration<double, std::milli>;
 
@@ -351,11 +353,10 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
     // Compute new vector
     // (D - LAM(0)*I) * W = -R ==> W = -(D - LAM(0)*I)**-1 * R
     // When D[j] == LAM[0], add a small shift to avoid division by zero
-    constexpr double shift = 1e-12;
     for (auto j = 0; j < N; ++j) {
       double denom = D[j] - LAM[0];
-      if (std::abs(denom) < shift) {
-        denom = (denom >= 0) ? shift : -shift;
+      if (std::abs(denom) < min_abs_denominator) {
+        denom = (denom >= 0) ? min_abs_denominator : -min_abs_denominator;
       }
       R[j] = -R[j] / denom;
     }
@@ -385,15 +386,17 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
  * @param[in] LDV     Leading dimension of V_old
  * @param[in,out] V_new Local portion of vector to orthogonalize and normalize
  * @param[in] comm    MPI communicator
+ * @param[in] min_norm Minimum norm threshold below which a vector is considered
+ * as zero vector
  */
 inline void p_gram_schmidt(int64_t N_local, int64_t K, const double* V_old,
-                           int64_t LDV, double* V_new, MPI_Comm comm) {
+                           int64_t LDV, double* V_new, MPI_Comm comm,
+                           double min_norm = 1e-12) {
   // Early return if no vectors to orthogonalize against - just normalize
   if (K <= 0) {
     double dot = blas::dot(N_local, V_new, 1, V_new, 1);
     dot = allreduce(dot, MPI_SUM, comm);
     double nrm = std::sqrt(dot);
-    constexpr double min_norm = 1e-12;
     if (nrm > min_norm) {
       blas::scal(N_local, 1. / nrm, V_new, 1);
     }
@@ -427,7 +430,6 @@ inline void p_gram_schmidt(int64_t N_local, int64_t K, const double* V_old,
   double nrm = std::sqrt(dot);
   // Protect against division by zero when the new vector is linearly dependent
   // on existing vectors (can happen with very small Hilbert spaces)
-  constexpr double min_norm = 1e-12;
   if (nrm > min_norm) {
     blas::scal(N_local, 1. / nrm, V_new, 1);
   } else {
@@ -546,12 +548,14 @@ inline void p_rayleigh_ritz(int64_t N_local, int64_t K, const double* X,
  * @param[in,out] X_local Input: local portion of initial guess, Output: local
  * portion of eigenvector
  * @param[in] comm      MPI communicator
+ * @param[in] min_abs_denominator  Minimum absolute value for preconditioner
+ * denominator to avoid division by zero
  * @return Pair containing (number of iterations, converged eigenvalue)
  */
 template <typename Functor>
 auto p_davidson(int64_t N_local, int64_t max_m, const Functor& op,
                 const double* D_local, double tol, double* X_local,
-                MPI_Comm comm) {
+                MPI_Comm comm, double min_abs_denominator = 1e-12) {
   using hrt_t = std::chrono::high_resolution_clock;
   using dur_t = std::chrono::duration<double, std::milli>;
 
@@ -648,12 +652,11 @@ auto p_davidson(int64_t N_local, int64_t max_m, const Functor& op,
     // Compute new vector
     // (D - LAM(0)*I) * W = -R ==> W = -(D - LAM(0)*I)**-1 * R
     // When D[j] == LAM[0], add a small shift to avoid division by zero
-    constexpr double shift = 1e-12;
     double E1_denom = 0, E1_num = 0;
     for (auto j = 0; j < N_local; ++j) {
       double denom = D_local[j] - LAM[0];
-      if (std::abs(denom) < shift) {
-        denom = (denom >= 0) ? shift : -shift;
+      if (std::abs(denom) < min_abs_denominator) {
+        denom = (denom >= 0) ? min_abs_denominator : -min_abs_denominator;
       }
       R_local[j] = -R_local[j] / denom;
       E1_num += X_local[j] * R_local[j];
@@ -665,8 +668,8 @@ auto p_davidson(int64_t N_local, int64_t max_m, const Functor& op,
 
     for (auto j = 0; j < N_local; ++j) {
       double denom = D_local[j] - LAM[0];
-      if (std::abs(denom) < shift) {
-        denom = (denom >= 0) ? shift : -shift;
+      if (std::abs(denom) < min_abs_denominator) {
+        denom = (denom >= 0) ? min_abs_denominator : -min_abs_denominator;
       }
       R_local[j] += E1 * X_local[j] / denom;
     }
