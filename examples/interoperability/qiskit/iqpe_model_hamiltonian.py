@@ -37,13 +37,13 @@ Logger.set_global_level("info")
 
 TIME_STEP_1 = np.pi / 4
 PHASE_BITS_1 = 6
-SHOTS_PER_ITERATION_1 = 3
+SHOTS_PER_BIT_1 = 3
 SIMULATOR_SEED_1 = 42
 REFERENCE_ENERGY_1 = 1.1266592208826944
 
 TIME_STEP_2 = np.pi / 4
 PHASE_BITS_2 = 11
-SHOTS_PER_ITERATION_2 = 3
+SHOTS_PER_BIT_2 = 3
 SIMULATOR_SEED_2 = 42
 REFERENCE_ENERGY_2 = -0.0887787
 
@@ -75,7 +75,7 @@ iqpe_1 = create(
     "iterative",
     num_bits=PHASE_BITS_1,
     evolution_time=TIME_STEP_1,
-    shots_per_iteration=SHOTS_PER_ITERATION_1,
+    shots_per_bit=SHOTS_PER_BIT_1,
 )
 simulator_1 = create("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED_1)
 evolution_builder = create("time_evolution_builder", "trotter")
@@ -148,7 +148,7 @@ iqpe_2 = create(
     "iterative",
     num_bits=PHASE_BITS_2,
     evolution_time=TIME_STEP_2,
-    shots_per_iteration=SHOTS_PER_ITERATION_2,
+    shots_per_bit=SHOTS_PER_BIT_2,
 )
 simulator_2 = create("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED_2)
 evolution_builder = create("time_evolution_builder", "trotter")

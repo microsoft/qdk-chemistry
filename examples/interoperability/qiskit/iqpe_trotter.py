@@ -34,7 +34,7 @@ ACTIVE_ELECTRONS = 2
 ACTIVE_ORBITALS = 2
 M_PRECISION = 10  # number of phase qubits ~ bits of precision
 T_TIME = 0.1  # evolution time; lower if you see 2π wrap
-SHOTS_PER_ITERATION = 10
+SHOTS_PER_BIT = 10
 SIMULATOR_SEED = 42
 
 
@@ -114,7 +114,7 @@ iqpe = create(
     "iterative",
     num_bits=M_PRECISION,
     evolution_time=T_TIME,
-    shots_per_iteration=SHOTS_PER_ITERATION,
+    shots_per_bit=SHOTS_PER_BIT,
 )
 aer_simulator = create("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED)
 evolution_builder = create("time_evolution_builder", "trotter")

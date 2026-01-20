@@ -50,8 +50,15 @@ class PhaseEstimationSettings(Settings):
 class PhaseEstimation(Algorithm):
     """Abstract base class for phase estimation algorithms."""
 
-    def __init__(self, num_bits: int, evolution_time: float):
-        """Initialize the PhaseEstimation with default settings."""
+    def __init__(self, num_bits: int = -1, evolution_time: float = 0.0):
+        """Initialize the PhaseEstimation with default settings.
+
+        Args:
+            num_bits: The number of phase bits to estimate. Default to -1 for user to set a valid value.
+            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``,
+                default to 0.0 for user to set a valid value.
+
+        """
         super().__init__()
         self._settings = PhaseEstimationSettings()
         self._settings.set("num_bits", num_bits)

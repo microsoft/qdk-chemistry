@@ -113,7 +113,7 @@ def _run_iterative(problem: PhaseEstimationProblem) -> QpeResult:
 
     """
     iqpe = IterativePhaseEstimation(
-        num_bits=problem.num_bits, evolution_time=problem.evolution_time, shots_per_iteration=problem.shots_iterative
+        num_bits=problem.num_bits, evolution_time=problem.evolution_time, shots_per_bit=problem.shots_iterative
     )
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
@@ -161,7 +161,7 @@ def _run_iterative_with_parameters(
     *,
     evolution_time: float,
     num_bits: int,
-    shots_per_iteration: int,
+    shots_per_bit: int,
     seed: int,
 ) -> QpeResult:
     """Execute iterative phase estimation for a custom Hamiltonian/state pair.
@@ -172,7 +172,7 @@ def _run_iterative_with_parameters(
         state_vector: Initial state amplitudes for the system register.
         evolution_time: Evolution time ``t`` used in ``U = exp(-i H t)``.
         num_bits: Number of iterative QPE rounds executed.
-        shots_per_iteration: Number of simulator shots per iteration circuit.
+        shots_per_bit: Number of simulator shots per iteration circuit.
         seed: PRNG seed for the simulator.
         reference_energy: Optional reference energy used to resolve alias branches.
 
@@ -188,9 +188,7 @@ def _run_iterative_with_parameters(
     state_prep = QuantumCircuit(num_qubits, name="state")
     state_prep.append(QiskitStatePreparation(state_vector), list(range(num_qubits)))
 
-    iqpe = IterativePhaseEstimation(
-        num_bits=num_bits, evolution_time=evolution_time, shots_per_iteration=shots_per_iteration
-    )
+    iqpe = IterativePhaseEstimation(num_bits=num_bits, evolution_time=evolution_time, shots_per_bit=shots_per_bit)
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=seed)
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
     evolution_builder = create("time_evolution_builder", "trotter")
@@ -370,7 +368,7 @@ def test_iterative_phase_estimation_non_commuting_xi_plus_zz() -> None:
         state_vector,
         evolution_time=np.pi / 4,
         num_bits=6,
-        shots_per_iteration=3,
+        shots_per_bit=3,
         seed=42,
     )
 
@@ -394,7 +392,7 @@ def test_iterative_phase_estimation_second_non_commuting_example() -> None:
         state_vector,
         evolution_time=np.pi / 4,
         num_bits=11,
-        shots_per_iteration=3,
+        shots_per_bit=3,
         seed=42,
     )
 
@@ -446,7 +444,7 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
     iqpe = IterativePhaseEstimation(
         num_bits=two_qubit_phase_problem.num_bits,
         evolution_time=two_qubit_phase_problem.evolution_time,
-        shots_per_iteration=two_qubit_phase_problem.shots_iterative,
+        shots_per_bit=two_qubit_phase_problem.shots_iterative,
     )
     noisy_result = iqpe.run(
         state_preparation=two_qubit_phase_problem.state_prep,
@@ -480,7 +478,7 @@ def test_iqe_generates_correct_number_of_circuits(
     iqpe = IterativePhaseEstimation(
         num_bits=two_qubit_phase_problem.num_bits,
         evolution_time=two_qubit_phase_problem.evolution_time,
-        shots_per_iteration=two_qubit_phase_problem.shots_iterative,
+        shots_per_bit=two_qubit_phase_problem.shots_iterative,
     )
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
@@ -570,7 +568,7 @@ def test_create_iteration_circuit_power_calculation() -> None:
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
     evolution_builder = create("time_evolution_builder", "trotter")
 
-    iqpe = IterativePhaseEstimation(num_bits=5, evolution_time=np.pi, shots_per_iteration=10)
+    iqpe = IterativePhaseEstimation(num_bits=5, evolution_time=np.pi, shots_per_bit=10)
     iter_0_circuit = iqpe.create_iteration_circuit(
         state_preparation=state_prep_circuit,
         qubit_hamiltonian=hamiltonian,
@@ -588,11 +586,9 @@ def test_iterative_qpe_initialization() -> None:
     """Test IterativePhaseEstimation initialization."""
     evolution_time = 2.5
     num_bits = 6
-    shots_per_iteration = 10
+    shots_per_bit = 10
 
-    iqpe = IterativePhaseEstimation(
-        num_bits=num_bits, evolution_time=evolution_time, shots_per_iteration=shots_per_iteration
-    )
+    iqpe = IterativePhaseEstimation(num_bits=num_bits, evolution_time=evolution_time, shots_per_bit=shots_per_bit)
 
     assert iqpe._settings.get("num_bits") == num_bits
     assert np.isclose(
@@ -601,4 +597,4 @@ def test_iterative_qpe_initialization() -> None:
         rtol=float_comparison_relative_tolerance,
         atol=float_comparison_relative_tolerance,
     )
-    assert iqpe._settings.get("shots_per_iteration") == shots_per_iteration
+    assert iqpe._settings.get("shots_per_bit") == shots_per_bit

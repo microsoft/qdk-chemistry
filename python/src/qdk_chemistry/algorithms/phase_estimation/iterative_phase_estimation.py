@@ -58,15 +58,16 @@ class IterativePhaseEstimation(PhaseEstimation):
 
     def __init__(
         self,
-        num_bits: int,
-        evolution_time: float,
+        num_bits: int = -1,
+        evolution_time: float = 0.0,
         shots_per_bit: int = 3,
     ):
         """Initialize IterativePhaseEstimation with the given settings.
 
         Args:
-            num_bits: The number of phase bits to estimate.
-            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.
+            num_bits: The number of phase bits to estimate. Default to -1 for user to set a valid value.
+            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``,
+                default to 0.0 for user to set a valid value.
             shots_per_bit: The number of shots to execute per measuring a bit in the iterative phase estimation.
 
         """
