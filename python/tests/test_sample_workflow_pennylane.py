@@ -18,17 +18,12 @@ See Also:
 import subprocess
 import sys
 from pathlib import Path
+import importlib.util
 
 import pytest
 
 # Check if pennylane is available
-try:
-    import pennylane  # noqa: F401
-
-    _PENNYLANE_AVAILABLE = True
-except ImportError:
-    _PENNYLANE_AVAILABLE = False
-
+_PENNYLANE_AVAILABLE = importlib.util.find_spec("pennylane") is not None
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
 
 
