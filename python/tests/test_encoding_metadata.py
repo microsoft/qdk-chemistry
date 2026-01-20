@@ -200,6 +200,21 @@ def test_qubit_mapper_injects_encoding():
     assert qubit_ham_parity.encoding == "parity"
 
 
+def test_qdk_qubit_mapper_injects_encoding():
+    """Test that QDK QubitMapper injects the correct encoding."""
+    hamiltonian = create_test_hamiltonian(2)
+
+    # Test Jordan-Wigner
+    mapper_jw = create("qubit_mapper", "qdk", encoding="jordan_wigner")
+    qubit_ham_jw = mapper_jw.run(hamiltonian)
+    assert qubit_ham_jw.encoding == "jordan-wigner"
+
+    # Test Bravyi-Kitaev
+    mapper_bk = create("qubit_mapper", "qdk", encoding="bravyi_kitaev")
+    qubit_ham_bk = mapper_bk.run(hamiltonian)
+    assert qubit_ham_bk.encoding == "bravyi-kitaev"
+
+
 def test_group_commuting_preserves_encoding():
     """Test that group_commuting preserves the encoding metadata."""
     pauli_strings = ["II", "ZI", "IZ", "ZZ", "XX", "YY"]
