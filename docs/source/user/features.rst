@@ -173,14 +173,25 @@ Classical quantum chemistry methods are generally expressed in the language of s
 Jordan-Wigner Transformation :cite:`Jordan-Wigner1928`
    A straightforward mapping that encodes fermionic operators directly onto qubits, preserving the algebraic structure of the operators.
 
-Bravyi-Kitaev Transformation :cite:`Bravyi-Kitaev2002`
+Bravyi-Kitaev Transformation :cite:`Seeley2012`
    A more efficient mapping that reduces the number of qubits required for certain operations by balancing locality and parity information.
 
-Parity Transformation :cite:`Love2012`
+Parity Transformation :cite:`Seeley2012`
    An alternative mapping that encodes fermionic operators based on the parity of occupation numbers, offering advantages in specific contexts.
 
-Fermion-to-qubit mapping is currently supported through QDK/Chemistry's Qiskit plugin; see the :doc:`comprehensive/algorithms/qubit_mapper` for further details.
+QDK/Chemistry provides both a native qubit mapper implementation and integration with external libraries through plugins.
+See :doc:`comprehensive/algorithms/qubit_mapper` for available implementations and usage details.
 QDK/Chemistry also provides :doc:`Pauli operator arithmetic <comprehensive/data/pauli_operator>` for building and manipulating qubit Hamiltonians using natural mathematical notation.
+
+.. _qubit-mapper-highlights:
+
+Implementation Highlights
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Native QDK Qubit Mapper
+   QDK/Chemistry includes a high-performance native implementation of fermion-to-qubit mappings built on the :doc:`PauliOperator <comprehensive/data/pauli_operator>` expression layer.
+   This implementation supports both Jordan-Wigner and Bravyi-Kitaev encodings :cite:`Seeley2012`, using the Seeley-Richard-Love algorithm for the Bravyi-Kitaev mapping, with configurable coefficient thresholds for controlling numerical precision.
+   The native mapper applies thresholds after the complete transformation, ensuring mathematically consistent results across different molecular systems.
 
 
 Observable Sampling
