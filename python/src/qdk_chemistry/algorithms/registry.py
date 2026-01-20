@@ -571,6 +571,7 @@ def _register_python_algorithms():
     """
     from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
+    from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.time_evolution.builder.trotter import (  # noqa: PLC0415
         Trotter,
@@ -583,6 +584,7 @@ def _register_python_algorithms():
     register(lambda: SparseIsometryGF2XStatePreparation())
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
+    register(lambda: QdkQubitMapper())
     register(lambda: Trotter())
     register(lambda: PauliSequenceMapper())
 
