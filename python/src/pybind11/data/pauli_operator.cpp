@@ -536,4 +536,246 @@ Args:
 Returns:
     SumPauliOperatorExpression: A new expression with small terms filtered out.
 )");
+
+  // PauliTermAccumulator class - high-performance accumulator for qubit
+  // mappings
+  py::class_<PauliTermAccumulator> accumulator(data, "PauliTermAccumulator", R"(
+High-performance accumulator for Pauli terms with coefficient combining.
+
+This class provides efficient accumulation of Pauli terms in sparse format,
+with automatic coefficient combination for identical terms. It is optimized
+for use cases like fermion-to-qubit mappings where many term products are
+accumulated.
+
+Sparse Pauli words are represented as lists of (qubit_index, operator_type)
+tuples where operator_type is: 0=I (identity), 1=X, 2=Y, 3=Z. The list must
+be sorted by qubit index, and identity operators are typically omitted
+(an empty list represents the identity operator).
+
+Example:
+    >>> acc = PauliTermAccumulator()
+    >>> x0 = [(0, 1)]  # X on qubit 0
+    >>> z1 = [(1, 3)]  # Z on qubit 1
+    >>> acc.accumulate(x0, 0.5)  # Add 0.5 * X(0)
+    >>> acc.accumulate_product(x0, z1, 1.0)  # Add 1.0 * X(0) * Z(1)
+    >>> terms = acc.get_terms_as_strings(4, 1e-12)
+)");
+
+  accumulator.def(py::init<>())
+      .def(
+          "accumulate",
+          [](PauliTermAccumulator& self,
+             const std::vector<std::pair<std::uint64_t, std::uint8_t>>& word,
+             std::complex<double> coeff) { self.accumulate(word, coeff); },
+          py::arg("word"), py::arg("coeff"),
+          R"(
+Accumulate a single term with the given coefficient.
+
+If a term with the same sparse Pauli word already exists, the coefficients
+are added together.
+
+Args:
+    word: A sparse Pauli word as a list of (qubit_index, operator_type) tuples.
+    coeff: The coefficient to add.
+)")
+      .def(
+          "accumulate_product",
+          [](PauliTermAccumulator& self,
+             const std::vector<std::pair<std::uint64_t, std::uint8_t>>& word1,
+             const std::vector<std::pair<std::uint64_t, std::uint8_t>>& word2,
+             std::complex<double> scale) {
+            self.accumulate_product(word1, word2, scale);
+          },
+          py::arg("word1"), py::arg("word2"), py::arg("scale"),
+          R"(
+Accumulate the product of two terms with a scale factor.
+
+Computes word1 * word2 using Pauli algebra (with cached multiplication),
+then accumulates the result scaled by the given factor.
+
+Args:
+    word1: The first sparse Pauli word.
+    word2: The second sparse Pauli word.
+    scale: The scale factor to apply to the product.
+)")
+      .def(
+          "get_terms",
+          [](const PauliTermAccumulator& self, double threshold) {
+            return self.get_terms(threshold);
+          },
+          py::arg("threshold") = 0.0,
+          R"(
+Get all accumulated terms as sparse Pauli words.
+
+Args:
+    threshold: Terms with abs(coefficient) < threshold are excluded.
+
+Returns:
+    List of (coefficient, sparse_word) tuples.
+)")
+      .def(
+          "get_terms_as_strings",
+          [](const PauliTermAccumulator& self, std::uint64_t num_qubits,
+             double threshold) {
+            return self.get_terms_as_strings(num_qubits, threshold);
+          },
+          py::arg("num_qubits"), py::arg("threshold") = 0.0,
+          R"(
+Get all accumulated terms as canonical Pauli strings.
+
+Args:
+    num_qubits: Total number of qubits for string representation.
+    threshold: Terms with abs(coefficient) < threshold are excluded.
+
+Returns:
+    List of (coefficient, canonical_string) tuples.
+)")
+      .def("clear", &PauliTermAccumulator::clear,
+           "Clear all accumulated terms.")
+      .def_property_readonly(
+          "size", [](const PauliTermAccumulator& self) { return self.size(); },
+          "Number of unique terms currently accumulated.")
+      .def(
+          "set_cache_capacity",
+          [](PauliTermAccumulator& self, std::size_t capacity) {
+            self.set_cache_capacity(capacity);
+          },
+          py::arg("capacity"),
+          R"(
+Set the capacity of this accumulator's multiplication cache.
+
+The cache stores results of Pauli word multiplications to avoid redundant
+computation. When the cache exceeds capacity, oldest entries are evicted
+(LRU policy). Default capacity is 10000.
+
+Args:
+    capacity: Maximum number of entries in the cache.
+)")
+      .def(
+          "clear_cache", [](PauliTermAccumulator& self) { self.clear_cache(); },
+          "Clear this accumulator's multiplication cache.")
+      .def_property_readonly(
+          "cache_size",
+          [](const PauliTermAccumulator& self) { return self.cache_size(); },
+          "Get the current number of entries in this accumulator's "
+          "multiplication cache.")
+      .def(
+          "multiply",
+          [](PauliTermAccumulator& self,
+             const std::vector<std::pair<std::uint64_t, std::uint8_t>>& word1,
+             const std::vector<std::pair<std::uint64_t, std::uint8_t>>& word2) {
+            return self.multiply(word1, word2);
+          },
+          py::arg("word1"), py::arg("word2"),
+          R"(
+Multiply two sparse Pauli words using Pauli algebra.
+
+Uses this accumulator's cache for efficiency.
+
+Args:
+    word1: The first sparse Pauli word.
+    word2: The second sparse Pauli word.
+
+Returns:
+    Tuple of (phase, result_word) where phase is the complex phase factor
+    from Pauli multiplication rules.
+)")
+      .def_static(
+          "multiply_uncached",
+          [](const std::vector<std::pair<std::uint64_t, std::uint8_t>>& word1,
+             const std::vector<std::pair<std::uint64_t, std::uint8_t>>& word2) {
+            return PauliTermAccumulator::multiply_uncached(word1, word2);
+          },
+          py::arg("word1"), py::arg("word2"),
+          R"(
+Multiply two sparse Pauli words using Pauli algebra without caching.
+
+Args:
+    word1: The first sparse Pauli word.
+    word2: The second sparse Pauli word.
+
+Returns:
+    Tuple of (phase, result_word) where phase is the complex phase factor
+    from Pauli multiplication rules.
+)")
+      .def_static(
+          "compute_all_jw_excitation_terms",
+          [](std::uint64_t n_spin_orbitals) {
+            auto result = PauliTermAccumulator::compute_all_jw_excitation_terms(
+                n_spin_orbitals);
+            // Convert to Python-friendly format: dict[(p,q)] -> list[(coeff,
+            // word)]
+            py::dict py_result;
+            for (auto& [key, terms] : result) {
+              py::tuple py_key = py::make_tuple(key.first, key.second);
+              py::list py_terms;
+              for (auto& [coeff, word] : terms) {
+                py_terms.append(py::make_tuple(coeff, word));
+              }
+              py_result[py_key] = py_terms;
+            }
+            return py_result;
+          },
+          py::arg("n_spin_orbitals"),
+          R"(
+Compute all Jordan-Wigner excitation terms E_pq = a†_p a_q for all (p, q) pairs.
+
+This computes all N² one-body excitation terms in a single C++ call,
+avoiding the overhead of many pybind11 boundary crossings.
+
+For p == q: E_pp = (1/2)(I - Z_p)  [number operator]
+For p != q: E_pq = (1/4)(XX + YY + iXY - iYX) with Z-strings between min(p,q) and max(p,q)
+
+Args:
+    n_spin_orbitals: Number of spin orbitals (qubits).
+
+Returns:
+    Dict mapping (p, q) tuples to lists of (coefficient, sparse_word) tuples.
+)")
+      .def_static(
+          "compute_all_bk_excitation_terms",
+          [](std::uint64_t n_spin_orbitals,
+             const std::unordered_map<std::uint64_t,
+                                      std::vector<std::uint64_t>>& parity_sets,
+             const std::unordered_map<std::uint64_t,
+                                      std::vector<std::uint64_t>>& update_sets,
+             const std::unordered_map<
+                 std::uint64_t, std::vector<std::uint64_t>>& remainder_sets) {
+            auto result = PauliTermAccumulator::compute_all_bk_excitation_terms(
+                n_spin_orbitals, parity_sets, update_sets, remainder_sets);
+            // Convert to Python-friendly format
+            py::dict py_result;
+            for (auto& [key, terms] : result) {
+              py::tuple py_key = py::make_tuple(key.first, key.second);
+              py::list py_terms;
+              for (auto& [coeff, word] : terms) {
+                py_terms.append(py::make_tuple(coeff, word));
+              }
+              py_result[py_key] = py_terms;
+            }
+            return py_result;
+          },
+          py::arg("n_spin_orbitals"), py::arg("parity_sets"),
+          py::arg("update_sets"), py::arg("remainder_sets"),
+          R"(
+Compute all Bravyi-Kitaev excitation terms E_pq = a†_p a_q for all (p, q) pairs.
+
+This computes all N² one-body excitation terms in a single C++ call,
+avoiding the overhead of many pybind11 boundary crossings.
+
+The Bravyi-Kitaev transformation uses parity, update, and remainder sets
+to encode fermionic operators efficiently. The ladder operators are::
+
+    a†_j = (1/2)(Z_{P(j)} X_j X_{U(j)} - i Z_{R(j)} Y_j X_{U(j)})
+    a_j  = (1/2)(Z_{P(j)} X_j X_{U(j)} + i Z_{R(j)} Y_j X_{U(j)})
+
+Args:
+    n_spin_orbitals: Number of spin orbitals (qubits).
+    parity_sets: Dict mapping qubit index j to its parity set P(j).
+    update_sets: Dict mapping qubit index j to its update set U(j).
+    remainder_sets: Dict mapping qubit index j to its remainder set R(j).
+
+Returns:
+    Dict mapping (p, q) tuples to lists of (coefficient, sparse_word) tuples.
+)");
 }
