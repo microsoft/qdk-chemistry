@@ -425,8 +425,8 @@ class QuantumErrorProfile(DataClass):
                 try:
                     getattr(noise, gate_name_qdk).set_depolarizing(error_def["rate"])
                 except AttributeError:
-                    Logger.warn(f"Gate {gate_name} not supported in QDK noise model; skipping.")
-                    continue  # Skip unsupported gates
+                    # Warn and skip unsupported gates
+                    Logger.warn(f"Gate {gate_name} not supported in QDK noise config; skipping.")
             else:
-                raise ValueError(f"Unsupported error type: {error_def['type']}")
+                raise ValueError(f"Error type {error_def['type']} is not currently supported.")
         return noise

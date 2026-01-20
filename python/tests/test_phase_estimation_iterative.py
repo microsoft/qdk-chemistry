@@ -483,7 +483,7 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
     )
 
 
-def test_iqe_generates_correct_number_of_circuits(
+def test_iterative_qpe_generates_correct_number_of_circuits(
     two_qubit_phase_problem: PhaseEstimationProblem,
 ) -> None:
     """Test that create_iterations generates the correct number of iteration circuits."""
@@ -495,6 +495,9 @@ def test_iqe_generates_correct_number_of_circuits(
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
     evolution_builder = create("time_evolution_builder", "trotter")
+
+    with pytest.raises(ValueError, match="No iteration circuits have been generated"):
+        iqpe.get_circuits()
 
     iqpe.run(
         qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,

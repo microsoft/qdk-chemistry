@@ -7,6 +7,7 @@
 
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import h5py
 import numpy as np
@@ -619,3 +620,28 @@ def test_noise_model_to_qdk_conversion_correct_gate_name():
                 atol=float_comparison_absolute_tolerance,
                 rtol=float_comparison_relative_tolerance,
             ), f"{gate_name}.{component} mismatch"
+
+
+def test_to_qdk_noise_config_warns_on_unsupported_gate():
+    """Test that unsupported gates log a warning and are skipped."""
+    # Create a profile with a gate that QDK doesn't support
+    profile = QuantumErrorProfile(
+        name="test",
+        description="test profile",
+        errors={
+            SupportedGate.CRZ: GateErrorDef(
+                type=SupportedErrorTypes.DEPOLARIZING_ERROR,
+                rate=0.01,
+                num_qubits=2,
+            ),
+        },
+    )
+
+    with patch("qdk_chemistry.data.noise_models.Logger") as mock_logger:
+        qdk_noise_config = profile.to_qdk_noise_config()
+
+        assert isinstance(qdk_noise_config, NoiseConfig)
+        mock_logger.warn.assert_called_once()
+        warning_message = mock_logger.warn.call_args[0][0]
+        assert "crz" in warning_message.lower()
+        assert "not supported in QDK" in warning_message
