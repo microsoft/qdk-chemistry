@@ -76,6 +76,20 @@ class QubitHamiltonian(DataClass):
         """
         return self.pauli_ops.num_qubits
 
+    @property
+    def schatten_norm(self) -> float:
+        """Calculate the Schatten norm (L1 norm) of the Hamiltonian.
+
+        The Schatten norm is the sum of the absolute values of all coefficients
+        in the Hamiltonian. This quantity is commonly used in estimating parameters
+        for quantum algorithms, most notably Quantum Phase Estimation (QPE).
+
+        Returns:
+            float: The Schatten norm (L1 norm) of the Hamiltonian.
+
+        """
+        return float(np.sum(np.abs(self.coefficients)))
+
     @cached_property
     def pauli_ops(self) -> SparsePauliOp:
         """Get the qubit Hamiltonian as a ``SparsePauliOp``.
@@ -216,9 +230,15 @@ class QubitHamiltonian(DataClass):
             dict[str, Any]: Dictionary representation of the qubit Hamiltonian.
 
         """
+        # Serialize complex coefficients as {"real": [...], "imag": [...]}
+        # This handles both real and complex coefficient arrays
+        coeffs = self.coefficients
         data = {
             "pauli_strings": self.pauli_strings,
-            "coefficients": self.coefficients.tolist(),
+            "coefficients": {
+                "real": coeffs.real.tolist(),
+                "imag": coeffs.imag.tolist(),
+            },
         }
         return self._add_json_version(data)
 
@@ -248,9 +268,16 @@ class QubitHamiltonian(DataClass):
 
         """
         cls._validate_json_version(cls._serialization_version, json_data)
+        coeff_data = json_data["coefficients"]
+        # Handle complex coefficients serialized as {"real": [...], "imag": [...]}
+        if isinstance(coeff_data, dict) and "real" in coeff_data and "imag" in coeff_data:
+            coefficients = np.array(coeff_data["real"]) + 1j * np.array(coeff_data["imag"])
+        else:
+            # Fallback for legacy format (simple list of real numbers)
+            coefficients = np.array(coeff_data)
         return cls(
             pauli_strings=json_data["pauli_strings"],
-            coefficients=np.array(json_data["coefficients"]),
+            coefficients=coefficients,
         )
 
     @classmethod
