@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 from qdk.openqasm import compile
-from qdk.simulation import run_qir
+from qsharp._simulation import run_qir
 from qdk_chemistry.algorithms import IterativePhaseEstimation
 from qdk_chemistry.data import (
     QpeResult,
@@ -132,7 +132,7 @@ def run_single_trial_iqpe(
         reference_energy=reference_energy,
     )
     if output_dir is not None:
-        Path(output_dir).mkdir(exist_ok=True)
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
         result.to_json_file(f"{output_dir}/iqpe_result_{trial_seed}.qpe_result.json")
     return result
 
@@ -168,6 +168,7 @@ def run_iqpe(
     """
     results = []
     for trial in range(trials):
+        print(f"Starting trial {trial + 1} of {trials}...")
         trial_seed = seed + trial  # Different seed per trial
         result = run_single_trial_iqpe(
             qubit_hamiltonian,
