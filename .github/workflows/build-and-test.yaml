@@ -273,6 +273,7 @@ jobs:
     - name: Run Python tests
       env:
         OMP_NUM_THREADS: 8
+        QDK_CHEMISTRY_RUN_SLOW_TESTS: 0
       working-directory: python
       run: |
         set -e
@@ -282,7 +283,7 @@ jobs:
         echo "Found build directory: $BUILD_TEMP"
 
         set +e
-        QDK_CHEMISTRY_RUN_SLOW_TESTS=1 pytest \
+        pytest \
           --cov=qdk_chemistry \
           --cov-report=xml:../coverage-reports/python_coverage.xml \
           --cov-report=html:../coverage-reports/python_coverage_html \

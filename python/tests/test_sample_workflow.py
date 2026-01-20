@@ -28,12 +28,11 @@ from nbclient import NotebookClient
 # Environment variable to enable slow tests (including notebook e2e tests)
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
-# Patterns that indicate a line starts a visualization block that should be skipped
-VISUALIZATION_LINE_PATTERNS = [
+# Patterns that indicate visualization code that should be skipped
+VISUALIZATION_PATTERNS = [
     "MoleculeViewer",
-    "display(Histogram",
-    "display(MoleculeViewer",
-    "display(Circuit",
+    "Histogram",
+    "Circuit",
     "display_html_table",
     "display_warning",
 ]
@@ -44,6 +43,19 @@ VISUALIZATION_IMPORT_PATTERNS = [
     "from qdk.widgets import Histogram",
     "from qdk.widgets import Circuit",
 ]
+
+
+def _contains_visualization(lines: list[str], start_idx: int) -> bool:
+    """Check if a multi-line statement contains visualization code."""
+    depth = 0
+    for i in range(start_idx, len(lines)):
+        line = lines[i]
+        depth += line.count("(") - line.count(")")
+        if any(pattern in line for pattern in VISUALIZATION_PATTERNS):
+            return True
+        if depth <= 0:
+            break
+    return False
 
 
 def _strip_visualization_lines(cell_source: str) -> str:
@@ -57,19 +69,25 @@ def _strip_visualization_lines(cell_source: str) -> str:
     filtered_lines = []
     skip_depth = 0  # Track parenthesis depth when skipping multi-line statements
 
-    for line in lines:
+    for i, line in enumerate(lines):
         # If we're in a skip block, continue skipping until parentheses balance
         if skip_depth > 0:
             skip_depth += line.count("(") - line.count(")")
             filtered_lines.append(f"# [test] Skipped: {line.strip()[:50]}")
             continue
 
-        # Check if this line contains visualization code
-        should_skip = any(pattern in line for pattern in VISUALIZATION_LINE_PATTERNS)
+        # Check if this line contains visualization code directly
+        should_skip = any(pattern in line for pattern in VISUALIZATION_PATTERNS)
 
         # Also check for visualization-only imports
         if not should_skip:
             should_skip = any(pattern in line for pattern in VISUALIZATION_IMPORT_PATTERNS)
+
+        # Check if this line starts a multi-line statement that contains visualization
+        if not should_skip:
+            open_parens = line.count("(") - line.count(")")
+            if open_parens > 0 and _contains_visualization(lines, i + 1):
+                should_skip = True
 
         if should_skip:
             # Start tracking parenthesis depth for multi-line statements
