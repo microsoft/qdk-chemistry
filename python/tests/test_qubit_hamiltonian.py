@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import re
 
 import numpy as np
@@ -318,3 +319,136 @@ def test_filter_and_group_both_trimming_modes():
     # Should have some result
     total_terms = len(grouped_ops_trim) + len(classical_coeffs_trim)
     assert total_terms >= 0
+
+
+class TestQubitHamiltonianSerialization:
+    """Test suite for QubitHamiltonian serialization (JSON and HDF5)."""
+
+    def test_json_serialization_real_coefficients(self):
+        """Test JSON serialization with real coefficients."""
+        pauli_strings = ["IX", "YY", "ZZ"]
+        coefficients = np.array([1.0, -0.5, 0.75])
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+
+        # Test to_json() returns valid JSON
+        json_data = qubit_hamiltonian.to_json()
+        assert "pauli_strings" in json_data
+        assert "coefficients" in json_data
+        assert "version" in json_data
+
+        # Verify the coefficients are serialized as dict with real and imag
+        assert isinstance(json_data["coefficients"], dict)
+        assert "real" in json_data["coefficients"]
+        assert "imag" in json_data["coefficients"]
+
+        # Serialize to string and back (validates JSON compatibility)
+        json_string = json.dumps(json_data)
+        parsed = json.loads(json_string)
+        assert parsed == json_data
+
+    def test_json_serialization_complex_coefficients(self):
+        """Test JSON serialization with complex coefficients."""
+        pauli_strings = ["IX", "YY", "ZZ", "XY"]
+        coefficients = np.array([1.0 + 0.5j, -0.5 - 0.25j, 0.75j, 2.0])
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+
+        # Test to_json() returns valid JSON
+        json_data = qubit_hamiltonian.to_json()
+
+        # Serialize to string and back (validates JSON compatibility)
+        json_string = json.dumps(json_data)
+        parsed = json.loads(json_string)
+
+        # Verify coefficients structure
+        assert isinstance(parsed["coefficients"], dict)
+        assert parsed["coefficients"]["real"] == [1.0, -0.5, 0.0, 2.0]
+        assert parsed["coefficients"]["imag"] == [0.5, -0.25, 0.75, 0.0]
+
+    def test_json_roundtrip_real_coefficients(self):
+        """Test JSON roundtrip with real coefficients."""
+        pauli_strings = ["IX", "YY", "ZZ"]
+        coefficients = np.array([1.0, -0.5, 0.75])
+        original = QubitHamiltonian(pauli_strings, coefficients)
+
+        # Roundtrip through JSON
+        json_data = original.to_json()
+        reconstructed = QubitHamiltonian.from_json(json_data)
+
+        assert reconstructed.pauli_strings == original.pauli_strings
+        np.testing.assert_array_almost_equal(reconstructed.coefficients, original.coefficients)
+
+    def test_json_roundtrip_complex_coefficients(self):
+        """Test JSON roundtrip with complex coefficients."""
+        pauli_strings = ["IX", "YY", "ZZ", "XY"]
+        coefficients = np.array([1.0 + 0.5j, -0.5 - 0.25j, 0.75j, 2.0])
+        original = QubitHamiltonian(pauli_strings, coefficients)
+
+        # Roundtrip through JSON
+        json_data = original.to_json()
+        reconstructed = QubitHamiltonian.from_json(json_data)
+
+        assert reconstructed.pauli_strings == original.pauli_strings
+        np.testing.assert_array_almost_equal(reconstructed.coefficients, original.coefficients)
+
+    def test_json_file_roundtrip_complex_coefficients(self, tmp_path):
+        """Test JSON file roundtrip with complex coefficients."""
+        pauli_strings = ["IX", "YY", "ZZ", "XY"]
+        coefficients = np.array([1.0 + 0.5j, -0.5 - 0.25j, 0.75j, 2.0])
+        original = QubitHamiltonian(pauli_strings, coefficients)
+
+        filename = tmp_path / "test.qubit_hamiltonian.json"
+        original.to_json_file(str(filename))
+
+        # Load and verify
+        reconstructed = QubitHamiltonian.from_json_file(str(filename))
+
+        assert reconstructed.pauli_strings == original.pauli_strings
+        np.testing.assert_array_almost_equal(reconstructed.coefficients, original.coefficients)
+
+    def test_hdf5_roundtrip_real_coefficients(self, tmp_path):
+        """Test HDF5 roundtrip with real coefficients."""
+        pauli_strings = ["IX", "YY", "ZZ"]
+        coefficients = np.array([1.0, -0.5, 0.75])
+        original = QubitHamiltonian(pauli_strings, coefficients)
+
+        filename = tmp_path / "test.qubit_hamiltonian.h5"
+        original.to_hdf5_file(str(filename))
+
+        # Load and verify
+        reconstructed = QubitHamiltonian.from_hdf5_file(str(filename))
+
+        assert reconstructed.pauli_strings == original.pauli_strings
+        np.testing.assert_array_almost_equal(reconstructed.coefficients, original.coefficients)
+
+    def test_hdf5_roundtrip_complex_coefficients(self, tmp_path):
+        """Test HDF5 roundtrip with complex coefficients."""
+        pauli_strings = ["IX", "YY", "ZZ", "XY"]
+        coefficients = np.array([1.0 + 0.5j, -0.5 - 0.25j, 0.75j, 2.0])
+        original = QubitHamiltonian(pauli_strings, coefficients)
+
+        filename = tmp_path / "test.qubit_hamiltonian.h5"
+        original.to_hdf5_file(str(filename))
+
+        # Load and verify
+        reconstructed = QubitHamiltonian.from_hdf5_file(str(filename))
+
+        assert reconstructed.pauli_strings == original.pauli_strings
+        np.testing.assert_array_almost_equal(reconstructed.coefficients, original.coefficients)
+
+    def test_json_to_json_file_no_complex_error(self, tmp_path):
+        """Regression test: to_json_file must not raise TypeError for complex coefficients."""
+        pauli_strings = ["IX", "YY", "ZZ", "XY"]
+        coefficients = np.array([1.0 + 0.5j, -0.5 - 0.25j, 0.75j, 2.0])
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+
+        filename = tmp_path / "test.qubit_hamiltonian.json"
+
+        # This should not raise TypeError: Object of type complex is not JSON serializable
+        qubit_hamiltonian.to_json_file(str(filename))
+
+        # Verify the file can be read
+        with open(filename) as f:
+            data = json.load(f)
+
+        assert "pauli_strings" in data
+        assert "coefficients" in data

@@ -713,6 +713,18 @@ class Wavefunction : public DataClass,
   size_t size() const;
 
   /**
+   * @brief Get top N determinants ranked by absolute CI coefficient
+   * @param max_determinants Maximum number of determinants to return.
+   *        If nullopt, returns all determinants.
+   * @return Pair of (configurations, coefficients) where configurations is a
+   *         vector of Configuration objects and coefficients is a VectorVariant
+   *         (Eigen::VectorXd or Eigen::VectorXcd), both sorted by descending
+   *         absolute coefficient value.
+   */
+  std::pair<DeterminantVector, VectorVariant> get_top_determinants(
+      std::optional<size_t> max_determinants = std::nullopt) const;
+
+  /**
    * @brief Calculate norm of the wavefunction
    * @return Norm (always real)
    */
