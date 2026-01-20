@@ -171,7 +171,7 @@ CasWavefunctionContainer::ScalarVariant CasWavefunctionContainer::overlap(
         "Overlap only implemented for wavefunctions with same number of "
         "electrons");
   }
-  // TODO: implement proper overlap calculation, workitem: 41338
+
   if (this->get_orbitals() != other_cas->get_orbitals()) {
     throw std::runtime_error(
         "Overlap only implemented for wavefunctions with same orbitals");

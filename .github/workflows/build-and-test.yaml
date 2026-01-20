@@ -267,10 +267,13 @@ jobs:
         # Use persistent build directory for coverage analysis
         python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[all]
         python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
+        # Install optional dependencies for tests
+        python -m pip install --prefix=${{ github.workspace }}/install pennylane
 
     - name: Run Python tests
       env:
         OMP_NUM_THREADS: 8
+        QDK_CHEMISTRY_RUN_SLOW_TESTS: 0
       working-directory: python
       run: |
         set -e

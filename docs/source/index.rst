@@ -68,5 +68,3 @@ Access to State-of-the-Art Algorithms
 
    glossary
    references
-
-.. todolist::
