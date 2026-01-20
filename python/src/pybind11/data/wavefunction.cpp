@@ -380,15 +380,17 @@ Examples:
   wavefunction.def(
       "get_top_determinants",
       [](const Wavefunction& self, std::optional<size_t> max_determinants) {
-        auto result = self.get_top_determinants(max_determinants);
+        auto [configs, coeffs] = self.get_top_determinants(max_determinants);
         py::dict py_result;
         std::visit(
-            [&py_result](const auto& vec) {
-              for (const auto& [config, coeff] : vec) {
-                py_result[py::cast(config)] = py::cast(coeff);
+            [&py_result, &configs](const auto& coeff_vec) {
+              for (Eigen::Index i = 0;
+                   i < static_cast<Eigen::Index>(configs.size()); ++i) {
+                py_result[py::cast(configs[static_cast<size_t>(i)])] =
+                    py::cast(coeff_vec[i]);
               }
             },
-            result);
+            coeffs);
         return py_result;
       },
       R"(

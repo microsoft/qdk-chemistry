@@ -94,15 +94,7 @@ int main() {
   // ---------------------------------------------------------------------------
   // start-cell-wfn-select-configs
   // Get top 2 determinants from the CASCI wavefunction
-  auto top_determinants_result = wfn_cas->get_top_determinants(2);
-  std::vector<data::Configuration> top_configurations;
-  std::visit(
-      [&top_configurations](const auto& vec) {
-        for (const auto& [config, coeff] : vec) {
-          top_configurations.push_back(config);
-        }
-      },
-      top_determinants_result);
+  auto [top_configurations, top_coeffs] = wfn_cas->get_top_determinants(2);
 
   // Perform PMC calculation with selected configurations
   auto pmc = algorithms::ProjectedMultiConfigurationCalculatorFactory::create();

@@ -1343,7 +1343,8 @@ size_t Wavefunction::size() const {
   return _container->size();
 }
 
-Wavefunction::TopDeterminantsResult Wavefunction::get_top_determinants(
+std::pair<Wavefunction::DeterminantVector, Wavefunction::VectorVariant>
+Wavefunction::get_top_determinants(
     std::optional<size_t> max_determinants) const {
   QDK_LOG_TRACE_ENTERING();
   const auto& determinants = get_active_determinants();
@@ -1367,19 +1368,25 @@ Wavefunction::TopDeterminantsResult Wavefunction::get_top_determinants(
     n = std::min(max_determinants.value(), n);
   }
 
-  // Build result vector preserving the original coefficient type
-  return std::visit(
-      [&determinants, &indices, n](const auto& vec) -> TopDeterminantsResult {
-        using CoeffType = typename std::decay_t<decltype(vec)>::Scalar;
-        std::vector<std::pair<Configuration, CoeffType>> result;
-        result.reserve(n);
+  // Build result as pair of vectors preserving the original coefficient type
+  std::vector<Configuration> configs;
+  configs.reserve(n);
+  for (size_t i = 0; i < n; ++i) {
+    configs.push_back(determinants[indices[i]]);
+  }
+
+  auto coeff_vec = std::visit(
+      [&indices, n](const auto& vec) -> VectorVariant {
+        using VecType = std::decay_t<decltype(vec)>;
+        VecType result(static_cast<Eigen::Index>(n));
         for (size_t i = 0; i < n; ++i) {
-          size_t idx = indices[i];
-          result.emplace_back(determinants[idx], vec[idx]);
+          result[static_cast<Eigen::Index>(i)] = vec[indices[i]];
         }
         return result;
       },
       coeffs);
+
+  return {std::move(configs), std::move(coeff_vec)};
 }
 
 double Wavefunction::norm() const {

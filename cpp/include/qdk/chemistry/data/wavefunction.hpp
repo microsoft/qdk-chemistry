@@ -713,21 +713,15 @@ class Wavefunction : public DataClass,
   size_t size() const;
 
   /**
-   * @brief Result type for get_top_determinants - either real or complex pairs
-   */
-  using TopDeterminantsResult =
-      std::variant<std::vector<std::pair<Configuration, double>>,
-                   std::vector<std::pair<Configuration, std::complex<double>>>>;
-
-  /**
    * @brief Get top N determinants ranked by absolute CI coefficient
    * @param max_determinants Maximum number of determinants to return.
    *        If nullopt, returns all determinants.
-   * @return Variant containing vector of (Configuration, coefficient) pairs
-   *         sorted by descending absolute coefficient value. The coefficient
-   *         type matches the wavefunction's coefficient type (real or complex).
+   * @return Pair of (configurations, coefficients) where configurations is a
+   *         vector of Configuration objects and coefficients is a VectorVariant
+   *         (Eigen::VectorXd or Eigen::VectorXcd), both sorted by descending
+   *         absolute coefficient value.
    */
-  TopDeterminantsResult get_top_determinants(
+  std::pair<DeterminantVector, VectorVariant> get_top_determinants(
       std::optional<size_t> max_determinants = std::nullopt) const;
 
   /**
