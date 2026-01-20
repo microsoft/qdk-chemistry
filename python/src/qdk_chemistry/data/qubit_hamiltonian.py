@@ -39,7 +39,7 @@ class QubitHamiltonian(DataClass):
     _data_type_name = "qubit_hamiltonian"
 
     # Serialization version for this class
-    _serialization_version = "0.2.0"
+    _serialization_version = "0.1.0"
 
     def __init__(
         self,

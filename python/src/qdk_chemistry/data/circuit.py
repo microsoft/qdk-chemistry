@@ -35,7 +35,7 @@ class Circuit(DataClass):
     _data_type_name = "circuit"
 
     # Serialization version for this class
-    _serialization_version = "0.2.0"
+    _serialization_version = "0.1.0"
 
     # Use keyword arguments to be future-proof
     def __init__(
