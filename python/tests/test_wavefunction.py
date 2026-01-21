@@ -1274,7 +1274,7 @@ class TestWavefunctionTruncate:
         truncated = sci_wavefunction.truncate(max_determinants=2)
 
         # Original top 2 coefficients: 0.8, 0.4
-        # Norm of [0.8, 0.4] = sqrt(0.64 + 0.16) = sqrt(0.8)
+        # Norm of [0.8, 0.4] = sqrt(0.64 + 0.16) = sqrt(0.80)
         expected_norm = np.sqrt(0.8**2 + 0.4**2)
         coeffs = truncated.get_coefficients()
 
