@@ -94,6 +94,88 @@ std::filesystem::path get_correct_basis_set_file(std::string& basis_set_name) {
 }
 
 /**
+ * @brief Sort ECP electrons vector based on the order of atom indices in ECP
+ * shells.
+ * @param ecp_electrons Vector of ECP electrons to be sorted inplace
+ * @param ecp_shells Vector of ECP shells used to determine the sorting order.
+ */
+void sort_ecp_electrons_inplace_based_on_shells(
+    std::vector<size_t>& ecp_electrons, const std::vector<Shell>& ecp_shells) {
+  // ecp_electrons are in order of appearance in ecp_shells
+  // get order of atom inidces from ecp_shells and sort ecp_electrons
+  // accordingly
+  std::vector<size_t> atom_indices;
+  for (const auto& shell : ecp_shells) {
+    atom_indices.push_back(shell.atom_index);
+  }
+  std::vector<size_t> sorted_ecp_electrons(ecp_electrons.size());
+  for (size_t i = 0; i < atom_indices.size(); i++) {
+    sorted_ecp_electrons[atom_indices[i]] = ecp_electrons[i];
+  }
+  // ecp_electrons = sorted_ecp_electrons;
+}
+
+/**
+ * @brief Sort shells and their primitives in a standardized order.
+ *
+ * This function performs two levels of sorting:
+ * 1. Sorts the shells themselves by atom index, then orbital type, then number
+ * of primitives
+ * 2. Within each shell, sorts the primitive Gaussian functions by exponent
+ * (descending order)
+ *
+ * The primitive sorting reorders exponents, coefficients, and radial powers (if
+ * present) consistently to maintain the correspondence between these arrays.
+ *
+ * @param shells Vector of Shell objects to be sorted in-place.
+ */
+void sort_shells_inplace(std::vector<Shell>& shells) {
+  // sort primitives (together with coefficients and rpowers) within each shell
+  auto sort_shell_primitives = [](Shell& shell) {
+    /// get exponent sorting indices
+    std::vector<size_t> indices(shell.get_num_primitives());
+    std::iota(indices.begin(), indices.end(), 0);
+    std::sort(indices.begin(), indices.end(), [&shell](size_t a, size_t b) {
+      return shell.exponents(a) > shell.exponents(b);
+    });
+
+    // sort exponents, coefficients, and rpowers
+    Eigen::VectorXd sorted_exponents(shell.get_num_primitives());
+    Eigen::VectorXd sorted_coefficients(shell.get_num_primitives());
+    Eigen::VectorXi sorted_rpowers(shell.get_num_primitives());
+    for (size_t i = 0; i < indices.size(); i++) {
+      sorted_exponents(i) = shell.exponents(indices[i]);
+      sorted_coefficients(i) = shell.coefficients(indices[i]);
+      if (shell.has_radial_powers()) {
+        sorted_rpowers(i) = shell.rpowers(indices[i]);
+      }
+    }
+    shell.exponents = sorted_exponents;
+    shell.coefficients = sorted_coefficients;
+    if (shell.has_radial_powers()) {
+      shell.rpowers = sorted_rpowers;
+    }
+  };
+
+  // sorting shells by atom type -> angular momentum -> number of primitives
+  auto shell_comparator = [](const Shell& a, const Shell& b) {
+    // ascending order
+    if (a.atom_index != b.atom_index) {
+      return a.atom_index < b.atom_index;
+    }
+    // s -> p -> d -> f ...
+    if (a.orbital_type != b.orbital_type) {
+      return a.orbital_type < b.orbital_type;
+    }
+    // descending order of number of primitives
+    return a.get_num_primitives() > b.get_num_primitives();
+  };
+
+  std::stable_sort(shells.begin(), shells.end(), shell_comparator);
+  std::for_each(shells.begin(), shells.end(), sort_shell_primitives);
+}
+
+/**
  * @brief Get basis set shells and ECP information for a given nuclear charge.
  * @param nuclear_charge Nuclear charge of the element.
  * @param basis_set_name Name of the basis set.
@@ -544,28 +626,15 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
   }
 
   // sort basis shells
-  std::vector<Shell> sorted_basis_shells;
-  stable_sort(all_basis_shells.begin(), all_basis_shells.end(),
-              [](const auto& x, const auto& y) {
-                return x.orbital_type == y.orbital_type
-                           ? x.exponents.size() > y.exponents.size()
-                           : x.orbital_type < y.orbital_type;
-              });
-  sorted_basis_shells.insert(sorted_basis_shells.end(),
-                             all_basis_shells.begin(), all_basis_shells.end());
+  detail::sort_shells_inplace(all_basis_shells);
+  // sort ecp_electrons based on ecp_shells
+  detail::sort_ecp_electrons_inplace_based_on_shells(all_ecp_electrons,
+                                                     all_ecp_shells);
   // sort ecp shells
-  std::vector<Shell> sorted_ecp_shells;
-  stable_sort(all_ecp_shells.begin(), all_ecp_shells.end(),
-              [](const auto& x, const auto& y) {
-                return x.orbital_type == y.orbital_type
-                           ? x.exponents.size() > y.exponents.size()
-                           : x.orbital_type < y.orbital_type;
-              });
-  sorted_ecp_shells.insert(sorted_ecp_shells.end(), all_ecp_shells.begin(),
-                           all_ecp_shells.end());
+  detail::sort_shells_inplace(all_ecp_shells);
 
-  return std::make_shared<BasisSet>(basis_name, sorted_basis_shells, basis_name,
-                                    sorted_ecp_shells, all_ecp_electrons,
+  return std::make_shared<BasisSet>(basis_name, all_basis_shells, basis_name,
+                                    all_ecp_shells, all_ecp_electrons,
                                     structure, atomic_orbital_type);
 }
 
@@ -650,30 +719,17 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
   }
 
   // sort basis shells
-  std::vector<Shell> sorted_basis_shells;
-  stable_sort(all_basis_shells.begin(), all_basis_shells.end(),
-              [](const auto& x, const auto& y) {
-                return x.orbital_type == y.orbital_type
-                           ? x.exponents.size() > y.exponents.size()
-                           : x.orbital_type < y.orbital_type;
-              });
-  sorted_basis_shells.insert(sorted_basis_shells.end(),
-                             all_basis_shells.begin(), all_basis_shells.end());
+  detail::sort_shells_inplace(all_basis_shells);
+  // sort ecp_electrons based on ecp_shells
+  detail::sort_ecp_electrons_inplace_based_on_shells(all_ecp_electrons,
+                                                     all_ecp_shells);
   // sort ecp shells
-  std::vector<Shell> sorted_ecp_shells;
-  stable_sort(all_ecp_shells.begin(), all_ecp_shells.end(),
-              [](const auto& x, const auto& y) {
-                return x.orbital_type == y.orbital_type
-                           ? x.exponents.size() > y.exponents.size()
-                           : x.orbital_type < y.orbital_type;
-              });
-  sorted_ecp_shells.insert(sorted_ecp_shells.end(), all_ecp_shells.begin(),
-                           all_ecp_shells.end());
+  detail::sort_shells_inplace(all_ecp_shells);
 
   return std::make_shared<BasisSet>(
-      std::string(BasisSet::custom_name), sorted_basis_shells,
-      std::string(BasisSet::custom_ecp_name), sorted_ecp_shells,
-      all_ecp_electrons, structure, atomic_orbital_type);
+      std::string(BasisSet::custom_name), all_basis_shells,
+      std::string(BasisSet::custom_ecp_name), all_ecp_shells, all_ecp_electrons,
+      structure, atomic_orbital_type);
 }
 
 BasisSet::BasisSet(const BasisSet& other)
