@@ -136,7 +136,7 @@ def test_validate_encoding_compatibility_matching():
 
 
 def test_validate_encoding_compatibility_none():
-    """Test that validation passes when one or both encodings are None."""
+    """Test that validation fails when encodings are None."""
     circuit_none = Circuit(qasm="OPENQASM 3.0; qubit[2] q;", encoding=None)
     circuit_jw = Circuit(qasm="OPENQASM 3.0; qubit[2] q;", encoding="jordan-wigner")
     pauli_strings = ["II", "ZI"]
@@ -144,10 +144,20 @@ def test_validate_encoding_compatibility_none():
     ham_none = QubitHamiltonian(pauli_strings, coefficients, encoding=None)
     ham_jw = QubitHamiltonian(pauli_strings, coefficients, encoding="jordan-wigner")
 
-    # All combinations with None should pass
-    validate_encoding_compatibility(circuit_none, ham_none)
-    validate_encoding_compatibility(circuit_none, ham_jw)
-    validate_encoding_compatibility(circuit_jw, ham_none)
+    # Circuit with None encoding should raise error
+    with pytest.raises(EncodingMismatchError) as exc_info:
+        validate_encoding_compatibility(circuit_none, ham_jw)
+    assert "Circuit encoding is not specified" in str(exc_info.value)
+
+    # Hamiltonian with None encoding should raise error
+    with pytest.raises(EncodingMismatchError) as exc_info:
+        validate_encoding_compatibility(circuit_jw, ham_none)
+    assert "QubitHamiltonian encoding is not specified" in str(exc_info.value)
+
+    # Both None should raise error (circuit is checked first)
+    with pytest.raises(EncodingMismatchError) as exc_info:
+        validate_encoding_compatibility(circuit_none, ham_none)
+    assert "Circuit encoding is not specified" in str(exc_info.value)
 
 
 def test_validate_encoding_compatibility_mismatch():
