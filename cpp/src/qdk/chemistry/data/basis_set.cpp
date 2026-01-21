@@ -10,6 +10,7 @@
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
@@ -1227,10 +1228,13 @@ std::shared_ptr<BasisSet> BasisSet::from_file(const std::string& filename,
 
 void BasisSet::to_hdf5_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
 
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, "basis_set");
+  std::string validated_filename = DataTypeFilename::validate_write_suffix(
+      filename, DATACLASS_TO_SNAKE_CASE(BasisSet));
 
   _to_hdf5_file(validated_filename);
 }
@@ -1238,6 +1242,9 @@ void BasisSet::to_hdf5_file(const std::string& filename) const {
 std::shared_ptr<BasisSet> BasisSet::from_hdf5_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
 
   // Validate filename has correct data type suffix
   std::string validated_filename =
@@ -1248,10 +1255,13 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5_file(
 
 void BasisSet::to_json_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
 
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, "basis_set");
+  std::string validated_filename = DataTypeFilename::validate_write_suffix(
+      filename, DATACLASS_TO_SNAKE_CASE(BasisSet));
 
   _to_json_file(validated_filename);
 }
@@ -1259,6 +1269,9 @@ void BasisSet::to_json_file(const std::string& filename) const {
 std::shared_ptr<BasisSet> BasisSet::from_json_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
 
   // Validate filename has correct data type suffix
   std::string validated_filename =

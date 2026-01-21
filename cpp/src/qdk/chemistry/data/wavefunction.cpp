@@ -5,8 +5,10 @@
 #include <H5Cpp.h>
 
 #include <Eigen/Dense>
+#include <algorithm>
 #include <fstream>
 #include <memory>
+#include <numeric>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
@@ -14,10 +16,12 @@
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
 #include <tuple>
 #include <variant>
 
+#include "filename_utils.hpp"
 #include "hdf5_error_handling.hpp"
 #include "hdf5_serialization.hpp"
 #include "json_serialization.hpp"
@@ -1339,6 +1343,77 @@ size_t Wavefunction::size() const {
   return _container->size();
 }
 
+std::pair<Wavefunction::DeterminantVector, Wavefunction::VectorVariant>
+Wavefunction::get_top_determinants(
+    std::optional<size_t> max_determinants) const {
+  QDK_LOG_TRACE_ENTERING();
+  const auto& determinants = get_active_determinants();
+  const auto& coeffs = get_coefficients();
+
+  // Create indices and sort by coefficient magnitude
+  std::vector<size_t> indices(determinants.size());
+  std::iota(indices.begin(), indices.end(), 0);
+
+  std::visit(
+      [&indices](const auto& vec) {
+        std::sort(indices.begin(), indices.end(), [&vec](size_t i1, size_t i2) {
+          return std::abs(vec[i1]) > std::abs(vec[i2]);
+        });
+      },
+      coeffs);
+
+  // Determine how many determinants to return
+  size_t n = determinants.size();
+  if (max_determinants.has_value()) {
+    n = std::min(max_determinants.value(), n);
+  }
+
+  // Build result as pair of vectors preserving the original coefficient type
+  std::vector<Configuration> configs;
+  configs.reserve(n);
+  for (size_t i = 0; i < n; ++i) {
+    configs.push_back(determinants[indices[i]]);
+  }
+
+  auto coeff_vec = std::visit(
+      [&indices, n](const auto& vec) -> VectorVariant {
+        using VecType = std::decay_t<decltype(vec)>;
+        VecType result(static_cast<Eigen::Index>(n));
+        for (size_t i = 0; i < n; ++i) {
+          result[static_cast<Eigen::Index>(i)] = vec[indices[i]];
+        }
+        return result;
+      },
+      coeffs);
+
+  return {std::move(configs), std::move(coeff_vec)};
+}
+
+std::shared_ptr<Wavefunction> Wavefunction::truncate(
+    std::optional<size_t> max_determinants) const {
+  QDK_LOG_TRACE_ENTERING();
+
+  // Get top determinants (sorted by absolute coefficient value)
+  auto [top_configs, top_coeffs] = get_top_determinants(max_determinants);
+
+  // Renormalize coefficients
+  auto normalized_coeffs = std::visit(
+      [](const auto& vec) -> VectorVariant {
+        using VecType = std::decay_t<decltype(vec)>;
+        double norm_val = vec.norm();
+        if (norm_val > 0.0) {
+          return VecType(vec / norm_val);
+        }
+        return vec;
+      },
+      top_coeffs);
+
+  // Create new wavefunction with SciWavefunctionContainer
+  return std::make_shared<Wavefunction>(
+      std::make_unique<SciWavefunctionContainer>(normalized_coeffs, top_configs,
+                                                 get_orbitals(), get_type()));
+}
+
 double Wavefunction::norm() const {
   QDK_LOG_TRACE_ENTERING();
   return _container->norm();
@@ -1488,12 +1563,21 @@ std::shared_ptr<Wavefunction> Wavefunction::from_json(const nlohmann::json& j) {
 
 void Wavefunction::to_json_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
+  DataTypeFilename::validate_write_suffix(
+      filename, DATACLASS_TO_SNAKE_CASE(Wavefunction));
   _to_json_file(filename);
 }
 
 std::shared_ptr<Wavefunction> Wavefunction::from_json_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
+  DataTypeFilename::validate_read_suffix(filename, "wavefunction");
   return _from_json_file(filename);
 }
 
@@ -1577,12 +1661,21 @@ std::shared_ptr<Wavefunction> Wavefunction::from_hdf5(H5::Group& group) {
 
 void Wavefunction::to_hdf5_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
+  DataTypeFilename::validate_write_suffix(
+      filename, DATACLASS_TO_SNAKE_CASE(Wavefunction));
   _to_hdf5_file(filename);
 }
 
 std::shared_ptr<Wavefunction> Wavefunction::from_hdf5_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
+  DataTypeFilename::validate_read_suffix(filename, "wavefunction");
   return _from_hdf5_file(filename);
 }
 

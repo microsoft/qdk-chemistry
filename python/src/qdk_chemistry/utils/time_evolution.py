@@ -11,13 +11,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
+from qiskit import QuantumCircuit
 
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from qiskit import QuantumCircuit
     from qiskit.circuit import Qubit
     from qiskit.quantum_info import SparsePauliOp
 
@@ -174,18 +174,34 @@ def append_controlled_time_evolution(
     if power < 1:
         raise ValueError("power must be at least 1 for controlled time evolution.")
 
+    # Create a new circuit for the controlled time evolution
+    num_qubits = len(system_qubits) + 1  # +1 for control qubit
+    power_evolution_circuit = QuantumCircuit(num_qubits, name=f"ctrl_time_evol_power_{power}")
+
+    # Map qubits: control is 0, system qubits are 1, 2, ...
+    control_idx = 0
+    system_indices = list(range(1, num_qubits))
+
+    ctrl_evol_circuit = QuantumCircuit(num_qubits, name="ctrl_time_evol")
+    for term in terms:
+        rotation_angle = time * term.coefficient
+        if np.isclose(rotation_angle, 0.0):
+            continue
+        controlled_pauli_rotation(
+            ctrl_evol_circuit,
+            control_idx,
+            system_indices,
+            term,
+            angle=rotation_angle,
+        )
+
+    ctrl_evol_gate = ctrl_evol_circuit.to_gate()
     for _ in range(power):
-        for term in terms:
-            rotation_angle = time * term.coefficient
-            if np.isclose(rotation_angle, 0.0):
-                continue
-            controlled_pauli_rotation(
-                circuit,
-                control_qubit,
-                system_qubits,
-                term,
-                angle=rotation_angle,
-            )
+        # Create a subcircuit for each power iteration
+        power_evolution_circuit.append(ctrl_evol_gate, list(range(num_qubits)))
+
+    # Convert to gate and append to original circuit
+    circuit.append(power_evolution_circuit.to_gate(), [control_qubit, *list(system_qubits)])
 
 
 def extract_terms_from_hamiltonian(hamiltonian: QubitHamiltonian) -> list[PauliEvolutionTerm]:

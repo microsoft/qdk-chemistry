@@ -5,6 +5,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
+import re
+
 import numpy as np
 import pytest
 
@@ -72,6 +75,130 @@ class TestQubitHamiltonian:
             assert len(group.pauli_strings) == 1  # Each group should contain only one Pauli string
             all_grouped_strings.extend(group.pauli_strings)
         assert set(all_grouped_strings) == {"XX", "YY", "ZZ", "XY"}
+
+    def test_schatten_norm_basic(self):
+        """Test Schatten norm with basic Hamiltonian."""
+        pauli_strings = ["IX", "YY", "ZZ"]
+        coefficients = np.array([1.0, -0.5, 0.75])
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+        # Schatten norm = |1.0| + |-0.5| + |0.75| = 2.25
+        expected_norm = 2.25
+        assert np.isclose(
+            qubit_hamiltonian.schatten_norm,
+            expected_norm,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+    def test_schatten_norm_with_negative_coefficients(self):
+        """Test Schatten norm handles negative coefficients correctly."""
+        pauli_strings = ["X", "Y", "Z"]
+        coefficients = np.array([-2.0, -1.5, -0.5])
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+        # Schatten norm = |-2.0| + |-1.5| + |-0.5| = 4.0
+        expected_norm = 4.0
+        assert np.isclose(
+            qubit_hamiltonian.schatten_norm,
+            expected_norm,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+    def test_schatten_norm_with_complex_coefficients(self):
+        """Test Schatten norm with complex coefficients."""
+        pauli_strings = ["XX", "YY"]
+        coefficients = np.array([3.0 + 4.0j, -1.0 + 0.0j])
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+        # Schatten norm = |3.0+4.0j| + |-1.0| = 5.0 + 1.0 = 6.0
+        expected_norm = 6.0
+        assert np.isclose(
+            qubit_hamiltonian.schatten_norm,
+            expected_norm,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+    def test_schatten_norm_single_term(self):
+        """Test Schatten norm with single term Hamiltonian."""
+        pauli_strings = ["Z"]
+        coefficients = np.array([3.5])
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+        expected_norm = 3.5
+        assert np.isclose(
+            qubit_hamiltonian.schatten_norm,
+            expected_norm,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+    def test_schatten_norm_zero_coefficients(self):
+        """Test Schatten norm with zero coefficients."""
+        pauli_strings = ["X", "Y", "Z"]
+        coefficients = np.array([0.0, 0.0, 0.0])
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+        expected_norm = 0.0
+        assert np.isclose(
+            qubit_hamiltonian.schatten_norm,
+            expected_norm,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+    def test_reorder_qubits_identity(self):
+        """Test that identity permutation returns equivalent Hamiltonian."""
+        qh = QubitHamiltonian(["XIZI", "IYII"], np.array([0.5, 0.3], dtype=complex))
+        reordered = qh.reorder_qubits([0, 1, 2, 3])
+        assert reordered.pauli_strings == qh.pauli_strings
+        assert np.allclose(reordered.coefficients, qh.coefficients)
+
+    def test_reorder_qubits_swap(self):
+        """Test swapping two adjacent qubits."""
+        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
+        reordered = qh.reorder_qubits([1, 0, 2, 3])
+        assert reordered.pauli_strings == ["IXZI"]
+
+    def test_reorder_qubits_reverse(self):
+        """Test reversing all qubit indices."""
+        qh = QubitHamiltonian(["XYZI"], np.array([1.0], dtype=complex))
+        reordered = qh.reorder_qubits([3, 2, 1, 0])
+        assert reordered.pauli_strings == ["IZYX"]
+
+    def test_reorder_qubits_invalid_length(self):
+        """Test that invalid permutation length raises error."""
+        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
+        with pytest.raises(ValueError, match="Permutation length"):
+            qh.reorder_qubits([0, 1, 2])
+
+    def test_reorder_qubits_invalid_values(self):
+        """Test that invalid permutation values raise error."""
+        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
+        with pytest.raises(ValueError, match="Invalid permutation"):
+            qh.reorder_qubits([0, 1, 1, 3])
+
+    def test_to_interleaved_4_qubits(self):
+        """Test blocked to interleaved conversion for 4 qubits."""
+        # Blocked: [α₀, α₁, β₀, β₁] -> Interleaved: [α₀, β₀, α₁, β₁]
+        qh = QubitHamiltonian(["XYZZ"], np.array([1.0], dtype=complex))
+        interleaved = qh.to_interleaved(n_spatial=2)
+        assert interleaved.pauli_strings == ["XZYZ"]
+
+    def test_to_interleaved_preserves_coefficients(self):
+        """Test that interleaving preserves coefficient values."""
+        qh = QubitHamiltonian(["XIZI", "IYII"], np.array([0.5 + 0.1j, 0.3], dtype=complex))
+        interleaved = qh.to_interleaved(n_spatial=2)
+        assert np.allclose(interleaved.coefficients, qh.coefficients)
+
+    def test_to_interleaved_invalid_n_spatial(self):
+        """Test that invalid n_spatial raises error."""
+        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
+        with pytest.raises(ValueError, match=re.escape("must be 2 * n_spatial")):
+            qh.to_interleaved(n_spatial=3)
+
+    def test_to_interleaved_single_orbital(self):
+        """Test that single spatial orbital (2 qubits) is unchanged."""
+        qh = QubitHamiltonian(["XY"], np.array([1.0], dtype=complex))
+        interleaved = qh.to_interleaved(n_spatial=1)
+        assert interleaved.pauli_strings == ["XY"]
 
 
 def test_filter_and_group_raises_on_zero_norm():
@@ -260,3 +387,136 @@ def test_filter_and_group_both_trimming_modes():
     # Should have some result
     total_terms = len(grouped_ops_trim) + len(classical_coeffs_trim)
     assert total_terms >= 0
+
+
+class TestQubitHamiltonianSerialization:
+    """Test suite for QubitHamiltonian serialization (JSON and HDF5)."""
+
+    def test_json_serialization_real_coefficients(self):
+        """Test JSON serialization with real coefficients."""
+        pauli_strings = ["IX", "YY", "ZZ"]
+        coefficients = np.array([1.0, -0.5, 0.75])
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+
+        # Test to_json() returns valid JSON
+        json_data = qubit_hamiltonian.to_json()
+        assert "pauli_strings" in json_data
+        assert "coefficients" in json_data
+        assert "version" in json_data
+
+        # Verify the coefficients are serialized as dict with real and imag
+        assert isinstance(json_data["coefficients"], dict)
+        assert "real" in json_data["coefficients"]
+        assert "imag" in json_data["coefficients"]
+
+        # Serialize to string and back (validates JSON compatibility)
+        json_string = json.dumps(json_data)
+        parsed = json.loads(json_string)
+        assert parsed == json_data
+
+    def test_json_serialization_complex_coefficients(self):
+        """Test JSON serialization with complex coefficients."""
+        pauli_strings = ["IX", "YY", "ZZ", "XY"]
+        coefficients = np.array([1.0 + 0.5j, -0.5 - 0.25j, 0.75j, 2.0])
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+
+        # Test to_json() returns valid JSON
+        json_data = qubit_hamiltonian.to_json()
+
+        # Serialize to string and back (validates JSON compatibility)
+        json_string = json.dumps(json_data)
+        parsed = json.loads(json_string)
+
+        # Verify coefficients structure
+        assert isinstance(parsed["coefficients"], dict)
+        assert parsed["coefficients"]["real"] == [1.0, -0.5, 0.0, 2.0]
+        assert parsed["coefficients"]["imag"] == [0.5, -0.25, 0.75, 0.0]
+
+    def test_json_roundtrip_real_coefficients(self):
+        """Test JSON roundtrip with real coefficients."""
+        pauli_strings = ["IX", "YY", "ZZ"]
+        coefficients = np.array([1.0, -0.5, 0.75])
+        original = QubitHamiltonian(pauli_strings, coefficients)
+
+        # Roundtrip through JSON
+        json_data = original.to_json()
+        reconstructed = QubitHamiltonian.from_json(json_data)
+
+        assert reconstructed.pauli_strings == original.pauli_strings
+        np.testing.assert_array_almost_equal(reconstructed.coefficients, original.coefficients)
+
+    def test_json_roundtrip_complex_coefficients(self):
+        """Test JSON roundtrip with complex coefficients."""
+        pauli_strings = ["IX", "YY", "ZZ", "XY"]
+        coefficients = np.array([1.0 + 0.5j, -0.5 - 0.25j, 0.75j, 2.0])
+        original = QubitHamiltonian(pauli_strings, coefficients)
+
+        # Roundtrip through JSON
+        json_data = original.to_json()
+        reconstructed = QubitHamiltonian.from_json(json_data)
+
+        assert reconstructed.pauli_strings == original.pauli_strings
+        np.testing.assert_array_almost_equal(reconstructed.coefficients, original.coefficients)
+
+    def test_json_file_roundtrip_complex_coefficients(self, tmp_path):
+        """Test JSON file roundtrip with complex coefficients."""
+        pauli_strings = ["IX", "YY", "ZZ", "XY"]
+        coefficients = np.array([1.0 + 0.5j, -0.5 - 0.25j, 0.75j, 2.0])
+        original = QubitHamiltonian(pauli_strings, coefficients)
+
+        filename = tmp_path / "test.qubit_hamiltonian.json"
+        original.to_json_file(str(filename))
+
+        # Load and verify
+        reconstructed = QubitHamiltonian.from_json_file(str(filename))
+
+        assert reconstructed.pauli_strings == original.pauli_strings
+        np.testing.assert_array_almost_equal(reconstructed.coefficients, original.coefficients)
+
+    def test_hdf5_roundtrip_real_coefficients(self, tmp_path):
+        """Test HDF5 roundtrip with real coefficients."""
+        pauli_strings = ["IX", "YY", "ZZ"]
+        coefficients = np.array([1.0, -0.5, 0.75])
+        original = QubitHamiltonian(pauli_strings, coefficients)
+
+        filename = tmp_path / "test.qubit_hamiltonian.h5"
+        original.to_hdf5_file(str(filename))
+
+        # Load and verify
+        reconstructed = QubitHamiltonian.from_hdf5_file(str(filename))
+
+        assert reconstructed.pauli_strings == original.pauli_strings
+        np.testing.assert_array_almost_equal(reconstructed.coefficients, original.coefficients)
+
+    def test_hdf5_roundtrip_complex_coefficients(self, tmp_path):
+        """Test HDF5 roundtrip with complex coefficients."""
+        pauli_strings = ["IX", "YY", "ZZ", "XY"]
+        coefficients = np.array([1.0 + 0.5j, -0.5 - 0.25j, 0.75j, 2.0])
+        original = QubitHamiltonian(pauli_strings, coefficients)
+
+        filename = tmp_path / "test.qubit_hamiltonian.h5"
+        original.to_hdf5_file(str(filename))
+
+        # Load and verify
+        reconstructed = QubitHamiltonian.from_hdf5_file(str(filename))
+
+        assert reconstructed.pauli_strings == original.pauli_strings
+        np.testing.assert_array_almost_equal(reconstructed.coefficients, original.coefficients)
+
+    def test_json_to_json_file_no_complex_error(self, tmp_path):
+        """Regression test: to_json_file must not raise TypeError for complex coefficients."""
+        pauli_strings = ["IX", "YY", "ZZ", "XY"]
+        coefficients = np.array([1.0 + 0.5j, -0.5 - 0.25j, 0.75j, 2.0])
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+
+        filename = tmp_path / "test.qubit_hamiltonian.json"
+
+        # This should not raise TypeError: Object of type complex is not JSON serializable
+        qubit_hamiltonian.to_json_file(str(filename))
+
+        # Verify the file can be read
+        with open(filename) as f:
+            data = json.load(f)
+
+        assert "pauli_strings" in data
+        assert "coefficients" in data

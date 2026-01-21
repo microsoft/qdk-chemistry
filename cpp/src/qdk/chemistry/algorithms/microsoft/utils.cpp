@@ -14,6 +14,8 @@
 
 #include <libint2.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <stdexcept>
+#include <string>
 
 namespace qdk::chemistry::utils::microsoft {
 
@@ -431,6 +433,40 @@ std::vector<unsigned> compute_shell_map(
   std::transform(qdk_to_internal_shells.begin(), qdk_to_internal_shells.end(),
                  ret_val.begin(), [](auto i) { return i; });
   return ret_val;
+}
+
+size_t factorial(size_t n) {
+  // For 64-bit size_t: 20! = 2,432,902,008,176,640,000 is the largest
+  // factorial that fits. 21! would overflow.
+  constexpr size_t MAX_FACTORIAL_INPUT = 20;
+
+  if (n > MAX_FACTORIAL_INPUT) {
+    throw std::overflow_error(
+        "factorial(" + std::to_string(n) + ") would overflow size_t. " +
+        "Maximum safe input is " + std::to_string(MAX_FACTORIAL_INPUT) + ".");
+  }
+
+  size_t result = 1;
+  for (size_t i = 2; i <= n; ++i) {
+    result *= i;
+  }
+  return result;
+}
+
+size_t binomial_coefficient(size_t n, size_t k) {
+  if (k > n) return 0ul;
+  if (k == 0 || k == n) return 1ul;
+  // Take advantage of symmetry: C(n, k) == C(n, n - k)
+  if (k > n - k) {
+    k = n - k;
+  }
+  size_t result = 1;
+  for (size_t i = 1; i <= k; ++i) {
+    // At each step: result *= (n - (k - i)); result /= i;
+    // This keeps intermediate values smaller than full factorials.
+    result = (result * (n - (k - i))) / i;
+  }
+  return result;
 }
 
 }  // namespace qdk::chemistry::utils::microsoft
