@@ -141,8 +141,8 @@ void sort_shells_inplace(std::vector<Shell>& shells) {
     if (a.orbital_type != b.orbital_type) {
       return a.orbital_type < b.orbital_type;
     }
-    // descending order of number of primitives
-    return a.get_num_primitives() > b.get_num_primitives();
+    // descending order of largest exponent
+    return a.exponents(0) > b.exponents(0);
   };
 
   std::stable_sort(shells.begin(), shells.end(), shell_comparator);

@@ -140,7 +140,6 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol,
     norm_psi4_mode(this->shells);
   }  // RAW branch doesn't normalize
 
-
   num_atomic_orbitals = std::accumulate(
       this->shells.begin(), this->shells.end(), 0,
       [&pure](auto sum, const auto& sh) {
@@ -176,7 +175,6 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol,
   if (mode == BasisMode::PSI4) {
     norm_psi4_mode(this->shells);
   }  // RAW branch doesn't normalize
-
 
   num_atomic_orbitals = std::accumulate(
       this->shells.begin(), this->shells.end(), 0,
@@ -251,7 +249,6 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
   if (mode == BasisMode::PSI4) {
     norm_psi4_mode(shells);
   }  // RAW branch doesn't normalize
-
 
   num_atomic_orbitals = std::accumulate(
       shells.begin(), shells.end(), 0, [&pure](auto sum, const auto& sh) {

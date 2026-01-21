@@ -318,8 +318,9 @@ void VVHVLocalization::initialize() {
   // Create minimal basis set
   auto mol_structure = ori_bs->mol;
   auto _min_basis = data::BasisSet::from_basis_name(
-    minimal_basis_name_, basis_set_->get_structure());
-  this->minimal_basis_fp_ = utils::microsoft::convert_basis_set_from_qdk(*_min_basis);
+      minimal_basis_name_, basis_set_->get_structure());
+  this->minimal_basis_fp_ =
+      utils::microsoft::convert_basis_set_from_qdk(*_min_basis);
   const auto* minimal_bs = this->minimal_basis_fp_.get();  // Minimal basis set
 
   const auto num_atoms = mol_structure->n_atoms;

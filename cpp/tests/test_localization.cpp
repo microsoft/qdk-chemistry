@@ -694,7 +694,8 @@ TEST_F(LocalizationTest, O2TripletVVHV) {
   // Check metric values to reference (commented out temporarily)
   EXPECT_NEAR(31.424771755135694, pm_metric_alpha,
               testing::localization_tolerance);
-  EXPECT_NEAR(28.551648094387637, pm_metric_beta, testing::localization_tolerance);
+  EXPECT_NEAR(28.551648094387637, pm_metric_beta,
+              testing::localization_tolerance);
 }
 
 // =============================================================================

@@ -18,26 +18,14 @@ structure = Structure.from_xyz_file(
 
 # Create basis sets from the library using basis set name
 basis_from_name = BasisSet.from_basis_name("sto-3g", structure)
-# With explicit ECP
-basis_from_name_ecp = BasisSet.from_basis_name("def2-svp", structure, "def2-svp")
-# Without ECP
-basis_from_name_no_ecp = BasisSet.from_basis_name("cc-pvdz", structure, "")
 
 # Create basis sets from the library using element-based mapping
 basis_map = {"H": "sto-3g", "O": "def2-svp"}
 basis_from_element = BasisSet.from_element_map(basis_map, structure)
-# With explicit ECP per element
-ecp_map = {"O": "def2-svp"}
-basis_from_element_ecp = BasisSet.from_element_map(basis_map, structure, ecp_map)
 
 # Create basis sets from the library using index-based mapping
 index_basis_map = {0: "def2-svp", 1: "sto-3g", 2: "sto-3g"}  # O at 0, H at 1 and 2
 basis_from_index = BasisSet.from_index_map(index_basis_map, structure)
-# With explicit ECP per atom index
-index_ecp_map = {0: "def2-svp"}  # ECP only for atom at index 0
-basis_from_index_ecp = BasisSet.from_index_map(
-    index_basis_map, structure, index_ecp_map
-)
 # end-cell-loading
 ################################################################################
 
