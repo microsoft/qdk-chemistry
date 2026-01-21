@@ -1389,6 +1389,31 @@ Wavefunction::get_top_determinants(
   return {std::move(configs), std::move(coeff_vec)};
 }
 
+std::shared_ptr<Wavefunction> Wavefunction::truncate(
+    std::optional<size_t> max_determinants) const {
+  QDK_LOG_TRACE_ENTERING();
+
+  // Get top determinants (sorted by absolute coefficient value)
+  auto [top_configs, top_coeffs] = get_top_determinants(max_determinants);
+
+  // Renormalize coefficients
+  auto normalized_coeffs = std::visit(
+      [](const auto& vec) -> VectorVariant {
+        using VecType = std::decay_t<decltype(vec)>;
+        double norm_val = vec.norm();
+        if (norm_val > 0.0) {
+          return VecType(vec / norm_val);
+        }
+        return vec;
+      },
+      top_coeffs);
+
+  // Create new wavefunction with SciWavefunctionContainer
+  return std::make_shared<Wavefunction>(
+      std::make_unique<SciWavefunctionContainer>(normalized_coeffs, top_configs,
+                                                 get_orbitals(), get_type()));
+}
+
 double Wavefunction::norm() const {
   QDK_LOG_TRACE_ENTERING();
   return _container->norm();
