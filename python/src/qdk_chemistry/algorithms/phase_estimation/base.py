@@ -33,9 +33,9 @@ class PhaseEstimationSettings(Settings):
         """Initialize the settings for Phase Estimation.
 
         Args:
-            num_bits: The number of phase bits to estimate. Default to -1 for user to set a valid value.
+            num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
             evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``,
-                default to 0.0 for user to set a valid value. This setting is only applicable to
+                defaults to 0.0; user needs to set a valid value. This setting is only applicable to
                 time evolution-based unitary builders such as Trotter.
 
         """
@@ -56,9 +56,9 @@ class PhaseEstimation(Algorithm):
         """Initialize the PhaseEstimation with default settings.
 
         Args:
-            num_bits: The number of phase bits to estimate. Default to -1 for user to set a valid value.
+            num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
             evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``,
-                default to 0.0 for user to set a valid value.
+                defaults to 0.0; user needs to set a valid value.
 
         """
         super().__init__()
