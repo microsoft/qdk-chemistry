@@ -66,5 +66,6 @@ Access to State-of-the-Art Algorithms
    :maxdepth: 1
    :caption:  Supporting Information
 
+   changelog
    glossary
    references
