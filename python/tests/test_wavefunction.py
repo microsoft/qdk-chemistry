@@ -20,6 +20,7 @@ from qdk_chemistry.data import (
     Hamiltonian,
     MP2Container,
     Orbitals,
+    SciWavefunctionContainer,
     SlaterDeterminantContainer,
     Structure,
     Wavefunction,
@@ -1225,3 +1226,71 @@ def test_wavefunction_data_type_name():
     """Test that Wavefunction has the correct _data_type_name class attribute."""
     assert hasattr(Wavefunction, "_data_type_name")
     assert Wavefunction._data_type_name == "wavefunction"
+
+
+class TestWavefunctionTruncate:
+    """Test the Wavefunction.truncate method."""
+
+    @pytest.fixture
+    def sci_wavefunction(self):
+        """Create a SCI wavefunction with multiple determinants for testing."""
+        coeffs = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 0.0], [0.0, 0.0]])
+        basis_set = create_test_basis_set(4, "test-truncate")
+        orbitals = Orbitals(coeffs, None, None, basis_set)
+
+        dets = [
+            Configuration("2200"),  # largest coeff
+            Configuration("2020"),  # second largest
+            Configuration("2002"),  # third largest
+            Configuration("0220"),  # smallest
+        ]
+        coeffs = np.array([0.8, 0.4, 0.3, 0.1])  # Not normalized
+
+        container = SciWavefunctionContainer(coeffs, dets, orbitals)
+        return Wavefunction(container)
+
+    def test_truncate_to_n_determinants(self, sci_wavefunction):
+        """Test truncation to specific number of determinants."""
+        truncated = sci_wavefunction.truncate(max_determinants=2)
+
+        # Should have 2 determinants
+        assert truncated.size() == 2
+
+        # Should be normalized
+        assert truncated.norm() == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
+
+    def test_truncate_keeps_top_determinants(self, sci_wavefunction):
+        """Test that truncation keeps the top determinants by coefficient magnitude."""
+        truncated = sci_wavefunction.truncate(max_determinants=2)
+
+        # Get the determinants
+        dets = truncated.get_active_determinants()
+        assert len(dets) == 2
+        assert str(dets[0]) == "2200"  # largest
+        assert str(dets[1]) == "2020"  # second largest
+
+    def test_truncate_renormalizes_coefficients(self, sci_wavefunction):
+        """Test that truncated coefficients are properly renormalized."""
+        truncated = sci_wavefunction.truncate(max_determinants=2)
+
+        # Original top 2 coefficients: 0.8, 0.4
+        # Norm of [0.8, 0.4] = sqrt(0.64 + 0.16) = sqrt(0.80)
+        expected_norm = np.sqrt(0.8**2 + 0.4**2)
+        coeffs = truncated.get_coefficients()
+
+        assert coeffs[0] == pytest.approx(0.8 / expected_norm, abs=float_comparison_absolute_tolerance)
+        assert coeffs[1] == pytest.approx(0.4 / expected_norm, abs=float_comparison_absolute_tolerance)
+
+    def test_truncate_with_none_returns_all(self, sci_wavefunction):
+        """Test truncation with None returns all determinants (renormalized)."""
+        truncated = sci_wavefunction.truncate(max_determinants=None)
+
+        assert truncated.size() == 4
+        assert truncated.norm() == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
+
+    def test_truncate_more_than_exist(self, sci_wavefunction):
+        """Test truncation requesting more determinants than exist."""
+        truncated = sci_wavefunction.truncate(max_determinants=10)
+
+        assert truncated.size() == 4
+        assert truncated.norm() == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)

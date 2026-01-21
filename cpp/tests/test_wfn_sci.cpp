@@ -909,3 +909,54 @@ TEST_F(SciWavefunctionTest, Hdf5SerializationRDMsUnrestricted) {
 
   std::remove(filename.c_str());
 }
+
+TEST_F(SciWavefunctionTest, Truncate) {
+  // Create a wavefunction with multiple determinants
+  auto orbitals = testing::create_test_orbitals(4, 4, true);
+  std::vector<Configuration> dets = {
+      Configuration("2200"),  // largest coeff
+      Configuration("2020"),  // second largest
+      Configuration("2002"),  // third largest
+      Configuration("0220"),  // smallest
+  };
+  Eigen::VectorXd coeffs(4);
+  coeffs << 0.8, 0.4, 0.3, 0.1;  // Not normalized
+
+  Wavefunction wfn(
+      std::make_unique<SciWavefunctionContainer>(coeffs, dets, orbitals));
+
+  // Test truncation to 2 determinants
+  auto truncated = wfn.truncate(2);
+
+  // Should have 2 determinants
+  EXPECT_EQ(truncated->size(), 2);
+
+  // Should be normalized
+  EXPECT_NEAR(truncated->norm(), 1.0, testing::wf_tolerance);
+
+  // Should contain the top 2 determinants by coefficient magnitude
+  const auto& truncated_dets = truncated->get_active_determinants();
+  EXPECT_EQ(truncated_dets.size(), 2);
+  EXPECT_EQ(truncated_dets[0].to_string(), "2200");
+  EXPECT_EQ(truncated_dets[1].to_string(), "2020");
+
+  // Verify coefficients are renormalized correctly
+  // Original top 2 coefficients: 0.8, 0.4
+  // Norm of [0.8, 0.4] = sqrt(0.64 + 0.16) = sqrt(0.80)
+  // Renormalized: 0.8/sqrt(0.8), 0.4/sqrt(0.8)
+  double expected_norm = std::sqrt(0.8 * 0.8 + 0.4 * 0.4);
+  const auto& truncated_coeffs =
+      std::get<Eigen::VectorXd>(truncated->get_coefficients());
+  EXPECT_NEAR(truncated_coeffs[0], 0.8 / expected_norm, testing::wf_tolerance);
+  EXPECT_NEAR(truncated_coeffs[1], 0.4 / expected_norm, testing::wf_tolerance);
+
+  // Test truncation with nullopt (should return all determinants, renormalized)
+  auto full_copy = wfn.truncate(std::nullopt);
+  EXPECT_EQ(full_copy->size(), 4);
+  EXPECT_NEAR(full_copy->norm(), 1.0, testing::wf_tolerance);
+
+  // Test truncation requesting more determinants than exist
+  auto over_truncate = wfn.truncate(10);
+  EXPECT_EQ(over_truncate->size(), 4);
+  EXPECT_NEAR(over_truncate->norm(), 1.0, testing::wf_tolerance);
+}
