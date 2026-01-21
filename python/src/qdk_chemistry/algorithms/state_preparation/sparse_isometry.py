@@ -235,7 +235,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 f"Final circuit after transpilation: {qc.num_qubits} qubits, depth {qc.depth()}, {qc.size()} gates"
             )
 
-        return Circuit(qasm=qasm3.dumps(qc))
+        return Circuit(qasm=qasm3.dumps(qc), encoding="jordan-wigner")
 
     def _bitstrings_to_binary_matrix(self, bitstrings: list[str]) -> np.ndarray:
         """Convert a list of bitstrings to a binary matrix.
@@ -336,7 +336,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             if bit == "1":
                 circuit.x(i)
 
-        return Circuit(qasm=qasm3.dumps(circuit))
+        return Circuit(qasm=qasm3.dumps(circuit), encoding="jordan-wigner")
 
     def name(self) -> str:
         """Return the name of the state preparation method."""

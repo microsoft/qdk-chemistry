@@ -30,6 +30,8 @@ class QubitHamiltonian(DataClass):
     Attributes:
         pauli_strings (list[str]): List of Pauli strings representing the ``QubitHamiltonian``.
         coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
+        encoding (str | None): The fermion-to-qubit encoding used to create this Hamiltonian
+            (e.g., "jordan-wigner", "bravyi-kitaev", "parity"). If None, encoding is not specified.
 
     """
 
@@ -39,12 +41,20 @@ class QubitHamiltonian(DataClass):
     # Serialization version for this class
     _serialization_version = "0.1.0"
 
-    def __init__(self, pauli_strings: list[str], coefficients: np.ndarray) -> None:
+    def __init__(
+        self,
+        pauli_strings: list[str],
+        coefficients: np.ndarray,
+        encoding: str | None = None,
+    ) -> None:
         """Initialize a QubitHamiltonian.
 
         Args:
             pauli_strings (list[str]): List of Pauli strings representing the ``QubitHamiltonian``.
             coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
+            encoding (str | None): The fermion-to-qubit encoding used to create this Hamiltonian.
+                Valid values include "jordan-wigner", "bravyi-kitaev", "parity", or None.
+                Defaults to None.
 
         Raises:
             ValueError: If the number of Pauli strings and coefficients don't match,
@@ -57,6 +67,7 @@ class QubitHamiltonian(DataClass):
 
         self.pauli_strings = pauli_strings
         self.coefficients = coefficients
+        self.encoding = encoding
 
         try:
             _ = self.pauli_ops  # Trigger cached property to validate Pauli strings
@@ -207,7 +218,11 @@ class QubitHamiltonian(DataClass):
         Logger.trace_entering()
         sparse_pauli_ops = self.pauli_ops.group_commuting(qubit_wise=qubit_wise)
         return [
-            QubitHamiltonian(pauli_strings=group.paulis.to_labels(), coefficients=group.coeffs)
+            QubitHamiltonian(
+                pauli_strings=group.paulis.to_labels(),
+                coefficients=group.coeffs,
+                encoding=self.encoding,
+            )
             for group in sparse_pauli_ops
         ]
 
@@ -219,9 +234,12 @@ class QubitHamiltonian(DataClass):
             str: Summary string describing the qubit Hamiltonian.
 
         """
-        return (
+        summary = (
             f"Qubit Hamiltonian\n  Number of qubits: {self.num_qubits}\n  Number of terms: {len(self.pauli_strings)}\n"
         )
+        if self.encoding is not None:
+            summary += f"  Encoding: {self.encoding}\n"
+        return summary
 
     def to_json(self) -> dict[str, Any]:
         """Convert the qubit Hamiltonian to a dictionary for JSON serialization.
@@ -240,6 +258,8 @@ class QubitHamiltonian(DataClass):
                 "imag": coeffs.imag.tolist(),
             },
         }
+        if self.encoding is not None:
+            data["encoding"] = self.encoding
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -252,6 +272,8 @@ class QubitHamiltonian(DataClass):
         self._add_hdf5_version(group)
         group.create_dataset("pauli_strings", data=np.array(self.pauli_strings, dtype="S"))
         group.create_dataset("coefficients", data=self.coefficients)
+        if self.encoding is not None:
+            group.attrs["encoding"] = self.encoding
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> "QubitHamiltonian":
@@ -278,6 +300,7 @@ class QubitHamiltonian(DataClass):
         return cls(
             pauli_strings=json_data["pauli_strings"],
             coefficients=coefficients,
+            encoding=json_data.get("encoding"),
         )
 
     @classmethod
@@ -297,7 +320,11 @@ class QubitHamiltonian(DataClass):
         cls._validate_hdf5_version(cls._serialization_version, group)
         pauli_strings = [s.decode() for s in group["pauli_strings"][:]]
         coefficients = np.array(group["coefficients"])
-        return cls(pauli_strings=pauli_strings, coefficients=coefficients)
+        encoding = group.attrs.get("encoding")
+        # Decode encoding if it's stored as bytes (HDF5 behavior can vary)
+        if encoding is not None and isinstance(encoding, bytes):
+            encoding = encoding.decode("utf-8")
+        return cls(pauli_strings=pauli_strings, coefficients=coefficients, encoding=encoding)
 
 
 def _filter_and_group_pauli_ops_from_statevector(
@@ -393,7 +420,7 @@ def _filter_and_group_pauli_ops_from_statevector(
         reduced_pauli.append(best_pauli)
         reduced_coeffs.append(coeff_sum)
 
-    reduced_hamiltonian = QubitHamiltonian(reduced_pauli, np.array(reduced_coeffs))
+    reduced_hamiltonian = QubitHamiltonian(reduced_pauli, np.array(reduced_coeffs), encoding=hamiltonian.encoding)
 
     grouped_hamiltonians = (
         reduced_hamiltonian.group_commuting(qubit_wise=abelian_grouping) if abelian_grouping else [reduced_hamiltonian]
