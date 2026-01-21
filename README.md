@@ -1,4 +1,4 @@
-# Quantum Applications Toolkit (QDK/Chemistry)
+# Azure Quantum Development Kit for Chemistry (QDK/Chemistry)
 
 QDK/Chemistry is an open-source C++ and Python package within the [Azure Quantum Development Kit (QDK)](https://github.com/microsoft/qdk).
 It provides an end-to-end toolkit for quantum chemistry:  from molecular setup and Hamiltonian generation to quantum algorithm execution and results analysis.
