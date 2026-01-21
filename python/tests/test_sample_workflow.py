@@ -21,9 +21,22 @@ To run the slow tests (including notebook e2e tests), set the environment variab
 import os
 from pathlib import Path
 
-import nbformat
 import pytest
-from nbclient import NotebookClient
+
+# Optional dependencies for notebook execution
+try:
+    import nbformat
+    from nbclient import NotebookClient
+
+    _HAS_NOTEBOOK_DEPS = True
+except ImportError:
+    _HAS_NOTEBOOK_DEPS = False
+
+_requires_notebook_deps = pytest.mark.xfail(
+    not _HAS_NOTEBOOK_DEPS,
+    reason="nbclient and nbformat are optional dependencies",
+    raises=NameError,
+)
 
 # Environment variable to enable slow tests (including notebook e2e tests)
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
@@ -145,6 +158,7 @@ def _execute_notebook_skip_visualizations(notebook_path: Path, timeout: int = 60
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
 
 
+@_requires_notebook_deps
 def test_factory_list():
     """Test the examples/factory_list.ipynb notebook executes without errors."""
     notebook_path = EXAMPLES_DIR / "factory_list.ipynb"
@@ -152,6 +166,7 @@ def test_factory_list():
     _execute_notebook_skip_visualizations(notebook_path)
 
 
+@_requires_notebook_deps
 @pytest.mark.slow
 @pytest.mark.skipif(
     not _RUN_SLOW_TESTS,
@@ -164,6 +179,7 @@ def test_state_prep_energy():
     _execute_notebook_skip_visualizations(notebook_path)
 
 
+@_requires_notebook_deps
 @pytest.mark.slow
 @pytest.mark.skipif(
     not _RUN_SLOW_TESTS,
