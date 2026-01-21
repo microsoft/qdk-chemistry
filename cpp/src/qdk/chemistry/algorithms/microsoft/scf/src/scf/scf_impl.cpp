@@ -487,6 +487,30 @@ void SCFImpl::iterate_() {
 
   auto& res = ctx_.result;
 
+  // Handle zero-electron systems (e.g., H+)
+  // For these systems, the SCF energy is just the nuclear repulsion energy
+  // with zero electronic contribution
+  if (nelec_[0] == 0 && nelec_[1] == 0) {
+    build_one_electron_integrals_();
+    res.nuclear_repulsion_energy = calc_nuclear_repulsion_energy_();
+    res.scf_one_electron_energy = 0.0;
+    res.scf_two_electron_energy = 0.0;
+    res.scf_total_energy = res.nuclear_repulsion_energy;
+    res.scf_iterations = 0;
+    res.converged = true;
+    // Initialize coefficient matrix with identity (virtual orbitals only)
+    C_ = RowMajorMatrix::Identity(num_molecular_orbitals_,
+                                  num_molecular_orbitals_);
+    // Initialize eigenvalues to zero for zero-electron system
+    eigenvalues_ =
+        RowMajorMatrix::Zero(num_density_matrices_, num_molecular_orbitals_);
+    QDK_LOGGER().info(
+        "Zero-electron system detected. SCF energy = nuclear repulsion = "
+        "{:.12f}",
+        res.scf_total_energy);
+    return;
+  }
+
   build_one_electron_integrals_();
 
   if (ctx_.cfg->mpi.world_rank == 0) {
