@@ -231,9 +231,7 @@ Shell::Shell(size_t atom_idx, OrbitalType orb_type,
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    AOType atomic_orbital_type)
-    : _name(name),
-      _atomic_orbital_type(atomic_orbital_type),
-      _ecp_name(std::string(BasisSet::default_ecp_name)) {
+    : _name(name), _atomic_orbital_type(atomic_orbital_type), _ecp_name(name) {
   QDK_LOG_TRACE_ENTERING();
   // Organize shells by atom index
   for (const auto& shell : shells) {
@@ -507,26 +505,20 @@ std::vector<std::string> BasisSet::get_supported_basis_set_names() {
 
 std::shared_ptr<BasisSet> BasisSet::from_basis_name(
     const std::string& name, const Structure& structure,
-    const std::string& ecp_name, AOType atomic_orbital_type) {
+    AOType atomic_orbital_type) {
   return BasisSet::from_basis_name(name, std::make_shared<Structure>(structure),
-                                   ecp_name, atomic_orbital_type);
+                                   atomic_orbital_type);
 }
 
 std::shared_ptr<BasisSet> BasisSet::from_basis_name(
     std::string basis_name, std::shared_ptr<Structure> structure,
-    std::string ecp_name, AOType atomic_orbital_type) {
+    AOType atomic_orbital_type) {
   if (!structure) {
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
   // convert names to lowercase
   std::transform(basis_name.begin(), basis_name.end(), basis_name.begin(),
                  ::tolower);
-  std::transform(ecp_name.begin(), ecp_name.end(), ecp_name.begin(), ::tolower);
-
-  // overwrite with real name if default
-  if (ecp_name == BasisSet::default_ecp_name) {
-    ecp_name = basis_name;
-  }
 
   std::vector<Shell> all_basis_shells;
   std::vector<Shell> all_ecp_shells;
@@ -545,32 +537,9 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
       all_basis_shells.push_back(sh);
     }
 
-    // check for specific ecp name
-    if (ecp_name != basis_name) {
-      all_ecp_electrons.push_back(0);
-      continue;
-    }
-
     all_ecp_electrons.push_back(ecp_electrons);
     for (const auto& sh : ecp_shells) {
       all_ecp_shells.push_back(sh);
-    }
-  }
-
-  // if ecp_name is different from basis_name, get ecp shells
-  if (!(ecp_name == basis_name || ecp_name.empty())) {
-    for (size_t atom_index = 0; atom_index < nuclear_charges.size();
-         ++atom_index) {
-      double nuclear_charge = nuclear_charges[atom_index];
-
-      auto [shells, ecp_shells, ecp_electrons] =
-          detail::get_basis_for_nuclear_charge(nuclear_charge, basis_name,
-                                               atom_index);
-      all_ecp_electrons[atom_index] = ecp_electrons;
-
-      for (const auto& sh : ecp_shells) {
-        all_ecp_shells.push_back(sh);
-      }
     }
   }
 
@@ -595,26 +564,22 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
   sorted_ecp_shells.insert(sorted_ecp_shells.end(), all_ecp_shells.begin(),
                            all_ecp_shells.end());
 
-  return std::make_shared<BasisSet>(basis_name, sorted_basis_shells, ecp_name,
+  return std::make_shared<BasisSet>(basis_name, sorted_basis_shells, basis_name,
                                     sorted_ecp_shells, all_ecp_electrons,
                                     structure, atomic_orbital_type);
 }
 
 std::shared_ptr<BasisSet> BasisSet::from_element_map(
     const std::map<std::string, std::string>& element_to_basis_map,
-    const Structure& structure,
-    const std::map<std::string, std::string>& element_to_ecp_map,
-    AOType atomic_orbital_type) {
+    const Structure& structure, AOType atomic_orbital_type) {
   return BasisSet::from_element_map(element_to_basis_map,
                                     std::make_shared<Structure>(structure),
-                                    element_to_ecp_map, atomic_orbital_type);
+                                    atomic_orbital_type);
 }
 
 std::shared_ptr<BasisSet> BasisSet::from_element_map(
     const std::map<std::string, std::string>& element_to_basis_map,
-    std::shared_ptr<Structure> structure,
-    const std::map<std::string, std::string>& element_to_ecp_map,
-    AOType atomic_orbital_type) {
+    std::shared_ptr<Structure> structure, AOType atomic_orbital_type) {
   if (!structure) {
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
@@ -631,33 +596,23 @@ std::shared_ptr<BasisSet> BasisSet::from_element_map(
                                   elements[atom_index]);
     }
     tmp_basis_index_map[atom_index] = it_basis->second;
-
-    // ecp
-    auto it_ecp = element_to_ecp_map.find(elements[atom_index]);
-    if (it_ecp != element_to_ecp_map.end()) {
-      tmp_ecp_index_map[atom_index] = it_ecp->second;
-    }
   }
 
   return BasisSet::from_index_map(tmp_basis_index_map, structure,
-                                  tmp_ecp_index_map, atomic_orbital_type);
+                                  atomic_orbital_type);
 }
 
 std::shared_ptr<BasisSet> BasisSet::from_index_map(
     const std::map<size_t, std::string>& index_to_basis_map,
-    const Structure& structure,
-    const std::map<size_t, std::string>& index_to_ecp_map,
-    AOType atomic_orbital_type) {
+    const Structure& structure, AOType atomic_orbital_type) {
   return BasisSet::from_index_map(index_to_basis_map,
                                   std::make_shared<Structure>(structure),
-                                  index_to_ecp_map, atomic_orbital_type);
+                                  atomic_orbital_type);
 }
 
 std::shared_ptr<BasisSet> BasisSet::from_index_map(
     const std::map<size_t, std::string>& index_to_basis_map,
-    std::shared_ptr<Structure> structure,
-    const std::map<size_t, std::string>& index_to_ecp_map,
-    AOType atomic_orbital_type) {
+    std::shared_ptr<Structure> structure, AOType atomic_orbital_type) {
   if (!structure) {
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
@@ -688,63 +643,9 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
       all_basis_shells.push_back(sh);
     }
 
-    // if no ecp map, use standard ecp
-    if (index_to_ecp_map.empty()) {
-      all_ecp_electrons.push_back(ecp_electrons);
-      for (const auto& sh : ecp_shells) {
-        all_ecp_shells.push_back(sh);
-      }
-    }
-    // no ecp for this atom use standard ecp
-    else if (index_to_ecp_map.find(atom_index) == index_to_ecp_map.end()) {
-      all_ecp_electrons.push_back(ecp_electrons);
-      for (const auto& sh : ecp_shells) {
-        all_ecp_shells.push_back(sh);
-      }
-    }
-    // specific ecp for this atom
-    else {
-      auto ecp_name = index_to_ecp_map.find(atom_index)->second;
-      std::transform(ecp_name.begin(), ecp_name.end(), ecp_name.begin(),
-                     ::tolower);
-      // if ecp_name is same as basis set name, default ecp
-      if (ecp_name == tmp_basis_set_name) {
-        all_ecp_electrons.push_back(ecp_electrons);
-        for (const auto& sh : ecp_shells) {
-          all_ecp_shells.push_back(sh);
-        }
-        // handle later
-      } else {
-        all_ecp_electrons.push_back(0);
-      }
-    }
-  }
-
-  // check if any ecp map is not empty
-  if (!index_to_ecp_map.empty()) {
-    for (size_t atom_index = 0; atom_index < nuclear_charges.size();
-         ++atom_index) {
-      if (index_to_ecp_map.find(atom_index) != index_to_ecp_map.end()) {
-        double nuclear_charge = nuclear_charges[atom_index];
-        // get ecp name
-        auto ecp_name = index_to_ecp_map.find(atom_index)->second;
-        std::transform(ecp_name.begin(), ecp_name.end(), ecp_name.begin(),
-                       ::tolower);
-        // if ecp_name is same as basis set name, already handled
-        // get basis set name
-        auto basis_set_name = index_to_basis_map.find(atom_index)->second;
-        std::transform(basis_set_name.begin(), basis_set_name.end(),
-                       basis_set_name.begin(), ::tolower);
-        if (ecp_name != basis_set_name) {
-          auto [shells, ecp_shells, ecp_electrons] =
-              detail::get_basis_for_nuclear_charge(nuclear_charge, ecp_name,
-                                                   atom_index);
-          all_ecp_electrons[atom_index] = ecp_electrons;
-          for (const auto& sh : ecp_shells) {
-            all_ecp_shells.push_back(sh);
-          }
-        }
-      }
+    all_ecp_electrons.push_back(ecp_electrons);
+    for (const auto& sh : ecp_shells) {
+      all_ecp_shells.push_back(sh);
     }
   }
 
