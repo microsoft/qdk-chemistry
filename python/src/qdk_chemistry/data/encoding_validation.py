@@ -31,8 +31,8 @@ def validate_encoding_compatibility(circuit: Circuit, hamiltonian: QubitHamilton
     Both must have their encoding specified (not None), and the encodings must match.
 
     Args:
-        circuit (Circuit): The quantum circuit with encoding metadata.
-        hamiltonian (QubitHamiltonian): The qubit Hamiltonian with encoding metadata.
+        circuit: The quantum circuit with encoding metadata.
+        hamiltonian: The qubit Hamiltonian with encoding metadata.
 
     Raises:
         EncodingMismatchError: If the circuit or Hamiltonian encoding is None, or if
