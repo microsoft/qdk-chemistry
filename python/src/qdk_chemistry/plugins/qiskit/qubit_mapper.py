@@ -97,7 +97,11 @@ class QiskitQubitMapper(QubitMapper):
         fermionic_op = electronic_hamiltonian.second_q_op()
         qubit_mapper = self.QubitMappers[encoding]()
         qubit_op = qubit_mapper.map(fermionic_op)
-        return QubitHamiltonian(pauli_strings=qubit_op.paulis.to_labels(), coefficients=qubit_op.coeffs)
+        return QubitHamiltonian(
+            pauli_strings=qubit_op.paulis.to_labels(),
+            coefficients=qubit_op.coeffs,
+            encoding=encoding,
+        )
 
     def name(self) -> str:
         """Return the algorithm name ``qiskit``."""
