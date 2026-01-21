@@ -410,6 +410,33 @@ Examples:
 )",
       py::arg("max_determinants") = py::none());
 
+  wavefunction.def(
+      "truncate",
+      [](const Wavefunction& self, std::optional<size_t> max_determinants) {
+        return self.truncate(max_determinants);
+      },
+      R"(
+Create a truncated wavefunction with top N determinants.
+
+Creates a new wavefunction containing only the top N determinants
+ranked by absolute coefficient value, with coefficients renormalized.
+The resulting wavefunction uses a SciWavefunctionContainer.
+
+Args:
+    max_determinants (int | None): Maximum number of determinants to keep.
+        If None, returns a copy with all determinants (renormalized).
+
+Returns:
+    Wavefunction: New wavefunction with truncated and renormalized coefficients
+
+Examples:
+    >>> # Get a truncated trial wavefunction with top 2 determinants
+    >>> trial_wfn = casci_wfn.truncate(max_determinants=2)
+    >>> print(f"Truncated to {trial_wfn.size()} determinants")
+    >>> print(f"Norm: {trial_wfn.norm()}")  # Should be 1.0
+)",
+      py::arg("max_determinants") = py::none());
+
   wavefunction.def("norm", &Wavefunction::norm,
                    R"(
 Calculate norm of the wavefunction.
@@ -519,10 +546,6 @@ Raises:
 Examples:
     >>> two_rdm = wf.get_active_two_rdm_spin_traced()
 )");
-
-  // TODO (NAB): it would be helpful to explain how to mark or check whether
-  // orbitals are active. Same comment applies to other methods that refer to
-  // "active orbitals". Workitem: 41398
 
   wavefunction.def("get_single_orbital_entropies",
                    &Wavefunction::get_single_orbital_entropies,
@@ -898,9 +921,6 @@ Examples:
            py::return_value_policy::reference_internal);
 
   // Bind CasWavefunctionContainer
-  // TODO (NAB): explain what makes this different from the generic wavefunction
-  // class 41400
-
   py::class_<CasWavefunctionContainer, WavefunctionContainer, py::smart_holder>(
       data, "CasWavefunctionContainer",
       R"(

@@ -157,7 +157,8 @@ SciWavefunctionContainer::ScalarVariant SciWavefunctionContainer::overlap(
 double SciWavefunctionContainer::norm() const {
   QDK_LOG_TRACE_ENTERING();
 
-  throw std::runtime_error("norm not implemented in SciWavefunctionContainer");
+  return std::visit([](const auto& vec) -> double { return vec.norm(); },
+                    _coefficients);
 }
 
 void SciWavefunctionContainer::clear_caches() const {
