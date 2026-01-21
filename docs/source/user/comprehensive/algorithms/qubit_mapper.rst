@@ -117,7 +117,7 @@ Use ``QubitHamiltonian.reorder_qubits()`` or ``QubitHamiltonian.to_interleaved()
      - Description
    * - ``encoding``
      - string
-     - Fermion-to-qubit encoding (``jordan_wigner``, ``bravyi_kitaev``). Default: ``jordan_wigner``
+     - Fermion-to-qubit encoding (``jordan-wigner``, ``bravyi-kitaev``). Default: ``jordan-wigner``
    * - ``threshold``
      - double
      - Threshold for pruning small Pauli coefficients. Default: ``1e-12``
