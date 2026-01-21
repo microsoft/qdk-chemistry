@@ -98,9 +98,10 @@ std::filesystem::path get_correct_basis_set_file(std::string& basis_set_name) {
  * @brief Sort shells and their primitives in a standardized order.
  *
  * This function performs two levels of sorting:
- * 1. Sorts the shells themselves by orbital type, then number of primitives
+ * 1. Sorts the shells themselves by orbital type, then largest primitive
+ *    exponent (descending order)
  * 2. Within each shell, sorts the primitive Gaussian functions by exponent
- * (descending order)
+ *    (descending order)
  *
  * The primitive sorting reorders exponents, coefficients, and radial powers (if
  * present) consistently to maintain the correspondence between these arrays.
@@ -110,7 +111,7 @@ std::filesystem::path get_correct_basis_set_file(std::string& basis_set_name) {
 void sort_shells_inplace(std::vector<Shell>& shells) {
   // sort primitives (together with coefficients and rpowers) within each shell
   auto sort_shell_primitives = [](Shell& shell) {
-    /// get exponent sorting indices
+    // get exponent sorting indices
     std::vector<size_t> indices(shell.get_num_primitives());
     std::iota(indices.begin(), indices.end(), 0);
     std::sort(indices.begin(), indices.end(), [&shell](size_t a, size_t b) {
@@ -145,8 +146,10 @@ void sort_shells_inplace(std::vector<Shell>& shells) {
     return a.exponents(0) > b.exponents(0);
   };
 
-  std::stable_sort(shells.begin(), shells.end(), shell_comparator);
+  // ensure primitives are sorted by exponent within each shell
   std::for_each(shells.begin(), shells.end(), sort_shell_primitives);
+  // sort shells by angular momentum and exponent
+  std::stable_sort(shells.begin(), shells.end(), shell_comparator);
 }
 
 /**
