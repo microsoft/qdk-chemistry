@@ -216,14 +216,25 @@ def append_controlled_time_evolution(
     if power < 1:
         raise ValueError("power must be at least 1 for controlled time evolution.")
 
+    # Create a new circuit for the controlled time evolution
+    num_qubits = len(target_qubits) + 1
+    power_evolution_circuit = QuantumCircuit(num_qubits, name=f"ctrl_time_evol_power_{power}")
+
+    ctrl_evol_circuit = QuantumCircuit(num_qubits, name="ctrl_time_evol")
+    for _ in range(reps):
+        for term in exponential_terms:
+            if np.isclose(term.angle, 0.0):
+                continue
+            _append_controlled_pauli_rotation(
+                ctrl_evol_circuit,
+                control_qubit,
+                target_qubits,
+                term,
+            )
+    # Convert to gate and repeat for the specified power
+    ctrl_evol_gate = ctrl_evol_circuit.to_gate()
     for _ in range(power):
-        for _ in range(reps):
-            for term in exponential_terms:
-                if np.isclose(term.angle, 0.0):
-                    continue
-                _append_controlled_pauli_rotation(
-                    circuit,
-                    control_qubit,
-                    target_qubits,
-                    term,
-                )
+        power_evolution_circuit.append(ctrl_evol_gate, list(range(num_qubits)))
+
+    # Convert to gate and append to original circuit
+    circuit.append(power_evolution_circuit.to_gate(), list(range(num_qubits)))

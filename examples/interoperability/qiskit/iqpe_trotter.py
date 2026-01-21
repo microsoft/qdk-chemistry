@@ -15,7 +15,6 @@ import numpy as np
 
 try:
     from qiskit import qasm3, transpile
-    from qiskit_aer import AerSimulator
 except ImportError as ex:
     raise ImportError(
         "Qiskit and Qiskit-Aer must be installed to run this example. "
@@ -23,10 +22,9 @@ except ImportError as ex:
     ) from ex
 
 from qdk_chemistry.algorithms import (
-    IterativePhaseEstimation,
     create,
 )
-from qdk_chemistry.data import QpeResult, Structure
+from qdk_chemistry.data import Circuit, Structure
 from qdk_chemistry.utils import Logger
 
 Logger.set_global_level("info")
@@ -35,7 +33,7 @@ ACTIVE_ELECTRONS = 2
 ACTIVE_ORBITALS = 2
 M_PRECISION = 10  # number of phase qubits ~ bits of precision
 T_TIME = 0.1  # evolution time; lower if you see 2π wrap
-SHOTS_PER_ITERATION = 10
+SHOTS_PER_BIT = 10
 SIMULATOR_SEED = 42
 
 
@@ -110,45 +108,34 @@ Logger.info(
 ########################################################################################
 # 4. Build and run the Trotterized iterative QPE circuit
 ########################################################################################
-simulator = AerSimulator(method="statevector", seed_simulator=SIMULATOR_SEED)
-iqpe = IterativePhaseEstimation(qubit_hamiltonian, T_TIME)
+iqpe = create(
+    "phase_estimation",
+    "iterative",
+    num_bits=M_PRECISION,
+    evolution_time=T_TIME,
+    shots_per_bit=SHOTS_PER_BIT,
+)
+aer_simulator = create("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED)
+evolution_builder = create("time_evolution_builder", "trotter")
+circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+
 
 Logger.info("\n=== Running iterative phase estimation (Trotterized) ===")
 Logger.info(f"  Hamiltonian terms: {len(qubit_pauli_op.paulis)}")
 Logger.info(f"  System qubits (spin orbitals): {num_spin_orbitals}")
 Logger.info(f"  Electron sector (alpha, beta): ({n_alpha}, {n_beta})")
 
-phase_feedback = 0.0
-bits: list[int] = []
-
-for iteration in range(M_PRECISION):
-    iter_info = iqpe.create_iteration(
-        state_prep,
-        iteration=iteration,
-        total_iterations=M_PRECISION,
-        phase_correction=phase_feedback,
-    )
-    compiled = transpile(iter_info.circuit, simulator, optimization_level=0)
-    result = simulator.run(compiled, shots=SHOTS_PER_ITERATION).result()
-    counts = result.get_counts()
-    measured_bit = 0 if counts.get("0", 0) >= counts.get("1", 0) else 1
-
-    bits.append(measured_bit)
-    phase_feedback = iqpe.update_phase_feedback(phase_feedback, measured_bit)
-
-phase_fraction = iqpe.phase_fraction_from_feedback(phase_feedback)
-
+result = iqpe.run(
+    state_preparation=Circuit(qasm3.dumps(state_prep)),
+    qubit_hamiltonian=qubit_hamiltonian,
+    circuit_executor=aer_simulator,
+    evolution_builder=evolution_builder,
+    circuit_mapper=circuit_mapper,
+)
 
 ########################################################################################
 # 5. Process and display results
 ########################################################################################
-result = QpeResult.from_phase_fraction(
-    method=IterativePhaseEstimation.algorithm,
-    phase_fraction=phase_fraction,
-    evolution_time=T_TIME,
-    bits_msb_first=bits,
-    reference_energy=casci_energy,
-)
 
 phase_angle_measured = result.phase_angle
 phase_angle_canonical = result.canonical_phase_angle

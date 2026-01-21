@@ -10,9 +10,11 @@ from pathlib import Path
 from typing import Any, ClassVar, TypedDict
 
 import h5py
+from qsharp._simulation import NoiseConfig
 from ruamel.yaml import YAML
 
 from qdk_chemistry.data.base import DataClass
+from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 
 __all__: list[str] = ["GateErrorDef", "SupportedErrorTypes", "SupportedGate"]
@@ -160,6 +162,7 @@ class QuantumErrorProfile(DataClass):
             errors (dict | None): Dictionary mapping supported gate names to their error definitions.
 
         """
+        Logger.trace_entering()
         self.name: str = "default" if name is None else name
         self.description: str = "No description provided" if description is None else description
         self.errors: dict[SupportedGate, GateErrorDef] = {}
@@ -398,3 +401,32 @@ class QuantumErrorProfile(DataClass):
             "errors": json.loads(group.attrs["errors"]),  # Deserialize errors from JSON string
         }
         return cls.from_json(data)
+
+    def to_qdk_noise_config(self) -> NoiseConfig:
+        """Convert the QuantumErrorProfile to a QDK-compatible noise configuration dictionary.
+
+        Returns:
+            QDK-compatible noise configuration object.
+
+        """
+        noise = NoiseConfig()
+        for gate, error_def in self.errors.items():
+            gate_name = str(gate)
+            if error_def["type"] == SupportedErrorTypes.DEPOLARIZING_ERROR:
+                gate_name_qdk = gate_name.lower()
+                if gate_name_qdk == "sdg":
+                    gate_name_qdk = "s_adj"
+                elif gate_name_qdk == "tdg":
+                    gate_name_qdk = "t_adj"
+                elif gate_name_qdk == "sxdg":
+                    gate_name_qdk = "sx_adj"
+                elif gate_name_qdk == "measure":
+                    gate_name_qdk = "mresetz"
+                try:
+                    getattr(noise, gate_name_qdk).set_depolarizing(error_def["rate"])
+                except AttributeError:
+                    # Warn and skip unsupported gates
+                    Logger.warn(f"Gate {gate_name} not supported in QDK noise config; skipping.")
+            else:
+                raise ValueError(f"Error type {error_def['type']} is not currently supported.")
+        return noise

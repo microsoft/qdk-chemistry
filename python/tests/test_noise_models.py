@@ -7,9 +7,12 @@
 
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import h5py
+import numpy as np
 import pytest
+from qdk.simulation import NoiseConfig
 
 from qdk_chemistry.data.noise_models import (
     GateErrorDef,
@@ -17,6 +20,8 @@ from qdk_chemistry.data.noise_models import (
     SupportedErrorTypes,
     SupportedGate,
 )
+
+from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 
 def test_profile_dumping(simple_error_profile):
@@ -562,3 +567,81 @@ def test_quantum_error_profile_yaml_with_all_supported_gates():
         assert len(loaded.two_qubit_gates) == 3
     finally:
         Path(temp_path).unlink()
+
+
+def test_noise_model_to_qdk_conversion(simple_error_profile):
+    """Test conversion of QuantumErrorProfile to QDK-compatible noise configuration."""
+    qdk_noise_config = simple_error_profile.to_qdk_noise_config()
+    cx_err = simple_error_profile.errors["cx"]["rate"]
+    h_err = simple_error_profile.errors["h"]["rate"]
+    assert isinstance(qdk_noise_config, NoiseConfig)
+    for component in ["x", "y", "z"]:
+        assert np.isclose(
+            getattr(qdk_noise_config.h, component),
+            h_err / 3,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        ), f"h.{component} mismatch"
+
+    two_qubit_components = ["ix", "iy", "iz", "xi", "xx", "xy", "xz", "yi", "yx", "yy", "yz", "zi", "zx", "zy", "zz"]
+    for component in two_qubit_components:
+        assert np.isclose(
+            getattr(qdk_noise_config.cx, component),
+            cx_err / 15,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        ), f"cx.{component} mismatch"
+
+
+def test_noise_model_to_qdk_conversion_correct_gate_name():
+    """Test that the conversion to QDK noise config uses correct gate names."""
+    test_profile = QuantumErrorProfile(
+        name="test_gate_names",
+        description="test correct gate names in QDK conversion",
+        errors={
+            "sdg": {"type": "depolarizing_error", "rate": 0.01, "num_qubits": 1},
+            "tdg": {"type": "depolarizing_error", "rate": 0.02, "num_qubits": 1},
+            "sxdg": {"type": "depolarizing_error", "rate": 0.03, "num_qubits": 1},
+            "measure": {"type": "depolarizing_error", "rate": 0.04, "num_qubits": 1},
+        },
+    )
+    gate_name_mapping = {
+        "sdg": "s_adj",
+        "tdg": "t_adj",
+        "sxdg": "sx_adj",
+        "measure": "mresetz",
+    }
+    qdk_noise_config = test_profile.to_qdk_noise_config()
+    for gate_name in ["sdg", "tdg", "sxdg", "measure"]:
+        for component in ["x", "y", "z"]:
+            assert np.isclose(
+                getattr(getattr(qdk_noise_config, gate_name_mapping[gate_name]), component),
+                test_profile.errors[gate_name]["rate"] / 3,
+                atol=float_comparison_absolute_tolerance,
+                rtol=float_comparison_relative_tolerance,
+            ), f"{gate_name}.{component} mismatch"
+
+
+def test_to_qdk_noise_config_warns_on_unsupported_gate():
+    """Test that unsupported gates log a warning and are skipped."""
+    # Create a profile with a gate that QDK doesn't support
+    profile = QuantumErrorProfile(
+        name="test",
+        description="test profile",
+        errors={
+            SupportedGate.CRZ: GateErrorDef(
+                type=SupportedErrorTypes.DEPOLARIZING_ERROR,
+                rate=0.01,
+                num_qubits=2,
+            ),
+        },
+    )
+
+    with patch("qdk_chemistry.data.noise_models.Logger") as mock_logger:
+        qdk_noise_config = profile.to_qdk_noise_config()
+
+        assert isinstance(qdk_noise_config, NoiseConfig)
+        mock_logger.warn.assert_called_once()
+        warning_message = mock_logger.warn.call_args[0][0]
+        assert "crz" in warning_message.lower()
+        assert "not supported in QDK" in warning_message
