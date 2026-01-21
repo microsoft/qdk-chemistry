@@ -200,6 +200,7 @@ TEST_P(HamiltonianTest, Constructor) {
   EXPECT_EQ(hamiltonian_restricted->get_container_type(), container_type);
   EXPECT_TRUE(hamiltonian_restricted->is_restricted());
   EXPECT_FALSE(hamiltonian_restricted->is_unrestricted());
+  EXPECT_TRUE(hamiltonian_restricted->is_hermitian());
 
   EXPECT_TRUE(hamiltonian_unrestricted->has_one_body_integrals());
   EXPECT_TRUE(hamiltonian_unrestricted->has_two_body_integrals());
@@ -211,6 +212,7 @@ TEST_P(HamiltonianTest, Constructor) {
   EXPECT_EQ(hamiltonian_unrestricted->get_container_type(), container_type);
   EXPECT_FALSE(hamiltonian_unrestricted->is_restricted());
   EXPECT_TRUE(hamiltonian_unrestricted->is_unrestricted());
+  EXPECT_TRUE(hamiltonian_unrestricted->is_hermitian());
 }
 
 TEST_P(HamiltonianTest, ConstructorWithInactiveFock) {
@@ -278,6 +280,7 @@ TEST_P(HamiltonianTest, CopyConstructorAndAssignment) {
   EXPECT_TRUE(h2.has_inactive_fock_matrix());
   EXPECT_EQ(h2.get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h2.get_core_energy(), 1.5);
+  EXPECT_TRUE(h2.is_restricted());
 
   // Verify one body integral copy
   auto [h1_one_alpha, h1_one_beta] = h1->get_one_body_integrals();
@@ -305,6 +308,7 @@ TEST_P(HamiltonianTest, CopyConstructorAndAssignment) {
   EXPECT_TRUE(h3->has_inactive_fock_matrix());
   EXPECT_EQ(h3->get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h3->get_core_energy(), 1.5);
+  EXPECT_TRUE(h3->is_restricted());
 
   // Test self-assignment (should be no-op)
   auto h4 = createHamiltonian(test_p);
@@ -317,6 +321,36 @@ TEST_P(HamiltonianTest, CopyConstructorAndAssignment) {
   EXPECT_TRUE(h4->has_orbitals());
   EXPECT_EQ(h4->get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h4->get_core_energy(), 1.5);
+
+  // unrestricted Hamiltonian
+  Hamiltonian h5(*hamiltonian_unrestricted);
+
+  // Verify all data was copied correctly
+  EXPECT_TRUE(h5.has_one_body_integrals());
+  EXPECT_TRUE(h5.has_two_body_integrals());
+  EXPECT_TRUE(h5.has_orbitals());
+  EXPECT_TRUE(h5.has_inactive_fock_matrix());
+  EXPECT_EQ(h5.get_orbitals()->get_num_molecular_orbitals(), 2);
+  EXPECT_EQ(h5.get_core_energy(), 1.5);
+  EXPECT_FALSE(h5.is_restricted());
+
+  // Verify one body integral copy
+  auto [hu_one_alpha, hu_one_beta] =
+      hamiltonian_unrestricted->get_one_body_integrals();
+  auto [h5_one_alpha, h5_one_beta] = h5.get_one_body_integrals();
+  EXPECT_TRUE(hu_one_alpha.isApprox(h5_one_alpha));
+  EXPECT_TRUE(hu_one_beta.isApprox(h5_one_beta));
+
+  // Compare each component of the two-body integrals tuple
+  auto [hu_two_aaaa, hu_two_aabb, hu_two_bbbb] =
+      hamiltonian_unrestricted->get_two_body_integrals();
+  auto [h5_two_aaaa, h5_two_aabb, h5_two_bbbb] = h5.get_two_body_integrals();
+  EXPECT_TRUE(hu_two_aaaa.isApprox(h5_two_aaaa));
+  EXPECT_TRUE(hu_two_aabb.isApprox(h5_two_aabb));
+  EXPECT_TRUE(hu_two_bbbb.isApprox(h5_two_bbbb));
+  EXPECT_TRUE(
+      hamiltonian_unrestricted->get_inactive_fock_matrix().first.isApprox(
+          h5.get_inactive_fock_matrix().first));
 }
 
 TEST_P(HamiltonianTest, TwoBodyElementAccess) {
@@ -338,6 +372,11 @@ TEST_P(HamiltonianTest, TwoBodyElementAccess) {
 
     Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
         test_one_body, test_two_body, orbitals, core_energy, inactive_fock));
+
+    EXPECT_DOUBLE_EQ(h.get_one_body_element(0, 0), 1.0);
+    EXPECT_DOUBLE_EQ(h.get_one_body_element(0, 1), 0.0);
+    EXPECT_DOUBLE_EQ(h.get_one_body_element(1, 0), 0.0);
+    EXPECT_DOUBLE_EQ(h.get_one_body_element(1, 1), 1.0);
 
     // Test accessing specific elements to verify get_two_body_index
     // calculations
@@ -397,6 +436,20 @@ TEST_P(HamiltonianTest, TwoBodyElementAccess) {
     Hamiltonian h(std::make_unique<DensityFittedHamiltonianContainer>(
         test_one_body, test_three_center, orbitals, core_energy,
         inactive_fock));
+
+    EXPECT_DOUBLE_EQ(h.get_one_body_element(0, 0), 1.0);
+    EXPECT_DOUBLE_EQ(h.get_one_body_element(0, 1), 0.0);
+    EXPECT_DOUBLE_EQ(h.get_one_body_element(1, 0), 0.0);
+    EXPECT_DOUBLE_EQ(h.get_one_body_element(1, 1), 1.0);
+
+    // Test three center integral
+    auto [three_c_aaaa, three_c_aabb, three_c_bbbb] =
+        h.get_container<DensityFittedHamiltonianContainer>()
+            .get_three_center_integrals();
+
+    EXPECT_TRUE(three_c_aaaa.isApprox(test_three_center));
+    EXPECT_TRUE(three_c_aabb.isApprox(test_three_center));
+    EXPECT_TRUE(three_c_bbbb.isApprox(test_three_center));
 
     // Test accessing specific elements to verify get_two_body_index
     // calculations
@@ -1123,6 +1176,11 @@ TEST_P(HamiltonianTest, UnrestrictedSpinChannelAccess) {
         two_body_bbbb, unrestricted_orbitals, core_energy, empty_fock,
         empty_fock));
 
+    EXPECT_DOUBLE_EQ(h.get_one_body_element(0, 0, SpinChannel::aa), 1.0);
+    EXPECT_DOUBLE_EQ(h.get_one_body_element(0, 1, SpinChannel::aa), 0.0);
+    EXPECT_DOUBLE_EQ(h.get_one_body_element(1, 1, SpinChannel::bb), 1.0);
+    EXPECT_DOUBLE_EQ(h.get_one_body_element(1, 0, SpinChannel::bb), 0.0);
+
     // Test accessing elements through different spin channels
     EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::aaaa),
                      1.0);
@@ -1141,6 +1199,11 @@ TEST_P(HamiltonianTest, UnrestrictedSpinChannelAccess) {
         one_body_alpha, one_body_beta, three_center_aaaa, three_center_aabb,
         three_center_bbbb, unrestricted_orbitals, core_energy, empty_fock,
         empty_fock));
+
+    EXPECT_DOUBLE_EQ(h.get_one_body_element(0, 0, SpinChannel::aa), 1.0);
+    EXPECT_DOUBLE_EQ(h.get_one_body_element(0, 1, SpinChannel::aa), 0.0);
+    EXPECT_DOUBLE_EQ(h.get_one_body_element(1, 1, SpinChannel::bb), 1.0);
+    EXPECT_DOUBLE_EQ(h.get_one_body_element(1, 0, SpinChannel::bb), 0.0);
 
     // Test accessing elements through different spin channels
     EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::aaaa),
