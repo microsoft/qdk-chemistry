@@ -1,8 +1,11 @@
-"""QDK/Chemistry Circuit Executor QDK implementation.
+"""QDK/Chemistry Circuit Executor implementation using QDK.
 
-This module provides a CircuitExecutor implementation that uses the QDK Full State Simulator
+This module provides a CircuitExecutor implementation that uses the QDK backends
 to execute quantum circuits. It accepts QDK/Chemistry Circuit and QuantumErrorProfile
 data classes and returns measurement bitstring results via CircuitExecutorData.
+
+Supported QDK backends include:
+    * QDK Full State Simulator
 """
 
 # --------------------------------------------------------------------------------------------
@@ -29,7 +32,9 @@ class QdkFullStateSimulatorSettings(Settings):
         """Initialize QDK Full State Simulator settings."""
         Logger.trace_entering()
         super().__init__()
-        self._set_default("type", "string", "cpu", "Type of simulator to use: 'cpu', 'gpu', or 'clifford'")
+        self._set_default(
+            "type", "string", "cpu", "Type of simulator to use: 'cpu', 'gpu', or 'clifford'", ["cpu", "gpu", "clifford"]
+        )
         self._set_default("seed", "int", 42, "Random seed for simulation reproducibility")
 
 
