@@ -410,6 +410,33 @@ Examples:
 )",
       py::arg("max_determinants") = py::none());
 
+  wavefunction.def(
+      "truncate",
+      [](const Wavefunction& self, std::optional<size_t> max_determinants) {
+        return self.truncate(max_determinants);
+      },
+      R"(
+Create a truncated wavefunction with top N determinants.
+
+Creates a new wavefunction containing only the top N determinants
+ranked by absolute coefficient value, with coefficients renormalized.
+The resulting wavefunction uses a SciWavefunctionContainer.
+
+Args:
+    max_determinants (int | None): Maximum number of determinants to keep.
+        If None, returns a copy with all determinants (renormalized).
+
+Returns:
+    Wavefunction: New wavefunction with truncated and renormalized coefficients
+
+Examples:
+    >>> # Get a truncated trial wavefunction with top 2 determinants
+    >>> trial_wfn = casci_wfn.truncate(max_determinants=2)
+    >>> print(f"Truncated to {trial_wfn.size()} determinants")
+    >>> print(f"Norm: {trial_wfn.norm()}")  # Should be 1.0
+)",
+      py::arg("max_determinants") = py::none());
+
   wavefunction.def("norm", &Wavefunction::norm,
                    R"(
 Calculate norm of the wavefunction.

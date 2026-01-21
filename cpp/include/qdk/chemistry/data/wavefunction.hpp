@@ -725,6 +725,22 @@ class Wavefunction : public DataClass,
       std::optional<size_t> max_determinants = std::nullopt) const;
 
   /**
+   * @brief Create a truncated wavefunction with top N determinants
+   *
+   * Creates a new wavefunction containing only the top N determinants
+   * ranked by absolute coefficient value, with coefficients renormalized.
+   * The resulting wavefunction uses a SciWavefunctionContainer.
+   *
+   * @param max_determinants Maximum number of determinants to keep.
+   *        If nullopt, returns a copy with all determinants, with
+   *        coefficients renormalized.
+   * @return Shared pointer to new Wavefunction with truncated and
+   *         renormalized coefficients
+   */
+  std::shared_ptr<Wavefunction> truncate(
+      std::optional<size_t> max_determinants = std::nullopt) const;
+
+  /**
    * @brief Calculate norm of the wavefunction
    * @return Norm (always real)
    */
