@@ -72,6 +72,12 @@ size_t load_from_database_json(std::filesystem::path bs_path, BasisSet& basis) {
         atom_shells.push_back(sh);
       }
     }
+    stable_sort(atom_shells.begin(), atom_shells.end(),
+                [](const auto& x, const auto& y) {
+                  return x.angular_momentum == y.angular_momentum
+                             ? x.contraction > y.contraction
+                             : x.angular_momentum < y.angular_momentum;
+                });
     shells.insert(shells.end(), atom_shells.begin(), atom_shells.end());
 
     if (!elem.contains("ecp_potentials")) continue;
@@ -140,6 +146,22 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol,
     norm_psi4_mode(this->shells);
   }  // RAW branch doesn't normalize
 
+  if (sort) {
+    std::stable_sort(this->shells.begin(), this->shells.end(),
+                     [](const auto& x, const auto& y) {
+                       return x.angular_momentum != y.angular_momentum
+                                  ? x.angular_momentum < y.angular_momentum
+                                  : x.contraction < y.contraction;
+                     });
+
+    std::stable_sort(this->ecp_shells.begin(), this->ecp_shells.end(),
+                     [](const auto& x, const auto& y) {
+                       return x.angular_momentum != y.angular_momentum
+                                  ? x.angular_momentum < y.angular_momentum
+                                  : x.contraction < y.contraction;
+                     });
+  }
+
   num_atomic_orbitals = std::accumulate(
       this->shells.begin(), this->shells.end(), 0,
       [&pure](auto sum, const auto& sh) {
@@ -175,6 +197,15 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol,
   if (mode == BasisMode::PSI4) {
     norm_psi4_mode(this->shells);
   }  // RAW branch doesn't normalize
+
+  if (sort) {
+    std::stable_sort(this->shells.begin(), this->shells.end(),
+                     [](const auto& x, const auto& y) {
+                       return x.angular_momentum != y.angular_momentum
+                                  ? x.angular_momentum < y.angular_momentum
+                                  : x.contraction < y.contraction;
+                     });
+  }
 
   num_atomic_orbitals = std::accumulate(
       this->shells.begin(), this->shells.end(), 0,
@@ -249,6 +280,15 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
   if (mode == BasisMode::PSI4) {
     norm_psi4_mode(shells);
   }  // RAW branch doesn't normalize
+
+  if (sort) {
+    std::stable_sort(shells.begin(), shells.end(),
+                     [](const auto& x, const auto& y) {
+                       return x.angular_momentum != y.angular_momentum
+                                  ? x.angular_momentum < y.angular_momentum
+                                  : x.contraction < y.contraction;
+                     });
+  }
 
   num_atomic_orbitals = std::accumulate(
       shells.begin(), shells.end(), 0, [&pure](auto sum, const auto& sh) {
