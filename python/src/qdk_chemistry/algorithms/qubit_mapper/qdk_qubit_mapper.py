@@ -417,7 +417,6 @@ class QdkQubitMapper(QubitMapper):
 
         h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
         h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
-        core_energy = hamiltonian.get_core_energy()
 
         n_spatial = h1_alpha.shape[0]
 
@@ -428,9 +427,6 @@ class QdkQubitMapper(QubitMapper):
 
         # Use C++ PauliTermAccumulator for efficient term accumulation
         accumulator = PauliTermAccumulator()
-
-        # Add core energy as identity term (empty sparse word = identity)
-        accumulator.accumulate([], complex(core_energy))
 
         # Eagerly precompute spin-summed excitation terms: E_pq = E_pq_alpha + E_pq_beta
         # (indexed by spatial orbitals p, q)

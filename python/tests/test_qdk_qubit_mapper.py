@@ -184,8 +184,8 @@ class TestQdkQubitMapper:
         assert np.isclose(pauli_dict["ZI"].real, -0.5, atol=1e-10)
         assert np.isclose(pauli_dict["IZ"].real, -0.5, atol=1e-10)
 
-    def test_core_energy_as_identity(self) -> None:
-        """Test that core energy appears as identity coefficient."""
+    def test_core_energy_not_included(self) -> None:
+        """Test that core energy is NOT included in QubitHamiltonian (matches Qiskit)."""
         mapper = create("qubit_mapper", "qdk")
 
         n_orbitals = 1
@@ -197,7 +197,7 @@ class TestQdkQubitMapper:
         result = mapper.run(hamiltonian)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
-        assert np.isclose(pauli_dict["II"].real, 5.0, atol=1e-10)
+        assert "II" not in pauli_dict or np.isclose(pauli_dict["II"].real, 0.0, atol=1e-10)
 
     def test_threshold_pruning(self) -> None:
         """Test that small coefficients are pruned."""
@@ -596,13 +596,7 @@ class TestQdkQubitMapperRealHamiltonians:
         qdk_dict = dict(zip(qdk_result.pauli_strings, qdk_result.coefficients, strict=True))
         qiskit_dict = dict(zip(qiskit_result.pauli_strings, qiskit_result.coefficients, strict=True))
 
-        # QDK includes core energy in identity term, Qiskit does not
-        core_energy = hamiltonian.get_core_energy()
-        identity_str = "I" * qdk_result.num_qubits
-        if identity_str in qiskit_dict:
-            qiskit_dict[identity_str] = qiskit_dict[identity_str] + core_energy
-        else:
-            qiskit_dict[identity_str] = core_energy
+        # QDK and Qiskit now both exclude core energy from the QubitHamiltonian
 
         assert len(qdk_dict) == len(qiskit_dict)
 
@@ -663,8 +657,8 @@ class TestBravyiKitaevMapper:
         assert np.isclose(bk_dict["IZ"], -0.5, rtol=1e-10)
         assert np.isclose(bk_dict["ZZ"], -0.5, rtol=1e-10)
 
-    def test_bk_core_energy(self) -> None:
-        """Test that core energy appears as identity coefficient in BK."""
+    def test_bk_core_energy_not_included(self) -> None:
+        """Test that core energy is NOT included in BK QubitHamiltonian (matches Qiskit)."""
         mapper = create("qubit_mapper", "qdk", encoding="bravyi-kitaev")
 
         n_orbitals = 1
@@ -676,7 +670,8 @@ class TestBravyiKitaevMapper:
         result = mapper.run(hamiltonian)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
-        assert np.isclose(pauli_dict["II"].real, 5.0, atol=1e-10)
+        # With zero one-body and two-body integrals, identity should be 0 (not 5.0)
+        assert "II" not in pauli_dict or np.isclose(pauli_dict["II"].real, 0.0, atol=1e-10)
 
     def test_bk_hopping_adjacent_orbitals(self) -> None:
         """Test BK transform of hopping term between adjacent orbitals.
@@ -820,13 +815,7 @@ class TestBravyiKitaevMapper:
         qdk_dict = dict(zip(qdk_result.pauli_strings, qdk_result.coefficients, strict=True))
         qiskit_dict = dict(zip(qiskit_result.pauli_strings, qiskit_result.coefficients, strict=True))
 
-        # QDK includes core energy in identity term, Qiskit does not
-        core_energy = hamiltonian.get_core_energy()
-        identity_str = "I" * qdk_result.num_qubits
-        if identity_str in qiskit_dict:
-            qiskit_dict[identity_str] = qiskit_dict[identity_str] + core_energy
-        else:
-            qiskit_dict[identity_str] = core_energy
+        # QDK and Qiskit now both exclude core energy from the QubitHamiltonian
 
         assert len(qdk_dict) == len(qiskit_dict), f"QDK has {len(qdk_dict)} terms, Qiskit has {len(qiskit_dict)}"
 
