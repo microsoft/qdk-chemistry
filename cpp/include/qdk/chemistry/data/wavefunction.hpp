@@ -732,7 +732,8 @@ class Wavefunction : public DataClass,
    * The resulting wavefunction uses a SciWavefunctionContainer.
    *
    * @param max_determinants Maximum number of determinants to keep.
-   *        If nullopt, returns a copy with all determinants.
+   *        If nullopt, returns a copy with all determinants, with
+   *        coefficients renormalized.
    * @return Shared pointer to new Wavefunction with truncated and
    *         renormalized coefficients
    */
