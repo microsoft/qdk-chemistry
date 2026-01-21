@@ -942,7 +942,7 @@ TEST_F(SciWavefunctionTest, Truncate) {
 
   // Verify coefficients are renormalized correctly
   // Original top 2 coefficients: 0.8, 0.4
-  // Norm of [0.8, 0.4] = sqrt(0.64 + 0.16) = sqrt(0.8)
+  // Norm of [0.8, 0.4] = sqrt(0.64 + 0.16) = sqrt(0.80)
   // Renormalized: 0.8/sqrt(0.8), 0.4/sqrt(0.8)
   double expected_norm = std::sqrt(0.8 * 0.8 + 0.4 * 0.4);
   const auto& truncated_coeffs =
