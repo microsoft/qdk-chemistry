@@ -324,7 +324,7 @@ class QdkQubitMapper(QubitMapper):
         all_excitation_terms = PauliTermAccumulator.compute_all_jw_excitation_terms(n_spin_orbitals)
 
         return self._transform_with_excitation_terms_dict(
-            hamiltonian, threshold, integral_threshold, n_spin_orbitals, all_excitation_terms
+            hamiltonian, threshold, integral_threshold, n_spin_orbitals, all_excitation_terms, "jordan-wigner"
         )
 
     def _bravyi_kitaev_transform(
@@ -380,7 +380,7 @@ class QdkQubitMapper(QubitMapper):
         )
 
         return self._transform_with_excitation_terms_dict(
-            hamiltonian, threshold, integral_threshold, n_spin_orbitals, all_excitation_terms
+            hamiltonian, threshold, integral_threshold, n_spin_orbitals, all_excitation_terms, "bravyi-kitaev"
         )
 
     def _transform_with_excitation_terms_dict(
@@ -390,6 +390,7 @@ class QdkQubitMapper(QubitMapper):
         integral_threshold: float,
         n_spin_orbitals: int,
         excitation_terms_dict: dict[tuple[int, int], list[tuple[complex, SparsePauliWord]]],
+        encoding: str,
     ) -> QubitHamiltonian:
         """Transform Hamiltonian to qubit representation using precomputed excitation terms.
 
@@ -408,6 +409,7 @@ class QdkQubitMapper(QubitMapper):
             n_spin_orbitals: Total number of spin orbitals.
             excitation_terms_dict: Pre-computed dictionary mapping (p, q) to
                 E_pq = a†_p a_q terms in sparse format.
+            encoding: The fermion-to-qubit encoding used (e.g., "jordan-wigner", "bravyi-kitaev").
 
         Returns:
             QubitHamiltonian: The transformed qubit Hamiltonian.
@@ -594,4 +596,5 @@ class QdkQubitMapper(QubitMapper):
         return QubitHamiltonian(
             pauli_strings=pauli_strings,
             coefficients=np.array(coefficients, dtype=complex),
+            encoding=encoding,
         )
