@@ -11,6 +11,7 @@
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/density_fitted.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -427,6 +428,224 @@ Args:
     nbeta (int): Number of beta electrons
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
+
+  // ============================================================================
+  // DensityFittedHamiltonianContainer - Density-fitted integral storage
+  // ============================================================================
+  py::class_<DensityFittedHamiltonianContainer, HamiltonianContainer,
+             py::smart_holder>
+      density_fitted(data, "DensityFittedHamiltonianContainer", R"(
+Represents a molecular Hamiltonian with density-fitted two-electron integrals.
+
+This class stores molecular Hamiltonian data using three-center integrals
+instead of four-center integrals, providing memory-efficient storage for
+large basis sets. The four-center integrals are computed on-demand from
+the three-center integrals via contraction.
+
+The density-fitted representation stores two-electron integrals as:
+    (ij|kl) = sum_P (ij|P) * (P|kl)
+
+where P runs over auxiliary basis functions.
+
+This class is particularly useful for:
+* Large basis set calculations where full four-center storage is prohibitive
+* Active space methods where integrals are needed for a subset of orbitals
+* Applications requiring on-the-fly integral transformations
+
+Examples:
+    >>> import numpy as np
+    >>> # Create restricted density-fitted Hamiltonian
+    >>> one_body = np.random.rand(4, 4)  # 4 orbitals
+    >>> # Three-center integrals: [naux x n_geminals] where n_geminals = norb^2
+    >>> three_center = np.random.rand(20, 16)  # 20 aux functions, 4^2 geminals
+    >>> fock_matrix = np.random.rand(4, 4)
+    >>> container = DensityFittedHamiltonianContainer(
+    ...     one_body, three_center, orbitals, 10.5, fock_matrix
+    ... )
+    >>> # Wrap in Hamiltonian interface
+    >>> hamiltonian = Hamiltonian(container)
+)");
+
+  // Restricted constructor
+  density_fitted.def(py::init<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
+                              std::shared_ptr<Orbitals>, double,
+                              const Eigen::MatrixXd&, HamiltonianType>(),
+                     R"(
+Constructor for restricted active space Hamiltonian with density-fitted integrals.
+
+Args:
+    one_body_integrals (numpy.ndarray): One-electron integrals matrix [norb x norb]
+    three_center_integrals (numpy.ndarray): Three-center integrals matrix [naux x n_geminals]
+        where n_geminals = norb * norb
+    orbitals (Orbitals): Molecular orbital data
+    core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
+    inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [norb x norb]
+    type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
+
+Examples:
+    >>> import numpy as np
+    >>> one_body = np.random.rand(4, 4)
+    >>> three_center = np.random.rand(20, 16)  # 20 aux, 4^2 geminals
+    >>> fock_matrix = np.random.rand(4, 4)
+    >>> container = DensityFittedHamiltonianContainer(
+    ...     one_body, three_center, orbitals, 10.5, fock_matrix
+    ... )
+)",
+                     py::arg("one_body_integrals"),
+                     py::arg("three_center_integrals"), py::arg("orbitals"),
+                     py::arg("core_energy"), py::arg("inactive_fock_matrix"),
+                     py::arg("type") = HamiltonianType::Hermitian);
+
+  // Unrestricted constructor
+  density_fitted.def(
+      py::init<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
+               const Eigen::MatrixXd&, const Eigen::MatrixXd&,
+               const Eigen::MatrixXd&, std::shared_ptr<Orbitals>, double,
+               const Eigen::MatrixXd&, const Eigen::MatrixXd&,
+               HamiltonianType>(),
+      R"(
+Constructor for unrestricted active space Hamiltonian with density-fitted integrals.
+
+Args:
+    one_body_integrals_alpha (numpy.ndarray): Alpha one-electron integrals [norb x norb]
+    one_body_integrals_beta (numpy.ndarray): Beta one-electron integrals [norb x norb]
+    three_center_integrals_aaaa (numpy.ndarray): Alpha-alpha three-center integrals [naux x n_geminals]
+    three_center_integrals_aabb (numpy.ndarray): Alpha-beta three-center integrals [naux x n_geminals]
+    three_center_integrals_bbbb (numpy.ndarray): Beta-beta three-center integrals [naux x n_geminals]
+    orbitals (Orbitals): Molecular orbital data
+    core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
+    inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix [norb x norb]
+    inactive_fock_matrix_beta (numpy.ndarray): Beta inactive Fock matrix [norb x norb]
+    type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
+
+Examples:
+    >>> import numpy as np
+    >>> one_body_a = np.random.rand(4, 4)
+    >>> one_body_b = np.random.rand(4, 4)
+    >>> three_center_aaaa = np.random.rand(20, 16)
+    >>> three_center_aabb = np.random.rand(20, 16)
+    >>> three_center_bbbb = np.random.rand(20, 16)
+    >>> fock_a = np.random.rand(4, 4)
+    >>> fock_b = np.random.rand(4, 4)
+    >>> container = DensityFittedHamiltonianContainer(
+    ...     one_body_a, one_body_b,
+    ...     three_center_aaaa, three_center_aabb, three_center_bbbb,
+    ...     orbitals, 10.5, fock_a, fock_b
+    ... )
+)",
+      py::arg("one_body_integrals_alpha"), py::arg("one_body_integrals_beta"),
+      py::arg("three_center_integrals_aaaa"),
+      py::arg("three_center_integrals_aabb"),
+      py::arg("three_center_integrals_bbbb"), py::arg("orbitals"),
+      py::arg("core_energy"), py::arg("inactive_fock_matrix_alpha"),
+      py::arg("inactive_fock_matrix_beta"),
+      py::arg("type") = HamiltonianType::Hermitian);
+
+  // Two-body integral access (computed from three-center)
+  bind_getter_as_property(
+      density_fitted, "get_two_body_integrals",
+      &DensityFittedHamiltonianContainer::get_two_body_integrals,
+      R"(
+Get two-electron integrals in molecular orbital basis.
+
+The four-center integrals are computed on-demand from the stored three-center
+integrals and cached for subsequent accesses.
+
+Returns:
+    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
+    integral vectors [norb^4] for aaaa, aabb, and bbbb spin channels.
+
+Notes:
+    Integrals are computed as (ij|kl) = sum_P (ij|P) * (P|kl) and stored
+    in chemist notation where indices are ordered as i + j*norb + k*norb^2 + l*norb^3
+)",
+      py::return_value_policy::reference_internal);
+
+  // Three-center integral access (specific to
+  // DensityFittedHamiltonianContainer)
+  bind_getter_as_property(
+      density_fitted, "get_three_center_integrals",
+      &DensityFittedHamiltonianContainer::get_three_center_integrals,
+      R"(
+Get three-center integrals in molecular orbital basis.
+
+Returns:
+    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of three-center
+    integral matrices [naux x n_geminals] for aaaa, aabb, and bbbb spin channels,
+    where n_geminals = norb * norb.
+
+Notes:
+    Three-center integrals represent (ij|P) where i,j are MO indices and P is
+    an auxiliary basis function index. The geminal index combines i and j.
+)",
+      py::return_value_policy::reference_internal);
+
+  density_fitted.def("get_two_body_element",
+                     &DensityFittedHamiltonianContainer::get_two_body_element,
+                     R"(
+Get specific two-electron integral element <ij|kl>.
+
+Args:
+    i, j, k, l (int): Orbital indices
+    channel (SpinChannel): Spin channel (aaaa, aabb, or bbbb), defaults to aaaa
+
+Returns:
+    float: Value of the two-electron integral <ij|kl>
+)",
+                     py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
+                     py::arg("channel") = SpinChannel::aaaa);
+
+  density_fitted.def("has_two_body_integrals",
+                     &DensityFittedHamiltonianContainer::has_two_body_integrals,
+                     R"(
+Check if two-body integrals are available (i.e., three-center integrals are set).
+
+Returns:
+    bool: True if three-center integrals have been set
+)");
+
+  density_fitted.def("is_restricted",
+                     &DensityFittedHamiltonianContainer::is_restricted,
+                     R"(
+Check if Hamiltonian is restricted (alpha == beta).
+
+Returns:
+    bool: True if alpha and beta integrals are identical
+)");
+
+  density_fitted.def("is_valid", &DensityFittedHamiltonianContainer::is_valid,
+                     R"(
+Check if the Hamiltonian data is complete and consistent.
+
+Returns:
+    bool: True if all required data is set and dimensions are consistent
+)");
+
+  density_fitted.def(
+      "to_json",
+      [](const DensityFittedHamiltonianContainer& self) -> std::string {
+        return self.to_json().dump();
+      },
+      R"(
+Convert container to JSON string.
+
+Returns:
+    str: JSON representation of the container
+)");
+
+  density_fitted.def("to_fcidump_file",
+                     &DensityFittedHamiltonianContainer::to_fcidump_file,
+                     R"(
+Save Hamiltonian to FCIDUMP file.
+
+The four-center integrals are computed from three-center integrals before saving.
+
+Args:
+    filename (str): Path to FCIDUMP file to create/overwrite
+    nalpha (int): Number of alpha electrons
+    nbeta (int): Number of beta electrons
+)",
+                     py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
   // ============================================================================
   // Hamiltonian - Interface class
