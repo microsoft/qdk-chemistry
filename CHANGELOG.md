@@ -1,5 +1,3 @@
 # Changelog
 
-## [1.0.0]
-
-- Initial release of QDK/Chemistry
+See the full changelog in the [documentation](docs/source/changelog.rst).
