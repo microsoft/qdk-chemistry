@@ -5,9 +5,31 @@ several common methods.
 
 ## Pip Wheel Installation
 
-We are currently in the process of preparing pre-built wheels for QDK/Chemistry.
-Once these are available, the preferred installation method will be via `pip`.
-For now, please build the package from source using the instructions below.
+QDK/Chemistry is distributed as the `qdk-chemistry` Python library through PyPI. To install the package, run the following command in a terminal:
+
+```bash
+python -m pip install qdk-chemistry
+```
+
+The pip installation of QDK/Chemistry currently has the following system requirements:
+
+- Python 3.11+
+- OS Support:
+  - Windows via [the Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/windows/wsl/install)
+    - x86_64
+    - arm64
+  - Linux
+    - x86_64
+    - arm64
+  - MacOS
+    - arm64
+
+Onces installed, you may run the tests in the `python/tests` directory. You may also optionally install `pyscf` to enable the PySCF plugin.
+
+```bash
+pythom -m pip install pytest [pyscf]
+pytest python/tests
+```
 
 ## Using the VSCode Dev Container
 
