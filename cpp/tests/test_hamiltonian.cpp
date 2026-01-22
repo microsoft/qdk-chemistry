@@ -1466,7 +1466,7 @@ TEST_P(HamiltonianTest, GetContainerTypedAccess) {
 
 TEST_P(HamiltonianTest, DataTypeName) {
   // Test that Hamiltonian has the correct data type name
-  EXPECT_EQ(hamiltonian_restricted.get_data_type_name(), "hamiltonian");
+  EXPECT_EQ(hamiltonian_restricted->get_data_type_name(), "hamiltonian");
 }
 
 // ============================================================================
