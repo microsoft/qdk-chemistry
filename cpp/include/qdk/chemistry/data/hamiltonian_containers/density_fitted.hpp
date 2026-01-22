@@ -19,13 +19,14 @@ namespace qdk::chemistry::data {
 
 /**
  * @class DensityFittedHamiltonianContainer
- * @brief Contains a molecular Hamiltonian using canonical four center
+ * @brief Contains a molecular Hamiltonian using three center
  * integrals, implemented as a subclass of HamiltonianContainer.
  *
  * This class stores molecular Hamiltonian data for quantum chemistry
  * calculations, specifically designed for active space methods. It contains:
  * - One-electron integrals (kinetic + nuclear attraction) in MO representation
- * - Two-electron integrals (electron-electron repulsion) in MO representation
+ * - Three-center two-electron integrals (electron-electron repulsion) in MO
+ * representation
  * - Molecular orbital information for the active space
  * - Core energy contributions from inactive orbitals and nuclear repulsion
  *
@@ -41,11 +42,11 @@ namespace qdk::chemistry::data {
 class DensityFittedHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
-   * @brief Constructor for active space Hamiltonian with four center integrals
+   * @brief Constructor for active space Hamiltonian with three center integrals
    *
    * @param one_body_integrals One-electron integrals in MO basis [norb x norb]
-   * @param two_body_integrals Two-electron integrals in MO basis [norb x norb x
-   * norb x norb]
+   * @param three_center_integrals Three-center two-electron integrals in MO
+   * basis [naux x (norb x norb)]
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital
    * energy)
@@ -57,7 +58,7 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
    */
   DensityFittedHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals,
-      const Eigen::MatrixXd& two_body_integrals,
+      const Eigen::MatrixXd& three_center_integrals,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
       const Eigen::MatrixXd& inactive_fock_matrix,
       HamiltonianType type = HamiltonianType::Hermitian);
@@ -70,10 +71,12 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
    * basis
    * @param one_body_integrals_beta One-electron integrals for beta spin in MO
    * basis
-   * @param two_body_integrals_aaaa Two-electron alpha-alpha-alpha-alpha
-   * integrals
-   * @param two_body_integrals_aabb Two-electron alpha-beta-alpha-beta integrals
-   * @param two_body_integrals_bbbb Two-electron beta-beta-beta-beta integrals
+   * @param three_center_integrals_aaaa Three-center two-electron
+   * alpha-alpha-alpha-alpha integrals
+   * @param three_center_integrals_aabb Three-center two-electron
+   * alpha-beta-alpha-beta integrals
+   * @param three_center_integrals_bbbb Three-center two-electron
+   * beta-beta-beta-beta integrals
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital
    * energy)
@@ -88,9 +91,9 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
   DensityFittedHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals_alpha,
       const Eigen::MatrixXd& one_body_integrals_beta,
-      const Eigen::MatrixXd& two_body_integrals_aaaa,
-      const Eigen::MatrixXd& two_body_integrals_aabb,
-      const Eigen::MatrixXd& two_body_integrals_bbbb,
+      const Eigen::MatrixXd& three_center_integrals_aaaa,
+      const Eigen::MatrixXd& three_center_integrals_aabb,
+      const Eigen::MatrixXd& three_center_integrals_bbbb,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
       const Eigen::MatrixXd& inactive_fock_matrix_alpha,
       const Eigen::MatrixXd& inactive_fock_matrix_beta,
@@ -109,15 +112,16 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Get the type of the underlying container
-   * @return String identifying the container type (e.g., "canonical_4_center",
-   * "density_fitted")
+   * @return String identifying the container type (e.g.,
+   * "canonical_four_center", "density_fitted")
    */
   std::string get_container_type() const override final;
 
   /**
-   * @brief Get two-electron integrals in MO basis for all spin channels
-   * @return Tuple of references to (aaaa, aabb, bbbb) two-electron integrals
-   * vectors
+   * @brief Get four-center two-electron integrals in MO basis for all spin
+   * channels
+   * @return Tuple of references to (aaaa, aabb, bbbb) four-center two-electron
+   * integrals vectors
    * @throws std::runtime_error if integrals are not set
    */
   std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
@@ -135,14 +139,14 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
   get_three_center_integrals() const;
 
   /**
-   * @brief Get specific two-electron integral element
+   * @brief Get specific four-center two-electron integral element
    * @param i First orbital index
    * @param j Second orbital index
    * @param k Third orbital index
    * @param l Fourth orbital index
    * @param channel Spin channel to query (aaaa, aabb, or bbbb), defaults to
    * aaaa
-   * @return Two-electron integral <ij|kl>
+   * @return Four-center two-electron integral (ij|kl)
    * @throws std::out_of_range if indices are invalid
    */
   double get_two_body_element(
