@@ -17,20 +17,12 @@ source $HOME/.cargo/env
 which rustc
 
 # Install ipykernel
-pip install ipykernel ipywidgets pandas pre-commit openfermion rdkit
+pip install ipykernel pandas pre-commit openfermion rdkit
 
 # Install QDK Chemistry package
 cd ./python
 export CMAKE_BUILD_PARALLEL_LEVEL=2
 QDK_UARCH=native pip install -v .[all]
-
-# Install QDK Widgets
-git clone --branch billti/widg https://github.com/microsoft/qdk /tmp/qdk
-cd /tmp/qdk
-python ./prereqs.py --install
-./build.py --widgets --qdk --pip
-pip install --force-reinstall ./target/wheels/*.whl
-rm -rf /tmp/qdk
 
 # Add venv to bash
 echo "source $HOME/qdk_chemistry_venv/bin/activate" >> $HOME/.bashrc

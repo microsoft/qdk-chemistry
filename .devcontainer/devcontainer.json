@@ -65,6 +65,6 @@
     "remoteEnv": {
         "CPATH": "${containerEnv:CPATH}:/usr/include/hdf5/serial:/usr/include/eigen3"
     },
-    "postCreateCommand": "bash .devcontainer/scripts/venv_and_widget.sh",
+    "postCreateCommand": "bash .devcontainer/scripts/venv.sh",
     "remoteUser": "vscode"
 }
