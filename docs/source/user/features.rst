@@ -78,7 +78,7 @@ The challenge lies in balancing accuracy and computational cost: an ideal active
 
 Entropy-Based Methods
    Using concepts from quantum information theory, these methods identify strongly correlated orbitals based on their entanglement with the rest of the system.
-   QDK/Chemistry includes a native implementation of the AutoCAS algorithm :cite:`Stein2019`, which leverages single-orbital entropies computed from reduced density matrices to systematically select active spaces (see below for details).
+   QDK/Chemistry includes a native implementation of the autoCAS algorithm :cite:`Stein2019`, which leverages single-orbital entropies computed from reduced density matrices to systematically select active spaces (see below for details).
 
 Occupation-based Methods
    Automatic selection based on natural orbital occupation numbers obtained from correlated many-body methods.
@@ -100,11 +100,11 @@ See :doc:`comprehensive/algorithms/active_space` for further details about avail
 Implementation Highlights
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-AutoCAS
-   QDK/Chemistry includes a native implementation of the AutoCAS algorithm :cite:`Stein2019`, which leverages quantum information concepts to identify strongly correlated orbitals.
+autoCAS
+   QDK/Chemistry includes a native implementation of the autoCAS algorithm :cite:`Stein2019`, which leverages quantum information concepts to identify strongly correlated orbitals.
    The method computes single-orbital entropies—measures of how entangled each orbital is with the rest of the system—from the one- and two-electron reduced density matrices of a multi-configurational wavefunction.
-   Orbitals with high entropy are strongly entangled and should be treated explicitly within the active space. QDK/Chemistry's implementation includes both standard AutoCAS and an enhanced variant (AutoCAS-EOS) for improved robustness.
-   See the :ref:`AutoCAS Algorithm <autocas-algorithm-details>` documentation for further details.
+   Orbitals with high entropy are strongly entangled and should be treated explicitly within the active space. QDK/Chemistry's implementation includes both standard autoCAS and an enhanced variant (autoCAS-EOS) for improved robustness.
+   See the :ref:`autoCAS Algorithm <autocas-algorithm-details>` documentation for further details.
 
 
 Multi-Configuration Methods

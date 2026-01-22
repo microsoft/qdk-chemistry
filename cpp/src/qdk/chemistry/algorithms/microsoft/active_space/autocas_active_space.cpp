@@ -15,7 +15,7 @@ namespace qdk::chemistry::algorithms::microsoft {
 std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
   QDK_LOG_TRACE_ENTERING();
-  QDK_LOGGER().info("AutoCAS::Starting active space selection.");
+  QDK_LOGGER().info("autoCAS::Starting active space selection.");
 
   // get settings
   const int64_t min_plateau_size = _settings->get<int64_t>("min_plateau_size");
@@ -149,7 +149,7 @@ std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
     if (i > 0) oss << ", ";
     oss << selected_active_space_indices[i];
   }
-  QDK_LOGGER().info("AutoCAS::Selected active space of {} orbitals: {}",
+  QDK_LOGGER().info("autoCAS::Selected active space of {} orbitals: {}",
                     selected_active_space_indices.size(), oss.str());
 
   // create new orbitals with active space

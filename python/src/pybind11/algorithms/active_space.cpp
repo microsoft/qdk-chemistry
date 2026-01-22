@@ -253,7 +253,7 @@ QDK entropy-based active space selector.
 This class selects active space orbitals based on orbital entropy measures.
 It identifies orbitals with high entropy, which indicates strong electron
 correlation and multi-reference character.
-This method is a variant of the AutoCAS method that uses entropy as the primary
+This method is a variant of the autoCAS method that uses entropy as the primary
 criterion for selecting active orbitals :cite:`Stein2019`.
 
 Typical usage:
@@ -286,7 +286,7 @@ Initializes an entropy-based active space selector with default settings.
   // Bind concrete microsoft::AutocasActiveSpaceSelector implementation
   py::class_<microsoft::AutocasActiveSpaceSelector, ActiveSpaceSelector,
              py::smart_holder>(m, "QdkAutocasActiveSpaceSelector", R"(
-QDK Automated Complete Active Space (AutoCAS) selector.
+QDK Automated Complete Active Space (autoCAS) selector.
 
 This class provides an automated approach to selecting active space orbitals
 based on various criteria including occupation numbers, orbital energies,
@@ -298,7 +298,7 @@ Typical usage:
 
     import qdk_chemistry.algorithms as alg
 
-    # Create an AutoCAS selector
+    # Create an autoCAS selector
     selector = alg.QdkAutocasActiveSpaceSelector()
 
     # Select active space automatically
@@ -312,7 +312,7 @@ See Also:
       .def(py::init<>(), R"(
 Default constructor.
 
-Initializes an AutoCAS selector with default settings.
+Initializes an autoCAS selector with default settings.
 
 )");
 }

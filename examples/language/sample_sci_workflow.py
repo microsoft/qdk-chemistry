@@ -74,14 +74,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--autocas",
         action="store_true",
-        help="Run AutoCAS active space refinement after the initial CASCI step.",
+        help="Run autoCAS active space refinement after the initial CASCI step.",
     )
     parser.add_argument(
         "--autocas-parameters",
         type=str,
         default=None,
         help=(
-            "JSON object with AutoCAS overrides (only used when --autocas is supplied). "
+            "JSON object with autoCAS overrides (only used when --autocas is supplied). "
             "e.g., '{\"entropy_threshold\": 0.01}'"
         ),
     )
@@ -176,7 +176,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     Logger.info(f"CASCI energy = {e_cas:.8f} Hartree")
 
     ########################################################################################
-    # 6. Optional AutoCAS refinement of active space size.
+    # 6. Optional autoCAS refinement of active space size.
     ########################################################################################
     if args.autocas:
         autocas_selector = create("active_space_selector", "qdk_autocas")
@@ -186,10 +186,10 @@ def main(argv: Sequence[str] | None = None) -> None:
                 autocas_selector.settings().set(key, value)
         refined_wfn = autocas_selector.run(wfn_cas)
         indices, _ = refined_wfn.get_orbitals().get_active_space_indices()
-        Logger.info(f"AutoCAS selected active space with indices: {indices}")
+        Logger.info(f"autoCAS selected active space with indices: {indices}")
         if len(indices) == 0:
             Logger.warn(
-                "AutoCAS did not identify correlated orbitals; retaining the initial space."
+                "autoCAS did not identify correlated orbitals; retaining the initial space."
             )
         else:
             refined_orbitals = refined_wfn.get_orbitals()
@@ -198,7 +198,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 active_hamiltonian, *refined_wfn.get_active_num_electrons()
             )
             Logger.info(active_hamiltonian.get_summary())
-            Logger.info(f"AutoCAS energy = {e_cas:.8f} Hartree")
+            Logger.info(f"autoCAS energy = {e_cas:.8f} Hartree")
 
     ########################################################################################
     # 7. Perform sparse-CI screening.

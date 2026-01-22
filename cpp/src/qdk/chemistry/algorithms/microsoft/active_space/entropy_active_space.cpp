@@ -14,7 +14,7 @@ namespace qdk::chemistry::algorithms::microsoft {
 std::shared_ptr<data::Wavefunction> AutocasEosActiveSpaceSelector::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
   QDK_LOG_TRACE_ENTERING();
-  QDK_LOGGER().info("AutoCAS-EOS::Starting active space selection.");
+  QDK_LOGGER().info("autoCAS-EOS::Starting active space selection.");
 
   // get settings
   const double entropy_threshold = _settings->get<double>("entropy_threshold");
@@ -67,7 +67,7 @@ std::shared_ptr<data::Wavefunction> AutocasEosActiveSpaceSelector::_run_impl(
     if (i > 0) oss2 << ", ";
     oss2 << selected_active_space_indices[i];
   }
-  QDK_LOGGER().info("AutoCAS-EOS::Selected active space of {} orbitals: {}",
+  QDK_LOGGER().info("autoCAS-EOS::Selected active space of {} orbitals: {}",
                     selected_active_space_indices.size(), oss2.str());
 
   // create new orbitals with active space
