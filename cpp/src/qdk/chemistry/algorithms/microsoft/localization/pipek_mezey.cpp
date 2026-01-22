@@ -323,12 +323,12 @@ Eigen::MatrixXd PipekMezeyLocalization::localize(
   if (this->converged_)
     QDK_LOGGER().info(
         "Pipek-Mezey Converged in {:6} sweeps with ObjectiveFunction = "
-        "{:.6e}",
+        "{:.16e}",
         i_sweep, this->obj_fun_);
   else
     QDK_LOGGER().info(
         "Pipek-Mezey Failed to Converge in {:6} sweeps - Last "
-        "ObjectiveFunction = {:.6e}",
+        "ObjectiveFunction = {:.16e}",
         i_sweep, this->obj_fun_);
 
   return orbital_coeffs;

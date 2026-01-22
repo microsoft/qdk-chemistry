@@ -455,12 +455,15 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
     temp = this->overlap_ori_;   // lapack::gelss overwrites input
     temp2 = this->overlap_mix_;  // the unnormalized T
     std::vector<double> W11(num_atomic_orbitals_ori);
-    double _rcond = -1;
+    double _rcond = 1e-12;
     int64_t RANK11;
     lapack::gelss(num_atomic_orbitals_ori, num_atomic_orbitals_ori,
                   num_atomic_orbitals_min, temp.data(), num_atomic_orbitals_ori,
                   temp2.data(), num_atomic_orbitals_ori, W11.data(), _rcond,
                   &RANK11);
+    QDK_LOGGER().info(
+        "RANK11 in calculating T: {}", RANK11);
+
     this->orthonormalization(num_atomic_orbitals_ori, num_atomic_orbitals_min,
                              this->overlap_ori_.data(), temp2.data(), T.data(),
                              1e-6, 0,
@@ -561,13 +564,16 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
       Eigen::MatrixXd overlap_ori_copy =
           overlap_ori_al;  // lapack::gelss overwrites input
       std::vector<double> W11(num_atomic_orbitals_al_ori);
-      double _rcond = -1.;
+      double _rcond = 1e-12;
       int64_t _tmp_rank;
       lapack::gelss(num_atomic_orbitals_al_ori, num_atomic_orbitals_al_ori,
                     num_atomic_orbitals_al_min, overlap_ori_copy.data(),
                     num_atomic_orbitals_al_ori, T_al.data(),
                     num_atomic_orbitals_al_ori, W11.data(), _rcond, &_tmp_rank);
+      QDK_LOGGER().info(
+        "tmp_rank in proto_hv: {}", _tmp_rank);
     }
+
 
     // Get overlap of xi, S = T_al^T * overlap_ori_al * T_al = overlap_mix_al^T
     // * overlap_ori_al**-1 * overlap_mix_al = overlap_mix_al^T * T_al
@@ -594,13 +600,15 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
                  num_atomic_orbitals_al_ori, 0.0, RHS.data(),
                  num_atomic_orbitals_al_min);
       std::vector<double> W_xi(num_atomic_orbitals_al_min);
-      double _rcond = -1.0;
+      double _rcond = 1e-12;
       int64_t _tmp_rank;
       lapack::gelss(num_atomic_orbitals_al_min, num_atomic_orbitals_al_min,
                     num_atomic_orbitals_al_ori, S_xi.data(),
                     num_atomic_orbitals_al_min, RHS.data(),
                     num_atomic_orbitals_al_min, W_xi.data(), _rcond,
                     &_tmp_rank);
+        QDK_LOGGER().info(
+        "tmp_rank in proto_hv solving for S_xi^-1 * overlap_mix^T: {}", _tmp_rank);
       // Compute C_psi - = T * RHS (where RHS now contains S_xi^-1 *
       // overlap_mix^T)
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
