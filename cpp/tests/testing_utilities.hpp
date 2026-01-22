@@ -50,6 +50,9 @@ auto pipek_mezey_metric(const qdk::chemistry::data::Orbitals& orbitals,
     for (size_t mu = 0; mu < num_atomic_orbitals; ++mu) {
       const auto iA = basis_set->get_atom_index_for_atomic_orbital(mu);
       Xi(iA, p) += C(mu, p) * SC(mu, p);
+      QDK_LOGGER().info(
+          "Accumulating iA: {}; p: {}; mu: {}; C(mu, p): {:.16e}; SC(mu, p): {:.16e}; Xi(iA, p): {:.16e}",
+          iA, p, mu, C(mu, p), SC(mu, p), Xi(iA, p));
     }
   }
   QDK_LOGGER().info(
