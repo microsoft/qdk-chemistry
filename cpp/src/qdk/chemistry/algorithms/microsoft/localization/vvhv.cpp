@@ -1031,6 +1031,25 @@ void VVHVLocalization::orthonormalization(int num_atomic_orbitals,
                num_orbitals,
                eigenvalues.data());  // S now contains eigenvectors U
 
+  // Enforce consistent eigenvector sign convention across platforms.
+  // Different LAPACK implementations (OpenBLAS, MKL, Accelerate) may return
+  // eigenvectors with arbitrary signs. We normalize by requiring the largest
+  // magnitude component of each eigenvector to be positive.
+  for (int i = 0; i < num_orbitals; ++i) {
+    int max_idx = 0;
+    double max_abs = 0.0;
+    for (int j = 0; j < num_orbitals; ++j) {
+      double abs_val = std::abs(S(j, i));
+      if (abs_val > max_abs) {
+        max_abs = abs_val;
+        max_idx = j;
+      }
+    }
+    if (S(max_idx, i) < 0.0) {
+      S.col(i) *= -1.0;
+    }
+  }
+
   if (expected_near_zero > 0) {
     // Check eigenvalue structure if selection needed
     VVHVLocalization::check_eigenvalue_structure(
