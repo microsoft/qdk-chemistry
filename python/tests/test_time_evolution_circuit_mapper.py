@@ -80,7 +80,8 @@ class TestPauliSequenceMapper:
 
         circuit = mapper.run(controlled_unitary)
 
-        assert re.search(r"crz\s*\([^)]*\)\s+q\[2\]\s*,\s*q\[\d+\]", circuit.qasm)
+        # control qubit is at index 2, so target qubits should be [0, 1]
+        assert re.search(r"crz\s*\([^)]*\)\s+_gate_q_2\s*,\s*_gate_q_", circuit.qasm)
 
     def test_invalid_container_type_raises(self):
         """Test that an invalid container type raises a ValueError."""
@@ -189,8 +190,8 @@ class TestAppendControlledTimeEvolution:
             target_qubits=[0, 1],
             power=2,
         )
-
-        assert qc.count_ops().get("crz", 0) == 4
+        ops = qc.count_ops()
+        assert ops == {"ctrl_time_evol_power_2": 1}
 
     def test_skips_zero_angle_terms(self):
         """Test that terms with zero angle are skipped."""
@@ -206,7 +207,8 @@ class TestAppendControlledTimeEvolution:
         )
 
         # No CRZ should be added
-        assert "crz" not in qc.count_ops()
+        cir_qasm = qasm3.dumps(qc)
+        assert "crz" not in cir_qasm
 
 
 class TestAppendControlledPauliRotation:
