@@ -96,6 +96,8 @@ from qdk_chemistry._core.data import (
 )
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.circuit import Circuit
+from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
+from qdk_chemistry.data.encoding_validation import EncodingMismatchError, validate_encoding_compatibility
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
@@ -118,6 +120,7 @@ __all__ = [
     "CanonicalFourCenterHamiltonianContainer",
     "CasWavefunctionContainer",
     "Circuit",
+    "CircuitExecutorData",
     "Configuration",
     "ConfigurationSet",
     "ControlledTimeEvolutionUnitary",
@@ -125,6 +128,7 @@ __all__ = [
     "DataClass",
     "ElectronicStructureSettings",
     "Element",
+    "EncodingMismatchError",
     "EnergyExpectationResult",
     "Hamiltonian",
     "HamiltonianContainer",
@@ -160,4 +164,5 @@ __all__ = [
     "WavefunctionContainer",
     "WavefunctionType",
     "get_current_ciaaw_version",
+    "validate_encoding_compatibility",
 ]
