@@ -272,9 +272,19 @@ Eigen::MatrixXd VVHVLocalization::localize(
   // Calculate valence virtuals
   Eigen::MatrixXd C_valence_virtual =
       calculate_valence_virtual(occupied_orbitals);
+  QDK_LOGGER().debug(
+      "VVHV: Computed valence virtual orbitals (unlocalized)");
+  QDK_LOGGER().info(
+      "VVHV: Norm of C_valence_virtual (unlocalized): {:.16e}",
+      C_valence_virtual.norm());
 
   // Localize valence virtual orbitals
   Eigen::MatrixXd C_valence_loc = localize_valence_virtual(C_valence_virtual);
+  QDK_LOGGER().debug(
+      "VVHV: Localized valence virtual orbitals using inner localizer");
+  QDK_LOGGER().info(
+      "VVHV: Norm of C_valence_loc (localized valence virtuals): {:.16e}",
+      C_valence_loc.norm());
 
   // Combine C_valence_virtual and occupied_orbitals to get C_minimal
   Eigen::MatrixXd C_minimal(num_atomic_orbitals_ori, num_atomic_orbitals_min);
@@ -282,9 +292,16 @@ Eigen::MatrixXd VVHVLocalization::localize(
       occupied_orbitals;
   C_minimal.block(0, num_occupied_orbitals, num_atomic_orbitals_ori,
                   n_val_virt) = C_valence_virtual;
+  QDK_LOGGER().debug(
+      "VVHV: Combined occupied and valence virtual orbitals into C_minimal");
 
   // Localize hard virtuals and combine with valence virtuals
   Eigen::MatrixXd hard_orbitals_loc = localize_hard_virtuals(C_minimal);
+  QDK_LOGGER().debug(
+      "VVHV: Generated and localized hard virtual orbitals");
+  QDK_LOGGER().info(
+      "VVHV: Norm of hard_orbitals_loc (localized hard virtuals): {:.16e}",
+      hard_orbitals_loc.norm());
 
   // Concatenate C_valence_loc and hard_orbitals_loc to form localized_orbitals
   Eigen::MatrixXd localized_orbitals =
@@ -341,11 +358,17 @@ void VVHVLocalization::initialize() {
     dipole_integrals_ = std::make_unique<qcs::RowMajorMatrix>(
         3 * num_atomic_orbitals_ori, num_atomic_orbitals_ori);
     ori_bs_1ee.dipole_integral(dipole_integrals_->data());
+    QDK_LOGGER().info(
+        "VVHVLocalization: Computed dipole integrals with norm {:.16e}",
+        dipole_integrals_->norm());
 
     // Allocate and compute quadrupole integrals
     quadrupole_integrals_ = std::make_unique<qcs::RowMajorMatrix>(
         6 * num_atomic_orbitals_ori, num_atomic_orbitals_ori);
     ori_bs_1ee.quadrupole_integral(quadrupole_integrals_->data());
+    QDK_LOGGER().info(
+        "VVHVLocalization: Computed quadrupole integrals with norm {:.16e}",
+        quadrupole_integrals_->norm());
 
     QDK_LOGGER().debug(
         "VVHVLocalization: Pre-computed dipole and quadrupole integrals for "
@@ -943,6 +966,18 @@ void VVHVLocalization::calculate_orbital_spreads(
                                     qcs::mpi_default_input());
     ori_bs_1ee.dipole_integral(local_dipole->data());
     ori_bs_1ee.quadrupole_integral(local_quadrupole->data());
+
+    // print debug message
+    QDK_LOGGER().info(
+        "VVHVLocalization: Computed dipole and quadrupole integrals locally "
+        "for orbital spreads");
+    QDK_LOGGER().info(
+        "VVHVLocalization: Dipole integrals norm = " +
+        std::to_string(local_dipole->norm()));
+    QDK_LOGGER().info(
+        "VVHVLocalization: Quadrupole integrals norm = " +
+        std::to_string(local_quadrupole->norm()));
+
 
     dipole = local_dipole.get();
     quadrupole = local_quadrupole.get();
