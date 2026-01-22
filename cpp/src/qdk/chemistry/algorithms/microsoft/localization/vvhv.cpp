@@ -144,7 +144,7 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    */
   void orthonormalization(int num_atomic_orbitals, int num_orbitals,
                           const double* overlap_inp, double* C, double* C_out,
-                          double ortho_threshold = 1e-6,
+                          double ortho_threshold = 1e-9,
                           unsigned int expected_near_zero = 0,
                           const std::string& error_label = "",
                           double separation_ratio = 5.0);
@@ -443,7 +443,7 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
                   &RANK11);
     this->orthonormalization(num_atomic_orbitals_ori, num_atomic_orbitals_min,
                              this->overlap_ori_.data(), temp2.data(), T.data(),
-                             1e-6, 0,
+                             1e-9, 0,
                              "initial orthonormalization of minimal basis");
   }
 
@@ -472,7 +472,7 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
   // =C_mp_wo_occ here
   this->orthonormalization(
       num_atomic_orbitals_ori, num_atomic_orbitals_min,
-      this->overlap_ori_.data(), C_mp_wo_occ.data(), temp.data(), 1e-6,
+      this->overlap_ori_.data(), C_mp_wo_occ.data(), temp.data(), 1e-9,
       num_occupied_orbitals,
       "calculating minimal space (after projecting out occupied space)", 5.0);
 
@@ -527,7 +527,7 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
   temp = C_psi;
   this->orthonormalization(
       num_atomic_orbitals_al_ori, num_atomic_orbitals_al_ori,
-      overlap_ori_al.data(), temp.data(), C_psi.data(), 1e-6, 0,
+      overlap_ori_al.data(), temp.data(), C_psi.data(), 1e-9, 0,
       "initial orthonormalization of original basis on atom " +
           std::to_string(atom_index) + " angular momentum " +
           std::to_string(l));
@@ -595,7 +595,7 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
   // Use orthonormalization for the orthogonalization step
   this->orthonormalization(
       num_atomic_orbitals_al_ori, num_atomic_orbitals_al_ori,
-      overlap_ori_al.data(), C_psi.data(), temp.data(), 1e-6,
+      overlap_ori_al.data(), C_psi.data(), temp.data(), 1e-9,
       num_atomic_orbitals_al_min,
       "generating prototype hard virtuals on atom " +
           std::to_string(atom_index) + " angular momentum " + std::to_string(l),
@@ -795,7 +795,7 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     // Orthonormalize C_eta_A
     this->orthonormalization(
         num_atomic_orbitals_ori, num_atomic_orbitals_a_ori,
-        this->overlap_ori_.data(), C_eta_a.data(), C_normal_a.data(), 1e-6, 0,
+        this->overlap_ori_.data(), C_eta_a.data(), C_normal_a.data(), 1e-9, 0,
         "initial orthonormalization of original basis on atom " +
             std::to_string(atom_a));
 
@@ -827,7 +827,7 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
 
     this->orthonormalization(
         num_atomic_orbitals_ori, num_atomic_orbitals_a_ori,
-        this->overlap_ori_.data(), C_eta_a.data(), C_hv_a.data(), 1e-6,
+        this->overlap_ori_.data(), C_eta_a.data(), C_hv_a.data(), 1e-9,
         num_atomic_orbitals_a_min,
         "projecting out the minimal space from the orbitals on atom " +
             std::to_string(atom_a),
@@ -847,7 +847,7 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     Eigen::MatrixXd Z = Eigen::MatrixXd::Zero(nhv_a, nhv_a);
     Eigen::MatrixXd Iden = Eigen::MatrixXd::Identity(nhv_a, nhv_a);
     this->orthonormalization(nhv_a, nhv_a, Iden.data(), T.data(), Z.data(),
-                             1e-6);
+                             1e-9);
 
     // Finally form the hard virtuals on atom A (gamma in the paper) in the
     // representation of the original basis
@@ -890,7 +890,7 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
   // orthogonalize them globally
   this->orthonormalization(num_atomic_orbitals_ori, nhv,
                            this->overlap_ori_.data(), C_hard_virtuals.data(),
-                           temp.data(), 1e-6, 0,
+                           temp.data(), 1e-9, 0,
                            "VVHVLocalization: Final orthonormalization of hard "
                            "virtuals");  // No expected near-zero eigenvalues
 
