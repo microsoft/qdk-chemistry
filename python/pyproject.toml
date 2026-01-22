@@ -21,7 +21,7 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Programming Language :: C++",
   "Topic :: Scientific/Engineering",
-  "Topic :: Scientific/Engineering :: Quantum",
+  "Topic :: Scientific/Engineering :: Quantum Computing",
   "Topic :: Scientific/Engineering :: Physics",
   "Topic :: Scientific/Engineering :: Chemistry",
   "Topic :: Software Development :: Libraries",
@@ -38,7 +38,7 @@ dependencies = [
   "pylatexenc==2.10",
   "ruamel-yaml>=0.18.10",
   "pydantic-settings>=2.9.1",
-  "qsharp[widgets]",
+  "qdk[jupyter]==1.23.1.dev0",
   "pybind11-stubgen>=2.5.1",
   "h5py>=3.0.0"
 ]
@@ -62,7 +62,10 @@ coverage = [
 dev = [
   "coverage",
   "mypy",
+  "nbclient",
+  "nbformat",
   "pytest",
+  "pytest-env",
   "ruff"
 ]
 docs = [
@@ -80,12 +83,11 @@ plugins = [
   "pyscf>=2.9.0"
 ]
 
-# TODO (NAB): update these URLs with final ones, workitem: 41430
 [project.urls]
-Documentation = "https://qdk-chemistry.readthedocs.io"
-Homepage = "https://github.com/example/qdk-chemistry"
-Issues = "https://github.com/example/qdk-chemistry/issues"
-Repository = "https://github.com/example/qdk-chemistry"
+Documentation = "https://microsoft.github.io/qdk-chemistry"
+Homepage = "https://github.com/microsoft/qdk-chemistry"
+Issues = "https://github.com/microsoft/qdk-chemistry/issues"
+Repository = "https://github.com/microsoft/qdk-chemistry"
 
 # Configuration for C++ coverage reporting
 [tool.coverage.cpp]
@@ -146,7 +148,13 @@ filterwarnings = [
   "ignore::DeprecationWarning:qiskit",
   "ignore::DeprecationWarning:qiskit_aer"
 ]
+markers = [
+  "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
 testpaths = ["tests"]
+env = [
+  "QSHARP_PYTHON_TELEMETRY=none"
+]
 
 [tool.ruff]
 line-length = 120

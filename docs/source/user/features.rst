@@ -173,14 +173,25 @@ Classical quantum chemistry methods are generally expressed in the language of s
 Jordan-Wigner Transformation :cite:`Jordan-Wigner1928`
    A straightforward mapping that encodes fermionic operators directly onto qubits, preserving the algebraic structure of the operators.
 
-Bravyi-Kitaev Transformation :cite:`Bravyi-Kitaev2002`
+Bravyi-Kitaev Transformation :cite:`Seeley2012`
    A more efficient mapping that reduces the number of qubits required for certain operations by balancing locality and parity information.
 
-Parity Transformation :cite:`Love2012`
+Parity Transformation :cite:`Seeley2012`
    An alternative mapping that encodes fermionic operators based on the parity of occupation numbers, offering advantages in specific contexts.
 
-Fermion-to-qubit mapping is currently supported through QDK/Chemistry's Qiskit plugin; see the :doc:`comprehensive/algorithms/qubit_mapper` for further details.
+QDK/Chemistry provides both a native qubit mapper implementation and integration with external libraries through plugins.
+See :doc:`comprehensive/algorithms/qubit_mapper` for available implementations and usage details.
 QDK/Chemistry also provides :doc:`Pauli operator arithmetic <comprehensive/data/pauli_operator>` for building and manipulating qubit Hamiltonians using natural mathematical notation.
+
+.. _qubit-mapper-highlights:
+
+Implementation Highlights
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Native QDK Qubit Mapper
+   QDK/Chemistry includes a high-performance native implementation of fermion-to-qubit mappings built on the :doc:`PauliOperator <comprehensive/data/pauli_operator>` expression layer.
+   This implementation supports both Jordan-Wigner and Bravyi-Kitaev encodings :cite:`Seeley2012`, using the Seeley-Richard-Love algorithm for the Bravyi-Kitaev mapping, with configurable coefficient thresholds for controlling numerical precision.
+   The native mapper applies thresholds after the complete transformation, ensuring mathematically consistent results across different molecular systems.
 
 
 Observable Sampling
@@ -262,6 +273,39 @@ PySCF Plugin
 Qiskit Plugin
    Enables interoperability between QDK/Chemistry and the Qiskit quantum computing framework
    See the `Qiskit documentation <https://qiskit.org/documentation/getting_started.html>`_ for guidance on citing Qiskit.
+
+
+Visual Studio Code Integration
+------------------------------
+
+QDK/Chemistry provides integration with Visual Studio Code to enhance the development experience when using the Python API.
+
+Type-Aware Autocompletion for Factory Methods
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+QDK/Chemistry dynamically generates type stubs that enable intelligent autocompletion in VS Code (via Pylance) for the :doc:`factory pattern <comprehensive/algorithms/factory_pattern>` used throughout the library.
+When calling ``registry.create()``, the editor provides:
+
+- **Algorithm type suggestions**: Autocompletion for valid ``algorithm_type`` values (e.g., ``"scf_solver"``, ``"orbital_localizer"``, ``"active_space_selector"``)
+- **Algorithm name suggestions**: Context-aware suggestions for ``algorithm_name`` based on the selected algorithm type
+- **Settings parameter hints**: Typed parameter hints for algorithm-specific settings
+- **Return type inference**: Accurate return type information for the created algorithm instance
+
+This integration significantly improves discoverability of available algorithms and reduces errors from typos in string literals.
+The autocompletion features are also going to work with other IDEs that support type stubs.
+
+.. note::
+
+   **Limitation**: Type stub generation only works for algorithms shipped with QDK/Chemistry and its official plugins.
+   Custom plugins registered at runtime will not have autocompletion support for their algorithm types and names.
+
+Dev Container Support
+^^^^^^^^^^^^^^^^^^^^^
+
+For developers who want to modify or extend QDK/Chemistry and compile from source, the repository includes a pre-configured Dev Container.
+This provides a complete build environment with all system dependencies installed, once the container is built.
+See the `Installation Guide <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_ for details.
+
 
 See Also
 --------

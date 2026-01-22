@@ -6,6 +6,8 @@
 
 #include <qdk/chemistry/data/pauli_operator.hpp>
 
+#include "ut_common.hpp"
+
 using namespace qdk::chemistry::data;
 
 // PauliOperatorExpression Tests
@@ -1114,6 +1116,346 @@ TEST(PauliOperatorExpressionTest, BaseClassToCanonicalTermsPolymorphism) {
     EXPECT_GE(terms.size(), 1);  // Each should have at least one term
     for (const auto& [coeff, str] : terms) {
       EXPECT_EQ(str.size(), 2);  // All should be 2 characters for 2 qubits
+    }
+  }
+}
+
+// ============================================================================
+// PauliTermAccumulator Tests
+// ============================================================================
+
+TEST(PauliTermAccumulatorTest, BasicAccumulation) {
+  PauliTermAccumulator acc;
+
+  // Accumulate identity term
+  acc.accumulate({}, std::complex<double>(1.0, 0.0));
+
+  // Accumulate X(0)
+  SparsePauliWord x0 = {{0, 1}};  // X on qubit 0
+  acc.accumulate(x0, std::complex<double>(0.5, 0.0));
+
+  // Accumulate Z(1)
+  SparsePauliWord z1 = {{1, 3}};  // Z on qubit 1
+  acc.accumulate(z1, std::complex<double>(0.25, 0.0));
+
+  EXPECT_EQ(acc.size(), 3);  // I, X(0), Z(1)
+
+  // Get terms
+  auto terms = acc.get_terms(0.0);
+  EXPECT_EQ(terms.size(), 3);
+}
+
+TEST(PauliTermAccumulatorTest, CoefficientCombining) {
+  PauliTermAccumulator acc;
+
+  SparsePauliWord x0 = {{0, 1}};
+
+  // Add the same term multiple times
+  acc.accumulate(x0, std::complex<double>(0.5, 0.0));
+  acc.accumulate(x0, std::complex<double>(0.3, 0.0));
+  acc.accumulate(x0, std::complex<double>(0.2, 0.0));
+
+  EXPECT_EQ(acc.size(), 1);  // Should combine into single term
+
+  auto terms = acc.get_terms(0.0);
+  EXPECT_EQ(terms.size(), 1);
+  EXPECT_NEAR(terms[0].first.real(), 1.0, testing::wf_tolerance);
+  EXPECT_NEAR(terms[0].first.imag(), 0.0, testing::wf_tolerance);
+}
+
+TEST(PauliTermAccumulatorTest, CancellationToZero) {
+  PauliTermAccumulator acc;
+
+  SparsePauliWord x0 = {{0, 1}};
+
+  // Add terms that cancel
+  acc.accumulate(x0, std::complex<double>(1.0, 0.0));
+  acc.accumulate(x0, std::complex<double>(-1.0, 0.0));
+
+  // The term should still exist (with zero coefficient)
+  EXPECT_EQ(acc.size(), 1);
+
+  // But should be filtered out when threshold > 0
+  auto terms = acc.get_terms(testing::numerical_zero_tolerance);
+  EXPECT_EQ(terms.size(), 0);
+}
+
+TEST(PauliTermAccumulatorTest, AccumulateProduct) {
+  PauliTermAccumulator acc;
+
+  SparsePauliWord x0 = {{0, 1}};  // X(0)
+  SparsePauliWord y0 = {{0, 2}};  // Y(0)
+
+  // X(0) * Y(0) = i*Z(0)
+  acc.accumulate_product(x0, y0, std::complex<double>(1.0, 0.0));
+
+  EXPECT_EQ(acc.size(), 1);
+
+  auto terms = acc.get_terms(0.0);
+  EXPECT_EQ(terms.size(), 1);
+
+  // Check the result is Z(0) with coefficient i
+  EXPECT_NEAR(terms[0].first.real(), 0.0, testing::wf_tolerance);
+  EXPECT_NEAR(terms[0].first.imag(), 1.0, testing::wf_tolerance);
+  EXPECT_EQ(terms[0].second.size(), 1);
+  EXPECT_EQ(terms[0].second[0].first, 0);   // qubit 0
+  EXPECT_EQ(terms[0].second[0].second, 3);  // Z
+}
+
+TEST(PauliTermAccumulatorTest, ProductWithDifferentQubits) {
+  PauliTermAccumulator acc;
+
+  SparsePauliWord x0 = {{0, 1}};  // X(0)
+  SparsePauliWord y1 = {{1, 2}};  // Y(1)
+
+  // X(0) * Y(1) = X(0)Y(1) with no phase
+  acc.accumulate_product(x0, y1, std::complex<double>(2.0, 0.0));
+
+  EXPECT_EQ(acc.size(), 1);
+
+  auto terms = acc.get_terms(0.0);
+  EXPECT_EQ(terms.size(), 1);
+  EXPECT_NEAR(terms[0].first.real(), 2.0, testing::wf_tolerance);
+  EXPECT_EQ(terms[0].second.size(), 2);  // X(0) and Y(1)
+}
+
+TEST(PauliTermAccumulatorTest, Multiply) {
+  PauliTermAccumulator acc;
+  SparsePauliWord x0 = {{0, 1}};  // X(0)
+  SparsePauliWord y0 = {{0, 2}};  // Y(0)
+
+  auto [phase, result] = acc.multiply(x0, y0);
+
+  // X * Y = iZ
+  EXPECT_NEAR(phase.real(), 0.0, testing::wf_tolerance);
+  EXPECT_NEAR(phase.imag(), 1.0, testing::wf_tolerance);
+  EXPECT_EQ(result.size(), 1);
+  EXPECT_EQ(result[0].first, 0);   // qubit 0
+  EXPECT_EQ(result[0].second, 3);  // Z
+}
+
+TEST(PauliTermAccumulatorTest, MultiplyPauliAlgebra) {
+  PauliTermAccumulator acc;
+  // Test all Pauli multiplication rules
+  SparsePauliWord x = {{0, 1}};
+  SparsePauliWord y = {{0, 2}};
+  SparsePauliWord z = {{0, 3}};
+
+  // X * Y = iZ
+  auto [xy_phase, xy_result] = acc.multiply(x, y);
+  EXPECT_NEAR(xy_phase.imag(), 1.0, testing::wf_tolerance);
+  EXPECT_EQ(xy_result[0].second, 3);
+
+  // Y * Z = iX
+  auto [yz_phase, yz_result] = acc.multiply(y, z);
+  EXPECT_NEAR(yz_phase.imag(), 1.0, testing::wf_tolerance);
+  EXPECT_EQ(yz_result[0].second, 1);
+
+  // Z * X = iY
+  auto [zx_phase, zx_result] = acc.multiply(z, x);
+  EXPECT_NEAR(zx_phase.imag(), 1.0, testing::wf_tolerance);
+  EXPECT_EQ(zx_result[0].second, 2);
+
+  // Y * X = -iZ
+  auto [yx_phase, yx_result] = acc.multiply(y, x);
+  EXPECT_NEAR(yx_phase.imag(), -1.0, testing::wf_tolerance);
+  EXPECT_EQ(yx_result[0].second, 3);
+
+  // X * X = I (empty word)
+  auto [xx_phase, xx_result] = acc.multiply(x, x);
+  EXPECT_NEAR(xx_phase.real(), 1.0, testing::wf_tolerance);
+  EXPECT_EQ(xx_result.size(), 0);
+}
+
+TEST(PauliTermAccumulatorTest, GetTermsAsStrings) {
+  PauliTermAccumulator acc;
+
+  acc.accumulate({}, std::complex<double>(1.0, 0.0));         // I
+  acc.accumulate({{0, 1}}, std::complex<double>(0.5, 0.0));   // X(0)
+  acc.accumulate({{1, 3}}, std::complex<double>(0.25, 0.0));  // Z(1)
+
+  auto terms = acc.get_terms_as_strings(4, 0.0);
+  EXPECT_EQ(terms.size(), 3);
+
+  // Find each term
+  std::map<std::string, std::complex<double>> term_map;
+  for (const auto& [coeff, str] : terms) {
+    term_map[str] = coeff;
+  }
+
+  EXPECT_EQ(term_map.count("IIII"), 1);
+  EXPECT_EQ(term_map.count("XIII"), 1);
+  EXPECT_EQ(term_map.count("IZII"), 1);
+  EXPECT_NEAR(term_map["IIII"].real(), 1.0, testing::wf_tolerance);
+  EXPECT_NEAR(term_map["XIII"].real(), 0.5, testing::wf_tolerance);
+  EXPECT_NEAR(term_map["IZII"].real(), 0.25, testing::wf_tolerance);
+}
+
+TEST(PauliTermAccumulatorTest, ThresholdFiltering) {
+  PauliTermAccumulator acc;
+
+  acc.accumulate({}, std::complex<double>(1.0, 0.0));
+  acc.accumulate({{0, 1}}, std::complex<double>(testing::integral_tolerance,
+                                                0.0));  // Below numerical_zero
+  acc.accumulate({{1, 3}},
+                 std::complex<double>(testing::numerical_zero_tolerance * 10,
+                                      0.0));  // Above numerical_zero
+
+  // With no threshold, get all terms
+  auto terms_all = acc.get_terms(0.0);
+  EXPECT_EQ(terms_all.size(), 3);
+
+  // With numerical_zero_tolerance threshold, filter small terms
+  auto terms_filtered = acc.get_terms(testing::numerical_zero_tolerance);
+  EXPECT_EQ(terms_filtered.size(), 2);
+
+  // String version should also filter
+  auto str_terms_filtered =
+      acc.get_terms_as_strings(4, testing::numerical_zero_tolerance);
+  EXPECT_EQ(str_terms_filtered.size(), 2);
+}
+
+TEST(PauliTermAccumulatorTest, Clear) {
+  PauliTermAccumulator acc;
+
+  acc.accumulate({}, std::complex<double>(1.0, 0.0));
+  acc.accumulate({{0, 1}}, std::complex<double>(0.5, 0.0));
+
+  EXPECT_EQ(acc.size(), 2);
+
+  acc.clear();
+  EXPECT_EQ(acc.size(), 0);
+
+  auto terms = acc.get_terms(0.0);
+  EXPECT_EQ(terms.size(), 0);
+}
+
+TEST(PauliTermAccumulatorTest, CacheOperations) {
+  PauliTermAccumulator acc;
+
+  // Fresh accumulator has empty cache
+  EXPECT_EQ(acc.cache_size(), 0);
+
+  // Perform some multiplications
+  SparsePauliWord x0 = {{0, 1}};
+  SparsePauliWord y0 = {{0, 2}};
+
+  acc.multiply(x0, y0);
+  EXPECT_GE(acc.cache_size(), 1);
+
+  // Clear cache
+  acc.clear_cache();
+  EXPECT_EQ(acc.cache_size(), 0);
+
+  // Verify cache doesn't persist across instances
+  acc.multiply(x0, y0);
+  EXPECT_GE(acc.cache_size(), 1);
+
+  PauliTermAccumulator acc2;
+  EXPECT_EQ(acc2.cache_size(), 0);  // New instance has fresh cache
+}
+
+TEST(PauliTermAccumulatorTest, ComplexCoefficients) {
+  PauliTermAccumulator acc;
+
+  SparsePauliWord x0 = {{0, 1}};
+  acc.accumulate(x0, std::complex<double>(1.0, 2.0));
+  acc.accumulate(x0, std::complex<double>(3.0, -1.0));
+
+  auto terms = acc.get_terms(0.0);
+  EXPECT_EQ(terms.size(), 1);
+  EXPECT_NEAR(terms[0].first.real(), 4.0, testing::wf_tolerance);
+  EXPECT_NEAR(terms[0].first.imag(), 1.0, testing::wf_tolerance);
+}
+
+// ============================================================================
+// Excitation Term Computation Tests
+// ============================================================================
+
+TEST(PauliTermAccumulatorTest, ComputeAllJWExcitationTerms) {
+  auto terms = PauliTermAccumulator::compute_all_jw_excitation_terms(4);
+
+  // Should have 16 entries (4x4 grid)
+  EXPECT_EQ(terms.size(), 16);
+
+  // Check diagonal element (0,0) - number operator: 0.5*I - 0.5*Z(0)
+  auto it = terms.find({0, 0});
+  ASSERT_NE(it, terms.end());
+  EXPECT_EQ(it->second.size(), 2);
+
+  // Check off-diagonal element (0,1) - should have 4 terms
+  auto it01 = terms.find({0, 1});
+  ASSERT_NE(it01, terms.end());
+  EXPECT_EQ(it01->second.size(), 4);  // XX, YY, XY, YX terms
+}
+
+TEST(PauliTermAccumulatorTest, JWNumberOperator) {
+  auto terms = PauliTermAccumulator::compute_all_jw_excitation_terms(2);
+
+  // E_00 = a†_0 a_0 = 0.5 * I - 0.5 * Z(0)
+  auto it = terms.find({0, 0});
+  ASSERT_NE(it, terms.end());
+
+  std::map<SparsePauliWord, std::complex<double>> term_map;
+  for (const auto& [coeff, word] : it->second) {
+    term_map[word] = coeff;
+  }
+
+  // Identity term
+  EXPECT_EQ(term_map.count({}), 1);
+  EXPECT_NEAR(term_map[{}].real(), 0.5, testing::wf_tolerance);
+
+  // Z(0) term
+  SparsePauliWord z0 = {{0, 3}};
+  EXPECT_EQ(term_map.count(z0), 1);
+  EXPECT_NEAR(term_map[z0].real(), -0.5, testing::wf_tolerance);
+}
+
+TEST(PauliTermAccumulatorTest, ComputeAllBKExcitationTerms) {
+  // Set up BK index sets for 4 qubits
+  std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> parity_sets = {
+      {0, {}}, {1, {0}}, {2, {}}, {3, {2}}};
+  std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> update_sets = {
+      {0, {1, 3}}, {1, {3}}, {2, {3}}, {3, {}}};
+  std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> remainder_sets =
+      {{0, {}}, {1, {0}}, {2, {}}, {3, {2}}};
+
+  auto terms = PauliTermAccumulator::compute_all_bk_excitation_terms(
+      4, parity_sets, update_sets, remainder_sets);
+
+  // Should have 16 entries
+  EXPECT_EQ(terms.size(), 16);
+
+  // Check that all entries exist
+  for (std::uint64_t p = 0; p < 4; ++p) {
+    for (std::uint64_t q = 0; q < 4; ++q) {
+      EXPECT_NE(terms.find({p, q}), terms.end());
+    }
+  }
+}
+
+TEST(PauliTermAccumulatorTest, ExcitationTermsHaveCorrectCoefficientMagnitude) {
+  auto jw_terms = PauliTermAccumulator::compute_all_jw_excitation_terms(4);
+
+  // For diagonal terms: coefficients should be 0.5
+  for (std::uint64_t p = 0; p < 4; ++p) {
+    auto it = jw_terms.find({p, p});
+    ASSERT_NE(it, jw_terms.end());
+    for (const auto& [coeff, word] : it->second) {
+      EXPECT_NEAR(std::abs(coeff), 0.5, testing::wf_tolerance);
+    }
+  }
+
+  // For off-diagonal terms: coefficients should be 0.25
+  for (std::uint64_t p = 0; p < 4; ++p) {
+    for (std::uint64_t q = 0; q < 4; ++q) {
+      if (p != q) {
+        auto it = jw_terms.find({p, q});
+        ASSERT_NE(it, jw_terms.end());
+        for (const auto& [coeff, word] : it->second) {
+          EXPECT_NEAR(std::abs(coeff), 0.25, testing::wf_tolerance);
+        }
+      }
     }
   }
 }

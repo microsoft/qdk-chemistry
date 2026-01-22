@@ -972,3 +972,9 @@ class TestContainerEquivalence:
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+
+
+def test_hamiltonian_data_type_name():
+    """Test that Hamiltonian has the correct _data_type_name class attribute."""
+    assert hasattr(Hamiltonian, "_data_type_name")
+    assert Hamiltonian._data_type_name == "hamiltonian"

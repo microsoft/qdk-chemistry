@@ -10,6 +10,7 @@
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
@@ -526,6 +527,11 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
   // overwrite with real name if default
   if (ecp_name == BasisSet::default_ecp_name) {
     ecp_name = basis_name;
+  } else if (ecp_name == basis_name || ecp_name.empty()) {
+    // ecp is compatible with basis set
+  } else {
+    throw std::invalid_argument(
+        "ECP " + ecp_name + " is not compatible with basis set " + basis_name);
   }
 
   std::vector<Shell> all_basis_shells;
@@ -546,7 +552,7 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
     }
 
     // check for specific ecp name
-    if (ecp_name != basis_name) {
+    if (ecp_name.empty()) {
       all_ecp_electrons.push_back(0);
       continue;
     }
@@ -554,23 +560,6 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
     all_ecp_electrons.push_back(ecp_electrons);
     for (const auto& sh : ecp_shells) {
       all_ecp_shells.push_back(sh);
-    }
-  }
-
-  // if ecp_name is different from basis_name, get ecp shells
-  if (!(ecp_name == basis_name || ecp_name.empty())) {
-    for (size_t atom_index = 0; atom_index < nuclear_charges.size();
-         ++atom_index) {
-      double nuclear_charge = nuclear_charges[atom_index];
-
-      auto [shells, ecp_shells, ecp_electrons] =
-          detail::get_basis_for_nuclear_charge(nuclear_charge, basis_name,
-                                               atom_index);
-      all_ecp_electrons[atom_index] = ecp_electrons;
-
-      for (const auto& sh : ecp_shells) {
-        all_ecp_shells.push_back(sh);
-      }
     }
   }
 
@@ -713,37 +702,13 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
         for (const auto& sh : ecp_shells) {
           all_ecp_shells.push_back(sh);
         }
-        // handle later
-      } else {
+      } else if (ecp_name.empty()) {
         all_ecp_electrons.push_back(0);
-      }
-    }
-  }
-
-  // check if any ecp map is not empty
-  if (!index_to_ecp_map.empty()) {
-    for (size_t atom_index = 0; atom_index < nuclear_charges.size();
-         ++atom_index) {
-      if (index_to_ecp_map.find(atom_index) != index_to_ecp_map.end()) {
-        double nuclear_charge = nuclear_charges[atom_index];
-        // get ecp name
-        auto ecp_name = index_to_ecp_map.find(atom_index)->second;
-        std::transform(ecp_name.begin(), ecp_name.end(), ecp_name.begin(),
-                       ::tolower);
-        // if ecp_name is same as basis set name, already handled
-        // get basis set name
-        auto basis_set_name = index_to_basis_map.find(atom_index)->second;
-        std::transform(basis_set_name.begin(), basis_set_name.end(),
-                       basis_set_name.begin(), ::tolower);
-        if (ecp_name != basis_set_name) {
-          auto [shells, ecp_shells, ecp_electrons] =
-              detail::get_basis_for_nuclear_charge(nuclear_charge, ecp_name,
-                                                   atom_index);
-          all_ecp_electrons[atom_index] = ecp_electrons;
-          for (const auto& sh : ecp_shells) {
-            all_ecp_shells.push_back(sh);
-          }
-        }
+      } else {
+        throw std::invalid_argument("ECP " + ecp_name +
+                                    " is not compatible with basis set " +
+                                    tmp_basis_set_name + " for atom index " +
+                                    std::to_string(atom_index));
       }
     }
   }
@@ -1303,10 +1268,13 @@ std::shared_ptr<BasisSet> BasisSet::from_file(const std::string& filename,
 
 void BasisSet::to_hdf5_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
 
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, "basis_set");
+  std::string validated_filename = DataTypeFilename::validate_write_suffix(
+      filename, DATACLASS_TO_SNAKE_CASE(BasisSet));
 
   _to_hdf5_file(validated_filename);
 }
@@ -1314,6 +1282,9 @@ void BasisSet::to_hdf5_file(const std::string& filename) const {
 std::shared_ptr<BasisSet> BasisSet::from_hdf5_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
 
   // Validate filename has correct data type suffix
   std::string validated_filename =
@@ -1324,10 +1295,13 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5_file(
 
 void BasisSet::to_json_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
 
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, "basis_set");
+  std::string validated_filename = DataTypeFilename::validate_write_suffix(
+      filename, DATACLASS_TO_SNAKE_CASE(BasisSet));
 
   _to_json_file(validated_filename);
 }
@@ -1335,6 +1309,9 @@ void BasisSet::to_json_file(const std::string& filename) const {
 std::shared_ptr<BasisSet> BasisSet::from_json_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
 
   // Validate filename has correct data type suffix
   std::string validated_filename =

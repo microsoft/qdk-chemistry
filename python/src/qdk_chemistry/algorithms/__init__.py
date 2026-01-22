@@ -21,6 +21,7 @@ from qdk_chemistry.algorithms.active_space_selector import (
     QdkOccupationActiveSpaceSelector,
     QdkValenceActiveSpaceSelector,
 )
+from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator
 from qdk_chemistry.algorithms.energy_estimator import EnergyEstimator
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
@@ -39,37 +40,33 @@ from qdk_chemistry.algorithms.orbital_localizer import (
     QdkPipekMezeyLocalizer,
     QdkVVHVLocalizer,
 )
+from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation
 from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     ProjectedMultiConfigurationCalculator,
     QdkMacisPmc,
 )
 from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolver
-from qdk_chemistry.algorithms.qubit_mapper import QubitMapper
+from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper, QubitMapper
 from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, ScfSolver
-from qdk_chemistry.algorithms.stability_checker import StabilityChecker
+from qdk_chemistry.algorithms.stability_checker import QdkStabilityChecker, StabilityChecker
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
-from qdk_chemistry.phase_estimation import (
-    IterativePhaseEstimation,
-    IterativePhaseEstimationIteration,
-    PhaseEstimation,
-    PhaseEstimationAlgorithm,
-    TraditionalPhaseEstimation,
-    energy_from_phase,
-)
+from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
+from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
+from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
+from qdk_chemistry.utils.telemetry_events import telemetry_tracker
 
 __all__ = [
     # Classes
     "ActiveSpaceSelector",
+    "CircuitExecutor",
+    "ControlledEvolutionCircuitMapper",
     "DynamicalCorrelationCalculator",
     "EnergyEstimator",
     "HamiltonianConstructor",
-    "IterativePhaseEstimation",
-    "IterativePhaseEstimationIteration",
     "MultiConfigurationCalculator",
     "MultiConfigurationScf",
     "OrbitalLocalizer",
     "PhaseEstimation",
-    "PhaseEstimationAlgorithm",
     "ProjectedMultiConfigurationCalculator",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
@@ -80,7 +77,9 @@ __all__ = [
     "QdkMacisPmc",
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
+    "QdkQubitMapper",
     "QdkScfSolver",
+    "QdkStabilityChecker",
     "QdkVVHVLocalizer",
     "QdkValenceActiveSpaceSelector",
     "QubitHamiltonianSolver",
@@ -88,11 +87,10 @@ __all__ = [
     "ScfSolver",
     "StabilityChecker",
     "StatePreparation",
-    "TraditionalPhaseEstimation",
+    "TimeEvolutionBuilder",
     # Factory functions
     "available",
     "create",
-    "energy_from_phase",
     "inspect_settings",
     "print_settings",
     "register",
@@ -146,3 +144,18 @@ def __getattr__(name: str) -> Any:
 def __dir__() -> list[str]:
     """Ensure dir() lists lazily resolved registry helpers."""
     return sorted(set(globals()) | _REGISTRY_EXPORTS)
+
+
+if TELEMETRY_ENABLED:
+
+    def apply_telemetry_to_classes():
+        """Apply telemetry tracking to the 'run' methods of all algorithm classes."""
+        with contextlib.suppress(NameError):
+            for name in __all__:
+                cls = globals().get(name)
+                if isinstance(cls, type) and hasattr(cls, "run"):
+                    cls.run = telemetry_tracker()(cls.run)
+
+    apply_telemetry_to_classes()
+    # Delete the function to avoid namespace pollution
+    del apply_telemetry_to_classes

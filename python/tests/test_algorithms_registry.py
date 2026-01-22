@@ -42,6 +42,10 @@ class TestRegistryShowDefault:
             "energy_estimator",
             "state_prep",
             "qubit_mapper",
+            "circuit_executor",
+            "controlled_evolution_circuit_mapper",
+            "phase_estimation",
+            "time_evolution_builder",
         ]
 
         for algorithm_type in expected_types:
@@ -70,12 +74,32 @@ class TestRegistryShowDefault:
         # Test for qubit mapper
         default_qubit_mapper = registry.show_default("qubit_mapper")
         assert isinstance(default_qubit_mapper, str)
-        assert default_qubit_mapper == "qiskit"
+        assert default_qubit_mapper == "qdk"
 
         # Test for SCF solver
         default_scf = registry.show_default("scf_solver")
         assert isinstance(default_scf, str)
         assert default_scf == "qdk"
+
+        # Test for circuit executor
+        default_circuit_executor = registry.show_default("circuit_executor")
+        assert isinstance(default_circuit_executor, str)
+        assert default_circuit_executor == "qdk_full_state_simulator"
+
+        # Test for phase estimation
+        default_phase_estimation = registry.show_default("phase_estimation")
+        assert isinstance(default_phase_estimation, str)
+        assert default_phase_estimation == "iterative"
+
+        # Test for time evolution builder
+        default_time_evolution_builder = registry.show_default("time_evolution_builder")
+        assert isinstance(default_time_evolution_builder, str)
+        assert default_time_evolution_builder == "trotter"
+
+        # Test for controlled evolution circuit mapper
+        default_controlled_evolution_circuit_mapper = registry.show_default("controlled_evolution_circuit_mapper")
+        assert isinstance(default_controlled_evolution_circuit_mapper, str)
+        assert default_controlled_evolution_circuit_mapper == "pauli_sequence"
 
     def test_show_default_returns_empty_string_for_unknown_type(self):
         """Test that show_default returns empty string for unknown algorithm type."""

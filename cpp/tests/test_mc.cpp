@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
@@ -47,7 +48,7 @@ TEST_F(MCTest, MCSettings) {
   EXPECT_FALSE(mc_settings.get<bool>("calculate_one_rdm"));
   EXPECT_FALSE(mc_settings.get<bool>("calculate_two_rdm"));
   EXPECT_DOUBLE_EQ(mc_settings.get<double>("ci_residual_tolerance"), 1.0e-6);
-  EXPECT_EQ(mc_settings.get<int64_t>("davidson_iterations"), 200);
+  EXPECT_EQ(mc_settings.get<int64_t>("max_solver_iterations"), 200);
 
   // Test destructor by creating and destroying in scope
   {
@@ -212,7 +213,7 @@ TEST_F(MCTest, MCSettings_DefaultValues) {
   EXPECT_FALSE(mc_settings.get<bool>("calculate_one_rdm"));
   EXPECT_FALSE(mc_settings.get<bool>("calculate_two_rdm"));
   EXPECT_DOUBLE_EQ(mc_settings.get<double>("ci_residual_tolerance"), 1.0e-6);
-  EXPECT_EQ(mc_settings.get<int64_t>("davidson_iterations"), 200);
+  EXPECT_EQ(mc_settings.get<int64_t>("max_solver_iterations"), 200);
 
   // Test that we can modify settings
   mc_settings.set("calculate_one_rdm", true);
@@ -277,4 +278,68 @@ TEST_F(MCTest, Factory_UnregisterInstance) {
   // Test unregistering a non-existent key
   EXPECT_FALSE(MultiConfigurationCalculatorFactory::unregister_instance(
       "_nonexistent_key"));
+}
+
+/**
+ * @brief Test selected CI calculation on hydrogen atom (single electron edge
+ * case)
+ *
+ */
+TEST_F(MCTest, HydrogenAtom_CCPVDZ_SCI) {
+  // Create structure for H atom
+  auto h_atom = testing::create_hydrogen_structure();
+
+  // Run SCF for H atom (charge=0, spin_multiplicity=2)
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("scf_type", std::string("auto"));
+  scf_solver->settings().set("enable_gdm", true);
+  auto [E_HF, wfn_HF] = scf_solver->run(h_atom, 0, 2, "cc-pvdz");
+  EXPECT_NEAR(E_HF, -0.49927840341958307, testing::scf_energy_tolerance);
+
+  // Construct the Hamiltonian
+  auto hamiltonian_constructor =
+      qdk::chemistry::algorithms::HamiltonianConstructorFactory::create();
+  auto orbitals_with_active_space = testing::with_active_space(
+      wfn_HF->get_orbitals(), std::vector<size_t>{0, 1}, std::vector<size_t>{});
+  auto ham = hamiltonian_constructor->run(orbitals_with_active_space);
+
+  // Run selected CI calculation (1 alpha electron, 0 beta electrons)
+  auto mc =
+      qdk::chemistry::algorithms::MultiConfigurationCalculatorFactory::create(
+          "macis_asci");
+  mc->settings().set("core_selection_strategy", "fixed");
+  auto [E_sci, wfn_sci] = mc->run(ham, 1, 0);
+  EXPECT_NEAR(E_sci, -0.49927840341958307, testing::ci_energy_tolerance);
+}
+
+/**
+ * @brief Test selected CI calculation on nitrogen atom (edge case for Davidson)
+ *
+ */
+TEST_F(MCTest, NitrogenAtom_CCPVDZ_SCI) {
+  // Create structure for N atom
+  auto n_atom = testing::create_nitrogen_structure();
+
+  // Run SCF for N atom (charge=0, spin_multiplicity=4)
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("scf_type", std::string("auto"));
+  scf_solver->settings().set("enable_gdm", true);
+  auto [E_HF, wfn_HF] = scf_solver->run(n_atom, 0, 4, "cc-pvdz");
+  EXPECT_NEAR(E_HF, -54.391114562199718, testing::scf_energy_tolerance);
+
+  // Construct the Hamiltonian (frozen 1s core)
+  auto hamiltonian_constructor =
+      qdk::chemistry::algorithms::HamiltonianConstructorFactory::create();
+  auto orbitals_with_active_space = testing::with_active_space(
+      wfn_HF->get_orbitals(), std::vector<size_t>{1, 2, 3, 4},
+      std::vector<size_t>{0});
+  auto ham = hamiltonian_constructor->run(orbitals_with_active_space);
+
+  // Run selected CI calculation (4 alpha electrons, 1 beta electron)
+  auto mc =
+      qdk::chemistry::algorithms::MultiConfigurationCalculatorFactory::create(
+          "macis_asci");
+  mc->settings().set("core_selection_strategy", "fixed");
+  auto [E_sci, wfn_sci] = mc->run(ham, 4, 1);
+  EXPECT_NEAR(E_sci, -54.385841001513917, testing::ci_energy_tolerance);
 }

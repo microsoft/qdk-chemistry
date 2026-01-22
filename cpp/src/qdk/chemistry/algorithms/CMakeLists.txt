@@ -6,6 +6,7 @@ target_sources(chemistry PRIVATE
     pmc.cpp
     dynamical_correlation_calculator.cpp
     scf.cpp
+    stability.cpp
 )
 
 add_subdirectory(microsoft)

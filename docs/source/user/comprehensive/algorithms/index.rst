@@ -1,30 +1,6 @@
 Algorithm classes
 =================
 
-.. toctree::
-   :maxdepth: 1
-   :hidden:
-   :caption: Creation, Configuration and Extension of Algorithm Classes
-
-   factory_pattern
-   settings
-
-.. toctree::
-   :maxdepth: 1
-   :hidden:
-   :caption: Available Algorithms
-
-   active_space
-   energy_estimator
-   hamiltonian_constructor
-   localizer
-   mc_calculator
-   mcscf
-   qubit_mapper
-   scf_solver
-   stability_checker
-   state_preparation
-
 QDK/Chemistry provides a comprehensive set of algorithm classes which express core methodological primitives for quantum and classical chemistry calculations.
 All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowing you to create instances by name and configured through a unified :doc:`settings <settings>` interface.
 
@@ -55,6 +31,9 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`MultiConfigurationCalculator <mc_calculator>`
      - Many-body wavefunction calculations
      - Hamiltonian → Wavefunction
+   * - :doc:`ProjectedMultiConfigurationCalculator <pmc>`
+     - Projected many-body wavefunction calculations
+     - Hamiltonian → Wavefunction
    * - :doc:`MultiConfigurationScf <mcscf>`
      - Coupled `Orbital`-`Wavefunction` calculations.
      - Orbitals → Wavefunction
@@ -70,6 +49,23 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`StabilityChecker <stability_checker>`
      - :term:`SCF` stability analysis
      - Orbitals → Stability
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Contents
+
+   factory_pattern
+   settings
+   active_space
+   energy_estimator
+   hamiltonian_constructor
+   localizer
+   mc_calculator
+   mcscf
+   qubit_mapper
+   scf_solver
+   stability_checker
+   state_preparation
 
 Discovering implementations
 ---------------------------

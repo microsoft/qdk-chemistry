@@ -20,6 +20,7 @@ from qdk_chemistry.data import (
     Hamiltonian,
     MP2Container,
     Orbitals,
+    SciWavefunctionContainer,
     SlaterDeterminantContainer,
     Structure,
     Wavefunction,
@@ -670,7 +671,7 @@ class TestWavefunctionSerialization:
 
     def test_hdf5_serialization_cas_real(self, cas_wavefunction_real, tmp_path):
         """Test HDF5 serialization for real CAS wavefunction."""
-        filename = tmp_path / "test_wavefunction_cas_real.h5"
+        filename = tmp_path / "test_wavefunction_cas_real.wavefunction.h5"
 
         # Save to HDF5 file
         cas_wavefunction_real.to_hdf5_file(str(filename))
@@ -695,7 +696,7 @@ class TestWavefunctionSerialization:
 
     def test_hdf5_serialization_cas_complex(self, cas_wavefunction_complex, tmp_path):
         """Test HDF5 serialization for complex CAS wavefunction."""
-        filename = tmp_path / "test_wavefunction_cas_complex.h5"
+        filename = tmp_path / "test_wavefunction_cas_complex.wavefunction.h5"
 
         # Save to HDF5 file
         cas_wavefunction_complex.to_hdf5_file(str(filename))
@@ -715,7 +716,7 @@ class TestWavefunctionSerialization:
 
     def test_hdf5_serialization_slater_determinant(self, sd_wavefunction, tmp_path):
         """Test HDF5 serialization for Slater determinant wavefunction."""
-        filename = tmp_path / "test_wavefunction_sd.h5"
+        filename = tmp_path / "test_wavefunction_sd.wavefunction.h5"
 
         # Save to HDF5 file
         sd_wavefunction.to_hdf5_file(str(filename))
@@ -735,7 +736,7 @@ class TestWavefunctionSerialization:
 
     def test_json_file_io(self, cas_wavefunction_real, tmp_path):
         """Test JSON file I/O."""
-        filename = tmp_path / "test_wavefunction.json"
+        filename = tmp_path / "test_wavefunction.wavefunction.json"
 
         # Save to JSON file
         cas_wavefunction_real.to_json_file(str(filename))
@@ -754,8 +755,8 @@ class TestWavefunctionSerialization:
 
     def test_generic_file_io(self, cas_wavefunction_real, tmp_path):
         """Test generic file I/O with different formats."""
-        json_filename = tmp_path / "test_wavefunction_generic.json"
-        hdf5_filename = tmp_path / "test_wavefunction_generic.h5"
+        json_filename = tmp_path / "test_wavefunction_generic.wavefunction.json"
+        hdf5_filename = tmp_path / "test_wavefunction_generic.wavefunction.h5"
 
         # Test JSON format
         cas_wavefunction_real.to_file(str(json_filename), "json")
@@ -794,10 +795,10 @@ class TestWavefunctionSerialization:
 
         # Test non-existent files
         with pytest.raises(RuntimeError):
-            Wavefunction.from_json_file("non_existent.json")
+            Wavefunction.from_json_file("non_existent.wavefunction.json")
 
         with pytest.raises(RuntimeError):
-            Wavefunction.from_hdf5_file("non_existent.h5")
+            Wavefunction.from_hdf5_file("non_existent.wavefunction.h5")
 
 
 class TestWavefunctionRdmIntegraion:
@@ -999,7 +1000,7 @@ class TestWavefunctionRdmIntegraion:
         original_2rdm_aabb, original_2rdm_aaaa, _ = wfn_sci.get_active_two_rdm_spin_dependent()
 
         # Save and reload using tmp_path
-        h5_file = tmp_path / "test_wavefunction.h5"
+        h5_file = tmp_path / "test_wavefunction.wavefunction.h5"
         wfn_sci.to_hdf5_file(str(h5_file))
         wfn_loaded = Wavefunction.from_hdf5_file(str(h5_file))
 
@@ -1046,7 +1047,7 @@ class TestWavefunctionRdmIntegraion:
         original_2rdm_aabb, original_2rdm_aaaa, _ = wfn_cas.get_active_two_rdm_spin_dependent()
 
         # Save and reload using tmp_path
-        h5_file = tmp_path / "test_wavefunction.h5"
+        h5_file = tmp_path / "test_wavefunction.wavefunction.h5"
         wfn_cas.to_hdf5_file(str(h5_file))
         wfn_loaded = Wavefunction.from_hdf5_file(str(h5_file))
 
@@ -1219,3 +1220,77 @@ class TestCCContainer:
         n_alpha_total, n_beta_total = wf.get_total_num_electrons()
         assert n_alpha_total == 2
         assert n_beta_total == 2
+
+
+def test_wavefunction_data_type_name():
+    """Test that Wavefunction has the correct _data_type_name class attribute."""
+    assert hasattr(Wavefunction, "_data_type_name")
+    assert Wavefunction._data_type_name == "wavefunction"
+
+
+class TestWavefunctionTruncate:
+    """Test the Wavefunction.truncate method."""
+
+    @pytest.fixture
+    def sci_wavefunction(self):
+        """Create a SCI wavefunction with multiple determinants for testing."""
+        coeffs = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 0.0], [0.0, 0.0]])
+        basis_set = create_test_basis_set(4, "test-truncate")
+        orbitals = Orbitals(coeffs, None, None, basis_set)
+
+        dets = [
+            Configuration("2200"),  # largest coeff
+            Configuration("2020"),  # second largest
+            Configuration("2002"),  # third largest
+            Configuration("0220"),  # smallest
+        ]
+        coeffs = np.array([0.8, 0.4, 0.3, 0.1])  # Not normalized
+
+        container = SciWavefunctionContainer(coeffs, dets, orbitals)
+        return Wavefunction(container)
+
+    def test_truncate_to_n_determinants(self, sci_wavefunction):
+        """Test truncation to specific number of determinants."""
+        truncated = sci_wavefunction.truncate(max_determinants=2)
+
+        # Should have 2 determinants
+        assert truncated.size() == 2
+
+        # Should be normalized
+        assert truncated.norm() == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
+
+    def test_truncate_keeps_top_determinants(self, sci_wavefunction):
+        """Test that truncation keeps the top determinants by coefficient magnitude."""
+        truncated = sci_wavefunction.truncate(max_determinants=2)
+
+        # Get the determinants
+        dets = truncated.get_active_determinants()
+        assert len(dets) == 2
+        assert str(dets[0]) == "2200"  # largest
+        assert str(dets[1]) == "2020"  # second largest
+
+    def test_truncate_renormalizes_coefficients(self, sci_wavefunction):
+        """Test that truncated coefficients are properly renormalized."""
+        truncated = sci_wavefunction.truncate(max_determinants=2)
+
+        # Original top 2 coefficients: 0.8, 0.4
+        # Norm of [0.8, 0.4] = sqrt(0.64 + 0.16) = sqrt(0.80)
+        expected_norm = np.sqrt(0.8**2 + 0.4**2)
+        coeffs = truncated.get_coefficients()
+
+        assert coeffs[0] == pytest.approx(0.8 / expected_norm, abs=float_comparison_absolute_tolerance)
+        assert coeffs[1] == pytest.approx(0.4 / expected_norm, abs=float_comparison_absolute_tolerance)
+
+    def test_truncate_with_none_returns_all(self, sci_wavefunction):
+        """Test truncation with None returns all determinants (renormalized)."""
+        truncated = sci_wavefunction.truncate(max_determinants=None)
+
+        assert truncated.size() == 4
+        assert truncated.norm() == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
+
+    def test_truncate_more_than_exist(self, sci_wavefunction):
+        """Test truncation requesting more determinants than exist."""
+        truncated = sci_wavefunction.truncate(max_determinants=10)
+
+        assert truncated.size() == 4
+        assert truncated.norm() == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)

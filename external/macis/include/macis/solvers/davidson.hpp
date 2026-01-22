@@ -17,7 +17,6 @@
 #include <iostream>
 #include <lobpcgxx/lobpcg.hpp>
 #include <macis/util/mpi.hpp>
-#include <random>
 #include <sparsexx/matrix_types/csr_matrix.hpp>
 
 #ifdef MACIS_ENABLE_MPI
@@ -180,9 +179,20 @@ void p_diagonal_guess(size_t N_local, const SpMatType& A, double* X) {
  * @param[in] V_old Matrix containing K orthonormal columns
  * @param[in] LDV   Leading dimension of V_old
  * @param[in,out] V_new Vector to orthogonalize and normalize
+ * @param[in] min_norm Minimum norm threshold below which a vector is considered
+ * as zero vector
  */
 inline void gram_schmidt(int64_t N, int64_t K, const double* V_old, int64_t LDV,
-                         double* V_new) {
+                         double* V_new, double min_norm = 1e-12) {
+  // Early return if no vectors to orthogonalize against - just normalize
+  if (K <= 0) {
+    auto nrm = blas::nrm2(N, V_new, 1);
+    if (nrm > min_norm) {
+      blas::scal(N, 1. / nrm, V_new, 1);
+    }
+    return;
+  }
+
   std::vector<double> inner(K);
   blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, K,
              1, N, 1., V_old, LDV, V_new, N, 0., inner.data(), K);
@@ -195,7 +205,36 @@ inline void gram_schmidt(int64_t N, int64_t K, const double* V_old, int64_t LDV,
              K, -1., V_old, LDV, inner.data(), K, 1., V_new, N);
 
   auto nrm = blas::nrm2(N, V_new, 1);
-  blas::scal(N, 1. / nrm, V_new, 1);
+  // Protect against division by zero when the new vector is linearly dependent
+  // on existing vectors (can happen with very small Hilbert spaces)
+  if (nrm > min_norm) {
+    blas::scal(N, 1. / nrm, V_new, 1);
+  } else {
+    // Vector is essentially zero after orthogonalization - try canonical basis
+    // vectors until we find one not in the span of existing vectors
+    for (int64_t idx = 0; idx < N; ++idx) {
+      // Start with canonical basis vector e_idx
+      std::fill_n(V_new, N, 0.0);
+      V_new[idx] = 1.0;
+      // Orthogonalize against existing vectors
+      blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans,
+                 K, 1, N, 1., V_old, LDV, V_new, N, 0., inner.data(), K);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+                 N, 1, K, -1., V_old, LDV, inner.data(), K, 1., V_new, N);
+      nrm = blas::nrm2(N, V_new, 1);
+      if (nrm > min_norm) {
+        blas::scal(N, 1. / nrm, V_new, 1);
+        break;
+      }
+    }
+    // If all canonical basis vectors failed, the subspace already spans the
+    // entire space (K >= N). This should not happen in normal use.
+    if (nrm <= min_norm) {
+      throw std::runtime_error(
+          "gram_schmidt: Unable to find orthogonal vector - subspace may "
+          "already span the entire space");
+    }
+  }
 }
 
 /**
@@ -213,11 +252,13 @@ inline void gram_schmidt(int64_t N, int64_t K, const double* V_old, int64_t LDV,
  * @param[in] D      Diagonal elements for preconditioning
  * @param[in] tol    Convergence tolerance for residual norm
  * @param[in,out] X  Input: initial guess vector, Output: converged eigenvector
+ * @param[in] min_abs_denominator  Minimum absolute value for preconditioner
+ * denominator to avoid division by zero
  * @return Pair containing (number of iterations, converged eigenvalue)
  */
 template <typename Functor>
 auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
-              double tol, double* X) {
+              double tol, double* X, double min_abs_denominator = 1e-12) {
   using hrt_t = std::chrono::high_resolution_clock;
   using dur_t = std::chrono::duration<double, std::milli>;
 
@@ -232,6 +273,18 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
   logger->info("[Davidson Eigensolver]:");
   logger->info("  {} = {:6}, {} = {:4}, {} = {:10.5e}", "N", N, "MAX_M", max_m,
                "RES_TOL", tol);
+
+  // Handle trivial case of 1x1 matrix
+  if (N == 1) {
+    // For a 1x1 matrix, the eigenvalue is simply the diagonal element
+    double eigenvalue = D[0];
+    X[0] = 1.0;  // Normalized eigenvector
+    logger->info(
+        "iter =    0, LAM(0) = {:20.12e}, RNORM =   0.000000000000e+00",
+        eigenvalue);
+    logger->info("Davidson Converged!");
+    return std::make_pair(size_t(0), eigenvalue);
+  }
 
   std::vector<double> V(N * (max_m + 1)), AV(N * (max_m + 1)),
       C((max_m + 1) * (max_m + 1)), LAM(max_m + 1);
@@ -299,11 +352,16 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
 
     // Compute new vector
     // (D - LAM(0)*I) * W = -R ==> W = -(D - LAM(0)*I)**-1 * R
+    // When D[j] == LAM[0], add a small shift to avoid division by zero
     for (auto j = 0; j < N; ++j) {
-      R[j] = -R[j] / (D[j] - LAM[0]);
+      double denom = D[j] - LAM[0];
+      if (std::abs(denom) < min_abs_denominator) {
+        denom = (denom >= 0) ? min_abs_denominator : -min_abs_denominator;
+      }
+      R[j] = -R[j] / denom;
     }
 
-    // Project new vector out form old vectors
+    // Project new vector out from old vectors
     gram_schmidt(N, k, V.data(), N, R);
 
   }  // Davidson iterations
@@ -328,9 +386,23 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
  * @param[in] LDV     Leading dimension of V_old
  * @param[in,out] V_new Local portion of vector to orthogonalize and normalize
  * @param[in] comm    MPI communicator
+ * @param[in] min_norm Minimum norm threshold below which a vector is considered
+ * as zero vector
  */
 inline void p_gram_schmidt(int64_t N_local, int64_t K, const double* V_old,
-                           int64_t LDV, double* V_new, MPI_Comm comm) {
+                           int64_t LDV, double* V_new, MPI_Comm comm,
+                           double min_norm = 1e-12) {
+  // Early return if no vectors to orthogonalize against - just normalize
+  if (K <= 0) {
+    double dot = blas::dot(N_local, V_new, 1, V_new, 1);
+    dot = allreduce(dot, MPI_SUM, comm);
+    double nrm = std::sqrt(dot);
+    if (nrm > min_norm) {
+      blas::scal(N_local, 1. / nrm, V_new, 1);
+    }
+    return;
+  }
+
   std::vector<double> inner(K);
   // Compute local V_old**H * V_new
   blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans, K,
@@ -356,9 +428,56 @@ inline void p_gram_schmidt(int64_t N_local, int64_t K, const double* V_old,
   double dot = blas::dot(N_local, V_new, 1, V_new, 1);
   dot = allreduce(dot, MPI_SUM, comm);
   double nrm = std::sqrt(dot);
-  // printf("[rank %d] GS DOT %.6e NRM %.6e\n", comm_rank(comm),
-  //   dot, nrm);
-  blas::scal(N_local, 1. / nrm, V_new, 1);
+  // Protect against division by zero when the new vector is linearly dependent
+  // on existing vectors (can happen with very small Hilbert spaces)
+  if (nrm > min_norm) {
+    blas::scal(N_local, 1. / nrm, V_new, 1);
+  } else {
+    // Vector is essentially zero after orthogonalization - try canonical basis
+    // vectors until we find one not in the span of existing vectors.
+    // In parallel, each rank handles its local portion of the global vector.
+    int rank = comm_rank(comm);
+    int size = comm_size(comm);
+    // Gather local sizes to determine global index mapping
+    std::vector<int64_t> local_sizes(size);
+    int64_t my_size = N_local;
+    MPI_Allgather(&my_size, 1, MPI_INT64_T, local_sizes.data(), 1, MPI_INT64_T,
+                  comm);
+    int64_t global_offset = 0;
+    for (int r = 0; r < rank; ++r) global_offset += local_sizes[r];
+    int64_t N_global = 0;
+    for (int r = 0; r < size; ++r) N_global += local_sizes[r];
+
+    for (int64_t idx = 0; idx < N_global; ++idx) {
+      // Start with canonical basis vector e_idx (distributed)
+      std::fill_n(V_new, N_local, 0.0);
+      if (idx >= global_offset && idx < global_offset + N_local) {
+        V_new[idx - global_offset] = 1.0;
+      }
+      // Orthogonalize against existing vectors
+      blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans,
+                 K, 1, N_local, 1., V_old, LDV, V_new, N_local, 0.,
+                 inner.data(), K);
+      allreduce(inner.data(), K, MPI_SUM, comm);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+                 N_local, 1, K, -1., V_old, LDV, inner.data(), K, 1., V_new,
+                 N_local);
+      dot = blas::dot(N_local, V_new, 1, V_new, 1);
+      dot = allreduce(dot, MPI_SUM, comm);
+      nrm = std::sqrt(dot);
+      if (nrm > min_norm) {
+        blas::scal(N_local, 1. / nrm, V_new, 1);
+        break;
+      }
+    }
+    // If all canonical basis vectors failed, the subspace already spans the
+    // entire space (K >= N_global). This should not happen in normal use.
+    if (nrm <= min_norm) {
+      throw std::runtime_error(
+          "p_gram_schmidt: Unable to find orthogonal vector - subspace may "
+          "already span the entire space");
+    }
+  }
 }
 
 /**
@@ -429,12 +548,14 @@ inline void p_rayleigh_ritz(int64_t N_local, int64_t K, const double* X,
  * @param[in,out] X_local Input: local portion of initial guess, Output: local
  * portion of eigenvector
  * @param[in] comm      MPI communicator
+ * @param[in] min_abs_denominator  Minimum absolute value for preconditioner
+ * denominator to avoid division by zero
  * @return Pair containing (number of iterations, converged eigenvalue)
  */
 template <typename Functor>
 auto p_davidson(int64_t N_local, int64_t max_m, const Functor& op,
                 const double* D_local, double tol, double* X_local,
-                MPI_Comm comm) {
+                MPI_Comm comm, double min_abs_denominator = 1e-12) {
   using hrt_t = std::chrono::high_resolution_clock;
   using dur_t = std::chrono::duration<double, std::milli>;
 
@@ -530,21 +651,33 @@ auto p_davidson(int64_t N_local, int64_t max_m, const Functor& op,
 
     // Compute new vector
     // (D - LAM(0)*I) * W = -R ==> W = -(D - LAM(0)*I)**-1 * R
+    // When D[j] == LAM[0], add a small shift to avoid division by zero
     double E1_denom = 0, E1_num = 0;
     for (auto j = 0; j < N_local; ++j) {
-      R_local[j] = -R_local[j] / (D_local[j] - LAM[0]);
+      double denom = D_local[j] - LAM[0];
+      if (std::abs(denom) < min_abs_denominator) {
+        denom = (denom >= 0) ? min_abs_denominator : -min_abs_denominator;
+      }
+      R_local[j] = -R_local[j] / denom;
       E1_num += X_local[j] * R_local[j];
-      E1_denom += X_local[j] * X_local[j] / (D_local[j] - LAM[0]);
+      E1_denom += X_local[j] * X_local[j] / denom;
     }
     E1_denom = allreduce(E1_denom, MPI_SUM, comm);
+    if (std::abs(E1_denom) < min_abs_denominator) {
+      E1_denom = (E1_denom >= 0) ? min_abs_denominator : -min_abs_denominator;
+    }
     E1_num = allreduce(E1_num, MPI_SUM, comm);
     const double E1 = E1_num / E1_denom;
 
     for (auto j = 0; j < N_local; ++j) {
-      R_local[j] += E1 * X_local[j] / (D_local[j] - LAM[0]);
+      double denom = D_local[j] - LAM[0];
+      if (std::abs(denom) < min_abs_denominator) {
+        denom = (denom >= 0) ? min_abs_denominator : -min_abs_denominator;
+      }
+      R_local[j] += E1 * X_local[j] / denom;
     }
 
-    // Project new vector out form old vectors
+    // Project new vector out from old vectors
     p_gram_schmidt(N_local, k, V_local.data(), N_local, R_local, comm);
 
   }  // Davidson iterations
