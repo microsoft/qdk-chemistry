@@ -136,7 +136,7 @@ void sort_shells_inplace(std::vector<Shell>& shells) {
     }
   };
 
-  // sorting shells by atom type -> angular momentum -> number of primitives
+  // sorting shells by atom type -> angular momentum -> exponent
   auto shell_comparator = [](const Shell& a, const Shell& b) {
     // s -> p -> d -> f ...
     if (a.orbital_type != b.orbital_type) {

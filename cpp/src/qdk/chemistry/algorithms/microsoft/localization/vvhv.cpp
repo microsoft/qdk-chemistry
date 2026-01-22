@@ -272,11 +272,9 @@ Eigen::MatrixXd VVHVLocalization::localize(
   // Calculate valence virtuals
   Eigen::MatrixXd C_valence_virtual =
       calculate_valence_virtual(occupied_orbitals);
-  QDK_LOGGER().debug(
-      "VVHV: Computed valence virtual orbitals (unlocalized)");
-  QDK_LOGGER().info(
-      "VVHV: Norm of C_valence_virtual (unlocalized): {:.16e}",
-      C_valence_virtual.norm());
+  QDK_LOGGER().debug("VVHV: Computed valence virtual orbitals (unlocalized)");
+  QDK_LOGGER().info("VVHV: Norm of C_valence_virtual (unlocalized): {:.16e}",
+                    C_valence_virtual.norm());
 
   // Localize valence virtual orbitals
   Eigen::MatrixXd C_valence_loc = localize_valence_virtual(C_valence_virtual);
@@ -297,8 +295,7 @@ Eigen::MatrixXd VVHVLocalization::localize(
 
   // Localize hard virtuals and combine with valence virtuals
   Eigen::MatrixXd hard_orbitals_loc = localize_hard_virtuals(C_minimal);
-  QDK_LOGGER().debug(
-      "VVHV: Generated and localized hard virtual orbitals");
+  QDK_LOGGER().debug("VVHV: Generated and localized hard virtual orbitals");
   QDK_LOGGER().info(
       "VVHV: Norm of hard_orbitals_loc (localized hard virtuals): {:.16e}",
       hard_orbitals_loc.norm());
@@ -971,13 +968,10 @@ void VVHVLocalization::calculate_orbital_spreads(
     QDK_LOGGER().info(
         "VVHVLocalization: Computed dipole and quadrupole integrals locally "
         "for orbital spreads");
-    QDK_LOGGER().info(
-        "VVHVLocalization: Dipole integrals norm = " +
-        std::to_string(local_dipole->norm()));
-    QDK_LOGGER().info(
-        "VVHVLocalization: Quadrupole integrals norm = " +
-        std::to_string(local_quadrupole->norm()));
-
+    QDK_LOGGER().info("VVHVLocalization: Dipole integrals norm = " +
+                      std::to_string(local_dipole->norm()));
+    QDK_LOGGER().info("VVHVLocalization: Quadrupole integrals norm = " +
+                      std::to_string(local_quadrupole->norm()));
 
     dipole = local_dipole.get();
     quadrupole = local_quadrupole.get();
