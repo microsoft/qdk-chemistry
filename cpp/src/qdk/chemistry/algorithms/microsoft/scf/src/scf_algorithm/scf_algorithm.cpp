@@ -31,7 +31,7 @@
 
 namespace qdk::chemistry::scf {
 
-SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx)
+SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx, bool rohf_enabled)
     : ctx_(ctx),
       step_count_(0),
       last_energy_(0.0),
@@ -39,12 +39,13 @@ SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx)
       delta_energy_(std::numeric_limits<double>::infinity()) {
   QDK_LOG_TRACE_ENTERING();
   auto num_atomic_orbitals = ctx.basis_set->num_atomic_orbitals;
-  auto num_density_matrices = ctx.cfg->unrestricted ? 2 : 1;
+  auto num_density_matrices = (ctx.cfg->unrestricted || rohf_enabled) ? 2 : 1;
   P_last_ = RowMajorMatrix::Zero(num_density_matrices * num_atomic_orbitals,
                                  num_atomic_orbitals);
 }
 
-std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx) {
+std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx,
+                                                   bool rohf_enabled) {
   QDK_LOG_TRACE_ENTERING();
   const auto& cfg = *ctx.cfg;
 
@@ -54,13 +55,15 @@ std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx) {
           ctx, cfg.scf_algorithm.diis_subspace_size);
 
     case SCFAlgorithmName::DIIS:
-      return std::make_shared<DIIS>(ctx, cfg.scf_algorithm.diis_subspace_size);
+      return std::make_shared<DIIS>(ctx, rohf_enabled,
+                                    cfg.scf_algorithm.diis_subspace_size);
 
     case SCFAlgorithmName::GDM:
-      return std::make_shared<GDM>(ctx, cfg.scf_algorithm.gdm_config);
+      return std::make_shared<GDM>(ctx, rohf_enabled,
+                                   cfg.scf_algorithm.gdm_config);
 
     case SCFAlgorithmName::DIIS_GDM:
-      return std::make_shared<DIIS_GDM>(ctx,
+      return std::make_shared<DIIS_GDM>(ctx, rohf_enabled,
                                         cfg.scf_algorithm.diis_subspace_size,
                                         cfg.scf_algorithm.gdm_config);
 
@@ -168,16 +171,18 @@ double SCFAlgorithm::calculate_og_error_(const RowMajorMatrix& F,
                                          const RowMajorMatrix& P,
                                          const RowMajorMatrix& S,
                                          RowMajorMatrix& error_matrix,
-                                         bool unrestricted) {
+                                         int num_orbital_sets) {
   QDK_LOG_TRACE_ENTERING();
   int num_atomic_orbitals = static_cast<int>(S.cols());
-  int num_density_matrices = unrestricted ? 2 : 1;
+  if (num_orbital_sets != 1 && num_orbital_sets != 2) {
+    throw std::invalid_argument("InputError: num_orbital_sets_ must be 1 or 2");
+  }
 
   RowMajorMatrix FP(num_atomic_orbitals, num_atomic_orbitals);
 
-  error_matrix = RowMajorMatrix::Zero(
-      num_density_matrices * num_atomic_orbitals, num_atomic_orbitals);
-  for (auto i = 0; i < num_density_matrices; ++i) {
+  error_matrix = RowMajorMatrix::Zero(num_orbital_sets * num_atomic_orbitals,
+                                      num_atomic_orbitals);
+  for (auto i = 0; i < num_orbital_sets; ++i) {
     Eigen::Map<RowMajorMatrix> error_dm(
         error_matrix.data() + i * num_atomic_orbitals * num_atomic_orbitals,
         num_atomic_orbitals, num_atomic_orbitals);
@@ -216,10 +221,11 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
 
   // Calculate orbital gradient error
   RowMajorMatrix error_matrix;
+  int num_orbital_sets = scf_impl.get_num_orbital_sets();
   double og_error =
       calculate_og_error_(scf_impl.get_fock_matrix(),
                           scf_impl.get_density_matrix(), scf_impl.overlap(),
-                          error_matrix, cfg->unrestricted) /
+                          error_matrix, num_orbital_sets) /
       num_atomic_orbitals;
 
   bool converged = density_rms_ < cfg->scf_algorithm.density_threshold &&

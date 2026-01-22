@@ -30,7 +30,7 @@ class SCFAlgorithm {
    *
    * @param[in] ctx Reference to SCFContext
    */
-  explicit SCFAlgorithm(const SCFContext& ctx);
+  explicit SCFAlgorithm(const SCFContext& ctx, bool rohf_enabled);
 
   /**
    * @brief Default destructor
@@ -69,7 +69,8 @@ class SCFAlgorithm {
    * @return std::shared_ptr<SCFAlgorithm> Pointer to newly created algorithm
    * instance
    */
-  static std::shared_ptr<SCFAlgorithm> create(const SCFContext& ctx);
+  static std::shared_ptr<SCFAlgorithm> create(const SCFContext& ctx,
+                                              bool rohf_enabled);
 
   /**
    * @brief Solve the eigenvalue problem for the Fock matrix and update
@@ -113,14 +114,17 @@ class SCFAlgorithm {
    * @param[in] S Overlap matrix (num_atomic_orbitals × num_atomic_orbitals)
    * @param[out] error_matrix Output matrix to store calculated error (will be
    * resized)
-   * @param[in] unrestricted Whether the calculation is unrestricted
+   * @param[in] num_orbital_sets Number of spin blocks supplied (1 for RHF /
+   * ROHF, 2 for UHF)
    * @return Infinity norm of the error matrix
    */
   static double calculate_og_error_(const RowMajorMatrix& F,
                                     const RowMajorMatrix& P,
                                     const RowMajorMatrix& S,
                                     RowMajorMatrix& error_matrix,
-                                    bool unrestricted);
+                                    int num_orbital_sets);
+
+  bool rohf_enabled_ = false;  ///< Flag indicating if ROHF is enabled
 
  protected:
   const SCFContext& ctx_;  ///< Reference to SCF context

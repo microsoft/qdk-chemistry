@@ -272,7 +272,7 @@ void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
 
 AtomicSphericallyAveragedHartreeFock::AtomicSphericallyAveragedHartreeFock(
     const SCFContext& ctx, size_t subspace_size)
-    : DIIS(ctx, subspace_size) {}
+    : DIIS(ctx, false, subspace_size) {}
 
 void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
     const RowMajorMatrix& F, const RowMajorMatrix& S, const RowMajorMatrix& X,

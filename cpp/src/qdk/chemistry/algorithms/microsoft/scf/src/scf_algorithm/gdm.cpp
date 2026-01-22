@@ -282,7 +282,8 @@ class GDM {
    * @param[in] history_size_limit Maximum history size limit for BFGS in GDM
    *
    */
-  explicit GDM(const SCFContext& ctx, const int history_size_limit);
+  explicit GDM(const SCFContext& ctx, bool rohf_enabled,
+               const int history_size_limit);
 
   /**
    * @brief Perform one GDM SCF iteration for all spin components
@@ -393,7 +394,7 @@ class GDM {
                               // for unrestricted)
 };
 
-GDM::GDM(const SCFContext& ctx, int history_size_limit)
+GDM::GDM(const SCFContext& ctx, bool rohf_enabled, int history_size_limit)
     : ctx_(ctx),
       history_size_limit_(history_size_limit),
       last_accepted_energy_(std::numeric_limits<double>::infinity()),
@@ -910,10 +911,10 @@ void GDM::iterate(SCFImpl& scf_impl) {
 }  // namespace impl
 
 // Constructor for SCFAlgorithm interface
-GDM::GDM(const SCFContext& ctx, const GDMConfig& gdm_config)
-    : SCFAlgorithm(ctx),
+GDM::GDM(const SCFContext& ctx, bool rohf_enabled, const GDMConfig& gdm_config)
+    : SCFAlgorithm(ctx, rohf_enabled),
       gdm_impl_(std::make_unique<impl::GDM>(
-          ctx, gdm_config.gdm_bfgs_history_size_limit)) {
+          ctx, rohf_enabled, gdm_config.gdm_bfgs_history_size_limit)) {
   QDK_LOG_TRACE_ENTERING();
 }
 

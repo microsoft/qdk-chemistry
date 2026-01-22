@@ -159,6 +159,11 @@ class SCFImpl {
   int get_num_density_matrices() const { return num_density_matrices_; }
 
   /**
+   * @brief Get number of distinct orbital coefficient sets
+   */
+  int get_num_orbital_sets() const { return num_orbital_sets_; }
+
+  /**
    * @brief Get the orthogonalization matrix
    * @return Reference to the orthogonalization matrix X
    */
@@ -325,6 +330,7 @@ class SCFImpl {
   size_t num_molecular_orbitals_;  ///< Number of molecular orbitals
   int num_density_matrices_;  ///< Number of density matrices (1=restricted,
                               ///< 2=unrestricted)
+  int num_orbital_sets_;      ///< Number of orbital sets (1=RHF/ROHF, 2=UHF)
   int nelec_[2];              ///< Number of [alpha, beta] electrons
 
   // SCF matrices
@@ -357,6 +363,7 @@ class SCFImpl {
       int1e_;                 ///< One-electron integral calculator
   std::shared_ptr<ERI> eri_;  ///< Electron repulsion integral calculator
   std::shared_ptr<SCFAlgorithm> scf_algorithm_;  ///< SCF convergence algorithm
+  bool rohf_enabled_ = false; ///< Flag indicating if ROHF is enabled
 
 #ifdef QDK_CHEMISTRY_ENABLE_PCM
   std::unique_ptr<pcm::PCM> pcm_;  ///< Polarizable Continuum Model solver

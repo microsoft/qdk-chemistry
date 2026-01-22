@@ -36,10 +36,11 @@ class DIIS : public SCFAlgorithm {
    * @brief Construct DIIS SCF algorithm
    *
    * @param[in] ctx SCFContext reference
+   * @param[in] rohf_enabled Flag indicating if ROHF is enabled
    * @param[in] subspace_size Maximum number of vectors to retain in DIIS
    * subspace
    */
-  explicit DIIS(const SCFContext& ctx, size_t subspace_size = 8);
+  explicit DIIS(const SCFContext& ctx, bool rohf_enabled, size_t subspace_size = 8);
 
   /**
    * @brief Destructor

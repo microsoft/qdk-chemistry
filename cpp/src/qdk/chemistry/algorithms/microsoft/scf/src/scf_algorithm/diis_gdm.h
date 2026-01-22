@@ -37,6 +37,7 @@ class DIIS_GDM : public SCFAlgorithm {
   /**
    * @brief Constructor for the DIIS-GDM composite algorithm
    * @param[in] ctx Reference to SCFContext
+   * @param[in] rohf_enabled Flag indicating if ROHF is enabled
    * @param[in] subspace_size Maximum number of vectors to retain in DIIS
    * subspace (default: 8)
    * @param[in] gdm_config GDM configuration parameters
@@ -44,8 +45,8 @@ class DIIS_GDM : public SCFAlgorithm {
    * @note If max_diis_step is less than 2, it will be automatically set to 2.
    * @note energy_thresh_diis_switch must be greater than 0.0.
    */
-  explicit DIIS_GDM(const SCFContext& ctx, const size_t subspace_size,
-                    const GDMConfig& gdm_config);
+  explicit DIIS_GDM(const SCFContext& ctx, bool rohf_enabled,
+                    const size_t subspace_size, const GDMConfig& gdm_config);
 
   /**
    * @brief Destructor
