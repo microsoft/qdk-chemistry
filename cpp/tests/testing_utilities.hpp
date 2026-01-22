@@ -4,6 +4,7 @@
 
 #pragma once
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace testing {
 
@@ -21,10 +22,24 @@ namespace testing {
  */
 auto pipek_mezey_metric(const qdk::chemistry::data::Orbitals& orbitals,
                         const Eigen::MatrixXd& C) {
+  QDK_LOG_TRACE_ENTERING();
   auto basis_set = orbitals.get_basis_set();
   auto structure = basis_set->get_structure();
   const auto& S = orbitals.get_overlap_matrix();
+
+  QDK_LOGGER().info(
+      "Computing Pipek-Mezey metric for {} atomic orbitals and {} molecular "
+      "orbitals",
+      orbitals.get_num_atomic_orbitals(),
+      orbitals.get_num_molecular_orbitals());
+  QDK_LOGGER().info(
+      "AO Overlap matrix S norm: {:.16e}", S.norm());
+  QDK_LOGGER().info(
+      "Orbital coefficient matrix C norm: {:.16e}", C.norm());
+
   Eigen::MatrixXd SC = S * C;
+  QDK_LOGGER().info(
+      "Computed SC matrix with norm {:.16e}", SC.norm());
 
   const size_t num_atomic_orbitals = orbitals.get_num_atomic_orbitals();
   const size_t num_molecular_orbitals = orbitals.get_num_molecular_orbitals();
@@ -37,6 +52,8 @@ auto pipek_mezey_metric(const qdk::chemistry::data::Orbitals& orbitals,
       Xi(iA, p) += C(mu, p) * SC(mu, p);
     }
   }
+  QDK_LOGGER().info(
+      "Computed Xi matrix with norm {:.16e}", Xi.norm());
 
   return Xi.cwiseProduct(Xi).sum();
 }
