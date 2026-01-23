@@ -37,11 +37,13 @@ namespace qcs = qdk::chemistry::scf;
  * @param v Vector to canonicalize (modified in-place)
  */
 static void canonicalize_sign(Eigen::VectorXd& v) {
+  const double tie_tol = 1e-10;
   int max_idx = 0;
   double max_abs = std::abs(v(0));
   for (int i = 1; i < v.size(); ++i) {
     double abs_val = std::abs(v(i));
-    if (abs_val > max_abs) {
+    // Only update if strictly larger to ensure deterministic tie-breaking
+    if (abs_val > max_abs + tie_tol) {
       max_abs = abs_val;
       max_idx = i;
     }
@@ -93,7 +95,7 @@ static int get_canonical_order_index(const Eigen::VectorXd& v,
  */
 static void canonicalize_eigenvectors(Eigen::MatrixXd& U,
                                       const Eigen::VectorXd& eigenvalues,
-                                      double degeneracy_tol = 1e-10) {
+                                      double degeneracy_tol = 1e-6) {
   const int n = static_cast<int>(U.cols());
   if (n == 0) return;
 
@@ -221,14 +223,17 @@ static void canonicalize_eigenvectors(Eigen::MatrixXd& U) {
  * @param cols Number of columns
  */
 static void canonicalize_columns(double* data, int rows, int cols) {
+  const double tie_tol = 1e-10;
   for (int col = 0; col < cols; ++col) {
     double* col_ptr = data + col * rows;
     // Find element with largest absolute value
+    // Use tolerance for tie-breaking: prefer smaller row index for near-ties
     int max_idx = 0;
     double max_abs = std::abs(col_ptr[0]);
     for (int row = 1; row < rows; ++row) {
       double abs_val = std::abs(col_ptr[row]);
-      if (abs_val > max_abs) {
+      // Only update if strictly larger to ensure deterministic tie-breaking
+      if (abs_val > max_abs + tie_tol) {
         max_abs = abs_val;
         max_idx = row;
       }
@@ -268,13 +273,18 @@ static void canonicalize_orthonormal_output(double* C_out, int num_rows,
   Eigen::Map<const Eigen::MatrixXd> S_map(overlap, num_rows, num_rows);
 
   // Step 1: Determine canonical ordering based on row index of max element
+  // Use a tolerance to handle floating-point tie-breaking deterministically:
+  // prefer smaller row index when values are within tolerance
+  const double tie_tol = 1e-10;
   std::vector<std::pair<int, int>> order_info;  // (max_row_idx, col_idx)
   for (int col = 0; col < num_cols; ++col) {
     int max_row = 0;
     double max_abs = std::abs(C_map(0, col));
     for (int row = 1; row < num_rows; ++row) {
       double abs_val = std::abs(C_map(row, col));
-      if (abs_val > max_abs) {
+      // Only update if strictly larger (beyond tolerance) to ensure
+      // deterministic tie-breaking: smaller row index wins for near-ties
+      if (abs_val > max_abs + tie_tol) {
         max_abs = abs_val;
         max_row = row;
       }
@@ -314,16 +324,17 @@ static void canonicalize_orthonormal_output(double* C_out, int num_rows,
     }
 
     // Apply sign convention: largest element positive
+    // Use tolerance for deterministic tie-breaking
     int max_idx = 0;
-    double max_abs = std::abs(v(0));
+    double max_abs_sign = std::abs(v(0));
     for (int row = 1; row < num_rows; ++row) {
       double abs_val = std::abs(v(row));
-      if (abs_val > max_abs) {
-        max_abs = abs_val;
+      if (abs_val > max_abs_sign + tie_tol) {
+        max_abs_sign = abs_val;
         max_idx = row;
       }
     }
-    if (max_abs > 1e-14 && v(max_idx) < 0.0) {
+    if (max_abs_sign > 1e-14 && v(max_idx) < 0.0) {
       v *= -1.0;
     }
 
@@ -605,7 +616,7 @@ Eigen::MatrixXd VVHVLocalization::localize(
   oss_cvl << C_valence_loc;
   QDK_LOGGER().info("VVHV: Localized C_valence_virtual:\n{}", oss_cvl.str());
 
-  if (n_val_virt > 0 && C_valence_loc.rows() >= 2) {
+  if (n_val_virt > 0 && C_valence_loc.cols() > 0 && C_valence_loc.rows() >= 2) {
     QDK_LOGGER().info("VVHV LOCALIZED: C_valence_loc(0,0) = {:.16e}",
                       C_valence_loc(0, 0));
     QDK_LOGGER().info("VVHV LOCALIZED: C_valence_loc(1,0) = {:.16e}",
@@ -787,16 +798,33 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
   // according to new tutorial
   Eigen::MatrixXd T(num_atomic_orbitals_ori, num_atomic_orbitals_min);
   {
-    temp = this->overlap_ori_;   // lapack::gelss overwrites input
-    temp2 = this->overlap_mix_;  // the unnormalized T
-    std::vector<double> W11(num_atomic_orbitals_ori);
-    double _rcond = -1.0e0;
-    int64_t RANK11;
-    lapack::gelss(num_atomic_orbitals_ori, num_atomic_orbitals_ori,
-                  num_atomic_orbitals_min, temp.data(), num_atomic_orbitals_ori,
-                  temp2.data(), num_atomic_orbitals_ori, W11.data(), _rcond,
-                  &RANK11);
-    QDK_LOGGER().info("RANK11 in calculating T: {}", RANK11);
+    // Solve overlap_ori * T = overlap_mix using Cholesky decomposition
+    // This is more deterministic than gelss across LAPACK implementations
+    // since overlap_ori is symmetric positive definite
+    temp = this->overlap_ori_;   // potrf overwrites with Cholesky factor
+    temp2 = this->overlap_mix_;  // potrs overwrites with solution
+
+    // Compute Cholesky factorization: overlap_ori = L * L^T
+    int64_t info = lapack::potrf(lapack::Uplo::Lower, num_atomic_orbitals_ori,
+                                 temp.data(), num_atomic_orbitals_ori);
+    if (info != 0) {
+      throw std::runtime_error(
+          "VVHVLocalization: Cholesky factorization failed for overlap matrix "
+          "(info=" +
+          std::to_string(info) + ")");
+    }
+
+    // Solve L * L^T * T = overlap_mix
+    info = lapack::potrs(lapack::Uplo::Lower, num_atomic_orbitals_ori,
+                         num_atomic_orbitals_min, temp.data(),
+                         num_atomic_orbitals_ori, temp2.data(),
+                         num_atomic_orbitals_ori);
+    if (info != 0) {
+      throw std::runtime_error(
+          "VVHVLocalization: Cholesky solve failed (info=" +
+          std::to_string(info) + ")");
+    }
+    QDK_LOGGER().info("Computed T using Cholesky decomposition");
 
     // Apply canonical sign convention for cross-platform determinism
     canonicalize_columns(temp2.data(), num_atomic_orbitals_ori,
@@ -914,19 +942,34 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
   if (num_atomic_orbitals_al_min != 0) {
     // Get T_al = overlap_ori_al**-1 * overlap_mix_al, corresponding to xi
     // coefficients in the literature, in the representation of the original
-    // basis
+    // basis. Use Cholesky for deterministic cross-platform results.
     Eigen::MatrixXd T_al = overlap_mix_al;
     {
       Eigen::MatrixXd overlap_ori_copy =
-          overlap_ori_al;  // lapack::gelss overwrites input
-      std::vector<double> W11(num_atomic_orbitals_al_ori);
-      double _rcond = -1.0e0;
-      int64_t _tmp_rank;
-      lapack::gelss(num_atomic_orbitals_al_ori, num_atomic_orbitals_al_ori,
-                    num_atomic_orbitals_al_min, overlap_ori_copy.data(),
-                    num_atomic_orbitals_al_ori, T_al.data(),
-                    num_atomic_orbitals_al_ori, W11.data(), _rcond, &_tmp_rank);
-      QDK_LOGGER().info("tmp_rank in proto_hv: {}", _tmp_rank);
+          overlap_ori_al;  // potrf overwrites with Cholesky factor
+
+      // Compute Cholesky factorization: overlap_ori_al = L * L^T
+      int64_t info =
+          lapack::potrf(lapack::Uplo::Lower, num_atomic_orbitals_al_ori,
+                        overlap_ori_copy.data(), num_atomic_orbitals_al_ori);
+      if (info != 0) {
+        throw std::runtime_error(
+            "VVHVLocalization::proto_hv: Cholesky factorization failed for "
+            "overlap matrix (info=" +
+            std::to_string(info) + ")");
+      }
+
+      // Solve L * L^T * T_al = overlap_mix_al
+      info = lapack::potrs(lapack::Uplo::Lower, num_atomic_orbitals_al_ori,
+                           num_atomic_orbitals_al_min, overlap_ori_copy.data(),
+                           num_atomic_orbitals_al_ori, T_al.data(),
+                           num_atomic_orbitals_al_ori);
+      if (info != 0) {
+        throw std::runtime_error(
+            "VVHVLocalization::proto_hv: Cholesky solve failed (info=" +
+            std::to_string(info) + ")");
+      }
+      QDK_LOGGER().debug("proto_hv: Computed T_al using Cholesky decomposition");
 
       // Apply canonical sign convention for cross-platform determinism
       canonicalize_columns(T_al.data(), num_atomic_orbitals_al_ori,
@@ -944,7 +987,7 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
                num_atomic_orbitals_al_ori, 0.0, S_xi.data(),
                num_atomic_orbitals_al_min);
 
-    // Compute S_xi^-1 * overlap_mix^T using lapack::gelss
+    // Compute S_xi^-1 * (overlap_mix^T * C_psi) using LU decomposition
     // Transformation matrix for proto hard virtual construction
     // C_psi = (I - T S_xi^-1 overlap_mix^T) C_psi,
     {
@@ -957,17 +1000,20 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
                  num_atomic_orbitals_al_ori, C_psi.data(),
                  num_atomic_orbitals_al_ori, 0.0, RHS.data(),
                  num_atomic_orbitals_al_min);
-      std::vector<double> W_xi(num_atomic_orbitals_al_min);
-      double _rcond = -1.0e0;
-      int64_t _tmp_rank;
-      lapack::gelss(num_atomic_orbitals_al_min, num_atomic_orbitals_al_min,
-                    num_atomic_orbitals_al_ori, S_xi.data(),
-                    num_atomic_orbitals_al_min, RHS.data(),
-                    num_atomic_orbitals_al_min, W_xi.data(), _rcond,
-                    &_tmp_rank);
-      QDK_LOGGER().info(
-          "tmp_rank in proto_hv solving for S_xi^-1 * overlap_mix^T: {}",
-          _tmp_rank);
+
+      // Use LU decomposition with pivoting (gesv) for S_xi solve
+      // This is more robust than Cholesky for potentially ill-conditioned S_xi
+      std::vector<int64_t> ipiv(num_atomic_orbitals_al_min);
+      int64_t info =
+          lapack::gesv(num_atomic_orbitals_al_min, num_atomic_orbitals_al_ori,
+                       S_xi.data(), num_atomic_orbitals_al_min, ipiv.data(),
+                       RHS.data(), num_atomic_orbitals_al_min);
+      if (info != 0) {
+        throw std::runtime_error(
+            "VVHVLocalization::proto_hv: LU solve for S_xi failed (info=" +
+            std::to_string(info) + ")");
+      }
+      QDK_LOGGER().debug("proto_hv: Solved S_xi^-1 * overlap_mix^T using LU");
 
       // Apply canonical sign convention for cross-platform determinism
       canonicalize_columns(RHS.data(), num_atomic_orbitals_al_min,
