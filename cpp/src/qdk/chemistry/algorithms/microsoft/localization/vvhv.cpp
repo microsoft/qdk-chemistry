@@ -97,6 +97,17 @@ static void canonicalize_eigenvectors(Eigen::MatrixXd& U,
   const int n = static_cast<int>(U.cols());
   if (n == 0) return;
 
+  // Safety check: eigenvalues must match columns
+  if (eigenvalues.size() != n) {
+    // Fall back to simple sign canonicalization if sizes don't match
+    for (int col = 0; col < n; ++col) {
+      Eigen::VectorXd v = U.col(col);
+      canonicalize_sign(v);
+      U.col(col) = v;
+    }
+    return;
+  }
+
   int cluster_start = 0;
   while (cluster_start < n) {
     // Find end of degenerate cluster
@@ -148,15 +159,20 @@ static void canonicalize_eigenvectors(Eigen::MatrixXd& U,
         double norm = v.norm();
         if (norm > 1e-14) {
           v /= norm;
+          // Apply sign convention
+          canonicalize_sign(v);
         } else {
-          // Vector became zero - should not happen with valid eigenvectors
-          // but handle gracefully by keeping original direction
+          // Vector became zero after orthogonalization - this can happen
+          // if vectors in the cluster are numerically linearly dependent.
+          // Keep the original vector direction with sign convention.
           v = V.col(i);
-          v.normalize();
+          double orig_norm = v.norm();
+          if (orig_norm > 1e-14) {
+            v /= orig_norm;
+            canonicalize_sign(v);
+          }
+          // If even original is zero, leave as-is (shouldn't happen)
         }
-
-        // Apply sign convention
-        canonicalize_sign(v);
 
         V.col(i) = v;
       }
@@ -224,6 +240,98 @@ static void canonicalize_columns(double* data, int rows, int cols) {
       }
     }
   }
+}
+
+/**
+ * @brief Deterministically re-orthogonalize vectors for cross-platform
+ * consistency.
+ *
+ * When different LAPACK implementations return different orthonormal bases for
+ * the same subspace, this function produces a canonical basis by:
+ * 1. Sorting columns by the row index of their largest-magnitude element
+ * 2. Applying modified Gram-Schmidt in that deterministic order
+ * 3. Applying sign convention (largest element positive)
+ *
+ * The vectors are orthonormalized with respect to a given overlap matrix.
+ *
+ * @param C_out Output matrix (modified in-place), stored column-major
+ * @param num_rows Number of rows (num_atomic_orbitals)
+ * @param num_cols Number of columns (output orbitals)
+ * @param overlap Overlap matrix (num_rows x num_rows)
+ */
+static void canonicalize_orthonormal_output(double* C_out, int num_rows,
+                                            int num_cols,
+                                            const double* overlap) {
+  if (num_cols <= 0) return;
+
+  Eigen::Map<Eigen::MatrixXd> C_map(C_out, num_rows, num_cols);
+  Eigen::Map<const Eigen::MatrixXd> S_map(overlap, num_rows, num_rows);
+
+  // Step 1: Determine canonical ordering based on row index of max element
+  std::vector<std::pair<int, int>> order_info;  // (max_row_idx, col_idx)
+  for (int col = 0; col < num_cols; ++col) {
+    int max_row = 0;
+    double max_abs = std::abs(C_map(0, col));
+    for (int row = 1; row < num_rows; ++row) {
+      double abs_val = std::abs(C_map(row, col));
+      if (abs_val > max_abs) {
+        max_abs = abs_val;
+        max_row = row;
+      }
+    }
+    order_info.emplace_back(max_row, col);
+  }
+
+  // Sort by max_row_idx, then by original column index for stability
+  std::sort(order_info.begin(), order_info.end(),
+            [](const std::pair<int, int>& a, const std::pair<int, int>& b) {
+              if (a.first != b.first) return a.first < b.first;
+              return a.second < b.second;
+            });
+
+  // Step 2: Reorder columns according to canonical order
+  Eigen::MatrixXd V(num_rows, num_cols);
+  for (int i = 0; i < num_cols; ++i) {
+    V.col(i) = C_map.col(order_info[i].second);
+  }
+
+  // Step 3: Apply modified Gram-Schmidt with overlap matrix
+  for (int i = 0; i < num_cols; ++i) {
+    Eigen::VectorXd v = V.col(i);
+
+    // Orthogonalize against previous vectors: v -= sum_j (V_j^T S v) V_j
+    for (int j = 0; j < i; ++j) {
+      Eigen::VectorXd Sv = S_map * v;
+      double proj = V.col(j).dot(Sv);
+      v -= proj * V.col(j);
+    }
+
+    // Normalize with respect to overlap: norm = sqrt(v^T S v)
+    Eigen::VectorXd Sv = S_map * v;
+    double norm_sq = v.dot(Sv);
+    if (norm_sq > 1e-28) {
+      v /= std::sqrt(norm_sq);
+    }
+
+    // Apply sign convention: largest element positive
+    int max_idx = 0;
+    double max_abs = std::abs(v(0));
+    for (int row = 1; row < num_rows; ++row) {
+      double abs_val = std::abs(v(row));
+      if (abs_val > max_abs) {
+        max_abs = abs_val;
+        max_idx = row;
+      }
+    }
+    if (max_abs > 1e-14 && v(max_idx) < 0.0) {
+      v *= -1.0;
+    }
+
+    V.col(i) = v;
+  }
+
+  // Step 4: Copy result back in canonical order
+  C_map = V;
 }
 
 /**
@@ -497,10 +605,12 @@ Eigen::MatrixXd VVHVLocalization::localize(
   oss_cvl << C_valence_loc;
   QDK_LOGGER().info("VVHV: Localized C_valence_virtual:\n{}", oss_cvl.str());
 
-  QDK_LOGGER().info("VVHV LOCALIZED: C_valence_loc(0,0) = {:.16e}",
-                    C_valence_loc(0, 0));
-  QDK_LOGGER().info("VVHV LOCALIZED: C_valence_loc(1,0) = {:.16e}",
-                    C_valence_loc(1, 0));
+  if (n_val_virt > 0 && C_valence_loc.rows() >= 2) {
+    QDK_LOGGER().info("VVHV LOCALIZED: C_valence_loc(0,0) = {:.16e}",
+                      C_valence_loc(0, 0));
+    QDK_LOGGER().info("VVHV LOCALIZED: C_valence_loc(1,0) = {:.16e}",
+                      C_valence_loc(1, 0));
+  }
 
   // Combine C_valence_virtual and occupied_orbitals to get C_minimal
   Eigen::MatrixXd C_minimal(num_atomic_orbitals_ori, num_atomic_orbitals_min);
@@ -680,7 +790,7 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
     temp = this->overlap_ori_;   // lapack::gelss overwrites input
     temp2 = this->overlap_mix_;  // the unnormalized T
     std::vector<double> W11(num_atomic_orbitals_ori);
-    double _rcond = -1;
+    double _rcond = -1.0e0;
     int64_t RANK11;
     lapack::gelss(num_atomic_orbitals_ori, num_atomic_orbitals_ori,
                   num_atomic_orbitals_min, temp.data(), num_atomic_orbitals_ori,
@@ -738,8 +848,13 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
                     C_mp_wo_occ(0, 0));
   QDK_LOGGER().info("VVHV VALENCE: C_valence_unloc norm = {:.16e}",
                     C_valence_unloc.norm());
-  QDK_LOGGER().info("VVHV VALENCE: C_valence_unloc(0,0) = {:.16e}",
-                    C_valence_unloc(0, 0));
+  if (C_valence_unloc.cols() > 0 && C_valence_unloc.rows() > 0) {
+    QDK_LOGGER().info("VVHV VALENCE: C_valence_unloc(0,0) = {:.16e}",
+                      C_valence_unloc(0, 0));
+  } else {
+    QDK_LOGGER().info(
+        "VVHV VALENCE: C_valence_unloc is empty (no valence virtual orbitals)");
+  }
   std::ostringstream oss_cmp;
   oss_cmp << C_mp_wo_occ;
   QDK_LOGGER().info("VVHV Valence: C_mp_wo_occ matrix:\n{}", oss_cmp.str());
@@ -805,7 +920,7 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
       Eigen::MatrixXd overlap_ori_copy =
           overlap_ori_al;  // lapack::gelss overwrites input
       std::vector<double> W11(num_atomic_orbitals_al_ori);
-      double _rcond = -1;
+      double _rcond = -1.0e0;
       int64_t _tmp_rank;
       lapack::gelss(num_atomic_orbitals_al_ori, num_atomic_orbitals_al_ori,
                     num_atomic_orbitals_al_min, overlap_ori_copy.data(),
@@ -843,7 +958,7 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
                  num_atomic_orbitals_al_ori, 0.0, RHS.data(),
                  num_atomic_orbitals_al_min);
       std::vector<double> W_xi(num_atomic_orbitals_al_min);
-      double _rcond = -1;
+      double _rcond = -1.0e0;
       int64_t _tmp_rank;
       lapack::gelss(num_atomic_orbitals_al_min, num_atomic_orbitals_al_min,
                     num_atomic_orbitals_al_ori, S_xi.data(),
@@ -1394,6 +1509,14 @@ void VVHVLocalization::orthonormalization(int num_atomic_orbitals,
                num_orbitals, 1.0, C, num_atomic_orbitals,
                S.data() + expected_near_zero * num_orbitals, num_orbitals, 0.0,
                C_out, num_atomic_orbitals);
+
+    // Deterministically re-orthogonalize for cross-platform consistency.
+    // Different LAPACK implementations return different orthonormal bases for
+    // degenerate eigenspaces, leading to different C_out vectors. This applies
+    // Gram-Schmidt in a canonical order to produce deterministic output.
+    canonicalize_orthonormal_output(C_out, num_atomic_orbitals,
+                                    num_orbitals - expected_near_zero,
+                                    overlap_inp);
   } else {
     // If no selection needed,
     // compute C_out = C *  U * Lambda^(-1/2) * U^T for symmetric
@@ -1421,6 +1544,10 @@ void VVHVLocalization::orthonormalization(int num_atomic_orbitals,
                num_atomic_orbitals, num_orbitals, num_orbitals, 1.0, C,
                num_atomic_orbitals, orthonorm_transform.data(), num_orbitals,
                0.0, C_out, num_atomic_orbitals);
+
+    // Deterministically re-orthogonalize for cross-platform consistency.
+    canonicalize_orthonormal_output(C_out, num_atomic_orbitals, num_orbitals,
+                                    overlap_inp);
   }
 }
 
