@@ -84,16 +84,16 @@ mc_energy, mc_wavefunction = mc_calculator.run(
     active_hamiltonian, num_electrons // 2, num_electrons // 2
 )
 
-# Print single orbital entropies which are used by AutoCAS to determine the active space
+# Print single orbital entropies which are used by autoCAS to determine the active space
 entropies = mc_wavefunction.get_single_orbital_entropies()
 print("Single orbital entropies:")
 for idx, entropy in enumerate(entropies):
     print(f"Orbital {idx + 1}: {entropy:.6f}")
 
-# Select active space using AutoCAS
+# Select active space using autoCAS
 autocas_selector = create("active_space_selector", "qdk_autocas_eos")
 active_autocas_wfn = autocas_selector.run(mc_wavefunction)
-print("AutoCAS selected active orbitals summary:")
+print("autoCAS selected active orbitals summary:")
 print(active_autocas_wfn.get_orbitals().get_summary())
 # end-cell-autocas
 ################################################################################

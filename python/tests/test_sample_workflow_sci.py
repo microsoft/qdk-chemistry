@@ -100,7 +100,7 @@ TEST_CASES: tuple[WorkflowCase, ...] = (
         ],
         cwd_relative=Path("."),
         expected_energy=-76.02623746,
-        expected_warning="AutoCAS did not identify correlated orbitals; retaining the initial space.",
+        expected_warning="autoCAS did not identify correlated orbitals; retaining the initial space.",
     ),
     WorkflowCase(
         identifier="valence_autocas_threshold",
@@ -208,7 +208,7 @@ def test_sample_sci_workflow_macis_asci_autocas_with_limits():
         casci_energy, expected_casci_energy, rtol=float_comparison_relative_tolerance, atol=ci_energy_tolerance
     )
 
-    autocas_energy = float(_find_line(lambda line: "AutoCAS energy = " in line, lines).split()[-2])
+    autocas_energy = float(_find_line(lambda line: "autoCAS energy = " in line, lines).split()[-2])
     assert np.isclose(
         autocas_energy, expected_autocas_energy, rtol=float_comparison_relative_tolerance, atol=ci_energy_tolerance
     )
@@ -223,5 +223,5 @@ def test_sample_sci_workflow_macis_asci_autocas_with_limits():
         energy, expected_sparse_ci_energy, rtol=float_comparison_relative_tolerance, atol=sci_energy_tolerance
     )
 
-    indices_line = _find_line(lambda line: "AutoCAS selected active space with indices:" in line, lines)
+    indices_line = _find_line(lambda line: "autoCAS selected active space with indices:" in line, lines)
     assert str(expected_active_space_indices) in indices_line
