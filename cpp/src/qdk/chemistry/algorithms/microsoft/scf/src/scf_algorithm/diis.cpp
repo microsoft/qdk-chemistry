@@ -12,6 +12,7 @@
 #include <qdk/chemistry/utils/logger.hpp>
 
 #include "../scf/scf_impl.h"
+#include "scf_matrix_handler.h"
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
@@ -42,7 +43,8 @@ class DIIS {
    * @param[in] subspace_size Maximum number of vectors to retain in DIIS
    * subspace
    */
-  explicit DIIS(const SCFContext& ctx, bool rohf_enabled, const size_t subspace_size);
+  explicit DIIS(const SCFContext& ctx, bool rohf_enabled,
+                const size_t subspace_size);
   /**
    * @brief Perform one DIIS iteration
    *
@@ -278,8 +280,14 @@ void DIIS::apply_level_shift_(const RowMajorMatrix& F, const RowMajorMatrix& P,
 // Constructor for SCFAlgorithm interface
 DIIS::DIIS(const SCFContext& ctx, bool rohf_enabled, const size_t subspace_size)
     : SCFAlgorithm(ctx, rohf_enabled),
-      diis_impl_(std::make_unique<impl::DIIS>(ctx, rohf_enabled, subspace_size)) {
+      diis_impl_(
+          std::make_unique<impl::DIIS>(ctx, rohf_enabled, subspace_size)) {
   QDK_LOG_TRACE_ENTERING();
+  if (rohf_enabled) {
+    matrix_handler_ = std::make_unique<ROHFMatrixHandler>();
+  } else {
+    matrix_handler_ = std::make_unique<RHFUHFMatrixHandler>();
+  }
 }
 
 DIIS::~DIIS() noexcept = default;
@@ -288,10 +296,13 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
   const auto* cfg = ctx_.cfg;
 
+  matrix_handler_->receive_F_P_matrices(
+      scf_impl.get_fock_matrix(), scf_impl.get_density_matrix());
+
   // Get references to matrices from SCFImpl
-  auto& P = scf_impl.density_matrix();
+  auto& P = matrix_handler_->get_density_matrix();
   auto& C = scf_impl.orbitals_matrix();
-  const auto& F = scf_impl.get_fock_matrix();
+  const auto& F = matrix_handler_->get_fock_matrix();
   const auto& S = scf_impl.overlap();
   const auto& X = scf_impl.get_orthogonalization_matrix();
   auto& eigenvalues = scf_impl.eigenvalues();

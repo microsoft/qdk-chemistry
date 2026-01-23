@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "scf_matrix_handler.h"
+
 #include <qdk/chemistry/scf/core/scf_algorithm.h>
 #include <qdk/chemistry/scf/core/types.h>
 
@@ -40,7 +42,8 @@ class DIIS : public SCFAlgorithm {
    * @param[in] subspace_size Maximum number of vectors to retain in DIIS
    * subspace
    */
-  explicit DIIS(const SCFContext& ctx, bool rohf_enabled, size_t subspace_size = 8);
+  explicit DIIS(const SCFContext& ctx, bool rohf_enabled,
+                size_t subspace_size = 8);
 
   /**
    * @brief Destructor
@@ -58,6 +61,9 @@ class DIIS : public SCFAlgorithm {
  private:
   /// PIMPL pointer to implementation
   std::unique_ptr<impl::DIIS> diis_impl_;
+
+  /// Fock matrix and density matrix handler, for RHF/UHF and ROHF cases
+  std::unique_ptr<SCFMatrixHandler> matrix_handler_;
 };
 
 }  // namespace qdk::chemistry::scf
