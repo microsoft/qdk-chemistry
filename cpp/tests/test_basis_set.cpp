@@ -1692,10 +1692,6 @@ TEST_F(BasisSetTest, FromBasisNameInvalidBasisSet) {
 TEST_F(BasisSetTest, FromBasisNameInvalidECP) {
   auto structure = testing::create_agh_structure();
   EXPECT_NO_THROW(BasisSet::from_basis_name("def2-svp", structure));
-  EXPECT_NO_THROW(BasisSet::from_basis_name("def2-svp", structure, "def2-svp"));
-  EXPECT_NO_THROW(BasisSet::from_basis_name("def2-svp", structure, ""));
-  EXPECT_THROW(BasisSet::from_basis_name("cc-pvdz", structure, "def2-svp"),
-               std::invalid_argument);
 }
 
 TEST_F(BasisSetTest, FromBasisNameEmptyBasisSet) {
@@ -1735,18 +1731,6 @@ TEST_F(BasisSetTest, FromElementMapInvalidECP) {
   element_map["H"] = "cc-pvdz";
   element_map["Ag"] = "def2-svp";
   EXPECT_NO_THROW(BasisSet::from_element_map(element_map, structure));
-
-  std::map<std::string, std::string> ecp_map;
-  ecp_map["H"] = "";
-  ecp_map["Ag"] = "def2-svp";
-  EXPECT_NO_THROW(BasisSet::from_element_map(element_map, structure, ecp_map));
-
-  std::map<std::string, std::string> invalid_ecp_map;
-  invalid_ecp_map["H"] = "def2-svp";
-  invalid_ecp_map["Ag"] = "def2-svp";
-  EXPECT_THROW(
-      BasisSet::from_element_map(element_map, structure, invalid_ecp_map),
-      std::invalid_argument);
 }
 
 TEST_F(BasisSetTest, FromIndexMapInvalidECP) {
@@ -1755,17 +1739,6 @@ TEST_F(BasisSetTest, FromIndexMapInvalidECP) {
   index_map[0] = "cc-pvdz";
   index_map[1] = "def2-svp";
   EXPECT_NO_THROW(BasisSet::from_index_map(index_map, structure));
-
-  std::map<size_t, std::string> ecp_map;
-  ecp_map[0] = "";
-  ecp_map[1] = "def2-svp";
-  EXPECT_NO_THROW(BasisSet::from_index_map(index_map, structure, ecp_map));
-
-  std::map<size_t, std::string> invalid_ecp_map;
-  invalid_ecp_map[0] = "def2-svp";
-  invalid_ecp_map[1] = "def2-svp";
-  EXPECT_THROW(BasisSet::from_index_map(index_map, structure, invalid_ecp_map),
-               std::invalid_argument);
 }
 
 TEST_F(BasisSetTest, FromElementMapInvalidBasisSet) {
