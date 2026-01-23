@@ -13,12 +13,12 @@
 #include <blas.hh>
 #include <cmath>
 #include <iostream>
-#include <sstream>
 #include <lapack.hh>
 #include <memory>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <sstream>
 #include <stdexcept>
 
 #include "../utils.hpp"
@@ -28,6 +28,203 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
+
+/**
+ * @brief Apply canonical sign convention to a single vector.
+ *
+ * Ensures the element with largest absolute value is positive.
+ *
+ * @param v Vector to canonicalize (modified in-place)
+ */
+static void canonicalize_sign(Eigen::VectorXd& v) {
+  int max_idx = 0;
+  double max_abs = std::abs(v(0));
+  for (int i = 1; i < v.size(); ++i) {
+    double abs_val = std::abs(v(i));
+    if (abs_val > max_abs) {
+      max_abs = abs_val;
+      max_idx = i;
+    }
+  }
+  if (max_abs > 1e-14 && v(max_idx) < 0.0) {
+    v *= -1.0;
+  }
+}
+
+/**
+ * @brief Get canonical ordering index for a vector.
+ *
+ * Returns the index of the first element with magnitude above threshold,
+ * used for deterministic ordering within degenerate subspaces.
+ *
+ * @param v Vector to analyze
+ * @param threshold Magnitude threshold
+ * @return Index of first significant element, or vector size if none found
+ */
+static int get_canonical_order_index(const Eigen::VectorXd& v,
+                                     double threshold = 1e-10) {
+  for (int i = 0; i < v.size(); ++i) {
+    if (std::abs(v(i)) > threshold) {
+      return i;
+    }
+  }
+  return static_cast<int>(v.size());
+}
+
+/**
+ * @brief Apply canonical orthogonalization to eigenvectors for cross-platform
+ * determinism.
+ *
+ * This function handles both sign ambiguity AND arbitrary rotations within
+ * degenerate eigenspaces. For degenerate eigenvalues, different LAPACK
+ * implementations (macOS Accelerate vs Linux OpenBLAS/MKL) can return different
+ * orthonormal bases for the same subspace.
+ *
+ * Algorithm:
+ * 1. Identify clusters of degenerate eigenvalues (within tolerance)
+ * 2. For each cluster with >1 eigenvector:
+ *    a. Sort eigenvectors by canonical order (first significant row index)
+ *    b. Apply Gram-Schmidt to re-orthogonalize in deterministic order
+ * 3. Apply sign convention to each eigenvector (largest element positive)
+ *
+ * @param U Matrix of eigenvectors (modified in-place), columns are eigenvectors
+ * @param eigenvalues Vector of eigenvalues corresponding to columns of U
+ * @param degeneracy_tol Tolerance for considering eigenvalues degenerate
+ */
+static void canonicalize_eigenvectors(Eigen::MatrixXd& U,
+                                      const Eigen::VectorXd& eigenvalues,
+                                      double degeneracy_tol = 1e-10) {
+  const int n = static_cast<int>(U.cols());
+  if (n == 0) return;
+
+  int cluster_start = 0;
+  while (cluster_start < n) {
+    // Find end of degenerate cluster
+    int cluster_end = cluster_start + 1;
+    while (cluster_end < n &&
+           std::abs(eigenvalues(cluster_end) - eigenvalues(cluster_start)) <
+               degeneracy_tol) {
+      ++cluster_end;
+    }
+
+    const int cluster_size = cluster_end - cluster_start;
+
+    if (cluster_size > 1) {
+      // Multiple degenerate eigenvectors - need canonical re-orthogonalization
+
+      // Step 1: Determine canonical ordering based on first significant element
+      std::vector<std::pair<int, int>>
+          order_indices;  // (canonical_index, column)
+      for (int col = cluster_start; col < cluster_end; ++col) {
+        Eigen::VectorXd v = U.col(col);
+        int order_idx = get_canonical_order_index(v);
+        order_indices.emplace_back(order_idx, col);
+      }
+
+      // Sort by canonical order index, then by column index for stability
+      std::sort(order_indices.begin(), order_indices.end(),
+                [](const std::pair<int, int>& a, const std::pair<int, int>& b) {
+                  if (a.first != b.first) return a.first < b.first;
+                  return a.second < b.second;
+                });
+
+      // Step 2: Extract eigenvectors in canonical order
+      Eigen::MatrixXd V(U.rows(), cluster_size);
+      for (int i = 0; i < cluster_size; ++i) {
+        V.col(i) = U.col(order_indices[i].second);
+      }
+
+      // Step 3: Apply modified Gram-Schmidt for numerical stability
+      for (int i = 0; i < cluster_size; ++i) {
+        Eigen::VectorXd v = V.col(i);
+
+        // Orthogonalize against previous vectors
+        for (int j = 0; j < i; ++j) {
+          double proj = V.col(j).dot(v);
+          v -= proj * V.col(j);
+        }
+
+        // Normalize
+        double norm = v.norm();
+        if (norm > 1e-14) {
+          v /= norm;
+        } else {
+          // Vector became zero - should not happen with valid eigenvectors
+          // but handle gracefully by keeping original direction
+          v = V.col(i);
+          v.normalize();
+        }
+
+        // Apply sign convention
+        canonicalize_sign(v);
+
+        V.col(i) = v;
+      }
+
+      // Step 4: Place back into U in original positions
+      for (int i = 0; i < cluster_size; ++i) {
+        U.col(cluster_start + i) = V.col(i);
+      }
+
+    } else {
+      // Single eigenvector - just apply sign convention
+      Eigen::VectorXd v = U.col(cluster_start);
+      canonicalize_sign(v);
+      U.col(cluster_start) = v;
+    }
+
+    cluster_start = cluster_end;
+  }
+}
+
+/**
+ * @brief Simplified canonicalization when eigenvalues are not available.
+ *
+ * Only applies sign convention (largest element positive).
+ * Use this for gelss output or when eigenvalues are not needed.
+ *
+ * @param U Matrix of vectors (modified in-place)
+ */
+static void canonicalize_eigenvectors(Eigen::MatrixXd& U) {
+  for (int col = 0; col < U.cols(); ++col) {
+    Eigen::VectorXd v = U.col(col);
+    canonicalize_sign(v);
+    U.col(col) = v;
+  }
+}
+
+/**
+ * @brief Apply canonical sign convention to matrix columns for cross-platform
+ * determinism.
+ *
+ * Similar to canonicalize_eigenvectors but works on raw data pointer.
+ * Used after gelss to ensure deterministic output.
+ *
+ * @param data Pointer to column-major matrix data
+ * @param rows Number of rows
+ * @param cols Number of columns
+ */
+static void canonicalize_columns(double* data, int rows, int cols) {
+  for (int col = 0; col < cols; ++col) {
+    double* col_ptr = data + col * rows;
+    // Find element with largest absolute value
+    int max_idx = 0;
+    double max_abs = std::abs(col_ptr[0]);
+    for (int row = 1; row < rows; ++row) {
+      double abs_val = std::abs(col_ptr[row]);
+      if (abs_val > max_abs) {
+        max_abs = abs_val;
+        max_idx = row;
+      }
+    }
+    // Flip sign if largest element is negative (with tolerance check)
+    if (max_abs > 1e-10 && col_ptr[max_idx] < 0.0) {
+      for (int row = 0; row < rows; ++row) {
+        col_ptr[row] *= -1.0;
+      }
+    }
+  }
+}
 
 /**
  * @brief VV-HV localization scheme implementation.
@@ -298,9 +495,7 @@ Eigen::MatrixXd VVHVLocalization::localize(
       C_valence_loc.norm());
   std::ostringstream oss_cvl;
   oss_cvl << C_valence_loc;
-  QDK_LOGGER().info(
-      "VVHV: Localized C_valence_virtual:\n{}", oss_cvl.str()
-  );
+  QDK_LOGGER().info("VVHV: Localized C_valence_virtual:\n{}", oss_cvl.str());
 
   QDK_LOGGER().info("VVHV LOCALIZED: C_valence_loc(0,0) = {:.16e}",
                     C_valence_loc(0, 0));
@@ -317,9 +512,7 @@ Eigen::MatrixXd VVHVLocalization::localize(
       "VVHV: Combined occupied and valence virtual orbitals into C_minimal");
   std::ostringstream oss_cmin;
   oss_cmin << C_minimal;
-  QDK_LOGGER().debug(
-      "VVHV: C_minimal matrix:\n{}", oss_cmin.str()
-  );
+  QDK_LOGGER().debug("VVHV: C_minimal matrix:\n{}", oss_cmin.str());
 
   // Localize hard virtuals and combine with valence virtuals
   Eigen::MatrixXd hard_orbitals_loc = localize_hard_virtuals(C_minimal);
@@ -329,9 +522,8 @@ Eigen::MatrixXd VVHVLocalization::localize(
       hard_orbitals_loc.norm());
   std::ostringstream oss_hol;
   oss_hol << hard_orbitals_loc;
-  QDK_LOGGER().info(
-      "VVHV: Localized hard virtual orbitals:\n{}", oss_hol.str()
-  );
+  QDK_LOGGER().info("VVHV: Localized hard virtual orbitals:\n{}",
+                    oss_hol.str());
 
   // Concatenate C_valence_loc and hard_orbitals_loc to form localized_orbitals
   Eigen::MatrixXd localized_orbitals =
@@ -496,6 +688,10 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
                   &RANK11);
     QDK_LOGGER().info("RANK11 in calculating T: {}", RANK11);
 
+    // Apply canonical sign convention for cross-platform determinism
+    canonicalize_columns(temp2.data(), num_atomic_orbitals_ori,
+                         num_atomic_orbitals_min);
+
     this->orthonormalization(num_atomic_orbitals_ori, num_atomic_orbitals_min,
                              this->overlap_ori_.data(), temp2.data(), T.data(),
                              1e-6, 0,
@@ -535,7 +731,7 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
   Eigen::MatrixXd C_valence_unloc =
       temp.block(0, 0, num_atomic_orbitals_ori,
                  num_atomic_orbitals_min - num_occupied_orbitals);
-  
+
   QDK_LOGGER().info("VVHV VALENCE: C_mp_wo_occ norm = {:.16e}",
                     C_mp_wo_occ.norm());
   QDK_LOGGER().info("VVHV VALENCE: C_mp_wo_occ(0,0) = {:.16e}",
@@ -616,6 +812,10 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
                     num_atomic_orbitals_al_ori, T_al.data(),
                     num_atomic_orbitals_al_ori, W11.data(), _rcond, &_tmp_rank);
       QDK_LOGGER().info("tmp_rank in proto_hv: {}", _tmp_rank);
+
+      // Apply canonical sign convention for cross-platform determinism
+      canonicalize_columns(T_al.data(), num_atomic_orbitals_al_ori,
+                           num_atomic_orbitals_al_min);
     }
 
     // Get overlap of xi, S = T_al^T * overlap_ori_al * T_al = overlap_mix_al^T
@@ -653,6 +853,11 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
       QDK_LOGGER().info(
           "tmp_rank in proto_hv solving for S_xi^-1 * overlap_mix^T: {}",
           _tmp_rank);
+
+      // Apply canonical sign convention for cross-platform determinism
+      canonicalize_columns(RHS.data(), num_atomic_orbitals_al_min,
+                           num_atomic_orbitals_al_ori);
+
       // Compute C_psi - = T * RHS (where RHS now contains S_xi^-1 *
       // overlap_mix^T)
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
@@ -1111,6 +1316,12 @@ void VVHVLocalization::orthonormalization(int num_atomic_orbitals,
   lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_orbitals, S.data(),
                num_orbitals,
                eigenvalues.data());  // S now contains eigenvectors U
+
+  // Apply canonical orthogonalization for cross-platform determinism
+  // This handles both sign ambiguity AND arbitrary rotations within
+  // degenerate eigenspaces (where different LAPACK implementations like
+  // Accelerate vs OpenBLAS/MKL can return different orthonormal bases)
+  canonicalize_eigenvectors(S, eigenvalues);
 
   if (expected_near_zero > 0) {
     // Check eigenvalue structure if selection needed
