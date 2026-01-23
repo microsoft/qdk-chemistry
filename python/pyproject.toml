@@ -88,6 +88,8 @@ Documentation = "https://microsoft.github.io/qdk-chemistry"
 Homepage = "https://github.com/microsoft/qdk-chemistry"
 Issues = "https://github.com/microsoft/qdk-chemistry/issues"
 Repository = "https://github.com/microsoft/qdk-chemistry"
+Source = "https://github.com/microsoft/qdk-chemistry"
+Changelog = "https://github.com/microsoft/qdk-chemistry/releases"
 
 # Configuration for C++ coverage reporting
 [tool.coverage.cpp]
