@@ -189,15 +189,17 @@ class TestQdkQubitMapper:
         mapper = create("qubit_mapper", "qdk")
 
         n_orbitals = 1
-        one_body = np.zeros((1, 1))
+        one_body = np.array([[1.0]])  # Non-zero integral to generate Pauli terms
         two_body = np.zeros(1)
         orbitals = create_test_orbitals(n_orbitals)
-        hamiltonian = _make_hamiltonian(one_body, two_body, orbitals, core_energy=5.0)
+        core_energy = 5.0
+        hamiltonian = _make_hamiltonian(one_body, two_body, orbitals, core_energy=core_energy)
 
         result = mapper.run(hamiltonian)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
-        assert "II" not in pauli_dict or np.isclose(pauli_dict["II"].real, 0.0, atol=1e-10)
+        assert "II" in pauli_dict
+        assert np.isclose(pauli_dict["II"].real, 1.0, atol=1e-10)
 
     def test_threshold_pruning(self) -> None:
         """Test that small coefficients are pruned."""
@@ -660,15 +662,17 @@ class TestBravyiKitaevMapper:
         mapper = create("qubit_mapper", "qdk", encoding="bravyi-kitaev")
 
         n_orbitals = 1
-        one_body = np.zeros((1, 1))
+        one_body = np.array([[1.0]])  # Non-zero integral to generate Pauli terms
         two_body = np.zeros(1)
         orbitals = create_test_orbitals(n_orbitals)
-        hamiltonian = _make_hamiltonian(one_body, two_body, orbitals, core_energy=5.0)
+        core_energy = 5.0
+        hamiltonian = _make_hamiltonian(one_body, two_body, orbitals, core_energy=core_energy)
 
         result = mapper.run(hamiltonian)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
-        assert "II" not in pauli_dict or np.isclose(pauli_dict["II"].real, 0.0, atol=1e-10)
+        assert "II" in pauli_dict
+        assert np.isclose(pauli_dict["II"].real, 1.0, atol=1e-10)
 
     def test_bk_hopping_adjacent_orbitals(self) -> None:
         """Test BK transform of hopping term between adjacent orbitals.

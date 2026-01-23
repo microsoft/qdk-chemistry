@@ -184,8 +184,8 @@ def test_state_preparation_injects_jordan_wigner_encoding(wavefunction_4e4o):
     circuit_gf2x = prep_gf2x.run(wavefunction_4e4o)
     assert circuit_gf2x.encoding == "jordan-wigner"
 
-    # Test regular_isometry
-    prep_regular = create("state_prep", "regular_isometry")
+    # Test qiskit_regular_isometry
+    prep_regular = create("state_prep", "qiskit_regular_isometry")
     circuit_regular = prep_regular.run(wavefunction_4e4o)
     assert circuit_regular.encoding == "jordan-wigner"
 
@@ -215,12 +215,12 @@ def test_qdk_qubit_mapper_injects_encoding():
     hamiltonian = create_test_hamiltonian(2)
 
     # Test Jordan-Wigner
-    mapper_jw = create("qubit_mapper", "qdk", encoding="jordan_wigner")
+    mapper_jw = create("qubit_mapper", "qdk", encoding="jordan-wigner")
     qubit_ham_jw = mapper_jw.run(hamiltonian)
     assert qubit_ham_jw.encoding == "jordan-wigner"
 
     # Test Bravyi-Kitaev
-    mapper_bk = create("qubit_mapper", "qdk", encoding="bravyi_kitaev")
+    mapper_bk = create("qubit_mapper", "qdk", encoding="bravyi-kitaev")
     qubit_ham_bk = mapper_bk.run(hamiltonian)
     assert qubit_ham_bk.encoding == "bravyi-kitaev"
 
