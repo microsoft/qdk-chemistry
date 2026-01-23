@@ -897,6 +897,11 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
 
   QDK_LOGGER().debug("VVHV::localize_hard_virtuals()");
 
+  // DEBUG INPUT: C_minimal_unloc
+  std::ostringstream oss_input;
+  oss_input << C_minimal_unloc;
+  QDK_LOGGER().info("DEBUG_HV_INPUT C_minimal_unloc:\n{}", oss_input.str());
+
   const auto* ori_bs = this->basis_ori_fp_.get();  // Original/full basis set
   const auto* min_bs = this->minimal_basis_fp_.get();  // Minimal basis set
   const auto num_atomic_orbitals_ori = ori_bs->num_atomic_orbitals;
@@ -1054,6 +1059,12 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
 
     }  // Loop over angular momenta to construct the proto_hard_virtuals
 
+    // DEBUG: proto_hv for atom
+    std::ostringstream oss_proto;
+    oss_proto << proto_hv;
+    QDK_LOGGER().info("DEBUG_HV_PROTO atom {} proto_hv:\n{}", atom_a,
+                      oss_proto.str());
+
     if (proto_hv_idx != nhv_a) {
       throw std::runtime_error(
           "VVHVLocalization: Mismatch in number of proto hard virtuals "
@@ -1079,6 +1090,8 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     // Now we want to project out all components of the minimal space from the
     // orbitals on A C_eta_A = (I - C_minimal_unloc * C_minimal_unloc^T *
     // overlap_ori) * C_normal_A
+    Eigen::MatrixXd temp_proj = Eigen::MatrixXd::Zero(
+        num_atomic_orbitals_min, num_atomic_orbitals_a_ori);
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
                num_atomic_orbitals_ori, num_atomic_orbitals_a_ori,
                num_atomic_orbitals_ori, 1.0, this->overlap_ori_.data(),
@@ -1089,12 +1102,14 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
                num_atomic_orbitals_min, num_atomic_orbitals_a_ori,
                num_atomic_orbitals_ori, 1.0, C_minimal_unloc.data(),
                num_atomic_orbitals_ori, C_eta_a.data(), num_atomic_orbitals_ori,
-               0.0, temp.data(), num_atomic_orbitals_min);
+               0.0, temp_proj.data(), num_atomic_orbitals_min);
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
                num_atomic_orbitals_ori, num_atomic_orbitals_a_ori,
                num_atomic_orbitals_min, -1.0, C_minimal_unloc.data(),
-               num_atomic_orbitals_ori, temp.data(), num_atomic_orbitals_min,
-               0.0, C_eta_a.data(), num_atomic_orbitals_ori);
+               num_atomic_orbitals_ori, temp_proj.data(),
+               num_atomic_orbitals_min, 0.0, C_eta_a.data(),
+               num_atomic_orbitals_ori);
+
     C_eta_a += C_normal_a;
 
     // Form normalized hard unmatched hard virtuals on atom A (xi in the paper
@@ -1110,21 +1125,34 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
             std::to_string(atom_a),
         2.0);
 
+    // DEBUG: C_hv_a after LAPACK orthonormalization (KEY DIVERGENCE POINT)
+    std::ostringstream oss_hva;
+    oss_hva << C_hv_a;
+    QDK_LOGGER().info("DEBUG_HV_LAPACK1 atom {} C_hv_a:\n{}", atom_a,
+                      oss_hva.str());
+
     // Form T = C_hv_A^T * overlap_ori * proto_hv
     Eigen::MatrixXd T = Eigen::MatrixXd::Zero(nhv_a, nhv_a);
+    Eigen::MatrixXd temp_T =
+        Eigen::MatrixXd::Zero(nhv_a, num_atomic_orbitals_ori);
     blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
                nhv_a, num_atomic_orbitals_ori, num_atomic_orbitals_ori, 1.0,
                C_hv_a.data(), num_atomic_orbitals_ori,
                this->overlap_ori_.data(), num_atomic_orbitals_ori, 0.0,
-               temp.data(), nhv_a);
+               temp_T.data(), nhv_a);
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-               nhv_a, nhv_a, num_atomic_orbitals_ori, 1.0, temp.data(), nhv_a,
+               nhv_a, nhv_a, num_atomic_orbitals_ori, 1.0, temp_T.data(), nhv_a,
                proto_hv.data(), num_atomic_orbitals_ori, 0.0, T.data(), nhv_a);
     // Now to form Z, Z is just orthonormalized T in our case
     Eigen::MatrixXd Z = Eigen::MatrixXd::Zero(nhv_a, nhv_a);
     Eigen::MatrixXd Iden = Eigen::MatrixXd::Identity(nhv_a, nhv_a);
     this->orthonormalization(nhv_a, nhv_a, Iden.data(), T.data(), Z.data(),
                              1e-6);
+
+    // DEBUG: Z after LAPACK orthonormalization (KEY DIVERGENCE POINT)
+    std::ostringstream oss_z;
+    oss_z << Z;
+    QDK_LOGGER().info("DEBUG_HV_LAPACK2 atom {} Z:\n{}", atom_a, oss_z.str());
 
     // Finally form the hard virtuals on atom A (gamma in the paper) in the
     // representation of the original basis
@@ -1146,9 +1174,21 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     C_hard_virtuals.block(0, idx_hv, num_atomic_orbitals_ori, nhv_a) =
         C_hv_final;
 
+    // DEBUG: C_hv_final for this atom
+    std::ostringstream oss_final;
+    oss_final << C_hv_final;
+    QDK_LOGGER().info("DEBUG_HV_FINAL atom {} C_hv_final:\n{}", atom_a,
+                      oss_final.str());
+
     idx_hv += nhv_a;
 
   }  // Loop over atoms
+
+  // DEBUG: C_hard_virtuals before weighted orthogonalization
+  std::ostringstream oss_before_weight;
+  oss_before_weight << C_hard_virtuals;
+  QDK_LOGGER().info("DEBUG_HV_BEFORE_WEIGHT C_hard_virtuals:\n{}",
+                    oss_before_weight.str());
 
   // Calculate the orbital spread of each hard virtual orbital, then do weighted
   // orthogonalization if requested
@@ -1161,6 +1201,12 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     // Weight each orbital by spread
     for (int orb = 0; orb < nhv; ++orb)
       C_hard_virtuals.col(orb) *= spreads_hv(orb);
+
+    // DEBUG: C_hard_virtuals after weighted orthogonalization
+    std::ostringstream oss_after_weight;
+    oss_after_weight << C_hard_virtuals;
+    QDK_LOGGER().info("DEBUG_HV_AFTER_WEIGHT C_hard_virtuals:\n{}",
+                      oss_after_weight.str());
   }
 
   // Now hard virtuals are only orthonormal on each atom, we need to
@@ -1173,6 +1219,12 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
 
   Eigen::MatrixXd result_hard_virtuals =
       temp.block(0, 0, num_atomic_orbitals_ori, nhv);
+
+  // DEBUG OUTPUT: final result_hard_virtuals
+  std::ostringstream oss_output;
+  oss_output << result_hard_virtuals;
+  QDK_LOGGER().info("DEBUG_HV_OUTPUT result_hard_virtuals:\n{}",
+                    oss_output.str());
 
   return result_hard_virtuals;
 }
