@@ -69,14 +69,13 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
     sample_one_body_beta = Eigen::MatrixXd::Ones(2, 2);
 
     sample_two_body_aaaa = Eigen::VectorXd::Constant(16, 1.0);
-    sample_two_body_aabb = Eigen::VectorXd::Constant(16, 2.0);
+    sample_two_body_aabb = Eigen::VectorXd::Constant(16, sqrt(3));
     sample_two_body_bbbb = Eigen::VectorXd::Constant(16, 3.0);
 
     // These numbers are selected because they correspond to
     // sample_two_body_xxxx that is used for canonical four-center tests
-    sample_three_center_aaaa = sqrt(0.5) * three_center;
-    sample_three_center_aabb = three_center;
-    sample_three_center_bbbb = sqrt(1.5) * three_center;
+    sample_three_center_aa = sqrt(0.5) * three_center;
+    sample_three_center_bb = sqrt(1.5) * three_center;
 
     sample_inactive_fock_alpha = Eigen::MatrixXd::Constant(2, 2, 4.0);
     sample_inactive_fock_beta = Eigen::MatrixXd::Constant(2, 2, 5.0);
@@ -131,9 +130,9 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
       return std::make_shared<Hamiltonian>(
           std::make_unique<DensityFittedHamiltonianContainer>(
               sample_one_body_alpha, sample_one_body_beta,
-              sample_three_center_aaaa, sample_three_center_aabb,
-              sample_three_center_bbbb, orbitals_unrestricted, core_energy,
-              sample_inactive_fock_alpha, sample_inactive_fock_beta));
+              sample_three_center_aa, sample_three_center_bb,
+              orbitals_unrestricted, core_energy, sample_inactive_fock_alpha,
+              sample_inactive_fock_beta));
     }
     throw std::runtime_error("Unknown container type: " + type);
   }
@@ -155,9 +154,8 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
   Eigen::VectorXd sample_two_body_aaaa;
   Eigen::VectorXd sample_two_body_aabb;
   Eigen::VectorXd sample_two_body_bbbb;
-  Eigen::MatrixXd sample_three_center_aaaa;
-  Eigen::MatrixXd sample_three_center_aabb;
-  Eigen::MatrixXd sample_three_center_bbbb;
+  Eigen::MatrixXd sample_three_center_aa;
+  Eigen::MatrixXd sample_three_center_bb;
   Eigen::MatrixXd sample_inactive_fock_alpha;
   Eigen::MatrixXd sample_inactive_fock_beta;
 
@@ -443,13 +441,12 @@ TEST_P(HamiltonianTest, TwoBodyElementAccess) {
     EXPECT_DOUBLE_EQ(h.get_one_body_element(1, 1), 1.0);
 
     // Test three center integral
-    auto [three_c_aaaa, three_c_aabb, three_c_bbbb] =
+    auto [three_c_aa, three_c_bb] =
         h.get_container<DensityFittedHamiltonianContainer>()
             .get_three_center_integrals();
 
-    EXPECT_TRUE(three_c_aaaa.isApprox(test_three_center));
-    EXPECT_TRUE(three_c_aabb.isApprox(test_three_center));
-    EXPECT_TRUE(three_c_bbbb.isApprox(test_three_center));
+    EXPECT_TRUE(three_c_aa.isApprox(test_three_center));
+    EXPECT_TRUE(three_c_bb.isApprox(test_three_center));
 
     // Test accessing specific elements to verify get_two_body_index
     // calculations
@@ -1150,9 +1147,8 @@ TEST_P(HamiltonianTest, UnrestrictedSpinChannelAccess) {
   Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Zero(16);
   Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Zero(16);
 
-  Eigen::MatrixXd three_center_aaaa = Eigen::MatrixXd::Zero(3, 4);
-  Eigen::MatrixXd three_center_aabb = Eigen::MatrixXd::Zero(3, 4);
-  Eigen::MatrixXd three_center_bbbb = Eigen::MatrixXd::Zero(3, 4);
+  Eigen::MatrixXd three_center_aa = Eigen::MatrixXd::Zero(3, 4);
+  Eigen::MatrixXd three_center_bb = Eigen::MatrixXd::Zero(3, 4);
 
   // canonical four center case
   two_body_aaaa[0] = 1.0;   // (0,0,0,0) in aaaa channel
@@ -1160,13 +1156,12 @@ TEST_P(HamiltonianTest, UnrestrictedSpinChannelAccess) {
   two_body_bbbb[15] = 3.0;  // (1,1,1,1) in bbbb channel
 
   // three center case
-  // (a,a,a,a) (a,a,b,b) (b,b,b,b)
-  // (0,1,0,0) (0,0,0,0) (0,0,0,0)
-  // (0,0,0,0) (0,0,2,0) (0,0,0,0)
-  // (0,0,0,0) (0,0,0,0) (0,0,3,0)
-  three_center_aaaa(1, 0) = 1.0;
-  three_center_aabb(1, 2) = 2.0;
-  three_center_bbbb(2, 2) = 3.0;
+  // (a,a,a,a) (a,a,b,b)
+  // (0,1,0,0) (0,0,0,0)
+  // (0,0,0,0) (0,0,2,0)
+  // (0,0,0,0) (0,0,0,0)
+  three_center_aa(1, 0) = 1.0;
+  three_center_bb(1, 2) = 2.0;
 
   Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
 
@@ -1196,9 +1191,8 @@ TEST_P(HamiltonianTest, UnrestrictedSpinChannelAccess) {
                      0.0);
   } else if (test_p == "density_fitted") {
     Hamiltonian h(std::make_unique<DensityFittedHamiltonianContainer>(
-        one_body_alpha, one_body_beta, three_center_aaaa, three_center_aabb,
-        three_center_bbbb, unrestricted_orbitals, core_energy, empty_fock,
-        empty_fock));
+        one_body_alpha, one_body_beta, three_center_aa, three_center_bb,
+        unrestricted_orbitals, core_energy, empty_fock, empty_fock));
 
     EXPECT_DOUBLE_EQ(h.get_one_body_element(0, 0, SpinChannel::aa), 1.0);
     EXPECT_DOUBLE_EQ(h.get_one_body_element(0, 1, SpinChannel::aa), 0.0);
@@ -1208,12 +1202,14 @@ TEST_P(HamiltonianTest, UnrestrictedSpinChannelAccess) {
     // Test accessing elements through different spin channels
     EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::aaaa),
                      1.0);
-    EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 0, 1, 0, SpinChannel::aabb),
-                     4.0);
+    EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 1, 0, SpinChannel::aabb),
+                     2.0);
     EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 0, 1, 0, SpinChannel::bbbb),
-                     9.0);
+                     4.0);
 
     // Verify other elements are zero
+    EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::aabb),
+                     0.0);
     EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::aabb),
                      0.0);
     EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::bbbb),
@@ -1387,11 +1383,11 @@ TEST_P(HamiltonianTest, ErrorHandlingUnrestrictedMismatchedActiveSpace) {
       Eigen::VectorXd::Ones(81);  // 3^4 - mismatched
   Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Ones(81);  // 3^4
 
-  Eigen::MatrixXd three_center_aaaa = Eigen::MatrixXd::Random(3, 4);  // 2^4
-  Eigen::MatrixXd three_center_aabb =
+  Eigen::MatrixXd three_center_aa = Eigen::MatrixXd::Random(3, 4);  // 2^4
+  Eigen::MatrixXd three_center_bb =
       Eigen::MatrixXd::Random(3, 4);  //  - mismatched
-  Eigen::MatrixXd three_center_bbbb1 = Eigen::MatrixXd::Random(3, 9);  // 3^4
-  Eigen::MatrixXd three_center_bbbb2 =
+  Eigen::MatrixXd three_center_bb1 = Eigen::MatrixXd::Random(3, 9);  // 3^4
+  Eigen::MatrixXd three_center_bb2 =
       Eigen::MatrixXd::Random(4, 4);  // - mismatch
 
   Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
@@ -1413,9 +1409,9 @@ TEST_P(HamiltonianTest, ErrorHandlingUnrestrictedMismatchedActiveSpace) {
           // geminal dimension mismatch
           Hamiltonian h_mismatched(
               std::make_unique<DensityFittedHamiltonianContainer>(
-                  one_body_alpha, one_body_beta, three_center_aaaa,
-                  three_center_aabb, three_center_bbbb1, unrestricted_orbitals,
-                  core_energy, empty_fock, empty_fock));
+                  one_body_alpha, one_body_beta, three_center_aa,
+                  three_center_bb1, unrestricted_orbitals, core_energy,
+                  empty_fock, empty_fock));
         },
         std::invalid_argument);
     EXPECT_THROW(
@@ -1423,9 +1419,9 @@ TEST_P(HamiltonianTest, ErrorHandlingUnrestrictedMismatchedActiveSpace) {
           // aux basis number mismatch
           Hamiltonian h_mismatched(
               std::make_unique<DensityFittedHamiltonianContainer>(
-                  one_body_alpha, one_body_beta, three_center_aaaa,
-                  three_center_aabb, three_center_bbbb2, unrestricted_orbitals,
-                  core_energy, empty_fock, empty_fock));
+                  one_body_alpha, one_body_beta, three_center_aa,
+                  three_center_bb2, unrestricted_orbitals, core_energy,
+                  empty_fock, empty_fock));
         },
         std::invalid_argument);
   }

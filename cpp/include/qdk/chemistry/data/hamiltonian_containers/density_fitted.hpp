@@ -71,12 +71,10 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
    * basis
    * @param one_body_integrals_beta One-electron integrals for beta spin in MO
    * basis
-   * @param three_center_integrals_aaaa Three-center two-electron
-   * alpha-alpha-alpha-alpha integrals
-   * @param three_center_integrals_aabb Three-center two-electron
-   * alpha-beta-alpha-beta integrals
-   * @param three_center_integrals_bbbb Three-center two-electron
-   * beta-beta-beta-beta integrals
+   * @param three_center_integrals_aa Three-center two-electron alpha-alpha
+   * integrals
+   * @param three_center_integrals_bb Three-center two-electron alpha-beta
+   * integrals
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital
    * energy)
@@ -91,9 +89,8 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
   DensityFittedHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals_alpha,
       const Eigen::MatrixXd& one_body_integrals_beta,
-      const Eigen::MatrixXd& three_center_integrals_aaaa,
-      const Eigen::MatrixXd& three_center_integrals_aabb,
-      const Eigen::MatrixXd& three_center_integrals_bbbb,
+      const Eigen::MatrixXd& three_center_integrals_aa,
+      const Eigen::MatrixXd& three_center_integrals_bb,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
       const Eigen::MatrixXd& inactive_fock_matrix_alpha,
       const Eigen::MatrixXd& inactive_fock_matrix_beta,
@@ -102,7 +99,7 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Destructor
    */
-  ~DensityFittedHamiltonianContainer() override final = default;
+  ~DensityFittedHamiltonianContainer() override = default;
 
   /**
    * @brief Create a deep copy of this container
@@ -126,16 +123,15 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
    */
   std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
              const Eigen::VectorXd&>
-  get_two_body_integrals() const override final;
+  get_two_body_integrals() const override;
 
   /**
    * @brief Get three-center integrals in MO basis for all spin channels
-   * @return Tuple of references to (aaaa, aabb, bbbb) two-electron three-center
+   * @return Tuple of references to (aa, bb) three-center two-electron
    * integrals matrices
    * @throws std::runtime_error if integrals are not set
    */
-  std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
-             const Eigen::MatrixXd&>
+  std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
   get_three_center_integrals() const;
 
   /**
@@ -151,13 +147,13 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
    */
   double get_two_body_element(
       unsigned i, unsigned j, unsigned k, unsigned l,
-      SpinChannel channel = SpinChannel::aaaa) const override final;
+      SpinChannel channel = SpinChannel::aaaa) const override;
 
   /**
    * @brief Check if two-body integrals are available
    * @return True if two-body integrals are set
    */
-  bool has_two_body_integrals() const override final;
+  bool has_two_body_integrals() const override;
 
   /**
    * @brief Check if the Hamiltonian is restricted
@@ -216,7 +212,6 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
   /// Three-center integrals in MO basis, stored as matrices [naux x n_geminals]
   /// where n_geminals = norb * norb for each spin channel
   const std::tuple<std::shared_ptr<Eigen::MatrixXd>,
-                   std::shared_ptr<Eigen::MatrixXd>,
                    std::shared_ptr<Eigen::MatrixXd>>
       _three_center_integrals;
 
@@ -238,11 +233,10 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
   size_t _get_geminal_index(size_t i, size_t j) const;
 
   double _get_two_body_element(const Eigen::MatrixXd& A, unsigned ij,
-                               unsigned kl) const;
+                               const Eigen::MatrixXd& B, unsigned kl) const;
 
-  static std::tuple<std::shared_ptr<Eigen::MatrixXd>,
-                    std::shared_ptr<Eigen::MatrixXd>,
-                    std::shared_ptr<Eigen::MatrixXd>>
+  static std::pair<std::shared_ptr<Eigen::MatrixXd>,
+                   std::shared_ptr<Eigen::MatrixXd>>
   make_restricted_three_center_integrals(const Eigen::MatrixXd& integrals);
 
   /**
