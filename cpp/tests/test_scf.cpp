@@ -1014,13 +1014,6 @@ TEST_F(ScfTest, H2ScanDIISNumericalStability) {
 }
 
 TEST_F(ScfTest, AtomInitGuessEnergyConvergence) {
-  // Clear the atomic guess cache to ensure both basis set creation methods
-  // generate fresh atomic guesses
-  std::filesystem::path guess_cache =
-      std::filesystem::temp_directory_path() / "qdk" / "chemistry" / "guess";
-  std::filesystem::remove_all(guess_cache);
-  std::filesystem::create_directories(guess_cache);
-
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("method", "hf");
   std::vector<std::string> basis_names = {"def2-tzvp"};

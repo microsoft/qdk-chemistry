@@ -338,35 +338,23 @@ class ERI {
     if (J) std::memset(J, 0, mat_size * sizeof(double));
     if (K) std::memset(K, 0, mat_size * sizeof(double));
 
-    // Use a fixed number of accumulation buckets for deterministic summation
-    // This ensures the same grouping of quartets regardless of thread count
-    constexpr int NUM_BUCKETS = 64;
-
-    // Bucket-local accumulation buffers for reproducibility
-    std::vector<std::vector<double>> J_bucket(0);
-    std::vector<std::vector<double>> K_bucket(0);
-#ifdef _OPENMP
-    std::vector<omp_lock_t> bucket_locks(NUM_BUCKETS);
-#endif
+    // Thread-local accumulation buffers for reproducibility
+    std::vector<std::vector<double>> J_local(0);
+    std::vector<std::vector<double>> K_local(0);
 
     if (use_thread_local_buffers_) {
-      J_bucket.resize(NUM_BUCKETS);
-      K_bucket.resize(NUM_BUCKETS);
+      J_local.resize(nthreads);
+      K_local.resize(nthreads);
       if (J) {
-        for (int b = 0; b < NUM_BUCKETS; ++b) {
-          J_bucket[b].resize(mat_size, 0.0);
+        for (int t = 0; t < nthreads; ++t) {
+          J_local[t].resize(mat_size, 0.0);
         }
       }
       if (K) {
-        for (int b = 0; b < NUM_BUCKETS; ++b) {
-          K_bucket[b].resize(mat_size, 0.0);
+        for (int t = 0; t < nthreads; ++t) {
+          K_local[t].resize(mat_size, 0.0);
         }
       }
-#ifdef _OPENMP
-      for (int b = 0; b < NUM_BUCKETS; ++b) {
-        omp_init_lock(&bucket_locks[b]);
-      }
-#endif
     }
 
 #ifdef _OPENMP
@@ -375,13 +363,19 @@ class ERI {
     {
 #ifdef _OPENMP
       const auto thread_id = omp_get_thread_num();
-      const auto num_threads = omp_get_num_threads();
 #else
       const auto thread_id = 0;
-      const auto num_threads = 1;
 #endif
       auto& engine = engines_coulomb[thread_id];
       const auto& buf = engine.results();
+
+      // Get pointers to thread-local buffers
+      double* J_thread = nullptr;
+      double* K_thread = nullptr;
+      if (use_thread_local_buffers_) {
+        J_thread = J ? J_local[thread_id].data() : nullptr;
+        K_thread = K ? K_local[thread_id].data() : nullptr;
+      }
 
       for (size_t s1 = 0ul, s1234 = 0ul; s1 < nsh; ++s1) {
         const auto bf1_st = shell2bf_[s1];
@@ -416,13 +410,8 @@ class ERI {
               const auto* sp34_data = sp34_data_it->get();
               sp34_data_it++;
 
-              // Assign quartets to threads using round-robin
-              // but accumulate into fixed buckets for determinism
-              const size_t current_quartet = s1234++;
-              if (current_quartet % num_threads != static_cast<size_t>(thread_id)) continue;
-
-              // Determine which bucket this quartet belongs to
-              const int bucket_id = current_quartet % NUM_BUCKETS;
+              // Assign to threads
+              if ((s1234++) % nthreads != thread_id) continue;
 
               // Determine if we need to compute this integral via Schwarz
               const auto P14_nrm = P_shnrm(s1, s4);
@@ -454,18 +443,14 @@ class ERI {
               if (buf_1234 == nullptr) continue;
 
               // Contract shell quartet (J)
-              if (J) {
-#ifdef _OPENMP
-                if (use_thread_local_buffers_)
-                  omp_set_lock(&bucket_locks[bucket_id]);
-#endif
+              if (J)
                 for (size_t idm = 0; idm < num_density_matrices; ++idm) {
                   auto* J_cur =
                       use_thread_local_buffers_
-                          ? J_bucket[bucket_id].data() +
+                          ? J_thread +
                                 idm * num_atomic_orbitals * num_atomic_orbitals
                           : J + idm * num_atomic_orbitals * num_atomic_orbitals;
-                  const auto* P_cur =
+                  auto* P_cur =
                       P + idm * num_atomic_orbitals * num_atomic_orbitals;
                   for (size_t i = 0, ijkl = 0; i < n1; ++i) {
                     const size_t bf1 = bf1_st + i;
@@ -510,25 +495,16 @@ class ERI {
                     }  // j
                   }  // i
                 }  // idm
-#ifdef _OPENMP
-                if (use_thread_local_buffers_)
-                  omp_unset_lock(&bucket_locks[bucket_id]);
-#endif
-              }
 
               // Contract shell quartet (K)
-              if (K) {
-#ifdef _OPENMP
-                if (use_thread_local_buffers_)
-                  omp_set_lock(&bucket_locks[bucket_id]);
-#endif
+              if (K)
                 for (size_t idm = 0; idm < num_density_matrices; ++idm) {
                   auto* K_cur =
                       use_thread_local_buffers_
-                          ? K_bucket[bucket_id].data() +
+                          ? K_thread +
                                 idm * num_atomic_orbitals * num_atomic_orbitals
                           : K + idm * num_atomic_orbitals * num_atomic_orbitals;
-                  const auto* P_cur =
+                  auto* P_cur =
                       P + idm * num_atomic_orbitals * num_atomic_orbitals;
                   for (size_t i = 0, ijkl = 0; i < n1; ++i) {
                     const size_t bf1 = bf1_st + i;
@@ -592,11 +568,6 @@ class ERI {
                     }  // j
                   }  // i
                 }  // idm
-#ifdef _OPENMP
-                if (use_thread_local_buffers_)
-                  omp_unset_lock(&bucket_locks[bucket_id]);
-#endif
-              }
 
             }  // s4
           }  // s3
@@ -605,28 +576,22 @@ class ERI {
 
     }  // End parallel region
 
-    // Deterministic reduction: combine bucket buffers in fixed order
-    // This ensures identical results regardless of thread count
+    // Deterministic reduction: combine thread-local buffers in order
     if (use_thread_local_buffers_) {
       if (J) {
-        for (int b = 0; b < NUM_BUCKETS; ++b) {
+        for (int t = 0; t < nthreads; ++t) {
           for (size_t i = 0; i < mat_size; ++i) {
-            J[i] += J_bucket[b][i];
+            J[i] += J_local[t][i];
           }
         }
       }
       if (K) {
-        for (int b = 0; b < NUM_BUCKETS; ++b) {
+        for (int t = 0; t < nthreads; ++t) {
           for (size_t i = 0; i < mat_size; ++i) {
-            K[i] += K_bucket[b][i];
+            K[i] += K_local[t][i];
           }
         }
       }
-#ifdef _OPENMP
-      for (int b = 0; b < NUM_BUCKETS; ++b) {
-        omp_destroy_lock(&bucket_locks[b]);
-      }
-#endif
     }
 
     // Symmetrize J

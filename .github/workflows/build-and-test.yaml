@@ -283,6 +283,7 @@ jobs:
         echo "Found build directory: $BUILD_TEMP"
 
         set +e
+        set -o pipefail
         pytest \
           --cov=qdk_chemistry \
           --cov-report=xml:../coverage-reports/python_coverage.xml \
@@ -293,7 +294,7 @@ jobs:
           --tb=short \
           2>&1 | tee ../coverage-reports/python_coverage.txt
 
-        PYTEST_EXIT_CODE=$?
+        PYTEST_EXIT_CODE=${PIPESTATUS[0]}
         set -e
 
         echo "=== Python Test Output ==="
