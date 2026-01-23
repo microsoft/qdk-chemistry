@@ -18,7 +18,6 @@
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <sstream>
 #include <stdexcept>
 
 #include "../utils.hpp"
@@ -28,322 +27,6 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
-
-/**
- * @brief Apply canonical sign convention to a single vector.
- *
- * Ensures the element with largest absolute value is positive.
- *
- * @param v Vector to canonicalize (modified in-place)
- */
-static void canonicalize_sign(Eigen::VectorXd& v) {
-  const double tie_tol = 1e-10;
-  int max_idx = 0;
-  double max_abs = std::abs(v(0));
-  for (int i = 1; i < v.size(); ++i) {
-    double abs_val = std::abs(v(i));
-    // Only update if strictly larger to ensure deterministic tie-breaking
-    if (abs_val > max_abs + tie_tol) {
-      max_abs = abs_val;
-      max_idx = i;
-    }
-  }
-  if (max_abs > 1e-14 && v(max_idx) < 0.0) {
-    v *= -1.0;
-  }
-}
-
-/**
- * @brief Get canonical ordering index for a vector.
- *
- * Returns the index of the first element with magnitude above threshold,
- * used for deterministic ordering within degenerate subspaces.
- *
- * @param v Vector to analyze
- * @param threshold Magnitude threshold
- * @return Index of first significant element, or vector size if none found
- */
-static int get_canonical_order_index(const Eigen::VectorXd& v,
-                                     double threshold = 1e-10) {
-  for (int i = 0; i < v.size(); ++i) {
-    if (std::abs(v(i)) > threshold) {
-      return i;
-    }
-  }
-  return static_cast<int>(v.size());
-}
-
-/**
- * @brief Apply canonical orthogonalization to eigenvectors for cross-platform
- * determinism.
- *
- * This function handles both sign ambiguity AND arbitrary rotations within
- * degenerate eigenspaces. For degenerate eigenvalues, different LAPACK
- * implementations (macOS Accelerate vs Linux OpenBLAS/MKL) can return different
- * orthonormal bases for the same subspace.
- *
- * Algorithm:
- * 1. Identify clusters of degenerate eigenvalues (within tolerance)
- * 2. For each cluster with >1 eigenvector:
- *    a. Sort eigenvectors by canonical order (first significant row index)
- *    b. Apply Gram-Schmidt to re-orthogonalize in deterministic order
- * 3. Apply sign convention to each eigenvector (largest element positive)
- *
- * @param U Matrix of eigenvectors (modified in-place), columns are eigenvectors
- * @param eigenvalues Vector of eigenvalues corresponding to columns of U
- * @param degeneracy_tol Tolerance for considering eigenvalues degenerate
- */
-static void canonicalize_eigenvectors(Eigen::MatrixXd& U,
-                                      const Eigen::VectorXd& eigenvalues,
-                                      double degeneracy_tol = 1e-6) {
-  const int n = static_cast<int>(U.cols());
-  if (n == 0) return;
-
-  // Safety check: eigenvalues must match columns
-  if (eigenvalues.size() != n) {
-    // Fall back to simple sign canonicalization if sizes don't match
-    for (int col = 0; col < n; ++col) {
-      Eigen::VectorXd v = U.col(col);
-      canonicalize_sign(v);
-      U.col(col) = v;
-    }
-    return;
-  }
-
-  int cluster_start = 0;
-  while (cluster_start < n) {
-    // Find end of degenerate cluster
-    int cluster_end = cluster_start + 1;
-    while (cluster_end < n &&
-           std::abs(eigenvalues(cluster_end) - eigenvalues(cluster_start)) <
-               degeneracy_tol) {
-      ++cluster_end;
-    }
-
-    const int cluster_size = cluster_end - cluster_start;
-
-    if (cluster_size > 1) {
-      // Multiple degenerate eigenvectors - need canonical re-orthogonalization
-
-      // Step 1: Determine canonical ordering based on first significant element
-      std::vector<std::pair<int, int>>
-          order_indices;  // (canonical_index, column)
-      for (int col = cluster_start; col < cluster_end; ++col) {
-        Eigen::VectorXd v = U.col(col);
-        int order_idx = get_canonical_order_index(v);
-        order_indices.emplace_back(order_idx, col);
-      }
-
-      // Sort by canonical order index, then by column index for stability
-      std::sort(order_indices.begin(), order_indices.end(),
-                [](const std::pair<int, int>& a, const std::pair<int, int>& b) {
-                  if (a.first != b.first) return a.first < b.first;
-                  return a.second < b.second;
-                });
-
-      // Step 2: Extract eigenvectors in canonical order
-      Eigen::MatrixXd V(U.rows(), cluster_size);
-      for (int i = 0; i < cluster_size; ++i) {
-        V.col(i) = U.col(order_indices[i].second);
-      }
-
-      // Step 3: Apply modified Gram-Schmidt for numerical stability
-      for (int i = 0; i < cluster_size; ++i) {
-        Eigen::VectorXd v = V.col(i);
-
-        // Orthogonalize against previous vectors
-        for (int j = 0; j < i; ++j) {
-          double proj = V.col(j).dot(v);
-          v -= proj * V.col(j);
-        }
-
-        // Normalize
-        double norm = v.norm();
-        if (norm > 1e-14) {
-          v /= norm;
-          // Apply sign convention
-          canonicalize_sign(v);
-        } else {
-          // Vector became zero after orthogonalization - this can happen
-          // if vectors in the cluster are numerically linearly dependent.
-          // Keep the original vector direction with sign convention.
-          v = V.col(i);
-          double orig_norm = v.norm();
-          if (orig_norm > 1e-14) {
-            v /= orig_norm;
-            canonicalize_sign(v);
-          }
-          // If even original is zero, leave as-is (shouldn't happen)
-        }
-
-        V.col(i) = v;
-      }
-
-      // Step 4: Place back into U in original positions
-      for (int i = 0; i < cluster_size; ++i) {
-        U.col(cluster_start + i) = V.col(i);
-      }
-
-    } else {
-      // Single eigenvector - just apply sign convention
-      Eigen::VectorXd v = U.col(cluster_start);
-      canonicalize_sign(v);
-      U.col(cluster_start) = v;
-    }
-
-    cluster_start = cluster_end;
-  }
-}
-
-/**
- * @brief Simplified canonicalization when eigenvalues are not available.
- *
- * Only applies sign convention (largest element positive).
- * Use this for gelss output or when eigenvalues are not needed.
- *
- * @param U Matrix of vectors (modified in-place)
- */
-static void canonicalize_eigenvectors(Eigen::MatrixXd& U) {
-  for (int col = 0; col < U.cols(); ++col) {
-    Eigen::VectorXd v = U.col(col);
-    canonicalize_sign(v);
-    U.col(col) = v;
-  }
-}
-
-/**
- * @brief Apply canonical sign convention to matrix columns for cross-platform
- * determinism.
- *
- * Similar to canonicalize_eigenvectors but works on raw data pointer.
- * Used after gelss to ensure deterministic output.
- *
- * @param data Pointer to column-major matrix data
- * @param rows Number of rows
- * @param cols Number of columns
- */
-static void canonicalize_columns(double* data, int rows, int cols) {
-  const double tie_tol = 1e-10;
-  for (int col = 0; col < cols; ++col) {
-    double* col_ptr = data + col * rows;
-    // Find element with largest absolute value
-    // Use tolerance for tie-breaking: prefer smaller row index for near-ties
-    int max_idx = 0;
-    double max_abs = std::abs(col_ptr[0]);
-    for (int row = 1; row < rows; ++row) {
-      double abs_val = std::abs(col_ptr[row]);
-      // Only update if strictly larger to ensure deterministic tie-breaking
-      if (abs_val > max_abs + tie_tol) {
-        max_abs = abs_val;
-        max_idx = row;
-      }
-    }
-    // Flip sign if largest element is negative (with tolerance check)
-    if (max_abs > 1e-10 && col_ptr[max_idx] < 0.0) {
-      for (int row = 0; row < rows; ++row) {
-        col_ptr[row] *= -1.0;
-      }
-    }
-  }
-}
-
-/**
- * @brief Deterministically re-orthogonalize vectors for cross-platform
- * consistency.
- *
- * When different LAPACK implementations return different orthonormal bases for
- * the same subspace, this function produces a canonical basis by:
- * 1. Sorting columns by the row index of their largest-magnitude element
- * 2. Applying modified Gram-Schmidt in that deterministic order
- * 3. Applying sign convention (largest element positive)
- *
- * The vectors are orthonormalized with respect to a given overlap matrix.
- *
- * @param C_out Output matrix (modified in-place), stored column-major
- * @param num_rows Number of rows (num_atomic_orbitals)
- * @param num_cols Number of columns (output orbitals)
- * @param overlap Overlap matrix (num_rows x num_rows)
- */
-static void canonicalize_orthonormal_output(double* C_out, int num_rows,
-                                            int num_cols,
-                                            const double* overlap) {
-  if (num_cols <= 0) return;
-
-  Eigen::Map<Eigen::MatrixXd> C_map(C_out, num_rows, num_cols);
-  Eigen::Map<const Eigen::MatrixXd> S_map(overlap, num_rows, num_rows);
-
-  // Step 1: Determine canonical ordering based on row index of max element
-  // Use a tolerance to handle floating-point tie-breaking deterministically:
-  // prefer smaller row index when values are within tolerance
-  const double tie_tol = 1e-10;
-  std::vector<std::pair<int, int>> order_info;  // (max_row_idx, col_idx)
-  for (int col = 0; col < num_cols; ++col) {
-    int max_row = 0;
-    double max_abs = std::abs(C_map(0, col));
-    for (int row = 1; row < num_rows; ++row) {
-      double abs_val = std::abs(C_map(row, col));
-      // Only update if strictly larger (beyond tolerance) to ensure
-      // deterministic tie-breaking: smaller row index wins for near-ties
-      if (abs_val > max_abs + tie_tol) {
-        max_abs = abs_val;
-        max_row = row;
-      }
-    }
-    order_info.emplace_back(max_row, col);
-  }
-
-  // Sort by max_row_idx, then by original column index for stability
-  std::sort(order_info.begin(), order_info.end(),
-            [](const std::pair<int, int>& a, const std::pair<int, int>& b) {
-              if (a.first != b.first) return a.first < b.first;
-              return a.second < b.second;
-            });
-
-  // Step 2: Reorder columns according to canonical order
-  Eigen::MatrixXd V(num_rows, num_cols);
-  for (int i = 0; i < num_cols; ++i) {
-    V.col(i) = C_map.col(order_info[i].second);
-  }
-
-  // Step 3: Apply modified Gram-Schmidt with overlap matrix
-  for (int i = 0; i < num_cols; ++i) {
-    Eigen::VectorXd v = V.col(i);
-
-    // Orthogonalize against previous vectors: v -= sum_j (V_j^T S v) V_j
-    for (int j = 0; j < i; ++j) {
-      Eigen::VectorXd Sv = S_map * v;
-      double proj = V.col(j).dot(Sv);
-      v -= proj * V.col(j);
-    }
-
-    // Normalize with respect to overlap: norm = sqrt(v^T S v)
-    Eigen::VectorXd Sv = S_map * v;
-    double norm_sq = v.dot(Sv);
-    if (norm_sq > 1e-28) {
-      v /= std::sqrt(norm_sq);
-    }
-
-    // Apply sign convention: largest element positive
-    // Use tolerance for deterministic tie-breaking
-    int max_idx = 0;
-    double max_abs_sign = std::abs(v(0));
-    for (int row = 1; row < num_rows; ++row) {
-      double abs_val = std::abs(v(row));
-      if (abs_val > max_abs_sign + tie_tol) {
-        max_abs_sign = abs_val;
-        max_idx = row;
-      }
-    }
-    if (max_abs_sign > 1e-14 && v(max_idx) < 0.0) {
-      v *= -1.0;
-    }
-
-    V.col(i) = v;
-  }
-
-  // Step 4: Copy result back in canonical order
-  C_map = V;
-}
 
 /**
  * @brief VV-HV localization scheme implementation.
@@ -586,42 +269,12 @@ Eigen::MatrixXd VVHVLocalization::localize(
   const auto nhv = num_atomic_orbitals_ori - num_atomic_orbitals_min;
   const auto num_virtual_orbitals = n_val_virt + nhv;
 
-  QDK_LOGGER().info("VVHV INPUT: occupied_orbitals norm = {:.16e}",
-                    occupied_orbitals.norm());
-  QDK_LOGGER().info("VVHV INPUT: occupied_orbitals(0,0) = {:.16e}",
-                    occupied_orbitals(0, 0));
-  QDK_LOGGER().info("VVHV INPUT: overlap_ori norm = {:.16e}",
-                    overlap_ori_.norm());
-  QDK_LOGGER().info("VVHV INPUT: overlap_mix norm = {:.16e}",
-                    overlap_mix_.norm());
-
   // Calculate valence virtuals
   Eigen::MatrixXd C_valence_virtual =
       calculate_valence_virtual(occupied_orbitals);
-  QDK_LOGGER().debug("VVHV: Computed valence virtual orbitals (unlocalized)");
-  QDK_LOGGER().info("VVHV: Norm of C_valence_virtual (unlocalized): {:.16e}",
-                    C_valence_virtual.norm());
-  std::ostringstream oss_cvv;
-  oss_cvv << C_valence_virtual;
-  QDK_LOGGER().info("VVHV: Unlocalized C_valence_virtual:\n{}", oss_cvv.str());
 
   // Localize valence virtual orbitals
   Eigen::MatrixXd C_valence_loc = localize_valence_virtual(C_valence_virtual);
-  QDK_LOGGER().debug(
-      "VVHV: Localized valence virtual orbitals using inner localizer");
-  QDK_LOGGER().info(
-      "VVHV: Norm of C_valence_loc (localized valence virtuals): {:.16e}",
-      C_valence_loc.norm());
-  std::ostringstream oss_cvl;
-  oss_cvl << C_valence_loc;
-  QDK_LOGGER().info("VVHV: Localized C_valence_virtual:\n{}", oss_cvl.str());
-
-  if (n_val_virt > 0 && C_valence_loc.cols() > 0 && C_valence_loc.rows() >= 2) {
-    QDK_LOGGER().info("VVHV LOCALIZED: C_valence_loc(0,0) = {:.16e}",
-                      C_valence_loc(0, 0));
-    QDK_LOGGER().info("VVHV LOCALIZED: C_valence_loc(1,0) = {:.16e}",
-                      C_valence_loc(1, 0));
-  }
 
   // Combine C_valence_virtual and occupied_orbitals to get C_minimal
   Eigen::MatrixXd C_minimal(num_atomic_orbitals_ori, num_atomic_orbitals_min);
@@ -629,22 +282,9 @@ Eigen::MatrixXd VVHVLocalization::localize(
       occupied_orbitals;
   C_minimal.block(0, num_occupied_orbitals, num_atomic_orbitals_ori,
                   n_val_virt) = C_valence_virtual;
-  QDK_LOGGER().debug(
-      "VVHV: Combined occupied and valence virtual orbitals into C_minimal");
-  std::ostringstream oss_cmin;
-  oss_cmin << C_minimal;
-  QDK_LOGGER().debug("VVHV: C_minimal matrix:\n{}", oss_cmin.str());
 
   // Localize hard virtuals and combine with valence virtuals
   Eigen::MatrixXd hard_orbitals_loc = localize_hard_virtuals(C_minimal);
-  QDK_LOGGER().debug("VVHV: Generated and localized hard virtual orbitals");
-  QDK_LOGGER().info(
-      "VVHV: Norm of hard_orbitals_loc (localized hard virtuals): {:.16e}",
-      hard_orbitals_loc.norm());
-  std::ostringstream oss_hol;
-  oss_hol << hard_orbitals_loc;
-  QDK_LOGGER().info("VVHV: Localized hard virtual orbitals:\n{}",
-                    oss_hol.str());
 
   // Concatenate C_valence_loc and hard_orbitals_loc to form localized_orbitals
   Eigen::MatrixXd localized_orbitals =
@@ -701,17 +341,11 @@ void VVHVLocalization::initialize() {
     dipole_integrals_ = std::make_unique<qcs::RowMajorMatrix>(
         3 * num_atomic_orbitals_ori, num_atomic_orbitals_ori);
     ori_bs_1ee.dipole_integral(dipole_integrals_->data());
-    QDK_LOGGER().info(
-        "VVHVLocalization: Computed dipole integrals with norm {:.16e}",
-        dipole_integrals_->norm());
 
     // Allocate and compute quadrupole integrals
     quadrupole_integrals_ = std::make_unique<qcs::RowMajorMatrix>(
         6 * num_atomic_orbitals_ori, num_atomic_orbitals_ori);
     ori_bs_1ee.quadrupole_integral(quadrupole_integrals_->data());
-    QDK_LOGGER().info(
-        "VVHVLocalization: Computed quadrupole integrals with norm {:.16e}",
-        quadrupole_integrals_->norm());
 
     QDK_LOGGER().debug(
         "VVHVLocalization: Pre-computed dipole and quadrupole integrals for "
@@ -798,38 +432,15 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
   // according to new tutorial
   Eigen::MatrixXd T(num_atomic_orbitals_ori, num_atomic_orbitals_min);
   {
-    // Solve overlap_ori * T = overlap_mix using Cholesky decomposition
-    // This is more deterministic than gelss across LAPACK implementations
-    // since overlap_ori is symmetric positive definite
-    temp = this->overlap_ori_;   // potrf overwrites with Cholesky factor
-    temp2 = this->overlap_mix_;  // potrs overwrites with solution
-
-    // Compute Cholesky factorization: overlap_ori = L * L^T
-    int64_t info = lapack::potrf(lapack::Uplo::Lower, num_atomic_orbitals_ori,
-                                 temp.data(), num_atomic_orbitals_ori);
-    if (info != 0) {
-      throw std::runtime_error(
-          "VVHVLocalization: Cholesky factorization failed for overlap matrix "
-          "(info=" +
-          std::to_string(info) + ")");
-    }
-
-    // Solve L * L^T * T = overlap_mix
-    info = lapack::potrs(lapack::Uplo::Lower, num_atomic_orbitals_ori,
-                         num_atomic_orbitals_min, temp.data(),
-                         num_atomic_orbitals_ori, temp2.data(),
-                         num_atomic_orbitals_ori);
-    if (info != 0) {
-      throw std::runtime_error(
-          "VVHVLocalization: Cholesky solve failed (info=" +
-          std::to_string(info) + ")");
-    }
-    QDK_LOGGER().info("Computed T using Cholesky decomposition");
-
-    // Apply canonical sign convention for cross-platform determinism
-    canonicalize_columns(temp2.data(), num_atomic_orbitals_ori,
-                         num_atomic_orbitals_min);
-
+    temp = this->overlap_ori_;   // lapack::gelss overwrites input
+    temp2 = this->overlap_mix_;  // the unnormalized T
+    std::vector<double> W11(num_atomic_orbitals_ori);
+    double _rcond = -1;
+    int64_t RANK11;
+    lapack::gelss(num_atomic_orbitals_ori, num_atomic_orbitals_ori,
+                  num_atomic_orbitals_min, temp.data(), num_atomic_orbitals_ori,
+                  temp2.data(), num_atomic_orbitals_ori, W11.data(), _rcond,
+                  &RANK11);
     this->orthonormalization(num_atomic_orbitals_ori, num_atomic_orbitals_min,
                              this->overlap_ori_.data(), temp2.data(), T.data(),
                              1e-6, 0,
@@ -870,25 +481,6 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
       temp.block(0, 0, num_atomic_orbitals_ori,
                  num_atomic_orbitals_min - num_occupied_orbitals);
 
-  QDK_LOGGER().info("VVHV VALENCE: C_mp_wo_occ norm = {:.16e}",
-                    C_mp_wo_occ.norm());
-  QDK_LOGGER().info("VVHV VALENCE: C_mp_wo_occ(0,0) = {:.16e}",
-                    C_mp_wo_occ(0, 0));
-  QDK_LOGGER().info("VVHV VALENCE: C_valence_unloc norm = {:.16e}",
-                    C_valence_unloc.norm());
-  if (C_valence_unloc.cols() > 0 && C_valence_unloc.rows() > 0) {
-    QDK_LOGGER().info("VVHV VALENCE: C_valence_unloc(0,0) = {:.16e}",
-                      C_valence_unloc(0, 0));
-  } else {
-    QDK_LOGGER().info(
-        "VVHV VALENCE: C_valence_unloc is empty (no valence virtual orbitals)");
-  }
-  std::ostringstream oss_cmp;
-  oss_cmp << C_mp_wo_occ;
-  QDK_LOGGER().info("VVHV Valence: C_mp_wo_occ matrix:\n{}", oss_cmp.str());
-  std::ostringstream oss_cvu;
-  oss_cvu << C_valence_unloc;
-  QDK_LOGGER().info("VVHV Valence C_valence_unloc:\n{}", oss_cvu.str());
   return C_valence_unloc;
 }
 
@@ -909,6 +501,7 @@ Eigen::MatrixXd VVHVLocalization::localize_valence_virtual(
         "*** Localizing Valence Virtual Orbitals (VVHV Sub-scheme) ***");
     result = this->inner_localizer_->localize(C_valence_unloc);
   }
+
   return result;
 }
 
@@ -942,38 +535,18 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
   if (num_atomic_orbitals_al_min != 0) {
     // Get T_al = overlap_ori_al**-1 * overlap_mix_al, corresponding to xi
     // coefficients in the literature, in the representation of the original
-    // basis. Use Cholesky for deterministic cross-platform results.
+    // basis
     Eigen::MatrixXd T_al = overlap_mix_al;
     {
       Eigen::MatrixXd overlap_ori_copy =
-          overlap_ori_al;  // potrf overwrites with Cholesky factor
-
-      // Compute Cholesky factorization: overlap_ori_al = L * L^T
-      int64_t info =
-          lapack::potrf(lapack::Uplo::Lower, num_atomic_orbitals_al_ori,
-                        overlap_ori_copy.data(), num_atomic_orbitals_al_ori);
-      if (info != 0) {
-        throw std::runtime_error(
-            "VVHVLocalization::proto_hv: Cholesky factorization failed for "
-            "overlap matrix (info=" +
-            std::to_string(info) + ")");
-      }
-
-      // Solve L * L^T * T_al = overlap_mix_al
-      info = lapack::potrs(lapack::Uplo::Lower, num_atomic_orbitals_al_ori,
-                           num_atomic_orbitals_al_min, overlap_ori_copy.data(),
-                           num_atomic_orbitals_al_ori, T_al.data(),
-                           num_atomic_orbitals_al_ori);
-      if (info != 0) {
-        throw std::runtime_error(
-            "VVHVLocalization::proto_hv: Cholesky solve failed (info=" +
-            std::to_string(info) + ")");
-      }
-      QDK_LOGGER().debug("proto_hv: Computed T_al using Cholesky decomposition");
-
-      // Apply canonical sign convention for cross-platform determinism
-      canonicalize_columns(T_al.data(), num_atomic_orbitals_al_ori,
-                           num_atomic_orbitals_al_min);
+          overlap_ori_al;  // lapack::gelss overwrites input
+      std::vector<double> W11(num_atomic_orbitals_al_ori);
+      double _rcond = -1.;
+      int64_t _tmp_rank;
+      lapack::gelss(num_atomic_orbitals_al_ori, num_atomic_orbitals_al_ori,
+                    num_atomic_orbitals_al_min, overlap_ori_copy.data(),
+                    num_atomic_orbitals_al_ori, T_al.data(),
+                    num_atomic_orbitals_al_ori, W11.data(), _rcond, &_tmp_rank);
     }
 
     // Get overlap of xi, S = T_al^T * overlap_ori_al * T_al = overlap_mix_al^T
@@ -987,7 +560,7 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
                num_atomic_orbitals_al_ori, 0.0, S_xi.data(),
                num_atomic_orbitals_al_min);
 
-    // Compute S_xi^-1 * (overlap_mix^T * C_psi) using LU decomposition
+    // Compute S_xi^-1 * overlap_mix^T using lapack::gelss
     // Transformation matrix for proto hard virtual construction
     // C_psi = (I - T S_xi^-1 overlap_mix^T) C_psi,
     {
@@ -1000,25 +573,14 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
                  num_atomic_orbitals_al_ori, C_psi.data(),
                  num_atomic_orbitals_al_ori, 0.0, RHS.data(),
                  num_atomic_orbitals_al_min);
-
-      // Use LU decomposition with pivoting (gesv) for S_xi solve
-      // This is more robust than Cholesky for potentially ill-conditioned S_xi
-      std::vector<int64_t> ipiv(num_atomic_orbitals_al_min);
-      int64_t info =
-          lapack::gesv(num_atomic_orbitals_al_min, num_atomic_orbitals_al_ori,
-                       S_xi.data(), num_atomic_orbitals_al_min, ipiv.data(),
-                       RHS.data(), num_atomic_orbitals_al_min);
-      if (info != 0) {
-        throw std::runtime_error(
-            "VVHVLocalization::proto_hv: LU solve for S_xi failed (info=" +
-            std::to_string(info) + ")");
-      }
-      QDK_LOGGER().debug("proto_hv: Solved S_xi^-1 * overlap_mix^T using LU");
-
-      // Apply canonical sign convention for cross-platform determinism
-      canonicalize_columns(RHS.data(), num_atomic_orbitals_al_min,
-                           num_atomic_orbitals_al_ori);
-
+      std::vector<double> W_xi(num_atomic_orbitals_al_min);
+      double _rcond = -1.0;
+      int64_t _tmp_rank;
+      lapack::gelss(num_atomic_orbitals_al_min, num_atomic_orbitals_al_min,
+                    num_atomic_orbitals_al_ori, S_xi.data(),
+                    num_atomic_orbitals_al_min, RHS.data(),
+                    num_atomic_orbitals_al_min, W_xi.data(), _rcond,
+                    &_tmp_rank);
       // Compute C_psi - = T * RHS (where RHS now contains S_xi^-1 *
       // overlap_mix^T)
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
@@ -1057,11 +619,6 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
   QDK_LOG_TRACE_ENTERING();
 
   QDK_LOGGER().debug("VVHV::localize_hard_virtuals()");
-
-  // DEBUG INPUT: C_minimal_unloc
-  std::ostringstream oss_input;
-  oss_input << C_minimal_unloc;
-  QDK_LOGGER().info("DEBUG_HV_INPUT C_minimal_unloc:\n{}", oss_input.str());
 
   const auto* ori_bs = this->basis_ori_fp_.get();  // Original/full basis set
   const auto* min_bs = this->minimal_basis_fp_.get();  // Minimal basis set
@@ -1220,12 +777,6 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
 
     }  // Loop over angular momenta to construct the proto_hard_virtuals
 
-    // DEBUG: proto_hv for atom
-    std::ostringstream oss_proto;
-    oss_proto << proto_hv;
-    QDK_LOGGER().info("DEBUG_HV_PROTO atom {} proto_hv:\n{}", atom_a,
-                      oss_proto.str());
-
     if (proto_hv_idx != nhv_a) {
       throw std::runtime_error(
           "VVHVLocalization: Mismatch in number of proto hard virtuals "
@@ -1251,8 +802,6 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     // Now we want to project out all components of the minimal space from the
     // orbitals on A C_eta_A = (I - C_minimal_unloc * C_minimal_unloc^T *
     // overlap_ori) * C_normal_A
-    Eigen::MatrixXd temp_proj = Eigen::MatrixXd::Zero(
-        num_atomic_orbitals_min, num_atomic_orbitals_a_ori);
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
                num_atomic_orbitals_ori, num_atomic_orbitals_a_ori,
                num_atomic_orbitals_ori, 1.0, this->overlap_ori_.data(),
@@ -1263,14 +812,12 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
                num_atomic_orbitals_min, num_atomic_orbitals_a_ori,
                num_atomic_orbitals_ori, 1.0, C_minimal_unloc.data(),
                num_atomic_orbitals_ori, C_eta_a.data(), num_atomic_orbitals_ori,
-               0.0, temp_proj.data(), num_atomic_orbitals_min);
+               0.0, temp.data(), num_atomic_orbitals_min);
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
                num_atomic_orbitals_ori, num_atomic_orbitals_a_ori,
                num_atomic_orbitals_min, -1.0, C_minimal_unloc.data(),
-               num_atomic_orbitals_ori, temp_proj.data(),
-               num_atomic_orbitals_min, 0.0, C_eta_a.data(),
-               num_atomic_orbitals_ori);
-
+               num_atomic_orbitals_ori, temp.data(), num_atomic_orbitals_min,
+               0.0, C_eta_a.data(), num_atomic_orbitals_ori);
     C_eta_a += C_normal_a;
 
     // Form normalized hard unmatched hard virtuals on atom A (xi in the paper
@@ -1286,34 +833,21 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
             std::to_string(atom_a),
         2.0);
 
-    // DEBUG: C_hv_a after LAPACK orthonormalization (KEY DIVERGENCE POINT)
-    std::ostringstream oss_hva;
-    oss_hva << C_hv_a;
-    QDK_LOGGER().info("DEBUG_HV_LAPACK1 atom {} C_hv_a:\n{}", atom_a,
-                      oss_hva.str());
-
     // Form T = C_hv_A^T * overlap_ori * proto_hv
     Eigen::MatrixXd T = Eigen::MatrixXd::Zero(nhv_a, nhv_a);
-    Eigen::MatrixXd temp_T =
-        Eigen::MatrixXd::Zero(nhv_a, num_atomic_orbitals_ori);
     blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
                nhv_a, num_atomic_orbitals_ori, num_atomic_orbitals_ori, 1.0,
                C_hv_a.data(), num_atomic_orbitals_ori,
                this->overlap_ori_.data(), num_atomic_orbitals_ori, 0.0,
-               temp_T.data(), nhv_a);
+               temp.data(), nhv_a);
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-               nhv_a, nhv_a, num_atomic_orbitals_ori, 1.0, temp_T.data(), nhv_a,
+               nhv_a, nhv_a, num_atomic_orbitals_ori, 1.0, temp.data(), nhv_a,
                proto_hv.data(), num_atomic_orbitals_ori, 0.0, T.data(), nhv_a);
     // Now to form Z, Z is just orthonormalized T in our case
     Eigen::MatrixXd Z = Eigen::MatrixXd::Zero(nhv_a, nhv_a);
     Eigen::MatrixXd Iden = Eigen::MatrixXd::Identity(nhv_a, nhv_a);
     this->orthonormalization(nhv_a, nhv_a, Iden.data(), T.data(), Z.data(),
                              1e-6);
-
-    // DEBUG: Z after LAPACK orthonormalization (KEY DIVERGENCE POINT)
-    std::ostringstream oss_z;
-    oss_z << Z;
-    QDK_LOGGER().info("DEBUG_HV_LAPACK2 atom {} Z:\n{}", atom_a, oss_z.str());
 
     // Finally form the hard virtuals on atom A (gamma in the paper) in the
     // representation of the original basis
@@ -1335,21 +869,9 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     C_hard_virtuals.block(0, idx_hv, num_atomic_orbitals_ori, nhv_a) =
         C_hv_final;
 
-    // DEBUG: C_hv_final for this atom
-    std::ostringstream oss_final;
-    oss_final << C_hv_final;
-    QDK_LOGGER().info("DEBUG_HV_FINAL atom {} C_hv_final:\n{}", atom_a,
-                      oss_final.str());
-
     idx_hv += nhv_a;
 
   }  // Loop over atoms
-
-  // DEBUG: C_hard_virtuals before weighted orthogonalization
-  std::ostringstream oss_before_weight;
-  oss_before_weight << C_hard_virtuals;
-  QDK_LOGGER().info("DEBUG_HV_BEFORE_WEIGHT C_hard_virtuals:\n{}",
-                    oss_before_weight.str());
 
   // Calculate the orbital spread of each hard virtual orbital, then do weighted
   // orthogonalization if requested
@@ -1362,12 +884,6 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     // Weight each orbital by spread
     for (int orb = 0; orb < nhv; ++orb)
       C_hard_virtuals.col(orb) *= spreads_hv(orb);
-
-    // DEBUG: C_hard_virtuals after weighted orthogonalization
-    std::ostringstream oss_after_weight;
-    oss_after_weight << C_hard_virtuals;
-    QDK_LOGGER().info("DEBUG_HV_AFTER_WEIGHT C_hard_virtuals:\n{}",
-                      oss_after_weight.str());
   }
 
   // Now hard virtuals are only orthonormal on each atom, we need to
@@ -1380,12 +896,6 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
 
   Eigen::MatrixXd result_hard_virtuals =
       temp.block(0, 0, num_atomic_orbitals_ori, nhv);
-
-  // DEBUG OUTPUT: final result_hard_virtuals
-  std::ostringstream oss_output;
-  oss_output << result_hard_virtuals;
-  QDK_LOGGER().info("DEBUG_HV_OUTPUT result_hard_virtuals:\n{}",
-                    oss_output.str());
 
   return result_hard_virtuals;
 }
@@ -1433,15 +943,6 @@ void VVHVLocalization::calculate_orbital_spreads(
                                     qcs::mpi_default_input());
     ori_bs_1ee.dipole_integral(local_dipole->data());
     ori_bs_1ee.quadrupole_integral(local_quadrupole->data());
-
-    // print debug message
-    QDK_LOGGER().info(
-        "VVHVLocalization: Computed dipole and quadrupole integrals locally "
-        "for orbital spreads");
-    QDK_LOGGER().info("VVHVLocalization: Dipole integrals norm = " +
-                      std::to_string(local_dipole->norm()));
-    QDK_LOGGER().info("VVHVLocalization: Quadrupole integrals norm = " +
-                      std::to_string(local_quadrupole->norm()));
 
     dipole = local_dipole.get();
     quadrupole = local_quadrupole.get();
@@ -1530,12 +1031,6 @@ void VVHVLocalization::orthonormalization(int num_atomic_orbitals,
                num_orbitals,
                eigenvalues.data());  // S now contains eigenvectors U
 
-  // Apply canonical orthogonalization for cross-platform determinism
-  // This handles both sign ambiguity AND arbitrary rotations within
-  // degenerate eigenspaces (where different LAPACK implementations like
-  // Accelerate vs OpenBLAS/MKL can return different orthonormal bases)
-  canonicalize_eigenvectors(S, eigenvalues);
-
   if (expected_near_zero > 0) {
     // Check eigenvalue structure if selection needed
     VVHVLocalization::check_eigenvalue_structure(
@@ -1555,14 +1050,6 @@ void VVHVLocalization::orthonormalization(int num_atomic_orbitals,
                num_orbitals, 1.0, C, num_atomic_orbitals,
                S.data() + expected_near_zero * num_orbitals, num_orbitals, 0.0,
                C_out, num_atomic_orbitals);
-
-    // Deterministically re-orthogonalize for cross-platform consistency.
-    // Different LAPACK implementations return different orthonormal bases for
-    // degenerate eigenspaces, leading to different C_out vectors. This applies
-    // Gram-Schmidt in a canonical order to produce deterministic output.
-    canonicalize_orthonormal_output(C_out, num_atomic_orbitals,
-                                    num_orbitals - expected_near_zero,
-                                    overlap_inp);
   } else {
     // If no selection needed,
     // compute C_out = C *  U * Lambda^(-1/2) * U^T for symmetric
@@ -1590,10 +1077,6 @@ void VVHVLocalization::orthonormalization(int num_atomic_orbitals,
                num_atomic_orbitals, num_orbitals, num_orbitals, 1.0, C,
                num_atomic_orbitals, orthonorm_transform.data(), num_orbitals,
                0.0, C_out, num_atomic_orbitals);
-
-    // Deterministically re-orthogonalize for cross-platform consistency.
-    canonicalize_orthonormal_output(C_out, num_atomic_orbitals, num_orbitals,
-                                    overlap_inp);
   }
 }
 
