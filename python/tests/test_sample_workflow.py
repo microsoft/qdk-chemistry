@@ -58,18 +58,40 @@ def _contains_visualization(lines: list[str], start_idx: int) -> bool:
     return False
 
 
+def _get_indent_level(line: str) -> int:
+    """Get the indentation level of a line (number of leading spaces)."""
+    return len(line) - len(line.lstrip())
+
+
 def _strip_visualization_lines(cell_source: str) -> str:
     """Remove visualization-related lines from cell source code.
 
     This preserves the rest of the cell's logic while removing only
     lines that contain visualization code. Handles multi-line statements
-    by tracking parenthesis depth.
+    by tracking parenthesis depth, and function definitions by tracking
+    indentation.
     """
     lines = cell_source.split("\n")
     filtered_lines = []
     skip_depth = 0  # Track parenthesis depth when skipping multi-line statements
+    skip_func_indent: int | None = None  # Track indentation when skipping function body
 
     for i, line in enumerate(lines):
+        # If we're skipping a function body, continue until we hit a line with
+        # the same or lesser indentation (that's not blank or a comment)
+        if skip_func_indent is not None:
+            stripped = line.strip()
+            # Blank lines or comments inside the function body should be skipped
+            if not stripped or stripped.startswith("#"):
+                filtered_lines.append(f"# [test] Skipped: {line.strip()[:50]}")
+                continue
+            # If this line has greater indentation, it's still part of the function
+            if _get_indent_level(line) > skip_func_indent:
+                filtered_lines.append(f"# [test] Skipped: {line.strip()[:50]}")
+                continue
+            # Otherwise, we've exited the function body
+            skip_func_indent = None
+
         # If we're in a skip block, continue skipping until parentheses balance
         if skip_depth > 0:
             skip_depth += line.count("(") - line.count(")")
@@ -90,6 +112,10 @@ def _strip_visualization_lines(cell_source: str) -> str:
                 should_skip = True
 
         if should_skip:
+            # Check if this is a function definition - need to skip the entire body
+            stripped = line.strip()
+            if stripped.startswith("def "):
+                skip_func_indent = _get_indent_level(line)
             # Start tracking parenthesis depth for multi-line statements
             skip_depth = line.count("(") - line.count(")")
             filtered_lines.append(f"# [test] Skipped: {line.strip()[:50]}")
