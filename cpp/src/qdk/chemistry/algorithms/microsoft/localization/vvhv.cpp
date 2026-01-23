@@ -13,6 +13,7 @@
 #include <blas.hh>
 #include <cmath>
 #include <iostream>
+#include <sstream>
 #include <lapack.hh>
 #include <memory>
 #include <qdk/chemistry/algorithms/active_space.hpp>
@@ -284,6 +285,9 @@ Eigen::MatrixXd VVHVLocalization::localize(
   QDK_LOGGER().debug("VVHV: Computed valence virtual orbitals (unlocalized)");
   QDK_LOGGER().info("VVHV: Norm of C_valence_virtual (unlocalized): {:.16e}",
                     C_valence_virtual.norm());
+  std::ostringstream oss_cvv;
+  oss_cvv << C_valence_virtual;
+  QDK_LOGGER().info("VVHV: Unlocalized C_valence_virtual:\n{}", oss_cvv.str());
 
   // Localize valence virtual orbitals
   Eigen::MatrixXd C_valence_loc = localize_valence_virtual(C_valence_virtual);
@@ -292,6 +296,11 @@ Eigen::MatrixXd VVHVLocalization::localize(
   QDK_LOGGER().info(
       "VVHV: Norm of C_valence_loc (localized valence virtuals): {:.16e}",
       C_valence_loc.norm());
+  std::ostringstream oss_cvl;
+  oss_cvl << C_valence_loc;
+  QDK_LOGGER().info(
+      "VVHV: Localized C_valence_virtual:\n{}", oss_cvl.str()
+  );
 
   QDK_LOGGER().info("VVHV LOCALIZED: C_valence_loc(0,0) = {:.16e}",
                     C_valence_loc(0, 0));
@@ -306,6 +315,11 @@ Eigen::MatrixXd VVHVLocalization::localize(
                   n_val_virt) = C_valence_virtual;
   QDK_LOGGER().debug(
       "VVHV: Combined occupied and valence virtual orbitals into C_minimal");
+  std::ostringstream oss_cmin;
+  oss_cmin << C_minimal;
+  QDK_LOGGER().debug(
+      "VVHV: C_minimal matrix:\n{}", oss_cmin.str()
+  );
 
   // Localize hard virtuals and combine with valence virtuals
   Eigen::MatrixXd hard_orbitals_loc = localize_hard_virtuals(C_minimal);
@@ -313,6 +327,11 @@ Eigen::MatrixXd VVHVLocalization::localize(
   QDK_LOGGER().info(
       "VVHV: Norm of hard_orbitals_loc (localized hard virtuals): {:.16e}",
       hard_orbitals_loc.norm());
+  std::ostringstream oss_hol;
+  oss_hol << hard_orbitals_loc;
+  QDK_LOGGER().info(
+      "VVHV: Localized hard virtual orbitals:\n{}", oss_hol.str()
+  );
 
   // Concatenate C_valence_loc and hard_orbitals_loc to form localized_orbitals
   Eigen::MatrixXd localized_orbitals =
@@ -516,7 +535,7 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
   Eigen::MatrixXd C_valence_unloc =
       temp.block(0, 0, num_atomic_orbitals_ori,
                  num_atomic_orbitals_min - num_occupied_orbitals);
-
+  
   QDK_LOGGER().info("VVHV VALENCE: C_mp_wo_occ norm = {:.16e}",
                     C_mp_wo_occ.norm());
   QDK_LOGGER().info("VVHV VALENCE: C_mp_wo_occ(0,0) = {:.16e}",
@@ -525,7 +544,12 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
                     C_valence_unloc.norm());
   QDK_LOGGER().info("VVHV VALENCE: C_valence_unloc(0,0) = {:.16e}",
                     C_valence_unloc(0, 0));
-
+  std::ostringstream oss_cmp;
+  oss_cmp << C_mp_wo_occ;
+  QDK_LOGGER().info("VVHV Valence: C_mp_wo_occ matrix:\n{}", oss_cmp.str());
+  std::ostringstream oss_cvu;
+  oss_cvu << C_valence_unloc;
+  QDK_LOGGER().info("VVHV Valence C_valence_unloc:\n{}", oss_cvu.str());
   return C_valence_unloc;
 }
 
@@ -546,7 +570,6 @@ Eigen::MatrixXd VVHVLocalization::localize_valence_virtual(
         "*** Localizing Valence Virtual Orbitals (VVHV Sub-scheme) ***");
     result = this->inner_localizer_->localize(C_valence_unloc);
   }
-
   return result;
 }
 
