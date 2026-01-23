@@ -28,6 +28,19 @@ from nbclient import NotebookClient
 # Environment variable to enable slow tests (including notebook e2e tests)
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
+
+def _has_jupyter_kernel(kernel_name: str = "python3") -> bool:
+    """Check if a Jupyter kernel is available."""
+    try:
+        from jupyter_client.kernelspec import find_kernel_specs
+
+        return kernel_name in find_kernel_specs()
+    except Exception:
+        return False
+
+
+_HAS_JUPYTER_KERNEL = _has_jupyter_kernel()
+
 # Patterns that indicate visualization code that should be skipped
 VISUALIZATION_PATTERNS = [
     "MoleculeViewer",
@@ -171,6 +184,10 @@ def _execute_notebook_skip_visualizations(notebook_path: Path, timeout: int = 60
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
 
 
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
 def test_factory_list():
     """Test the examples/factory_list.ipynb notebook executes without errors."""
     notebook_path = EXAMPLES_DIR / "factory_list.ipynb"
@@ -183,6 +200,10 @@ def test_factory_list():
     not _RUN_SLOW_TESTS,
     reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
 )
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
 def test_state_prep_energy():
     """Test the examples/state_prep_energy.ipynb notebook executes without errors."""
     notebook_path = EXAMPLES_DIR / "state_prep_energy.ipynb"
@@ -194,6 +215,10 @@ def test_state_prep_energy():
 @pytest.mark.skipif(
     not _RUN_SLOW_TESTS,
     reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+)
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
 )
 def test_qpe_stretched_n2():
     """Test the examples/qpe_stretched_n2.ipynb notebook executes without errors."""
