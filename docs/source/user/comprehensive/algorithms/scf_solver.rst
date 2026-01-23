@@ -2,7 +2,7 @@ Self-consistent field (SCF) solver
 ==================================
 
 The :class:`~qdk_chemistry.algorithms.ScfSolver` algorithm in QDK/Chemistry performs Self-Consistent Field (:term:`SCF`) calculations to optimize molecular orbitals for a given molecular structure.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :doc:`Structure <../data/structure>` instance, total molecular charge and multiplicity, and a desired basis representation as input ,and produces an :doc:`Orbitals <../data/orbitals>` instance and the associated energy as output.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :doc:`Structure <../data/structure>` instance, total molecular charge and multiplicity, and a desired basis representation as input, and produces an :doc:`Orbitals <../data/orbitals>` instance and the associated energy as output.
 Its primary purpose is to find the best single-particle orbitals within a mean-field approximation.
 For Hartree-Fock (:term:`HF`) theory, it yields the mean field energy, which misses electron correlation and typically requires post-:term:`HF` methods for accurate energetics.
 For Density Functional Theory (:term:`DFT`), some correlation effects are included through the exchange-correlation functional.
@@ -213,8 +213,7 @@ The :term:`GDM` algorithm then proceeds via a slightly modified :cite:`VanVoorhi
 
 .. rubric:: Hybrid DIIS-GDM Strategy
 
-By default, the native QDK implementation uses :term:`DIIS` alone (``enable_gdm=False``).
-When enabled, the hybrid strategy (``enable_gdm=True``) provides enhanced robustness:
+By default, the native QDK implementation uses the hybrid strategy (``enable_gdm=True``), which provides enhanced robustness over using :term:`DIIS` alone (``enable_gdm=False``).
 
 1. Start with :term:`DIIS` for rapid initial convergence
 2. Monitor energy changes; if the energy change exceeds ``energy_thresh_diis_switch`` (default: :math:`10^{-3}` Ha), switch to :term:`GDM`
@@ -250,7 +249,7 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
      - Maximum number of overall :term:`SCF` steps
    * - ``enable_gdm``
      - bool
-     - ``False``
+     - ``True``
      - Enable geometric direct minimization (:term:`GDM`) algorithm
    * - ``gdm_max_diis_iteration``
      - int

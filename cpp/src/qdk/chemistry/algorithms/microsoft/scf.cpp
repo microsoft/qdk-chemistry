@@ -72,6 +72,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
       basis_set_type == BasisSetType::Explicit) {
     qdk_raw_basis_set =
         std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess);
+  } else {
+    qdk_raw_basis_set =
+        data::BasisSet::from_basis_name(basis_set_name, structure);
   }
 
   // Extract geometry from structure object
@@ -145,13 +148,10 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   auto ms_mol = qdk::chemistry::utils::microsoft::convert_to_molecule(
       *structure, charge, multiplicity);
   // update atomic charges for ECPs
-  if (basis_set_type == BasisSetType::Explicit) {
-    // iterate through atoms and adjust charges
-    auto ecp_electrons = qdk_raw_basis_set->get_ecp_electrons();
-    for (size_t i = 0; i < ms_mol->n_atoms; ++i) {
-      int n_core_electrons = static_cast<int>(ecp_electrons[i]);
-      ms_mol->atomic_charges[i] = ms_mol->atomic_nums[i] - n_core_electrons;
-    }
+  auto ecp_electrons = qdk_raw_basis_set->get_ecp_electrons();
+  for (size_t i = 0; i < ms_mol->n_atoms; ++i) {
+    int n_core_electrons = static_cast<int>(ecp_electrons[i]);
+    ms_mol->atomic_charges[i] = ms_mol->atomic_nums[i] - n_core_electrons;
   }
 
   // Create SCFConfig
@@ -242,32 +242,17 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // Create SCF solver based on method and basis set type
   std::shared_ptr<qcs::SCF> scf;
   if (method == "hf") {
-    if (basis_set_type == BasisSetType::Explicit) {
-      scf = qcs::SCF::make_hf_solver(
-          ms_mol, *ms_scf_config,
-          utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set),
-          utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set,
-                                                       false));
-    } else {
-      scf = qcs::SCF::make_hf_solver(ms_mol, *ms_scf_config);
-    }
+    scf = qcs::SCF::make_hf_solver(
+        ms_mol, *ms_scf_config,
+        utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set),
+        utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set,
+                                                     false));
   } else {
-    if (basis_set_type == BasisSetType::Explicit) {
-      scf = qcs::SCF::make_ks_solver(
-          ms_mol, *ms_scf_config,
-          utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set),
-          utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set,
-                                                       false));
-    } else {
-      scf = qcs::SCF::make_ks_solver(ms_mol, *ms_scf_config);
-    }
-  }
-
-  // Extract the basis set
-  if (basis_set_type != BasisSetType::Explicit) {
-    qdk_raw_basis_set = std::make_shared<qdk::chemistry::data::BasisSet>(
-        utils::microsoft::convert_basis_set_to_qdk(
-            *scf->context().basis_set_raw));
+    scf = qcs::SCF::make_ks_solver(
+        ms_mol, *ms_scf_config,
+        utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set),
+        utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set,
+                                                     false));
   }
 
   // Compute map from QDK shells to internal representation
@@ -373,9 +358,18 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
     // Create new SCF solver with density matrix
     auto initial_guess_scf =
-        (method == "hf")
-            ? qcs::SCF::make_hf_solver(ms_mol, *ms_scf_config, density_matrix)
-            : qcs::SCF::make_ks_solver(ms_mol, *ms_scf_config, density_matrix);
+        (method == "hf") ? qcs::SCF::make_hf_solver(
+                               ms_mol, *ms_scf_config, density_matrix,
+                               utils::microsoft::convert_basis_set_from_qdk(
+                                   *qdk_raw_basis_set),
+                               utils::microsoft::convert_basis_set_from_qdk(
+                                   *qdk_raw_basis_set, false))
+                         : qcs::SCF::make_ks_solver(
+                               ms_mol, *ms_scf_config, density_matrix,
+                               utils::microsoft::convert_basis_set_from_qdk(
+                                   *qdk_raw_basis_set),
+                               utils::microsoft::convert_basis_set_from_qdk(
+                                   *qdk_raw_basis_set, false));
 
     // Replace the original scf with the initial guess version
     scf = std::move(initial_guess_scf);

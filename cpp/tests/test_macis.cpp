@@ -175,7 +175,7 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
             macis_params::ntdets_max_large);  // Should respect ntdets_max
 
   // Energy should be reasonable (above HF but below exact)
-  EXPECT_NEAR(energy, -75.945264400409414,
+  EXPECT_NEAR(energy, -75.945264376786554,
               macis_params::energy_tol);  // Should be negative for bound system
 }
 
@@ -1101,7 +1101,7 @@ TEST_F(MacisPmcTest, BasicPMCCalculation) {
       calculator->run(hamiltonian, test_configurations_);
 
   // Verify basic properties of the result
-  EXPECT_NEAR(energy - hamiltonian->get_core_energy(), -12.423933309195846,
+  EXPECT_NEAR(energy - hamiltonian->get_core_energy(), -12.42393362329171,
               macis_params::energy_tol);
   EXPECT_EQ(wavefunction->size(), test_configurations_.size());
 

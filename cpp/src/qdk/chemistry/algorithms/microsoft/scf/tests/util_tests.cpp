@@ -22,6 +22,7 @@
 #include <thread>
 #include <vector>
 
+#include "scf/guess.h"
 #include "scf_algorithm/asahf.h"
 #include "test_common.h"
 
@@ -468,63 +469,6 @@ TEST(ClassRegistryTest, PrimitiveKey) {
 // Atom Guess Tests
 //==============================================================================
 
-TEST(AtomGuessTest, CompareWithFileGuess) {
-  // Create a simple water molecule
-  auto mol = make_bf();
-  std::vector<std::string> basis_names = {"sto-3g", "6-31g", "def2-svp"};
-  for (const auto& basis_name : basis_names) {
-    bool pure = true;
-
-    // Create basis set
-    auto basis_set = BasisSet::from_database_json(mol, basis_name,
-                                                  BasisMode::PSI4, pure, false);
-
-    // Generate atomic guess using get_atom_guess
-    int N = basis_set->num_atomic_orbitals;
-    RowMajorMatrix tD_generated = RowMajorMatrix::Zero(N, N);
-    get_atom_guess(*basis_set, *mol, tD_generated);
-
-    // Prepare path for guess file
-    std::filesystem::path guess_chk(std::filesystem::temp_directory_path() /
-                                    "qdk" / "chemistry");
-    guess_chk = guess_chk / "guess" / (basis_name + "_pure");
-
-    // Read from file if it exists (should exist after running get_atom_guess)
-    RowMajorMatrix tD_from_file = RowMajorMatrix::Zero(N, N);
-    std::map<int, RowMajorMatrix> atom_dm;
-    std::ifstream fin(guess_chk);
-    int atomic_number;
-    while (fin >> atomic_number) {
-      int n;
-      fin >> n;
-      RowMajorMatrix d(n, n);
-      for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-          fin >> d(i, j);
-        }
-      }
-      atom_dm[atomic_number] = d;
-    }
-
-    for (size_t i = 0, p = 0; i < mol->n_atoms; i++) {
-      int z = mol->atomic_nums[i];
-      if (atom_dm.count(z)) {
-        const auto& d = atom_dm[z];
-        tD_from_file.block(p, p, d.rows(), d.cols()) = d;
-        p += d.rows();
-      }
-    }
-
-    // get default SCF conv thresh
-    auto config = SCFConfig();
-    double conv_thresh = config.scf_algorithm.density_threshold;
-
-    // Compare the two matrices
-    EXPECT_TRUE(tD_generated.isApprox(tD_from_file, conv_thresh))
-        << "Generated density matrix differs from file-based density matrix";
-  }
-}
-
 TEST(AtomGuessTest, BasisSetMap) {
   // Test that the map correctly identifies equivalent basis sets
   auto mol = std::make_shared<Molecule>();
@@ -583,4 +527,34 @@ TEST(AtomGuessTest, BasisSetMap) {
   // Retrieve using basis5 (should not be found)
   auto it5 = basis_map.find(*basis5);
   EXPECT_EQ(it5, basis_map.end());
+}
+
+TEST(AtomGuessTest, CompareWithFileGuess) {
+  std::vector<std::shared_ptr<Molecule>> molecules = {make_bf(), make_o2()};
+  std::vector<std::string> basis_names = {"sto-3g", "def2-svp", "cc-pvdz"};
+  for (const auto& mol : molecules) {
+    for (const auto& basis_name : basis_names) {
+      // Create basis set with standard name
+      auto basis_from_file = BasisSet::from_database_json(
+          mol, basis_name, BasisMode::PSI4, true, false);
+      int N = basis_from_file->num_atomic_orbitals;
+      RowMajorMatrix D_from_file = RowMajorMatrix::Zero(N, N);
+      atom_guess(*basis_from_file, *mol, D_from_file.data());
+
+      // Create identical basis set but with a custom name
+      auto basis_generated = BasisSet::from_database_json(
+          mol, basis_name, BasisMode::PSI4, true, false);
+      basis_generated->name = "custom_basis_for_testing";
+      RowMajorMatrix D_generated = RowMajorMatrix::Zero(N, N);
+      atom_guess(*basis_generated, *mol, D_generated.data());
+
+      auto config = SCFConfig();
+      double conv_thresh = config.scf_algorithm.density_threshold;
+
+      // Compare the two density matrices - they should be essentially identical
+      EXPECT_TRUE(D_from_file.isApprox(D_generated, conv_thresh))
+          << "Density matrix from file differs from generated density matrix "
+          << "for basis " << basis_name << std::endl;
+    }
+  }
 }

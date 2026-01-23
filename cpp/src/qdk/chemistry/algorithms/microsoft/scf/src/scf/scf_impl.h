@@ -53,7 +53,9 @@ class SCFImpl {
    * (default: false)
    */
   SCFImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
-          const RowMajorMatrix& density_matrix, bool delay_eri = false);
+          const RowMajorMatrix& density_matrix,
+          std::shared_ptr<BasisSet> basis_set,
+          std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri = false);
 
   /**
    * @brief Construct SCF implementation with initial density matrix

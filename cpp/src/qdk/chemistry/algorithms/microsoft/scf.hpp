@@ -46,7 +46,7 @@ class ScfSettings
    */
   ScfSettings() : qdk::chemistry::algorithms::ElectronicStructureSettings() {
     set_default("level_shift", -1.0);
-    set_default("enable_gdm", false);
+    set_default("enable_gdm", true);
     set_default("energy_thresh_diis_switch", 1e-3);
     set_default("gdm_max_diis_iteration", 50);
     set_default("gdm_bfgs_history_size_limit", 50);

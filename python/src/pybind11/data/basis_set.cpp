@@ -1009,8 +1009,8 @@ Examples:
                        py::arg("basis_name"));
   basis_set.def_static(
       "from_basis_name",
-      py::overload_cast<const std::string&, const Structure&,
-                        const std::string&, AOType>(&BasisSet::from_basis_name),
+      py::overload_cast<const std::string&, const Structure&, AOType>(
+          &BasisSet::from_basis_name),
       R"(
 Create a basis set by name for a molecular structure.
 
@@ -1019,7 +1019,6 @@ Loads a standard basis set (e.g., "sto-3g", "cc-pvdz") for all atoms in the stru
 Args:
     basis_name (str): Name of the basis set (e.g., "sto-3g", "cc-pvdz", "6-31g");
     structure (Structure): Molecular structure
-    ecp_name (str, optional): Name of the ECP basis set. Default is "default_ecp"
     atomic_orbital_type (AOType, optional): Whether to use spherical or Cartesian atomic orbitals.
         Default is Spherical
 
@@ -1036,14 +1035,11 @@ Examples:
     >>> print(f"Created {basis.get_name()} basis with {basis.get_num_shells()} shells")
 )",
       py::arg("basis_name"), py::arg("structure"),
-      py::arg("ecp_name") = BasisSet::default_ecp_name,
       py::arg("atomic_orbital_type") = AOType::Spherical);
   basis_set.def_static(
       "from_element_map",
       py::overload_cast<const std::map<std::string, std::string>&,
-                        const Structure&,
-                        const std::map<std::string, std::string>&, AOType>(
-          &BasisSet::from_element_map),
+                        const Structure&, AOType>(&BasisSet::from_element_map),
       R"(
 Create a basis set with different basis sets per element.
 
@@ -1053,8 +1049,6 @@ Args:
     element_to_basis_map (dict[str, str]): Dictionary mapping element symbols to basis set names.
         Example: {"H": "sto-3g", "O": "cc-pvdz"}
     structure (Structure): Molecular structure
-    element_to_ecp_map (dict[str, str], optional): Dictionary mapping element symbols to ECP basis set names.
-        Default is empty dict
     atomic_orbital_type (AOType, optional): Whether to use spherical or Cartesian atomic orbitals.
         Default is Spherical
 
@@ -1072,13 +1066,11 @@ Examples:
     >>> print(f"Created custom basis with {basis.get_num_shells()} shells")
 )",
       py::arg("element_to_basis_map"), py::arg("structure"),
-      py::arg("element_to_ecp_map") = std::map<std::string, std::string>{},
       py::arg("atomic_orbital_type") = AOType::Spherical);
   basis_set.def_static(
       "from_index_map",
       py::overload_cast<const std::map<size_t, std::string>&, const Structure&,
-                        const std::map<size_t, std::string>&, AOType>(
-          &BasisSet::from_index_map),
+                        AOType>(&BasisSet::from_index_map),
       R"(
 Create a basis set with different basis sets per atom index.
 
@@ -1088,8 +1080,6 @@ Args:
     index_to_basis_map (dict[int, str]): Dictionary mapping atom indices to basis set names.
         Example: {0: "sto-3g", 1: "cc-pvdz", 2: "sto-3g"}
     structure (Structure): Molecular structure
-    index_to_ecp_map (dict[int, str], optional): Dictionary mapping atom indices to ECP basis set names.
-        Default is empty dict
     atomic_orbital_type (AOType, optional): Whether to use spherical or Cartesian atomic orbitals.
         Default is Spherical
 
@@ -1107,7 +1097,6 @@ Examples:
     >>> print(f"Created custom basis with {basis.get_num_shells()} shells")
 )",
       py::arg("index_to_basis_map"), py::arg("structure"),
-      py::arg("index_to_ecp_map") = std::map<size_t, std::string>{},
       py::arg("atomic_orbital_type") = AOType::Spherical);
 
   // Utility functions (static methods);
@@ -1279,13 +1268,6 @@ Type:
   basis_set.def_readonly_static("custom_ecp_name", &BasisSet::custom_ecp_name,
                                 R"(
 Name used for custom ECP basis sets.
-
-Type:
-    str
-)");
-  basis_set.def_readonly_static("default_ecp_name", &BasisSet::default_ecp_name,
-                                R"(
-Default name for ECP basis sets.
 
 Type:
     str

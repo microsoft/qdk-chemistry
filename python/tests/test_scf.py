@@ -125,7 +125,7 @@ class TestScfSolver:
 
         # Test invalid basis set - should throw during solve
         scf_solver = algorithms.create("scf_solver")
-        with pytest.raises(ValueError, match=r".*basis.*not.*supported"):
+        with pytest.raises(ValueError, match=r"Basis set file does not exist:"):
             scf_solver.run(water, 0, 1, "not_a_basis")
 
         # Should solve successfully with valid settings

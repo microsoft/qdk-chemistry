@@ -805,6 +805,7 @@ TEST_F(StabilityCheckerTest, QDK_UHF_BN_Plus_Internal_Instability) {
 
   // Run UHF SCF calculation (doublet state)
   auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("enable_gdm", false);
   auto [energy, wavefunction] = scf_solver->run(bn_plus, 1, 2, "def2-svp");
 
   // Verify we have UHF orbitals

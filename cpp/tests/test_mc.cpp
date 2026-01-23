@@ -166,14 +166,14 @@ TEST_F(MCTest, Water_DEF2SVP_CASCI) {
       std::vector<size_t>{0, 1});
   // Print number of electrons before and after selection
   auto ham = hamiltonian_constructor->run(orbitals_with_active_space);
-  EXPECT_NEAR(ham->get_core_energy(), -6.349912970471e+01,
+  EXPECT_NEAR(ham->get_core_energy(), -63.499129387385118,
               testing::numerical_zero_tolerance * 10);
 
   // Run CASCI
   auto mc =
       qdk::chemistry::algorithms::MultiConfigurationCalculatorFactory::create();
   auto [E_cas, wfn_cas] = mc->run(ham, 3, 3);
-  EXPECT_NEAR(E_cas, -75.94529022131313, testing::ci_energy_tolerance);
+  EXPECT_NEAR(E_cas, -75.945290197648347, testing::ci_energy_tolerance);
   EXPECT_EQ(wfn_cas->size(), 400);
 }
 
@@ -194,14 +194,13 @@ TEST_F(MCTest, StretchedN2_CCPVDZ_CASCI) {
       std::vector<size_t>{0, 1, 4, 5, 6});
 
   auto ham = hamiltonian_constructor->run(orbitals_with_active_space);
-  EXPECT_NEAR(ham->get_core_energy(), -1.017618497502e+02,
+  EXPECT_NEAR(ham->get_core_energy(), -101.76185007585768,
               testing::numerical_zero_tolerance * 10);
 
   // Run CASCI
   auto mc =
       qdk::chemistry::algorithms::MultiConfigurationCalculatorFactory::create();
   auto [E_cas, wfn_cas] = mc->run(ham, 2, 2);
-  // total energy -6.581564558042 + -1.017618497502e+02
   EXPECT_NEAR(E_cas, -108.343414308242, testing::ci_energy_tolerance);
 }
 

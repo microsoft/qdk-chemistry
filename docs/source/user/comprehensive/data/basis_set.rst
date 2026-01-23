@@ -78,14 +78,8 @@ The library supports three methods for loading basis sets:
 2. **By element map**: Use different basis sets for different elements
 3. **By atom index map**: Use different basis sets for specific atoms
 
-Each method also supports optional :term:`ECP` (Effective Core Potential) specification, which is commonly used to replace core electrons with pseudopotentials, particularly for heavy atoms.
-ECPs can be specified either uniformly for all atoms or selectively per element or atom index.
-
 .. note::
-   If no ECP is specified, the default ECP for the chosen basis set will be used if available.
-
-.. note::
-   If an empty string is provided instead of an ECP name, no ECP will be applied even if the basis set has a default ECP.
+   If a basis set includes an :term:`ECP` (Effective Core Potential), it will be automatically loaded. ECPs are commonly used to replace core electrons with pseudopotentials, particularly for heavy atoms.
 
 .. tab:: C++ API
 

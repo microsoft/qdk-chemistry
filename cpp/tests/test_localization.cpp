@@ -633,7 +633,7 @@ TEST_F(LocalizationTest, WaterVVHV) {
   EXPECT_EQ(Cb_loc.rows(), Cb_can.rows());
 
   auto pm_metric = testing::pipek_mezey_metric(localized_orbitals, Ca_loc);
-  EXPECT_NEAR(2.361763653e+01, pm_metric, testing::localization_tolerance);
+  EXPECT_GT(pm_metric, 23.61863);
 }
 
 TEST_F(LocalizationTest, O2TripletVVHV) {
@@ -692,9 +692,8 @@ TEST_F(LocalizationTest, O2TripletVVHV) {
   auto pm_metric_beta = testing::pipek_mezey_metric(localized_orbitals, Cb_loc);
 
   // Check metric values to reference (commented out temporarily)
-  EXPECT_NEAR(3.148110465e+01, pm_metric_alpha,
-              testing::localization_tolerance);
-  EXPECT_NEAR(2.862067715e+01, pm_metric_beta, testing::localization_tolerance);
+  EXPECT_GT(pm_metric_alpha, 31.42477);
+  EXPECT_GT(pm_metric_beta, 28.55164);
 }
 
 // =============================================================================

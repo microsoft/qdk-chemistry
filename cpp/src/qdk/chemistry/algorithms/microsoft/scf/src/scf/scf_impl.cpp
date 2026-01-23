@@ -244,8 +244,9 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
     : SCFImpl(mol_ptr, cfg, nullptr, nullptr, delay_eri) {}
 
 SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
-                 const RowMajorMatrix& dm, bool delay_eri)
-    : SCFImpl(mol, cfg, delay_eri) {
+                 const RowMajorMatrix& dm, std::shared_ptr<BasisSet> basis_set,
+                 std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri)
+    : SCFImpl(mol, cfg, basis_set, raw_basis_set, delay_eri) {
   QDK_LOG_TRACE_ENTERING();
   VERIFY(dm.rows() == num_density_matrices_ * num_atomic_orbitals_ &&
          dm.cols() == num_atomic_orbitals_);

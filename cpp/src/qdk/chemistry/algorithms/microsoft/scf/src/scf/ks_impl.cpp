@@ -71,8 +71,9 @@ KSImpl::KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
 }
 
 KSImpl::KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
-               const RowMajorMatrix& dm)
-    : KSImpl(mol, cfg) {
+               const RowMajorMatrix& dm, std::shared_ptr<BasisSet> basis_set,
+               std::shared_ptr<BasisSet> raw_basis_set)
+    : KSImpl(mol, cfg, basis_set, raw_basis_set) {
   QDK_LOG_TRACE_ENTERING();
   VERIFY(dm.rows() == num_density_matrices_ * num_atomic_orbitals_ &&
          dm.cols() == num_atomic_orbitals_);

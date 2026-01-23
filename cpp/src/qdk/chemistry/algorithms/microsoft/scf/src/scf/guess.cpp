@@ -31,11 +31,11 @@ void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
   }
 
   int N = obs.num_atomic_orbitals;
-  RowMajorMatrix tD = RowMajorMatrix::Zero(N, N);
+  RowMajorMatrix nD = RowMajorMatrix::Zero(N, N);
   if (!std::filesystem::exists(guess_chk)) {
     QDK_LOGGER().info("Guess file {} not found, generating atomic guesses",
                       guess_chk.string());
-    get_atom_guess(obs, mol, tD);
+    get_atom_guess(obs, mol, nD);
   } else {
     std::map<int, RowMajorMatrix> atom_dm;
     std::ifstream fin(guess_chk);
@@ -52,6 +52,7 @@ void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
       atom_dm[atomic_number] = d;
     }
 
+    RowMajorMatrix tD = RowMajorMatrix::Zero(N, N);
     for (size_t i = 0, p = 0; i < mol.n_atoms; i++) {
       int z = mol.atomic_nums[i];
       VERIFY_INPUT(atom_dm.count(z),
@@ -60,42 +61,41 @@ void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
       tD.block(p, p, d.rows(), d.cols()) = d;
       p += d.rows();
     }
-  }
 
-  std::vector<int> order(obs.shells.size());
-  std::iota(order.begin(), order.end(), 0);
-  std::stable_sort(order.begin(), order.end(), [&](int p1, int p2) {
-    const auto& a = obs.shells[p1];
-    const auto& b = obs.shells[p2];
-    return a.atom_index != b.atom_index
-               ? a.atom_index < b.atom_index
-               : (a.angular_momentum != b.angular_momentum
-                      ? a.angular_momentum < b.angular_momentum
-                      : a.exponents[0] > b.exponents[0]);
-  });
+    std::vector<int> order(obs.shells.size());
+    std::iota(order.begin(), order.end(), 0);
+    std::stable_sort(order.begin(), order.end(), [&](int p1, int p2) {
+      const auto& a = obs.shells[p1];
+      const auto& b = obs.shells[p2];
+      return a.atom_index != b.atom_index
+                 ? a.atom_index < b.atom_index
+                 : (a.angular_momentum != b.angular_momentum
+                        ? a.angular_momentum < b.angular_momentum
+                        : a.exponents[0] > b.exponents[0]);
+    });
 
-  auto shell_num_atomic_orbitals = [&](int am) {
-    return obs.pure ? 2 * am + 1 : (am + 1) * (am + 2) / 2;
-  };
-  std::vector<int> sh2bf;
-  for (size_t i = 0, p = 0; i < obs.shells.size(); i++) {
-    sh2bf.push_back(p);
-    int am = obs.shells[i].angular_momentum;
-    p += shell_num_atomic_orbitals(am);
-  }
-
-  RowMajorMatrix nD = RowMajorMatrix::Zero(N, N);
-  for (size_t i = 0, bf1 = 0; i < obs.shells.size(); i++) {
-    int am1 = obs.shells[order[i]].angular_momentum;
-    int n1 = shell_num_atomic_orbitals(am1);
-    for (size_t j = 0, bf2 = 0; j < obs.shells.size(); j++) {
-      int am2 = obs.shells[order[j]].angular_momentum;
-      int n2 = shell_num_atomic_orbitals(am2);
-      nD.block(sh2bf[order[i]], sh2bf[order[j]], n1, n2) =
-          tD.block(bf1, bf2, n1, n2);
-      bf2 += n2;
+    auto shell_num_atomic_orbitals = [&](int am) {
+      return obs.pure ? 2 * am + 1 : (am + 1) * (am + 2) / 2;
+    };
+    std::vector<int> sh2bf;
+    for (size_t i = 0, p = 0; i < obs.shells.size(); i++) {
+      sh2bf.push_back(p);
+      int am = obs.shells[i].angular_momentum;
+      p += shell_num_atomic_orbitals(am);
     }
-    bf1 += n1;
+
+    for (size_t i = 0, bf1 = 0; i < obs.shells.size(); i++) {
+      int am1 = obs.shells[order[i]].angular_momentum;
+      int n1 = shell_num_atomic_orbitals(am1);
+      for (size_t j = 0, bf2 = 0; j < obs.shells.size(); j++) {
+        int am2 = obs.shells[order[j]].angular_momentum;
+        int n2 = shell_num_atomic_orbitals(am2);
+        nD.block(sh2bf[order[i]], sh2bf[order[j]], n1, n2) =
+            tD.block(bf1, bf2, n1, n2);
+        bf2 += n2;
+      }
+      bf1 += n1;
+    }
   }
   memcpy(D, nD.data(), N * N * sizeof(double));
 }
