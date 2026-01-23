@@ -501,18 +501,16 @@ Examples:
   density_fitted.def(
       py::init<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
                const Eigen::MatrixXd&, const Eigen::MatrixXd&,
-               const Eigen::MatrixXd&, std::shared_ptr<Orbitals>, double,
-               const Eigen::MatrixXd&, const Eigen::MatrixXd&,
-               HamiltonianType>(),
+               std::shared_ptr<Orbitals>, double, const Eigen::MatrixXd&,
+               const Eigen::MatrixXd&, HamiltonianType>(),
       R"(
 Constructor for unrestricted active space Hamiltonian with density-fitted integrals.
 
 Args:
     one_body_integrals_alpha (numpy.ndarray): Alpha one-electron integrals [norb x norb]
     one_body_integrals_beta (numpy.ndarray): Beta one-electron integrals [norb x norb]
-    three_center_integrals_aaaa (numpy.ndarray): Alpha-alpha three-center integrals [naux x n_geminals]
-    three_center_integrals_aabb (numpy.ndarray): Alpha-beta three-center integrals [naux x n_geminals]
-    three_center_integrals_bbbb (numpy.ndarray): Beta-beta three-center integrals [naux x n_geminals]
+    three_center_integrals_aa (numpy.ndarray): Alpha-alpha three-center integrals [naux x n_geminals]
+    three_center_integrals_bb (numpy.ndarray): Beta-beta three-center integrals [naux x n_geminals]
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix [norb x norb]
@@ -523,21 +521,19 @@ Examples:
     >>> import numpy as np
     >>> one_body_a = np.random.rand(4, 4)
     >>> one_body_b = np.random.rand(4, 4)
-    >>> three_center_aaaa = np.random.rand(20, 16)
-    >>> three_center_aabb = np.random.rand(20, 16)
-    >>> three_center_bbbb = np.random.rand(20, 16)
+    >>> three_center_aa = np.random.rand(20, 16)
+    >>> three_center_bb = np.random.rand(20, 16)
     >>> fock_a = np.random.rand(4, 4)
     >>> fock_b = np.random.rand(4, 4)
     >>> container = DensityFittedHamiltonianContainer(
     ...     one_body_a, one_body_b,
-    ...     three_center_aaaa, three_center_aabb, three_center_bbbb,
+    ...     three_center_aa, three_center_bb,
     ...     orbitals, 10.5, fock_a, fock_b
     ... )
 )",
       py::arg("one_body_integrals_alpha"), py::arg("one_body_integrals_beta"),
-      py::arg("three_center_integrals_aaaa"),
-      py::arg("three_center_integrals_aabb"),
-      py::arg("three_center_integrals_bbbb"), py::arg("orbitals"),
+      py::arg("three_center_integrals_aa"),
+      py::arg("three_center_integrals_bb"), py::arg("orbitals"),
       py::arg("core_energy"), py::arg("inactive_fock_matrix_alpha"),
       py::arg("inactive_fock_matrix_beta"),
       py::arg("type") = HamiltonianType::Hermitian);
@@ -571,8 +567,8 @@ Notes:
 Get three-center integrals in molecular orbital basis.
 
 Returns:
-    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of three-center
-    integral matrices [naux x n_geminals] for aaaa, aabb, and bbbb spin channels,
+    tuple[numpy.ndarray, numpy.ndarray]: Pair of three-center
+    integral matrices [naux x n_geminals] for aa and bb spin channels,
     where n_geminals = norb * norb.
 
 Notes:

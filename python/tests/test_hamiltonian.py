@@ -517,15 +517,13 @@ class TestRestrictedUnrestricted:
                     [0.8, 0.8, 0.8, 0.8],
                 ]
             )
-            three_center_aaaa = math.sqrt(0.5) * base_three_center
-            three_center_aabb = base_three_center
-            three_center_bbbb = math.sqrt(1.5) * base_three_center
+            three_center_aa = math.sqrt(0.5) * base_three_center
+            three_center_bb = math.sqrt(1.5) * base_three_center
             container = DensityFittedHamiltonianContainer(
                 one_body_alpha,
                 one_body_beta,
-                three_center_aaaa,
-                three_center_aabb,
-                three_center_bbbb,
+                three_center_aa,
+                three_center_bb,
                 orbitals,
                 2.0,
                 inactive_fock_alpha,
@@ -607,15 +605,13 @@ class TestRestrictedUnrestricted:
                     [0.8, 0.8, 0.8, 0.8],
                 ]
             )
-            three_center_aaaa = math.sqrt(0.5) * base_three_center
-            three_center_aabb = base_three_center
-            three_center_bbbb = math.sqrt(1.5) * base_three_center
+            three_center_aa = math.sqrt(0.5) * base_three_center
+            three_center_bb = math.sqrt(1.5) * base_three_center
             container_unrestricted = DensityFittedHamiltonianContainer(
                 one_body_alpha,
                 one_body_beta,
-                three_center_aaaa,
-                three_center_aabb,
-                three_center_bbbb,
+                three_center_aa,
+                three_center_bb,
                 orbitals_unrestricted,
                 2.0,
                 np.eye(2),
@@ -694,15 +690,13 @@ class TestRestrictedUnrestricted:
                 np.eye(4),
             )
         else:
-            three_center_aaaa = np.zeros((4, 16))
-            three_center_aabb = np.zeros((4, 16))
-            three_center_bbbb = np.zeros((4, 16))
+            three_center_aa = np.zeros((4, 16))
+            three_center_bb = np.zeros((4, 16))
             container_unrestricted = DensityFittedHamiltonianContainer(
                 one_body_alpha,
                 one_body_beta,
-                three_center_aaaa,
-                three_center_aabb,
-                three_center_bbbb,
+                three_center_aa,
+                three_center_bb,
                 model_orbitals_unrestricted,
                 0.0,
                 np.eye(4),
@@ -746,9 +740,10 @@ class TestDensityFittedSpecific:
 
         container = DensityFittedHamiltonianContainer(one_body, three_center, orbitals, 1.5, np.array([]))
 
-        # Verify three-center storage
-        tc = container.get_three_center_integrals()
-        assert np.allclose(tc, three_center)
+        # Verify three-center storage (returns pair for aa, bb; restricted shares same data)
+        tc_aa, tc_bb = container.get_three_center_integrals()
+        assert np.allclose(tc_aa, three_center)
+        assert np.allclose(tc_bb, three_center)  # Restricted: aa == bb
 
     def test_two_body_from_three_center_contraction(self):
         """Test two-body integrals computed from three-center contraction.
@@ -797,16 +792,14 @@ class TestDensityFittedSpecific:
                 [0.8, 0.8, 0.8, 0.8],
             ]
         )
-        three_center_aaaa = math.sqrt(0.5) * base_three_center
-        three_center_aabb = base_three_center
-        three_center_bbbb = math.sqrt(1.5) * base_three_center
+        three_center_aa = math.sqrt(0.5) * base_three_center
+        three_center_bb = math.sqrt(1.5) * base_three_center
 
         container = DensityFittedHamiltonianContainer(
             one_body_alpha,
             one_body_beta,
-            three_center_aaaa,
-            three_center_aabb,
-            three_center_bbbb,
+            three_center_aa,
+            three_center_bb,
             orbitals,
             1.5,
             np.eye(2),
@@ -814,10 +807,9 @@ class TestDensityFittedSpecific:
         )
 
         # Verify three-center retrieval for unrestricted
-        tc_aaaa, tc_aabb, tc_bbbb = container.get_three_center_integrals()
-        assert np.allclose(tc_aaaa, three_center_aaaa)
-        assert np.allclose(tc_aabb, three_center_aabb)
-        assert np.allclose(tc_bbbb, three_center_bbbb)
+        tc_aa, tc_bb = container.get_three_center_integrals()
+        assert np.allclose(tc_aa, three_center_aa)
+        assert np.allclose(tc_bb, three_center_bb)
 
 
 # =============================================================================
@@ -910,7 +902,7 @@ class TestContainerEquivalence:
 
         # Canonical two-body values
         two_body_aaaa = np.ones(16) * 1.0
-        two_body_aabb = np.ones(16) * 2.0
+        two_body_aabb = np.ones(16) * math.sqrt(3.0)
         two_body_bbbb = np.ones(16) * 3.0
 
         # Three-center chosen to produce matching two-body
@@ -921,9 +913,8 @@ class TestContainerEquivalence:
                 [0.8, 0.8, 0.8, 0.8],
             ]
         )
-        three_center_aaaa = math.sqrt(0.5) * base_three_center
-        three_center_aabb = base_three_center
-        three_center_bbbb = math.sqrt(1.5) * base_three_center
+        three_center_aa = math.sqrt(0.5) * base_three_center
+        three_center_bb = math.sqrt(1.5) * base_three_center
 
         canonical = CanonicalFourCenterHamiltonianContainer(
             one_body_alpha,
@@ -939,9 +930,8 @@ class TestContainerEquivalence:
         density_fitted = DensityFittedHamiltonianContainer(
             one_body_alpha,
             one_body_beta,
-            three_center_aaaa,
-            three_center_aabb,
-            three_center_bbbb,
+            three_center_aa,
+            three_center_bb,
             orbitals,
             1.5,
             np.eye(2),
