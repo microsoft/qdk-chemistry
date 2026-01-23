@@ -25,17 +25,24 @@ import nbformat
 import pytest
 from nbclient import NotebookClient
 
+try:
+    from jupyter_client.kernelspec import find_kernel_specs
+
+    _HAS_JUPYTER_CLIENT = True
+except ImportError:
+    _HAS_JUPYTER_CLIENT = False
+
 # Environment variable to enable slow tests (including notebook e2e tests)
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
 
 def _has_jupyter_kernel(kernel_name: str = "python3") -> bool:
     """Check if a Jupyter kernel is available."""
+    if not _HAS_JUPYTER_CLIENT:
+        return False
     try:
-        from jupyter_client.kernelspec import find_kernel_specs
-
         return kernel_name in find_kernel_specs()
-    except Exception:
+    except OSError:
         return False
 
 
