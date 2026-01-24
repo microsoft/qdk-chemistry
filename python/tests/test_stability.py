@@ -735,7 +735,8 @@ class TestStabilityChecker:
         expected_negative_count = 1 if backend == "qdk" else 2
 
         scf_solver = self._create_scf_solver(backend=backend)
-        scf_solver.settings().set("enable_gdm", False)
+        if backend == "qdk":
+            scf_solver.settings().set("enable_gdm", False)
         _, wavefunction = scf_solver.run(structure, 1, 2, "def2-svp")
 
         # Test internal-only analysis (external not supported for UHF)

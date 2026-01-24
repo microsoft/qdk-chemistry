@@ -59,6 +59,9 @@ class ScfSettings
         "'incore' stores all integrals in memory",
         data::ListConstraint<std::string>{
             {std::vector<std::string>{"direct", "incore"}}});
+    set_default("nthreads", static_cast<int64_t>(-1),
+                "Number of OpenMP threads to use for SCF calculation. "
+                "Set to -1 to use all available threads.");
   }
 };
 

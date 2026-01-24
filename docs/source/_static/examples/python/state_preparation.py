@@ -11,7 +11,7 @@ from qdk_chemistry.algorithms import create
 
 # Create a StatePreparation instance
 sparse_prep = create("state_prep", "sparse_isometry_gf2x")
-regular_prep = create("state_prep", "regular_isometry")
+regular_prep = create("state_prep", "qiskit_regular_isometry")
 # end-cell-create
 ################################################################################
 
@@ -61,6 +61,6 @@ print(f"Sparse isometry QASM:\n{sparse_circuit.get_qasm()}")
 from qdk_chemistry.algorithms import registry  # noqa: E402
 
 print(registry.available("state_prep"))
-# ['sparse_isometry_gf2x', 'regular_isometry']
+# ['sparse_isometry_gf2x', 'qiskit_regular_isometry']
 # end-cell-list-implementations
 ################################################################################

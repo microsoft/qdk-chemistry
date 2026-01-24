@@ -186,9 +186,8 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
   QDK_LOG_TRACE_ENTERING();
 
   // Check if we're encountering edge cases
+  // TODO: Support Cartesian Atomic Orbitals
   if (not basis_set.pure) {
-    // TODO (NAB):  is basis_set.pure always false for cartesian basis sets?
-    // Does it mean anything else? Work item: 41332
     throw std::runtime_error("QDK Does Not Support Cartesian Atomic Orbitals");
   }
 

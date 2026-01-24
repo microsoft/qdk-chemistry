@@ -21,6 +21,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <vector>
 
 #include "test_common.h"
@@ -174,9 +175,8 @@ class SCFTest
         cfg.density_init_file = std::string(TEST_DATA_DIR) + "/" +
                                 json.value("density-init-file", "");
       } else {
-        // TODO Replace with Logger
-        std::cout << "SCFTest: No density-init-file provided" << std::endl;
-        exit(EXIT_FAILURE);
+        QDK_LOGGER().error("SCFTest: No density-init-file provided");
+        throw std::runtime_error("SCFTest: No density-init-file provided");
       }
     }
 

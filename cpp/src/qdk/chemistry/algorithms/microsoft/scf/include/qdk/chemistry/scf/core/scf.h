@@ -61,7 +61,6 @@ struct EXCConfig {
 
 /**
  * @brief Electron repulsion integral (ERI) configuration
- * TODO (DBWY): Need to prune these options now that LSXC is gone
  */
 struct ERIConfig {
 #ifdef QDK_CHEMISTRY_ENABLE_HGP

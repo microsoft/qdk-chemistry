@@ -770,8 +770,7 @@ void CanonicalFourCenterHamiltonianContainer::_to_fcidump_file(
       num_molecular_orbitals * num_molecular_orbitals;
   const size_t num_molecular_orbitals3 =
       num_molecular_orbitals2 * num_molecular_orbitals;
-  const double print_thresh =
-      std::numeric_limits<double>::epsilon();  // TODO: Make configurable?
+  const double print_thresh = std::numeric_limits<double>::epsilon();
 
   // We don't use symmetry, so populate with C1 data
   std::string orb_string;

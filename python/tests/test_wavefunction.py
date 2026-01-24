@@ -1234,7 +1234,8 @@ class TestWavefunctionTruncate:
     @pytest.fixture
     def sci_wavefunction(self):
         """Create a SCI wavefunction with multiple determinants for testing."""
-        coeffs = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 0.0], [0.0, 0.0]])
+        # 4 basis functions x 4 molecular orbitals to match 4-orbital configurations
+        coeffs = np.array([[0.9, 0.1, 0.0, 0.0], [0.1, -0.9, 0.0, 0.0], [0.0, 0.0, 0.9, 0.1], [0.0, 0.0, 0.1, -0.9]])
         basis_set = create_test_basis_set(4, "test-truncate")
         orbitals = Orbitals(coeffs, None, None, basis_set)
 

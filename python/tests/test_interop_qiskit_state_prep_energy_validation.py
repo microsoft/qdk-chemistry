@@ -33,7 +33,7 @@ def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamilton
         "state_prep", algorithm_name="sparse_isometry_gf2x", transpile_optimization_level=1, basis_gates=basis_gates
     )
     regular_prep = create(
-        "state_prep", algorithm_name="regular_isometry", transpile_optimization_level=1, basis_gates=basis_gates
+        "state_prep", algorithm_name="qiskit_regular_isometry", transpile_optimization_level=1, basis_gates=basis_gates
     )
 
     sparse_gf2x_circuit = qasm3.loads(sparse_prep_gf2x.run(wavefunction_4e4o).get_qasm())
@@ -100,7 +100,7 @@ def test_sparse_isometry_gf2x_circuit_efficiency(wavefunction_4e4o):
         "state_prep", algorithm_name="sparse_isometry_gf2x", transpile_optimization_level=1, basis_gates=basis_gates
     )
     regular_prep = create(
-        "state_prep", algorithm_name="regular_isometry", transpile_optimization_level=1, basis_gates=basis_gates
+        "state_prep", algorithm_name="qiskit_regular_isometry", transpile_optimization_level=1, basis_gates=basis_gates
     )
 
     # Create circuits using both methods

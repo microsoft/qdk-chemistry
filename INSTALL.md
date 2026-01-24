@@ -5,9 +5,31 @@ several common methods.
 
 ## Pip Wheel Installation
 
-We are currently in the process of preparing pre-built wheels for QDK/Chemistry.
-Once these are available, the preferred installation method will be via `pip`.
-For now, please build the package from source using the instructions below.
+QDK/Chemistry is distributed as the `qdk-chemistry` Python library through PyPI. To install the package, run the following command in a terminal:
+
+```bash
+python -m pip install qdk-chemistry
+```
+
+The pip installation of QDK/Chemistry currently has the following system requirements:
+
+- Python 3.11+
+- OS Support:
+  - Windows via [the Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/windows/wsl/install)
+    - x86_64
+    - arm64
+  - Linux
+    - x86_64
+    - arm64
+  - MacOS
+    - arm64
+
+Onces installed, you may run the tests in the `python/tests` directory. You may also optionally install `pyscf` to enable the PySCF plugin.
+
+```bash
+pythom -m pip install pytest [pyscf]
+pytest python/tests
+```
 
 ## Using the VSCode Dev Container
 
@@ -146,11 +168,6 @@ cmake [...] -DCMAKE_PREFIX_PATH="/opt/openblas;/opt/hdf5"
 
 **Disclaimer**: The list of dependencies listed in this file denotes the *direct* software dependencies of QDK/Chemistry. Each of these dependencies may come with dependencies of their own. The Component Governance Manifests for the [C++](cpp/manifest/qdk-chemistry/cgmanifest.json) and [Python](python/manifest/cgmanifest.json) libraries keep track of our current understanding of the complete dependency graph of QDK/Chemistry, but are subject to inaccuracies given changes in upstream dependencies. Please refer to the documentation of linked dependencies for more information of their respective dependency trees.
 
-```txt
-TODO (DBWY): Flesh out DNF Installation instructions
-Work Item: 41432
-```
-
 ### System Dependencies
 
 This section details the QDK/Chemistry dependencies which must be installed prior to
@@ -161,24 +178,18 @@ QDK/Chemistry requires both a C and a C++ compiler to be installed. Additionally
 
 | Compiler Family | Versions |
 |-----------------|----------|
-| GNU  | 11.0 + |
-| Clang | `TODO (DBWY)` |
-| MCVC | `TODO (DBWY)` |
-
-```txt
-TODO (DBWY): Add compiler support documentation
-Work Item: 41432
-```
+| GNU  | 13+ |
+| AppleClang | 17+ |
 
 Additionally, QDK/Chemistry requires the following software dependencies:
 
 | Dependency | Description | Requirements | Source Location | Ubuntu / Debian | Redhat |
 |------------|-------------|--------------------|-----------------|-----------------|---------|
 | CMake | Build system manager | Version > 3.15 | [source](https://github.com/Kitware/CMake) | `apt install cmake` | `dnf install cmake` |
-| Eigen | C++ linear algebra templates | Version > 3.4.0 | [source](https://eigen.tuxfamily.org/index.php?title=Main_Pag) | `apt install libeigen3-dev` | `dnf install eigen3-devel` |
-| LAPACK | C library for linear algebra. See [this note](#note-on-lapack-usage) for further information | N/A | e.g. [source](https://github.com/OpenMathLib/OpenBLAS) | e.g. `apt install libopenblas-dev` | e.g. `dnf install TODO(DBWY)`|
-| HDF5 | A portable data file library | Version > 1.12 + C++ bindings | [source](https://www.hdfgroup.org/download-hdf5/) | `apt install libhdf5-serial-dev` | `dnf install TODO(DBWY)`|
-| Boost | A collection of useful C++ libraries | Version > 1.80 | [source](https://github.com/boostorg/wiki/wiki/Getting-Started%3A-Overview) | `apt install libboost-all-dev` | `dnf install TODO (DBWY)` |
+| Eigen | C++ linear algebra templates | Version > 3.4.0 | [source](https://libeigen.gitlab.io/) | `apt install libeigen3-dev` | `dnf install eigen3-devel` |
+| LAPACK | C library for linear algebra. See [this note](#note-on-lapack-usage) for further information | N/A | e.g. [source](https://github.com/OpenMathLib/OpenBLAS) | e.g. `apt install libopenblas-dev` | e.g. `dnf install openblas-devel`|
+| HDF5 | A portable data file library | Version > 1.12 + C++ bindings | [source](https://www.hdfgroup.org/download-hdf5/) | `apt install libhdf5-serial-dev` | `dnf install hdf5-devel`|
+| Boost | A collection of useful C++ libraries | Version > 1.80 | [source](https://github.com/boostorg/wiki/wiki/Getting-Started%3A-Overview) | `apt install libboost-all-dev` | `dnf install boost-devel` |
 
 See [Python dependencies](#python-dependencies) for a list of dependencies installed by `pip`.
 
@@ -190,9 +201,9 @@ dependencies, see the [C++ build instructions](#configuring-the-c-library) for g
 
 | Dependency | Description | Tested Versions | Source Location | Ubuntu / Debian | Redhat |
 |------------|-------------|--------------------|-----------------|-----------------|---------|
-| nlohmann/json | A C++ library for JSON manipulation | v3.12.0 | [source](https://github.com/nlohmann/json) | `apt install nlohmann-json3-dev` | `dnf install TODO(DBWY)` |
+| nlohmann/json | A C++ library for JSON manipulation | v3.12.0 | [source](https://github.com/nlohmann/json) | `apt install nlohmann-json3-dev` | `dnf install json-devel` |
 | Libint2 | A C++ library for molecular integral evaluation | v2.9.0 | [source](https://github.com/evaleev/libint) | N/A | N/A |
-| Libecpint | A C++ library for molecular integrals involving [effective core potentials](https://en.wikipedia.org/wiki/Pseudopotential) | v1.0.7 | [source](https://github.com/robashaw/libecpint) | `apt install libecpint-dev` | `dnf install TODO (DBWY)`|
+| Libecpint | A C++ library for molecular integrals involving [effective core potentials](https://en.wikipedia.org/wiki/Pseudopotential) | v1.0.7 | [source](https://github.com/robashaw/libecpint) | `apt install libecpint-dev` | N/A |
 | GauXC | A C++ library for molecular integrals on numerical grids | v1.0 | [source](https://github.com/wavefunction91/gauxc) | N/A | N/A |
 | MACIS | A C++ library for configuration interaction methods | N/A | [source](https://github.com/wavefunction91/macis) | N/A | N/A |
 

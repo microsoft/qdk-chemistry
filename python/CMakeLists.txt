@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(qdk_chemistry_python VERSION 1.0.0.1 LANGUAGES CXX)
+project(qdk_chemistry_python VERSION 1.0.0 LANGUAGES CXX)
 
 # Set default build type to Release if not specified
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -150,8 +150,6 @@ target_compile_definitions(_core PRIVATE VERSION_INFO=${PROJECT_VERSION})
 set_target_properties(_core PROPERTIES
     CXX_VISIBILITY_PRESET "hidden"
     VISIBILITY_INLINES_HIDDEN YES
-    # TODO(DBWY): See if this is still needed with static upstream builds (it's not)
-    # Set RPATH so _core.so can find libqdk_chemistry.so at runtime
     BUILD_RPATH "$ORIGIN:$ORIGIN/.."
     INSTALL_RPATH "$ORIGIN:$ORIGIN/.."
     BUILD_RPATH_USE_ORIGIN ON

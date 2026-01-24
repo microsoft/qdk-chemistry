@@ -104,7 +104,7 @@ This method is an optimized approach that leverages sparsity in the target wavef
 Regular Isometry
 ~~~~~~~~~~~~~~~~
 
-.. rubric:: Factory name: ``"regular_isometry"``
+.. rubric:: Factory name: ``"qiskit_regular_isometry"``
 
 This method uses regular isometry synthesis via `Qiskit <https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.circuit.library.StatePreparation>`_, implementing the isometry-based approach proposed by Matthias Christandl :cite:`Christandl2016`. It provides a general solution for state preparation, and is suitable for cases where a dense representation is required or preferred.
 

@@ -268,7 +268,9 @@ jobs:
         python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[all]
         python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
         # Install optional dependencies for tests
-        python -m pip install --prefix=${{ github.workspace }}/install pennylane
+        python -m pip install --prefix=${{ github.workspace }}/install pennylane ipykernel
+        # Register the Jupyter kernel for notebook tests
+        python -m ipykernel install --user --name python3 --display-name "Python 3"
 
     - name: Run Python tests
       env:
@@ -283,6 +285,7 @@ jobs:
         echo "Found build directory: $BUILD_TEMP"
 
         set +e
+        set -o pipefail
         pytest \
           --cov=qdk_chemistry \
           --cov-report=xml:../coverage-reports/python_coverage.xml \
@@ -293,7 +296,7 @@ jobs:
           --tb=short \
           2>&1 | tee ../coverage-reports/python_coverage.txt
 
-        PYTEST_EXIT_CODE=$?
+        PYTEST_EXIT_CODE=${PIPESTATUS[0]}
         set -e
 
         echo "=== Python Test Output ==="

@@ -12,6 +12,12 @@ The :class:`~qdk_chemistry.algorithms.QubitMapper` algorithm converts fermionic 
 This transformation preserves the operator algebra, particle-number constraints, and antisymmetry required by fermionic statistics.
 The resulting qubit Hamiltonian is mathematically equivalent to the original fermionic Hamiltonian but is now in a form that can be executed on quantum hardware or simulated by quantum algorithms.
 
+.. note::
+
+   **Core energy handling:** The core energy (nuclear repulsion + frozen orbital contributions)
+   from the input Hamiltonian is **not** included in the output QubitHamiltonian. To compute
+   total energies, add ``hamiltonian.get_core_energy()`` to expectation values computed from
+   the QubitHamiltonian.
 
 
 Using the QubitMapper
@@ -117,7 +123,7 @@ Use ``QubitHamiltonian.reorder_qubits()`` or ``QubitHamiltonian.to_interleaved()
      - Description
    * - ``encoding``
      - string
-     - Fermion-to-qubit encoding (``jordan_wigner``, ``bravyi_kitaev``). Default: ``jordan_wigner``
+     - Fermion-to-qubit encoding (``jordan-wigner``, ``bravyi-kitaev``). Default: ``jordan-wigner``
    * - ``threshold``
      - double
      - Threshold for pruning small Pauli coefficients. Default: ``1e-12``

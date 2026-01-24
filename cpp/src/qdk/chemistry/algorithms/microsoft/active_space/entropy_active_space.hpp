@@ -46,9 +46,6 @@ class AutocasEosSettings : public data::Settings {
   }
 };
 
-// TODO (NAB):  We need to describe the details of this selection method and how
-// it is different from other methods. Work items 41270
-
 /**
  * @class AutocasEosActiveSpaceSelector
  * @brief Selects active space orbitals based on single orbital entropies
@@ -56,7 +53,10 @@ class AutocasEosSettings : public data::Settings {
  * This class provides a concrete implementation of the
  * WavefunctionBasedActiveSpaceSelector interface that selects active space
  * orbitals based on single orbital entropies. It identifies gaps in the sorted
- * entropies to determine plateaus of strongly correlated orbitals.
+ * entropies to determine plateaus of strongly correlated orbitals. Unlike the
+ * standard AutoCAS algorithm which uses histogram-based discretization to find
+ * plateaus, this variant directly compares consecutive entropy differences
+ * against a threshold.
  *
  * Typical usage:
  * ```cpp

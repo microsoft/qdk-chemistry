@@ -21,12 +21,45 @@ To run the slow tests (including notebook e2e tests), set the environment variab
 import os
 from pathlib import Path
 
-import nbformat
 import pytest
-from nbclient import NotebookClient
+
+# Optional dependencies for notebook execution
+try:
+    import nbformat
+    from nbclient import NotebookClient
+
+    _HAS_NOTEBOOK_DEPS = True
+except ImportError:
+    _HAS_NOTEBOOK_DEPS = False
+
+_requires_notebook_deps = pytest.mark.xfail(
+    not _HAS_NOTEBOOK_DEPS,
+    reason="nbclient and nbformat are optional dependencies",
+    raises=NameError,
+)
+
+try:
+    from jupyter_client.kernelspec import find_kernel_specs
+
+    _HAS_JUPYTER_CLIENT = True
+except ImportError:
+    _HAS_JUPYTER_CLIENT = False
 
 # Environment variable to enable slow tests (including notebook e2e tests)
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
+
+
+def _has_jupyter_kernel(kernel_name: str = "python3") -> bool:
+    """Check if a Jupyter kernel is available."""
+    if not _HAS_JUPYTER_CLIENT:
+        return False
+    try:
+        return kernel_name in find_kernel_specs()
+    except OSError:
+        return False
+
+
+_HAS_JUPYTER_KERNEL = _has_jupyter_kernel()
 
 # Patterns that indicate visualization code that should be skipped
 VISUALIZATION_PATTERNS = [
@@ -58,18 +91,40 @@ def _contains_visualization(lines: list[str], start_idx: int) -> bool:
     return False
 
 
+def _get_indent_level(line: str) -> int:
+    """Get the indentation level of a line (number of leading spaces)."""
+    return len(line) - len(line.lstrip())
+
+
 def _strip_visualization_lines(cell_source: str) -> str:
     """Remove visualization-related lines from cell source code.
 
     This preserves the rest of the cell's logic while removing only
     lines that contain visualization code. Handles multi-line statements
-    by tracking parenthesis depth.
+    by tracking parenthesis depth, and function definitions by tracking
+    indentation.
     """
     lines = cell_source.split("\n")
     filtered_lines = []
     skip_depth = 0  # Track parenthesis depth when skipping multi-line statements
+    skip_func_indent: int | None = None  # Track indentation when skipping function body
 
     for i, line in enumerate(lines):
+        # If we're skipping a function body, continue until we hit a line with
+        # the same or lesser indentation (that's not blank or a comment)
+        if skip_func_indent is not None:
+            stripped = line.strip()
+            # Blank lines or comments inside the function body should be skipped
+            if not stripped or stripped.startswith("#"):
+                filtered_lines.append(f"# [test] Skipped: {line.strip()[:50]}")
+                continue
+            # If this line has greater indentation, it's still part of the function
+            if _get_indent_level(line) > skip_func_indent:
+                filtered_lines.append(f"# [test] Skipped: {line.strip()[:50]}")
+                continue
+            # Otherwise, we've exited the function body
+            skip_func_indent = None
+
         # If we're in a skip block, continue skipping until parentheses balance
         if skip_depth > 0:
             skip_depth += line.count("(") - line.count(")")
@@ -90,6 +145,10 @@ def _strip_visualization_lines(cell_source: str) -> str:
                 should_skip = True
 
         if should_skip:
+            # Check if this is a function definition - need to skip the entire body
+            stripped = line.strip()
+            if stripped.startswith("def "):
+                skip_func_indent = _get_indent_level(line)
             # Start tracking parenthesis depth for multi-line statements
             skip_depth = line.count("(") - line.count(")")
             filtered_lines.append(f"# [test] Skipped: {line.strip()[:50]}")
@@ -145,6 +204,11 @@ def _execute_notebook_skip_visualizations(notebook_path: Path, timeout: int = 60
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
 
 
+@_requires_notebook_deps
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
 def test_factory_list():
     """Test the examples/factory_list.ipynb notebook executes without errors."""
     notebook_path = EXAMPLES_DIR / "factory_list.ipynb"
@@ -152,10 +216,15 @@ def test_factory_list():
     _execute_notebook_skip_visualizations(notebook_path)
 
 
+@_requires_notebook_deps
 @pytest.mark.slow
 @pytest.mark.skipif(
     not _RUN_SLOW_TESTS,
     reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+)
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
 )
 def test_state_prep_energy():
     """Test the examples/state_prep_energy.ipynb notebook executes without errors."""
@@ -164,10 +233,15 @@ def test_state_prep_energy():
     _execute_notebook_skip_visualizations(notebook_path)
 
 
+@_requires_notebook_deps
 @pytest.mark.slow
 @pytest.mark.skipif(
     not _RUN_SLOW_TESTS,
     reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+)
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
 )
 def test_qpe_stretched_n2():
     """Test the examples/qpe_stretched_n2.ipynb notebook executes without errors."""

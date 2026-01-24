@@ -91,4 +91,4 @@ class RegularIsometryStatePreparation(StatePreparation):
     def name(self) -> str:
         """Return the name of the state preparation method."""
         Logger.trace_entering()
-        return "regular_isometry"
+        return "qiskit_regular_isometry"

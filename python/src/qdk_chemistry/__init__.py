@@ -5,7 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-__version__ = "1.0.0-rc1"
+__version__ = "1.0.0"
 
 import contextlib
 import os

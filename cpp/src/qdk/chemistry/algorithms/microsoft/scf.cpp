@@ -98,8 +98,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   if (multiplicity < 0) {
     // Default to singlet for closed shell, doublet for open-shell
     multiplicity = ((nuclear_charge - charge) % 2 == 0) ? 1 : 2;
-    // TODO (NAB): should the user be warned about a default being used?
-    // Workitem: 41322
+    QDK_LOGGER().warn("No multiplicity specified. Defaulting to {} ({}).",
+                      multiplicity, multiplicity == 1 ? "singlet" : "doublet");
   }
 
   const bool open_shell = (multiplicity != 1);
@@ -226,11 +226,15 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 #endif
   }
 
-  // FP scales poorly with threads
-  // TODO: Make this configurable, workitem: 41325
+  // Configure OpenMP thread count if specified
 #ifdef _OPENMP
   auto old_max_threads = omp_get_max_threads();
-  // omp_set_num_threads(1);
+  int64_t nthreads = _settings->get<int64_t>("nthreads");
+  if (nthreads > 0) {
+    omp_set_num_threads(static_cast<int>(nthreads));
+    QDK_LOGGER().debug("Setting OpenMP threads to {} for SCF calculation.",
+                       nthreads);
+  }
 #endif
 
   // Save the current global level before disabling SCF logging
