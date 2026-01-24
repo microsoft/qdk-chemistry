@@ -123,6 +123,9 @@ python3 -m pip install --upgrade pip
 python3 -m pip install auditwheel build
 python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
 
+# Prepare README for PyPI
+bash .pipelines/pip-scripts/prepare-readme.sh
+
 # Install Python package
 cd python
 

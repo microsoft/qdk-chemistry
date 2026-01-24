@@ -40,7 +40,7 @@ from .test_helpers import create_test_orbitals
 def test_regular_isometry_state_prep(wavefunction_4e4o):
     """Test that regular isometry StatePreparation algorithm creates valid quantum circuits."""
     # Create a state preparation instance
-    prep = create("state_prep", "regular_isometry")
+    prep = create("state_prep", "qiskit_regular_isometry")
 
     # Create a circuit
     circuit = prep.run(wavefunction_4e4o)

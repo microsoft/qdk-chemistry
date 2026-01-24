@@ -4,8 +4,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# TODO (DBWY): I feel like the functions in this file do not have broad user scope - can they be moved to private
-# context where they're used?
 
 from collections.abc import Iterable, Sequence
 

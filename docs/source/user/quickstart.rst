@@ -194,8 +194,6 @@ For efficient energy estimation, the qubit Hamiltonian can be optimized in two w
 Generate the state preparation circuit
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. TODO: Add more references to other methods
-
 Given the classical representation of the sparse multi-configurational :class:`~qdk_chemistry.data.Wavefunction`, a quantum circuit can be generated to prepare this state on a quantum computer.
 This can be done in many ways, including via Isometry encoding :cite:`Christandl2016`, linear combinations of unitaries, and tensor product methods.
 However, when the wavefunction is very sparse, these methods can be inefficient.

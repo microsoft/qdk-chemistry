@@ -43,8 +43,8 @@ dependencies = [
   "h5py>=3.0.0"
 ]
 description = "Quantum Development Kit - Chemistry Library"
-dynamic = ["version"]
 license = { file = "LICENSE.txt" }
+version = "1.0.0"
 name = "qdk-chemistry"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -88,6 +88,8 @@ Documentation = "https://microsoft.github.io/qdk-chemistry"
 Homepage = "https://github.com/microsoft/qdk-chemistry"
 Issues = "https://github.com/microsoft/qdk-chemistry/issues"
 Repository = "https://github.com/microsoft/qdk-chemistry"
+Source = "https://github.com/microsoft/qdk-chemistry"
+Changelog = "https://github.com/microsoft/qdk-chemistry/releases"
 
 # Configuration for C++ coverage reporting
 [tool.coverage.cpp]
@@ -146,7 +148,8 @@ addopts = [
 ]
 filterwarnings = [
   "ignore::DeprecationWarning:qiskit",
-  "ignore::DeprecationWarning:qiskit_aer"
+  "ignore::DeprecationWarning:qiskit_aer",
+  "ignore::pyparsing.exceptions.PyparsingDeprecationWarning"
 ]
 markers = [
   "slow: marks tests as slow (deselect with '-m \"not slow\"')",
@@ -233,7 +236,6 @@ cmake.source-dir = "."
 # Enable verbose output for debugging
 cmake.verbose = true
 install.components = ["_core", "qdk_chemistry_resources"]
-metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
 
 [tool.scikit-build.wheel]
 packages = ["src/qdk_chemistry"]
@@ -253,8 +255,3 @@ cmake.build-type = "Debug"
 [[tool.scikit-build.overrides]]
 if.env.CMAKE_BUILD_TYPE = "RelWithDebInfo"
 cmake.build-type = "RelWithDebInfo"
-
-# Use setuptools_scm to get version from git tags
-[tool.setuptools_scm]
-local_scheme = "node-and-date"  # Append the git commit hash and date for dev versions
-root = ".."  # finds the .git in the root directory to help with versioning

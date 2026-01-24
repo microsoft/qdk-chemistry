@@ -605,6 +605,15 @@ void GDM::iterate(SCFImpl& scf_impl) {
       static_cast<int>(ctx_.num_molecular_orbitals);
   const int num_density_matrices = cfg->unrestricted ? 2 : 1;
 
+  // Check if there are any virtual orbitals for any spin component
+  // If not, orbital rotation is not possible and we should skip GDM iteration
+  if (total_rotation_size_ == 0) {
+    QDK_LOGGER().warn(
+        "GDM: No virtual orbitals available for orbital rotation. "
+        "Skipping GDM iteration.");
+    return;
+  }
+
   // Compute current gradient and dgrad for each spin
   for (int i = 0; i < num_density_matrices; ++i) {
     const int num_occupied_orbitals = num_electrons_[i];

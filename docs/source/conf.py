@@ -18,7 +18,7 @@ from pathlib import Path
 project = "qdk-chemistry"
 copyright = "Microsoft Corporation. All rights reserved. Licensed under the MIT License"
 author = "QDK/Chemistry Team"
-release = "1.0.0-rc1"
+release = "1.0.0"
 
 # -----------------------------------------------------------------------------
 # Perform initial setup and tests

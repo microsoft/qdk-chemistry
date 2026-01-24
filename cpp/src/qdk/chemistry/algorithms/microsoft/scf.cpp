@@ -72,6 +72,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
       basis_set_type == BasisSetType::Explicit) {
     qdk_raw_basis_set =
         std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess);
+  } else {
+    qdk_raw_basis_set =
+        data::BasisSet::from_basis_name(basis_set_name, structure);
   }
 
   // Extract geometry from structure object
@@ -95,8 +98,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   if (multiplicity < 0) {
     // Default to singlet for closed shell, doublet for open-shell
     multiplicity = ((nuclear_charge - charge) % 2 == 0) ? 1 : 2;
-    // TODO (NAB): should the user be warned about a default being used?
-    // Workitem: 41322
+    QDK_LOGGER().warn("No multiplicity specified. Defaulting to {} ({}).",
+                      multiplicity, multiplicity == 1 ? "singlet" : "doublet");
   }
 
   const bool open_shell = (multiplicity != 1);
@@ -145,13 +148,10 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   auto ms_mol = qdk::chemistry::utils::microsoft::convert_to_molecule(
       *structure, charge, multiplicity);
   // update atomic charges for ECPs
-  if (basis_set_type == BasisSetType::Explicit) {
-    // iterate through atoms and adjust charges
-    auto ecp_electrons = qdk_raw_basis_set->get_ecp_electrons();
-    for (size_t i = 0; i < ms_mol->n_atoms; ++i) {
-      int n_core_electrons = static_cast<int>(ecp_electrons[i]);
-      ms_mol->atomic_charges[i] = ms_mol->atomic_nums[i] - n_core_electrons;
-    }
+  auto ecp_electrons = qdk_raw_basis_set->get_ecp_electrons();
+  for (size_t i = 0; i < ms_mol->n_atoms; ++i) {
+    int n_core_electrons = static_cast<int>(ecp_electrons[i]);
+    ms_mol->atomic_charges[i] = ms_mol->atomic_nums[i] - n_core_electrons;
   }
 
   // Create SCFConfig
@@ -226,11 +226,15 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 #endif
   }
 
-  // FP scales poorly with threads
-  // TODO: Make this configurable, workitem: 41325
+  // Configure OpenMP thread count if specified
 #ifdef _OPENMP
   auto old_max_threads = omp_get_max_threads();
-  // omp_set_num_threads(1);
+  int64_t nthreads = _settings->get<int64_t>("nthreads");
+  if (nthreads > 0) {
+    omp_set_num_threads(static_cast<int>(nthreads));
+    QDK_LOGGER().debug("Setting OpenMP threads to {} for SCF calculation.",
+                       nthreads);
+  }
 #endif
 
   // Save the current global level before disabling SCF logging
@@ -242,32 +246,17 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // Create SCF solver based on method and basis set type
   std::shared_ptr<qcs::SCF> scf;
   if (method == "hf") {
-    if (basis_set_type == BasisSetType::Explicit) {
-      scf = qcs::SCF::make_hf_solver(
-          ms_mol, *ms_scf_config,
-          utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set),
-          utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set,
-                                                       false));
-    } else {
-      scf = qcs::SCF::make_hf_solver(ms_mol, *ms_scf_config);
-    }
+    scf = qcs::SCF::make_hf_solver(
+        ms_mol, *ms_scf_config,
+        utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set),
+        utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set,
+                                                     false));
   } else {
-    if (basis_set_type == BasisSetType::Explicit) {
-      scf = qcs::SCF::make_ks_solver(
-          ms_mol, *ms_scf_config,
-          utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set),
-          utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set,
-                                                       false));
-    } else {
-      scf = qcs::SCF::make_ks_solver(ms_mol, *ms_scf_config);
-    }
-  }
-
-  // Extract the basis set
-  if (basis_set_type != BasisSetType::Explicit) {
-    qdk_raw_basis_set = std::make_shared<qdk::chemistry::data::BasisSet>(
-        utils::microsoft::convert_basis_set_to_qdk(
-            *scf->context().basis_set_raw));
+    scf = qcs::SCF::make_ks_solver(
+        ms_mol, *ms_scf_config,
+        utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set),
+        utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set,
+                                                     false));
   }
 
   // Compute map from QDK shells to internal representation
@@ -373,9 +362,18 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
     // Create new SCF solver with density matrix
     auto initial_guess_scf =
-        (method == "hf")
-            ? qcs::SCF::make_hf_solver(ms_mol, *ms_scf_config, density_matrix)
-            : qcs::SCF::make_ks_solver(ms_mol, *ms_scf_config, density_matrix);
+        (method == "hf") ? qcs::SCF::make_hf_solver(
+                               ms_mol, *ms_scf_config, density_matrix,
+                               utils::microsoft::convert_basis_set_from_qdk(
+                                   *qdk_raw_basis_set),
+                               utils::microsoft::convert_basis_set_from_qdk(
+                                   *qdk_raw_basis_set, false))
+                         : qcs::SCF::make_ks_solver(
+                               ms_mol, *ms_scf_config, density_matrix,
+                               utils::microsoft::convert_basis_set_from_qdk(
+                                   *qdk_raw_basis_set),
+                               utils::microsoft::convert_basis_set_from_qdk(
+                                   *qdk_raw_basis_set, false));
 
     // Replace the original scf with the initial guess version
     scf = std::move(initial_guess_scf);

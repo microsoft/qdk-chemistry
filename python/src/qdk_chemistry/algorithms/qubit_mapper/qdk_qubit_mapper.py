@@ -184,8 +184,8 @@ class QdkQubitMapperSettings(Settings):
     """Settings configuration for a QdkQubitMapper.
 
     QdkQubitMapper-specific settings:
-        encoding (string, default="jordan_wigner"): Fermion-to-qubit encoding type.
-            Valid options: "jordan_wigner", "bravyi_kitaev"
+        encoding (string, default="jordan-wigner"): Fermion-to-qubit encoding type.
+            Valid options: "jordan-wigner", "bravyi-kitaev"
 
         threshold (double, default=1e-12): Threshold for pruning small Pauli coefficients.
 
@@ -202,9 +202,9 @@ class QdkQubitMapperSettings(Settings):
         self._set_default(
             "encoding",
             "string",
-            "jordan_wigner",
+            "jordan-wigner",
             "Fermion-to-qubit encoding type",
-            ["jordan_wigner", "bravyi_kitaev"],
+            ["jordan-wigner", "bravyi-kitaev"],
         )
         self._set_default(
             "threshold",
@@ -233,14 +233,14 @@ class QdkQubitMapper(QubitMapper):
     ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings.
 
     Attributes:
-        encoding (str): The fermion-to-qubit encoding type. Default: "jordan_wigner".
+        encoding (str): The fermion-to-qubit encoding type. Default: "jordan-wigner".
         threshold (float): Threshold for pruning small Pauli coefficients. Default: 1e-12.
         integral_threshold (float): Threshold for filtering small integrals. Default: 1e-12.
 
     Examples:
         >>> from qdk_chemistry.algorithms import QdkQubitMapper
         >>> mapper = QdkQubitMapper()
-        >>> mapper.settings().set("encoding", "jordan_wigner")
+        >>> mapper.settings().set("encoding", "jordan-wigner")
         >>> mapper.settings().set("threshold", 1e-10)
         >>> qubit_hamiltonian = mapper.run(hamiltonian)
 
@@ -248,14 +248,14 @@ class QdkQubitMapper(QubitMapper):
 
     def __init__(
         self,
-        encoding: str = "jordan_wigner",
+        encoding: str = "jordan-wigner",
         threshold: float = 1e-12,
         integral_threshold: float = 1e-12,
     ) -> None:
         """Initialize the QdkQubitMapper with default settings.
 
         Args:
-            encoding: Fermion-to-qubit encoding type. Default: "jordan_wigner".
+            encoding: Fermion-to-qubit encoding type. Default: "jordan-wigner".
             threshold: Threshold for pruning small Pauli coefficients. Default: 1e-12.
             integral_threshold: Threshold for filtering small integrals. Default: 1e-12.
 
@@ -290,9 +290,9 @@ class QdkQubitMapper(QubitMapper):
         threshold = float(self.settings().get("threshold"))
         integral_threshold = float(self.settings().get("integral_threshold"))
 
-        if encoding == "jordan_wigner":
+        if encoding == "jordan-wigner":
             return self._jordan_wigner_transform(hamiltonian, threshold, integral_threshold)
-        if encoding == "bravyi_kitaev":
+        if encoding == "bravyi-kitaev":
             return self._bravyi_kitaev_transform(hamiltonian, threshold, integral_threshold)
 
         raise ValueError(f"Unsupported encoding: '{encoding}'.")
@@ -419,7 +419,6 @@ class QdkQubitMapper(QubitMapper):
 
         h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
         h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
-        core_energy = hamiltonian.get_core_energy()
 
         n_spatial = h1_alpha.shape[0]
 
@@ -430,9 +429,6 @@ class QdkQubitMapper(QubitMapper):
 
         # Use C++ PauliTermAccumulator for efficient term accumulation
         accumulator = PauliTermAccumulator()
-
-        # Add core energy as identity term (empty sparse word = identity)
-        accumulator.accumulate([], complex(core_energy))
 
         # Eagerly precompute spin-summed excitation terms: E_pq = E_pq_alpha + E_pq_beta
         # (indexed by spatial orbitals p, q)
