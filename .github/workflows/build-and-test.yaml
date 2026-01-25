@@ -58,17 +58,17 @@ jobs:
           runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
           build-parallel: 120
           uarch: x86-64-v3
-          python-version: 3.10
+          python-version: '3.10'
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
           build-parallel: 120
           uarch: x86-64-v3
-          python-version: 3.13
+          python-version: '3.13'
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
           uarch: native
-          python-version: 3.13
+          python-version: '3.13'
     env:
       BUILD_DIR: cpp/build
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
