@@ -24,9 +24,16 @@ class ROHFMatrixHandler {
   ~ROHFMatrixHandler() noexcept;
 
   /**
-   * @brief Receive and store Fock and Density matrices
+   * @brief Build ROHF effective Fock matrix and total Density matrix
+   *
+   * @param[in] F Spin-blocked Fock matrix
+   * @param[in] C Orbital coefficients matrix
+   * @param[in] P Spin-blocked density matrix
+   * @param[in] nd Number of doubly occupied orbitals
+   * @param[in] ns Number of singly occupied orbitals
    */
-  void receive_F_P_matrices(const RowMajorMatrix& F, RowMajorMatrix& P);
+  void build_ROHF_F_P_matrix(const RowMajorMatrix& F, const RowMajorMatrix& C,
+                             RowMajorMatrix& P, int nd, int ns);
 
   /**
    * @brief Get reference to Fock matrix

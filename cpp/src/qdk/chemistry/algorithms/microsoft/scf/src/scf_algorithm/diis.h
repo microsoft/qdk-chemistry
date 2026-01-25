@@ -4,12 +4,12 @@
 
 #pragma once
 
-#include "rohf_matrix_handler.h"
-
 #include <qdk/chemistry/scf/core/scf_algorithm.h>
 #include <qdk/chemistry/scf/core/types.h>
 
 #include <memory>
+
+#include "rohf_matrix_handler.h"
 
 namespace qdk::chemistry::scf {
 

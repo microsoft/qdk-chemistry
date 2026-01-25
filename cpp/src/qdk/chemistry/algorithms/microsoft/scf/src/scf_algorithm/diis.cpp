@@ -282,7 +282,7 @@ DIIS::DIIS(const SCFContext& ctx, bool rohf_enabled, const size_t subspace_size)
     : SCFAlgorithm(ctx, rohf_enabled),
       diis_impl_(
           std::make_unique<impl::DIIS>(ctx, rohf_enabled, subspace_size)),
-          rohf_enabled_(rohf_enabled) {
+      rohf_enabled_(rohf_enabled) {
   QDK_LOG_TRACE_ENTERING();
   // Only create matrix handler for ROHF case
   if (rohf_enabled) {
@@ -303,8 +303,13 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   RowMajorMatrix* P_ptr;
 
   if (rohf_enabled_) {
-    rohf_matrix_handler_->receive_F_P_matrices(
-        scf_impl.get_fock_matrix(), scf_impl.density_matrix());
+    auto nelec = scf_impl.get_num_electrons();
+    int nd = nelec[1];
+    int ns = nelec[0] - nelec[1];
+    rohf_matrix_handler_->build_ROHF_F_P_matrix(scf_impl.get_fock_matrix(),
+                                                scf_impl.get_orbitals_matrix(),
+                                                scf_impl.density_matrix(),
+                                                nd, ns);
     F_ptr = &rohf_matrix_handler_->get_fock_matrix();
     P_ptr = &rohf_matrix_handler_->get_density_matrix();
   } else {
@@ -316,7 +321,8 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   // spin-blocked Fock matrices for UHF
   const auto& F = *F_ptr;
 
-  // Total density matrix for RHF and ROHF; spin-blocked density matrices for UHF
+  // Total density matrix for RHF and ROHF; spin-blocked density matrices for
+  // UHF
   auto& P = *P_ptr;
 
   auto& C = scf_impl.orbitals_matrix();

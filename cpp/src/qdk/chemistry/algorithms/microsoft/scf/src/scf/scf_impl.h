@@ -363,7 +363,7 @@ class SCFImpl {
       int1e_;                 ///< One-electron integral calculator
   std::shared_ptr<ERI> eri_;  ///< Electron repulsion integral calculator
   std::shared_ptr<SCFAlgorithm> scf_algorithm_;  ///< SCF convergence algorithm
-  bool rohf_enabled_ = false; ///< Flag indicating if ROHF is enabled
+  bool rohf_enabled_ = false;  ///< Flag indicating if ROHF is enabled
 
 #ifdef QDK_CHEMISTRY_ENABLE_PCM
   std::unique_ptr<pcm::PCM> pcm_;  ///< Polarizable Continuum Model solver
