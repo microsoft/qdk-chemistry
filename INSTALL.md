@@ -44,7 +44,7 @@ The pip installation of QDK/Chemistry currently has the following system require
 You may also optionally install the `qdk-chemistry` extras `plugins` (to enable the PySCF plugin) and `dev` (to enable the testing toolchain, including `pytest` and related plugins):
 
 ```bash
-python -m pip install qdk-chemistry[plugins,dev]
+python -m pip install "qdk-chemistry[plugins,dev]"
 ```
 
 Installing with the `dev` option allows you to run the tests in the `python/tests` directory of the source repository you cloned above.
