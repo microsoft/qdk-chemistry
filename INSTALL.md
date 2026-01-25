@@ -1,7 +1,14 @@
 # Installation Instructions for QDK/Chemistry
 
-This file contains instructions for how to configure, build and install QDK/Chemistry via
-several common methods.
+This file contains instructions for how to configure, build, and install QDK/Chemistry via
+several common methods, outlined below.
+You only need to choose one of the methods below for installation.
+
+To run the examples with any of these installation methods, we recommend cloning the GitHub repository:
+
+```bash
+git clone https://github.com/microsoft/qdk-chemistry.git
+```
 
 ## Pip Wheel Installation
 
@@ -24,10 +31,15 @@ The pip installation of QDK/Chemistry currently has the following system require
   - MacOS
     - arm64
 
-Onces installed, you may run the tests in the `python/tests` directory. You may also optionally install `pyscf` to enable the PySCF plugin.
+You may also optionally install `pyscf` to enable the PySCF plugin and `pytest` to enable testing.
 
 ```bash
-pythom -m pip install pytest [pyscf]
+python -m pip install pytest pyscf
+```
+
+Once installed, you may run the tests in the `python/tests` directory of the source repository you cloned above.
+
+```bash
 pytest python/tests
 ```
 
