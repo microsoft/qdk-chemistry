@@ -63,6 +63,9 @@ class DIIS : public SCFAlgorithm {
   std::unique_ptr<impl::DIIS> diis_impl_;
 
   /// ROHF matrix handler for transforming alpha/beta matrices
+  bool rohf_enabled_;
+
+  /// Unique pointer to ROHFMatrixHandler
   std::unique_ptr<ROHFMatrixHandler> rohf_matrix_handler_;
 };
 

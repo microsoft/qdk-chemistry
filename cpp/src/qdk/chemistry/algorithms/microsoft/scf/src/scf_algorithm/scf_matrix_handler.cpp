@@ -62,6 +62,8 @@ ROHFMatrixHandler::ROHFMatrixHandler() {
   handler_impl_ = std::make_unique<impl::ROHFMatrixHandler>();
 }
 
+ROHFMatrixHandler::~ROHFMatrixHandler() noexcept = default;
+
 void ROHFMatrixHandler::receive_F_P_matrices(const RowMajorMatrix& F,
                                              RowMajorMatrix& P) {
   handler_impl_->receive_F_P_matrices(F, P);

@@ -19,6 +19,11 @@ class ROHFMatrixHandler {
   explicit ROHFMatrixHandler();
 
   /**
+   * @brief Destructor
+   */
+  ~ROHFMatrixHandler() noexcept;
+
+  /**
    * @brief Receive and store Fock and Density matrices
    */
   void receive_F_P_matrices(const RowMajorMatrix& F, RowMajorMatrix& P);
