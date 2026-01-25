@@ -57,8 +57,7 @@ class ROHFMatrixHandler {
 
 }  // namespace impl
 
-ROHFMatrixHandler::ROHFMatrixHandler()
-    : SCFMatrixHandler() {
+ROHFMatrixHandler::ROHFMatrixHandler() {
   QDK_LOG_TRACE_ENTERING();
   handler_impl_ = std::make_unique<impl::ROHFMatrixHandler>();
 }

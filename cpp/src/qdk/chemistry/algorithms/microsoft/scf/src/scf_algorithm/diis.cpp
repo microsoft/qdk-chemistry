@@ -283,10 +283,9 @@ DIIS::DIIS(const SCFContext& ctx, bool rohf_enabled, const size_t subspace_size)
       diis_impl_(
           std::make_unique<impl::DIIS>(ctx, rohf_enabled, subspace_size)) {
   QDK_LOG_TRACE_ENTERING();
+  // Only create matrix handler for ROHF case
   if (rohf_enabled) {
     matrix_handler_ = std::make_unique<ROHFMatrixHandler>();
-  } else {
-    matrix_handler_ = std::make_unique<RHFUHFMatrixHandler>();
   }
 }
 
@@ -296,13 +295,23 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
   const auto* cfg = ctx_.cfg;
 
-  matrix_handler_->receive_F_P_matrices(
-      scf_impl.get_fock_matrix(), scf_impl.get_density_matrix());
+  // Get matrix references - use handler for ROHF, direct access for RHF/UHF
+  const RowMajorMatrix* F_ptr;
+  RowMajorMatrix* P_ptr;
 
-  // Get references to matrices from SCFImpl
-  auto& P = matrix_handler_->get_density_matrix();
+  if (rohf_enabled_) {
+    matrix_handler_->receive_F_P_matrices(
+        scf_impl.get_fock_matrix(), scf_impl.get_density_matrix());
+    F_ptr = &matrix_handler_->get_fock_matrix();
+    P_ptr = &matrix_handler_->get_density_matrix();
+  } else {
+    F_ptr = &scf_impl.get_fock_matrix();
+    P_ptr = &scf_impl.density_matrix();
+  }
+
+  const auto& F = *F_ptr;
+  auto& P = *P_ptr;
   auto& C = scf_impl.orbitals_matrix();
-  const auto& F = matrix_handler_->get_fock_matrix();
   const auto& S = scf_impl.overlap();
   const auto& X = scf_impl.get_orthogonalization_matrix();
   auto& eigenvalues = scf_impl.eigenvalues();

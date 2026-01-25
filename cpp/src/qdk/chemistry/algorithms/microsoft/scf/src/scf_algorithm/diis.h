@@ -62,8 +62,8 @@ class DIIS : public SCFAlgorithm {
   /// PIMPL pointer to implementation
   std::unique_ptr<impl::DIIS> diis_impl_;
 
-  /// Fock matrix and density matrix handler, for RHF/UHF and ROHF cases
-  std::unique_ptr<SCFMatrixHandler> matrix_handler_;
+  /// ROHF matrix handler for transforming alpha/beta matrices
+  std::unique_ptr<ROHFMatrixHandler> rohf_matrix_handler_;
 };
 
 }  // namespace qdk::chemistry::scf
