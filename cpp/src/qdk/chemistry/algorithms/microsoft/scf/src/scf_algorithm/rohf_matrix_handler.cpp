@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include "scf_matrix_handler.h"
+#include "rohf_matrix_handler.h"
 
 #include <cmath>
 #include <lapack.hh>
@@ -50,6 +50,18 @@ class ROHFMatrixHandler {
     return total_density_matrix_;
   }
 
+  /**
+   * @brief Update spin-blocked density matrices from total density matrix
+   *
+   * @param[out] P Spin-blocked density matrices to update
+   * @param[in] C Orbital coefficients matrix
+   */
+  void update_spin_density_matrices(RowMajorMatrix& P, const RowMajorMatrix& C) {
+    QDK_LOG_TRACE_ENTERING();
+    int num_atomic_orbitals = C.rows();
+    int num_molecular_orbitals = C.cols();
+  }
+
  private:
   RowMajorMatrix effective_Fock_matrix_;
   RowMajorMatrix total_density_matrix_;
@@ -75,6 +87,13 @@ const RowMajorMatrix& ROHFMatrixHandler::get_fock_matrix() {
 
 RowMajorMatrix& ROHFMatrixHandler::get_density_matrix() {
   return handler_impl_->get_density_matrix();
+}
+
+// Implementation for updating spin-blocked density matrices from
+// total density matrix and orbital coefficients
+void ROHFMatrixHandler::update_spin_density_matrices(
+    RowMajorMatrix& P, const RowMajorMatrix& C) {
+  handler_impl_->update_spin_density_matrices(P, C);
 }
 
 }  // namespace qdk::chemistry::scf

@@ -12,7 +12,7 @@
 #include <qdk/chemistry/utils/logger.hpp>
 
 #include "../scf/scf_impl.h"
-#include "scf_matrix_handler.h"
+#include "rohf_matrix_handler.h"
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
@@ -312,8 +312,13 @@ void DIIS::iterate(SCFImpl& scf_impl) {
     P_ptr = &scf_impl.density_matrix();
   }
 
+  // Fock matrix for RHF; effective Fock matrix for ROHF;
+  // spin-blocked Fock matrices for UHF
   const auto& F = *F_ptr;
+
+  // Total density matrix for RHF and ROHF; spin-blocked density matrices for UHF
   auto& P = *P_ptr;
+
   auto& C = scf_impl.orbitals_matrix();
   const auto& S = scf_impl.overlap();
   const auto& X = scf_impl.get_orthogonalization_matrix();
@@ -337,12 +342,19 @@ void DIIS::iterate(SCFImpl& scf_impl) {
                             cfg->unrestricted);
   }
 
+  // For ROHF, P_scf_impl is spin-blocked density matrices in scf_impl
+  // For RHF or UHF, P_scf_impl is just P
+  auto& P_scf_impl = scf_impl.density_matrix();
+  if (rohf_enabled_) {
+    rohf_matrix_handler_->update_spin_density_matrices(P_scf_impl, C);
+  }
+
   double diis_error = diis_impl_->get_diis_error();
   bool should_apply_damping = cfg->scf_algorithm.enable_damping &&
                               diis_error > cfg->scf_algorithm.damping_threshold;
   if (should_apply_damping) {
     double factor = cfg->scf_algorithm.damping_factor;
-    P = P_last_ * factor + P * (1.0 - factor);
+    P_scf_impl = P_last_ * factor + P_scf_impl * (1.0 - factor);
   }
 }
 

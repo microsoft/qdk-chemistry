@@ -42,6 +42,14 @@ class ROHFMatrixHandler {
    */
   RowMajorMatrix& get_density_matrix();
 
+  /**
+   * @brief Update spin-blocked density matrices from total density matrix
+   *
+   * @param[out] P Spin-blocked density matrices to update
+   * @param[in] C Orbital coefficients matrix
+   */
+  void update_spin_density_matrices(RowMajorMatrix& P, const RowMajorMatrix& C);
+
  private:
   std::unique_ptr<impl::ROHFMatrixHandler> handler_impl_;
 };

@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "scf_matrix_handler.h"
+#include "rohf_matrix_handler.h"
 
 #include <qdk/chemistry/scf/core/scf_algorithm.h>
 #include <qdk/chemistry/scf/core/types.h>
