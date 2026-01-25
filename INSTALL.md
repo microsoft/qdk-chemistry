@@ -38,7 +38,7 @@ The pip installation of QDK/Chemistry currently has the following system require
   - Linux
     - x86_64
     - arm64
-  - MacOS
+  - macOS
     - arm64
 
 You may also optionally install the `qdk-chemistry` extras `plugins` (to enable the PySCF plugin) and `dev` (to enable the testing toolchain, including `pytest` and related plugins):
