@@ -13,8 +13,15 @@ git clone https://github.com/microsoft/qdk-chemistry.git
 ## Pip Wheel Installation
 
 **Note**:  We strongly recommend using a virtual environment when installing QDK/Chemistry via pip to avoid conflicts with other installed packages.
+For example:
 
-QDK/Chemistry is distributed as the `qdk-chemistry` Python library through PyPI. To install the package, run the following command in a terminal:
+```bash
+python -m venv venv
+source venv/bin/activate
+```
+
+QDK/Chemistry is distributed as the `qdk-chemistry` Python library through PyPI.
+To install the package, run the following command in a terminal:
 
 ```bash
 python -m pip install qdk-chemistry
