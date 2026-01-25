@@ -14,7 +14,7 @@ cd qdk-chemistry
 ## Pip Wheel Installation
 
 **Note**:  We strongly recommend using a virtual environment when installing QDK/Chemistry via pip to avoid conflicts with other installed packages.
-For example:
+For example, on Windows Subsystem Linux (WSL), Linux, or macOS, you can create and activate a virtual environment as follows:
 
 ```bash
 python -m venv venv
