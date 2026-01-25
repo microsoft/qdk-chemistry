@@ -33,13 +33,13 @@ The pip installation of QDK/Chemistry currently has the following system require
   - MacOS
     - arm64
 
-You may also optionally install `pyscf` to enable the PySCF plugin and `pytest` to enable testing.
+You may also optionally install the `qdk-chemistry` extras `plugins` (to enable the PySCF plugin) and `dev` (to enable the testing toolchain, including `pytest` and related plugins):
 
 ```bash
-python -m pip install pytest pyscf
+python -m pip install qdk-chemistry[plugins,dev]
 ```
 
-Once installed, you may run the tests in the `python/tests` directory of the source repository you cloned above.
+Installing with the `dev` option allows you to run the tests in the `python/tests` directory of the source repository you cloned above.
 
 ```bash
 pytest python/tests
