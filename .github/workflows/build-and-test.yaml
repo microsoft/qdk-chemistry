@@ -464,6 +464,7 @@ jobs:
         cat coverage-summary.md >> $GITHUB_STEP_SUMMARY
 
     - name: Build documentation
+      if: matrix.python-version == '3.13'
       working-directory: docs
       run: |
         set +e
