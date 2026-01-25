@@ -1,11 +1,28 @@
 # Installation Instructions for QDK/Chemistry
 
-This file contains instructions for how to configure, build and install QDK/Chemistry via
-several common methods.
+This file contains instructions for how to configure, build, and install QDK/Chemistry via
+several common methods, outlined below.
+You only need to choose one of the methods below for installation.
+
+To run the examples with any of these installation methods, we recommend cloning the GitHub repository and navigating to the repository directory for subsequent steps:
+
+```bash
+git clone https://github.com/microsoft/qdk-chemistry.git
+cd qdk-chemistry
+```
 
 ## Pip Wheel Installation
 
-QDK/Chemistry is distributed as the `qdk-chemistry` Python library through PyPI. To install the package, run the following command in a terminal:
+**Note**:  We strongly recommend using a virtual environment when installing QDK/Chemistry via pip to avoid conflicts with other installed packages.
+For example, on Windows Subsystem Linux (WSL), Linux, or macOS, you can create and activate a virtual environment as follows:
+
+```bash
+python -m venv venv
+source venv/bin/activate
+```
+
+QDK/Chemistry is distributed as the `qdk-chemistry` Python library through PyPI.
+To install the package, run the following command in a terminal:
 
 ```bash
 python -m pip install qdk-chemistry
@@ -21,13 +38,18 @@ The pip installation of QDK/Chemistry currently has the following system require
   - Linux
     - x86_64
     - arm64
-  - MacOS
+  - macOS
     - arm64
 
-Onces installed, you may run the tests in the `python/tests` directory. You may also optionally install `pyscf` to enable the PySCF plugin.
+You may also optionally install the `qdk-chemistry` extras `plugins` (to enable the PySCF plugin) and `dev` (to enable the testing toolchain, including `pytest` and related plugins):
 
 ```bash
-pythom -m pip install pytest [pyscf]
+python -m pip install 'qdk-chemistry[plugins,dev]'
+```
+
+Installing with the `dev` option allows you to run the tests in the `python/tests` directory of the source repository you cloned above.
+
+```bash
 pytest python/tests
 ```
 
