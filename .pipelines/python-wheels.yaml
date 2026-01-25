@@ -112,9 +112,6 @@ extends:
               Python3.13:
                 pythonVersion: '3.13'
                 buildMarch: ${{ target.march }}
-              Python3.14:
-                pythonVersion: '3.14'
-                buildMarch: ${{ target.march }}
             maxParallel: 3
           templateContext:
             outputs:
@@ -248,9 +245,6 @@ extends:
             artifactName: linux-x86_64-wheels-python3.13
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.13
           - input: pipelineArtifact
-            artifactName: linux-x86_64-wheels-python3.14
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.14
-          - input: pipelineArtifact
             artifactName: linux-aarch64-wheels-python3.10
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.10
           - input: pipelineArtifact
@@ -263,9 +257,6 @@ extends:
             artifactName: linux-aarch64-wheels-python3.13
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.13
           - input: pipelineArtifact
-            artifactName: linux-aarch64-wheels-python3.14
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.14
-          - input: pipelineArtifact
             artifactName: macos-aarch64-wheels-python3.10
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.10
           - input: pipelineArtifact
@@ -277,9 +268,6 @@ extends:
           - input: pipelineArtifact
             artifactName: macos-aarch64-wheels-python3.13
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.13
-          - input: pipelineArtifact
-            artifactName: macos-aarch64-wheels-python3.14
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.14
         steps:
         - script: |
             mkdir -p $(System.DefaultWorkingDirectory)/target/wheels

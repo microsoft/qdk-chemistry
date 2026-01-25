@@ -64,11 +64,6 @@ jobs:
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.13'
-        - os-name: Linux
-          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
-          build-parallel: 120
-          uarch: x86-64-v3
-          python-version: '3.14'
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
