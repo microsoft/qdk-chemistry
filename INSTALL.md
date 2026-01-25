@@ -4,10 +4,11 @@ This file contains instructions for how to configure, build, and install QDK/Che
 several common methods, outlined below.
 You only need to choose one of the methods below for installation.
 
-To run the examples with any of these installation methods, we recommend cloning the GitHub repository:
+To run the examples with any of these installation methods, we recommend cloning the GitHub repository and navigating to the repository directory for subsequent steps:
 
 ```bash
 git clone https://github.com/microsoft/qdk-chemistry.git
+cd qdk-chemistry
 ```
 
 ## Pip Wheel Installation
