@@ -47,7 +47,7 @@ license = { file = "LICENSE.txt" }
 version = "1.0.0"
 name = "qdk-chemistry"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 
 [project.optional-dependencies]
 all = [
