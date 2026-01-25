@@ -13,7 +13,7 @@ python -m pip install qdk-chemistry
 
 The pip installation of QDK/Chemistry currently has the following system requirements:
 
-- Python 3.11+
+- Python 3.10+
 - OS Support:
   - Windows via [the Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/windows/wsl/install)
     - x86_64
@@ -24,10 +24,21 @@ The pip installation of QDK/Chemistry currently has the following system require
   - MacOS
     - arm64
 
-Onces installed, you may run the tests in the `python/tests` directory. You may also optionally install `pyscf` to enable the PySCF plugin.
+Once installed, you may run the tests in the `python/tests` directory.
 
 ```bash
-pythom -m pip install pytest [pyscf]
+python -m pip install pytest
+
+# Optionally install PySCF to enable the PySCF plugin
+python -m pip install pyscf
+
+# Optionally install Openfermion to enable the Openfermion integration example tests
+python -m pip install openfermion
+
+# Optionally install RDKit to enable the Openfermion integration example tests
+python -m pip install rdkit
+
+# Run the tests
 pytest python/tests
 ```
 
