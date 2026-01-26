@@ -33,7 +33,7 @@ class ROHFMatrixHandler {
    * @param[in] nelec_beta Number of beta electrons, less than nelec_alpha
    */
   void build_ROHF_F_P_matrix(const RowMajorMatrix& F, const RowMajorMatrix& C,
-                             RowMajorMatrix& P, int nelec_alpha,
+                             const RowMajorMatrix& P, int nelec_alpha,
                              int nelec_beta);
 
   /**
@@ -48,7 +48,14 @@ class ROHFMatrixHandler {
    *
    * @return Reference to Density matrix
    */
-  RowMajorMatrix& get_density_matrix();
+  const RowMajorMatrix& get_density_matrix();
+
+  /**
+   * @brief Get reference to Density matrix
+   *
+   * @return Reference to Density matrix
+   */
+  RowMajorMatrix& density_matrix();
 
   /**
    * @brief Update spin-blocked density matrices from total density matrix

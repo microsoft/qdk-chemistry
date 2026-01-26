@@ -281,15 +281,8 @@ void DIIS::apply_level_shift_(const RowMajorMatrix& F, const RowMajorMatrix& P,
 DIIS::DIIS(const SCFContext& ctx, bool rohf_enabled, const size_t subspace_size)
     : SCFAlgorithm(ctx, rohf_enabled),
       diis_impl_(
-          std::make_unique<impl::DIIS>(ctx, rohf_enabled, subspace_size)),
-      rohf_enabled_(rohf_enabled) {
+          std::make_unique<impl::DIIS>(ctx, rohf_enabled, subspace_size)) {
   QDK_LOG_TRACE_ENTERING();
-  // Only create matrix handler for ROHF case
-  if (rohf_enabled) {
-    rohf_matrix_handler_ = std::make_unique<ROHFMatrixHandler>();
-  } else {
-    rohf_matrix_handler_ = nullptr;
-  }
 }
 
 DIIS::~DIIS() noexcept = default;
@@ -305,11 +298,8 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   const int nelec[2] = {nelec_vec[0], nelec_vec[1]};
 
   if (rohf_enabled_) {
-    rohf_matrix_handler_->build_ROHF_F_P_matrix(
-        scf_impl.get_fock_matrix(), scf_impl.get_orbitals_matrix(),
-        scf_impl.density_matrix(), nelec[0], nelec[1]);
     F_ptr = &rohf_matrix_handler_->get_fock_matrix();
-    P_ptr = &rohf_matrix_handler_->get_density_matrix();
+    P_ptr = &rohf_matrix_handler_->density_matrix();
   } else {
     F_ptr = &scf_impl.get_fock_matrix();
     P_ptr = &scf_impl.density_matrix();

@@ -11,6 +11,7 @@
 #include <qdk/chemistry/utils/logger.hpp>
 
 #include "../scf/scf_impl.h"
+#include "rohf_matrix_handler.h"
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
 #include <qdk/chemistry/scf/util/gpu/cusolver_utils.h>
@@ -40,9 +41,17 @@ SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx, bool rohf_enabled)
   QDK_LOG_TRACE_ENTERING();
   auto num_atomic_orbitals = ctx.basis_set->num_atomic_orbitals;
   auto num_density_matrices = (ctx.cfg->unrestricted || rohf_enabled) ? 2 : 1;
+  // Only create matrix handler for ROHF case
+  if (rohf_enabled) {
+    rohf_matrix_handler_ = std::make_unique<ROHFMatrixHandler>();
+  } else {
+    rohf_matrix_handler_ = nullptr;
+  }
   P_last_ = RowMajorMatrix::Zero(num_density_matrices * num_atomic_orbitals,
                                  num_atomic_orbitals);
 }
+
+SCFAlgorithm::~SCFAlgorithm() noexcept = default;
 
 std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx,
                                                    bool rohf_enabled) {
@@ -222,11 +231,34 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
   // Calculate orbital gradient error
   RowMajorMatrix error_matrix;
   int num_orbital_sets = scf_impl.get_num_orbital_sets();
-  double og_error =
-      calculate_og_error_(scf_impl.get_fock_matrix(),
-                          scf_impl.get_density_matrix(), scf_impl.overlap(),
-                          error_matrix, num_orbital_sets) /
-      num_atomic_orbitals;
+
+  const RowMajorMatrix* F_ptr;
+  const RowMajorMatrix* P_ptr;
+  std::vector<int> nelec_vec = scf_impl.get_num_electrons();
+  const int nelec[2] = {nelec_vec[0], nelec_vec[1]};
+
+  if (rohf_enabled_) {
+    rohf_matrix_handler_->build_ROHF_F_P_matrix(
+        scf_impl.get_fock_matrix(), scf_impl.get_orbitals_matrix(),
+        scf_impl.get_density_matrix(), nelec[0], nelec[1]);
+    F_ptr = &rohf_matrix_handler_->get_fock_matrix();
+    P_ptr = &rohf_matrix_handler_->get_density_matrix();
+  } else {
+    F_ptr = &scf_impl.get_fock_matrix();
+    P_ptr = &scf_impl.get_density_matrix();
+  }
+
+  // Fock matrix for RHF; effective Fock matrix for ROHF;
+  // spin-blocked Fock matrices for UHF
+  const auto& F = *F_ptr;
+
+  // Total density matrix for RHF and ROHF; spin-blocked density matrices for
+  // UHF
+  const auto& P = *P_ptr;
+
+  double og_error = calculate_og_error_(F, P, scf_impl.overlap(), error_matrix,
+                                        num_orbital_sets) /
+                    num_atomic_orbitals;
 
   bool converged = density_rms_ < cfg->scf_algorithm.density_threshold &&
                    og_error < cfg->scf_algorithm.og_threshold;

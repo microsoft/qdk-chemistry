@@ -14,6 +14,7 @@ namespace qdk::chemistry::scf {
 
 // Forward declaration
 class SCFImpl;
+class ROHFMatrixHandler;
 
 /**
  * @brief Base class for SCF iteration algorithms
@@ -35,7 +36,7 @@ class SCFAlgorithm {
   /**
    * @brief Default destructor
    */
-  virtual ~SCFAlgorithm() noexcept = default;
+  virtual ~SCFAlgorithm() noexcept;
 
   /**
    * @brief Perform one iteration of the SCF algorithm
@@ -124,8 +125,6 @@ class SCFAlgorithm {
                                     RowMajorMatrix& error_matrix,
                                     int num_orbital_sets);
 
-  bool rohf_enabled_ = false;  ///< Flag indicating if ROHF is enabled
-
  protected:
   const SCFContext& ctx_;  ///< Reference to SCF context
   double og_error_ = 0.0;  ///< Current orbital gradient error
@@ -138,5 +137,9 @@ class SCFAlgorithm {
   double delta_energy_ =
       std::numeric_limits<double>::infinity();  ///< Energy change
   double density_rms_ = 0.0;                    ///< Last calculated density RMS
+
+  bool rohf_enabled_ = false;  ///< Flag indicating if ROHF is enabled
+  /// Unique pointer to ROHFMatrixHandler
+  std::unique_ptr<ROHFMatrixHandler> rohf_matrix_handler_;
 };
 }  // namespace qdk::chemistry::scf

@@ -31,7 +31,7 @@ class ROHFMatrixHandler {
    * @param[in] nelec_beta Number of beta electrons, less than nelec_alpha
    */
   void build_ROHF_F_P_matrix(const RowMajorMatrix& F, const RowMajorMatrix& C,
-                             RowMajorMatrix& P, int nelec_alpha,
+                             const RowMajorMatrix& P, int nelec_alpha,
                              int nelec_beta) {
     QDK_LOG_TRACE_ENTERING();
     int num_molecular_orbitals = static_cast<int>(F.cols());
@@ -96,12 +96,17 @@ class ROHFMatrixHandler {
     return effective_F_;
   }
 
+  const RowMajorMatrix& get_density_matrix() {
+    QDK_LOG_TRACE_ENTERING();
+    return total_P_;
+  }
+
   /**
    * @brief Get reference to Density matrix
    *
    * @return Reference to Density matrix
    */
-  RowMajorMatrix& get_density_matrix() {
+  RowMajorMatrix& density_matrix() {
     QDK_LOG_TRACE_ENTERING();
     return total_P_;
   }
@@ -151,7 +156,7 @@ ROHFMatrixHandler::~ROHFMatrixHandler() noexcept = default;
 
 void ROHFMatrixHandler::build_ROHF_F_P_matrix(const RowMajorMatrix& F,
                                               const RowMajorMatrix& C,
-                                              RowMajorMatrix& P,
+                                              const RowMajorMatrix& P,
                                               int nelec_alpha, int nelec_beta) {
   handler_impl_->build_ROHF_F_P_matrix(F, C, P, nelec_alpha, nelec_beta);
 }
@@ -160,8 +165,12 @@ const RowMajorMatrix& ROHFMatrixHandler::get_fock_matrix() {
   return handler_impl_->get_fock_matrix();
 }
 
-RowMajorMatrix& ROHFMatrixHandler::get_density_matrix() {
+const RowMajorMatrix& ROHFMatrixHandler::get_density_matrix() {
   return handler_impl_->get_density_matrix();
+}
+
+RowMajorMatrix& ROHFMatrixHandler::density_matrix() {
+  return handler_impl_->density_matrix();
 }
 
 // Implementation for updating spin-blocked density matrices from

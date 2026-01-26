@@ -9,8 +9,6 @@
 
 #include <memory>
 
-#include "rohf_matrix_handler.h"
-
 namespace qdk::chemistry::scf {
 
 // Forward declaration of implementation classes
@@ -61,12 +59,6 @@ class DIIS : public SCFAlgorithm {
  private:
   /// PIMPL pointer to implementation
   std::unique_ptr<impl::DIIS> diis_impl_;
-
-  /// ROHF matrix handler for transforming alpha/beta matrices
-  bool rohf_enabled_;
-
-  /// Unique pointer to ROHFMatrixHandler
-  std::unique_ptr<ROHFMatrixHandler> rohf_matrix_handler_;
 };
 
 }  // namespace qdk::chemistry::scf
