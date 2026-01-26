@@ -279,7 +279,7 @@ elif [[ "$MAC_BUILD" == "ON" ]]; then
             -DGAUXC_ENABLE_CUDA=OFF \
             -DGAUXC_ENABLE_MPI=OFF \
             -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS" \
-            -GAUXC_ENABLE_OPENMP=OFF
+            -DGAUXC_ENABLE_OPENMP=OFF
 fi
 make -j"$JOBS"
 make install
