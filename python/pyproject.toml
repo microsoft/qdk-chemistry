@@ -45,7 +45,7 @@ dependencies = [
 ]
 description = "Quantum Development Kit - Chemistry Library"
 license = { file = "LICENSE.txt" }
-version = "1.0.0"
+version = "1.0.1"
 name = "qdk-chemistry"
 readme = "README.md"
 requires-python = ">=3.10"

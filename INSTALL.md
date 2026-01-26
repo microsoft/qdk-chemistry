@@ -30,7 +30,7 @@ python -m pip install qdk-chemistry
 
 The pip installation of QDK/Chemistry currently has the following system requirements:
 
-- Python 3.10 - 3.13
+- Python 3.10+
 - OS Support:
   - Windows via [the Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/windows/wsl/install)
     - x86_64
