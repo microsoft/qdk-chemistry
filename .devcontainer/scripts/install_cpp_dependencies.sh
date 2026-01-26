@@ -45,6 +45,9 @@ if command -v nproc >/dev/null 2>&1; then
 else
     JOBS=$(sysctl -n hw.logicalcpu) # macOS
 fi
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    MAC_BUILD="ON"
+fi
 # Helper function to extract commit hash from cgmanifest by repository URL pattern
 get_commit_hash() {
     local manifest="$1"
@@ -252,17 +255,32 @@ cd gauxc
 git checkout "$GAUXC_COMMIT"
 mkdir -p build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-         -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-         -DBUILD_TESTING=OFF \
-         -DEXCHCXX_ENABLE_LIBXC=OFF \
-         -DGAUXC_ENABLE_HDF5=OFF \
-         -DGAUXC_ENABLE_MAGMA=OFF \
-         -DGAUXC_ENABLE_CUTLASS=ON \
-         -DGAUXC_ENABLE_CUDA=OFF \
-         -DGAUXC_ENABLE_MPI=OFF \
-         -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
+if [[ "$MAC_BUILD" == "OFF" ]]; then
+    cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+            -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DBUILD_TESTING=OFF \
+            -DEXCHCXX_ENABLE_LIBXC=OFF \
+            -DGAUXC_ENABLE_HDF5=OFF \
+            -DGAUXC_ENABLE_MAGMA=OFF \
+            -DGAUXC_ENABLE_CUTLASS=ON \
+            -DGAUXC_ENABLE_CUDA=OFF \
+            -DGAUXC_ENABLE_MPI=OFF \
+            -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
+elif [[ "$MAC_BUILD" == "ON" ]]; then
+    cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+            -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DBUILD_TESTING=OFF \
+            -DEXCHCXX_ENABLE_LIBXC=OFF \
+            -DGAUXC_ENABLE_HDF5=OFF \
+            -DGAUXC_ENABLE_MAGMA=OFF \
+            -DGAUXC_ENABLE_CUTLASS=OFF \
+            -DGAUXC_ENABLE_CUDA=OFF \
+            -DGAUXC_ENABLE_MPI=OFF \
+            -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS" \
+            -GAUXC_ENABLE_OPENMP=OFF
+fi
 make -j"$JOBS"
 make install
 cd "$BUILD_DIR"
