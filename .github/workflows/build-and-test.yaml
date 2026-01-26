@@ -75,6 +75,7 @@ jobs:
     env:
       BUILD_DIR: cpp/build
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
+      CPP_DEPS_PREFIX: ${{ github.workspace }}/cpp_deps_install
       CTEST_OUTPUT_ON_FAILURE: 1
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
@@ -154,6 +155,7 @@ jobs:
         mkdir build && cd build
 
         cmake -DBISON_EXECUTABLE=/opt/homebrew/Cellar/bison/3.8.2/bin/bison \
+        -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/doxygen_install" \
         -DCMAKE_CXX_FLAGS="-Wno-missing-template-arg-list-after-template-kw $CMAKE_CXX_FLAGS" \
         -G "Unix Makefiles" ..
         make -j$(sysctl -n hw.ncpu)
@@ -163,13 +165,6 @@ jobs:
       if: matrix.os-name == 'macOS'
       run: |
         echo "PATH=${{ github.workspace }}/doxygen_install/bin:$PATH" >> $GITHUB_ENV
-
-    - name: Add C++ deps prefix to CMake search path (Linux)
-      if: matrix.os-name == 'Linux'
-      run: |
-        echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
-        echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
 
     - name: Cache C++ dependency install (Linux)
       if: matrix.os-name == 'Linux'
@@ -182,12 +177,19 @@ jobs:
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
           ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
 
+    - name: Add C++ deps prefix to CMake search path (Linux)
+      if: matrix.os-name == 'Linux'
+      run: |
+        echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+        echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
+
     - name: Install C++ dependencies
       if: matrix.os-name == 'Linux' && steps.cache-cpp-deps.outputs.cache-hit != 'true'
       env:
         INSTALL_PREFIX: ${{ env.CPP_DEPS_PREFIX }}
         BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
-        KEEP_BUILD_DIR: '1'   # enable only if you also decide to cache cpp_deps_build
+        KEEP_BUILD_DIR: 1
       run: |
         bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh \
           ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \

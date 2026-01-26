@@ -34,12 +34,13 @@ echo "Using cgmanifest: $CGMANIFEST"
 echo "Using macis cgmanifest: $MACIS_CGMANIFEST"
 
 # Configuration
-BUILD_DIR="/tmp/qdk_deps_build"
+BUILD_DIR="${BUILD_DIR:-/tmp/qdk_deps_build}"
 INSTALL_PREFIX="${INSTALL_PREFIX:-/usr/local}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 JOBS="${JOBS:-$(nproc)}"
 BUILD_SHARED_LIBS="${BUILD_SHARED_LIBS:-OFF}"  # Default to static
 LIBINT_JOBS=${LIBINT_JOBS:-4}  # Limit libint build jobs to 4 due to high memory usage
+KEEP_BUILD_DIR="${KEEP_BUILD_DIR:-0}"
 
 # Helper function to extract commit hash from cgmanifest by repository URL pattern
 get_commit_hash() {
