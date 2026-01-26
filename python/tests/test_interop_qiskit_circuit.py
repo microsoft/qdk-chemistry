@@ -23,7 +23,7 @@ if QISKIT_AVAILABLE:
         plot_circuit_diagram,
     )
 
-pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
+pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit not available")
 
 
 @pytest.fixture

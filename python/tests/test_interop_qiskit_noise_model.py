@@ -9,21 +9,17 @@ import importlib.util
 
 import pytest
 
-QISKIT_AVAILABLE = (
-    importlib.util.find_spec("qiskit") is not None
-    and importlib.util.find_spec("qiskit_aer") is not None
-    and importlib.util.find_spec("qiskit_nature") is not None
-)
+QISKIT_AER_AVAILABLE = importlib.util.find_spec("qiskit_aer") is not None
 
 
-if QISKIT_AVAILABLE:
+if QISKIT_AER_AVAILABLE:
     from qiskit_aer.noise import NoiseModel
 
     from qdk_chemistry.data.noise_models import QuantumErrorProfile
     from qdk_chemistry.plugins.qiskit._interop.noise_model import get_noise_model_from_profile
 
 
-pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
+pytestmark = pytest.mark.skipif(not QISKIT_AER_AVAILABLE, reason="Qiskit Aer not available")
 
 
 def test_get_qiskit_noise_model(simple_error_profile):

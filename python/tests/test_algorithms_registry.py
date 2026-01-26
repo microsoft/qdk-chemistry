@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import importlib.util
+
 import pytest
 
 from qdk_chemistry._core._algorithms import ScfSolverFactory
@@ -445,3 +447,54 @@ class TestRegistryFactoryRegistration:
         with pytest.raises(KeyError) as excinfo:
             registry.unregister_factory("nonexistent_factory_type")
         assert "not registered" in str(excinfo.value)
+
+
+class TestRegistryQiskitPlugins:
+    """Test that Qiskit plugins are registered in the registry."""
+
+    def test_registered_qiskit_plugins(self):
+        """Test that qiskit plugins are registered when available."""
+        # Check if qiskit packages are available
+        qiskit_available = importlib.util.find_spec("qiskit") is not None
+        qiskit_aer_available = importlib.util.find_spec("qiskit_aer") is not None
+        qiskit_nature_available = importlib.util.find_spec("qiskit_nature") is not None
+
+        state_prep_algorithms = registry.available("state_prep")
+        circuit_executors = registry.available("circuit_executor")
+        qubit_mappers = registry.available("qubit_mapper")
+
+        # Test Qiskit state prep plugin
+        if qiskit_available:
+            assert "qiskit_regular_isometry" in state_prep_algorithms, "Qiskit state prep plugin not found in registry"
+            # Verify it can be created
+            state_prep = registry.create("state_prep", "qiskit_regular_isometry")
+            assert state_prep is not None
+            assert state_prep.name() == "qiskit_regular_isometry"
+        else:
+            assert "qiskit_regular_isometry" not in state_prep_algorithms, (
+                "Qiskit state prep plugin should not be registered when Qiskit is unavailable"
+            )
+
+        # Test Qiskit Aer simulator
+        if qiskit_aer_available:
+            assert "qiskit_aer_simulator" in circuit_executors, "Qiskit Aer simulator not found in registry"
+            # Verify it can be created
+            executor = registry.create("circuit_executor", "qiskit_aer_simulator")
+            assert executor is not None
+            assert executor.name() == "qiskit_aer_simulator"
+        else:
+            assert "qiskit_aer_simulator" not in circuit_executors, (
+                "Qiskit Aer simulator should not be registered when Qiskit Aer is unavailable"
+            )
+
+        # Test Qiskit Nature qubit mapper
+        if qiskit_nature_available:
+            assert "qiskit" in qubit_mappers, "Qiskit Nature qubit mapper not found in registry"
+            # Verify it can be created
+            mapper = registry.create("qubit_mapper", "qiskit")
+            assert mapper is not None
+            assert mapper.name() == "qiskit"
+        else:
+            assert "qiskit" not in qubit_mappers, (
+                "Qiskit Nature qubit mapper should not be registered when Qiskit Nature is unavailable"
+            )

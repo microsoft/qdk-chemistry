@@ -16,13 +16,9 @@ import pytest
 
 from .reference_tolerances import estimator_energy_tolerance, float_comparison_relative_tolerance
 
-QISKIT_AVAILABLE = (
-    importlib.util.find_spec("qiskit") is not None
-    and importlib.util.find_spec("qiskit_aer") is not None
-    and importlib.util.find_spec("qiskit_nature") is not None
-)
+QISKIT_AER_AVAILABLE = importlib.util.find_spec("qiskit_aer") is not None
 
-if QISKIT_AVAILABLE:
+if QISKIT_AER_AVAILABLE:
     from qiskit_aer import AerSimulator
     from qiskit_aer.noise import NoiseModel, depolarizing_error
 
@@ -32,7 +28,7 @@ if QISKIT_AVAILABLE:
     from qdk_chemistry.plugins.qiskit.energy_estimator import QiskitEnergyEstimator
 
 
-pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
+pytestmark = pytest.mark.skipif(not QISKIT_AER_AVAILABLE, reason="Qiskit Aer not available")
 
 
 @pytest.fixture

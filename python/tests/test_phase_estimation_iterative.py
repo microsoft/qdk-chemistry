@@ -34,15 +34,13 @@ from .reference_tolerances import (
     qpe_phase_fraction_tolerance,
 )
 
-QISKIT_AVAILABLE = (
-    importlib.util.find_spec("qiskit") is not None
-    and importlib.util.find_spec("qiskit_aer") is not None
-    and importlib.util.find_spec("qiskit_nature") is not None
-)
+QISKIT_AER_AVAILABLE = importlib.util.find_spec("qiskit_aer") is not None
+QISKIT_AVAILABLE = importlib.util.find_spec("qiskit") is not None
 
+if QISKIT_AER_AVAILABLE:
+    from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
 
 if QISKIT_AVAILABLE:
-    from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
     from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
 
 _SEED = 42
@@ -151,7 +149,7 @@ def _run_traditional(problem: PhaseEstimationProblem) -> QpeResult:
     qpe = QiskitStandardPhaseEstimation(
         num_bits=problem.num_bits, evolution_time=problem.evolution_time, shots=problem.shots_traditional
     )
-    simulator = QiskitAerSimulator(seed=_SEED)
+    simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
     evolution_builder = create("time_evolution_builder", "trotter")
 
@@ -258,7 +256,7 @@ def test_iterative_phase_estimation_extracts_phase_and_energy(two_qubit_phase_pr
     )
 
 
-@pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
+@pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit not available")
 def test_iterative_and_traditional_results_match(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
     """Confirm iterative and traditional algorithms produce consistent estimates."""
     iterative_result = _run_iterative(two_qubit_phase_problem)
@@ -324,7 +322,7 @@ def test_iterative_phase_estimation_four_qubit_phase_and_energy(
     )
 
 
-@pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
+@pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit not available")
 def test_iterative_and_traditional_match_on_four_qubits(four_qubit_phase_problem: PhaseEstimationProblem) -> None:
     """Ensure iterative and traditional approaches agree for four qubits."""
     iterative_result = _run_iterative(four_qubit_phase_problem)
@@ -417,7 +415,7 @@ def test_iterative_phase_estimation_second_non_commuting_example() -> None:
     )
 
 
-@pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
+@pytest.mark.skipif(not QISKIT_AER_AVAILABLE, reason="Qiskit Aer not available")
 def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
     """Integration test showing NoiseModel impact on iterative phase estimation accuracy."""
     # Run noiseless QPE

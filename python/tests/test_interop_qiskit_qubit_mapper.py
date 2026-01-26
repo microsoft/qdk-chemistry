@@ -16,17 +16,13 @@ from .reference_tolerances import (
 )
 from .test_helpers import create_test_hamiltonian
 
-QISKIT_AVAILABLE = (
-    importlib.util.find_spec("qiskit") is not None
-    and importlib.util.find_spec("qiskit_aer") is not None
-    and importlib.util.find_spec("qiskit_nature") is not None
-)
+QISKIT_NATURE_AVAILABLE = importlib.util.find_spec("qiskit_nature") is not None
 
-if QISKIT_AVAILABLE:
+if QISKIT_NATURE_AVAILABLE:
     from qdk_chemistry.algorithms import QubitMapper, available, create
     from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
 
-pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
+pytestmark = pytest.mark.skipif(not QISKIT_NATURE_AVAILABLE, reason="Qiskit Nature not available")
 
 
 @pytest.mark.parametrize("encoding", ["jordan-wigner", "bravyi-kitaev", "parity"])

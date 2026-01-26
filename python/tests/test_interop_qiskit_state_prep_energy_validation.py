@@ -18,18 +18,14 @@ from qdk_chemistry.data import Circuit
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
-QISKIT_AVAILABLE = (
-    importlib.util.find_spec("qiskit") is not None
-    and importlib.util.find_spec("qiskit_aer") is not None
-    and importlib.util.find_spec("qiskit_nature") is not None
-)
+QISKIT_AER_AVAILABLE = importlib.util.find_spec("qiskit_aer") is not None
 
-if QISKIT_AVAILABLE:
+if QISKIT_AER_AVAILABLE:
     from qiskit_aer import AerSimulator
     from qiskit_aer.primitives import EstimatorV2 as AerEstimator
 
 
-pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
+pytestmark = pytest.mark.skipif(not QISKIT_AER_AVAILABLE, reason="Qiskit Aer not available")
 
 
 def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamiltonian_4e4o, ref_energy_4e4o):

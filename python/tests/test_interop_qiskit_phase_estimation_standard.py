@@ -20,22 +20,17 @@ from .reference_tolerances import (
     qpe_phase_fraction_tolerance,
 )
 
-QISKIT_AVAILABLE = (
-    importlib.util.find_spec("qiskit") is not None
-    and importlib.util.find_spec("qiskit_aer") is not None
-    and importlib.util.find_spec("qiskit_nature") is not None
-)
+QISKIT_AVAILABLE = importlib.util.find_spec("qiskit") is not None
 
 if QISKIT_AVAILABLE:
     from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 
     from qdk_chemistry.algorithms import create
-    from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
     from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
     from qdk_chemistry.utils.phase import energy_from_phase
 
 
-pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
+pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit not available")
 
 _SEED = 42
 
@@ -109,8 +104,8 @@ def _extract_traditional_results(problem: TraditionalProblem) -> QpeResult:
 
     """
     qpe = QiskitStandardPhaseEstimation(num_bits=problem.num_bits, evolution_time=problem.evolution_time)
-    simulator = QiskitAerSimulator(seed=_SEED)
 
+    simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
     evolution_builder = create("time_evolution_builder", "trotter")
 

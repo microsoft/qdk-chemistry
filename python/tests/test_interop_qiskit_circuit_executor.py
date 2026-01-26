@@ -11,17 +11,13 @@ import pytest
 
 from qdk_chemistry.data import Circuit, QuantumErrorProfile
 
-QISKIT_AVAILABLE = (
-    importlib.util.find_spec("qiskit") is not None
-    and importlib.util.find_spec("qiskit_aer") is not None
-    and importlib.util.find_spec("qiskit_nature") is not None
-)
+QISKIT_AER_AVAILABLE = importlib.util.find_spec("qiskit_aer") is not None
 
-if QISKIT_AVAILABLE:
+if QISKIT_AER_AVAILABLE:
     from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
 
 
-pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
+pytestmark = pytest.mark.skipif(not QISKIT_AER_AVAILABLE, reason="Qiskit Aer not available")
 
 
 @pytest.fixture

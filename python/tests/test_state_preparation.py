@@ -37,11 +37,7 @@ from qdk_chemistry.data import CasWavefunctionContainer, Circuit, Configuration,
 
 from .test_helpers import create_test_orbitals
 
-QISKIT_AVAILABLE = (
-    importlib.util.find_spec("qiskit") is not None
-    and importlib.util.find_spec("qiskit_aer") is not None
-    and importlib.util.find_spec("qiskit_nature") is not None
-)
+QISKIT_AVAILABLE = importlib.util.find_spec("qiskit") is not None
 
 
 @pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")

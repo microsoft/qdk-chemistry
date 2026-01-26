@@ -29,14 +29,12 @@ from .test_sample_workflow_utils import (
     _skip_for_mpi_failure,
 )
 
-QISKIT_AVAILABLE = (
-    importlib.util.find_spec("qiskit") is not None
-    and importlib.util.find_spec("qiskit_aer") is not None
-    and importlib.util.find_spec("qiskit_nature") is not None
-)
+OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
+QISKIT_NATURE_AVAILABLE = importlib.util.find_spec("qiskit_nature") is not None
 
 
-@pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
+@pytest.mark.skipif(not OPENFERMION_AVAILABLE, reason="OpenFermion not available")
+@pytest.mark.skipif(not QISKIT_NATURE_AVAILABLE, reason="Qiskit Nature not available")
 def test_openfermion_molecular_hamiltonian_jordan_wigner():
     """Execute the OpenFermion Jordan-Wigner sample and validate reported energies."""
     repo_root = Path(__file__).resolve().parents[2]
