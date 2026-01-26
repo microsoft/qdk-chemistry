@@ -59,21 +59,26 @@ jobs:
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.10'
-          test-omp-threads: 64
+          test-omp-threads: 120
+          cpp-test-threads: 120
+          python-test-threads: 32
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.13'
-          test-omp-threads: 64
+          cpp-test-threads: 120
+          python-test-threads: 32
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
           uarch: native
           python-version: '3.13'
-          test-omp-threads: 16
+          cpp-test-threads: 16
+          python-test-threads: 16
     env:
       BUILD_DIR: cpp/build
+      QSHARP_PYTHON_TELEMETRY: 'false'
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
       CPP_DEPS_PREFIX: ${{ github.workspace }}/cpp_deps_install
       CTEST_OUTPUT_ON_FAILURE: 1
@@ -194,7 +199,18 @@ jobs:
           ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
           ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
 
-    - name: Configure C++ RelWithDebInfo/Coverage build
+    - name: Configure C++ RelWithDebInfo/Coverage build (macOS)
+      if: matrix.os-name == 'macOS'
+      run: |
+        cmake -S cpp -B "$BUILD_DIR" \
+          -GNinja \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DQDK_UARCH="$QDK_UARCH" \
+          -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
+          -DBUILD_TESTING=ON
+
+    - name: Configure C++ RelWithDebInfo/Coverage build (Linux)
+      if: matrix.os-name == 'Linux'
       run: |
         cmake -S cpp -B "$BUILD_DIR" \
           -GNinja \
@@ -208,7 +224,7 @@ jobs:
 
     - name: Run C++ tests in RelWithDebInfo/Coverage mode with coverage
       env:
-        OMP_NUM_THREADS: ${{ matrix.test-omp-threads }}
+        OMP_NUM_THREADS: ${{ matrix.cpp-test-threads }}
       run: |
         mkdir -p test-results ${{ github.workspace }}/coverage-reports
         cd "$BUILD_DIR"
@@ -280,7 +296,7 @@ jobs:
 
     - name: Run Python tests
       env:
-        OMP_NUM_THREADS: 16
+        OMP_NUM_THREADS: ${{ matrix.python-test-threads }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: 0
       working-directory: python
       run: |
