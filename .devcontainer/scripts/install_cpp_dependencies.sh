@@ -17,6 +17,7 @@ fi
 
 CGMANIFEST="$1"
 MACIS_CGMANIFEST="$2"
+KEEP_BUILD_DIR="${KEEP_BUILD_DIR:-0}"
 
 if [[ ! -f "$CGMANIFEST" ]]; then
     echo "Error: cgmanifest.json not found at $CGMANIFEST"
@@ -264,7 +265,9 @@ cd "$BUILD_DIR"
 rm -rf gauxc
 
 # Cleanup
-cd /
-rm -rf "$BUILD_DIR"
+if [[ "$KEEP_BUILD_DIR" != "1" ]]; then
+  cd /
+  rm -rf "$BUILD_DIR"
+fi
 
 echo "=== All dependencies installed successfully ==="
