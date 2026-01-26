@@ -45,9 +45,11 @@ if command -v nproc >/dev/null 2>&1; then
 else
     JOBS=$(sysctl -n hw.logicalcpu) # macOS
 fi
+MAC_BUILD="OFF"
 if [[ "$OSTYPE" == "darwin"* ]]; then
     MAC_BUILD="ON"
 fi
+
 # Helper function to extract commit hash from cgmanifest by repository URL pattern
 get_commit_hash() {
     local manifest="$1"

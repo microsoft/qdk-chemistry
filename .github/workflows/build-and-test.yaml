@@ -175,6 +175,7 @@ jobs:
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
           ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
+          # Hash-map checks if manifest files or build script have changed to rebuild dependencies
 
     - name: Add C++ deps prefix to CMake search path
       run: |
@@ -192,11 +193,6 @@ jobs:
         bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh \
           ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
           ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
-
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install --prefix=${{ github.workspace }}/install coverage pytest pytest-cov
 
     - name: Configure C++ RelWithDebInfo/Coverage build
       run: |
@@ -276,6 +272,11 @@ jobs:
         python -m pip install --prefix=${{ github.workspace }}/install pennylane ipykernel
         # Register the Jupyter kernel for notebook tests
         python -m ipykernel install --user --name python3 --display-name "Python 3"
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install --prefix=${{ github.workspace }}/install coverage pytest pytest-cov
 
     - name: Run Python tests
       env:
