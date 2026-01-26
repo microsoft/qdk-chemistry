@@ -8,6 +8,7 @@
 #include <macis/util/fcidump.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/density_fitted.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
@@ -360,6 +361,8 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_json(
   // Forward to appropriate container implementation
   if (container_type == "canonical_four_center") {
     return CanonicalFourCenterHamiltonianContainer::from_json(j);
+  } else if (container_type == "density_fitted") {
+    return DensityFittedHamiltonianContainer::from_json(j);
   } else {
     throw std::runtime_error("Unknown container type: " + container_type);
   }
@@ -383,6 +386,8 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_hdf5(
     // Forward to appropriate container implementation
     if (container_type == "canonical_four_center") {
       return CanonicalFourCenterHamiltonianContainer::from_hdf5(group);
+    } else if (container_type == "density_fitted") {
+      return DensityFittedHamiltonianContainer::from_hdf5(group);
     } else {
       throw std::runtime_error("Unknown container type: " + container_type);
     }
