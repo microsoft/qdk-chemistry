@@ -24,6 +24,8 @@ except ImportError:
 
 try:
     import qiskit  # noqa: F401
+    import qiskit_aer  # noqa: F401
+    import qiskit_nature  # noqa: F401
 
     QISKIT_AVAILABLE = True
 except ImportError:
@@ -58,6 +60,12 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool]:
         requires_pyscf = True
 
     if ', "qiskit' in content or ", 'qiskit" in content:
+        requires_qiskit = True
+
+    # Look for create(..., algorithm_name="pyscf") or create(..., algorithm_name='pyscf') patterns
+    if 'algorithm_name="pyscf' in content or "algorithm_name='pyscf" in content:
+        requires_pyscf = True
+    if 'algorithm_name="qiskit' in content or "algorithm_name='qiskit" in content:
         requires_qiskit = True
 
     # check for plugin imports

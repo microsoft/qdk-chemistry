@@ -9,17 +9,30 @@ and expectation value calculations for quantum circuits and observables.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import numpy as np
+try:
+    import qiskit  # noqa: F401
+    import qiskit_aer  # noqa: F401
+    import qiskit_nature  # noqa: F401
+
+    QISKIT_AVAILABLE = True
+except ImportError:
+    QISKIT_AVAILABLE = False
+
+if QISKIT_AVAILABLE:
+    import numpy as np
+    from qiskit_aer import AerSimulator
+    from qiskit_aer.noise import NoiseModel, depolarizing_error
+
+    from qdk_chemistry.algorithms import create
+    from qdk_chemistry.data import Circuit, QubitHamiltonian
+    from qdk_chemistry.data.qubit_hamiltonian import filter_and_group_pauli_ops_from_wavefunction
+    from qdk_chemistry.plugins.qiskit.energy_estimator import QiskitEnergyEstimator
+
+    from .reference_tolerances import estimator_energy_tolerance, float_comparison_relative_tolerance
+
 import pytest
-from qiskit_aer import AerSimulator
-from qiskit_aer.noise import NoiseModel, depolarizing_error
 
-from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Circuit, QubitHamiltonian
-from qdk_chemistry.data.qubit_hamiltonian import filter_and_group_pauli_ops_from_wavefunction
-from qdk_chemistry.plugins.qiskit.energy_estimator import QiskitEnergyEstimator
-
-from .reference_tolerances import estimator_energy_tolerance, float_comparison_relative_tolerance
+pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 
 
 @pytest.fixture

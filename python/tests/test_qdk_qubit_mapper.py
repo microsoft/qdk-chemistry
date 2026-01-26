@@ -5,6 +5,15 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+try:
+    import qiskit  # noqa: F401
+    import qiskit_aer  # noqa: F401
+    import qiskit_nature  # noqa: F401
+
+    QISKIT_AVAILABLE = True
+except ImportError:
+    QISKIT_AVAILABLE = False
+
 from pathlib import Path
 
 import numpy as np
@@ -571,6 +580,7 @@ class TestQdkQubitMapperRealHamiltonians:
         assert result.num_qubits == expected_qubits
         assert len(result.pauli_strings) > 0
 
+    @pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
     def test_vs_qiskit(self, test_data_path: Path) -> None:
         """Cross-validate against Qiskit JordanWignerMapper."""
         pytest.importorskip("qiskit_nature")
@@ -789,6 +799,7 @@ class TestBravyiKitaevMapper:
                 f"BK coefficient mismatch for {pauli_str}: got {pauli_dict[pauli_str].real}, expected {expected_coeff}"
             )
 
+    @pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
     def test_bk_vs_qiskit(self, test_data_path: Path) -> None:
         """Cross-validate BK against Qiskit BravyiKitaevMapper."""
         pytest.importorskip("qiskit_nature")

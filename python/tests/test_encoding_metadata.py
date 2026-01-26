@@ -14,6 +14,15 @@ from qdk_chemistry.data import Circuit, EncodingMismatchError, QubitHamiltonian,
 
 from .test_helpers import create_test_hamiltonian
 
+try:
+    import qiskit  # noqa: F401
+    import qiskit_aer  # noqa: F401
+    import qiskit_nature  # noqa: F401
+
+    QISKIT_AVAILABLE = True
+except ImportError:
+    QISKIT_AVAILABLE = False
+
 
 def test_circuit_encoding_metadata():
     """Test that Circuit properly stores and retrieves encoding metadata."""
@@ -184,12 +193,16 @@ def test_state_preparation_injects_jordan_wigner_encoding(wavefunction_4e4o):
     circuit_gf2x = prep_gf2x.run(wavefunction_4e4o)
     assert circuit_gf2x.encoding == "jordan-wigner"
 
+
+@pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
+def test_qiskit_state_preparation_injects_jordan_wigner_encoding(wavefunction_4e4o):
     # Test qiskit_regular_isometry
     prep_regular = create("state_prep", "qiskit_regular_isometry")
     circuit_regular = prep_regular.run(wavefunction_4e4o)
     assert circuit_regular.encoding == "jordan-wigner"
 
 
+@pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 def test_qubit_mapper_injects_encoding():
     """Test that QubitMapper injects the correct encoding."""
     hamiltonian = create_test_hamiltonian(2)
@@ -239,6 +252,7 @@ def test_group_commuting_preserves_encoding():
         assert group.encoding == "jordan-wigner"
 
 
+@pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 def test_end_to_end_workflow_compatible_encodings(wavefunction_4e4o):
     """Test end-to-end workflow with compatible encodings (both Jordan-Wigner)."""
     hamiltonian = create_test_hamiltonian(2)
@@ -255,6 +269,7 @@ def test_end_to_end_workflow_compatible_encodings(wavefunction_4e4o):
     validate_encoding_compatibility(circuit, qubit_ham)
 
 
+@pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 def test_end_to_end_workflow_incompatible_encodings(wavefunction_4e4o):
     """Test end-to-end workflow with incompatible encodings."""
     hamiltonian = create_test_hamiltonian(2)

@@ -28,7 +28,17 @@ from .test_sample_workflow_utils import (
     _skip_for_mpi_failure,
 )
 
+try:
+    import qiskit  # noqa: F401
+    import qiskit_aer  # noqa: F401
+    import qiskit_nature  # noqa: F401
 
+    QISKIT_AVAILABLE = True
+except ImportError:
+    QISKIT_AVAILABLE = False
+
+
+@pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 def test_openfermion_molecular_hamiltonian_jordan_wigner():
     """Execute the OpenFermion Jordan-Wigner sample and validate reported energies."""
     repo_root = Path(__file__).resolve().parents[2]

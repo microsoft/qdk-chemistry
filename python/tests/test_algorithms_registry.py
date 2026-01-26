@@ -205,7 +205,7 @@ class TestRegistryCreate:
         assert ham.type_name() == "hamiltonian_constructor"
 
         # Test qubit mapper
-        mapper = registry.create("qubit_mapper", "qiskit")
+        mapper = registry.create("qubit_mapper", "qdk")
         assert mapper is not None
         assert mapper.type_name() == "qubit_mapper"
 

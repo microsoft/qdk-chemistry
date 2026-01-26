@@ -4,10 +4,24 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+
+try:
+    import qiskit  # noqa: F401
+    import qiskit_aer  # noqa: F401
+    import qiskit_nature  # noqa: F401
+
+    QISKIT_AVAILABLE = True
+except ImportError:
+    QISKIT_AVAILABLE = False
+
+if QISKIT_AVAILABLE:
+    from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
+
 import pytest
 
 from qdk_chemistry.data import Circuit, QuantumErrorProfile
-from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
+
+pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 
 
 @pytest.fixture

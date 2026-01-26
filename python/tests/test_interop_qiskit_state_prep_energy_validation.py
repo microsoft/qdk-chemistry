@@ -5,21 +5,32 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+try:
+    import qiskit  # noqa: F401
+    import qiskit_aer  # noqa: F401
+    import qiskit_nature  # noqa: F401
+
+    QISKIT_AVAILABLE = True
+except ImportError:
+    QISKIT_AVAILABLE = False
+
+if QISKIT_AVAILABLE:
+    from qiskit_aer import AerSimulator
+    from qiskit_aer.primitives import EstimatorV2 as AerEstimator
+
 from itertools import combinations
 
 import numpy as np
 import pytest
 from qiskit import qasm3, transpile
-from qiskit_aer import AerSimulator
-from qiskit_aer.primitives import EstimatorV2 as AerEstimator
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
-    SparseIsometryGF2XStatePreparation,
-)
+from qdk_chemistry.algorithms.state_preparation.sparse_isometry import SparseIsometryGF2XStatePreparation
 from qdk_chemistry.data import Circuit
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 
 
 def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamiltonian_4e4o, ref_energy_4e4o):

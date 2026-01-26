@@ -1,21 +1,34 @@
-"""Test Qubit Mapper functionality."""
+"""Test Qiskit Qubit Mapper functionality."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import numpy as np
+try:
+    import qiskit  # noqa: F401
+    import qiskit_aer  # noqa: F401
+    import qiskit_nature  # noqa: F401
+
+    QISKIT_AVAILABLE = True
+except ImportError:
+    QISKIT_AVAILABLE = False
+
+if QISKIT_AVAILABLE:
+    import numpy as np
+
+    from qdk_chemistry.algorithms import QubitMapper, available, create
+    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
+
+    from .reference_tolerances import (
+        float_comparison_absolute_tolerance,
+        float_comparison_relative_tolerance,
+    )
+    from .test_helpers import create_test_hamiltonian
+
 import pytest
 
-from qdk_chemistry.algorithms import QubitMapper, available, create
-from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
-
-from .reference_tolerances import (
-    float_comparison_absolute_tolerance,
-    float_comparison_relative_tolerance,
-)
-from .test_helpers import create_test_hamiltonian
+pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 
 
 @pytest.mark.parametrize("encoding", ["jordan-wigner", "bravyi-kitaev", "parity"])

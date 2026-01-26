@@ -36,7 +36,17 @@ from qdk_chemistry.data import CasWavefunctionContainer, Circuit, Configuration,
 
 from .test_helpers import create_test_orbitals
 
+try:
+    import qiskit  # noqa: F401
+    import qiskit_aer  # noqa: F401
+    import qiskit_nature  # noqa: F401
 
+    QISKIT_AVAILABLE = True
+except ImportError:
+    QISKIT_AVAILABLE = False
+
+
+@pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 def test_regular_isometry_state_prep(wavefunction_4e4o):
     """Test that regular isometry StatePreparation algorithm creates valid quantum circuits."""
     # Create a state preparation instance

@@ -17,16 +17,28 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from .reference_tolerances import (
-    estimator_energy_tolerance,
-    float_comparison_relative_tolerance,
-    qpe_energy_tolerance,
-)
-from .test_sample_workflow_utils import (
-    _extract_float,
-    _run_workflow,
-    _skip_for_mpi_failure,
-)
+try:
+    import qiskit  # noqa: F401
+    import qiskit_aer  # noqa: F401
+    import qiskit_nature  # noqa: F401
+
+    QISKIT_AVAILABLE = True
+except ImportError:
+    QISKIT_AVAILABLE = False
+
+if QISKIT_AVAILABLE:
+    from .reference_tolerances import (
+        estimator_energy_tolerance,
+        float_comparison_relative_tolerance,
+        qpe_energy_tolerance,
+    )
+    from .test_sample_workflow_utils import (
+        _extract_float,
+        _run_workflow,
+        _skip_for_mpi_failure,
+    )
+
+pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 
 
 def test_qiskit_iqpe_model_hamiltonian():

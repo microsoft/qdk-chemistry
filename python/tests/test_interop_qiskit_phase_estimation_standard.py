@@ -5,26 +5,38 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from __future__ import annotations
+try:
+    import qiskit  # noqa: F401
+    import qiskit_aer  # noqa: F401
+    import qiskit_nature  # noqa: F401
+
+    QISKIT_AVAILABLE = True
+except ImportError:
+    QISKIT_AVAILABLE = False
+
+if QISKIT_AVAILABLE:
+    from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
+
+    from qdk_chemistry.algorithms import create
+    from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
+    from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
+    from qdk_chemistry.utils.phase import energy_from_phase
+
+    from .reference_tolerances import (
+        float_comparison_relative_tolerance,
+        qpe_energy_tolerance,
+        qpe_phase_fraction_tolerance,
+    )
 
 from dataclasses import dataclass
 
 import numpy as np
 import pytest
 from qiskit import QuantumCircuit, qasm3
-from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 
-from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Circuit, QpeResult, QubitHamiltonian
-from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
-from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
-from qdk_chemistry.utils.phase import energy_from_phase
 
-from .reference_tolerances import (
-    float_comparison_relative_tolerance,
-    qpe_energy_tolerance,
-    qpe_phase_fraction_tolerance,
-)
+pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 
 _SEED = 42
 
