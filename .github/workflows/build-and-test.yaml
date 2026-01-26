@@ -166,7 +166,7 @@ jobs:
       run: |
         echo "PATH=${{ github.workspace }}/doxygen_install/bin:$PATH" >> $GITHUB_ENV
 
-    - name: Cache C++ dependency install (Linux)
+    - name: Cache C++ dependency install
       id: cache-cpp-deps
       uses: actions/cache@v4
       with:
@@ -176,7 +176,7 @@ jobs:
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
           ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
 
-    - name: Add C++ deps prefix to CMake search path (Linux)
+    - name: Add C++ deps prefix to CMake search path
       run: |
         echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
         echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
