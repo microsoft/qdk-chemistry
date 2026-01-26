@@ -301,15 +301,13 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   // Get matrix references - use handler for ROHF, direct access for RHF/UHF
   const RowMajorMatrix* F_ptr;
   RowMajorMatrix* P_ptr;
+  std::vector<int> nelec_vec = scf_impl.get_num_electrons();
+  const int nelec[2] = {nelec_vec[0], nelec_vec[1]};
 
   if (rohf_enabled_) {
-    auto nelec = scf_impl.get_num_electrons();
-    int nd = nelec[1];
-    int ns = nelec[0] - nelec[1];
-    rohf_matrix_handler_->build_ROHF_F_P_matrix(scf_impl.get_fock_matrix(),
-                                                scf_impl.get_orbitals_matrix(),
-                                                scf_impl.density_matrix(),
-                                                nd, ns);
+    rohf_matrix_handler_->build_ROHF_F_P_matrix(
+        scf_impl.get_fock_matrix(), scf_impl.get_orbitals_matrix(),
+        scf_impl.density_matrix(), nelec[0], nelec[1]);
     F_ptr = &rohf_matrix_handler_->get_fock_matrix();
     P_ptr = &rohf_matrix_handler_->get_density_matrix();
   } else {
@@ -338,8 +336,6 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   int num_atomic_orbitals = scf_impl.get_num_atomic_orbitals();
   int num_molecular_orbitals = scf_impl.get_num_molecular_orbitals();
   const int num_orbital_sets = scf_impl.get_num_orbital_sets();
-  std::vector<int> nelec_vec = scf_impl.get_num_electrons();
-  const int nelec[2] = {nelec_vec[0], nelec_vec[1]};
 
   for (auto i = 0; i < num_orbital_sets; ++i) {
     // Use extrapolated Fock matrix for density matrix update
@@ -352,7 +348,8 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   // For RHF or UHF, P_scf_impl is just P
   auto& P_scf_impl = scf_impl.density_matrix();
   if (rohf_enabled_) {
-    rohf_matrix_handler_->update_spin_density_matrices(P_scf_impl, C);
+    rohf_matrix_handler_->update_spin_density_matrices(P_scf_impl, C, nelec[0],
+                                                       nelec[1]);
   }
 
   double diis_error = diis_impl_->get_diis_error();

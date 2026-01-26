@@ -27,9 +27,12 @@ class ROHFMatrixHandler {
    * @param[in] F Spin-blocked Fock matrix
    * @param[in] C Orbital coefficients matrix
    * @param[in] P Spin-blocked density matrix
+   * @param[in] nelec_alpha Number of alpha electrons
+   * @param[in] nelec_beta Number of beta electrons, less than nelec_alpha
    */
   void build_ROHF_F_P_matrix(const RowMajorMatrix& F, const RowMajorMatrix& C,
-                             RowMajorMatrix& P, int nd, int ns) {
+                             RowMajorMatrix& P, int nelec_alpha,
+                             int nelec_beta) {
     QDK_LOG_TRACE_ENTERING();
     int num_molecular_orbitals = static_cast<int>(F.cols());
 
@@ -60,7 +63,9 @@ class ROHFMatrixHandler {
           src.block(row, col, rows, cols);
     };
 
-    int nv = num_molecular_orbitals - (nd + ns);
+    int nd = nelec_beta;
+    int ns = nelec_alpha - nelec_beta;
+    int nv = num_molecular_orbitals - nelec_alpha;
     average_block(0, 0, nd, nd);               // F_c^{dd}
     average_block(0, nd + ns, nd, nv);         // F_c^{dv}
     average_block(nd + ns, 0, nv, nd);         // F_c^{vd}
@@ -106,12 +111,28 @@ class ROHFMatrixHandler {
    *
    * @param[out] P Spin-blocked density matrices to update
    * @param[in] C Orbital coefficients matrix
+   * @param[in] nelec_alpha Number of alpha electrons
+   * @param[in] nelec_beta Number of beta electrons, less than nelec_alpha
    */
-  void update_spin_density_matrices(RowMajorMatrix& P,
-                                    const RowMajorMatrix& C) {
+  void update_spin_density_matrices(RowMajorMatrix& P, const RowMajorMatrix& C,
+                                    int nelec_alpha, int nelec_beta) {
     QDK_LOG_TRACE_ENTERING();
     int num_atomic_orbitals = C.rows();
-    int num_molecular_orbitals = C.cols();
+
+    auto build_density = [&](auto& target, int n_occ) {
+      if (n_occ <= 0) {
+        target.setZero();
+        return;
+      }
+      target.noalias() = C.block(0, 0, num_atomic_orbitals, n_occ) *
+                         C.block(0, 0, num_atomic_orbitals, n_occ).transpose();
+    };
+
+    auto P_alpha = P.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
+    auto P_beta = P.block(num_atomic_orbitals, 0, num_atomic_orbitals,
+                          num_atomic_orbitals);
+    build_density(P_alpha, nelec_alpha);
+    build_density(P_beta, nelec_beta);
   }
 
  private:
@@ -128,9 +149,11 @@ ROHFMatrixHandler::ROHFMatrixHandler() {
 
 ROHFMatrixHandler::~ROHFMatrixHandler() noexcept = default;
 
-void ROHFMatrixHandler::build_ROHF_F_P_matrix(const RowMajorMatrix& F, const RowMajorMatrix& C,
-                                              RowMajorMatrix& P, int nd, int ns) {
-  handler_impl_->build_ROHF_F_P_matrix(F, C, P, nd, ns);
+void ROHFMatrixHandler::build_ROHF_F_P_matrix(const RowMajorMatrix& F,
+                                              const RowMajorMatrix& C,
+                                              RowMajorMatrix& P,
+                                              int nelec_alpha, int nelec_beta) {
+  handler_impl_->build_ROHF_F_P_matrix(F, C, P, nelec_alpha, nelec_beta);
 }
 
 const RowMajorMatrix& ROHFMatrixHandler::get_fock_matrix() {
@@ -144,8 +167,10 @@ RowMajorMatrix& ROHFMatrixHandler::get_density_matrix() {
 // Implementation for updating spin-blocked density matrices from
 // total density matrix and orbital coefficients
 void ROHFMatrixHandler::update_spin_density_matrices(RowMajorMatrix& P,
-                                                     const RowMajorMatrix& C) {
-  handler_impl_->update_spin_density_matrices(P, C);
+                                                     const RowMajorMatrix& C,
+                                                     int nelec_alpha,
+                                                     int nelec_beta) {
+  handler_impl_->update_spin_density_matrices(P, C, nelec_alpha, nelec_beta);
 }
 
 }  // namespace qdk::chemistry::scf
