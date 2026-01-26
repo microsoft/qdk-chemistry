@@ -5,14 +5,26 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-try:
-    import qiskit  # noqa: F401
-    import qiskit_aer  # noqa: F401
-    import qiskit_nature  # noqa: F401
+import importlib.util
+from dataclasses import dataclass
 
-    QISKIT_AVAILABLE = True
-except ImportError:
-    QISKIT_AVAILABLE = False
+import numpy as np
+import pytest
+from qiskit import QuantumCircuit, qasm3
+
+from qdk_chemistry.data import Circuit, QpeResult, QubitHamiltonian
+
+from .reference_tolerances import (
+    float_comparison_relative_tolerance,
+    qpe_energy_tolerance,
+    qpe_phase_fraction_tolerance,
+)
+
+QISKIT_AVAILABLE = (
+    importlib.util.find_spec("qiskit") is not None
+    and importlib.util.find_spec("qiskit_aer") is not None
+    and importlib.util.find_spec("qiskit_nature") is not None
+)
 
 if QISKIT_AVAILABLE:
     from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
@@ -22,19 +34,6 @@ if QISKIT_AVAILABLE:
     from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
     from qdk_chemistry.utils.phase import energy_from_phase
 
-    from .reference_tolerances import (
-        float_comparison_relative_tolerance,
-        qpe_energy_tolerance,
-        qpe_phase_fraction_tolerance,
-    )
-
-from dataclasses import dataclass
-
-import numpy as np
-import pytest
-from qiskit import QuantumCircuit, qasm3
-
-from qdk_chemistry.data import Circuit, QpeResult, QubitHamiltonian
 
 pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 

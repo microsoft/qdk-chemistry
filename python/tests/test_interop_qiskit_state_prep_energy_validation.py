@@ -5,19 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-try:
-    import qiskit  # noqa: F401
-    import qiskit_aer  # noqa: F401
-    import qiskit_nature  # noqa: F401
-
-    QISKIT_AVAILABLE = True
-except ImportError:
-    QISKIT_AVAILABLE = False
-
-if QISKIT_AVAILABLE:
-    from qiskit_aer import AerSimulator
-    from qiskit_aer.primitives import EstimatorV2 as AerEstimator
-
+import importlib.util
 from itertools import combinations
 
 import numpy as np
@@ -29,6 +17,17 @@ from qdk_chemistry.algorithms.state_preparation.sparse_isometry import SparseIso
 from qdk_chemistry.data import Circuit
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+QISKIT_AVAILABLE = (
+    importlib.util.find_spec("qiskit") is not None
+    and importlib.util.find_spec("qiskit_aer") is not None
+    and importlib.util.find_spec("qiskit_nature") is not None
+)
+
+if QISKIT_AVAILABLE:
+    from qiskit_aer import AerSimulator
+    from qiskit_aer.primitives import EstimatorV2 as AerEstimator
+
 
 pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 

@@ -4,19 +4,26 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+import importlib.util
 
 import numpy as np
 import pytest
-from qiskit import QuantumCircuit
-from qiskit.circuit import Parameter
-from qiskit.circuit.library import IGate, SdgGate, SGate, ZGate
-from qiskit.transpiler import PassManager
 
-from qdk_chemistry.plugins.qiskit._interop.transpiler import (
-    MergeZBasisRotations,
-    RemoveZBasisOnZeroState,
-    SubstituteCliffordRz,
-)
+QISKIT_AVAILABLE = importlib.util.find_spec("qiskit") is not None
+
+if QISKIT_AVAILABLE:
+    from qiskit import QuantumCircuit
+    from qiskit.circuit import Parameter
+    from qiskit.circuit.library import IGate, SdgGate, SGate, ZGate
+    from qiskit.transpiler import PassManager
+
+    from qdk_chemistry.plugins.qiskit._interop.transpiler import (
+        MergeZBasisRotations,
+        RemoveZBasisOnZeroState,
+        SubstituteCliffordRz,
+    )
+
+pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 
 
 def _run_pass(pass_class, circuit):

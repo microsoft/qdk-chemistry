@@ -5,21 +5,21 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-try:
-    import qiskit  # noqa: F401
-    import qiskit_aer  # noqa: F401
-    import qiskit_nature  # noqa: F401
-
-    QISKIT_AVAILABLE = True
-except ImportError:
-    QISKIT_AVAILABLE = False
-
-if QISKIT_AVAILABLE:
-    from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
+import importlib.util
 
 import pytest
 
 from qdk_chemistry.data import Circuit, QuantumErrorProfile
+
+QISKIT_AVAILABLE = (
+    importlib.util.find_spec("qiskit") is not None
+    and importlib.util.find_spec("qiskit_aer") is not None
+    and importlib.util.find_spec("qiskit_nature") is not None
+)
+
+if QISKIT_AVAILABLE:
+    from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
+
 
 pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 

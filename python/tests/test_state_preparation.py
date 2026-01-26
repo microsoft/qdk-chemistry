@@ -13,6 +13,7 @@ This test module also checks various utility functions associated with state pre
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import importlib.util
 import re
 
 import numpy as np
@@ -36,14 +37,11 @@ from qdk_chemistry.data import CasWavefunctionContainer, Circuit, Configuration,
 
 from .test_helpers import create_test_orbitals
 
-try:
-    import qiskit  # noqa: F401
-    import qiskit_aer  # noqa: F401
-    import qiskit_nature  # noqa: F401
-
-    QISKIT_AVAILABLE = True
-except ImportError:
-    QISKIT_AVAILABLE = False
+QISKIT_AVAILABLE = (
+    importlib.util.find_spec("qiskit") is not None
+    and importlib.util.find_spec("qiskit_aer") is not None
+    and importlib.util.find_spec("qiskit_nature") is not None
+)
 
 
 @pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")

@@ -9,6 +9,7 @@ summary values when executed as scripts.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import importlib.util
 import math
 import re
 import sys
@@ -17,26 +18,23 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-try:
-    import qiskit  # noqa: F401
-    import qiskit_aer  # noqa: F401
-    import qiskit_nature  # noqa: F401
+from .reference_tolerances import (
+    estimator_energy_tolerance,
+    float_comparison_relative_tolerance,
+    qpe_energy_tolerance,
+)
+from .test_sample_workflow_utils import (
+    _extract_float,
+    _run_workflow,
+    _skip_for_mpi_failure,
+)
 
-    QISKIT_AVAILABLE = True
-except ImportError:
-    QISKIT_AVAILABLE = False
+QISKIT_AVAILABLE = (
+    importlib.util.find_spec("qiskit") is not None
+    and importlib.util.find_spec("qiskit_aer") is not None
+    and importlib.util.find_spec("qiskit_nature") is not None
+)
 
-if QISKIT_AVAILABLE:
-    from .reference_tolerances import (
-        estimator_energy_tolerance,
-        float_comparison_relative_tolerance,
-        qpe_energy_tolerance,
-    )
-    from .test_sample_workflow_utils import (
-        _extract_float,
-        _run_workflow,
-        _skip_for_mpi_failure,
-    )
 
 pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 

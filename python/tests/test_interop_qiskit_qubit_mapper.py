@@ -5,28 +5,26 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-try:
-    import qiskit  # noqa: F401
-    import qiskit_aer  # noqa: F401
-    import qiskit_nature  # noqa: F401
+import importlib.util
 
-    QISKIT_AVAILABLE = True
-except ImportError:
-    QISKIT_AVAILABLE = False
+import numpy as np
+import pytest
+
+from .reference_tolerances import (
+    float_comparison_absolute_tolerance,
+    float_comparison_relative_tolerance,
+)
+from .test_helpers import create_test_hamiltonian
+
+QISKIT_AVAILABLE = (
+    importlib.util.find_spec("qiskit") is not None
+    and importlib.util.find_spec("qiskit_aer") is not None
+    and importlib.util.find_spec("qiskit_nature") is not None
+)
 
 if QISKIT_AVAILABLE:
-    import numpy as np
-
     from qdk_chemistry.algorithms import QubitMapper, available, create
     from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
-
-    from .reference_tolerances import (
-        float_comparison_absolute_tolerance,
-        float_comparison_relative_tolerance,
-    )
-    from .test_helpers import create_test_hamiltonian
-
-import pytest
 
 pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 

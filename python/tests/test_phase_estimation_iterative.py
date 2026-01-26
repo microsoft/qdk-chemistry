@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 from dataclasses import dataclass
 
 import numpy as np
@@ -33,14 +34,12 @@ from .reference_tolerances import (
     qpe_phase_fraction_tolerance,
 )
 
-try:
-    import qiskit  # noqa: F401
-    import qiskit_aer  # noqa: F401
-    import qiskit_nature  # noqa: F401
+QISKIT_AVAILABLE = (
+    importlib.util.find_spec("qiskit") is not None
+    and importlib.util.find_spec("qiskit_aer") is not None
+    and importlib.util.find_spec("qiskit_nature") is not None
+)
 
-    QISKIT_AVAILABLE = True
-except ImportError:
-    QISKIT_AVAILABLE = False
 
 if QISKIT_AVAILABLE:
     from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator

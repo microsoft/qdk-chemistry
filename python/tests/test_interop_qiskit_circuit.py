@@ -5,17 +5,25 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import importlib.util
 from unittest.mock import patch
 
 import pytest
-from qiskit import QuantumCircuit
 
-from qdk_chemistry.plugins.qiskit._interop.circuit import (
-    CircuitInfo,
-    analyze_qubit_status,
-    plot_circuit_diagram,
-)
 from qdk_chemistry.utils import Logger
+
+QISKIT_AVAILABLE = importlib.util.find_spec("qiskit") is not None
+
+if QISKIT_AVAILABLE:
+    from qiskit import QuantumCircuit
+
+    from qdk_chemistry.plugins.qiskit._interop.circuit import (
+        CircuitInfo,
+        analyze_qubit_status,
+        plot_circuit_diagram,
+    )
+
+pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 
 
 @pytest.fixture

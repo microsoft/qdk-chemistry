@@ -5,15 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-try:
-    import qiskit  # noqa: F401
-    import qiskit_aer  # noqa: F401
-    import qiskit_nature  # noqa: F401
-
-    QISKIT_AVAILABLE = True
-except ImportError:
-    QISKIT_AVAILABLE = False
-
+import importlib.util
 from pathlib import Path
 
 import numpy as np
@@ -29,6 +21,12 @@ from qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper import (
 from qdk_chemistry.data import CanonicalFourCenterHamiltonianContainer, Hamiltonian, QubitHamiltonian
 
 from .test_helpers import create_test_hamiltonian, create_test_orbitals
+
+QISKIT_AVAILABLE = (
+    importlib.util.find_spec("qiskit") is not None
+    and importlib.util.find_spec("qiskit_aer") is not None
+    and importlib.util.find_spec("qiskit_nature") is not None
+)
 
 
 @pytest.fixture

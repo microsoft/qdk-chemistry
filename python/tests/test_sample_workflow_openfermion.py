@@ -11,6 +11,7 @@ the same ground state energy as OpenFermion.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -28,14 +29,11 @@ from .test_sample_workflow_utils import (
     _skip_for_mpi_failure,
 )
 
-try:
-    import qiskit  # noqa: F401
-    import qiskit_aer  # noqa: F401
-    import qiskit_nature  # noqa: F401
-
-    QISKIT_AVAILABLE = True
-except ImportError:
-    QISKIT_AVAILABLE = False
+QISKIT_AVAILABLE = (
+    importlib.util.find_spec("qiskit") is not None
+    and importlib.util.find_spec("qiskit_aer") is not None
+    and importlib.util.find_spec("qiskit_nature") is not None
+)
 
 
 @pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")

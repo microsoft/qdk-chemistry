@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import importlib.util
+
 import h5py
 import numpy as np
 import pytest
@@ -14,14 +16,11 @@ from qdk_chemistry.data import Circuit, EncodingMismatchError, QubitHamiltonian,
 
 from .test_helpers import create_test_hamiltonian
 
-try:
-    import qiskit  # noqa: F401
-    import qiskit_aer  # noqa: F401
-    import qiskit_nature  # noqa: F401
-
-    QISKIT_AVAILABLE = True
-except ImportError:
-    QISKIT_AVAILABLE = False
+QISKIT_AVAILABLE = (
+    importlib.util.find_spec("qiskit") is not None
+    and importlib.util.find_spec("qiskit_aer") is not None
+    and importlib.util.find_spec("qiskit_nature") is not None
+)
 
 
 def test_circuit_encoding_metadata():
