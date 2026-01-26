@@ -16,6 +16,7 @@ from qdk_chemistry.data import Circuit, EncodingMismatchError, QubitHamiltonian,
 
 from .test_helpers import create_test_hamiltonian
 
+QISKIT_AVAILABLE = importlib.util.find_spec("qiskit") is not None
 QISKIT_NATURE_AVAILABLE = importlib.util.find_spec("qiskit_nature") is not None
 
 
@@ -189,7 +190,7 @@ def test_state_preparation_injects_jordan_wigner_encoding(wavefunction_4e4o):
     assert circuit_gf2x.encoding == "jordan-wigner"
 
 
-@pytest.mark.skipif(not QISKIT_NATURE_AVAILABLE, reason="Qiskit Nature not available")
+@pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit not available")
 def test_qiskit_state_preparation_injects_jordan_wigner_encoding(wavefunction_4e4o):
     # Test qiskit_regular_isometry
     prep_regular = create("state_prep", "qiskit_regular_isometry")

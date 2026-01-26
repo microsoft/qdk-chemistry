@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import importlib.util
 import subprocess
 import sys
 import unittest
@@ -15,21 +16,12 @@ from typing import ClassVar
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "docs" / "source" / "_static" / "examples"
 PYTHON_EXAMPLES_DIR = EXAMPLES_DIR / "python"
 
-try:
-    import pyscf  # noqa: F401
-
-    PYSCF_AVAILABLE = True
-except ImportError:
-    PYSCF_AVAILABLE = False
-
-try:
-    import qiskit  # noqa: F401
-    import qiskit_aer  # noqa: F401
-    import qiskit_nature  # noqa: F401
-
-    QISKIT_AVAILABLE = True
-except ImportError:
-    QISKIT_AVAILABLE = False
+PYSCF_AVAILABLE = importlib.util.find_spec("pyscf") is not None
+QISKIT_AVAILABLE = (
+    importlib.util.find_spec("qiskit") is not None
+    and importlib.util.find_spec("qiskit_nature") is not None
+    and importlib.util.find_spec("qiskit_aer") is not None
+)
 
 
 def check_example_requirements(example_file: Path) -> tuple[bool, bool]:
