@@ -58,10 +58,17 @@ jobs:
           runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
           build-parallel: 120
           uarch: x86-64-v3
+          python-version: '3.10'
+        - os-name: Linux
+          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
+          build-parallel: 120
+          uarch: x86-64-v3
+          python-version: '3.13'
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
           uarch: native
+          python-version: '3.13'
     env:
       BUILD_DIR: cpp/build
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
@@ -77,13 +84,13 @@ jobs:
     - name: Set up environment paths
       run: |
         echo "PATH=${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH" >> $GITHUB_ENV
-        echo "PYTHONPATH=${{ github.workspace }}/install/lib/python3.13/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
+        echo "PYTHONPATH=${{ github.workspace }}/install/lib/python${{ matrix.python-version }}/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
         echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
-    - name: Set up Python 3.13
+    - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.13'
+        python-version: ${{ matrix.python-version }}
         cache: pip
 
     - name: Install Linux system packages
@@ -452,6 +459,7 @@ jobs:
         cat coverage-summary.md >> $GITHUB_STEP_SUMMARY
 
     - name: Build documentation
+      if: matrix.python-version == '3.13'
       working-directory: docs
       run: |
         set +e
