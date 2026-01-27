@@ -291,12 +291,13 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
   const auto* cfg = ctx_.cfg;
 
-  // Get matrix references - use handler for ROHF, direct access for RHF/UHF
   const RowMajorMatrix* F_ptr;
   RowMajorMatrix* P_ptr;
   std::vector<int> nelec_vec = scf_impl.get_num_electrons();
   const int nelec[2] = {nelec_vec[0], nelec_vec[1]};
 
+  // Effective Fock matrix of ROHF is computed in SCFAlgorithm::check_convergence 
+  // and saved in rohf_matrix_handler_
   if (rohf_enabled_) {
     F_ptr = &rohf_matrix_handler_->get_fock_matrix();
     P_ptr = &rohf_matrix_handler_->density_matrix();
@@ -334,12 +335,14 @@ void DIIS::iterate(SCFImpl& scf_impl) {
                             cfg->unrestricted);
   }
 
-  // For ROHF, P_scf_impl is spin-blocked density matrices in scf_impl
-  // For RHF or UHF, P_scf_impl is just P
+  // Update spin-blocked density matrices stored in SCFImpl
   auto& P_scf_impl = scf_impl.density_matrix();
   if (rohf_enabled_) {
-    rohf_matrix_handler_->update_spin_density_matrices(P_scf_impl, C, nelec[0],
+    rohf_matrix_handler_->update_density_matrix(P_scf_impl, C, nelec[0],
                                                        nelec[1]);
+  } else {
+    update_density_matrix(P_scf_impl, C, cfg->unrestricted,
+                                 nelec[0], nelec[1]);
   }
 
   double diis_error = diis_impl_->get_diis_error();

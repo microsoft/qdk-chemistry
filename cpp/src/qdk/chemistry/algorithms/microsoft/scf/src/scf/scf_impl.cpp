@@ -88,7 +88,6 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   num_atomic_orbitals_ = ctx_.basis_set->num_atomic_orbitals;
   num_molecular_orbitals_ = ctx_.basis_set->num_atomic_orbitals;
   ctx_.num_molecular_orbitals = num_molecular_orbitals_;
-  num_density_matrices_ = cfg.unrestricted ? 2 : 1;
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
   add_mm_charge_ = cfg.pointcharges != nullptr;
 #endif
@@ -97,7 +96,7 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   auto spin = mol.multiplicity - 1;
   auto alpha = (mol.n_electrons - n_ecp_electrons + spin) / 2;
   auto beta = mol.n_electrons - n_ecp_electrons - alpha;
-  rohf_enabled_ = false;  // to add (!cfg.unrestricted && alpha != beta)
+  rohf_enabled_ = cfg.rohf_enabled;
   if (cfg.scf_algorithm.method == SCFAlgorithmName::ASAHF) {
     rohf_enabled_ = false;
   }
@@ -371,7 +370,7 @@ void SCFImpl::update_fock_() {
 #endif
 
   if (ctx_.cfg->mpi.world_rank == 0) {
-    if (ctx_.cfg->unrestricted) {
+    if (ctx_.cfg->unrestricted || rohf_enabled_) {
       F_ += (J_.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_) +
              J_.block(num_atomic_orbitals_, 0, num_atomic_orbitals_,
                       num_atomic_orbitals_))
@@ -617,6 +616,9 @@ void SCFImpl::iterate_() {
           F_, S_, X_, C_, eigenvalues_, P_, nelec_, num_atomic_orbitals_,
           num_molecular_orbitals_, i, ctx_.cfg->unrestricted);
     }
+    scf_algorithm_->update_density_matrix(
+        P_, C_, ctx_.cfg->unrestricted, nelec_[0],
+        nelec_[1]);
   }
 }
 
@@ -841,6 +843,9 @@ void SCFImpl::init_density_matrix_() {
           H_, S_, X_, C_, eigenvalues_, P_, nelec_, num_atomic_orbitals_,
           num_molecular_orbitals_, i, ctx_.cfg->unrestricted);
     }
+    scf_algorithm_->update_density_matrix(
+        P_, C_, ctx_.cfg->unrestricted, nelec_[0],
+        nelec_[1]);
   } else if (method == DensityInitializationMethod::Atom) {
     atom_guess(*ctx_.basis_set, mol, P_.data());
   } else if (method == DensityInitializationMethod::File) {

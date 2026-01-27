@@ -176,6 +176,8 @@ struct SCFConfig {
   bool do_dfj = false;  ///< Use density fitting for Coulomb (J) integrals
   bool unrestricted =
       false;  ///< Use unrestricted (UHF/UKS) rather than restricted (RHF/RKS)
+  bool rohf_enabled =
+      false;  ///< Use restricted open-shell (ROHF) formalism if applicable
   double lindep_threshold =
       1e-6;  ///< Linear dependency threshold for basis set orthogonalization
   DensityInitializationMethod density_init_method =

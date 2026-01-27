@@ -65,7 +65,7 @@ class ROHFMatrixHandler {
    * @param[in] nelec_alpha Number of alpha electrons
    * @param[in] nelec_beta Number of beta electrons, less than nelec_alpha
    */
-  void update_spin_density_matrices(RowMajorMatrix& P, const RowMajorMatrix& C,
+  void update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
                                     int nelec_alpha, int nelec_beta);
 
  private:

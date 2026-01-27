@@ -131,17 +131,6 @@ void SCFAlgorithm::solve_fock_eigenproblem(
   matrix_op::transpose(
       C_d->data(), {num_atomic_orbitals, num_molecular_orbitals}, C_t->data());
 
-  auto P_d = F_d;
-  auto alpha = unrestricted ? 1.0 : 2.0;
-  matrix_op::bmm_ex(
-      alpha, C_t->data(),
-      {1, num_occupied_orbitals[idx_spin], num_atomic_orbitals, true},
-      C_t->data(), {num_occupied_orbitals[idx_spin], num_atomic_orbitals}, 0.0,
-      P_d->data());
-  CUDA_CHECK(cudaMemcpy(
-      P.data() + idx_spin * num_atomic_orbitals * num_atomic_orbitals,
-      P_d->data(), sizeof(double) * num_atomic_orbitals * num_atomic_orbitals,
-      cudaMemcpyDeviceToHost));
   CUDA_CHECK(cudaMemcpy(
       C.data() + idx_spin * num_atomic_orbitals * num_molecular_orbitals,
       C_d->data(),
@@ -154,9 +143,6 @@ void SCFAlgorithm::solve_fock_eigenproblem(
   Eigen::Map<const RowMajorMatrix> F_dm(
       F.data() + idx_spin * num_atomic_orbitals * num_atomic_orbitals,
       num_atomic_orbitals, num_atomic_orbitals);
-  Eigen::Map<RowMajorMatrix> P_dm(
-      P.data() + idx_spin * num_atomic_orbitals * num_atomic_orbitals,
-      num_atomic_orbitals, num_atomic_orbitals);
   Eigen::Map<RowMajorMatrix> C_dm(
       C.data() + idx_spin * num_atomic_orbitals * num_molecular_orbitals,
       num_atomic_orbitals, num_molecular_orbitals);
@@ -167,13 +153,37 @@ void SCFAlgorithm::solve_fock_eigenproblem(
                eigenvalues.data() + idx_spin * num_molecular_orbitals);
   tmp2.transposeInPlace();  // Row major
   C_dm.noalias() = X * tmp2;
-  auto alpha = unrestricted ? 1.0 : 2.0;
-  P_dm.noalias() =
-      alpha *
-      C_dm.block(0, 0, num_atomic_orbitals, num_occupied_orbitals[idx_spin]) *
-      C_dm.block(0, 0, num_atomic_orbitals, num_occupied_orbitals[idx_spin])
-          .transpose();
 #endif
+}
+
+void SCFAlgorithm::update_density_matrix(RowMajorMatrix& P,
+                                         const RowMajorMatrix& C,
+                                         bool unrestricted,
+                                         int nelec_alpha, int nelec_beta) {
+  QDK_LOG_TRACE_ENTERING();
+  const int num_orbital_sets = unrestricted ? 2 : 1;
+  const int num_atomic_orbitals =
+      static_cast<int>(ctx_.basis_set->num_atomic_orbitals);
+
+  if (C.rows() != num_atomic_orbitals * num_orbital_sets) {
+    throw std::invalid_argument(
+        "Coefficient matrix rows do not match orbital set count");
+  }
+
+  const double occupancy_factor = unrestricted ? 1.0 : 2.0;
+  for (int i = 0; i < num_orbital_sets; ++i) {
+    const int n_occ = (i == 0) ? nelec_alpha : nelec_beta;
+    auto block = P.block(i * num_atomic_orbitals, 0, num_atomic_orbitals,
+                         num_atomic_orbitals);
+    if (n_occ <= 0) {
+      block.setZero();
+      continue;
+    }
+
+    const auto coeff_block = C.block(i * num_atomic_orbitals, 0,
+                                     num_atomic_orbitals, n_occ);
+    block.noalias() = occupancy_factor * coeff_block * coeff_block.transpose();
+  }
 }
 
 double SCFAlgorithm::calculate_og_error_(const RowMajorMatrix& F,

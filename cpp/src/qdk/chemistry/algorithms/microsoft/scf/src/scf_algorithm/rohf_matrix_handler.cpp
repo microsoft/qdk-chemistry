@@ -112,14 +112,14 @@ class ROHFMatrixHandler {
   }
 
   /**
-   * @brief Update spin-blocked density matrices from total density matrix
+   * @brief Update density matrix from total density matrix
    *
-   * @param[out] P Spin-blocked density matrices to update
+   * @param[out] P Density matrix to update
    * @param[in] C Orbital coefficients matrix
    * @param[in] nelec_alpha Number of alpha electrons
    * @param[in] nelec_beta Number of beta electrons, less than nelec_alpha
    */
-  void update_spin_density_matrices(RowMajorMatrix& P, const RowMajorMatrix& C,
+  void update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
                                     int nelec_alpha, int nelec_beta) {
     QDK_LOG_TRACE_ENTERING();
     int num_atomic_orbitals = C.rows();
@@ -173,13 +173,13 @@ RowMajorMatrix& ROHFMatrixHandler::density_matrix() {
   return handler_impl_->density_matrix();
 }
 
-// Implementation for updating spin-blocked density matrices from
+// Implementation for updating density matrix from
 // total density matrix and orbital coefficients
-void ROHFMatrixHandler::update_spin_density_matrices(RowMajorMatrix& P,
-                                                     const RowMajorMatrix& C,
-                                                     int nelec_alpha,
-                                                     int nelec_beta) {
-  handler_impl_->update_spin_density_matrices(P, C, nelec_alpha, nelec_beta);
+void ROHFMatrixHandler::update_density_matrix(RowMajorMatrix& P,
+                                              const RowMajorMatrix& C,
+                                              int nelec_alpha,
+                                              int nelec_beta) {
+  handler_impl_->update_density_matrix(P, C, nelec_alpha, nelec_beta);
 }
 
 }  // namespace qdk::chemistry::scf

@@ -106,6 +106,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   std::transform(scf_type.begin(), scf_type.end(), scf_type.begin(), ::tolower);
 
   bool unrestricted;
+  bool rohf_enabled = false;
   if (scf_type == "auto") {
     unrestricted = open_shell;
   } else if (scf_type == "unrestricted") {
@@ -118,6 +119,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     }
   } else if (scf_type == "restricted") {
     if (open_shell) {
+      // rohf_enabled = true;
       throw std::invalid_argument(
           "Restricted Open-Shell calculation is not currently supported in the "
           "QDK/Chemistry SCFSolver");
@@ -166,6 +168,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   ms_scf_config->basis = basis_set_name;
   ms_scf_config->basis_mode = qcs::BasisMode::PSI4;
   ms_scf_config->unrestricted = unrestricted;
+  ms_scf_config->rohf_enabled = rohf_enabled;
   ms_scf_config->scf_algorithm.density_threshold = density_threshold;
   ms_scf_config->scf_algorithm.og_threshold = orbital_gradient_threshold;
   ms_scf_config->scf_algorithm.max_iteration = max_iterations;

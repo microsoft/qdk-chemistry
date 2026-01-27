@@ -75,7 +75,7 @@ class SCFAlgorithm {
 
   /**
    * @brief Solve the eigenvalue problem for the Fock matrix and update
-   * eigenvalues, molecular coefficients, and density matrix
+   * eigenvalues and molecular coefficients
    *
    * Solves the generalized eigenvalue problem F*C = S*C*E using the
    * orthogonalization matrix to transform to an orthogonal basis.
@@ -100,6 +100,19 @@ class SCFAlgorithm {
       RowMajorMatrix& C, RowMajorMatrix& eigenvalues, RowMajorMatrix& P,
       const int num_occupied_orbitals[2], int num_atomic_orbitals,
       int num_molecular_orbitals, int idx_spin, bool unrestricted);
+
+  /**
+   * @brief Update the density matrix after DIIS iteration
+   *
+   * @param[in,out] P Reference to the density matrix to be updated
+   * @param[in] C Reference to the molecular orbital coefficients
+   * @param[in] unrestricted Flag indicating if the calculation is unrestricted
+   * @param[in] nelec_alpha Number of alpha electrons
+   * @param[in] nelec_beta Number of beta electrons
+   */
+  void update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
+                                        bool unrestricted, int nelec_alpha,
+                                        int nelec_beta);
 
   /**
    * @brief Calculate orbital gradient (OG) error for convergence checking
