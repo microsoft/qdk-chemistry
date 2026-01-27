@@ -218,7 +218,7 @@ Additionally, QDK/Chemistry requires the following software dependencies:
 sudo apt update
 ```
 
-For Fedora systems, update package metadata with:
+For Fedora/RHEL systems, update package metadata with:
 ```bash
 sudo dnf makecache
 ```
