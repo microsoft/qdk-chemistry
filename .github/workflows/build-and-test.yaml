@@ -112,8 +112,8 @@ jobs:
           libeigen3-dev \
           libboost-all-dev \
           libhdf5-dev \
-          libblis-dev \
-          libflame-dev \
+          libblas-dev \
+          liblapack-dev \
           libgfortran5 \
           pkg-config \
           doxygen \
