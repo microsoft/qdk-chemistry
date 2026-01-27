@@ -59,16 +59,15 @@ jobs:
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.10'
-          test-omp-threads: 120
-          cpp-test-threads: 4
-          python-test-threads: 32
+          cpp-test-threads: 16
+          python-test-threads: 16
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.13'
-          cpp-test-threads: 4
-          python-test-threads: 32
+          cpp-test-threads: 16
+          python-test-threads: 16
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
@@ -113,8 +112,8 @@ jobs:
           libeigen3-dev \
           libboost-all-dev \
           libhdf5-dev \
-          liblapack-dev \
-          libopenblas-dev \
+          libblis-dev \
+          libflame-dev \
           libgfortran5 \
           pkg-config \
           doxygen \
@@ -217,8 +216,8 @@ jobs:
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DQDK_UARCH="$QDK_UARCH" \
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
-          -DBUILD_TESTING=ON \
-          -DQDK_ENABLE_OPENMP=OFF
+          -DBUILD_TESTING=ON
+          # -DQDK_ENABLE_OPENMP=OFF
 
     - name: Build C++ RelWithDebInfo/Coverage library
       run: cmake --build "$BUILD_DIR"
