@@ -217,7 +217,8 @@ jobs:
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DQDK_UARCH="$QDK_UARCH" \
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
-          -DBUILD_TESTING=ON
+          -DBUILD_TESTING=ON \
+          -DQDK_ENABLE_OPENMP=OFF
 
     - name: Build C++ RelWithDebInfo/Coverage library
       run: cmake --build "$BUILD_DIR"
