@@ -214,11 +214,13 @@ QDK/Chemistry requires both a C and a C++ compiler to be installed. Additionally
 Additionally, QDK/Chemistry requires the following software dependencies:
 
 **Note**: Before installing dependencies on Ubuntu/Debian, update package indices with:
+
 ```bash
 sudo apt update
 ```
 
 For Fedora/RHEL systems, update package metadata with:
+
 ```bash
 sudo dnf makecache
 ```
