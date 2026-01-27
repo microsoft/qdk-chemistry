@@ -60,14 +60,14 @@ jobs:
           uarch: x86-64-v3
           python-version: '3.10'
           test-omp-threads: 120
-          cpp-test-threads: 120
+          cpp-test-threads: 4
           python-test-threads: 32
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.13'
-          cpp-test-threads: 120
+          cpp-test-threads: 4
           python-test-threads: 32
         - os-name: macOS
           runner: macos-26-xlarge
