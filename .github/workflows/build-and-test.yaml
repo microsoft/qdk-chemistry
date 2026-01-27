@@ -59,15 +59,15 @@ jobs:
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.10'
-          cpp-test-threads: 16
-          python-test-threads: 16
+          cpp-test-threads: 2
+          python-test-threads: 2
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.13'
-          cpp-test-threads: 16
-          python-test-threads: 16
+          cpp-test-threads: 2
+          python-test-threads: 2
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
@@ -112,8 +112,7 @@ jobs:
           libeigen3-dev \
           libboost-all-dev \
           libhdf5-dev \
-          libblas-dev \
-          liblapack-dev \
+          libopenblas-dev \
           libgfortran5 \
           pkg-config \
           doxygen \
