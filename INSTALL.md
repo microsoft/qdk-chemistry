@@ -17,7 +17,7 @@ cd qdk-chemistry
 For example, on Windows Subsystem Linux (WSL), Linux, or macOS, you can create and activate a virtual environment as follows:
 
 ```bash
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 ```
 
@@ -25,7 +25,7 @@ QDK/Chemistry is distributed as the `qdk-chemistry` Python library through PyPI.
 To install the package, run the following command in a terminal:
 
 ```bash
-python -m pip install qdk-chemistry
+python3 -m pip install qdk-chemistry
 ```
 
 The pip installation of QDK/Chemistry currently has the following system requirements:
@@ -46,13 +46,13 @@ The pip installation of QDK/Chemistry currently has the following system require
 You may also optionally install the `qdk-chemistry` extras `plugins` (to enable the PySCF plugin) and `dev` (to enable the testing toolchain, including `pytest` and related plugins):
 
 ```bash
-python -m pip install 'qdk-chemistry[plugins,dev]'
+python3 -m pip install 'qdk-chemistry[plugins,dev]'
 ```
 
 To run the OpenFermion integration example tests, you will also need to install `openfermion` and `rdkit`:
 
 ```bash
-python -m pip install openfermion rdkit
+python3 -m pip install openfermion rdkit
 ```
 
 Installing with the `dev` option allows you to run the tests in the `python/tests` directory of the source repository you cloned above.
@@ -101,25 +101,25 @@ The easiest way to build and install the QDK/Chemistry python package from sourc
 
 ```bash
 cd qdk-chemistry/python
-pip install .
+python3 -m pip install .
 pytest tests/
 ```
 
-**NOTE:** Building this Python package may require significant memory, since the C++ library build uses all available threads by default and some compilations can consume around 3 GB of RAM. To avoid running out of memory, set `CMAKE_BUILD_PARALLEL_LEVEL` to a reasonably small value. For example, use: `CMAKE_BUILD_PARALLEL_LEVEL=1 pip install .` to perform a single-threaded C++ library build.
+**NOTE:** Building this Python package may require significant memory, since the C++ library build uses all available threads by default and some compilations can consume around 3 GB of RAM. To avoid running out of memory, set `CMAKE_BUILD_PARALLEL_LEVEL` to a reasonably small value. For example, use: `CMAKE_BUILD_PARALLEL_LEVEL=1 python3 -m pip install .` to perform a single-threaded C++ library build.
 
 #### Accelerating Rebuilds with Build Caching
 
 By default, each `pip install` uses a fresh temporary build directory to ensure reproducible builds and avoid issues with stale CMake cache state. However, for development workflows where you're making frequent changes, you can enable persistent build caching for significantly faster rebuilds:
 
 ```bash
-pip install . -C build-dir="build/{wheel_tag}"
+python3 -m pip install . -C build-dir="build/{wheel_tag}"
 ```
 
 **Warning:** When using a persistent build directory, CMake caches configuration decisions (such as whether the C++ library was found pre-installed or built from source). If your environment changes (e.g., you add or remove a pre-installed C++ library, or C++ dependencies change), the cached state may cause subtle build failures. In this case, remove the build directory and try again:
 
 ```bash
 rm -rf build/
-pip install .
+python3 -m pip install .
 ```
 
 #### Environment Variables for the Python Build
@@ -212,6 +212,16 @@ QDK/Chemistry requires both a C and a C++ compiler to be installed. Additionally
 | AppleClang | 17+ |
 
 Additionally, QDK/Chemistry requires the following software dependencies:
+
+**Note**: Before installing dependencies on Ubuntu/Debian, update package indices with:
+```bash
+sudo apt update && sleep 2 && sudo apt upgrade -y
+```
+
+For Fedora systems, update package indices with:
+```bash
+sudo dnf update -y
+```
 
 | Dependency | Description | Requirements | Source Location | Ubuntu / Debian | Redhat |
 |------------|-------------|--------------------|-----------------|-----------------|---------|
