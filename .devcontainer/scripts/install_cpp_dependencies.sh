@@ -283,6 +283,7 @@ elif [[ "$MAC_BUILD" == "ON" ]]; then
             -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS" \
             -DGAUXC_ENABLE_OPENMP=OFF
 fi
+
 make -j"$JOBS"
 make install
 cd "$BUILD_DIR"
