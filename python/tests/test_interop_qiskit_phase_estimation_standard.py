@@ -5,7 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import importlib.util
 from dataclasses import dataclass
 
 import numpy as np
@@ -13,6 +12,7 @@ import pytest
 from qiskit import QuantumCircuit, qasm3
 
 from qdk_chemistry.data import Circuit, QpeResult, QubitHamiltonian
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
 from .reference_tolerances import (
     float_comparison_relative_tolerance,
@@ -20,9 +20,7 @@ from .reference_tolerances import (
     qpe_phase_fraction_tolerance,
 )
 
-QISKIT_AVAILABLE = importlib.util.find_spec("qiskit") is not None
-
-if QISKIT_AVAILABLE:
+if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 
     from qdk_chemistry.algorithms import create
@@ -30,7 +28,7 @@ if QISKIT_AVAILABLE:
     from qdk_chemistry.utils.phase import energy_from_phase
 
 
-pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit not available")
+pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 
 _SEED = 42
 

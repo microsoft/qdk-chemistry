@@ -5,19 +5,15 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import importlib.util
-
 import h5py
 import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Circuit, EncodingMismatchError, QubitHamiltonian, validate_encoding_compatibility
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE
 
 from .test_helpers import create_test_hamiltonian
-
-QISKIT_AVAILABLE = importlib.util.find_spec("qiskit") is not None
-QISKIT_NATURE_AVAILABLE = importlib.util.find_spec("qiskit_nature") is not None
 
 
 def test_circuit_encoding_metadata():
@@ -190,7 +186,7 @@ def test_state_preparation_injects_jordan_wigner_encoding(wavefunction_4e4o):
     assert circuit_gf2x.encoding == "jordan-wigner"
 
 
-@pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit not available")
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 def test_qiskit_state_preparation_injects_jordan_wigner_encoding(wavefunction_4e4o):
     # Test qiskit_regular_isometry
     prep_regular = create("state_prep", "qiskit_regular_isometry")
@@ -198,7 +194,7 @@ def test_qiskit_state_preparation_injects_jordan_wigner_encoding(wavefunction_4e
     assert circuit_regular.encoding == "jordan-wigner"
 
 
-@pytest.mark.skipif(not QISKIT_NATURE_AVAILABLE, reason="Qiskit Nature not available")
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_NATURE, reason="Qiskit Nature not available")
 def test_qiskit_qubit_mapper_injects_encoding():
     """Test that QubitMapper injects the correct encoding."""
     hamiltonian = create_test_hamiltonian(2)

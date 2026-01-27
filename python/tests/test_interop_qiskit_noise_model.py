@@ -5,21 +5,18 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import importlib.util
-
 import pytest
 
-QISKIT_AER_AVAILABLE = importlib.util.find_spec("qiskit_aer") is not None
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER
 
-
-if QISKIT_AER_AVAILABLE:
+if QDK_CHEMISTRY_HAS_QISKIT_AER:
     from qiskit_aer.noise import NoiseModel
 
     from qdk_chemistry.data.noise_models import QuantumErrorProfile
     from qdk_chemistry.plugins.qiskit._interop.noise_model import get_noise_model_from_profile
 
 
-pytestmark = pytest.mark.skipif(not QISKIT_AER_AVAILABLE, reason="Qiskit Aer not available")
+pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available")
 
 
 def test_get_qiskit_noise_model(simple_error_profile):

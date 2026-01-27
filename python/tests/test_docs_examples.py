@@ -12,14 +12,17 @@ import unittest
 from pathlib import Path
 from typing import ClassVar
 
+from qdk_chemistry.plugins.qiskit import (
+    QDK_CHEMISTRY_HAS_QISKIT,
+    QDK_CHEMISTRY_HAS_QISKIT_AER,
+    QDK_CHEMISTRY_HAS_QISKIT_NATURE,
+)
+
 # Get the examples directory
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "docs" / "source" / "_static" / "examples"
 PYTHON_EXAMPLES_DIR = EXAMPLES_DIR / "python"
 
 PYSCF_AVAILABLE = importlib.util.find_spec("pyscf") is not None
-QISKIT_AVAILABLE = importlib.util.find_spec("qiskit") is not None
-QISKIT_AER_AVAILABLE = importlib.util.find_spec("qiskit_aer") is not None
-QISKIT_NATURE_AVAILABLE = importlib.util.find_spec("qiskit_nature") is not None
 
 
 def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool]:
@@ -160,11 +163,11 @@ def _create_test_methods():
                     # Skip if required packages are not available
                     if needs_pyscf and not PYSCF_AVAILABLE:
                         self.skipTest("PySCF not available")
-                    if needs_qiskit and not QISKIT_AVAILABLE:
+                    if needs_qiskit and not QDK_CHEMISTRY_HAS_QISKIT:
                         self.skipTest("Qiskit not available")
-                    if needs_qiskit_aer and not QISKIT_AER_AVAILABLE:
+                    if needs_qiskit_aer and not QDK_CHEMISTRY_HAS_QISKIT_AER:
                         self.skipTest("Qiskit Aer not available")
-                    if needs_qiskit_nature and not QISKIT_NATURE_AVAILABLE:
+                    if needs_qiskit_nature and not QDK_CHEMISTRY_HAS_QISKIT_NATURE:
                         self.skipTest("Qiskit Nature not available")
 
                     self._run_python_example(filepath)

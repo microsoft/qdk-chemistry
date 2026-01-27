@@ -4,14 +4,13 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-import importlib.util
 
 import numpy as np
 import pytest
 
-QISKIT_AVAILABLE = importlib.util.find_spec("qiskit") is not None
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
-if QISKIT_AVAILABLE:
+if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import QuantumCircuit
     from qiskit.circuit import Parameter
     from qiskit.circuit.library import IGate, SdgGate, SGate, ZGate
@@ -23,7 +22,7 @@ if QISKIT_AVAILABLE:
         SubstituteCliffordRz,
     )
 
-pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
+pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 
 
 def _run_pass(pass_class, circuit):

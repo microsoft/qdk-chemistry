@@ -14,20 +14,27 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="qiskit.*"
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="qiskit_aer.*")
 
 _loaded = False
+QDK_CHEMISTRY_HAS_QISKIT = False
+QDK_CHEMISTRY_HAS_QISKIT_NATURE = False
+QDK_CHEMISTRY_HAS_QISKIT_AER = False
 
 
 def load():
     """Load the Qiskit related plugins into QDK/Chemistry."""
     Logger.trace_entering()
     global _loaded  # noqa: PLW0603
+    global QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE, QDK_CHEMISTRY_HAS_QISKIT_AER  # noqa: PLW0603
     if _loaded:
         return
     _loaded = True
     if importlib.util.find_spec("qiskit") is not None:
+        QDK_CHEMISTRY_HAS_QISKIT = True
         qiskit_load()
     if importlib.util.find_spec("qiskit_nature") is not None:
+        QDK_CHEMISTRY_HAS_QISKIT_NATURE = True
         qiskit_nature_load()
     if importlib.util.find_spec("qiskit_aer") is not None:
+        QDK_CHEMISTRY_HAS_QISKIT_AER = True
         qiskit_aer_load()
 
 
@@ -42,7 +49,7 @@ def qiskit_load():
     register(lambda: RegularIsometryStatePreparation())
     register(lambda: QiskitStandardPhaseEstimation())
 
-    Logger.info(
+    Logger.debug(
         "Qiskit plugins loaded: "
         f"[{RegularIsometryStatePreparation().type_name()}: {RegularIsometryStatePreparation().name()}], "
         f"[{QiskitStandardPhaseEstimation().type_name()}: {QiskitStandardPhaseEstimation().name()}]."
@@ -57,7 +64,7 @@ def qiskit_nature_load():
     from qdk_chemistry.plugins.qiskit.qubit_mapper import QiskitQubitMapper  # noqa: PLC0415
 
     register(lambda: QiskitQubitMapper())
-    Logger.info(f"Qiskit Nature plugin loaded: [{QiskitQubitMapper().type_name()}: {QiskitQubitMapper().name()}].")
+    Logger.debug(f"Qiskit Nature plugin loaded: [{QiskitQubitMapper().type_name()}: {QiskitQubitMapper().name()}].")
 
 
 def qiskit_aer_load():
@@ -70,7 +77,7 @@ def qiskit_aer_load():
 
     register(lambda: QiskitEnergyEstimator())
     register(lambda: QiskitAerSimulator())
-    Logger.info(
+    Logger.debug(
         f"Qiskit Aer plugins loaded: "
         f"[{QiskitAerSimulator().type_name()}: {QiskitAerSimulator().name()}], "
         f"[{QiskitEnergyEstimator().type_name()}: {QiskitEnergyEstimator().name()}]."

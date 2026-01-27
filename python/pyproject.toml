@@ -50,7 +50,7 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 all = [
-  "qdk-chemistry[coverage,dev,docs,plugins]"
+  "qdk-chemistry[coverage,dev,docs,plugins,qiskit-extras]"
 ]
 coverage = [
   "coverage",
@@ -79,7 +79,9 @@ docs = [
   "sphinx_copybutton"
 ]
 plugins = [
-  "pyscf>=2.9.0",
+  "pyscf>=2.9.0"
+]
+qiskit-extras = [
   "qiskit-aer",
   "qiskit-nature"
 ]

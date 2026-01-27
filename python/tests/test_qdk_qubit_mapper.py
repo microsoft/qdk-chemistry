@@ -5,7 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import importlib.util
 from pathlib import Path
 
 import numpy as np
@@ -19,10 +18,9 @@ from qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper import (
     _bk_compute_z_indices_for_y_component,
 )
 from qdk_chemistry.data import CanonicalFourCenterHamiltonianContainer, Hamiltonian, QubitHamiltonian
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_NATURE
 
 from .test_helpers import create_test_hamiltonian, create_test_orbitals
-
-QISKIT_NATURE_AVAILABLE = importlib.util.find_spec("qiskit_nature") is not None
 
 
 @pytest.fixture
@@ -574,7 +572,7 @@ class TestQdkQubitMapperRealHamiltonians:
         assert result.num_qubits == expected_qubits
         assert len(result.pauli_strings) > 0
 
-    @pytest.mark.skipif(not QISKIT_NATURE_AVAILABLE, reason="Qiskit Nature not available")
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_NATURE, reason="Qiskit Nature not available")
     def test_vs_qiskit(self, test_data_path: Path) -> None:
         """Cross-validate against Qiskit JordanWignerMapper."""
         pytest.importorskip("qiskit_nature")
@@ -793,7 +791,7 @@ class TestBravyiKitaevMapper:
                 f"BK coefficient mismatch for {pauli_str}: got {pauli_dict[pauli_str].real}, expected {expected_coeff}"
             )
 
-    @pytest.mark.skipif(not QISKIT_NATURE_AVAILABLE, reason="Qiskit Nature not available")
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_NATURE, reason="Qiskit Nature not available")
     def test_bk_vs_qiskit(self, test_data_path: Path) -> None:
         """Cross-validate BK against Qiskit BravyiKitaevMapper."""
         pytest.importorskip("qiskit_nature")

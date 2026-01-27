@@ -5,19 +5,16 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import importlib.util
-
 import pytest
 
 from qdk_chemistry.data import Circuit, QuantumErrorProfile
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER
 
-QISKIT_AER_AVAILABLE = importlib.util.find_spec("qiskit_aer") is not None
-
-if QISKIT_AER_AVAILABLE:
+if QDK_CHEMISTRY_HAS_QISKIT_AER:
     from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
 
 
-pytestmark = pytest.mark.skipif(not QISKIT_AER_AVAILABLE, reason="Qiskit Aer not available")
+pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available")
 
 
 @pytest.fixture

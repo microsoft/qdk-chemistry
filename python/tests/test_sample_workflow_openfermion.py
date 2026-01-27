@@ -30,11 +30,9 @@ from .test_sample_workflow_utils import (
 )
 
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
-QISKIT_NATURE_AVAILABLE = importlib.util.find_spec("qiskit_nature") is not None
 
 
 @pytest.mark.skipif(not OPENFERMION_AVAILABLE, reason="OpenFermion not available")
-@pytest.mark.skipif(not QISKIT_NATURE_AVAILABLE, reason="Qiskit Nature not available")
 def test_openfermion_molecular_hamiltonian_jordan_wigner():
     """Execute the OpenFermion Jordan-Wigner sample and validate reported energies."""
     repo_root = Path(__file__).resolve().parents[2]
@@ -81,7 +79,7 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
 
     # Obtain qubit Hamiltonian assuming block ordering - spin up first then spin down
     # Note if printed directly, the Pauli operators will not match with OpenFermion output
-    qubit_mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
+    qubit_mapper = create("qubit_mapper", "qdk", encoding="jordan-wigner")
     qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
 
     # Obtain the ground state energy by diagonalizing the qubit Hamiltonian matrix

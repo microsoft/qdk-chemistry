@@ -9,7 +9,6 @@ summary values when executed as scripts.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import importlib.util
 import math
 import re
 import sys
@@ -17,6 +16,12 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+
+from qdk_chemistry.plugins.qiskit import (
+    QDK_CHEMISTRY_HAS_QISKIT,
+    QDK_CHEMISTRY_HAS_QISKIT_AER,
+    QDK_CHEMISTRY_HAS_QISKIT_NATURE,
+)
 
 from .reference_tolerances import (
     estimator_energy_tolerance,
@@ -29,14 +34,10 @@ from .test_sample_workflow_utils import (
     _skip_for_mpi_failure,
 )
 
-QISKIT_AVAILABLE = (
-    importlib.util.find_spec("qiskit") is not None
-    and importlib.util.find_spec("qiskit_aer") is not None
-    and importlib.util.find_spec("qiskit_nature") is not None
+pytestmark = pytest.mark.skipif(
+    not (QDK_CHEMISTRY_HAS_QISKIT_AER and QDK_CHEMISTRY_HAS_QISKIT and QDK_CHEMISTRY_HAS_QISKIT_NATURE),
+    reason="Qiskit dependencies not available",
 )
-
-
-pytestmark = pytest.mark.skipif(not QISKIT_AVAILABLE, reason="Qiskit dependencies not available")
 
 
 def test_qiskit_iqpe_model_hamiltonian():

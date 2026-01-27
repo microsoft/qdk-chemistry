@@ -5,7 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import importlib.util
 import json
 import tempfile
 from pathlib import Path
@@ -25,12 +24,11 @@ from qdk_chemistry.algorithms.energy_estimator.energy_estimator import (
     _paulis_to_indices,
 )
 from qdk_chemistry.data import Circuit, MeasurementData, QubitHamiltonian
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
-QISKIT_AER_AVAILABLE = importlib.util.find_spec("qiskit_aer") is not None
-
-if QISKIT_AER_AVAILABLE:
+if QDK_CHEMISTRY_HAS_QISKIT_AER:
     from qiskit_aer import AerSimulator
 
     from qdk_chemistry.plugins.qiskit.energy_estimator import QiskitEnergyEstimator
@@ -322,7 +320,7 @@ def test_measurement_data_to_json():
         Path(temp_path).unlink()
 
 
-@pytest.mark.skipif(not QISKIT_AER_AVAILABLE, reason="Qiskit Aer not available")
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available")
 def test_create_energy_estimator_qiskit():
     """Test factory function for creating Qiskit energy estimator."""
     estimator = create("energy_estimator", "qiskit_aer_simulator")

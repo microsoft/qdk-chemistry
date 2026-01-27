@@ -5,12 +5,15 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import importlib.util
-
 import pytest
 
 from qdk_chemistry._core._algorithms import ScfSolverFactory
 from qdk_chemistry.algorithms import ScfSolver, registry
+from qdk_chemistry.plugins.qiskit import (
+    QDK_CHEMISTRY_HAS_QISKIT,
+    QDK_CHEMISTRY_HAS_QISKIT_AER,
+    QDK_CHEMISTRY_HAS_QISKIT_NATURE,
+)
 
 try:
     import pyscf  # noqa: F401
@@ -454,17 +457,12 @@ class TestRegistryQiskitPlugins:
 
     def test_registered_qiskit_plugins(self):
         """Test that qiskit plugins are registered when available."""
-        # Check if qiskit packages are available
-        qiskit_available = importlib.util.find_spec("qiskit") is not None
-        qiskit_aer_available = importlib.util.find_spec("qiskit_aer") is not None
-        qiskit_nature_available = importlib.util.find_spec("qiskit_nature") is not None
-
         state_prep_algorithms = registry.available("state_prep")
         circuit_executors = registry.available("circuit_executor")
         qubit_mappers = registry.available("qubit_mapper")
 
         # Test Qiskit state prep plugin
-        if qiskit_available:
+        if QDK_CHEMISTRY_HAS_QISKIT:
             assert "qiskit_regular_isometry" in state_prep_algorithms, "Qiskit state prep plugin not found in registry"
             # Verify it can be created
             state_prep = registry.create("state_prep", "qiskit_regular_isometry")
@@ -476,7 +474,7 @@ class TestRegistryQiskitPlugins:
             )
 
         # Test Qiskit Aer simulator
-        if qiskit_aer_available:
+        if QDK_CHEMISTRY_HAS_QISKIT_AER:
             assert "qiskit_aer_simulator" in circuit_executors, "Qiskit Aer simulator not found in registry"
             # Verify it can be created
             executor = registry.create("circuit_executor", "qiskit_aer_simulator")
@@ -488,7 +486,7 @@ class TestRegistryQiskitPlugins:
             )
 
         # Test Qiskit Nature qubit mapper
-        if qiskit_nature_available:
+        if QDK_CHEMISTRY_HAS_QISKIT_NATURE:
             assert "qiskit" in qubit_mappers, "Qiskit Nature qubit mapper not found in registry"
             # Verify it can be created
             mapper = registry.create("qubit_mapper", "qiskit")
