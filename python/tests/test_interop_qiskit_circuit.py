@@ -8,14 +8,20 @@
 from unittest.mock import patch
 
 import pytest
-from qiskit import QuantumCircuit
 
-from qdk_chemistry.plugins.qiskit._interop.circuit import (
-    CircuitInfo,
-    analyze_qubit_status,
-    plot_circuit_diagram,
-)
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils import Logger
+
+if QDK_CHEMISTRY_HAS_QISKIT:
+    from qiskit import QuantumCircuit
+
+    from qdk_chemistry.plugins.qiskit._interop.circuit import (
+        CircuitInfo,
+        analyze_qubit_status,
+        plot_circuit_diagram,
+    )
+
+pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 
 
 @pytest.fixture
