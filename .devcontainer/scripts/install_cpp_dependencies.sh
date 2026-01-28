@@ -17,7 +17,6 @@ fi
 
 CGMANIFEST="$1"
 MACIS_CGMANIFEST="$2"
-KEEP_BUILD_DIR="${KEEP_BUILD_DIR:-0}"
 
 if [[ ! -f "$CGMANIFEST" ]]; then
     echo "Error: cgmanifest.json not found at $CGMANIFEST"

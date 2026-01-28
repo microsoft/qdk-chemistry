@@ -169,7 +169,7 @@ jobs:
       run: |
         echo "PATH=${{ github.workspace }}/doxygen_install/bin:$PATH" >> $GITHUB_ENV
 
-    - name: Cache C++ dependency install
+    - name: Cache C++ dependency install # Checks if manifest files or build script have changed to rebuild dependencies
       id: cache-cpp-deps
       uses: actions/cache@v4
       with:
@@ -178,7 +178,6 @@ jobs:
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
           ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
-          # Hash-map checks if manifest files or build script have changed to rebuild dependencies
 
     - name: Add C++ deps prefix to CMake search path
       run: |
@@ -187,7 +186,7 @@ jobs:
         echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
 
     - name: Install C++ dependencies
-      if: steps.cache-cpp-deps.outputs.cache-hit != 'true'
+      if: steps.cache-cpp-deps.outputs.cache-hit != 'true' # Run the dependency build if we don't find the right hash in the cache
       env:
         INSTALL_PREFIX: ${{ env.CPP_DEPS_PREFIX }}
         BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
@@ -197,8 +196,7 @@ jobs:
           ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
           ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
 
-    - name: Configure C++ RelWithDebInfo/Coverage build (macOS)
-      if: matrix.os-name == 'macOS'
+    - name: Configure C++ RelWithDebInfo/Coverage build
       run: |
         cmake -S cpp -B "$BUILD_DIR" \
           -GNinja \
@@ -206,17 +204,6 @@ jobs:
           -DQDK_UARCH="$QDK_UARCH" \
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
           -DBUILD_TESTING=ON
-
-    - name: Configure C++ RelWithDebInfo/Coverage build (Linux)
-      if: matrix.os-name == 'Linux'
-      run: |
-        cmake -S cpp -B "$BUILD_DIR" \
-          -GNinja \
-          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-          -DQDK_UARCH="$QDK_UARCH" \
-          -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
-          -DBUILD_TESTING=ON
-          # -DQDK_ENABLE_OPENMP=OFF
 
     - name: Build C++ RelWithDebInfo/Coverage library
       run: cmake --build "$BUILD_DIR"
