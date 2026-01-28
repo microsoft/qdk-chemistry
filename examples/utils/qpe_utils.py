@@ -75,8 +75,7 @@ def compute_evolution_time(
         num_bits: Number of precision bits used in iterative QPE.
         solve_hamiltonian: Whether to solve for a reference energy to refine the time. Defaults to True.
         target_energy_precision: Desired energy precision in Hartree. Defaults to 1e-3.
-        initial_time_guess: Optional initial evolution time. Provided only if solve_hamiltonian is True.
-            If provided, used as the base time.
+        initial_time_guess: Optional initial evolution time guess.
 
     Returns:
         Computed evolution time.
