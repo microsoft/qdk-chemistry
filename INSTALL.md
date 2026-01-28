@@ -43,10 +43,39 @@ The pip installation of QDK/Chemistry currently has the following system require
 
 **Note:** Python 3.14 is not currently supported via pip installation. If you need to use Python 3.14, please follow the [Building from Source](#building-from-source) instructions below.
 
-You may also optionally install the `qdk-chemistry` extras `plugins` (to enable the PySCF plugin) and `dev` (to enable the testing toolchain, including `pytest` and related plugins):
+### Optional Extras
+
+QDK/Chemistry supports optional extras for extended functionality. These can be installed using pip's extras syntax:
+
+```bash
+python -m pip install 'qdk-chemistry[extra1,extra2]'
+```
+
+The following extras are available:
+
+| Extra | Description | Included Packages |
+|-------|-------------|-------------------|
+| `plugins` | Third-party quantum chemistry backends | PySCF |
+| `qiskit-extras` | Optional Qiskit ecosystem packages | qiskit-aer, qiskit-nature |
+| `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
+| `all` | All of the above | All optional dependencies |
+
+For example, to install with PySCF support and development tools:
 
 ```bash
 python -m pip install 'qdk-chemistry[plugins,dev]'
+```
+
+To install with all optional Qiskit ecosystem packages:
+
+```bash
+python -m pip install 'qdk-chemistry[qiskit-extras]'
+```
+
+To install everything:
+
+```bash
+python -m pip install 'qdk-chemistry[all]'
 ```
 
 To run the OpenFermion integration example tests, you will also need to install `openfermion` and `rdkit`:
