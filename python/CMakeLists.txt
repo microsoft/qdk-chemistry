@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(qdk_chemistry_python VERSION 1.0.0 LANGUAGES CXX)
+project(qdk_chemistry_python VERSION 1.0.1 LANGUAGES CXX)
 
 # Set default build type to Release if not specified
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -61,7 +61,7 @@ else()
 endif()
 
 # Find Python first (required for pybind11)
-find_package(Python 3.11 REQUIRED COMPONENTS Interpreter Development.Module)
+find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
 
 # Find pybind11 - tell it to use the FindPython we already called
 set(PYBIND11_FINDPYTHON ON)

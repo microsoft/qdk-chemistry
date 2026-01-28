@@ -33,13 +33,13 @@ Examples:
 # --------------------------------------------------------------------------------------------
 
 from collections import Counter
-from enum import StrEnum
 
 import numpy as np
 import pyscf
 
 from qdk_chemistry.data import AOType, BasisSet, Hamiltonian, Orbitals, Shell, Structure
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 
 __all__ = [
     "basis_to_pyscf_mol",
@@ -49,7 +49,7 @@ __all__ = [
 ]
 
 
-class SCFType(StrEnum):
+class SCFType(CaseInsensitiveStrEnum):
     """Enum to specify the type of SCF calculation out of auto/restricted/unrestricted.
 
     Attributes:
