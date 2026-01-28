@@ -13,6 +13,8 @@ cd qdk-chemistry
 
 ## Pip Wheel Installation
 
+**Note**: Before using pip to install QDK/Chemistry, ensure that Python 3.10+ and pip are installed on your system. On Ubuntu/Debian, you may need to install `python3-pip` and `python3-venv` first. See the [System Dependencies](#system-dependencies) section for more details.
+
 **Note**:  We strongly recommend using a virtual environment when installing QDK/Chemistry via pip to avoid conflicts with other installed packages.
 For example, on Windows Subsystem Linux (WSL), Linux, or macOS, you can create and activate a virtual environment as follows:
 
@@ -227,6 +229,7 @@ sudo dnf makecache
 
 | Dependency | Description | Requirements | Source Location | Ubuntu / Debian | Redhat |
 |------------|-------------|--------------------|-----------------|-----------------|---------|
+| Python 3 | Python interpreter and package tools | Version 3.10+ | [source](https://www.python.org/) | `apt install python3 python3-pip python3-venv` | `dnf install python3 python3-pip` |
 | CMake | Build system manager | Version > 3.15 | [source](https://github.com/Kitware/CMake) | `apt install cmake` | `dnf install cmake` |
 | Eigen | C++ linear algebra templates | Version > 3.4.0 | [source](https://libeigen.gitlab.io/) | `apt install libeigen3-dev` | `dnf install eigen3-devel` |
 | LAPACK | C library for linear algebra. See [this note](#note-on-lapack-usage) for further information | N/A | e.g. [source](https://github.com/OpenMathLib/OpenBLAS) | e.g. `apt install libopenblas-dev` | e.g. `dnf install openblas-devel`|
