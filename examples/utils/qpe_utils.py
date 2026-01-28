@@ -108,9 +108,15 @@ def compute_evolution_time(
     # Shift the energy error to achieve the target precision
     shifted_energy = discretization_energy_error - target_energy_precision
 
-    # Compute the adjusted evolution time
-    proposed_time = base_time + shifted_energy * base_time / (
-        reference_energy + target_energy_precision
-    )
+    # Compute the adjusted evolution time, guarding against division by zero
+    denominator = reference_energy + target_energy_precision
+    if np.isclose(denominator, 0.0) or abs(denominator) < 1e-10:
+        raise ValueError(
+            "Cannot compute adjusted evolution time: reference_energy + "
+            f"target_energy_precision is too close to zero "
+            f"(reference_energy={reference_energy}, "
+            f"target_energy_precision={target_energy_precision})."
+        )
 
+    proposed_time = base_time + shifted_energy * base_time / denominator
     return proposed_time
