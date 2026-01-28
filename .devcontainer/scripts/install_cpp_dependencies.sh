@@ -256,32 +256,31 @@ cd gauxc
 git checkout "$GAUXC_COMMIT"
 mkdir -p build
 cd build
-if [[ "$MAC_BUILD" == "OFF" ]]; then
-    cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-            -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-            -DBUILD_TESTING=OFF \
-            -DEXCHCXX_ENABLE_LIBXC=OFF \
-            -DGAUXC_ENABLE_HDF5=OFF \
-            -DGAUXC_ENABLE_MAGMA=OFF \
-            -DGAUXC_ENABLE_CUTLASS=ON \
-            -DGAUXC_ENABLE_CUDA=OFF \
-            -DGAUXC_ENABLE_MPI=OFF \
-            -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
-elif [[ "$MAC_BUILD" == "ON" ]]; then
-    cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-            -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-            -DBUILD_TESTING=OFF \
-            -DEXCHCXX_ENABLE_LIBXC=OFF \
-            -DGAUXC_ENABLE_HDF5=OFF \
-            -DGAUXC_ENABLE_MAGMA=OFF \
-            -DGAUXC_ENABLE_CUTLASS=OFF \
-            -DGAUXC_ENABLE_CUDA=OFF \
-            -DGAUXC_ENABLE_MPI=OFF \
-            -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS" \
-            -DGAUXC_ENABLE_OPENMP=OFF
+gauxc_cmake_args=(
+  ..
+  -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
+  -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX"
+  -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+  -DBUILD_TESTING=OFF
+  -DEXCHCXX_ENABLE_LIBXC=OFF
+  -DGAUXC_ENABLE_HDF5=OFF
+  -DGAUXC_ENABLE_MAGMA=OFF
+  -DGAUXC_ENABLE_CUDA=OFF
+  -DGAUXC_ENABLE_MPI=OFF
+  -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
+)
+
+if [[ "$MAC_BUILD" == "ON" ]]; then
+  gauxc_cmake_args+=(
+    -DGAUXC_ENABLE_CUTLASS=OFF
+    -DGAUXC_ENABLE_OPENMP=OFF
+  )
+else
+  gauxc_cmake_args+=(
+    -DGAUXC_ENABLE_CUTLASS=ON
+  )
 fi
+cmake "${gauxc_cmake_args[@]}"
 make -j"$JOBS"
 make install
 cd "$BUILD_DIR"
