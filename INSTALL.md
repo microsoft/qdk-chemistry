@@ -41,8 +41,6 @@ The pip installation of QDK/Chemistry currently has the following system require
   - macOS
     - arm64
 
-**Note:** Python 3.14 is not currently supported via pip installation. If you need to use Python 3.14, please follow the [Building from Source](#building-from-source) instructions below.
-
 ### Optional Extras
 
 QDK/Chemistry supports optional extras for extended functionality. These can be installed using pip's extras syntax:
@@ -59,6 +57,8 @@ The following extras are available:
 | `qiskit-extras` | Optional Qiskit ecosystem packages | qiskit-aer, qiskit-nature |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
 | `all` | All of the above | All optional dependencies |
+
+**Note:** The `qiskit-extras` extra is not currently supported on Python 3.14.
 
 For example, to install with PySCF support and development tools:
 

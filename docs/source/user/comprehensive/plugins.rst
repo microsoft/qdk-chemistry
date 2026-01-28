@@ -110,6 +110,10 @@ Alternatively, you can install them directly:
 
    pip install qiskit-aer qiskit-nature
 
+.. note::
+
+   The ``qiskit-extras`` extra is not currently supported on Python 3.14.
+
 **Checking what is loaded:**
 
 To determine which Qiskit components are available in your environment, you can check the following module-level variables:
