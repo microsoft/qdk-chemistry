@@ -14,6 +14,7 @@ import pytest
 from qiskit.quantum_info import Pauli, PauliList
 
 from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator
 from qdk_chemistry.algorithms.energy_estimator.energy_estimator import (
     EnergyEstimator,
     _build_measurement_circuit,
@@ -23,26 +24,14 @@ from qdk_chemistry.algorithms.energy_estimator.energy_estimator import (
     _paulis_to_indices,
 )
 from qdk_chemistry.data import Circuit, MeasurementData, QubitHamiltonian
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
-try:
+if QDK_CHEMISTRY_HAS_QISKIT_AER:
     from qiskit_aer import AerSimulator
 
     from qdk_chemistry.plugins.qiskit.energy_estimator import QiskitEnergyEstimator
-
-    QISKIT_AVAILABLE = True
-except ImportError:
-    QISKIT_AVAILABLE = False
-    QiskitEnergyEstimator = None
-
-try:
-    from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator
-
-    QSHARP_AVAILABLE = True
-except ImportError:
-    QSHARP_AVAILABLE = False
-    QDKEnergyEstimator = None
 
 
 def test_parity():
@@ -331,6 +320,7 @@ def test_measurement_data_to_json():
         Path(temp_path).unlink()
 
 
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available")
 def test_create_energy_estimator_qiskit():
     """Test factory function for creating Qiskit energy estimator."""
     estimator = create("energy_estimator", "qiskit_aer_simulator")

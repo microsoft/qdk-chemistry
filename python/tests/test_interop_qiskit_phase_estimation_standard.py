@@ -5,26 +5,30 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 import numpy as np
 import pytest
 from qiskit import QuantumCircuit, qasm3
-from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 
-from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Circuit, QpeResult, QubitHamiltonian
-from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
-from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
-from qdk_chemistry.utils.phase import energy_from_phase
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
 from .reference_tolerances import (
     float_comparison_relative_tolerance,
     qpe_energy_tolerance,
     qpe_phase_fraction_tolerance,
 )
+
+if QDK_CHEMISTRY_HAS_QISKIT:
+    from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
+
+    from qdk_chemistry.algorithms import create
+    from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
+    from qdk_chemistry.utils.phase import energy_from_phase
+
+
+pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 
 _SEED = 42
 
@@ -98,8 +102,8 @@ def _extract_traditional_results(problem: TraditionalProblem) -> QpeResult:
 
     """
     qpe = QiskitStandardPhaseEstimation(num_bits=problem.num_bits, evolution_time=problem.evolution_time)
-    simulator = QiskitAerSimulator(seed=_SEED)
 
+    simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
     evolution_builder = create("time_evolution_builder", "trotter")
 
