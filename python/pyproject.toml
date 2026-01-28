@@ -32,10 +32,8 @@ classifiers = [
 dependencies = [
   "numpy>=1.20.0,<2.4.0",
   "scipy>=1.7.0",
-  "matplotlib==3.10.0",
+  "matplotlib>=3.10.0",
   "qiskit[qasm3-import]>=2.2.0",
-  "qiskit-aer",
-  "qiskit-nature",
   "pylatexenc==2.10",
   "ruamel-yaml>=0.18.10",
   "pydantic-settings>=2.9.1",
@@ -52,7 +50,7 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 all = [
-  "qdk-chemistry[coverage,dev,docs,plugins]"
+  "qdk-chemistry[coverage,dev,docs,plugins,qiskit-extras]"
 ]
 coverage = [
   "coverage",
@@ -82,6 +80,10 @@ docs = [
 ]
 plugins = [
   "pyscf>=2.9.0"
+]
+qiskit-extras = [
+  "qiskit-aer",
+  "qiskit-nature"
 ]
 
 [project.urls]

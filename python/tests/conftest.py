@@ -104,7 +104,7 @@ def test_data_files_path():
 @pytest.fixture
 def hamiltonian_4e4o(test_data_files_path):
     """Fixture to create the Qubit Hamiltonian for 4e4o ethylene 2det problem."""
-    mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
+    mapper = create("qubit_mapper", "qdk", encoding="jordan-wigner")
     classical_hamiltonian = Hamiltonian.from_json_file(test_data_files_path / "ethylene_4e4o_2det.hamiltonian.json")
     return mapper.run(classical_hamiltonian)
 
@@ -112,7 +112,7 @@ def hamiltonian_4e4o(test_data_files_path):
 @pytest.fixture
 def hamiltonian_10e6o(test_data_files_path):
     """Fixture to create the Qubit Hamiltonian for 10e6o f2 problem."""
-    mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
+    mapper = create("qubit_mapper", "qdk", encoding="jordan-wigner")
     classical_hamiltonian = Hamiltonian.from_json_file(test_data_files_path / "f2_10e6o.hamiltonian.json")
     return mapper.run(classical_hamiltonian)
 

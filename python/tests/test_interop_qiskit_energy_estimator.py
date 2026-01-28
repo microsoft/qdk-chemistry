@@ -11,15 +11,22 @@ and expectation value calculations for quantum circuits and observables.
 
 import numpy as np
 import pytest
-from qiskit_aer import AerSimulator
-from qiskit_aer.noise import NoiseModel, depolarizing_error
 
-from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Circuit, QubitHamiltonian
-from qdk_chemistry.data.qubit_hamiltonian import filter_and_group_pauli_ops_from_wavefunction
-from qdk_chemistry.plugins.qiskit.energy_estimator import QiskitEnergyEstimator
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER
 
 from .reference_tolerances import estimator_energy_tolerance, float_comparison_relative_tolerance
+
+if QDK_CHEMISTRY_HAS_QISKIT_AER:
+    from qiskit_aer import AerSimulator
+    from qiskit_aer.noise import NoiseModel, depolarizing_error
+
+    from qdk_chemistry.algorithms import create
+    from qdk_chemistry.data import Circuit, QubitHamiltonian
+    from qdk_chemistry.data.qubit_hamiltonian import filter_and_group_pauli_ops_from_wavefunction
+    from qdk_chemistry.plugins.qiskit.energy_estimator import QiskitEnergyEstimator
+
+
+pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available")
 
 
 @pytest.fixture

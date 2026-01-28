@@ -1,4 +1,4 @@
-"""Test Qubit Mapper functionality."""
+"""Test Qiskit Qubit Mapper functionality."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -8,14 +8,19 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms import QubitMapper, available, create
-from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_NATURE
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
 )
 from .test_helpers import create_test_hamiltonian
+
+if QDK_CHEMISTRY_HAS_QISKIT_NATURE:
+    from qdk_chemistry.algorithms import QubitMapper, available, create
+    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
+
+pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_NATURE, reason="Qiskit Nature not available")
 
 
 @pytest.mark.parametrize("encoding", ["jordan-wigner", "bravyi-kitaev", "parity"])

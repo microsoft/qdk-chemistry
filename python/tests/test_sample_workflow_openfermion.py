@@ -11,6 +11,7 @@ the same ground state energy as OpenFermion.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -28,7 +29,10 @@ from .test_sample_workflow_utils import (
     _skip_for_mpi_failure,
 )
 
+OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
 
+
+@pytest.mark.skipif(not OPENFERMION_AVAILABLE, reason="OpenFermion not available")
 def test_openfermion_molecular_hamiltonian_jordan_wigner():
     """Execute the OpenFermion Jordan-Wigner sample and validate reported energies."""
     repo_root = Path(__file__).resolve().parents[2]
@@ -75,7 +79,7 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
 
     # Obtain qubit Hamiltonian assuming block ordering - spin up first then spin down
     # Note if printed directly, the Pauli operators will not match with OpenFermion output
-    qubit_mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
+    qubit_mapper = create("qubit_mapper", "qdk", encoding="jordan-wigner")
     qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
 
     # Obtain the ground state energy by diagonalizing the qubit Hamiltonian matrix

@@ -17,6 +17,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from qdk_chemistry.plugins.qiskit import (
+    QDK_CHEMISTRY_HAS_QISKIT,
+    QDK_CHEMISTRY_HAS_QISKIT_AER,
+    QDK_CHEMISTRY_HAS_QISKIT_NATURE,
+)
+
 from .reference_tolerances import (
     estimator_energy_tolerance,
     float_comparison_relative_tolerance,
@@ -26,6 +32,11 @@ from .test_sample_workflow_utils import (
     _extract_float,
     _run_workflow,
     _skip_for_mpi_failure,
+)
+
+pytestmark = pytest.mark.skipif(
+    not (QDK_CHEMISTRY_HAS_QISKIT_AER and QDK_CHEMISTRY_HAS_QISKIT and QDK_CHEMISTRY_HAS_QISKIT_NATURE),
+    reason="Qiskit dependencies not available",
 )
 
 

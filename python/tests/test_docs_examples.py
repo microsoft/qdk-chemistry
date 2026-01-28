@@ -5,32 +5,27 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import importlib.util
 import subprocess
 import sys
 import unittest
 from pathlib import Path
 from typing import ClassVar
 
+from qdk_chemistry.plugins.qiskit import (
+    QDK_CHEMISTRY_HAS_QISKIT,
+    QDK_CHEMISTRY_HAS_QISKIT_AER,
+    QDK_CHEMISTRY_HAS_QISKIT_NATURE,
+)
+
 # Get the examples directory
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "docs" / "source" / "_static" / "examples"
 PYTHON_EXAMPLES_DIR = EXAMPLES_DIR / "python"
 
-try:
-    import pyscf  # noqa: F401
-
-    PYSCF_AVAILABLE = True
-except ImportError:
-    PYSCF_AVAILABLE = False
-
-try:
-    import qiskit  # noqa: F401
-
-    QISKIT_AVAILABLE = True
-except ImportError:
-    QISKIT_AVAILABLE = False
+PYSCF_AVAILABLE = importlib.util.find_spec("pyscf") is not None
 
 
-def check_example_requirements(example_file: Path) -> tuple[bool, bool]:
+def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool]:
     """Check if an example file requires qiskit or pyscf.
 
     Args:
@@ -44,6 +39,8 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool]:
 
     requires_pyscf = False
     requires_qiskit = False
+    requires_qiskit_aer = False
+    requires_qiskit_nature = False
 
     # Check for explicit imports
     if "import pyscf" in content or "from pyscf" in content:
@@ -60,17 +57,52 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool]:
     if ', "qiskit' in content or ", 'qiskit" in content:
         requires_qiskit = True
 
+    # Look for create(..., algorithm_name="pyscf") or create(..., algorithm_name='pyscf') patterns
+    if 'algorithm_name="pyscf' in content or "algorithm_name='pyscf" in content:
+        requires_pyscf = True
+    if 'algorithm_name="qiskit' in content or "algorithm_name='qiskit" in content:
+        requires_qiskit = True
+
+    if any(
+        pattern in content
+        for pattern in [
+            "qiskit_regular_isometry",
+            "qiskit_standard",
+            "QiskitStandardPhaseEstimation",
+            "RegularIsometryStatePreparation",
+        ]
+    ):
+        requires_qiskit = True
+
     # check for plugin imports
     if "import qdk_chemistry.plugins.pyscf" in content:
         requires_pyscf = True
     if "import qdk_chemistry.plugins.qiskit" in content:
         requires_qiskit = True
 
-    # Check for qiskit-specific classes
-    if "QiskitEnergyEstimator" in content:
-        requires_qiskit = True
+    if any(
+        pattern in content
+        for pattern in [
+            'create("qubit_mapper", "qiskit"',
+            "create('qubit_mapper', 'qiskit'",
+            'create("qubit_mapper", algorithm_name="qiskit"',
+            "create('qubit_mapper', algorithm_name='qiskit'",
+            "QiskitQubitMapper ",
+        ]
+    ):
+        requires_qiskit_nature = True
 
-    return requires_pyscf, requires_qiskit
+    if any(
+        pattern in content
+        for pattern in [
+            "qiskit_aer_simulator",
+            "QiskitEnergyEstimator",
+            "QiskitAerSimulator",
+        ]
+    ):
+        requires_qiskit_aer = True
+
+    return requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature
 
 
 class TestExampleScripts(unittest.TestCase):
@@ -118,10 +150,12 @@ def _create_test_methods():
             test_name = f"test_py_{example_file.stem}"
 
             # Check requirements for this example
-            requires_pyscf, requires_qiskit = check_example_requirements(example_file)
+            requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature = check_example_requirements(
+                example_file
+            )
 
             # Create the test method
-            def make_test(filepath, needs_pyscf, needs_qiskit):
+            def make_test(filepath, needs_pyscf, needs_qiskit, needs_qiskit_aer, needs_qiskit_nature):
                 """Create a test method for the given example file."""
 
                 def test_method(self):
@@ -129,15 +163,23 @@ def _create_test_methods():
                     # Skip if required packages are not available
                     if needs_pyscf and not PYSCF_AVAILABLE:
                         self.skipTest("PySCF not available")
-                    if needs_qiskit and not QISKIT_AVAILABLE:
+                    if needs_qiskit and not QDK_CHEMISTRY_HAS_QISKIT:
                         self.skipTest("Qiskit not available")
+                    if needs_qiskit_aer and not QDK_CHEMISTRY_HAS_QISKIT_AER:
+                        self.skipTest("Qiskit Aer not available")
+                    if needs_qiskit_nature and not QDK_CHEMISTRY_HAS_QISKIT_NATURE:
+                        self.skipTest("Qiskit Nature not available")
 
                     self._run_python_example(filepath)
 
                 return test_method
 
             # Add the test method to the TestExampleScripts class
-            setattr(TestExampleScripts, test_name, make_test(example_file, requires_pyscf, requires_qiskit))
+            setattr(
+                TestExampleScripts,
+                test_name,
+                make_test(example_file, requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature),
+            )
 
 
 # Generate test methods when the module is loaded

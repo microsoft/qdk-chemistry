@@ -4,10 +4,17 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+
 import pytest
 
 from qdk_chemistry.data import Circuit, QuantumErrorProfile
-from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER
+
+if QDK_CHEMISTRY_HAS_QISKIT_AER:
+    from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
+
+
+pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available")
 
 
 @pytest.fixture
