@@ -34,19 +34,31 @@ Algorithm Details:
 # --------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
-from qiskit import QuantumCircuit, qasm3
-from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
-from qiskit.compiler import transpile
-from qiskit.quantum_info import Statevector
-from qiskit.transpiler import PassManager
+import qsharp
 
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
 from qdk_chemistry.data import Circuit, Wavefunction
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
+
+# Import the Q# code from the StatePreparation.qs file
+code = (Path(__file__).parent / "StatePreparation.qs").read_text()
+qsharp.eval(code)
+
+
+class SparseIsometryGF2XStatePreparationSettings(StatePreparationSettings):
+    """Settings for SparseIsometryGF2XStatePreparation."""
+
+    def __init__(self):
+        """Initialize the StatePreparationSettings."""
+        super().__init__()
+        self._set_default(
+            "prune_classical_qubits", "bool", False, "Whether to prune classical qubits and return the circuit."
+        )
 
 
 class SparseIsometryGF2XStatePreparation(StatePreparation):
@@ -79,11 +91,12 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
     """
 
-    def __init__(self):
+    def __init__(self, prune_classical_qubits: bool = False):
         """Initialize the SparseIsometryGF2XStatePreparation."""
         Logger.trace_entering()
         super().__init__()
-        self._settings = StatePreparationSettings()
+        self._settings = SparseIsometryGF2XStatePreparationSettings()
+        self._settings.set("prune_classical_qubits", prune_classical_qubits)
 
     def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
         """Prepare a quantum circuit that encodes the given wavefunction using sparse isometry over GF(2^x).
@@ -96,12 +109,6 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
         """
         Logger.trace_entering()
-        # Imported here to avoid circular import issues
-        from qdk_chemistry.plugins.qiskit._interop.transpiler import (  # noqa: PLC0415
-            MergeZBasisRotations,
-            RemoveZBasisOnZeroState,
-            SubstituteCliffordRz,
-        )
 
         # Active Space Consistency Check
         alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()
@@ -145,19 +152,13 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         Logger.debug(f"CNOT operations: {[op for op in gf2x_operation_results.operations if op[0] == 'cnot']}")
         Logger.debug(f"X operations: {[op for op in gf2x_operation_results.operations if op[0] == 'x']}")
 
-        # Step 3: Create quantum circuit
-        qc = QuantumCircuit(
-            n_qubits,
-            name=f"sparse_isometry_gf2x_{len(bitstrings)}_dets",
-        )
-
-        # Step 4: Create statevector for the reduced matrix
+        # Step 3: Create statevector for the reduced matrix
         if gf2x_operation_results.rank > 0:
             # Create statevector correctly preserving coefficient-determinant correspondence.
             # Each coefficient corresponds to a specific determinant (column in reduced matrix).
             # We need to map each coefficient to the correct basis state in the reduced space.
 
-            statevector_data = np.zeros(2**gf2x_operation_results.rank, dtype=complex)
+            statevector_data = np.zeros(2**gf2x_operation_results.rank, dtype=float)
 
             # For each determinant (column in reduced matrix), map it to the correct statevector index
             for det_idx in range(gf2x_operation_results.reduced_matrix.shape[1]):
@@ -191,12 +192,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 bitstring_repr = format(i, f"0{gf2x_operation_results.rank}b")
                 Logger.debug(f"  |{bitstring_repr}⟩: {amp:.6f}")
 
-            # Create Statevector object for StatePreparation
-            statevector = Statevector(statevector_data)
-
-            # Step 5: Apply dense state preparation on reduced space
             Logger.debug(f"Target indices are {gf2x_operation_results.row_map}")
-            qc.append(QiskitStatePreparation(statevector, normalize=False), gf2x_operation_results.row_map)
         else:
             # If reduced matrix has zero rank, all determinants are identical
             raise ValueError(
@@ -205,37 +201,30 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 "need to use a single-determinant state preparation method."
             )
 
-        # Step 6: Apply recorded operations in reverse order to expand back to full space.
+        # Step 4: Apply recorded operations in reverse order to expand back to full space.
         # Note: GF2+X can have both CNOT and X operations
+        expansion_ops: list[list[int]] = []
         for operation in reversed(gf2x_operation_results.operations):
             if operation[0] == "cnot":
                 # operation[1] should be a tuple for CNOT operations
                 if isinstance(operation[1], tuple):
                     target, control = operation[1]
-                    qc.cx(control, target)
+                    expansion_ops.append([control, target])
             elif operation[0] == "x" and isinstance(operation[1], int):
                 # operation[1] should be an int for X operations
                 qubit = operation[1]
-                qc.x(qubit)
+                expansion_ops.append([qubit])
 
-        Logger.info(
-            f"Final circuit before transpilation: {qc.num_qubits} qubits, depth {qc.depth()}, {qc.size()} gates"
+        qsharp_circuit = qsharp.circuit(
+            qsharp.code.StatePreparation,
+            gf2x_operation_results.row_map,
+            statevector_data.tolist(),
+            expansion_ops,
+            n_qubits,
+            prune_classical_qubits=self._settings.get("prune_classical_qubits"),
         )
 
-        # Transpile the circuit if needed
-        basis_gates = self._settings.get("basis_gates")
-        do_transpile = self._settings.get("transpile")
-        if do_transpile and basis_gates:
-            opt_level = self._settings.get("transpile_optimization_level")
-            qc = transpile(qc, basis_gates=basis_gates, optimization_level=opt_level)
-            pass_manager = PassManager([MergeZBasisRotations(), SubstituteCliffordRz(), RemoveZBasisOnZeroState()])
-            qc = pass_manager.run(qc)
-
-            Logger.info(
-                f"Final circuit after transpilation: {qc.num_qubits} qubits, depth {qc.depth()}, {qc.size()} gates"
-            )
-
-        return Circuit(qasm=qasm3.dumps(qc), encoding="jordan-wigner")
+        return Circuit(qsharp=qsharp_circuit, encoding="jordan-wigner")
 
     def _bitstrings_to_binary_matrix(self, bitstrings: list[str]) -> np.ndarray:
         """Convert a list of bitstrings to a binary matrix.
@@ -328,15 +317,15 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             raise ValueError("Bitstring must contain only '0' and '1' characters")
 
         num_qubits = len(bitstring)
-        circuit = QuantumCircuit(num_qubits, name=f"SingleRef_{bitstring}")
+        bitstring_array = [int(bit) for bit in bitstring]
+        qsharp_circuit = qsharp.circuit(
+            qsharp.code.PrepareSingleReferenceState,
+            reversed(bitstring_array),  # Reverse for little-endian convention
+            num_qubits,
+            prune_classical_qubits=self._settings.get("prune_classical_qubits"),
+        )
 
-        # Apply X gates for positions with '1'
-        # Note: bitstring is in little-endian format (rightmost bit = qubit 0)
-        for i, bit in enumerate(reversed(bitstring)):
-            if bit == "1":
-                circuit.x(i)
-
-        return Circuit(qasm=qasm3.dumps(circuit), encoding="jordan-wigner")
+        return Circuit(qsharp=qsharp_circuit, encoding="jordan-wigner")
 
     def name(self) -> str:
         """Return the name of the state preparation method."""
