@@ -58,7 +58,7 @@ The following extras are available:
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
 | `all` | All of the above | All optional dependencies |
 
-**Note:** The `qiskit-extras` extra is not currently supported on Python 3.14.
+**Note:** The `qiskit-extras` and `all` extras are not currently supported on Python 3.14, since `all` includes `qiskit-extras`.
 
 For example, to install with PySCF support and development tools:
 
