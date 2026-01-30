@@ -105,7 +105,7 @@ def compute_evolution_time(
     # Compute the energy error from phase discretization
     if abs(base_time) < np.finfo(type(base_time)).eps:
         raise ValueError(
-            f"Cannot compute discretization energy error: base_time {base_time}is too close to zero."
+            f"Cannot compute discretization energy error: base_time {base_time} is too close to zero."
         )
     discretization_energy_error = (2 * np.pi * (bit_phase - expected_phase)) / base_time
 
