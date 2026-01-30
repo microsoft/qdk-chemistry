@@ -175,7 +175,8 @@ class TestHamiltonianConstructor : public HamiltonianConstructor {
  public:
   std::string name() const override { return "test-hamiltonian_constructor"; }
   std::shared_ptr<Hamiltonian> _run_impl(
-      std::shared_ptr<Orbitals> orbitals) const override {
+      std::shared_ptr<Orbitals> orbitals,
+      OptionalAuxBasis aux_basis) const override {
     // Dummy implementation for testing
     Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(3, 3);
     Eigen::VectorXd two_body = Eigen::VectorXd::Random(81);
