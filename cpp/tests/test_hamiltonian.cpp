@@ -20,6 +20,7 @@
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <string>
 
 #include "ut_common.hpp"
 using namespace qdk::chemistry::data;
@@ -781,316 +782,6 @@ TEST_P(HamiltonianTest, ValidationEdgeCases) {
   }
 }
 
-TEST_F(HamiltonianConstructorTest, Factory) {
-  auto available_solvers = HamiltonianConstructorFactory::available();
-  EXPECT_EQ(available_solvers.size(), 1);
-  EXPECT_EQ(available_solvers[0], "qdk");
-  EXPECT_THROW(HamiltonianConstructorFactory::create("nonexistent_solver"),
-               std::runtime_error);
-  EXPECT_NO_THROW(HamiltonianConstructorFactory::register_instance(
-      []() -> HamiltonianConstructorFactory::return_type {
-        return std::make_unique<TestHamiltonianConstructor>();
-      }));
-  EXPECT_THROW(HamiltonianConstructorFactory::register_instance(
-                   []() -> HamiltonianConstructorFactory::return_type {
-                     return std::make_unique<TestHamiltonianConstructor>();
-                   }),
-               std::runtime_error);
-  auto test_scf =
-      HamiltonianConstructorFactory::create("test-hamiltonian_constructor");
-
-  // Test unregister_instance
-  // First test unregistering a non-existent key (should return false)
-  EXPECT_FALSE(
-      HamiltonianConstructorFactory::unregister_instance("nonexistent_key"));
-
-  // Test unregistering an existing key (should return true)
-  EXPECT_TRUE(HamiltonianConstructorFactory::unregister_instance(
-      "test-hamiltonian_constructor"));
-
-  // Test unregistering the same key again (should return false since it's
-  // already removed)
-  EXPECT_FALSE(HamiltonianConstructorFactory::unregister_instance(
-      "test-hamiltonian_constructor"));
-}
-
-TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
-  auto hc = HamiltonianConstructorFactory::create();
-
-  // Create structure for basis set
-  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0)};
-  std::vector<std::string> symbols = {"H"};
-  Structure structure(coordinates, symbols);
-
-  // Create basis set of appropriate size for tests
-  std::vector<Shell> shells;
-  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{1.0},
-                            std::vector<double>{1.0}));
-  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{1.0},
-                            std::vector<double>{1.0}));
-  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{1.0},
-                            std::vector<double>{1.0}));
-
-  auto basis_set = std::make_shared<BasisSet>("test", shells, structure);
-
-  // Throw if basis set is not set in orbitals
-  EXPECT_THROW(
-      {
-        // Create model orbitals without basis set
-        auto orbitals =
-            std::make_shared<ModelOrbitals>(3, true);  // 3 orbitals, restricted
-        hc->run(orbitals);
-      },
-      std::runtime_error);
-
-  // Test that restricted orbitals throw when alpha active space is empty
-  EXPECT_THROW(
-      {
-        Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(3, 3);
-        std::vector<size_t> empty_active_indices{};  // Empty active space
-        // Create restricted orbitals with no active space
-        auto orbitals = std::make_shared<Orbitals>(
-            coeffs, std::nullopt, std::nullopt, basis_set,
-            std::make_tuple(std::move(empty_active_indices),
-                            std::vector<size_t>{}));
-        hc->run(orbitals);
-      },
-      std::runtime_error);
-
-  // Test that unrestricted orbitals throw when alpha is empty
-  EXPECT_THROW(({
-                 Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
-                 Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
-                 std::vector<size_t> alpha_active_indices{};  // Empty alpha
-                 std::vector<size_t> beta_active_indices{0, 1};
-                 std::vector<size_t> alpha_inactive_indices{};
-                 std::vector<size_t> beta_inactive_indices{2};
-                 // Create unrestricted orbitals with only beta active space
-                 auto orbitals = std::make_shared<Orbitals>(
-                     coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
-                     std::nullopt, basis_set,
-                     std::make_tuple(std::move(alpha_active_indices),
-                                     std::move(alpha_inactive_indices),
-                                     std::move(beta_active_indices),
-                                     std::move(beta_inactive_indices)));
-                 hc->run(orbitals);
-               }),
-               std::runtime_error);
-
-  // Test that unrestricted orbitals throw when beta is empty
-  EXPECT_THROW(({
-                 Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
-                 Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
-                 std::vector<size_t> alpha_active_indices{0, 1};
-                 std::vector<size_t> beta_active_indices{};  // Empty beta
-                 std::vector<size_t> alpha_inactive_indices{2};
-                 std::vector<size_t> beta_inactive_indices{};
-                 // Create unrestricted orbitals with only alpha active space
-                 auto orbitals = std::make_shared<Orbitals>(
-                     coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
-                     std::nullopt, basis_set,
-                     std::make_tuple(std::move(alpha_active_indices),
-                                     std::move(alpha_inactive_indices),
-                                     std::move(beta_active_indices),
-                                     std::move(beta_inactive_indices)));
-                 hc->run(orbitals);
-               }),
-               std::runtime_error);
-
-  // Throw if the active space is larger than the MO set
-  EXPECT_THROW(
-      {
-        Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(3, 3);
-        std::vector<size_t> active_indices(
-            {0, 1, 2, 3});  // 4 indices for 3x3 matrix
-        // Create orbitals with invalid active space
-        auto orbitals = std::make_shared<Orbitals>(
-            coeffs, std::nullopt, std::nullopt, basis_set,
-            std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
-        hc->run(orbitals);
-      },
-      std::invalid_argument);
-
-  // Throw if there is an index out of bounds
-  EXPECT_THROW(
-      {
-        Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(3, 3);
-        std::vector<size_t> active_indices(
-            {0, 3});  // Index 3 is out of bounds for 3x3 matrix
-        // Create orbitals with out-of-bounds active space index
-        auto orbitals = std::make_shared<Orbitals>(
-            coeffs, std::nullopt, std::nullopt, basis_set,
-            std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
-        hc->run(orbitals);
-      },
-      std::invalid_argument);
-
-  // Throw if there are repeated indices in the active space
-  EXPECT_THROW(
-      {
-        Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(3, 3);
-        std::vector<size_t> active_indices({0, 0});  // Repeated index
-        // Create orbitals with repeated active space indices
-        auto orbitals = std::make_shared<Orbitals>(
-            coeffs, std::nullopt, std::nullopt, basis_set,
-            std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
-        hc->run(orbitals);
-      },
-      std::invalid_argument);
-
-  // Throw if active space indices are not sorted
-  EXPECT_THROW(
-      {
-        Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(3, 3);
-        std::vector<size_t> active_indices({1, 0});  // Unsorted indices
-        // Create orbitals with unsorted active space indices
-        auto orbitals = std::make_shared<Orbitals>(
-            coeffs, std::nullopt, std::nullopt, basis_set,
-            std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
-        hc->run(orbitals);
-      },
-      std::runtime_error);
-
-  // Throw if alpha and beta active spaces have different sizes
-  EXPECT_THROW(
-      {
-        Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(4, 4);
-        Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(4, 4);
-        std::vector<size_t> alpha_active_indices({0, 1});  // 2 orbitals
-        std::vector<size_t> beta_active_indices({0, 1, 2});
-        // Create unrestricted orbitals with different active space sizes
-        std::vector<size_t> alpha_inactive_indices({2, 3});
-        std::vector<size_t> beta_inactive_indices({3});
-        auto orbitals = std::make_shared<Orbitals>(
-            coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
-            basis_set,
-            std::make_tuple(std::move(alpha_active_indices),
-                            std::move(alpha_inactive_indices),
-                            std::move(beta_active_indices),
-                            std::move(beta_inactive_indices)));
-        hc->run(orbitals);
-      },
-      std::runtime_error);
-
-  // Different alpha/beta indices with same size should work
-  // Create structure for large basis set
-  std::vector<Eigen::Vector3d> large_coordinates = {
-      Eigen::Vector3d(0.0, 0.0, 0.0), Eigen::Vector3d(1.0, 0.0, 0.0),
-      Eigen::Vector3d(0.0, 1.0, 0.0), Eigen::Vector3d(0.0, 0.0, 1.0)};
-  std::vector<std::string> large_symbols = {"H", "H", "H", "H"};
-  Structure large_structure(large_coordinates, large_symbols);
-
-  EXPECT_NO_THROW({
-    // Create basis set with enough shells for this test
-    std::vector<Shell> large_shells;
-    for (int i = 0; i < 4; ++i) {
-      large_shells.emplace_back(Shell(i, OrbitalType::S,
-                                      std::vector<double>{1.0},
-                                      std::vector<double>{1.0}));
-    }
-    auto large_basis_set =
-        std::make_shared<BasisSet>("test", large_shells, large_structure);
-
-    Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(4, 4);
-    Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Ones(4, 4);
-    std::vector<size_t> alpha_active_indices({0, 1});  // Different indices
-    std::vector<size_t> beta_active_indices({2, 3});   // but same size
-    std::vector<size_t> alpha_inactive_indices(
-        {2, 3});  // remaining orbitals for alpha
-    std::vector<size_t> beta_inactive_indices(
-        {0, 1});  // remaining orbitals for beta
-    // Create unrestricted orbitals with different indices but same size
-    auto orbitals = std::make_shared<Orbitals>(
-        coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
-        large_basis_set,
-        std::make_tuple(
-            std::move(alpha_active_indices), std::move(alpha_inactive_indices),
-            std::move(beta_active_indices), std::move(beta_inactive_indices)));
-    auto hamiltonian = hc->run(orbitals);
-    EXPECT_TRUE(hamiltonian->has_one_body_integrals());
-    EXPECT_TRUE(hamiltonian->has_two_body_integrals());
-  });
-}
-
-TEST_F(HamiltonianConstructorTest, NonContiguousActiveSpace) {
-  auto hc = HamiltonianConstructorFactory::create();
-
-  // Create a structure for a simple molecule (e.g., H2)
-  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
-                                              Eigen::Vector3d(0.0, 0.0, 1.4)};
-  std::vector<std::string> symbols = {"H", "H"};
-  Structure structure(coordinates, symbols);
-
-  // Create basis set with enough shells for the test
-  std::vector<Shell> shells;
-  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{1.0},
-                            std::vector<double>{1.0}));
-  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{0.5},
-                            std::vector<double>{1.0}));
-  shells.emplace_back(Shell(1, OrbitalType::S, std::vector<double>{1.0},
-                            std::vector<double>{1.0}));
-  shells.emplace_back(Shell(1, OrbitalType::S, std::vector<double>{0.5},
-                            std::vector<double>{1.0}));
-  auto basis_set = std::make_shared<BasisSet>("test", shells, structure);
-
-  // Create orbitals with non-contiguous active space indices
-  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
-
-  // Set non-contiguous active space indices: 0, 2 (skipping 1)
-  std::vector<size_t> active_indices = {0, 2};
-
-  auto orbitals = std::make_shared<Orbitals>(
-      coeffs, std::nullopt, std::nullopt, basis_set,
-      std::make_tuple(std::vector<size_t>(active_indices),
-                      std::vector<size_t>{}));
-  // This should successfully construct the Hamiltonian
-  // and exercise the non-contiguous active space code paths
-  EXPECT_NO_THROW({
-    auto hamiltonian = hc->run(orbitals);
-    EXPECT_TRUE(hamiltonian->has_one_body_integrals());
-    EXPECT_TRUE(hamiltonian->has_two_body_integrals());
-  });
-}
-
-TEST_F(HamiltonianConstructorTest, NonContiguousInactiveSpace) {
-  auto hc = HamiltonianConstructorFactory::create();
-
-  // Create a structure for a molecule with enough electrons
-  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0)};
-  std::vector<std::string> symbols = {"Li"};
-  Structure structure(coordinates, symbols);
-
-  // Create basis set with sufficient shells
-  std::vector<Shell> shells;
-  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{2.0},
-                            std::vector<double>{1.0}));
-  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{0.8},
-                            std::vector<double>{1.0}));
-  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{0.3},
-                            std::vector<double>{1.0}));
-  shells.emplace_back(Shell(0, OrbitalType::P, std::vector<double>{1.0},
-                            std::vector<double>{1.0}));
-  auto basis_set = std::make_shared<BasisSet>("test", shells, structure);
-
-  // Create orbitals with scenario that will create non-contiguous inactive
-  // space
-  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(
-      6, 6);  // 1 s-shell + 1 s-shell + 1 s-shell + 3 p-shells = 6 orbitals
-
-  // Set active space to include middle orbitals: 2, 3
-  std::vector<size_t> active_indices = {2, 3};
-  std::vector<size_t> inactive_indices = {0};
-
-  auto orbitals = std::make_shared<Orbitals>(
-      coeffs, std::nullopt, std::nullopt, basis_set,
-      std::make_tuple(std::move(active_indices), std::move(inactive_indices)));
-  EXPECT_NO_THROW({
-    auto hamiltonian = hc->run(orbitals);
-    EXPECT_TRUE(hamiltonian->has_one_body_integrals());
-    EXPECT_TRUE(hamiltonian->has_two_body_integrals());
-  });
-}
-
 TEST_P(HamiltonianTest, UnrestrictedConstructor) {
   // Verify the unrestricted Hamiltonian was created successfully using
   // pre-built hamiltonian_unrestricted
@@ -1471,7 +1162,7 @@ TEST_P(HamiltonianTest, DataTypeName) {
 // ============================================================================
 
 // Helper lambda to run restricted O2 calculation
-auto run_restricted_o2 = []() {
+auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
                                               Eigen::Vector3d(2.3, 0.0, 0.0)};
   std::vector<std::string> symbols = {"O", "O"};
@@ -1485,14 +1176,18 @@ auto run_restricted_o2 = []() {
       scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
   auto rhf_orbitals = rhf_wavefunction->get_orbitals();
 
-  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
-  auto rhf_hamiltonian = ham_factory->run(rhf_orbitals);
+  auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
+
+  auto rhf_hamiltonian =
+      (factory_name == "qdk_density_fitted")
+          ? ham_factory->run(rhf_orbitals, std::string("cc-pvdz-rifit"))
+          : ham_factory->run(rhf_orbitals);
 
   return std::make_tuple(rhf_energy, rhf_hamiltonian);
 };
 
 // Helper lambda to run unrestricted O2 triplet calculation
-auto run_unrestricted_o2 = []() {
+auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk") {
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
                                               Eigen::Vector3d(2.3, 0.0, 0.0)};
   std::vector<std::string> symbols = {"O", "O"};
@@ -1506,11 +1201,391 @@ auto run_unrestricted_o2 = []() {
       scf_factory->run(o2_structure_ptr, 0, 3, "cc-pvdz");
   auto uhf_orbitals = uhf_wavefunction->get_orbitals();
 
-  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
-  auto uhf_hamiltonian = ham_factory->run(uhf_orbitals);
+  auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
+
+  auto uhf_hamiltonian =
+      (factory_name == "qdk_density_fitted")
+          ? ham_factory->run(uhf_orbitals, std::string("cc-pvdz-rifit"))
+          : ham_factory->run(uhf_orbitals);
 
   return std::make_tuple(uhf_energy, uhf_hamiltonian);
 };
+
+TEST_F(HamiltonianConstructorTest, Factory) {
+  auto available_solvers = HamiltonianConstructorFactory::available();
+  EXPECT_EQ(available_solvers.size(), 2);
+  EXPECT_EQ(available_solvers[1], "qdk");
+  EXPECT_EQ(available_solvers[0], "qdk_density_fitted");
+  EXPECT_THROW(HamiltonianConstructorFactory::create("nonexistent_solver"),
+               std::runtime_error);
+  EXPECT_NO_THROW(HamiltonianConstructorFactory::register_instance(
+      []() -> HamiltonianConstructorFactory::return_type {
+        return std::make_unique<TestHamiltonianConstructor>();
+      }));
+  EXPECT_THROW(HamiltonianConstructorFactory::register_instance(
+                   []() -> HamiltonianConstructorFactory::return_type {
+                     return std::make_unique<TestHamiltonianConstructor>();
+                   }),
+               std::runtime_error);
+  auto test_scf =
+      HamiltonianConstructorFactory::create("test-hamiltonian_constructor");
+
+  // Test unregister_instance
+  // First test unregistering a non-existent key (should return false)
+  EXPECT_FALSE(
+      HamiltonianConstructorFactory::unregister_instance("nonexistent_key"));
+
+  // Test unregistering an existing key (should return true)
+  EXPECT_TRUE(HamiltonianConstructorFactory::unregister_instance(
+      "test-hamiltonian_constructor"));
+
+  // Test unregistering the same key again (should return false since it's
+  // already removed)
+  EXPECT_FALSE(HamiltonianConstructorFactory::unregister_instance(
+      "test-hamiltonian_constructor"));
+}
+
+TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
+  auto hc = HamiltonianConstructorFactory::create();
+
+  // Create structure for basis set
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"H"};
+  Structure structure(coordinates, symbols);
+
+  // Create basis set of appropriate size for tests
+  std::vector<Shell> shells;
+  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{1.0},
+                            std::vector<double>{1.0}));
+  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{1.0},
+                            std::vector<double>{1.0}));
+  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{1.0},
+                            std::vector<double>{1.0}));
+
+  auto basis_set = std::make_shared<BasisSet>("test", shells, structure);
+
+  // Throw if basis set is not set in orbitals
+  EXPECT_THROW(
+      {
+        // Create model orbitals without basis set
+        auto orbitals =
+            std::make_shared<ModelOrbitals>(3, true);  // 3 orbitals, restricted
+        hc->run(orbitals);
+      },
+      std::runtime_error);
+
+  // Test that restricted orbitals throw when alpha active space is empty
+  EXPECT_THROW(
+      {
+        Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(3, 3);
+        std::vector<size_t> empty_active_indices{};  // Empty active space
+        // Create restricted orbitals with no active space
+        auto orbitals = std::make_shared<Orbitals>(
+            coeffs, std::nullopt, std::nullopt, basis_set,
+            std::make_tuple(std::move(empty_active_indices),
+                            std::vector<size_t>{}));
+        hc->run(orbitals);
+      },
+      std::runtime_error);
+
+  // Test that unrestricted orbitals throw when alpha is empty
+  EXPECT_THROW(({
+                 Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
+                 Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
+                 std::vector<size_t> alpha_active_indices{};  // Empty alpha
+                 std::vector<size_t> beta_active_indices{0, 1};
+                 std::vector<size_t> alpha_inactive_indices{};
+                 std::vector<size_t> beta_inactive_indices{2};
+                 // Create unrestricted orbitals with only beta active space
+                 auto orbitals = std::make_shared<Orbitals>(
+                     coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
+                     std::nullopt, basis_set,
+                     std::make_tuple(std::move(alpha_active_indices),
+                                     std::move(alpha_inactive_indices),
+                                     std::move(beta_active_indices),
+                                     std::move(beta_inactive_indices)));
+                 hc->run(orbitals);
+               }),
+               std::runtime_error);
+
+  // Test that unrestricted orbitals throw when beta is empty
+  EXPECT_THROW(({
+                 Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
+                 Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
+                 std::vector<size_t> alpha_active_indices{0, 1};
+                 std::vector<size_t> beta_active_indices{};  // Empty beta
+                 std::vector<size_t> alpha_inactive_indices{2};
+                 std::vector<size_t> beta_inactive_indices{};
+                 // Create unrestricted orbitals with only alpha active space
+                 auto orbitals = std::make_shared<Orbitals>(
+                     coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
+                     std::nullopt, basis_set,
+                     std::make_tuple(std::move(alpha_active_indices),
+                                     std::move(alpha_inactive_indices),
+                                     std::move(beta_active_indices),
+                                     std::move(beta_inactive_indices)));
+                 hc->run(orbitals);
+               }),
+               std::runtime_error);
+
+  // Throw if the active space is larger than the MO set
+  EXPECT_THROW(
+      {
+        Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(3, 3);
+        std::vector<size_t> active_indices(
+            {0, 1, 2, 3});  // 4 indices for 3x3 matrix
+        // Create orbitals with invalid active space
+        auto orbitals = std::make_shared<Orbitals>(
+            coeffs, std::nullopt, std::nullopt, basis_set,
+            std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
+        hc->run(orbitals);
+      },
+      std::invalid_argument);
+
+  // Throw if there is an index out of bounds
+  EXPECT_THROW(
+      {
+        Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(3, 3);
+        std::vector<size_t> active_indices(
+            {0, 3});  // Index 3 is out of bounds for 3x3 matrix
+        // Create orbitals with out-of-bounds active space index
+        auto orbitals = std::make_shared<Orbitals>(
+            coeffs, std::nullopt, std::nullopt, basis_set,
+            std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
+        hc->run(orbitals);
+      },
+      std::invalid_argument);
+
+  // Throw if there are repeated indices in the active space
+  EXPECT_THROW(
+      {
+        Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(3, 3);
+        std::vector<size_t> active_indices({0, 0});  // Repeated index
+        // Create orbitals with repeated active space indices
+        auto orbitals = std::make_shared<Orbitals>(
+            coeffs, std::nullopt, std::nullopt, basis_set,
+            std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
+        hc->run(orbitals);
+      },
+      std::invalid_argument);
+
+  // Throw if active space indices are not sorted
+  EXPECT_THROW(
+      {
+        Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(3, 3);
+        std::vector<size_t> active_indices({1, 0});  // Unsorted indices
+        // Create orbitals with unsorted active space indices
+        auto orbitals = std::make_shared<Orbitals>(
+            coeffs, std::nullopt, std::nullopt, basis_set,
+            std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
+        hc->run(orbitals);
+      },
+      std::runtime_error);
+
+  // Throw if alpha and beta active spaces have different sizes
+  EXPECT_THROW(
+      {
+        Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(4, 4);
+        Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(4, 4);
+        std::vector<size_t> alpha_active_indices({0, 1});  // 2 orbitals
+        std::vector<size_t> beta_active_indices({0, 1, 2});
+        // Create unrestricted orbitals with different active space sizes
+        std::vector<size_t> alpha_inactive_indices({2, 3});
+        std::vector<size_t> beta_inactive_indices({3});
+        auto orbitals = std::make_shared<Orbitals>(
+            coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
+            basis_set,
+            std::make_tuple(std::move(alpha_active_indices),
+                            std::move(alpha_inactive_indices),
+                            std::move(beta_active_indices),
+                            std::move(beta_inactive_indices)));
+        hc->run(orbitals);
+      },
+      std::runtime_error);
+
+  // Different alpha/beta indices with same size should work
+  // Create structure for large basis set
+  std::vector<Eigen::Vector3d> large_coordinates = {
+      Eigen::Vector3d(0.0, 0.0, 0.0), Eigen::Vector3d(1.0, 0.0, 0.0),
+      Eigen::Vector3d(0.0, 1.0, 0.0), Eigen::Vector3d(0.0, 0.0, 1.0)};
+  std::vector<std::string> large_symbols = {"H", "H", "H", "H"};
+  Structure large_structure(large_coordinates, large_symbols);
+
+  EXPECT_NO_THROW({
+    // Create basis set with enough shells for this test
+    std::vector<Shell> large_shells;
+    for (int i = 0; i < 4; ++i) {
+      large_shells.emplace_back(Shell(i, OrbitalType::S,
+                                      std::vector<double>{1.0},
+                                      std::vector<double>{1.0}));
+    }
+    auto large_basis_set =
+        std::make_shared<BasisSet>("test", large_shells, large_structure);
+
+    Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(4, 4);
+    Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Ones(4, 4);
+    std::vector<size_t> alpha_active_indices({0, 1});  // Different indices
+    std::vector<size_t> beta_active_indices({2, 3});   // but same size
+    std::vector<size_t> alpha_inactive_indices(
+        {2, 3});  // remaining orbitals for alpha
+    std::vector<size_t> beta_inactive_indices(
+        {0, 1});  // remaining orbitals for beta
+    // Create unrestricted orbitals with different indices but same size
+    auto orbitals = std::make_shared<Orbitals>(
+        coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
+        large_basis_set,
+        std::make_tuple(
+            std::move(alpha_active_indices), std::move(alpha_inactive_indices),
+            std::move(beta_active_indices), std::move(beta_inactive_indices)));
+    auto hamiltonian = hc->run(orbitals);
+    EXPECT_TRUE(hamiltonian->has_one_body_integrals());
+    EXPECT_TRUE(hamiltonian->has_two_body_integrals());
+  });
+}
+
+TEST_F(HamiltonianConstructorTest, NonContiguousActiveSpace) {
+  auto hc = HamiltonianConstructorFactory::create();
+
+  // Create a structure for a simple molecule (e.g., H2)
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(0.0, 0.0, 1.4)};
+  std::vector<std::string> symbols = {"H", "H"};
+  Structure structure(coordinates, symbols);
+
+  // Create basis set with enough shells for the test
+  std::vector<Shell> shells;
+  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{1.0},
+                            std::vector<double>{1.0}));
+  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{0.5},
+                            std::vector<double>{1.0}));
+  shells.emplace_back(Shell(1, OrbitalType::S, std::vector<double>{1.0},
+                            std::vector<double>{1.0}));
+  shells.emplace_back(Shell(1, OrbitalType::S, std::vector<double>{0.5},
+                            std::vector<double>{1.0}));
+  auto basis_set = std::make_shared<BasisSet>("test", shells, structure);
+
+  // Create orbitals with non-contiguous active space indices
+  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
+
+  // Set non-contiguous active space indices: 0, 2 (skipping 1)
+  std::vector<size_t> active_indices = {0, 2};
+
+  auto orbitals = std::make_shared<Orbitals>(
+      coeffs, std::nullopt, std::nullopt, basis_set,
+      std::make_tuple(std::vector<size_t>(active_indices),
+                      std::vector<size_t>{}));
+  // This should successfully construct the Hamiltonian
+  // and exercise the non-contiguous active space code paths
+  EXPECT_NO_THROW({
+    auto hamiltonian = hc->run(orbitals);
+    EXPECT_TRUE(hamiltonian->has_one_body_integrals());
+    EXPECT_TRUE(hamiltonian->has_two_body_integrals());
+  });
+}
+
+TEST_F(HamiltonianConstructorTest, NonContiguousInactiveSpace) {
+  auto hc = HamiltonianConstructorFactory::create();
+
+  // Create a structure for a molecule with enough electrons
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"Li"};
+  Structure structure(coordinates, symbols);
+
+  // Create basis set with sufficient shells
+  std::vector<Shell> shells;
+  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{2.0},
+                            std::vector<double>{1.0}));
+  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{0.8},
+                            std::vector<double>{1.0}));
+  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{0.3},
+                            std::vector<double>{1.0}));
+  shells.emplace_back(Shell(0, OrbitalType::P, std::vector<double>{1.0},
+                            std::vector<double>{1.0}));
+  auto basis_set = std::make_shared<BasisSet>("test", shells, structure);
+
+  // Create orbitals with scenario that will create non-contiguous inactive
+  // space
+  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(
+      6, 6);  // 1 s-shell + 1 s-shell + 1 s-shell + 3 p-shells = 6 orbitals
+
+  // Set active space to include middle orbitals: 2, 3
+  std::vector<size_t> active_indices = {2, 3};
+  std::vector<size_t> inactive_indices = {0};
+
+  auto orbitals = std::make_shared<Orbitals>(
+      coeffs, std::nullopt, std::nullopt, basis_set,
+      std::make_tuple(std::move(active_indices), std::move(inactive_indices)));
+  EXPECT_NO_THROW({
+    auto hamiltonian = hc->run(orbitals);
+    EXPECT_TRUE(hamiltonian->has_one_body_integrals());
+    EXPECT_TRUE(hamiltonian->has_two_body_integrals());
+  });
+}
+
+// Cholesky Hamiltonian Constructor Tests
+TEST_F(HamiltonianConstructorTest, DensityFittedFactoryRegistration) {
+  // Test that qdk_cholesky is available
+  auto available_solvers = HamiltonianConstructorFactory::available();
+  EXPECT_GE(available_solvers.size(), 2);
+
+  bool found_density_fitted = false;
+  for (const auto& solver : available_solvers) {
+    if (solver == "qdk_density_fitted") {
+      found_density_fitted = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_density_fitted)
+      << "qdk_density_fitted not found in available constructors";
+
+  // Test that we can create a density-fitted hamiltonian constructor
+  EXPECT_NO_THROW(HamiltonianConstructorFactory::create("qdk_density_fitted"));
+  auto density_fitted_hc =
+      HamiltonianConstructorFactory::create("qdk_density_fitted");
+  EXPECT_EQ(density_fitted_hc->name(), "qdk_density_fitted");
+}
+
+TEST_F(HamiltonianConstructorTest, DensityFittedRestrictedO2) {
+  // Run restricted O2 with density-fitted
+  auto [energy, hamiltonian] = run_restricted_o2("qdk_density_fitted");
+
+  // Verify hamiltonian properties
+  EXPECT_TRUE(hamiltonian->has_one_body_integrals());
+  EXPECT_TRUE(hamiltonian->has_two_body_integrals());
+  EXPECT_TRUE(hamiltonian->has_orbitals());
+  EXPECT_TRUE(hamiltonian->is_restricted());
+  EXPECT_EQ(hamiltonian->get_container_type(), "density_fitted");
+
+  // Verify we can access the typed container
+  EXPECT_TRUE(
+      hamiltonian->has_container_type<DensityFittedHamiltonianContainer>());
+  EXPECT_NO_THROW({
+    const auto& container =
+        hamiltonian->get_container<DensityFittedHamiltonianContainer>();
+    EXPECT_EQ(container.get_container_type(), "density_fitted");
+  });
+}
+
+TEST_F(HamiltonianConstructorTest, DensityFittedUnrestrictedO2) {
+  // Run unrestricted O2 triplet with density-fitted
+  auto [energy, hamiltonian] = run_unrestricted_o2("qdk_density_fitted");
+
+  // Verify hamiltonian properties
+  EXPECT_TRUE(hamiltonian->has_one_body_integrals());
+  EXPECT_TRUE(hamiltonian->has_two_body_integrals());
+  EXPECT_TRUE(hamiltonian->has_orbitals());
+  EXPECT_TRUE(hamiltonian->is_unrestricted());
+  EXPECT_EQ(hamiltonian->get_container_type(), "density_fitted");
+
+  // Verify we can access the typed container
+  EXPECT_TRUE(
+      hamiltonian->has_container_type<DensityFittedHamiltonianContainer>());
+  EXPECT_NO_THROW({
+    const auto& container =
+        hamiltonian->get_container<DensityFittedHamiltonianContainer>();
+    EXPECT_EQ(container.get_container_type(), "density_fitted");
+  });
+}
 
 // Helper class to force unrestricted behavior for closed-shell systems
 class ForceUnrestrictedOrbitals : public Orbitals {

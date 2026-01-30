@@ -26,7 +26,7 @@ class DensityFittedHamiltonianConstructor
   };
   ~DensityFittedHamiltonianConstructor() override = default;
 
-  virtual std::string name() const final { return "qdk-density-fitted"; };
+  virtual std::string name() const final { return "qdk_density_fitted"; };
 
  protected:
   std::shared_ptr<data::Hamiltonian> _run_impl(
