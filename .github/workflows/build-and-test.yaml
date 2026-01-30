@@ -259,6 +259,12 @@ jobs:
       run: |
         cmake --install "$BUILD_DIR"
 
+    - name: Test C++ installation
+      run: |
+        cmake -S examples/language/cpp -B build_example -GNinja -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install
+        cmake --build build_example --target all
+        echo "C++ Example Compiled with Pre-Installed QDK/Chemistry-C++ Libraries!"
+
     - name: Install Python package
       working-directory: python
       env:
