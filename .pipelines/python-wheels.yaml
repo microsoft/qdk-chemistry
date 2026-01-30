@@ -1,8 +1,17 @@
 # Pipeline for building and publishing Python wheels for QDK Chemistry
-# Only triggered manually
+# Publishing can only be triggered manually after approval
+# Non-publishing builds are triggered nightly on main to ensure the current builds are valid
 
 trigger: none
 pr: none
+
+schedules:
+- cron: 0 23 * * *
+  displayName: Nightly Build
+  branches:
+    include:
+    - main
+  always: true
 
 resources:
   repositories:
@@ -205,7 +214,7 @@ extends:
     - stage: Approval
       displayName: Approval
       dependsOn: Build
-      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'))
+      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'), ${{ parameters.publishEsrp }})
       jobs:
       - job: Approval
         pool: server

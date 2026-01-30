@@ -33,12 +33,21 @@ echo "Using cgmanifest: $CGMANIFEST"
 echo "Using macis cgmanifest: $MACIS_CGMANIFEST"
 
 # Configuration
-BUILD_DIR="/tmp/qdk_deps_build"
+BUILD_DIR="${BUILD_DIR:-/tmp/qdk_deps_build}"
 INSTALL_PREFIX="${INSTALL_PREFIX:-/usr/local}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
-JOBS="${JOBS:-$(nproc)}"
 BUILD_SHARED_LIBS="${BUILD_SHARED_LIBS:-OFF}"  # Default to static
 LIBINT_JOBS=${LIBINT_JOBS:-4}  # Limit libint build jobs to 4 due to high memory usage
+KEEP_BUILD_DIR="${KEEP_BUILD_DIR:-0}"
+if command -v nproc >/dev/null 2>&1; then
+    JOBS=$(nproc) # Linux
+else
+    JOBS=$(sysctl -n hw.logicalcpu) # macOS
+fi
+MAC_BUILD="OFF"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    MAC_BUILD="ON"
+fi
 
 # Helper function to extract commit hash from cgmanifest by repository URL pattern
 get_commit_hash() {
@@ -247,24 +256,40 @@ cd gauxc
 git checkout "$GAUXC_COMMIT"
 mkdir -p build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-         -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-         -DBUILD_TESTING=OFF \
-         -DEXCHCXX_ENABLE_LIBXC=OFF \
-         -DGAUXC_ENABLE_HDF5=OFF \
-         -DGAUXC_ENABLE_MAGMA=OFF \
-         -DGAUXC_ENABLE_CUTLASS=ON \
-         -DGAUXC_ENABLE_CUDA=OFF \
-         -DGAUXC_ENABLE_MPI=OFF \
-         -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
+gauxc_cmake_args=(
+  ..
+  -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
+  -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX"
+  -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+  -DBUILD_TESTING=OFF
+  -DEXCHCXX_ENABLE_LIBXC=OFF
+  -DGAUXC_ENABLE_HDF5=OFF
+  -DGAUXC_ENABLE_MAGMA=OFF
+  -DGAUXC_ENABLE_CUDA=OFF
+  -DGAUXC_ENABLE_MPI=OFF
+  -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
+)
+
+if [[ "$MAC_BUILD" == "ON" ]]; then
+  gauxc_cmake_args+=(
+    -DGAUXC_ENABLE_CUTLASS=OFF
+    -DGAUXC_ENABLE_OPENMP=OFF
+  )
+else
+  gauxc_cmake_args+=(
+    -DGAUXC_ENABLE_CUTLASS=ON
+  )
+fi
+cmake "${gauxc_cmake_args[@]}"
 make -j"$JOBS"
 make install
 cd "$BUILD_DIR"
 rm -rf gauxc
 
 # Cleanup
-cd /
-rm -rf "$BUILD_DIR"
+if [[ "$KEEP_BUILD_DIR" != "1" ]]; then
+  cd /
+  rm -rf "$BUILD_DIR"
+fi
 
 echo "=== All dependencies installed successfully ==="
