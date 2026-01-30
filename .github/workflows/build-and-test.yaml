@@ -52,6 +52,7 @@ jobs:
     name: ${{ matrix.os-name }} Build, Test, and Coverage Analysis
     runs-on: ${{ matrix.runner }}
     strategy:
+      fail-fast: false
       matrix:
         include:
         - os-name: Linux
@@ -73,7 +74,7 @@ jobs:
           skip-qiskit-extras: true
         - os-name: macOS
           runner: macos-26-xlarge
-          build-parallel: 5
+          build-parallel: 3
           uarch: native
           python-version: '3.13'
     env:
