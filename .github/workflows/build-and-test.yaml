@@ -60,6 +60,8 @@ jobs:
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.10'
+          cpp-test-threads: 2
+          python-test-threads: 2
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
           build-parallel: 120
@@ -72,14 +74,20 @@ jobs:
           python-version: '3.14'
           # qiskit-extras is not supported on Python 3.14
           skip-qiskit-extras: true
+          cpp-test-threads: 2
+          python-test-threads: 2
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 3
           uarch: native
           python-version: '3.13'
+          cpp-test-threads: 16
+          python-test-threads: 16
     env:
       BUILD_DIR: cpp/build
+      QSHARP_PYTHON_TELEMETRY: 'false'
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
+      CPP_DEPS_PREFIX: ${{ github.workspace }}/cpp_deps_install
       CTEST_OUTPUT_ON_FAILURE: 1
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
@@ -112,7 +120,6 @@ jobs:
           libeigen3-dev \
           libboost-all-dev \
           libhdf5-dev \
-          liblapack-dev \
           libopenblas-dev \
           libgfortran5 \
           pkg-config \
@@ -138,8 +145,17 @@ jobs:
           flex \
           googletest
 
-    - name: Build doxygen from source on macOS
+    - name: Cache Doxygen (macOS)
       if: matrix.os-name == 'macOS'
+      id: cache-doxygen
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ github.workspace }}/doxygen_install
+        key: doxygen-${{ runner.os }}-Release_1_9_8
+
+    - name: Build doxygen from source on macOS
+      if: matrix.os-name == 'macOS' && steps.cache-doxygen.outputs.cache-hit != 'true'
       run: |
         # Clone repo for working Doxygen version
         git clone https://github.com/doxygen/doxygen.git
@@ -150,57 +166,43 @@ jobs:
         mkdir build && cd build
 
         cmake -DBISON_EXECUTABLE=/opt/homebrew/Cellar/bison/3.8.2/bin/bison \
+        -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/doxygen_install" \
         -DCMAKE_CXX_FLAGS="-Wno-missing-template-arg-list-after-template-kw $CMAKE_CXX_FLAGS" \
         -G "Unix Makefiles" ..
         make -j$(sysctl -n hw.ncpu)
         make install
 
+    - name: Add Doxygen to PATH (macOS)
+      if: matrix.os-name == 'macOS'
+      run: |
+        echo "PATH=${{ github.workspace }}/doxygen_install/bin:$PATH" >> $GITHUB_ENV
+
+    - name: Cache C++ dependency install # Checks if manifest files or build script have changed to rebuild dependencies
+      id: cache-cpp-deps
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ env.CPP_DEPS_PREFIX }}
+        key: >-
+          cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
+
+    - name: Add C++ deps prefix to CMake search path
+      run: |
+        echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+        echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
+
     - name: Install C++ dependencies
-      if: matrix.os-name == 'Linux'
+      if: steps.cache-cpp-deps.outputs.cache-hit != 'true' # Run the dependency build if we don't find the right hash in the cache
       env:
-        INSTALL_PREFIX: ${{ github.workspace }}/install
+        INSTALL_PREFIX: ${{ env.CPP_DEPS_PREFIX }}
         BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
+        KEEP_BUILD_DIR: 1
       run: |
         bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh \
           ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
           ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
-
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install --prefix=${{ github.workspace }}/install coverage pytest pytest-cov
-
-    - name: Configure C++ Release build
-      run: |
-        cmake -S cpp -B "$BUILD_DIR" \
-          -GNinja \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DQDK_UARCH="$QDK_UARCH" \
-          -DBUILD_TESTING=ON
-
-    - name: Build C++ Release library
-      run: cmake --build "$BUILD_DIR"
-
-    - name: Run C++ tests in Release mode (Linux)
-      if: matrix.os-name == 'Linux'
-      env:
-        OMP_NUM_THREADS: 16
-      run: |
-        cd "$BUILD_DIR"
-        echo "=== Running C++ Tests in Release Mode ==="
-        ctest --output-on-failure --verbose --timeout 300
-
-    - name: Run C++ tests in Release mode (macOS)
-      if: matrix.os-name == 'macOS'
-      env:
-        OMP_NUM_THREADS: 1
-      run: |
-        cd "$BUILD_DIR"
-        echo "=== Running C++ Tests in Release Mode ==="
-        ctest --output-on-failure --verbose -E "AtomInitGuessEnergyConvergence" --timeout 300
-
-    - name: Clean build directory for RelWithDebInfo/Coverage build
-      run: rm -rf "$BUILD_DIR"
 
     - name: Configure C++ RelWithDebInfo/Coverage build
       run: |
@@ -216,7 +218,7 @@ jobs:
 
     - name: Run C++ tests in RelWithDebInfo/Coverage mode with coverage
       env:
-        OMP_NUM_THREADS: 16
+        OMP_NUM_THREADS: ${{ matrix.cpp-test-threads }}
       run: |
         mkdir -p test-results ${{ github.workspace }}/coverage-reports
         cd "$BUILD_DIR"
@@ -293,9 +295,14 @@ jobs:
         # Register the Jupyter kernel for notebook tests
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install --prefix=${{ github.workspace }}/install coverage pytest pytest-cov
+
     - name: Run Python tests
       env:
-        OMP_NUM_THREADS: 8
+        OMP_NUM_THREADS: ${{ matrix.python-test-threads }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: 0
       working-directory: python
       run: |

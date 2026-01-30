@@ -13,11 +13,13 @@ cd qdk-chemistry
 
 ## Pip Wheel Installation
 
+**Note**: Before using pip to install QDK/Chemistry, ensure that Python 3.10+ and pip are installed on your system. On Ubuntu/Debian, you may need to install `python3-pip` and `python3-venv` first. See the [System Dependencies](#system-dependencies) section for more details.
+
 **Note**:  We strongly recommend using a virtual environment when installing QDK/Chemistry via pip to avoid conflicts with other installed packages.
 For example, on Windows Subsystem Linux (WSL), Linux, or macOS, you can create and activate a virtual environment as follows:
 
 ```bash
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 ```
 
@@ -25,7 +27,7 @@ QDK/Chemistry is distributed as the `qdk-chemistry` Python library through PyPI.
 To install the package, run the following command in a terminal:
 
 ```bash
-python -m pip install qdk-chemistry
+python3 -m pip install qdk-chemistry
 ```
 
 The pip installation of QDK/Chemistry currently has the following system requirements:
@@ -63,7 +65,7 @@ The following extras are available:
 For example, to install with PySCF support and development tools:
 
 ```bash
-python -m pip install 'qdk-chemistry[plugins,dev]'
+python3 -m pip install 'qdk-chemistry[plugins,dev]'
 ```
 
 To install with all optional Qiskit ecosystem packages:
@@ -81,7 +83,7 @@ python -m pip install 'qdk-chemistry[all]'
 To run the OpenFermion integration example tests, you will also need to install `openfermion` and `rdkit`:
 
 ```bash
-python -m pip install openfermion rdkit
+python3 -m pip install openfermion rdkit
 ```
 
 Installing with the `dev` option allows you to run the tests in the `python/tests` directory of the source repository you cloned above.
@@ -130,25 +132,25 @@ The easiest way to build and install the QDK/Chemistry python package from sourc
 
 ```bash
 cd qdk-chemistry/python
-pip install .
+python3 -m pip install .
 pytest tests/
 ```
 
-**NOTE:** Building this Python package may require significant memory, since the C++ library build uses all available threads by default and some compilations can consume around 3 GB of RAM. To avoid running out of memory, set `CMAKE_BUILD_PARALLEL_LEVEL` to a reasonably small value. For example, use: `CMAKE_BUILD_PARALLEL_LEVEL=1 pip install .` to perform a single-threaded C++ library build.
+**NOTE:** Building this Python package may require significant memory, since the C++ library build uses all available threads by default and some compilations can consume around 3 GB of RAM. To avoid running out of memory, set `CMAKE_BUILD_PARALLEL_LEVEL` to a reasonably small value. For example, use: `CMAKE_BUILD_PARALLEL_LEVEL=1 python3 -m pip install .` to perform a single-threaded C++ library build.
 
 #### Accelerating Rebuilds with Build Caching
 
 By default, each `pip install` uses a fresh temporary build directory to ensure reproducible builds and avoid issues with stale CMake cache state. However, for development workflows where you're making frequent changes, you can enable persistent build caching for significantly faster rebuilds:
 
 ```bash
-pip install . -C build-dir="build/{wheel_tag}"
+python3 -m pip install . -C build-dir="build/{wheel_tag}"
 ```
 
 **Warning:** When using a persistent build directory, CMake caches configuration decisions (such as whether the C++ library was found pre-installed or built from source). If your environment changes (e.g., you add or remove a pre-installed C++ library, or C++ dependencies change), the cached state may cause subtle build failures. In this case, remove the build directory and try again:
 
 ```bash
 rm -rf build/
-pip install .
+python3 -m pip install .
 ```
 
 #### Environment Variables for the Python Build
@@ -242,8 +244,21 @@ QDK/Chemistry requires both a C and a C++ compiler to be installed. Additionally
 
 Additionally, QDK/Chemistry requires the following software dependencies:
 
+**Note**: Before installing dependencies on Ubuntu/Debian, update package indices with:
+
+```bash
+sudo apt update
+```
+
+For Fedora/RHEL systems, update package metadata with:
+
+```bash
+sudo dnf makecache
+```
+
 | Dependency | Description | Requirements | Source Location | Ubuntu / Debian | Redhat |
 |------------|-------------|--------------------|-----------------|-----------------|---------|
+| Python 3 | Python interpreter and package tools | Version 3.10+ | [source](https://www.python.org/) | `apt install python3 python3-pip python3-venv` | `dnf install python3 python3-pip` |
 | CMake | Build system manager | Version > 3.15 | [source](https://github.com/Kitware/CMake) | `apt install cmake` | `dnf install cmake` |
 | Eigen | C++ linear algebra templates | Version > 3.4.0 | [source](https://libeigen.gitlab.io/) | `apt install libeigen3-dev` | `dnf install eigen3-devel` |
 | LAPACK | C library for linear algebra. See [this note](#note-on-lapack-usage) for further information | N/A | e.g. [source](https://github.com/OpenMathLib/OpenBLAS) | e.g. `apt install libopenblas-dev` | e.g. `dnf install openblas-devel`|
