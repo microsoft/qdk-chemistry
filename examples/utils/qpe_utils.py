@@ -103,7 +103,7 @@ def compute_evolution_time(
     bit_phase = round(expected_phase * 2**num_bits) / 2**num_bits
 
     # Compute the energy error from phase discretization
-    if abs(base_time) < np.finfo(type(base_time)).eps:
+    if abs(base_time) < np.finfo(np.float64).eps:
         raise ValueError(
             f"Cannot compute discretization energy error: base_time {base_time} is too close to zero."
         )
@@ -114,7 +114,7 @@ def compute_evolution_time(
 
     # Compute the adjusted evolution time, guarding against division by zero
     denominator = reference_energy + target_energy_precision
-    if abs(denominator) < np.finfo(type(denominator)).eps:
+    if abs(denominator) < np.finfo(np.float64).eps:
         raise ValueError(
             "Cannot compute adjusted evolution time: reference_energy + "
             f"target_energy_precision is too close to zero "
