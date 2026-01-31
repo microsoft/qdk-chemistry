@@ -67,6 +67,8 @@ jobs:
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.13'
+          cpp-test-threads: 2
+          python-test-threads: 2
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
           build-parallel: 120
