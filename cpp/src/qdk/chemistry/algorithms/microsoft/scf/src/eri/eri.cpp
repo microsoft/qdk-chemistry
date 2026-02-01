@@ -53,14 +53,14 @@ std::shared_ptr<ERI> ERI::create(BasisSet& basis_set, const SCFConfig& cfg,
                                       basis_set, cfg.mpi);
 #endif
     case ERIMethod::Incore:
-      return std::make_shared<ERIINCORE>(cfg.unrestricted, basis_set, cfg.mpi,
+      return std::make_shared<ERIINCORE>(cfg.unrestricted, cfg.rohf_enabled, basis_set, cfg.mpi,
                                          omega);
     case ERIMethod::SnK:
-      return std::make_shared<SNK>(cfg.unrestricted, basis_set, cfg.snk_input,
+      return std::make_shared<SNK>(cfg.unrestricted, cfg.rohf_enabled, basis_set, cfg.snk_input,
                                    cfg.exc.xc_name, cfg.mpi);
     case ERIMethod::Libint2Direct:
-      return std::make_shared<LIBINT2_DIRECT>(cfg.unrestricted, basis_set,
-                                              cfg.mpi, cfg.eri.use_atomics);
+      return std::make_shared<LIBINT2_DIRECT>(cfg.unrestricted, cfg.rohf_enabled,
+                                              basis_set, cfg.mpi, cfg.eri.use_atomics);
     default:
       throw std::runtime_error("Invalid ERI Method");
   }
@@ -77,8 +77,8 @@ std::shared_ptr<ERI> ERI::create(BasisSet& basis_set, BasisSet& aux_basis_set,
   AutoTimer t("ERI::create");
   switch (cfg.eri.method) {
     case ERIMethod::Incore:
-      return std::make_shared<ERIINCORE_DF>(cfg.unrestricted, basis_set,
-                                            aux_basis_set, cfg.mpi);
+      return std::make_shared<ERIINCORE_DF>(cfg.unrestricted, cfg.rohf_enabled,
+                                            basis_set, aux_basis_set, cfg.mpi);
 #ifdef QDK_CHEMISTRY_ENABLE_LIBINTX
     case ERIMethod::LibintX:
       return std::make_shared<LIBINTX_DF>(cfg.unrestricted, basis_set,
@@ -102,7 +102,7 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
   build_JK_impl_(P, J, K, alpha, beta, omega);
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
-  int num_density_matrices = unrestricted_ ? 2 : 1;
+  int num_density_matrices = (unrestricted_ || rohf_enabled_) ? 2 : 1;
   int size = num_density_matrices * basis_set_.num_atomic_orbitals *
              basis_set_.num_atomic_orbitals;
   if (mpi_.world_size > 1) {

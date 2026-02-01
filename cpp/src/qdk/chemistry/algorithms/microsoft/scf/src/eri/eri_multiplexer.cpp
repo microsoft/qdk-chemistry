@@ -9,7 +9,7 @@
 namespace qdk::chemistry::scf {
 ERIMultiplexer::ERIMultiplexer(BasisSet& basis, BasisSet& aux_basis,
                                const SCFConfig& cfg, double omega)
-    : ERI(cfg.unrestricted, cfg.eri.eri_threshold, basis, cfg.mpi) {
+    : ERI(cfg.unrestricted, cfg.rohf_enabled, cfg.eri.eri_threshold, basis, cfg.mpi) {
   QDK_LOG_TRACE_ENTERING();
 
   if (not cfg.do_dfj) {
@@ -33,7 +33,7 @@ ERIMultiplexer::ERIMultiplexer(BasisSet& basis, BasisSet& aux_basis,
 
 ERIMultiplexer::ERIMultiplexer(BasisSet& basis, const SCFConfig& cfg,
                                double omega)
-    : ERI(cfg.unrestricted, cfg.eri.eri_threshold, basis, cfg.mpi) {
+    : ERI(cfg.unrestricted, cfg.rohf_enabled, cfg.eri.eri_threshold, basis, cfg.mpi) {
   QDK_LOG_TRACE_ENTERING();
 
   if (cfg.do_dfj)

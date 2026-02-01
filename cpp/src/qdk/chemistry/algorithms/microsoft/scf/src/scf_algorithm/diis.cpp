@@ -283,6 +283,7 @@ DIIS::DIIS(const SCFContext& ctx, bool rohf_enabled, const size_t subspace_size)
       diis_impl_(
           std::make_unique<impl::DIIS>(ctx, rohf_enabled, subspace_size)) {
   QDK_LOG_TRACE_ENTERING();
+  std::cout << "in DIIS constructor, rohf_enabled: " << rohf_enabled << " rohf_enabled_: " << rohf_enabled_ << std::endl;
 }
 
 DIIS::~DIIS() noexcept = default;
@@ -344,6 +345,19 @@ void DIIS::iterate(SCFImpl& scf_impl) {
     update_density_matrix(P_scf_impl, C, cfg->unrestricted,
                                  nelec[0], nelec[1]);
   }
+
+  // debugging
+  RowMajorMatrix P_upS =
+      P_scf_impl.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) * S;
+  double trace_P_upS = P_upS.trace();
+  std::cout << "Trace of P_alpha * S: " << std::setprecision(10)
+            << trace_P_upS << std::endl;
+  RowMajorMatrix P_dnS =
+      P_scf_impl.block(num_atomic_orbitals, 0, num_atomic_orbitals,
+                       num_atomic_orbitals) * S;
+  double trace_P_dnS = P_dnS.trace();
+  std::cout << "Trace of P_beta * S: " << std::setprecision(10)
+            << trace_P_dnS << std::endl;
 
   double diis_error = diis_impl_->get_diis_error();
   bool should_apply_damping = cfg->scf_algorithm.enable_damping &&

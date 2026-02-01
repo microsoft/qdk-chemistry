@@ -5,6 +5,7 @@
 #include "rohf_matrix_handler.h"
 
 #include <cmath>
+#include <iostream>
 #include <lapack.hh>
 #include <qdk/chemistry/utils/logger.hpp>
 
@@ -120,7 +121,7 @@ class ROHFMatrixHandler {
    * @param[in] nelec_beta Number of beta electrons, less than nelec_alpha
    */
   void update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
-                                    int nelec_alpha, int nelec_beta) {
+                             int nelec_alpha, int nelec_beta) {
     QDK_LOG_TRACE_ENTERING();
     int num_atomic_orbitals = C.rows();
 
@@ -177,8 +178,7 @@ RowMajorMatrix& ROHFMatrixHandler::density_matrix() {
 // total density matrix and orbital coefficients
 void ROHFMatrixHandler::update_density_matrix(RowMajorMatrix& P,
                                               const RowMajorMatrix& C,
-                                              int nelec_alpha,
-                                              int nelec_beta) {
+                                              int nelec_alpha, int nelec_beta) {
   handler_impl_->update_density_matrix(P, C, nelec_alpha, nelec_beta);
 }
 

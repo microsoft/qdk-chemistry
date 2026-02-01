@@ -34,6 +34,7 @@ namespace qdk::chemistry::scf {
 
 SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx, bool rohf_enabled)
     : ctx_(ctx),
+      rohf_enabled_(rohf_enabled),
       step_count_(0),
       last_energy_(0.0),
       density_rms_(std::numeric_limits<double>::infinity()),

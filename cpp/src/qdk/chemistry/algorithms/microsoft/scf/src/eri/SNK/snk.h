@@ -37,6 +37,7 @@ class SNK : public ERI {
    * @brief Construct semi-numerical exchange calculator using GauXC
    * @param unrestricted Whether this is an unrestricted (UHF/UKS) spin
    * calculation
+   * @param rohf_enabled Whether ROHF is enabled
    * @param basis_set Atomic orbital basis set for molecular orbitals
    * @param gauxc_input GauXC configuration specifying grid quality,
    * partitioning, etc.
@@ -46,7 +47,7 @@ class SNK : public ERI {
    *
    * @throws std::runtime_error if GauXC initialization fails
    */
-  SNK(bool unrestricted, BasisSet& basis_set, GAUXCInput gauxc_input,
+  SNK(bool unrestricted, bool rohf_enabled, BasisSet& basis_set, GAUXCInput gauxc_input,
       std::string xc_name, ParallelConfig mpi);
 
   /**

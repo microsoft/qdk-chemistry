@@ -192,9 +192,9 @@ class ERI {
 
 }  // namespace snk
 
-SNK::SNK(bool unr, BasisSet& basis_set, GAUXCInput gauxc_input,
+SNK::SNK(bool unr, bool rohf_enabled, BasisSet& basis_set, GAUXCInput gauxc_input,
          std::string xc_name, ParallelConfig _mpi)
-    : ERI(unr, 0.0, basis_set, _mpi),
+    : ERI(unr, rohf_enabled, 0.0, basis_set, _mpi),
       eri_impl_(
           snk::ERI::make_gauxc_snk(unr, basis_set, gauxc_input, xc_name)) {
   QDK_LOG_TRACE_ENTERING();

@@ -119,10 +119,10 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     }
   } else if (scf_type == "restricted") {
     if (open_shell) {
-      // rohf_enabled = true;
-      throw std::invalid_argument(
-          "Restricted Open-Shell calculation is not currently supported in the "
-          "QDK/Chemistry SCFSolver");
+      rohf_enabled = true;
+      // throw std::invalid_argument(
+      //     "Restricted Open-Shell calculation is not currently supported in the "
+      //     "QDK/Chemistry SCFSolver");
     }
     unrestricted = false;
   } else {
@@ -240,7 +240,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   auto saved_level = Logger::get_global_level();
 
   // Disable SCF logging
-  Logger::set_global_level(LogLevel::off);
+  Logger::set_global_level(LogLevel::info);
 
   // Create SCF solver based on method and basis set type
   std::shared_ptr<qcs::SCF> scf;

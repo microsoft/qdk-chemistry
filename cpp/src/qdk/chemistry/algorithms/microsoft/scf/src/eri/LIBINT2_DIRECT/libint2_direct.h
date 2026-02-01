@@ -39,6 +39,7 @@ class LIBINT2_DIRECT : public ERI {
    *
    * @param unrestricted Whether this is an unrestricted (UHF/UKS) spin
    * calculation
+   * @param rohf_enabled Whether ROHF is enabled
    * @param basis_set Atomic orbital basis set for molecular orbitals
    * @param mpi MPI parallelization configuration
    * @param use_atomics Use atomic operations (true) or thread-local buffers
@@ -47,7 +48,7 @@ class LIBINT2_DIRECT : public ERI {
    * @throws std::runtime_error if Libint2 initialization fails
    * @throws std::runtime_error if screening matrix computation fails
    */
-  LIBINT2_DIRECT(bool unrestricted, BasisSet& basis_set, ParallelConfig mpi,
+  LIBINT2_DIRECT(bool unrestricted, bool rohf_enabled, BasisSet& basis_set, ParallelConfig mpi,
                  bool use_atomics);
 
   /**
