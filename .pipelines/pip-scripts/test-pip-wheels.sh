@@ -91,6 +91,16 @@ cd "$PYTHON_DIR"
 python3 -m pip install pytest pyscf
 pip3 install repaired_wheelhouse/qdk_chemistry*.whl
 
+# Install qiskit-extras if supported (not available on Python 3.14+)
+# qiskit-aer and qiskit-nature do not yet have Python 3.14 wheels
+PYTHON_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
+if [ "$PYTHON_MINOR" -lt 14 ]; then
+    echo "Installing qiskit-extras..."
+    python3 -m pip install qiskit-aer qiskit-nature
+else
+    echo "Skipping qiskit-extras (not supported on Python 3.14+)"
+fi
+
 # Run pytest suite
 echo '=== Running pytest suite ==='
 python3 -m pytest -v ./tests
