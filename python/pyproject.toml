@@ -78,6 +78,12 @@ docs = [
   "sphinxcontrib-bibtex",
   "sphinx_copybutton"
 ]
+jupyter = [
+  "ipykernel>=6.0",
+  "pandas>=2.0.0",
+  # cubgen from PySCF used in sample notebooks
+  "pyscf>=2.9.0" 
+]
 plugins = [
   "pyscf>=2.9.0"
 ]
