@@ -52,6 +52,7 @@ jobs:
     name: ${{ matrix.os-name }} Build, Test, and Coverage Analysis
     runs-on: ${{ matrix.runner }}
     strategy:
+      fail-fast: false
       matrix:
         include:
         - os-name: Linux
@@ -68,9 +69,18 @@ jobs:
           python-version: '3.13'
           cpp-test-threads: 2
           python-test-threads: 2
+        - os-name: Linux
+          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
+          build-parallel: 120
+          uarch: x86-64-v3
+          python-version: '3.14'
+          # qiskit-extras is not supported on Python 3.14
+          skip-qiskit-extras: true
+          cpp-test-threads: 2
+          python-test-threads: 2
         - os-name: macOS
           runner: macos-26-xlarge
-          build-parallel: 5
+          build-parallel: 3
           uarch: native
           python-version: '3.13'
           cpp-test-threads: 16
@@ -274,7 +284,13 @@ jobs:
         # Remove CMake files to build Python package without picking the installed library
         rm -r ${{ github.workspace }}/install/lib/cmake/qdk
         # Use persistent build directory for coverage analysis
-        python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[all]
+        # Note: qiskit-extras is not supported on Python 3.14
+        if [ "${{ matrix.skip-qiskit-extras }}" == "true" ]; then
+          echo "Skipping qiskit-extras installation (not supported on Python ${{ matrix.python-version }})"
+          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[plugins,dev,docs,coverage]
+        else
+          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[all]
+        fi
         python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
         # Install optional dependencies for tests
         python -m pip install --prefix=${{ github.workspace }}/install pennylane ipykernel
