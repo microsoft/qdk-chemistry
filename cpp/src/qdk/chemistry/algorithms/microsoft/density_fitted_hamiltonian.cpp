@@ -116,38 +116,20 @@ void transform_dferi_ao_to_mo(
 
   std::vector<double> tmp(naux * nao * nmo);
 
-  // // TMP(Q,i,q) = C(p,i) * B_ao(Q,p,q)
-  // // TMP(Q,i,q)  = B_ao(Q,p,q) * C(p,i)
-  // for (size_t Q = 0; Q < naux; ++Q) {
-  //   auto TMP = tmp.data() + Q * nao * nmo;
-  //   auto B_pt = df_eri.get() + Q * nao2;
-  //   blas::gemm(blas::Layout::RowMajor, blas::Op::Trans, blas::Op::NoTrans,
-  //              nao, nmo, nao, 1.0, B_pt, nao, C_active_row_maj.data(), nmo,
-  //              0.0, TMP, nao);
-  // }
-
-  // // B(Q,i,j) = C(q,j) * TMP(Q,i,q)
-  // // B(Qi,j) = TMP(Qi,q) * C(q,j)
-  // blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-  //            naux * nmo, nmo, nao, 1.0, tmp.data(), nao,
-  //            C_active_row_maj.data(), nmo, 0.0, B_out_rm.data(), nmo);
-
-  // B(Q,p,j) = C(q,j) * TMP(Q,p,q)
-  // B(Qp,j) = TMP(Qp,q) * C(q,j)
-
-  blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-             naux * nao, nmo, nao, 1.0, df_eri.get(), nao,
-             C_active_row_maj.data(), nmo, 0.0, tmp.data(), nmo);
-
   // TMP(Q,i,q) = C(p,i) * B_ao(Q,p,q)
-  // TMP(Q,i,j)  = B_ao(Q,p,j) * C(p,i)
   for (size_t Q = 0; Q < naux; ++Q) {
     auto TMP = tmp.data() + Q * nao * nmo;
-    auto B_pt = B_out_rm.data() + Q * nmo2;
+    auto B_pt = df_eri.get() + Q * nao2;
     blas::gemm(blas::Layout::RowMajor, blas::Op::Trans, blas::Op::NoTrans, nmo,
-               nmo, nao, 1.0, TMP, nmo, C_active_row_maj.data(), nmo, 0.0, B_pt,
-               nmo);
+               nao, nao, 1.0, C_active_row_maj.data(), nmo, B_pt, nao, 0.0, TMP,
+               nao);
   }
+
+  // B(Q,i,j) = C(q,j) * TMP(Q,i,q)
+  // B(Qi,j) = TMP(Qi,q) * C(q,j)
+  blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             naux * nmo, nmo, nao, 1.0, tmp.data(), nao,
+             C_active_row_maj.data(), nmo, 0.0, B_out_rm.data(), nmo);
 
   dfmoeri_mo = B_out_rm;
 }
@@ -262,23 +244,6 @@ DensityFittedHamiltonianConstructor::_run_impl(
   // Create dummy SCFConfig
   auto scf_config = std::make_unique<qcs::SCFConfig>();
 
-  // // Use the default MPI configuration (fallback to serial if MPI not
-  // enabled) scf_config->mpi = qcs::mpi_default_input();
-  // scf_config->require_gradient = false;
-  // scf_config->basis = internal_basis_set->name;
-  // scf_config->cartesian = !internal_basis_set->pure;
-  // scf_config->unrestricted = false;
-
-  // // Set ERI method based on settings
-  // std::string method_name = _settings->get<std::string>("eri_method");
-  // if (!method_name.compare("incore")) {
-  //   scf_config->eri.method = qcs::ERIMethod::Incore;
-  //   scf_config->k_eri.method = qcs::ERIMethod::Incore;
-  // } else {
-  //   throw std::runtime_error("Unsupported ERI method '" + method_name +
-  //                            "'. Only CPU ERI methods are supported now");
-  // }
-
   // Create Integral Instance
   auto eri = qcs::ERIMultiplexer::create(*internal_basis_set, *scf_config, 0.0);
   auto int1e = std::make_unique<qcs::OneBodyIntegral>(
@@ -324,24 +289,6 @@ DensityFittedHamiltonianConstructor::_run_impl(
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
       Cb_active_rm = Cb_active;
 
-  // Initialize MOERI
-  // qcs::MOERI moeri_c(eri);
-
-  // // Determine SCF type from settings
-  // std::string scf_type = _settings->get<std::string>("scf_type");
-
-  // bool is_restricted_calc;
-  // if (scf_type == "restricted") {
-  //   is_restricted_calc = true;
-  // } else if (scf_type == "unrestricted") {
-  //   is_restricted_calc = false;
-  // } else {  // "auto"
-  //   is_restricted_calc = (active_indices_alpha == active_indices_beta) &&
-  //                        orbitals->is_restricted();
-  // }
-
-  // scf_config->unrestricted = !is_restricted_calc;
-
   // Compute integrals (same size for alpha and beta)
   const size_t nactive = nactive_alpha;
 
@@ -386,10 +333,6 @@ DensityFittedHamiltonianConstructor::_run_impl(
                                         Cb_active_rm, dfmoeri_bb);
   }
 
-  // std::cout << "dfmoeri_aa (" << dfmoeri_aa.rows() << " x " <<
-  // dfmoeri_aa.cols()
-  //           << "):\n"
-  //           << dfmoeri_aa << std::endl;
   // Get inactive space indices for both alpha and beta
   auto [inactive_indices_alpha, inactive_indices_beta] =
       orbitals->get_inactive_space_indices();
