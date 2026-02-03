@@ -2001,17 +2001,12 @@ TEST_F(HamiltonianIntegrationTest, DensityFittedRestrictedO2MP2) {
   EXPECT_TRUE(df_hamiltonian->is_restricted());
   EXPECT_EQ(df_hamiltonian->get_container_type(), "density_fitted");
 
-  std::cout << std::setprecision(10) << "energy is: " << energy << std::endl;
-
   // Verify we can access the typed container
   auto [h_aa, h_bb] = df_hamiltonian->get_one_body_integrals();
   auto [eri_aaaa, eri_aabb, eri_bbbb] =
       df_hamiltonian->get_two_body_integrals();
   auto orbitals = df_hamiltonian->get_orbitals();
   double core_energy = df_hamiltonian->get_core_energy();
-
-  //  auto [inactive_fock_aa, inactive_fock_bb] =
-  //  df_hamiltonian->get_inactive_fock_matrix();
 
   // Calculate restricted MP2 energy using factory
   auto rhf_ansatz = std::make_shared<Ansatz>(*df_hamiltonian, *wfn);
@@ -2029,11 +2024,8 @@ TEST_F(HamiltonianIntegrationTest, DensityFittedRestrictedO2MP2) {
   auto rmp2_corr_energy = mp2_calc_ptr->calculate_restricted_mp2_energy(
       df_hamiltonian, orbitals, n_alpha);
 
-  std::cout << "mp2 correlation energy" << rmp2_corr_energy << std::endl;
-
-  EXPECT_NEAR(
-      rmp2_corr_energy, -0.3843068379,
-      testing::scf_energy_tolerance);  // Replace with actual expected value
+  EXPECT_NEAR(rmp2_corr_energy, -0.3843068379,
+              testing::scf_energy_tolerance);  // reference value from Psi4
 }
 
 // ============================================================================
