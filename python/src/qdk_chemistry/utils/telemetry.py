@@ -41,8 +41,10 @@ try:
     # Define the package version
     QDK_CHEMISTRY_VERSION = version("qdk-chemistry")
 except PackageNotFoundError:
-    # Fallback if package not installed
-    QDK_CHEMISTRY_VERSION = "0.0.0.dev0"
+    # Fallback for development/uninstalled use - read from VERSION file
+    from pathlib import Path as _Path
+
+    QDK_CHEMISTRY_VERSION = (_Path(__file__).parent.parent.parent.parent.parent / "VERSION").read_text().strip()
 
 if sys.version_info >= (3, 11):
     from datetime import UTC

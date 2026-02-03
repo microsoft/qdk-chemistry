@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """Check that all version strings in the codebase are aligned.
 
-This script verifies that version strings across multiple files are consistent:
-- __version__ in python/src/qdk_chemistry/__init__.py
-- VERSION in python/CMakeLists.txt
-- VERSION in cpp/CMakeLists.txt
-- release in docs/source/conf.py
+This script verifies that the VERSION file exists and is valid, and that
+all version-dependent files are configured to read from it:
+- VERSION (canonical source of truth)
+- cpp/CMakeLists.txt (reads from VERSION via file(READ ...))
+- python/CMakeLists.txt (reads from VERSION via file(READ ...))
+- python/pyproject.toml (uses scikit-build-core metadata provider)
+- python/src/qdk_chemistry/__init__.py (uses importlib.metadata with fallback)
+- python/src/qdk_chemistry/utils/telemetry.py (uses importlib.metadata with fallback)
+- docs/source/conf.py (uses Path.read_text())
+- docs/source/changelog.rst (must have entry for current version)
 
 Exit codes:
     0: All versions are aligned
@@ -20,97 +25,6 @@ Exit codes:
 import re
 import sys
 from pathlib import Path
-from typing import NamedTuple, TypedDict
-
-
-class VersionLocation(NamedTuple):
-    """Location of a version string in the codebase."""
-
-    file_path: Path
-    pattern: str
-    description: str
-    is_cmake: bool = False  # Whether this uses CMake version format
-
-
-class VersionInfo(TypedDict):
-    """Information about a version found in the codebase."""
-
-    version: str
-    location: VersionLocation
-
-
-def extract_version(file_path: Path, pattern: str) -> str | None:
-    """Extract version string from a file using a regex pattern.
-
-    Args:
-        file_path: Path to the file to search
-        pattern: Regex pattern with a capture group for the version
-
-    Returns:
-        The extracted version string, or None if not found
-    """
-    if not file_path.exists():
-        return None
-
-    try:
-        content = file_path.read_text()
-        match = re.search(pattern, content)
-        if match:
-            return match.group(1)
-    except (OSError, UnicodeDecodeError) as e:
-        print(f"Error reading {file_path}: {e}", file=sys.stderr)
-
-    return None
-
-
-def normalize_cmake_version(cmake_version: str) -> str:
-    """Convert CMake version format to Python version format.
-
-    CMake versions use 4 components where the 4th is the pre-release number:
-    - 1.0.0.1 -> 1.0.0-rc1
-    - 1.0.0.2 -> 1.0.0-rc2
-    - 1.0.0.0 -> 1.0.0 (no pre-release)
-
-    Args:
-        cmake_version: Version string in CMake format (e.g., "1.0.0.1")
-
-    Returns:
-        Version string in Python format (e.g., "1.0.0-rc1")
-    """
-    parts = cmake_version.split(".")
-    if len(parts) == 4:
-        tweak = int(parts[3])
-        if tweak > 0:
-            return f"{'.'.join(parts[:3])}-rc{tweak}"
-        else:
-            return ".".join(parts[:3])
-    return cmake_version
-
-
-def python_to_cmake_version(python_version: str) -> str:
-    """Convert Python version format to CMake version format.
-
-    Python versions with pre-release use hyphen notation:
-    - 1.0.0-rc1 -> 1.0.0.1
-    - 1.0.0-rc2 -> 1.0.0.2
-    - 1.0.0 -> 1.0.0.0
-
-    Args:
-        python_version: Version string in Python format (e.g., "1.0.0-rc1")
-
-    Returns:
-        Version string in CMake format (e.g., "1.0.0.1")
-    """
-    # Match version with optional pre-release suffix
-    match = re.match(r"^(\d+\.\d+\.\d+)(?:-rc(\d+))?$", python_version)
-    if match:
-        base_version = match.group(1)
-        rc_number = match.group(2)
-        if rc_number:
-            return f"{base_version}.{rc_number}"
-        else:
-            return f"{base_version}.0"
-    return python_version
 
 
 def check_versions() -> int:
@@ -122,112 +36,145 @@ def check_versions() -> int:
     # Define the root directory (repository root)
     repo_root = Path(__file__).parent.parent.parent
 
-    # Define version locations
-    version_locations = [
-        VersionLocation(
-            file_path=repo_root / "python/src/qdk_chemistry/__init__.py",
-            pattern=r'__version__\s*=\s*["\']([^"\']+)["\']',
-            description="Python __version__",
-            is_cmake=False,
-        ),
-        VersionLocation(
-            file_path=repo_root / "python/CMakeLists.txt",
-            pattern=r"project\(qdk_chemistry_python\s+VERSION\s+([^\s)]+)",
-            description="Python CMakeLists.txt VERSION",
-            is_cmake=True,
-        ),
-        VersionLocation(
-            file_path=repo_root / "cpp/CMakeLists.txt",
-            pattern=r"project\(qdk\s+VERSION\s+([^\s)]+)",
-            description="C++ CMakeLists.txt VERSION",
-            is_cmake=True,
-        ),
-        VersionLocation(
-            file_path=repo_root / "docs/source/conf.py",
-            pattern=r'release\s*=\s*["\']([^"\']+)["\']',
-            description="Sphinx release",
-            is_cmake=False,
-        ),
-    ]
-
-    # Extract all versions
-    versions: dict[str, VersionInfo] = {}
-    missing: list[VersionLocation] = []
-
-    for loc in version_locations:
-        version = extract_version(loc.file_path, loc.pattern)
-        if version is None:
-            missing.append(loc)
-        else:
-            # Normalize CMake versions to Python format for comparison
-            normalized = normalize_cmake_version(version) if loc.is_cmake else version
-            versions[loc.description] = {
-                "version": normalized,
-                "location": loc,
-            }
-
-    # Report missing versions
-    if missing:
-        print("❌ Version check failed: Missing version strings", file=sys.stderr)
-        print(file=sys.stderr)
-        for loc in missing:
-            print(f"  ⚠️  Missing: {loc.description}", file=sys.stderr)
-            print(f"      File: {loc.file_path}", file=sys.stderr)
+    # Read the canonical version from the VERSION file
+    version_file = repo_root / "VERSION"
+    if not version_file.exists():
+        print("❌ Version check failed: VERSION file not found", file=sys.stderr)
+        print(f"      Expected at: {version_file}", file=sys.stderr)
         return 1
 
-    # Get the canonical version (from Python __init__.py)
-    canonical = versions.get("Python __version__")
-    if not canonical:
-        print("❌ Version check failed: Canonical version not found", file=sys.stderr)
+    canonical_version = version_file.read_text().strip()
+    if not canonical_version:
+        print("❌ Version check failed: VERSION file is empty", file=sys.stderr)
         return 1
 
-    canonical_version = canonical["version"]
-
-    # Check alignment
-    misaligned = []
-    for desc, ver_info in versions.items():
-        if desc == "Python __version__":
-            continue  # Skip the canonical version itself
-
-        actual = ver_info["version"]
-
-        if actual != canonical_version:
-            misaligned.append(
-                {
-                    "description": desc,
-                    "expected": canonical_version,
-                    "actual": actual,
-                    "file": ver_info["location"].file_path,
-                }
-            )
-
-    # Report results
-    if misaligned:
+    # Validate version format (should be X.Y.Z or X.Y.Z-rcN)
+    if not re.match(r"^\d+\.\d+\.\d+(-rc\d+)?$", canonical_version):
         print(
-            "❌ Version check failed: Version strings are not aligned", file=sys.stderr
-        )
-        print(file=sys.stderr)
-        print(f"  ✓  Canonical version: {canonical_version}", file=sys.stderr)
-        print(
-            f"      Location: {canonical['location'].file_path}",
+            f"❌ Version check failed: Invalid version format '{canonical_version}'",
             file=sys.stderr,
         )
+        print("      Expected format: X.Y.Z or X.Y.Z-rcN", file=sys.stderr)
+        return 1
+
+    errors = []
+
+    # Check 1: CMakeLists.txt files read from VERSION (not hardcoded)
+    cmake_files = [
+        repo_root / "python/CMakeLists.txt",
+        repo_root / "cpp/CMakeLists.txt",
+    ]
+
+    for cmake_file in cmake_files:
+        if not cmake_file.exists():
+            errors.append(f"{cmake_file.name}: file not found")
+            continue
+
+        content = cmake_file.read_text()
+        if 'file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION"' not in content:
+            errors.append(
+                f"{cmake_file.name}: does not read from VERSION file "
+                '(expected: file(READ "${{CMAKE_CURRENT_SOURCE_DIR}}/../VERSION" ...))'
+            )
+
+    # Check 2: pyproject.toml uses scikit-build-core metadata provider
+    pyproject = repo_root / "python/pyproject.toml"
+    if pyproject.exists():
+        content = pyproject.read_text()
+        if (
+            'metadata.version.provider = "scikit_build_core.metadata.regex"'
+            not in content
+        ):
+            errors.append(
+                "pyproject.toml: missing scikit-build-core metadata.version.provider"
+            )
+        if 'metadata.version.input = "../VERSION"' not in content:
+            errors.append(
+                "pyproject.toml: missing metadata.version.input pointing to VERSION"
+            )
+        if 'dynamic = ["version"]' not in content:
+            errors.append('pyproject.toml: missing dynamic = ["version"]')
+    else:
+        errors.append("pyproject.toml: file not found")
+
+    # Check 3: __init__.py uses importlib.metadata with fallback
+    init_py = repo_root / "python/src/qdk_chemistry/__init__.py"
+    if init_py.exists():
+        content = init_py.read_text()
+        if (
+            "from importlib.metadata import" not in content
+            or "PackageNotFoundError" not in content
+        ):
+            errors.append(
+                "__init__.py: missing importlib.metadata with PackageNotFoundError fallback"
+            )
+        if '/ "VERSION"' not in content:
+            errors.append("__init__.py: fallback does not read from VERSION file")
+    else:
+        errors.append("__init__.py: file not found")
+
+    # Check 4: telemetry.py uses importlib.metadata with fallback
+    telemetry_py = repo_root / "python/src/qdk_chemistry/utils/telemetry.py"
+    if telemetry_py.exists():
+        content = telemetry_py.read_text()
+        if (
+            "from importlib.metadata import" not in content
+            or "PackageNotFoundError" not in content
+        ):
+            errors.append(
+                "telemetry.py: missing importlib.metadata with PackageNotFoundError fallback"
+            )
+        if '/ "VERSION"' not in content:
+            errors.append("telemetry.py: fallback does not read from VERSION file")
+    else:
+        errors.append("telemetry.py: file not found")
+
+    # Check 5: docs/source/conf.py reads from VERSION
+    conf_py = repo_root / "docs/source/conf.py"
+    if conf_py.exists():
+        content = conf_py.read_text()
+        if '/ "VERSION"' not in content:
+            errors.append("docs/source/conf.py: does not read from VERSION file")
+    else:
+        errors.append("docs/source/conf.py: file not found")
+
+    # Check 6: docs/source/changelog.rst has an entry for the current version
+    changelog_rst = repo_root / "docs/source/changelog.rst"
+    if changelog_rst.exists():
+        content = changelog_rst.read_text()
+        # Look for "Version X.Y.Z" header in rst format
+        version_header = f"Version {canonical_version}"
+        if version_header not in content:
+            errors.append(
+                f"docs/source/changelog.rst: missing entry for '{version_header}'"
+            )
+    else:
+        errors.append("docs/source/changelog.rst: file not found")
+
+    # Report results
+    if errors:
+        print("❌ Version check failed:", file=sys.stderr)
         print(file=sys.stderr)
-
-        for item in misaligned:
-            print(f"  ✗  {item['description']}: {item['actual']}", file=sys.stderr)
-            print(f"      Expected: {item['expected']}", file=sys.stderr)
-            print(f"      File: {item['file']}", file=sys.stderr)
-            print(file=sys.stderr)
-
+        for error in errors:
+            print(f"  ✗  {error}", file=sys.stderr)
+        print(file=sys.stderr)
         print(
-            "Please update the version strings to match the canonical version.",
+            "All version references should read from the VERSION file.",
             file=sys.stderr,
         )
         return 1
 
     # All versions aligned
     print(f"✓ All version strings are aligned: {canonical_version}")
+    print(f"  Source: {version_file}")
+    print("  Verified:")
+    print("    - cpp/CMakeLists.txt")
+    print("    - python/CMakeLists.txt")
+    print("    - python/pyproject.toml")
+    print("    - python/src/qdk_chemistry/__init__.py")
+    print("    - python/src/qdk_chemistry/utils/telemetry.py")
+    print("    - docs/source/conf.py")
+    print("    - docs/source/changelog.rst")
     return 0
 
 

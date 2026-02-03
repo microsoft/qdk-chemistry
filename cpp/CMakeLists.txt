@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.15)
-project(qdk VERSION 1.0.2 LANGUAGES CXX C)
+
+# Read version from VERSION file at repo root
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION" QDK_VERSION)
+string(STRIP "${QDK_VERSION}" QDK_VERSION)
+
+project(qdk VERSION ${QDK_VERSION} LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 

@@ -43,7 +43,7 @@ dependencies = [
 ]
 description = "Quantum Development Kit - Chemistry Library"
 license = { file = "LICENSE.txt" }
-version = "1.0.2"
+dynamic = ["version"]
 name = "qdk-chemistry"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -243,6 +243,12 @@ cmake.source-dir = "."
 # Enable verbose output for debugging
 cmake.verbose = true
 install.components = ["_core", "qdk_chemistry_resources"]
+# Read version from VERSION file at repo root
+metadata.version.provider = "scikit_build_core.metadata.regex"
+metadata.version.input = "../VERSION"
+metadata.version.regex = "(?P<value>.+)"
+# Include VERSION file in source distribution
+sdist.include = ["../VERSION"]
 
 [tool.scikit-build.wheel]
 packages = ["src/qdk_chemistry"]
