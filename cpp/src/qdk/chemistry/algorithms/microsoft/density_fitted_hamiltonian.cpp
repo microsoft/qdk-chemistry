@@ -96,11 +96,10 @@ void transform_dferi_ao_to_mo(
     std::unique_ptr<double[]>& df_eri, std::unique_ptr<double[]>& df_metric,
     const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
                         Eigen::RowMajor>& C_active_row_maj,
-    Eigen::MatrixXd& dfmoeri_mo) {
+    Eigen::MatrixXd& df_mo_eri_cm) {
   size_t nao = num_atomic_orbitals;
   size_t nmo = nactive;
   size_t nao2 = nao * nao;
-  size_t nmo2 = nmo * nmo;
 
   // 1. Cholesky factorization of metric:  df_metric = L L^{T}
   lapack::potrf(lapack::Uplo::Upper, naux, df_metric.get(), naux);
@@ -112,7 +111,7 @@ void transform_dferi_ao_to_mo(
              df_metric.get(), naux, df_eri.get(), nao2);
 
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-      B_out_rm(dfmoeri_mo.rows(), dfmoeri_mo.cols());
+      df_eri_mo_rm(df_mo_eri_cm.rows(), df_mo_eri_cm.cols());
 
   std::vector<double> tmp(naux * nao * nmo);
 
@@ -129,9 +128,9 @@ void transform_dferi_ao_to_mo(
   // B(Qi,j) = TMP(Qi,q) * C(q,j)
   blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
              naux * nmo, nmo, nao, 1.0, tmp.data(), nao,
-             C_active_row_maj.data(), nmo, 0.0, B_out_rm.data(), nmo);
+             C_active_row_maj.data(), nmo, 0.0, df_eri_mo_rm.data(), nmo);
 
-  dfmoeri_mo = B_out_rm;
+  df_mo_eri_cm = df_eri_mo_rm;
 }
 }  // namespace detail_df
 
