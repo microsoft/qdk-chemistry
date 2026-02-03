@@ -102,23 +102,8 @@ void transform_dferi_ao_to_mo(
   size_t nao2 = nao * nao;
   size_t nmo2 = nmo * nmo;
 
-  Eigen::Map<
-      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
-      df_metric_matrix(df_metric.get(), naux, naux);
-  std::cout << "df_metric before(" << naux << " x " << naux << "):\n"
-            << df_metric_matrix << std::endl;
-
   // 1. Cholesky factorization of metric:  df_metric = L L^{T}
   lapack::potrf(lapack::Uplo::Upper, naux, df_metric.get(), naux);
-
-  std::cout << "df_metric after(" << naux << " x " << naux << "):\n"
-            << df_metric_matrix << std::endl;
-  // Debug: print df_eri as Eigen Matrix (row major, naux x nao*nao)
-  Eigen::Map<
-      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
-      df_eri_matrix(df_eri.get(), naux, nao2);
-  std::cout << "df_eri before (" << naux << " x " << nao2 << "):\n"
-            << df_eri_matrix << std::endl;
 
   // 2. Solve L B = eri_df  => B = L^{-1} eri_df = (metric)^(-1/2) eri_df
   // save result in df_eri.
@@ -126,18 +111,6 @@ void transform_dferi_ao_to_mo(
              blas::Op::NoTrans, blas::Diag::NonUnit, naux, nao2, 1.0,
              df_metric.get(), naux, df_eri.get(), nao2);
 
-  // hack df_eri_matrix
-  //  df_eri_matrix <<      0.71014301292428,     0.44583509826080,
-  //  0.44583509826080,     0.40680218613678,
-  //      0.40680218613678,     0.44583509826080,     0.44583509826080,
-  //      0.71014301292428;
-
-  std::cout << "df_eri after (" << naux << " x " << nao2 << "):\n"
-            << df_eri_matrix << std::endl;
-
-  // Eigen::Map<qcs::RowMajorMatrix> B_out_rm(dfmoeri_mo.data(),
-  // dfmoeri_mo.cols(),
-  //                                          dfmoeri_mo.rows());
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
       B_out_rm(dfmoeri_mo.rows(), dfmoeri_mo.cols());
 
@@ -161,17 +134,11 @@ void transform_dferi_ao_to_mo(
 
   // B(Q,p,j) = C(q,j) * TMP(Q,p,q)
   // B(Qp,j) = TMP(Qp,q) * C(q,j)
-  std::cout << "C_active_row_maj (" << nao << " x " << nmo << "):\n"
-            << C_active_row_maj << std::endl;
+
   blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
              naux * nao, nmo, nao, 1.0, df_eri.get(), nao,
              C_active_row_maj.data(), nmo, 0.0, tmp.data(), nmo);
-  std::cout << "tmp (" << naux * nao << " x " << nmo << "):\n"
-            << tmp.data() << std::endl;
-  for (size_t i = 0; i < tmp.size(); ++i) {
-    std::cout << tmp[i] << " ";
-  }
-  std::cout << std::endl;
+
   // TMP(Q,i,q) = C(p,i) * B_ao(Q,p,q)
   // TMP(Q,i,j)  = B_ao(Q,p,j) * C(p,i)
   for (size_t Q = 0; Q < naux; ++Q) {
@@ -182,14 +149,7 @@ void transform_dferi_ao_to_mo(
                nmo);
   }
 
-  // Debug: print B_out_rm before returning
-  std::cout << "B_out_rm (" << B_out_rm.rows() << " x " << B_out_rm.cols()
-            << "):\n"
-            << B_out_rm << std::endl;
   dfmoeri_mo = B_out_rm;
-
-  // dfmoeri_mo << 0.55900827, 0.25089303, 0.25089303, 0.55374144,
-  //  0.55900827, -0.25089303,  -0.25089303,  0.55374144;
 }
 }  // namespace detail_df
 
@@ -364,10 +324,6 @@ DensityFittedHamiltonianConstructor::_run_impl(
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
       Cb_active_rm = Cb_active;
 
-  std::cout << "Ca_active_rm (" << Ca_active_rm.rows() << " x "
-            << Ca_active_rm.cols() << "):\n"
-            << Ca_active_rm << std::endl;
-
   // Initialize MOERI
   // qcs::MOERI moeri_c(eri);
 
@@ -430,9 +386,10 @@ DensityFittedHamiltonianConstructor::_run_impl(
                                         Cb_active_rm, dfmoeri_bb);
   }
 
-  std::cout << "dfmoeri_aa (" << dfmoeri_aa.rows() << " x " << dfmoeri_aa.cols()
-            << "):\n"
-            << dfmoeri_aa << std::endl;
+  // std::cout << "dfmoeri_aa (" << dfmoeri_aa.rows() << " x " <<
+  // dfmoeri_aa.cols()
+  //           << "):\n"
+  //           << dfmoeri_aa << std::endl;
   // Get inactive space indices for both alpha and beta
   auto [inactive_indices_alpha, inactive_indices_beta] =
       orbitals->get_inactive_space_indices();
