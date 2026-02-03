@@ -2,6 +2,14 @@
 Changelog
 =========
 
+Version 1.0.2
+=============
+
+- Make qiskit-aer and qiskit-nature optional dependencies
+- Loosen matplotlib version requirement to >=3.10.0
+- Fixed installation instructions for Ubuntu compatibility
+- Improved iQPE demo notebook
+
 Version 1.0.1
 =============
 
