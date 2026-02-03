@@ -7,6 +7,7 @@
 #include <Eigen/Dense>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
@@ -22,6 +23,7 @@
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <string>
 
+#include "../src/qdk/chemistry/algorithms/microsoft/mp2.hpp"
 #include "ut_common.hpp"
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
@@ -1166,6 +1168,13 @@ auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
                                               Eigen::Vector3d(2.3, 0.0, 0.0)};
   std::vector<std::string> symbols = {"O", "O"};
+
+  // debugging with H2 molecule instead of O2
+  //    std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0,
+  //    0.0),
+  //                                                Eigen::Vector3d(0.0,
+  //                                                0.0, 1.0)};
+  //    std::vector<std::string> symbols = {"H", "H"};
   Structure o2_structure(coordinates, symbols);
 
   auto scf_factory = ScfSolverFactory::create("qdk");
@@ -1174,6 +1183,7 @@ auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
   auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
   auto [rhf_energy, rhf_wavefunction] =
       scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
+  // scf_factory->run(o2_structure_ptr, 0, 1, "sto-3g");
   auto rhf_orbitals = rhf_wavefunction->get_orbitals();
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
@@ -1183,7 +1193,7 @@ auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
           ? ham_factory->run(rhf_orbitals, std::string("cc-pvdz-rifit"))
           : ham_factory->run(rhf_orbitals);
 
-  return std::make_tuple(rhf_energy, rhf_hamiltonian);
+  return std::make_tuple(rhf_energy, rhf_hamiltonian, rhf_wavefunction);
 };
 
 // Helper lambda to run unrestricted O2 triplet calculation
@@ -1547,7 +1557,7 @@ TEST_F(HamiltonianConstructorTest, DensityFittedFactoryRegistration) {
 
 TEST_F(HamiltonianConstructorTest, DensityFittedRestrictedO2) {
   // Run restricted O2 with density-fitted
-  auto [energy, hamiltonian] = run_restricted_o2("qdk_density_fitted");
+  auto [energy, hamiltonian, wfn] = run_restricted_o2("qdk_density_fitted");
 
   // Verify hamiltonian properties
   EXPECT_TRUE(hamiltonian->has_one_body_integrals());
@@ -1555,6 +1565,8 @@ TEST_F(HamiltonianConstructorTest, DensityFittedRestrictedO2) {
   EXPECT_TRUE(hamiltonian->has_orbitals());
   EXPECT_TRUE(hamiltonian->is_restricted());
   EXPECT_EQ(hamiltonian->get_container_type(), "density_fitted");
+
+  std::cout << std::setprecision(10) << "energy is: " << energy << std::endl;
 
   // Verify we can access the typed container
   EXPECT_TRUE(
@@ -1857,8 +1869,8 @@ TEST_F(HamiltonianIntegrationTest,
 
   // Test restricted O2 deterministic behavior
   {
-    auto [energy1, hamiltonian1] = run_restricted_o2();
-    auto [energy2, hamiltonian2] = run_restricted_o2();
+    auto [energy1, hamiltonian1, wfn1] = run_restricted_o2();
+    auto [energy2, hamiltonian2, wfn2] = run_restricted_o2();
 
     // Energies should be identical
     EXPECT_DOUBLE_EQ(energy1, energy2)
@@ -1978,6 +1990,62 @@ TEST_F(HamiltonianIntegrationTest,
           << " differs across runs";
     }
   }
+}
+
+TEST_F(HamiltonianIntegrationTest, DensityFittedRestrictedO2MP2) {
+  // Run restricted O2 with density-fitted
+  auto [energy, df_hamiltonian, wfn] = run_restricted_o2("qdk_density_fitted");
+
+  // Verify hamiltonian properties
+  EXPECT_TRUE(df_hamiltonian->has_one_body_integrals());
+  EXPECT_TRUE(df_hamiltonian->has_two_body_integrals());
+  EXPECT_TRUE(df_hamiltonian->has_orbitals());
+  EXPECT_TRUE(df_hamiltonian->is_restricted());
+  EXPECT_EQ(df_hamiltonian->get_container_type(), "density_fitted");
+
+  std::cout << std::setprecision(10) << "energy is: " << energy << std::endl;
+
+  // Verify we can access the typed container
+  auto [h_aa, h_bb] = df_hamiltonian->get_one_body_integrals();
+  auto [eri_aaaa, eri_aabb, eri_bbbb] =
+      df_hamiltonian->get_two_body_integrals();
+  auto orbitals = df_hamiltonian->get_orbitals();
+  double core_energy = df_hamiltonian->get_core_energy();
+
+  std::cout << "eri_aaaa" << std::endl;
+  std::cout << eri_aaaa << std::endl;
+
+  //  auto [inactive_fock_aa, inactive_fock_bb] =
+  //  df_hamiltonian->get_inactive_fock_matrix();
+
+  //   auto four_c_hamiltonian = std::make_shared<Hamiltonian>(
+  //     std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+  //               h_aa, eri_aaaa, orbitals, core_energy, inactive_fock_aa));
+  //     // Calculate MP2 energy using factory
+
+  // Calculate restricted MP2 energy using factory
+  auto rhf_ansatz = std::make_shared<Ansatz>(*df_hamiltonian, *wfn);
+  auto mp2_calculator =
+      DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
+  //   auto [rmp2_energy, rhf_mp2_wavefunction] =
+  //   mp2_calculator->run(rhf_ansatz);
+
+  auto [n_alpha, n_beta] = wfn->get_active_num_electrons();
+
+  // Cast to MP2Calculator to access the specific method
+  auto* mp2_calc_ptr =
+      dynamic_cast<qdk::chemistry::algorithms::microsoft::MP2Calculator*>(
+          mp2_calculator.get());
+  auto rmp2_corr_energy = mp2_calc_ptr->calculate_restricted_mp2_energy(
+      df_hamiltonian, orbitals, n_alpha);
+
+  //   std::cout<<"mp2 energy"<<rmp2_energy<<std::endl;
+  std::cout << "mp2 correlation energy" << rmp2_corr_energy << std::endl;
+
+  // EXPECT_NEAR(rmp2_energy, -1.0708985794, testing::scf_energy_tolerance);
+  EXPECT_NEAR(
+      rmp2_corr_energy, -0.3843068379,
+      testing::scf_energy_tolerance);  // Replace with actual expected value
 }
 
 // ============================================================================
