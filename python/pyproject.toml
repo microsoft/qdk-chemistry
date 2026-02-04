@@ -79,7 +79,7 @@ docs = [
   "sphinx_copybutton"
 ]
 plugins = [
-  "pyscf>=2.9.0"
+  "pyscf>=2.9.0,<2.12.1"
 ]
 qiskit-extras = [
   "qiskit-aer",
