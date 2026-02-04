@@ -324,8 +324,6 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   diis_impl_->iterate(P, F, S);
   // Update density matrices using the extrapolated Fock matrix
   const RowMajorMatrix& F_extrapolated = diis_impl_->get_extrapolated_fock();
-  std::cout << "Fock matrix after DIIS / level shift:" << std::endl;
-  std::cout << F_extrapolated << std::endl;
 
   int num_atomic_orbitals = scf_impl.get_num_atomic_orbitals();
   int num_molecular_orbitals = scf_impl.get_num_molecular_orbitals();
@@ -337,8 +335,6 @@ void DIIS::iterate(SCFImpl& scf_impl) {
                             num_atomic_orbitals, num_molecular_orbitals, i,
                             cfg->unrestricted);
   }
-  std::cout << "MO matrix after eigenproblem solution:" << std::endl;
-  std::cout << C << std::endl;
 
   // Update spin-blocked density matrices stored in SCFImpl
   auto& P_scf_impl = scf_impl.density_matrix();
@@ -349,19 +345,6 @@ void DIIS::iterate(SCFImpl& scf_impl) {
     update_density_matrix(P_scf_impl, C, cfg->unrestricted,
                                  nelec[0], nelec[1]);
   }
-
-  // debugging
-  RowMajorMatrix P_upS =
-      P_scf_impl.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) * S;
-  double trace_P_upS = P_upS.trace();
-  std::cout << "Trace of P_alpha * S: " << std::setprecision(10)
-            << trace_P_upS << std::endl;
-  RowMajorMatrix P_dnS =
-      P_scf_impl.block(num_atomic_orbitals, 0, num_atomic_orbitals,
-                       num_atomic_orbitals) * S;
-  double trace_P_dnS = P_dnS.trace();
-  std::cout << "Trace of P_beta * S: " << std::setprecision(10)
-            << trace_P_dnS << std::endl;
 
   double diis_error = diis_impl_->get_diis_error();
   bool should_apply_damping = cfg->scf_algorithm.enable_damping &&

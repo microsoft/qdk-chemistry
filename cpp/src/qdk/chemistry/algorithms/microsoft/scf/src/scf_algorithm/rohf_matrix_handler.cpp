@@ -80,10 +80,13 @@ class ROHFMatrixHandler {
       copy_block(F_up_mo, nd, nd + ns, ns, nv);  // F_up^{sv}
       copy_block(F_up_mo, nd + ns, nd, nv, ns);  // F_up^{vs}
 
+      // F_MO -> F_AO is C^{-T} * F_MO * C^{-1}
       effective_F_ =
           RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
-      effective_F_.noalias() = C * effective_F_mo * C.transpose();
+      RowMajorMatrix C_inv = C.inverse();
+      effective_F_.noalias() = C_inv.transpose() * effective_F_mo * C_inv;
       effective_F_ = 0.5 * (effective_F_ + effective_F_.transpose().eval());
+      std::cout << "effective_F_mo:\n" << effective_F_mo << "\n";
     }
     
 
