@@ -11,6 +11,7 @@ import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Circuit, EncodingMismatchError, QubitHamiltonian, validate_encoding_compatibility
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE
 
 from .test_helpers import create_test_hamiltonian
 
@@ -184,13 +185,17 @@ def test_state_preparation_injects_jordan_wigner_encoding(wavefunction_4e4o):
     circuit_gf2x = prep_gf2x.run(wavefunction_4e4o)
     assert circuit_gf2x.encoding == "jordan-wigner"
 
-    # Test regular_isometry
-    prep_regular = create("state_prep", "regular_isometry")
+
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+def test_qiskit_state_preparation_injects_jordan_wigner_encoding(wavefunction_4e4o):
+    # Test qiskit_regular_isometry
+    prep_regular = create("state_prep", "qiskit_regular_isometry")
     circuit_regular = prep_regular.run(wavefunction_4e4o)
     assert circuit_regular.encoding == "jordan-wigner"
 
 
-def test_qubit_mapper_injects_encoding():
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_NATURE, reason="Qiskit Nature not available")
+def test_qiskit_qubit_mapper_injects_encoding():
     """Test that QubitMapper injects the correct encoding."""
     hamiltonian = create_test_hamiltonian(2)
 
@@ -215,12 +220,12 @@ def test_qdk_qubit_mapper_injects_encoding():
     hamiltonian = create_test_hamiltonian(2)
 
     # Test Jordan-Wigner
-    mapper_jw = create("qubit_mapper", "qdk", encoding="jordan_wigner")
+    mapper_jw = create("qubit_mapper", "qdk", encoding="jordan-wigner")
     qubit_ham_jw = mapper_jw.run(hamiltonian)
     assert qubit_ham_jw.encoding == "jordan-wigner"
 
     # Test Bravyi-Kitaev
-    mapper_bk = create("qubit_mapper", "qdk", encoding="bravyi_kitaev")
+    mapper_bk = create("qubit_mapper", "qdk", encoding="bravyi-kitaev")
     qubit_ham_bk = mapper_bk.run(hamiltonian)
     assert qubit_ham_bk.encoding == "bravyi-kitaev"
 
@@ -244,7 +249,7 @@ def test_end_to_end_workflow_compatible_encodings(wavefunction_4e4o):
     hamiltonian = create_test_hamiltonian(2)
 
     # Create QubitHamiltonian with Jordan-Wigner encoding
-    mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
+    mapper = create("qubit_mapper", "qdk", encoding="jordan-wigner")
     qubit_ham = mapper.run(hamiltonian)
 
     # Create Circuit with state preparation (should be Jordan-Wigner)
@@ -260,7 +265,7 @@ def test_end_to_end_workflow_incompatible_encodings(wavefunction_4e4o):
     hamiltonian = create_test_hamiltonian(2)
 
     # Create QubitHamiltonian with Bravyi-Kitaev encoding
-    mapper = create("qubit_mapper", "qiskit", encoding="bravyi-kitaev")
+    mapper = create("qubit_mapper", "qdk", encoding="bravyi-kitaev")
     qubit_ham = mapper.run(hamiltonian)
 
     # Create Circuit with state preparation (should be Jordan-Wigner)

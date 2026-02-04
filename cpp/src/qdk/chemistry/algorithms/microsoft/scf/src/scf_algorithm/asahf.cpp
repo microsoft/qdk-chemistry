@@ -24,6 +24,37 @@ namespace qdk::chemistry::scf {
 namespace detail {
 
 /**
+ */
+std::array<size_t, 4> get_core_config_from_ecp_shells(
+    const BasisSet& basis_set) {
+  size_t ecp_electrons = basis_set.n_ecp_electrons;
+  // ecp map
+  std::unordered_map<int, std::array<size_t, 4>> ecp_map = {
+      {0, {0, 0, 0, 0}},   // []
+      {2, {1, 0, 0, 0}},   // [He]
+      {10, {2, 1, 0, 0}},  // [Ne]
+      {18, {3, 2, 0, 0}},  // [Ar]
+      {28, {3, 2, 1, 0}},  // [Ar] + 3d
+      {36, {4, 3, 1, 0}},  // [Kr]
+      {46, {4, 3, 2, 0}},  // [Kr] + 4d
+      {54, {5, 4, 2, 0}},  // [Xe]
+      {60, {4, 3, 2, 1}},  // [Kr] + 4d + 4f
+      {68, {5, 4, 2, 1}},  // [Xe] + 4f
+      {78, {5, 4, 3, 1}}   // [Xe] + 4f + 5d
+  };
+
+  // check if ecp_electrons is in map
+  if (ecp_map.find(ecp_electrons) == ecp_map.end()) {
+    throw std::runtime_error(
+        "ECP electron configuration not predefined for this number of ECP "
+        "electrons.");
+  }
+
+  std::array<size_t, 4> core_config = ecp_map[ecp_electrons];
+  return core_config;
+}
+
+/**
  *  @brief Get the number of fully occupied and fractionally occupied
  *  orbitals for a given angular momentum and nuclear charge.
  *  @param l Angular momentum quantum number
@@ -117,9 +148,19 @@ std::shared_ptr<BasisSet> make_atom_basis_set(size_t index,
   }
 
   // Create a new BasisSet for the atom
-  return std::shared_ptr<BasisSet>(
+  auto atom_basis = std::shared_ptr<BasisSet>(
       new BasisSet(mol, shells, ecp_shells, ecp_electrons, total_ecp_electrons,
                    BasisMode::RAW, basis_set.pure, false));
+
+  // Update atomic charges, total nuclear charge, and n_electrons based on ECPs
+  if (ecp_electrons.count(atomic_number)) {
+    int ecp_elec = ecp_electrons[atomic_number];
+    mol->atomic_charges[0] = atomic_number - ecp_elec;
+    mol->total_nuclear_charge = mol->atomic_charges[0];
+    mol->n_electrons = mol->total_nuclear_charge - mol->charge;
+  }
+
+  return atom_basis;
 }
 
 bool BasisEqChecker::operator()(const BasisSet& a,
@@ -397,6 +438,11 @@ void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
 
   // get fractional occupation
   std::vector<double> occupation;
+
+  // Get core configuration from ECP shells
+  std::array<size_t, 4> core_config =
+      detail::get_core_config_from_ecp_shells(*ctx_.basis_set);
+
   for (size_t l = 0; l < max_l; ++l) {
     const auto& idx = ao_indices_by_l[l];
     if (idx.empty()) continue;
@@ -404,8 +450,22 @@ void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
     size_t degeneracy = 2 * l + 1;
     size_t n_shells = idx.size() / degeneracy;
 
+    // Get full configuration for this atom using atomic number
     auto [n_double_occ, frac_occ] =
-        detail::get_num_frac_occ_orbs(l, ctx_.mol->total_nuclear_charge);
+        detail::get_num_frac_occ_orbs(l, ctx_.mol->atomic_nums[0]);
+
+    // Subtract core electrons for this angular momentum
+    if (l < 4 && core_config[l] > 0) {
+      // core_config[l] is already the number of core shells for this l
+      size_t core_shells = core_config[l];
+      if (n_double_occ >= core_shells) {
+        n_double_occ -= core_shells;
+      } else {
+        // All electrons for this l are in the core
+        n_double_occ = 0;
+        frac_occ = 0;
+      }
+    }
 
     std::vector<double> occ_l(n_shells, 0);
     for (size_t i = 0; i < n_double_occ; ++i) {

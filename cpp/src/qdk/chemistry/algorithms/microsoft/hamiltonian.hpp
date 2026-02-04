@@ -12,8 +12,6 @@ namespace qdk::chemistry::algorithms::microsoft {
 class HamiltonianSettings : public qdk::chemistry::data::Settings {
  public:
   HamiltonianSettings() {
-    // TODO enable and use
-    // set_default("integral_threshold", 1e-12);
     set_default("eri_method", "direct");
     set_default("scf_type", "auto");
   }

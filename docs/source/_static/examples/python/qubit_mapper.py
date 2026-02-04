@@ -72,8 +72,8 @@ from qdk_chemistry.algorithms import create as create_algorithm  # noqa: E402
 # Create a native QDK QubitMapper instance
 qdk_mapper = create_algorithm("qubit_mapper", "qdk")
 
-# Configure the encoding (jordan_wigner or bravyi_kitaev)
-qdk_mapper.settings().set("encoding", "jordan_wigner")
+# Configure the encoding (jordan-wigner or bravyi-kitaev)
+qdk_mapper.settings().set("encoding", "jordan-wigner")
 
 # Optional: configure thresholds for numerical precision
 qdk_mapper.settings().set("threshold", 1e-12)

@@ -1,8 +1,17 @@
 # Pipeline for building and publishing Python wheels for QDK Chemistry
-# Only triggered manually
+# Publishing can only be triggered manually after approval
+# Non-publishing builds are triggered nightly on main to ensure the current builds are valid
 
 trigger: none
 pr: none
+
+schedules:
+- cron: 0 23 * * *
+  displayName: Nightly Build
+  branches:
+    include:
+    - main
+  always: true
 
 resources:
   repositories:
@@ -100,6 +109,9 @@ extends:
             LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
           strategy:
             matrix:
+              Python3.10:
+                pythonVersion: '3.10'
+                buildMarch: ${{ target.march }}
               Python3.11:
                 pythonVersion: '3.11'
                 buildMarch: ${{ target.march }}
@@ -108,6 +120,9 @@ extends:
                 buildMarch: ${{ target.march }}
               Python3.13:
                 pythonVersion: '3.13'
+                buildMarch: ${{ target.march }}
+              Python3.14:
+                pythonVersion: '3.14'
                 buildMarch: ${{ target.march }}
             maxParallel: 3
           templateContext:
@@ -202,7 +217,7 @@ extends:
     - stage: Approval
       displayName: Approval
       dependsOn: Build
-      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'))
+      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'), ${{ parameters.publishEsrp }})
       jobs:
       - job: Approval
         pool: server
@@ -230,6 +245,9 @@ extends:
           isProduction: true
           inputs:     # Declare all build artifacts to be consumed in the release job
           - input: pipelineArtifact
+            artifactName: linux-x86_64-wheels-python3.10
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.10
+          - input: pipelineArtifact
             artifactName: linux-x86_64-wheels-python3.11
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.11
           - input: pipelineArtifact
@@ -238,6 +256,12 @@ extends:
           - input: pipelineArtifact
             artifactName: linux-x86_64-wheels-python3.13
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.13
+          - input: pipelineArtifact
+            artifactName: linux-x86_64-wheels-python3.14
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.14
+          - input: pipelineArtifact
+            artifactName: linux-aarch64-wheels-python3.10
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.10
           - input: pipelineArtifact
             artifactName: linux-aarch64-wheels-python3.11
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.11
@@ -248,6 +272,12 @@ extends:
             artifactName: linux-aarch64-wheels-python3.13
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.13
           - input: pipelineArtifact
+            artifactName: linux-aarch64-wheels-python3.14
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.14
+          - input: pipelineArtifact
+            artifactName: macos-aarch64-wheels-python3.10
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.10
+          - input: pipelineArtifact
             artifactName: macos-aarch64-wheels-python3.11
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.11
           - input: pipelineArtifact
@@ -256,6 +286,9 @@ extends:
           - input: pipelineArtifact
             artifactName: macos-aarch64-wheels-python3.13
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.13
+          - input: pipelineArtifact
+            artifactName: macos-aarch64-wheels-python3.14
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.14
         steps:
         - script: |
             mkdir -p $(System.DefaultWorkingDirectory)/target/wheels

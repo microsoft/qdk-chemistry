@@ -1408,7 +1408,6 @@ def test_basis_set_static_constants():
     # Test that the static constants exist and have expected values
     assert BasisSet.custom_name == "custom_basis_set"
     assert BasisSet.custom_ecp_name == "custom_ecp"
-    assert BasisSet.default_ecp_name == "default_ecp"
 
 
 def test_get_supported_basis_set_names():

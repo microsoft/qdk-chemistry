@@ -33,14 +33,16 @@ from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     gf2x_with_tracking,
 )
 from qdk_chemistry.data import CasWavefunctionContainer, Circuit, Configuration, Wavefunction
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
 from .test_helpers import create_test_orbitals
 
 
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit dependencies not available")
 def test_regular_isometry_state_prep(wavefunction_4e4o):
     """Test that regular isometry StatePreparation algorithm creates valid quantum circuits."""
     # Create a state preparation instance
-    prep = create("state_prep", "regular_isometry")
+    prep = create("state_prep", "qiskit_regular_isometry")
 
     # Create a circuit
     circuit = prep.run(wavefunction_4e4o)

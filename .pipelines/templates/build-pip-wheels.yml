@@ -72,6 +72,7 @@ steps:
                                                       ${{ parameters.pyenvVersion }} \
                                                       ${{ parameters.macBuild }}
     displayName: Build wheel (Linux)
+    retryCountOnTaskFailure: 4
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
   - script: |
@@ -89,3 +90,4 @@ steps:
                                                       ${{ parameters.pyenvVersion }} \
                                                       ${{ parameters.macBuild }}
     displayName: Build wheel (macOS native)
+    retryCountOnTaskFailure: 4
