@@ -8,6 +8,7 @@
 #include <pybind11/stl.h>
 
 #include <qdk/chemistry.hpp>
+#include <qdk/chemistry/algorithms/microsoft/density_fitted_hamiltonian.hpp>
 
 #include "factory_bindings.hpp"
 
@@ -37,9 +38,33 @@ class HamiltonianConstructorBase
 
  protected:
   std::shared_ptr<Hamiltonian> _run_impl(
-      std::shared_ptr<Orbitals> orbitals) const override {
-    PYBIND11_OVERRIDE_PURE(std::shared_ptr<Hamiltonian>, HamiltonianConstructor,
-                           _run_impl, orbitals);
+      std::shared_ptr<Orbitals> orbitals,
+      OptionalAuxBasis aux_basis) const override {
+    // Custom override logic to support both old (1-arg) and new (2-arg)
+    // Python implementations for backwards compatibility
+    py::gil_scoped_acquire gil;
+    py::function override = py::get_override(
+        static_cast<const HamiltonianConstructor *>(this), "_run_impl");
+    if (override) {
+      // Check how many parameters the Python method accepts
+      py::module_ inspect = py::module_::import("inspect");
+      py::object sig = inspect.attr("signature")(override);
+      py::object params = sig.attr("parameters");
+      size_t num_params = py::len(params);
+
+      py::object result;
+      if (num_params >= 2) {
+        // New signature: _run_impl(self, orbitals, aux_basis)
+        result = override(orbitals, aux_basis);
+      } else {
+        // Old signature: _run_impl(self, orbitals)
+        result = override(orbitals);
+      }
+      return result.cast<std::shared_ptr<Hamiltonian>>();
+    }
+    py::pybind11_fail(
+        "Tried to call pure virtual function "
+        "\"HamiltonianConstructor::_run_impl\"");
   }
 };
 
@@ -83,8 +108,11 @@ Examples:
 
 )");
 
-  hamiltonian_constructor.def("run", &HamiltonianConstructor::run,
-                              R"(
+  hamiltonian_constructor.def(
+      "run",
+      static_cast<std::shared_ptr<Hamiltonian> (HamiltonianConstructor::*)(
+          std::shared_ptr<Orbitals>) const>(&HamiltonianConstructor::run),
+      R"(
 Construct a Hamiltonian from the given orbitals.
 
 This method automatically locks settings before execution to prevent
@@ -100,7 +128,7 @@ Raises:
     SettingsAreLocked: If attempting to modify settings after run() is called
 
 )",
-                              py::arg("orbitals"));
+      py::arg("orbitals"));
 
   hamiltonian_constructor.def("settings", &HamiltonianConstructor::settings,
                               R"(
@@ -201,6 +229,44 @@ See Also:
 Default constructor.
 
 Initializes a Hamiltonian constructor with default settings.
+
+)");
+
+  // Bind concrete microsoft::DensityFittedHamiltonianConstructor implementation
+  py::class_<microsoft::DensityFittedHamiltonianConstructor,
+             HamiltonianConstructor, py::smart_holder>(
+      m, "QdkDensityFittedHamiltonianConstructor", R"(
+QDK implementation of the density-fitted Hamiltonian constructor.
+
+This class provides a concrete implementation of the Hamiltonian constructor
+using density fitting (also known as resolution-of-the-identity, RI) approximation.
+Density fitting reduces the computational cost of two-electron integrals by
+approximating them using an auxiliary basis set.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+    import qdk_chemistry.data as data
+
+    # Assuming you have orbitals from an SCF calculation
+    constructor = alg.QdkDensityFittedHamiltonianConstructor()
+
+    # Construct Hamiltonian using density fitting
+    hamiltonian = constructor.run(orbitals)
+
+See Also:
+    :class:`HamiltonianConstructor`
+    :class:`QdkHamiltonianConstructor`
+    :class:`qdk_chemistry.data.Orbitals`
+    :class:`qdk_chemistry.data.Hamiltonian`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a density-fitted Hamiltonian constructor with default settings.
 
 )");
 }
