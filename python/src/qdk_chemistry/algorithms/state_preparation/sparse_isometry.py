@@ -76,6 +76,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
     Key References:
 
         * Sparse isometry: Malvetti, Iten, and Colbeck (arXiv:2006.00016) :cite:`Malvetti2021`
+
     """
 
     def __init__(self):
@@ -206,7 +207,6 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
         # Step 6: Apply recorded operations in reverse order to expand back to full space.
         # Note: GF2+X can have both CNOT and X operations
-        qc.barrier()  # Add barrier before applying operations in reverse order
         for operation in reversed(gf2x_operation_results.operations):
             if operation[0] == "cnot":
                 # operation[1] should be a tuple for CNOT operations
@@ -235,7 +235,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 f"Final circuit after transpilation: {qc.num_qubits} qubits, depth {qc.depth()}, {qc.size()} gates"
             )
 
-        return Circuit(qasm=qasm3.dumps(qc))
+        return Circuit(qasm=qasm3.dumps(qc), encoding="jordan-wigner")
 
     def _bitstrings_to_binary_matrix(self, bitstrings: list[str]) -> np.ndarray:
         """Convert a list of bitstrings to a binary matrix.
@@ -336,7 +336,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             if bit == "1":
                 circuit.x(i)
 
-        return Circuit(qasm=qasm3.dumps(circuit))
+        return Circuit(qasm=qasm3.dumps(circuit), encoding="jordan-wigner")
 
     def name(self) -> str:
         """Return the name of the state preparation method."""

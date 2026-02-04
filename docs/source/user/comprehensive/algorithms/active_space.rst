@@ -167,13 +167,13 @@ Automatic selection based on orbital occupation numbers, identifying orbitals wi
 
 .. _autocas-algorithm:
 
-QDK AutoCAS
+QDK autoCAS
 ~~~~~~~~~~~
 
 .. rubric:: Factory name: ``"qdk_autocas"``
 
 Entropy-based automatic selection using histogram-based plateau detection to identify strongly correlated orbitals.
-See :ref:`AutoCAS Algorithm <autocas-algorithm-details>` below for a detailed description.
+See :ref:`autoCAS Algorithm <autocas-algorithm-details>` below for a detailed description.
 
 .. note::
 
@@ -209,13 +209,13 @@ See :ref:`AutoCAS Algorithm <autocas-algorithm-details>` below for a detailed de
      - ``True``
      - Whether to normalize entropy values
 
-QDK AutoCAS EOS
+QDK autoCAS EOS
 ~~~~~~~~~~~~~~~
 
 .. rubric:: Factory name: ``"qdk_autocas_eos"``
 
 Entropy-based selection using consecutive entropy differences to identify plateau boundaries.
-See :ref:`AutoCAS Algorithm <autocas-algorithm-details>` below for a detailed description.
+See :ref:`autoCAS Algorithm <autocas-algorithm-details>` below for a detailed description.
 
 .. note::
 
@@ -247,40 +247,40 @@ See :ref:`AutoCAS Algorithm <autocas-algorithm-details>` below for a detailed de
 
 .. _autocas-algorithm-details:
 
-AutoCAS Algorithm
+autoCAS Algorithm
 ^^^^^^^^^^^^^^^^^
 
 Selecting an appropriate active space is one of the most challenging aspects of multi-configuration calculations.
 Traditional approaches rely on chemical intuition and trial-and-error, which can be unreliable for complex systems.
-The AutoCAS algorithm :cite:`Stein2019` provides a systematic, black-box approach to active space selection.
+The autoCAS algorithm :cite:`Stein2016,Stein2019` provides a systematic, black-box approach to active space selection.
 
-AutoCAS leverages concepts from quantum information theory to quantify orbital correlation.
+autoCAS leverages concepts from quantum information theory to quantify orbital correlation.
 The key insight is that strongly correlated orbitals are highly *entangled* with the rest of the electronic system.
 This entanglement can be measured using the single-orbital entropy :math:`s_i^{(1)}`, which quantifies how much information about orbital :math:`i` is "shared" with all other orbitals.
 
-Single orbital entropies can be calculated for many-body systems given access to (approximate) one- and two-particle reduced density matrices (:term:`RDM`) :cite:`Boguslawski2015`, which are easily accessible in QDK/Chemistry through multi-configuration wavefunction data structures. As such, single orbital entropies are computed by default when RDMs are requested in :doc:`multi-configuration calculations <mc_calculator>`. The QDK/Chemistry implementation of AutoCAS is agnostic to the underlying wavefunction method, as long as the required RDMs are available, thus allowing for comparisons across different multi-configuration approaches.
+Single orbital entropies can be calculated for many-body systems given access to (approximate) one- and two-particle reduced density matrices (:term:`RDM`) :cite:`Boguslawski2015`, which are easily accessible in QDK/Chemistry through multi-configuration wavefunction data structures. As such, single orbital entropies are computed by default when RDMs are requested in :doc:`multi-configuration calculations <mc_calculator>`. The QDK/Chemistry implementation of autoCAS is agnostic to the underlying wavefunction method, as long as the required RDMs are available, thus allowing for comparisons across different multi-configuration approaches.
 
-.. rubric:: QDK/Chemistry AutoCAS Variants
+.. rubric:: QDK/Chemistry autoCAS Variants
 
 QDK/Chemistry provides two entropy-based selection methods:
 
-AutoCAS (Histogram-Based Plateau Detection)
-  As described in the original AutoCAS protocol :cite:`Stein2019`, this method discretizes the entropy distribution into histogram bins and identifies plateaus—contiguous regions where the count of orbitals above each entropy threshold remains constant.
+autoCAS (Histogram-Based Plateau Detection)
+  As described in the original autoCAS protocol :cite:`Stein2016,Stein2019`, this method discretizes the entropy distribution into histogram bins and identifies plateaus—contiguous regions where the count of orbitals above each entropy threshold remains constant.
   This approach is robust for systems with clear entropy gaps but requires tuning of ``num_bins`` and ``min_plateau_size`` parameters.
-  The algorithm selects the plateau containing the most orbitals that exceed the ``entropy_threshold``.
+  If none of the entropies exceed the ``entropy_threshold``, the system is considered single configurational and all orbitals are excluded from the active space.
 
-AutoCAS-EOS (Entropy Difference Detection)
+autoCAS-EOS (Entropy Difference Detection)
   Uses a direct approach that examines consecutive differences in the sorted entropy values. When the difference between adjacent entropies exceeds ``diff_threshold`` and the entropy is above ``entropy_threshold``, a plateau boundary is identified.
 
 Both methods sort orbitals by decreasing entropy and select the largest identified group of strongly correlated orbitals for the active space.
 
 .. rubric:: Populating Orbital Entropies
 
-The entropy-based AutoCAS methods require orbital entropies as input, which are computed from the one- and two-electron reduced density matrices (RDMs).
+The entropy-based autoCAS methods require orbital entropies as input, which are computed from the one- and two-electron reduced density matrices (RDMs).
 These RDMs must be obtained from a :doc:`multi-configuration calculation <mc_calculator>` that captures static correlation.
 A key practical consideration is balancing the cost of this initial calculation against the quality of the resulting entropies.
 
-A recommended approach is to use :ref:`Selected Configuration Interaction (SCI) <macis-asci>` with a relatively small number of determinants (e.g., 10,000–50,000).
+A recommended approach is to use :ref:`Selected Configuration Interaction (SCI) <macis-asci>` with a relatively small number of determinants (e.g., 10,000–50,000) within a conservatively chosen active space.
 :term:`SCI` methods are well-suited for this purpose because they:
 
 - Automatically identify the most important determinants for capturing static correlation
@@ -289,6 +289,25 @@ A recommended approach is to use :ref:`Selected Configuration Interaction (SCI) 
 
 This approach has been shown to provide a reasonable trade-off between computational cost and entropy accuracy for active space selection.
 The resulting entropies are typically sufficient to identify strongly correlated orbitals, even when the :term:`SCI` calculation uses a fraction of the determinants that would be required for quantitative energy accuracy.
+
+.. rubric:: Example
+
+.. note::
+  The number of valence orbitals and electrons can be automatically determined using the utility function :func:`~qdk_chemistry.utils.compute_valence_space_parameters`.
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/active_space_selector.cpp
+      :language: cpp
+      :start-after: // start-cell-autocas
+      :end-before: // end-cell-autocas
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/active_space_selector.py
+      :language: python
+      :start-after: # start-cell-autocas
+      :end-before: # end-cell-autocas
 
 .. _pyscf-avas-plugin:
 
@@ -299,7 +318,7 @@ PySCF AVAS
 
 The PySCF plugin provides access to the Automated Valence Active Space (:term:`AVAS`) method from `PySCF <https://pyscf.org/>`_.
 :term:`AVAS` selects active orbitals by projecting molecular orbitals onto a target atomic orbital basis.
-See the `original :term:`AVAS` publication <https://doi.org/10.1021/acs.jctc.7b00128>`_ for details.
+See the original :term:`AVAS` publication :cite:`Sayfutyarova2017` for details.
 
 .. rubric:: Settings
 
@@ -324,6 +343,15 @@ See the `original :term:`AVAS` publication <https://doi.org/10.1021/acs.jctc.7b0
      - ``2``
      - Handling of singly-occupied orbitals: ``2`` = project as alpha, ``3`` = keep in active space
 
+.. rubric:: Example
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/active_space_selector.py
+      :language: python
+      :start-after: # start-cell-avas-example
+      :end-before: # end-cell-avas-example
+
 Related classes
 ---------------
 
@@ -337,3 +365,4 @@ Further reading
 - :doc:`MCCalculator <mc_calculator>`: Uses active space for multiconfigurational calculations
 - :doc:`Settings <settings>`: Configuration settings for algorithms
 - :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation
+- :func:`~qdk_chemistry.utils.compute_valence_space_parameters`: Utility function to determine valence orbitals and electrons

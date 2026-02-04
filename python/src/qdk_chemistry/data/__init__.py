@@ -14,6 +14,8 @@ Exposed classes are:
 - :class:`CholeskyHamiltonianContainer`: Container for Hamiltonians represented using Cholesky-decomposed integrals.
 - :class:`Circuit`: Quantum circuit information.
 - :class:`Configuration`: Electronic configuration state information.
+- :class:`ConfigurationSet`: Collection of electronic configurations with associated orbital information.
+- :class:`ControlledTimeEvolutionUnitary`: Controlled time evolution unitary.
 - :class:`CoupledClusterContainer`: Container for coupled cluster wavefunction amplitudes and determinants.
 - :class:`DataClass`: Base data class.
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
@@ -28,6 +30,7 @@ Exposed classes are:
 - :class:`Orbitals`: Molecular orbital information and properties.
 - :class:`OrbitalType`: Enumeration of orbital angular momentum types (s, p, d, f, etc.).
 - :class:`PauliOperator`: Pauli operator (I, X, Y, Z) for quantum operator expressions with arithmetic support.
+- :class:`PauliProductFormulaContainer`: Container for Pauli product formula representation of time evolution unitary.
 - :class:`QpeResult`: Result of quantum phase estimation workflows, including phase, energy, and metadata.
 - :class:`QuantumErrorProfile`: Information about quantum gates and error properties.
 - :class:`QubitHamiltonian`: Molecular electronic Hamiltonians mapped to qubits.
@@ -38,6 +41,8 @@ Exposed classes are:
 - :class:`SlaterDeterminantContainer`: Single Slater determinant wavefunction representation.
 - :class:`StabilityResult`: Result of stability analysis for electronic structure calculations.
 - :class:`Structure`: Molecular structure and geometry information.
+- :class:`TimeEvolutionUnitary`: Time evolution unitary.
+- :class:`TimeEvolutionUnitaryContainer`: Abstract base class for different time evolution unitary representation.
 - :class:`Wavefunction`: Electronic wavefunction data and coefficients.
 - :class:`WavefunctionContainer`: Abstract base class for different wavefunction representations.
 - :class:`WavefunctionType`: Enumeration of wavefunction types (SelfDual, NotSelfDual).
@@ -64,6 +69,7 @@ from qdk_chemistry._core.data import (
     CasWavefunctionContainer,
     CholeskyHamiltonianContainer,
     Configuration,
+    ConfigurationSet,
     CoupledClusterContainer,
     ElectronicStructureSettings,
     Element,
@@ -75,6 +81,7 @@ from qdk_chemistry._core.data import (
     Orbitals,
     OrbitalType,
     PauliOperator,
+    PauliTermAccumulator,
     SciWavefunctionContainer,
     SettingNotFound,
     Settings,
@@ -93,10 +100,16 @@ from qdk_chemistry._core.data import (
 )
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.circuit import Circuit
+from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
+from qdk_chemistry.data.encoding_validation import EncodingMismatchError, validate_encoding_compatibility
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary
+from qdk_chemistry.data.time_evolution.containers.base import TimeEvolutionUnitaryContainer
+from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.data.time_evolution.controlled_time_evolution import ControlledTimeEvolutionUnitary
 
 # Give Users the option to use "Error" suffix for exceptions if they prefer
 SettingNotFoundError = SettingNotFound
@@ -112,11 +125,15 @@ __all__ = [
     "CasWavefunctionContainer",
     "CholeskyHamiltonianContainer",
     "Circuit",
+    "CircuitExecutorData",
     "Configuration",
+    "ConfigurationSet",
+    "ControlledTimeEvolutionUnitary",
     "CoupledClusterContainer",
     "DataClass",
     "ElectronicStructureSettings",
     "Element",
+    "EncodingMismatchError",
     "EnergyExpectationResult",
     "Hamiltonian",
     "HamiltonianContainer",
@@ -127,6 +144,8 @@ __all__ = [
     "OrbitalType",
     "Orbitals",
     "PauliOperator",
+    "PauliProductFormulaContainer",
+    "PauliTermAccumulator",
     "QpeResult",
     "QuantumErrorProfile",
     "QubitHamiltonian",
@@ -144,8 +163,11 @@ __all__ = [
     "SpinChannel",
     "StabilityResult",
     "Structure",
+    "TimeEvolutionUnitary",
+    "TimeEvolutionUnitaryContainer",
     "Wavefunction",
     "WavefunctionContainer",
     "WavefunctionType",
     "get_current_ciaaw_version",
+    "validate_encoding_compatibility",
 ]

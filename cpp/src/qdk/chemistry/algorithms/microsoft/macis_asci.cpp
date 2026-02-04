@@ -14,6 +14,9 @@
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
+// Local implementation details
+#include "utils.hpp"
+
 namespace qdk::chemistry::algorithms::microsoft {
 
 /**
@@ -70,24 +73,44 @@ struct asci_helper {
                             const_cast<double*>(V_aaaa.data()),
                             num_molecular_orbitals, num_molecular_orbitals,
                             num_molecular_orbitals, num_molecular_orbitals));
-    // HF Guess
-    dets = {macis::wavefunction_traits<wfn_type>::canonical_hf_determinant(
-        nalpha, nbeta)};
-    E_casci = ham_gen.matrix_element(dets[0], dets[0]);
-    C_casci = {1.0};
 
-    // Growth phase
-    std::tie(E_casci, dets, C_casci) = macis::asci_grow<N, int64_t>(
-        asci_settings, mcscf_settings, E_casci, std::move(dets),
-        std::move(C_casci), ham_gen,
-        num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD));
+    size_t fci_dimension =
+        qdk::chemistry::utils::microsoft::binomial_coefficient(
+            num_molecular_orbitals, nalpha) *
+        qdk::chemistry::utils::microsoft::binomial_coefficient(
+            num_molecular_orbitals, nbeta);
 
-    // Refinement phase
-    if (asci_settings.max_refine_iter) {
-      std::tie(E_casci, dets, C_casci) = macis::asci_refine<N, int64_t>(
+    if (asci_settings.ntdets_max > fci_dimension) {
+      QDK_LOGGER().info(
+          "Requested number of determinants ({}) exceeds FCI dimension ({}).",
+          asci_settings.ntdets_max, fci_dimension);
+      E_casci = macis::CASRDMFunctor<generator_t>::rdms(
+          mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
+          nbeta, const_cast<double*>(T_a.data()),
+          const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
+      // Generate determinant basis for RDM calculation
+      dets = macis::generate_hilbert_space<typename generator_t::full_det_t>(
+          num_molecular_orbitals, nalpha, nbeta);
+    } else {
+      // HF Guess
+      dets = {macis::wavefunction_traits<wfn_type>::canonical_hf_determinant(
+          nalpha, nbeta)};
+      E_casci = ham_gen.matrix_element(dets[0], dets[0]);
+      C_casci = {1.0};
+
+      // Growth phase
+      std::tie(E_casci, dets, C_casci) = macis::asci_grow<N, int64_t>(
           asci_settings, mcscf_settings, E_casci, std::move(dets),
           std::move(C_casci), ham_gen,
           num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD));
+
+      // Refinement phase
+      if (asci_settings.max_refine_iter) {
+        std::tie(E_casci, dets, C_casci) = macis::asci_refine<N, int64_t>(
+            asci_settings, mcscf_settings, E_casci, std::move(dets),
+            std::move(C_casci), ham_gen,
+            num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD));
+      }
     }
 
     // Build wavefunction with unified builder (supports spin-dependent RDMs

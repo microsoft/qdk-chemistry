@@ -15,57 +15,12 @@
  * 6. Projected multi-configuration (PMC) calculation with top determinants
  */
 
-#include <algorithm>
 #include <iomanip>
 #include <iostream>
-#include <numeric>
 #include <qdk/chemistry.hpp>
 #include <vector>
 
 using namespace qdk::chemistry;
-
-// -----------------------------------------------------------------------------
-// start-cell-wfn-fn-select-configs
-/**
- * @brief Get top N determinants from a wavefunction sorted by coefficient
- * magnitude
- * @param wfn The wavefunction to extract determinants from
- * @param max_determinants Maximum number of determinants to return
- * @return Vector of top configurations
- */
-std::vector<data::Configuration> get_top_determinants(
-    std::shared_ptr<data::Wavefunction> wfn, size_t max_determinants) {
-  const auto& determinants = wfn->get_active_determinants();
-  const auto& coeffs = wfn->get_coefficients();
-
-  // Extract coefficients as doubles (handle real case)
-  std::vector<double> coeff_values;
-  const auto& real_coeffs = std::get<Eigen::VectorXd>(coeffs);
-  coeff_values.resize(real_coeffs.size());
-  for (int i = 0; i < real_coeffs.size(); ++i) {
-    coeff_values[i] = std::abs(real_coeffs[i]);
-  }
-
-  // Create indices and sort by coefficient magnitude
-  std::vector<size_t> indices(determinants.size());
-  std::iota(indices.begin(), indices.end(), 0);
-  std::sort(indices.begin(), indices.end(),
-            [&coeff_values](size_t i1, size_t i2) {
-              return coeff_values[i1] > coeff_values[i2];
-            });
-
-  // Extract top determinants
-  std::vector<data::Configuration> top_dets;
-  size_t n = std::min(max_determinants, determinants.size());
-  top_dets.reserve(n);
-  for (size_t i = 0; i < n; ++i) {
-    top_dets.push_back(determinants[indices[i]]);
-  }
-
-  return top_dets;
-}
-// end-cell-wfn-fn-select-configs
-// -----------------------------------------------------------------------------
 
 int main() {
   // ---------------------------------------------------------------------------
@@ -139,7 +94,7 @@ int main() {
   // ---------------------------------------------------------------------------
   // start-cell-wfn-select-configs
   // Get top 2 determinants from the CASCI wavefunction
-  auto top_configurations = get_top_determinants(wfn_cas, 2);
+  auto [top_configurations, top_coeffs] = wfn_cas->get_top_determinants(2);
 
   // Perform PMC calculation with selected configurations
   auto pmc = algorithms::ProjectedMultiConfigurationCalculatorFactory::create();

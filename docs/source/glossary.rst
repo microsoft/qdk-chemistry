@@ -93,6 +93,9 @@ Acronym definitions
    MP2
       Second-order Møller-Plesset perturbation theory.
 
+   PMC
+      Projected Multi-Configuration.
+
    QDK
       Quantum Development Kit.
 

@@ -317,8 +317,10 @@ void VVHVLocalization::initialize() {
 
   // Create minimal basis set
   auto mol_structure = ori_bs->mol;
-  this->minimal_basis_fp_ = qcs::BasisSet::from_database_json(
-      mol_structure, minimal_basis_name_, ori_bs->mode, ori_bs->pure, true);
+  auto _min_basis = data::BasisSet::from_basis_name(
+      minimal_basis_name_, basis_set_->get_structure());
+  this->minimal_basis_fp_ =
+      utils::microsoft::convert_basis_set_from_qdk(*_min_basis);
   const auto* minimal_bs = this->minimal_basis_fp_.get();  // Minimal basis set
 
   const auto num_atoms = mol_structure->n_atoms;
@@ -1204,8 +1206,6 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
   auto [coeffs_alpha, coeffs_beta] = orbitals->get_coefficients();
   auto ao_overlap = orbitals->get_overlap_matrix();
 
-  // TODO (DBWY): Adding configurable inner localizer
-  // Work Item: 41816
   // Create reusable Pipek-Mezey localizer for inner localization
   const size_t num_atoms = basis_set->get_structure()->get_num_atoms();
   std::vector<int> bf_to_atom(num_atomic_orbitals);

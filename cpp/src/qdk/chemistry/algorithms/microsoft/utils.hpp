@@ -142,4 +142,27 @@ std::vector<unsigned> compute_shell_map(
     const qdk::chemistry::data::BasisSet& qdk_basis_set,
     const qcs::BasisSet& itrn_basis_set);
 
+/**
+ * @brief Compute the factorial of a non-negative integer
+ *
+ * For 64-bit size_t, the maximum safe input is n=20, as 21! exceeds the
+ * maximum value representable in 64 bits. Attempting to compute factorial
+ * for n > 20 will throw std::overflow_error.
+ *
+ * @param n The non-negative integer to compute the factorial of (must be <= 20
+ * for 64-bit size_t).
+ * @return The factorial of n (n!).
+ * @throws std::overflow_error if n > 20 (for 64-bit size_t).
+ */
+size_t factorial(size_t n);
+
+/**
+ * @brief Compute the binomial coefficient C(n, k) = n! / (k! * (n-k)!)
+ *
+ * @param n The total number of items.
+ * @param k The number of items to choose.
+ * @return The binomial coefficient C(n, k), or 0 if k > n.
+ */
+size_t binomial_coefficient(size_t n, size_t k);
+
 }  // namespace qdk::chemistry::utils::microsoft

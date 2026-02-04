@@ -17,6 +17,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from qdk_chemistry.plugins.qiskit import (
+    QDK_CHEMISTRY_HAS_QISKIT,
+    QDK_CHEMISTRY_HAS_QISKIT_AER,
+    QDK_CHEMISTRY_HAS_QISKIT_NATURE,
+)
+
 from .reference_tolerances import (
     estimator_energy_tolerance,
     float_comparison_relative_tolerance,
@@ -28,11 +34,16 @@ from .test_sample_workflow_utils import (
     _skip_for_mpi_failure,
 )
 
+pytestmark = pytest.mark.skipif(
+    not (QDK_CHEMISTRY_HAS_QISKIT_AER and QDK_CHEMISTRY_HAS_QISKIT and QDK_CHEMISTRY_HAS_QISKIT_NATURE),
+    reason="Qiskit dependencies not available",
+)
+
 
 def test_qiskit_iqpe_model_hamiltonian():
     """Execute the non-commuting IQPE sample and validate reported results."""
     repo_root = Path(__file__).resolve().parents[2]
-    cmd = [sys.executable, "examples/qiskit/iqpe_model_hamiltonian.py"]
+    cmd = [sys.executable, "examples/interoperability/qiskit/iqpe_model_hamiltonian.py"]
 
     result = _run_workflow(cmd, repo_root)
     if result.returncode != 0:
@@ -54,7 +65,7 @@ def test_qiskit_iqpe_model_hamiltonian():
 def test_qiskit_iqpe_no_trotter():
     """Execute the exact-evolution IQPE sample and validate reported energies."""
     repo_root = Path(__file__).resolve().parents[2]
-    cmd = [sys.executable, "examples/qiskit/iqpe_no_trotter.py"]
+    cmd = [sys.executable, "examples/interoperability/qiskit/iqpe_no_trotter.py"]
 
     result = _run_workflow(cmd, repo_root)
     if result.returncode != 0:
@@ -96,7 +107,7 @@ def test_qiskit_iqpe_no_trotter():
 def test_qiskit_iqpe_trotter():
     """Execute the Trotterized IQPE sample and validate reported energies."""
     repo_root = Path(__file__).resolve().parents[2]
-    cmd = [sys.executable, "examples/qiskit/iqpe_trotter.py"]
+    cmd = [sys.executable, "examples/interoperability/qiskit/iqpe_trotter.py"]
 
     result = _run_workflow(cmd, repo_root)
     if result.returncode != 0:

@@ -12,6 +12,7 @@
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -1034,4 +1035,7 @@ Examples:
         // __setstate__ - deserialize from JSON string
         return *Hamiltonian::from_json(nlohmann::json::parse(json_str));
       }));
+
+  // Data type name class attribute
+  hamiltonian.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Hamiltonian);
 }

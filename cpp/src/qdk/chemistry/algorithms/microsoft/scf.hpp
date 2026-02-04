@@ -46,7 +46,7 @@ class ScfSettings
    */
   ScfSettings() : qdk::chemistry::algorithms::ElectronicStructureSettings() {
     set_default("level_shift", -1.0);
-    set_default("enable_gdm", false);
+    set_default("enable_gdm", true);
     set_default("energy_thresh_diis_switch", 1e-3);
     set_default("gdm_max_diis_iteration", 50);
     set_default("gdm_bfgs_history_size_limit", 50);
@@ -59,6 +59,9 @@ class ScfSettings
         "'incore' stores all integrals in memory",
         data::ListConstraint<std::string>{
             {std::vector<std::string>{"direct", "incore"}}});
+    set_default("nthreads", static_cast<int64_t>(-1),
+                "Number of OpenMP threads to use for SCF calculation. "
+                "Set to -1 to use all available threads.");
   }
 };
 

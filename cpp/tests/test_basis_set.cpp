@@ -1689,6 +1689,11 @@ TEST_F(BasisSetTest, FromBasisNameInvalidBasisSet) {
                std::invalid_argument);
 }
 
+TEST_F(BasisSetTest, FromBasisNameInvalidECP) {
+  auto structure = testing::create_agh_structure();
+  EXPECT_NO_THROW(BasisSet::from_basis_name("def2-svp", structure));
+}
+
 TEST_F(BasisSetTest, FromBasisNameEmptyBasisSet) {
   auto structure = testing::create_water_structure();
   EXPECT_THROW(BasisSet::from_basis_name("", structure), std::invalid_argument);
@@ -1718,6 +1723,22 @@ TEST_F(BasisSetTest, FromElementMapEmpty) {
   std::map<std::string, std::string> empty_map;
   EXPECT_THROW(BasisSet::from_element_map(empty_map, structure),
                std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromElementMapInvalidECP) {
+  auto structure = testing::create_agh_structure();
+  std::map<std::string, std::string> element_map;
+  element_map["H"] = "cc-pvdz";
+  element_map["Ag"] = "def2-svp";
+  EXPECT_NO_THROW(BasisSet::from_element_map(element_map, structure));
+}
+
+TEST_F(BasisSetTest, FromIndexMapInvalidECP) {
+  auto structure = testing::create_agh_structure();
+  std::map<size_t, std::string> index_map;
+  index_map[0] = "cc-pvdz";
+  index_map[1] = "def2-svp";
+  EXPECT_NO_THROW(BasisSet::from_index_map(index_map, structure));
 }
 
 TEST_F(BasisSetTest, FromElementMapInvalidBasisSet) {
@@ -1806,4 +1827,17 @@ TEST_F(BasisSetTest, BasisSetNameNormalization) {
   EXPECT_EQ("sto-3g", detail::denormalize_basis_set_name("sto-3g"));
   EXPECT_EQ("def2-TZVP", detail::normalize_basis_set_name("def2-TZVP"));
   EXPECT_EQ("def2-TZVP", detail::denormalize_basis_set_name("def2-TZVP"));
+}
+
+TEST_F(BasisSetTest, DataTypeName) {
+  // Test that BasisSet has the correct data type name
+  std::vector<Shell> shells;
+  shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{2.0}));
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}};
+  std::vector<std::string> symbols = {"H"};
+  Structure structure(coords, symbols);
+  BasisSet basis("6-31G", shells, structure);
+
+  EXPECT_EQ(basis.get_data_type_name(), "basis_set");
 }

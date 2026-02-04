@@ -2270,4 +2270,11 @@ TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
     auto core_chol = ham_chol->get_core_energy();
     EXPECT_NEAR(core_incore, core_chol, testing::numerical_zero_tolerance);
   }
+
+TEST_F(HamiltonianTest, DataTypeName) {
+  // Test that Hamiltonian has the correct data type name
+  Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
+
+  EXPECT_EQ(h.get_data_type_name(), "hamiltonian");
 }

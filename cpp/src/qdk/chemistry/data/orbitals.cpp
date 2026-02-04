@@ -9,6 +9,7 @@
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <set>
 #include <stdexcept>
 
@@ -19,9 +20,6 @@
 
 namespace qdk::chemistry {
 namespace data {
-
-// TODO (NAB):  this is a huge file.  Is there a way to break it up into smaller
-// pieces? Workitem: 41350
 
 Orbitals::Orbitals(
     const Eigen::MatrixXd& coefficients,
@@ -902,9 +900,12 @@ std::shared_ptr<Orbitals> Orbitals::from_file(const std::string& filename,
 
 void Orbitals::to_hdf5_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, "orbitals");
+  std::string validated_filename = DataTypeFilename::validate_write_suffix(
+      filename, DATACLASS_TO_SNAKE_CASE(Orbitals));
 
   _to_hdf5_file(validated_filename);
 }
@@ -912,6 +913,9 @@ void Orbitals::to_hdf5_file(const std::string& filename) const {
 std::shared_ptr<Orbitals> Orbitals::from_hdf5_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "orbitals");
@@ -921,9 +925,12 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5_file(
 
 void Orbitals::to_json_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, "orbitals");
+  std::string validated_filename = DataTypeFilename::validate_write_suffix(
+      filename, DATACLASS_TO_SNAKE_CASE(Orbitals));
 
   _to_json_file(validated_filename);
 }
@@ -931,6 +938,9 @@ void Orbitals::to_json_file(const std::string& filename) const {
 std::shared_ptr<Orbitals> Orbitals::from_json_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
+  if (filename.empty()) {
+    throw std::invalid_argument("Filename cannot be empty");
+  }
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "orbitals");

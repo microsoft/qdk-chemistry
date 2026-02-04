@@ -1,8 +1,17 @@
 # Pipeline for building and publishing Python wheels for QDK Chemistry
-# Only triggered manually
+# Publishing can only be triggered manually after approval
+# Non-publishing builds are triggered nightly on main to ensure the current builds are valid
 
 trigger: none
 pr: none
+
+schedules:
+- cron: 0 23 * * *
+  displayName: Nightly Build
+  branches:
+    include:
+    - main
+  always: true
 
 resources:
   repositories:
@@ -27,6 +36,17 @@ parameters:
     arch: aarch64
     march: armv8-a
     imageName: 1es-pt-azurelinux3-arm
+  - name: macos_arm64
+    os: macos
+    arch: aarch64
+    march: armv8-a
+    imageName: ACES_VM_SharedPool_Tahoe
+- name: publishInternalFeed
+  type: boolean
+  default: false
+- name: publishEsrp
+  type: boolean
+  default: false
 
 variables:
 - group: QdkChemistry
@@ -63,25 +83,35 @@ extends:
       jobs:
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
-          ${{ if eq(target.arch, 'aarch64') }}:
+          ${{ if eq(target.os, 'macos') }}:
+            pool:
+              name: AcesShared
+              demands:
+              - ImageOverride -equals ${{ target.imageName }}
+              os: ${{ target.os }}
+          ${{ elseif eq(target.arch, 'aarch64') }}:
             pool:
               name: $(CPU_POOL_ARM)
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
               hostArchitecture: Arm64
-          ${{ if eq(target.arch, 'x86_64') }}:
+          ${{ else }}:
             pool:
               name: $(CPU_POOL_X86)
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
+
           timeoutInMinutes: 480
           displayName: Build ${{ target.march }} wheels
           variables:
             LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
           strategy:
             matrix:
+              Python3.10:
+                pythonVersion: '3.10'
+                buildMarch: ${{ target.march }}
               Python3.11:
                 pythonVersion: '3.11'
                 buildMarch: ${{ target.march }}
@@ -91,17 +121,20 @@ extends:
               Python3.13:
                 pythonVersion: '3.13'
                 buildMarch: ${{ target.march }}
+              Python3.14:
+                pythonVersion: '3.14'
+                buildMarch: ${{ target.march }}
             maxParallel: 3
           templateContext:
             outputs:
             - output: pipelineArtifact
-              displayName: Upload Linux Python $(pythonVersion) Wheels for ${{ target.march }}
+              displayName: Upload Python $(pythonVersion) Wheels for ${{ target.os }} ${{ target.march }}
               targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
-              artifactName: linux-${{ target.arch }}-wheels-python$(pythonVersion)
+              artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
-          # Build - x86_64
+          # Build - Linux x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
-            - template: .pipelines/templates/docker-pip-wheel.yml@self
+            - template: .pipelines/templates/build-pip-wheels.yml@self
               parameters:
                 march: $(buildMarch)
                 buildTesting: OFF
@@ -111,18 +144,18 @@ extends:
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
 
-          # Test - x86_64
+          # Test - Linux x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
-            - template: .pipelines/templates/docker-test-wheel.yml@self
+            - template: .pipelines/templates/test-pip-wheels.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
 
-          # Build - ARM64
-          - ${{ if eq(target.arch, 'aarch64') }}:
-            - template: .pipelines/templates/docker-pip-wheel.yml@self
+          # Build - Linux ARM64
+          - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
+            - template: .pipelines/templates/build-pip-wheels.yml@self
               parameters:
                 march: $(buildMarch)
                 buildTesting: OFF
@@ -132,14 +165,33 @@ extends:
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
 
-          # Test - ARM64
-          - ${{ if eq(target.arch, 'aarch64') }}:
-            - template: .pipelines/templates/docker-test-wheel.yml@self
+          # Test - Linux ARM64
+          - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
+            - template: .pipelines/templates/test-pip-wheels.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
+
+          # Build - macOS ARM64
+          - ${{ if eq(target.os, 'macos') }}:
+            - template: .pipelines/templates/build-pip-wheels.yml@self
+              parameters:
+                march: $(buildMarch)
+                buildTesting: OFF
+                enableCoverage: OFF
+                agentBuildDirectory: $(Agent.BuildDirectory)
+                pythonVersion: $(pythonVersion)
+                macBuild: ON
+
+          # Test - macOS ARM64
+          - ${{ if eq(target.os, 'macos') }}:
+            - template: .pipelines/templates/test-pip-wheels.yml@self
+              parameters:
+                agentBuildDirectory: $(Agent.BuildDirectory)
+                pythonVersion: $(pythonVersion)
+                macBuild: ON
 
           # ARM builds require that we transfer ownership of the wheel directory
           # back to the original base image user
@@ -148,10 +200,24 @@ extends:
                 sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
               displayName: Fix wheel directory ownership
 
+
+          - task: TwineAuthenticate@1
+            inputs:
+              artifactFeed: $(artifactProject)/$(artifactFeed)
+            displayName: Authenticate to internal feed
+            condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
+
+          - script: |
+              cd $(Agent.BuildDirectory)/qdk-chemistry/python
+              python3 -m pip install twine
+              python3 -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
+            displayName: Upload wheel with twine
+            condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
+
     - stage: Approval
       displayName: Approval
       dependsOn: Build
-      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'))
+      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'), ${{ parameters.publishEsrp }})
       jobs:
       - job: Approval
         pool: server
@@ -167,7 +233,7 @@ extends:
     - stage: Release
       displayName: Release
       dependsOn: Approval
-      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'))
+      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'), ${{ parameters.publishEsrp }})
       jobs:
       - job: Publish_Python_Packages
         pool:
@@ -179,6 +245,9 @@ extends:
           isProduction: true
           inputs:     # Declare all build artifacts to be consumed in the release job
           - input: pipelineArtifact
+            artifactName: linux-x86_64-wheels-python3.10
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.10
+          - input: pipelineArtifact
             artifactName: linux-x86_64-wheels-python3.11
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.11
           - input: pipelineArtifact
@@ -188,6 +257,12 @@ extends:
             artifactName: linux-x86_64-wheels-python3.13
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.13
           - input: pipelineArtifact
+            artifactName: linux-x86_64-wheels-python3.14
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.14
+          - input: pipelineArtifact
+            artifactName: linux-aarch64-wheels-python3.10
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.10
+          - input: pipelineArtifact
             artifactName: linux-aarch64-wheels-python3.11
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.11
           - input: pipelineArtifact
@@ -196,6 +271,24 @@ extends:
           - input: pipelineArtifact
             artifactName: linux-aarch64-wheels-python3.13
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.13
+          - input: pipelineArtifact
+            artifactName: linux-aarch64-wheels-python3.14
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.14
+          - input: pipelineArtifact
+            artifactName: macos-aarch64-wheels-python3.10
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.10
+          - input: pipelineArtifact
+            artifactName: macos-aarch64-wheels-python3.11
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.11
+          - input: pipelineArtifact
+            artifactName: macos-aarch64-wheels-python3.12
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.12
+          - input: pipelineArtifact
+            artifactName: macos-aarch64-wheels-python3.13
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.13
+          - input: pipelineArtifact
+            artifactName: macos-aarch64-wheels-python3.14
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.14
         steps:
         - script: |
             mkdir -p $(System.DefaultWorkingDirectory)/target/wheels
@@ -204,7 +297,7 @@ extends:
           displayName: Collect Python Artifacts for Release
 
         # Setting the contenttype to the wrong value will allow us to do a dry run of this task without
-        # publishing anything, according to the ESRP docs
+        # publishing anything, according to the ESRP docs. When debugging, set contenttype: NPM to prevent publishing to PyPI.
         - task: EsrpRelease@9
           condition: succeeded()
           displayName: Publish Python Packages
@@ -214,7 +307,7 @@ extends:
             keyvaultname: quantum-esrp-kv
             signcertname: ESRPCert
             clientid: 832c049d-cd07-4c1c-bfa5-c07250d190cb
-            contenttype: NPM
+            contenttype: PyPI
             domaintenantid: 975f013f-7f24-47e8-a7d3-abc4752bf346
             folderlocation: $(System.DefaultWorkingDirectory)/target/wheels
             waitforreleasecompletion: true

@@ -30,6 +30,8 @@ class QubitHamiltonian(DataClass):
     Attributes:
         pauli_strings (list[str]): List of Pauli strings representing the ``QubitHamiltonian``.
         coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
+        encoding (str | None): The fermion-to-qubit encoding used to create this Hamiltonian
+            (e.g., "jordan-wigner", "bravyi-kitaev", "parity"). If None, encoding is not specified.
 
     """
 
@@ -39,12 +41,20 @@ class QubitHamiltonian(DataClass):
     # Serialization version for this class
     _serialization_version = "0.1.0"
 
-    def __init__(self, pauli_strings: list[str], coefficients: np.ndarray) -> None:
+    def __init__(
+        self,
+        pauli_strings: list[str],
+        coefficients: np.ndarray,
+        encoding: str | None = None,
+    ) -> None:
         """Initialize a QubitHamiltonian.
 
         Args:
             pauli_strings (list[str]): List of Pauli strings representing the ``QubitHamiltonian``.
             coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
+            encoding (str | None): The fermion-to-qubit encoding used to create this Hamiltonian.
+                Valid values include "jordan-wigner", "bravyi-kitaev", "parity", or None.
+                Defaults to None.
 
         Raises:
             ValueError: If the number of Pauli strings and coefficients don't match,
@@ -57,6 +67,7 @@ class QubitHamiltonian(DataClass):
 
         self.pauli_strings = pauli_strings
         self.coefficients = coefficients
+        self.encoding = encoding
 
         try:
             _ = self.pauli_ops  # Trigger cached property to validate Pauli strings
@@ -76,6 +87,20 @@ class QubitHamiltonian(DataClass):
         """
         return self.pauli_ops.num_qubits
 
+    @property
+    def schatten_norm(self) -> float:
+        """Calculate the Schatten norm (L1 norm) of the Hamiltonian.
+
+        The Schatten norm is the sum of the absolute values of all coefficients
+        in the Hamiltonian. This quantity is commonly used in estimating parameters
+        for quantum algorithms, most notably Quantum Phase Estimation (QPE).
+
+        Returns:
+            float: The Schatten norm (L1 norm) of the Hamiltonian.
+
+        """
+        return float(np.sum(np.abs(self.coefficients)))
+
     @cached_property
     def pauli_ops(self) -> SparsePauliOp:
         """Get the qubit Hamiltonian as a ``SparsePauliOp``.
@@ -85,6 +110,100 @@ class QubitHamiltonian(DataClass):
 
         """
         return SparsePauliOp(self.pauli_strings, self.coefficients)
+
+    def reorder_qubits(self, permutation: list[int]) -> "QubitHamiltonian":
+        """Reorder qubits in all Pauli strings according to a permutation.
+
+        Applies a qubit index permutation to all Pauli strings. The permutation
+        specifies where each qubit should be mapped: permutation[old_index] = new_index.
+
+        Args:
+            permutation (list[int]): A permutation mapping old qubit indices to new indices.
+                Must be a valid permutation of [0, 1, ..., num_qubits-1].
+
+        Returns:
+            QubitHamiltonian: A new QubitHamiltonian with reordered Pauli strings.
+
+        Raises:
+            ValueError: If the permutation is invalid (wrong length or not a valid permutation).
+
+        Examples:
+            >>> qh = QubitHamiltonian(["XIZI", "IYII"], np.array([0.5, 0.3]))
+            >>> # Swap qubits 0 and 1: permutation[0]=1, permutation[1]=0, ...
+            >>> reordered = qh.reorder_qubits([1, 0, 2, 3])
+            >>> print(reordered.pauli_strings)
+            ['IXZI', 'YIII']
+
+        """
+        Logger.trace_entering()
+        n_qubits = self.num_qubits
+
+        # Validate permutation
+        if len(permutation) != n_qubits:
+            raise ValueError(f"Permutation length ({len(permutation)}) must match number of qubits ({n_qubits}).")
+        if sorted(permutation) != list(range(n_qubits)):
+            raise ValueError(f"Invalid permutation: must be a permutation of [0, 1, ..., {n_qubits - 1}].")
+
+        # Apply permutation to each Pauli string
+        # Pauli strings are in little-endian order: string[i] corresponds to qubit i
+        reordered_strings = []
+        for pauli_str in self.pauli_strings:
+            # Create new string with reordered characters
+            new_chars = ["I"] * n_qubits
+            for old_idx, char in enumerate(pauli_str):
+                new_idx = permutation[old_idx]
+                new_chars[new_idx] = char
+            reordered_strings.append("".join(new_chars))
+
+        return QubitHamiltonian(
+            pauli_strings=reordered_strings,
+            coefficients=self.coefficients.copy(),
+        )
+
+    def to_interleaved(self, n_spatial: int) -> "QubitHamiltonian":
+        """Convert from blocked to interleaved spin-orbital ordering.
+
+        Converts a qubit Hamiltonian from blocked ordering (alpha orbitals first,
+        then beta orbitals) to interleaved ordering (alternating alpha/beta).
+
+        Blocked ordering:    [α₀, α₁, ..., αₙ₋₁, β₀, β₁, ..., βₙ₋₁]
+        Interleaved ordering: [α₀, β₀, α₁, β₁, ..., αₙ₋₁, βₙ₋₁]
+
+        Args:
+            n_spatial (int): The number of spatial orbitals. The total number of
+                qubits should be 2 * n_spatial.
+
+        Returns:
+            QubitHamiltonian: A new QubitHamiltonian with interleaved ordering.
+
+        Raises:
+            ValueError: If num_qubits != 2 * n_spatial.
+
+        Examples:
+            >>> # H2 with 2 spatial orbitals (4 qubits)
+            >>> # Blocked: [α₀, α₁, β₀, β₁] -> Interleaved: [α₀, β₀, α₁, β₁]
+            >>> interleaved = blocked_hamiltonian.to_interleaved(n_spatial=2)
+
+        """
+        Logger.trace_entering()
+        n_qubits = self.num_qubits
+
+        if n_qubits != 2 * n_spatial:
+            raise ValueError(f"Number of qubits ({n_qubits}) must be 2 * n_spatial ({2 * n_spatial}).")
+
+        # Build permutation: blocked -> interleaved
+        # Blocked ordering:      a0, a1, ..., a(n-1), b0, b1, ..., b(n-1)
+        # Interleaved ordering:  a0, b0, a1, b1, ..., a(n-1), b(n-1)
+        # For blocked index i, alpha spin (i < n_spatial) maps to 2*i,
+        # and beta spin (i >= n_spatial) maps to 2*(i - n_spatial) + 1
+        permutation = []
+        for i in range(n_qubits):
+            if i < n_spatial:
+                permutation.append(2 * i)
+            else:
+                permutation.append(2 * (i - n_spatial) + 1)
+
+        return self.reorder_qubits(permutation)
 
     def group_commuting(self, qubit_wise: bool = True) -> list["QubitHamiltonian"]:
         """Group the qubit Hamiltonian into commuting subsets.
@@ -99,7 +218,11 @@ class QubitHamiltonian(DataClass):
         Logger.trace_entering()
         sparse_pauli_ops = self.pauli_ops.group_commuting(qubit_wise=qubit_wise)
         return [
-            QubitHamiltonian(pauli_strings=group.paulis.to_labels(), coefficients=group.coeffs)
+            QubitHamiltonian(
+                pauli_strings=group.paulis.to_labels(),
+                coefficients=group.coeffs,
+                encoding=self.encoding,
+            )
             for group in sparse_pauli_ops
         ]
 
@@ -111,9 +234,12 @@ class QubitHamiltonian(DataClass):
             str: Summary string describing the qubit Hamiltonian.
 
         """
-        return (
+        summary = (
             f"Qubit Hamiltonian\n  Number of qubits: {self.num_qubits}\n  Number of terms: {len(self.pauli_strings)}\n"
         )
+        if self.encoding is not None:
+            summary += f"  Encoding: {self.encoding}\n"
+        return summary
 
     def to_json(self) -> dict[str, Any]:
         """Convert the qubit Hamiltonian to a dictionary for JSON serialization.
@@ -122,10 +248,18 @@ class QubitHamiltonian(DataClass):
             dict[str, Any]: Dictionary representation of the qubit Hamiltonian.
 
         """
+        # Serialize complex coefficients as {"real": [...], "imag": [...]}
+        # This handles both real and complex coefficient arrays
+        coeffs = self.coefficients
         data = {
             "pauli_strings": self.pauli_strings,
-            "coefficients": self.coefficients.tolist(),
+            "coefficients": {
+                "real": coeffs.real.tolist(),
+                "imag": coeffs.imag.tolist(),
+            },
         }
+        if self.encoding is not None:
+            data["encoding"] = self.encoding
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -138,6 +272,8 @@ class QubitHamiltonian(DataClass):
         self._add_hdf5_version(group)
         group.create_dataset("pauli_strings", data=np.array(self.pauli_strings, dtype="S"))
         group.create_dataset("coefficients", data=self.coefficients)
+        if self.encoding is not None:
+            group.attrs["encoding"] = self.encoding
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> "QubitHamiltonian":
@@ -154,9 +290,17 @@ class QubitHamiltonian(DataClass):
 
         """
         cls._validate_json_version(cls._serialization_version, json_data)
+        coeff_data = json_data["coefficients"]
+        # Handle complex coefficients serialized as {"real": [...], "imag": [...]}
+        if isinstance(coeff_data, dict) and "real" in coeff_data and "imag" in coeff_data:
+            coefficients = np.array(coeff_data["real"]) + 1j * np.array(coeff_data["imag"])
+        else:
+            # Fallback for legacy format (simple list of real numbers)
+            coefficients = np.array(coeff_data)
         return cls(
             pauli_strings=json_data["pauli_strings"],
-            coefficients=np.array(json_data["coefficients"]),
+            coefficients=coefficients,
+            encoding=json_data.get("encoding"),
         )
 
     @classmethod
@@ -176,7 +320,11 @@ class QubitHamiltonian(DataClass):
         cls._validate_hdf5_version(cls._serialization_version, group)
         pauli_strings = [s.decode() for s in group["pauli_strings"][:]]
         coefficients = np.array(group["coefficients"])
-        return cls(pauli_strings=pauli_strings, coefficients=coefficients)
+        encoding = group.attrs.get("encoding")
+        # Decode encoding if it's stored as bytes (HDF5 behavior can vary)
+        if encoding is not None and isinstance(encoding, bytes):
+            encoding = encoding.decode("utf-8")
+        return cls(pauli_strings=pauli_strings, coefficients=coefficients, encoding=encoding)
 
 
 def _filter_and_group_pauli_ops_from_statevector(
@@ -272,7 +420,7 @@ def _filter_and_group_pauli_ops_from_statevector(
         reduced_pauli.append(best_pauli)
         reduced_coeffs.append(coeff_sum)
 
-    reduced_hamiltonian = QubitHamiltonian(reduced_pauli, np.array(reduced_coeffs))
+    reduced_hamiltonian = QubitHamiltonian(reduced_pauli, np.array(reduced_coeffs), encoding=hamiltonian.encoding)
 
     grouped_hamiltonians = (
         reduced_hamiltonian.group_commuting(qubit_wise=abelian_grouping) if abelian_grouping else [reduced_hamiltonian]

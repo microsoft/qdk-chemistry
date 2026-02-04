@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -817,6 +818,9 @@ Examples:
             // Reconstruct from JSON string
             return *Orbitals::from_json(nlohmann::json::parse(json_str));
           }));
+
+  // Data type name class attribute
+  orbitals.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Orbitals);
 
   // Bind ModelOrbitals
   bind_model_orbitals(data);

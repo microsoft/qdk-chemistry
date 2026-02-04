@@ -10,16 +10,20 @@ from itertools import combinations
 import numpy as np
 import pytest
 from qiskit import qasm3, transpile
-from qiskit_aer import AerSimulator
-from qiskit_aer.primitives import EstimatorV2 as AerEstimator
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
-    SparseIsometryGF2XStatePreparation,
-)
+from qdk_chemistry.algorithms.state_preparation.sparse_isometry import SparseIsometryGF2XStatePreparation
 from qdk_chemistry.data import Circuit
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+if QDK_CHEMISTRY_HAS_QISKIT_AER:
+    from qiskit_aer import AerSimulator
+    from qiskit_aer.primitives import EstimatorV2 as AerEstimator
+
+
+pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available")
 
 
 def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamiltonian_4e4o, ref_energy_4e4o):
@@ -33,7 +37,7 @@ def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamilton
         "state_prep", algorithm_name="sparse_isometry_gf2x", transpile_optimization_level=1, basis_gates=basis_gates
     )
     regular_prep = create(
-        "state_prep", algorithm_name="regular_isometry", transpile_optimization_level=1, basis_gates=basis_gates
+        "state_prep", algorithm_name="qiskit_regular_isometry", transpile_optimization_level=1, basis_gates=basis_gates
     )
 
     sparse_gf2x_circuit = qasm3.loads(sparse_prep_gf2x.run(wavefunction_4e4o).get_qasm())
@@ -100,7 +104,7 @@ def test_sparse_isometry_gf2x_circuit_efficiency(wavefunction_4e4o):
         "state_prep", algorithm_name="sparse_isometry_gf2x", transpile_optimization_level=1, basis_gates=basis_gates
     )
     regular_prep = create(
-        "state_prep", algorithm_name="regular_isometry", transpile_optimization_level=1, basis_gates=basis_gates
+        "state_prep", algorithm_name="qiskit_regular_isometry", transpile_optimization_level=1, basis_gates=basis_gates
     )
 
     # Create circuits using both methods

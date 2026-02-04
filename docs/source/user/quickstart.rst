@@ -155,11 +155,6 @@ By identifying and retaining only the dominant configurations (those with the la
 
    .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
       :language: cpp
-      :start-after: // start-cell-wfn-fn-select-configs
-      :end-before: // end-cell-wfn-fn-select-configs
-
-   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
-      :language: cpp
       :start-after: // start-cell-wfn-select-configs
       :end-before: // end-cell-wfn-select-configs
 
@@ -198,8 +193,6 @@ For efficient energy estimation, the qubit Hamiltonian can be optimized in two w
 
 Generate the state preparation circuit
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. TODO: Add more references to other methods
 
 Given the classical representation of the sparse multi-configurational :class:`~qdk_chemistry.data.Wavefunction`, a quantum circuit can be generated to prepare this state on a quantum computer.
 This can be done in many ways, including via Isometry encoding :cite:`Christandl2016`, linear combinations of unitaries, and tensor product methods.
@@ -252,3 +245,28 @@ For more information, see:
 - Above examples as complete `C++ <../_static/examples/cpp/quickstart.cpp>`_ and `Python <../_static/examples/python/quickstart.py>`_ scripts.
 - Additional examples of workflows using QDK/Chemistry in the `examples <https://github.com/microsoft/qdk-chemistry/tree/main/examples>`_ directory of the source repository.
 - :doc:`comprehensive/index` for links to more detailed documentation on specific components of QDK/Chemistry.
+
+Compiling C++ examples
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To compile the C++ examples, the QDK/Chemistry C++ library must be installed on your system.
+See the `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_ for details on building and installing the library.
+
+Once installed, you can compile examples by linking against the ``qdk::chemistry`` CMake target:
+
+.. code-block:: cmake
+
+   cmake_minimum_required(VERSION 3.15)
+   project(my_example LANGUAGES CXX)
+
+   find_package(qdk REQUIRED COMPONENTS chemistry)
+
+   add_executable(my_example example.cpp)
+   target_link_libraries(my_example PUBLIC qdk::chemistry)
+
+Then build with CMake, pointing to your QDK/Chemistry installation:
+
+.. code-block:: bash
+
+   cmake -B build -DCMAKE_PREFIX_PATH="/path/to/qdk/install"
+   cmake --build build

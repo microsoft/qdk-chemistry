@@ -260,9 +260,9 @@ class TestPyscfPlugin:
         # Test default settings
         assert settings.get("internal") is True
         assert settings.get("external") is True
-        assert settings.get("with_symmetry") is True
+        assert settings.get("with_symmetry") is False
         assert settings.get("nroots") == 3
-        assert settings.get("davidson_tolerance") == 1e-4
+        assert settings.get("davidson_tolerance") == 1e-8
         assert settings.get("stability_tolerance") == -1e-4
 
         # Test setting parameters
@@ -1628,7 +1628,7 @@ class TestPyscfPlugin:
         assert json_num_elec == orig_num_elec
 
         # Test 2: HDF5 serialization
-        filename = tmp_path / "uccsd_wf.hdf5"
+        filename = tmp_path / "uccsd_wf.wavefunction.hdf5"
         cc_wavefunction.to_hdf5_file(str(filename))
         restored_hdf5 = data.Wavefunction.from_hdf5_file(str(filename))
 
@@ -1756,7 +1756,7 @@ class TestPyscfPlugin:
         assert json_num_elec == orig_num_elec
 
         # Test 2: HDF5 serialization
-        filename = tmp_path / "cc_wf.hdf5"
+        filename = tmp_path / "cc_wf.wavefunction.hdf5"
         cc_wavefunction.to_hdf5_file(str(filename))
         restored_hdf5 = data.Wavefunction.from_hdf5_file(str(filename))
 
