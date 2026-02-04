@@ -11,10 +11,7 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 class DensityFittedHamiltonianSettings : public qdk::chemistry::data::Settings {
  public:
-  DensityFittedHamiltonianSettings() {
-    // TODO enable and use
-    // set_default("integral_threshold", 1e-12);
-  }
+  DensityFittedHamiltonianSettings() {}
   ~DensityFittedHamiltonianSettings() override = default;
 };
 

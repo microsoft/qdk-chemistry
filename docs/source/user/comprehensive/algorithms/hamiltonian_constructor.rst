@@ -109,6 +109,7 @@ QDK (Native)
 .. rubric:: Factory name: ``"qdk"`` (default)
 
 The native QDK/Chemistry implementation for Hamiltonian construction. Transforms molecular orbitals from :term:`AO` to :term:`MO` basis and computes one- and two-electron integrals.
+This implementation produces a ``CanonicalFourCenterHamiltonianContainer`` with explicit four-center integrals.
 
 .. rubric:: Settings
 
@@ -125,6 +126,54 @@ The native QDK/Chemistry implementation for Hamiltonian construction. Transforms
    * - ``scf_type``
      - string
      - Type of :term:`SCF` reference ("rhf", "rohf", or "uhf")
+
+QDK Density-Fitted
+~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_density_fitted"``
+
+A memory-efficient implementation that uses density fitting (resolution-of-the-identity, RI) to approximate two-electron integrals.
+This implementation produces a ``DensityFittedHamiltonianContainer`` that stores three-center integrals instead of four-center integrals, significantly reducing memory requirements for large active spaces.
+
+The density fitting approximation expresses four-center integrals as:
+
+.. math::
+
+    (ij|kl) \approx \sum_P (ij|P)(P|kl)
+
+where :math:`P` indexes an auxiliary basis set. The four-center integrals are computed on-the-fly when needed.
+
+.. rubric:: When to use
+
+- Large active space calculations where memory is a concern
+- Systems where the density fitting approximation provides acceptable accuracy
+- Workflows already using density-fitted :term:`SCF` calculations
+
+.. rubric:: Auxiliary basis
+
+The ``run`` method requires an extra auxiliary basis set parameter.
+
+   .. code-block:: cpp
+
+      // Create density-fitted Hamiltonian constructor
+      auto constructor = algorithms::HamiltonianConstructor::create("qdk_density_fitted");
+
+      // Specify auxiliary basis explicitly
+      auto hamiltonian_with_aux = constructor->run(orbitals, "cc-pvtz-ri");
+
+.. tab:: Python API
+
+   .. code-block:: python
+
+      # Create density-fitted Hamiltonian constructor
+      constructor = HamiltonianConstructor.create("qdk_density_fitted")
+
+      # Specify auxiliary basis explicitly
+      hamiltonian_with_aux = constructor.run(orbitals, "cc-pvtz-ri")
+
+.. rubric:: Settings
+
+This implementation currently has no configurable settings.
 
 Related classes
 ---------------
