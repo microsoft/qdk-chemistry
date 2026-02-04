@@ -152,14 +152,14 @@ void DIIS::iterate(const RowMajorMatrix& P, const RowMajorMatrix& F,
 
   // Create error matrix for DIIS (use the base class error calculation)
   RowMajorMatrix error = RowMajorMatrix::Zero(
-      num_density_matrices * num_atomic_orbitals, num_atomic_orbitals);
+      num_orbital_sets * num_atomic_orbitals, num_atomic_orbitals);
   diis_error_ =
       SCFAlgorithm::calculate_og_error_(F, P, S, error, num_orbital_sets);
 
   // Create extrapolated Fock matrix for density matrix update, instead of
   // modifying F in place
   RowMajorMatrix F_extrapolated = RowMajorMatrix::Zero(
-      num_density_matrices * num_atomic_orbitals, num_atomic_orbitals);
+      num_orbital_sets * num_atomic_orbitals, num_atomic_orbitals);
   if (cfg->scf_algorithm.level_shift > 0.0) {  // Level Shifting
     double mu = cfg->scf_algorithm.level_shift;
     apply_level_shift_(F, P, S, F_extrapolated, mu);
@@ -324,6 +324,8 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   diis_impl_->iterate(P, F, S);
   // Update density matrices using the extrapolated Fock matrix
   const RowMajorMatrix& F_extrapolated = diis_impl_->get_extrapolated_fock();
+  std::cout << "Fock matrix after DIIS / level shift:" << std::endl;
+  std::cout << F_extrapolated << std::endl;
 
   int num_atomic_orbitals = scf_impl.get_num_atomic_orbitals();
   int num_molecular_orbitals = scf_impl.get_num_molecular_orbitals();
@@ -335,6 +337,8 @@ void DIIS::iterate(SCFImpl& scf_impl) {
                             num_atomic_orbitals, num_molecular_orbitals, i,
                             cfg->unrestricted);
   }
+  std::cout << "MO matrix after eigenproblem solution:" << std::endl;
+  std::cout << C << std::endl;
 
   // Update spin-blocked density matrices stored in SCFImpl
   auto& P_scf_impl = scf_impl.density_matrix();

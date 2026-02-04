@@ -37,50 +37,55 @@ class ROHFMatrixHandler {
     QDK_LOG_TRACE_ENTERING();
     int num_molecular_orbitals = static_cast<int>(F.cols());
 
-    RowMajorMatrix F_up_mo =
-        RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
-    RowMajorMatrix F_dn_mo = F_up_mo;
-    RowMajorMatrix effective_F_mo = F_up_mo;
+    if (C.isZero()) {
+      effective_F_ = F.block(0, 0, num_molecular_orbitals, num_molecular_orbitals);
+    } else {
+        RowMajorMatrix F_up_mo =
+          RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
+      RowMajorMatrix F_dn_mo = F_up_mo;
+      RowMajorMatrix effective_F_mo = F_up_mo;
 
-    F_up_mo.noalias() =
-        C.transpose() *
-        F.block(0, 0, num_molecular_orbitals, num_molecular_orbitals) * C;
-    F_dn_mo.noalias() =
-        C.transpose() *
-        F.block(num_molecular_orbitals, 0, num_molecular_orbitals,
-                num_molecular_orbitals) *
-        C;
+      F_up_mo.noalias() =
+          C.transpose() *
+          F.block(0, 0, num_molecular_orbitals, num_molecular_orbitals) * C;
+      F_dn_mo.noalias() =
+          C.transpose() *
+          F.block(num_molecular_orbitals, 0, num_molecular_orbitals,
+                  num_molecular_orbitals) *
+          C;
 
-    auto average_block = [&](int row, int col, int rows, int cols) {
-      if (rows <= 0 || cols <= 0) return;
-      effective_F_mo.block(row, col, rows, cols).noalias() =
-          0.5 * (F_up_mo.block(row, col, rows, cols) +
-                 F_dn_mo.block(row, col, rows, cols));
-    };
-    auto copy_block = [&](const RowMajorMatrix& src, int row, int col, int rows,
-                          int cols) {
-      if (rows <= 0 || cols <= 0) return;
-      effective_F_mo.block(row, col, rows, cols) =
-          src.block(row, col, rows, cols);
-    };
+      auto average_block = [&](int row, int col, int rows, int cols) {
+        if (rows <= 0 || cols <= 0) return;
+        effective_F_mo.block(row, col, rows, cols).noalias() =
+            0.5 * (F_up_mo.block(row, col, rows, cols) +
+                   F_dn_mo.block(row, col, rows, cols));
+      };
+      auto copy_block = [&](const RowMajorMatrix& src, int row, int col, int rows,
+                            int cols) {
+        if (rows <= 0 || cols <= 0) return;
+        effective_F_mo.block(row, col, rows, cols) =
+            src.block(row, col, rows, cols);
+      };
 
-    int nd = nelec_beta;
-    int ns = nelec_alpha - nelec_beta;
-    int nv = num_molecular_orbitals - nelec_alpha;
-    average_block(0, 0, nd, nd);               // F_c^{dd}
-    average_block(0, nd + ns, nd, nv);         // F_c^{dv}
-    average_block(nd + ns, 0, nv, nd);         // F_c^{vd}
-    average_block(nd + ns, nd + ns, nv, nv);   // F_c^{vv}
-    average_block(nd, nd, ns, ns);             // F_c^{ss}
-    copy_block(F_dn_mo, 0, nd, nd, ns);        // F_dn^{ds}
-    copy_block(F_dn_mo, nd, 0, ns, nd);        // F_dn^{sd}
-    copy_block(F_up_mo, nd, nd + ns, ns, nv);  // F_up^{sv}
-    copy_block(F_up_mo, nd + ns, nd, nv, ns);  // F_up^{vs}
+      int nd = nelec_beta;
+      int ns = nelec_alpha - nelec_beta;
+      int nv = num_molecular_orbitals - nelec_alpha;
+      average_block(0, 0, nd, nd);               // F_c^{dd}
+      average_block(0, nd + ns, nd, nv);         // F_c^{dv}
+      average_block(nd + ns, 0, nv, nd);         // F_c^{vd}
+      average_block(nd + ns, nd + ns, nv, nv);   // F_c^{vv}
+      average_block(nd, nd, ns, ns);             // F_c^{ss}
+      copy_block(F_dn_mo, 0, nd, nd, ns);        // F_dn^{ds}
+      copy_block(F_dn_mo, nd, 0, ns, nd);        // F_dn^{sd}
+      copy_block(F_up_mo, nd, nd + ns, ns, nv);  // F_up^{sv}
+      copy_block(F_up_mo, nd + ns, nd, nv, ns);  // F_up^{vs}
 
-    effective_F_ =
-        RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
-    effective_F_.noalias() = C * effective_F_mo * C.transpose();
-    effective_F_ = 0.5 * (effective_F_ + effective_F_.transpose().eval());
+      effective_F_ =
+          RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
+      effective_F_.noalias() = C * effective_F_mo * C.transpose();
+      effective_F_ = 0.5 * (effective_F_ + effective_F_.transpose().eval());
+    }
+    
 
     total_P_ = P.block(0, 0, num_molecular_orbitals, num_molecular_orbitals) +
                P.block(num_molecular_orbitals, 0, num_molecular_orbitals,
