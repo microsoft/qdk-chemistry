@@ -152,7 +152,7 @@ std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
 DensityFittedHamiltonianContainer::get_three_center_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_two_body_integrals()) {
-    throw std::runtime_error("Two-body integrals are not set");
+    throw std::runtime_error("Three-center two-body integrals are not set");
   }
   return std::make_pair(std::cref(*std::get<0>(_three_center_integrals)),
                         std::cref(*std::get<1>(_three_center_integrals)));

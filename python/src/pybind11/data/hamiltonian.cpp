@@ -356,7 +356,7 @@ Returns:
     integral vectors [norb^4] for aaaa, aabb, and bbbb spin channels.
 
 Notes:
-    Integrals are stored as flattened vectors in chemist notation <ij|kl>
+    Integrals are stored as flattened vectors in chemist notation (ij|kl)
     where indices are ordered as i + j*norb + k*norb^2 + l*norb^3
 )",
       py::return_value_policy::reference_internal);
@@ -365,14 +365,14 @@ Notes:
       "get_two_body_element",
       &CanonicalFourCenterHamiltonianContainer::get_two_body_element,
       R"(
-Get specific two-electron integral element <ij|kl>.
+Get specific two-electron integral element (ij|kl).
 
 Args:
     i, j, k, l (int): Orbital indices
     channel (SpinChannel): Spin channel (aaaa, aabb, or bbbb), defaults to aaaa
 
 Returns:
-    float: Value of the two-electron integral <ij|kl>
+    float: Value of the two-electron integral (ij|kl)
 )",
       py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
       py::arg("channel") = SpinChannel::aaaa);
@@ -580,14 +580,14 @@ Notes:
   density_fitted.def("get_two_body_element",
                      &DensityFittedHamiltonianContainer::get_two_body_element,
                      R"(
-Get specific two-electron integral element <ij|kl>.
+Get specific two-electron integral element (ij|kl).
 
 Args:
     i, j, k, l (int): Orbital indices
     channel (SpinChannel): Spin channel (aaaa, aabb, or bbbb), defaults to aaaa
 
 Returns:
-    float: Value of the two-electron integral <ij|kl>
+    float: Value of the two-electron integral (ij|kl)
 )",
                      py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
                      py::arg("channel") = SpinChannel::aaaa);
@@ -746,20 +746,20 @@ Raises:
     RuntimeError: If two-body integrals have not been set
 
 Notes:
-    Integrals are stored as flattened vectors in chemist notation <ij|kl>
+    Integrals are stored as flattened vectors in chemist notation (ij|kl)
 )",
                           py::return_value_policy::reference_internal);
 
   hamiltonian.def("get_two_body_element", &Hamiltonian::get_two_body_element,
                   R"(
-Get specific two-electron integral element <ij|kl>.
+Get specific two-electron integral element (ij|kl).
 
 Args:
     i, j, k, l (int): Orbital indices
     channel (SpinChannel): Spin channel (aaaa, aabb, or bbbb), defaults to aaaa
 
 Returns:
-    float: Value of the two-electron integral <ij|kl>
+    float: Value of the two-electron integral (ij|kl)
 )",
                   py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
                   py::arg("channel") = SpinChannel::aaaa);

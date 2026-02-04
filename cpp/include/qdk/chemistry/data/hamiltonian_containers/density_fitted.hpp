@@ -64,7 +64,7 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
-   * @brief Constructor for active space Hamiltonian with four center integrals
+   * @brief Constructor for active space Hamiltonian with three center integrals
    * using separate spin components
    *
    * @param one_body_integrals_alpha One-electron integrals for alpha spin in MO
@@ -127,7 +127,7 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Get three-center integrals in MO basis for all spin channels
-   * @return Tuple of references to (aa, bb) three-center two-electron
+   * @return Pair of references to (aa, bb) three-center two-electron
    * integrals matrices
    * @throws std::runtime_error if integrals are not set
    */
@@ -209,25 +209,29 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
   bool is_valid() const override final;
 
  private:
-  /// Three-center integrals in MO basis, stored as matrices [naux x n_geminals]
-  /// where n_geminals = norb * norb for each spin channel
-  const std::tuple<std::shared_ptr<Eigen::MatrixXd>,
-                   std::shared_ptr<Eigen::MatrixXd>>
+  /**
+   * Three-center integrals in MO basis, stored as matrices [naux x n_geminals]
+   * where n_geminals = norb * norb for each spin channel
+   */
+  const std::pair<std::shared_ptr<Eigen::MatrixXd>,
+                  std::shared_ptr<Eigen::MatrixXd>>
       _three_center_integrals;
 
-  /// Lazily computed four-center integrals cache (built on first access)
-  /// Stores (aaaa, aabb, bbbb) as flattened arrays [norb^4]
-  /// Uses shared_ptr so restricted case can share the same data for all
-  /// channels
+  /**
+   * Lazily computed four-center integrals cache (built on first access).
+   * Stores (aaaa, aabb, bbbb) as flattened arrays [norb^4].
+   * Uses shared_ptr so restricted case can share the same data for all
+   * channels.
+   */
   mutable std::optional<std::tuple<std::shared_ptr<Eigen::VectorXd>,
                                    std::shared_ptr<Eigen::VectorXd>,
                                    std::shared_ptr<Eigen::VectorXd>>>
       _cached_four_center_integrals;
 
-  /// Build four-center integrals from three-center integrals and cache them
+  /** Build four-center integrals from three-center integrals and cache them */
   void _build_four_center_cache() const;
 
-  /// Validation helpers
+  /** Validation helper for integral dimensions */
   void validate_integral_dimensions() const override final;
 
   size_t _get_geminal_index(size_t i, size_t j) const;
@@ -249,7 +253,7 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
   void _to_fcidump_file(const std::string& filename, size_t nalpha,
                         size_t nbeta) const;
 
-  /// Serialization version
+  /** Serialization version */
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 };
 
