@@ -116,7 +116,7 @@ class HamiltonianConstructor
    * @param aux_basis Optional auxiliary basis set for density-fitted
    *        implementations. Can be a BasisSet pointer or a string name.
    *        Implementations that don't use density fitting should not provide
-   * this.
+   *        this parameter.
    * @return The constructed Hamiltonian operator
    */
   virtual std::shared_ptr<data::Hamiltonian> _run_impl(
