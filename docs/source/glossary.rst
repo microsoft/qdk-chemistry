@@ -46,7 +46,7 @@ Acronym definitions
 
    DF
       Density Fitting.
-      An approximation technique for two-electron integrals that uses an auxiliary basis to reduce storage from :math:`O(N^4)` to :math:`O(N_{aux} \\times N^2)`.
+      An approximation technique for two-electron integrals that uses an auxiliary basis to reduce storage from :math:`O(N^4)` to :math:`O(N_{aux} \times N^2)`.
       Also known as Resolution of the Identity (RI).
 
    DIIS

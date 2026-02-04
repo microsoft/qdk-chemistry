@@ -73,7 +73,7 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
    * basis
    * @param three_center_integrals_aa Three-center two-electron alpha-alpha
    * integrals
-   * @param three_center_integrals_bb Three-center two-electron alpha-beta
+   * @param three_center_integrals_bb Three-center two-electron beta-beta
    * integrals
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital

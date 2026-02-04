@@ -183,7 +183,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
   auto aux_basis_set = qdk_raw_aux_basis_set;
   const auto& [Ca, Cb] = orbitals->get_coefficients();
   const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
-  const size_t num_auxillary_orbitals =
+  const size_t num_auxiliary_orbitals =
       aux_basis_set->get_num_atomic_orbitals();
   const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
 
@@ -304,7 +304,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
 
   auto h_eri =
       qcs::libint2_util::eri_df(internal_basis_set->mode, basis_libint2,
-                                aux_basis_libint2, 0, num_auxillary_orbitals);
+                                aux_basis_libint2, 0, num_auxiliary_orbitals);
   auto h_metric =
       qcs::libint2_util::metric_df(internal_basis_set->mode, aux_basis_libint2);
 
@@ -312,23 +312,23 @@ DensityFittedHamiltonianConstructor::_run_impl(
 
   if (is_restricted_calc) {
     // Only allocate and compute (αα|αα) integrals - the others are identical
-    dfmoeri_aa.resize(num_auxillary_orbitals, df_geminal_size);
+    dfmoeri_aa.resize(num_auxiliary_orbitals, df_geminal_size);
     detail_df::transform_dferi_ao_to_mo(num_atomic_orbitals, nactive,
-                                        num_auxillary_orbitals, h_eri, h_metric,
+                                        num_auxiliary_orbitals, h_eri, h_metric,
                                         Ca_active_rm, dfmoeri_aa);
   } else {
     // Unrestricted case - allocate and compute all three types of integrals
-    dfmoeri_aa.resize(num_auxillary_orbitals, df_geminal_size);
-    dfmoeri_bb.resize(num_auxillary_orbitals, df_geminal_size);
+    dfmoeri_aa.resize(num_auxiliary_orbitals, df_geminal_size);
+    dfmoeri_bb.resize(num_auxiliary_orbitals, df_geminal_size);
 
     // (X|αα) integrals
     detail_df::transform_dferi_ao_to_mo(num_atomic_orbitals, nactive,
-                                        num_auxillary_orbitals, h_eri, h_metric,
+                                        num_auxiliary_orbitals, h_eri, h_metric,
                                         Ca_active_rm, dfmoeri_aa);
 
     // (X|ββ) integrals
     detail_df::transform_dferi_ao_to_mo(num_atomic_orbitals, nactive,
-                                        num_auxillary_orbitals, h_eri, h_metric,
+                                        num_auxiliary_orbitals, h_eri, h_metric,
                                         Cb_active_rm, dfmoeri_bb);
   }
 

@@ -71,7 +71,7 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
    * basis
    * @param two_body_integrals_aaaa Two-electron alpha-alpha-alpha-alpha
    * integrals
-   * @param two_body_integrals_aabb Two-electron alpha-beta-alpha-beta integrals
+   * @param two_body_integrals_aabb Two-electron alpha-alpha-beta-beta integrals
    * @param two_body_integrals_bbbb Two-electron beta-beta-beta-beta integrals
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital
