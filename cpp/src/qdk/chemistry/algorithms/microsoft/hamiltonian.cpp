@@ -91,7 +91,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   if (aux_basis) {
     throw std::runtime_error(
-        "Auxiliary basis sets are not supported in the standard Hamiltonian "
+        "Auxiliary basis sets are not supported in the four-center Hamiltonian "
         "constructor. Do you mean to use DensityFittedHamiltonianConstructor?");
   }
 

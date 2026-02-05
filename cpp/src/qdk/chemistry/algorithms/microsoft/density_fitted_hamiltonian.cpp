@@ -295,7 +295,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
   Eigen::MatrixXd dfmoeri_aa;
   Eigen::MatrixXd dfmoeri_bb;
 
-  const size_t df_geminal_size = nactive * nactive;
+  const size_t df_orb_pair_size = nactive * nactive;
 
   auto basis_libint2 =
       qcs::libint2_util::convert_to_libint_basisset(*internal_basis_set);
@@ -312,14 +312,14 @@ DensityFittedHamiltonianConstructor::_run_impl(
 
   if (is_restricted_calc) {
     // Only allocate and compute (αα|αα) integrals - the others are identical
-    dfmoeri_aa.resize(num_auxiliary_orbitals, df_geminal_size);
+    dfmoeri_aa.resize(num_auxiliary_orbitals, df_orb_pair_size);
     detail_df::transform_dferi_ao_to_mo(num_atomic_orbitals, nactive,
                                         num_auxiliary_orbitals, h_eri, h_metric,
                                         Ca_active_rm, dfmoeri_aa);
   } else {
     // Unrestricted case - allocate and compute all three types of integrals
-    dfmoeri_aa.resize(num_auxiliary_orbitals, df_geminal_size);
-    dfmoeri_bb.resize(num_auxiliary_orbitals, df_geminal_size);
+    dfmoeri_aa.resize(num_auxiliary_orbitals, df_orb_pair_size);
+    dfmoeri_bb.resize(num_auxiliary_orbitals, df_orb_pair_size);
 
     // (X|αα) integrals
     detail_df::transform_dferi_ao_to_mo(num_atomic_orbitals, nactive,

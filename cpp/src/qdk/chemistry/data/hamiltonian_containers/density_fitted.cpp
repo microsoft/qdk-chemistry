@@ -3,9 +3,12 @@
 // license information.
 
 #include <algorithm>
+#include <blas.hh>
+#include <cstddef>
 #include <fstream>
 #include <iostream>
 #include <macis/util/fcidump.hpp>
+#include <memory>
 #include <qdk/chemistry/data/hamiltonian_containers/density_fitted.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
@@ -112,37 +115,36 @@ void DensityFittedHamiltonianContainer::_build_four_center_cache() const {
   size_t norb4 = norb2 * norb2;
 
   // Helper lambda to build 4-center from 3-center: (ij|kl) = sum_P A_P,ij *
-  // A_P,kl This is a Gram matrix computation: G = A^T * A, using optimized BLAS
-  // GEMM
-  auto build_four_center = [&](const Eigen::MatrixXd& three_center_left,
-                               const Eigen::MatrixXd& three_center_right)
+  // B_P,kl This computes G = A^T * B using BLAS GEMM
+  auto build_four_center =
+      [&](std::shared_ptr<const Eigen::MatrixXd> three_center_left,
+          std::shared_ptr<const Eigen::MatrixXd> three_center_right)
       -> std::shared_ptr<Eigen::VectorXd> {
     // Allocate output vector
     auto four_center = std::make_shared<Eigen::VectorXd>(norb4);
 
-    // Map the VectorXd memory as a row-major matrix view
-    // Layout: V[ij*norb2 + kl] = G(ij,kl) where G = A^T * A
-    Eigen::Map<
-        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
-        gram_view(four_center->data(), norb2, norb2);
+    size_t naux = three_center_left->rows();
 
-    gram_view.noalias() = three_center_left.transpose() * three_center_right;
+    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+               norb2, norb2, naux, 1.0, three_center_left->data(), naux,
+               three_center_right->data(), naux, 0.0, four_center->data(),
+               norb2);
 
     return four_center;
   };
 
   // Build four-center integrals from three-center
-  auto aaaa = build_four_center(*_three_center_integrals.first,
-                                *_three_center_integrals.first);
+  auto aaaa = build_four_center(_three_center_integrals.first,
+                                _three_center_integrals.first);
 
   if (is_restricted()) {
     _cached_four_center_integrals.emplace(aaaa, aaaa, aaaa);
     return;
   } else {
-    auto aabb = build_four_center(*_three_center_integrals.first,
-                                  *_three_center_integrals.second);
-    auto bbbb = build_four_center(*_three_center_integrals.second,
-                                  *_three_center_integrals.second);
+    auto aabb = build_four_center(_three_center_integrals.first,
+                                  _three_center_integrals.second);
+    auto bbbb = build_four_center(_three_center_integrals.second,
+                                  _three_center_integrals.second);
     _cached_four_center_integrals.emplace(std::move(aaaa), std::move(aabb),
                                           std::move(bbbb));
   }
