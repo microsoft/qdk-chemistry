@@ -60,6 +60,12 @@ os.environ["QSHARP_PYTHON_TELEMETRY"] = "disabled"
 
 If you have any questions about the library's use of Telemetry, please use the [Discussion forum](https://github.com/microsoft/qdk-chemistry/discussions).
 
+## Citing QDK/Chemistry
+
+If you use QDK/Chemistry in your research, please cite the following paper:
+
+> N. A. Baker, B. Bilodeau, C. Chen, Y. Chen, M. Eckhoff, A. Efimovskaya, P. Gasparotto, P. van Gerwen, R. Gong, K. Hoang, Z. Hooshmand, A. J. Jenkins, C. S. N. Johnston, R. R. Li, J. Liang, H. Liu, A. Mills, M. Mörchen, G. Nishibuchi, C. Sun, B. Ticehurst, M. Troyer, J. P. Unsleber, S. Wernli, D. B. Williams-Young, and B. Zhang, "QDK/Chemistry: A Modular Toolkit for Quantum Chemistry Applications," [arXiv:2601.15253](https://arxiv.org/abs/2601.15253) (2026).
+
 ## Contributing
 
 There are many ways in which you can participate in this project, for example:
