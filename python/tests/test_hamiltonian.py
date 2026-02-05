@@ -1102,6 +1102,8 @@ class TestCholeskyHamiltonian:
         assert np.array_equal(
             h_unrestricted.get_one_body_integrals()[1], h_unrestricted_json.get_one_body_integrals()[1]
         )
+
+
 def test_hamiltonian_data_type_name():
     """Test that Hamiltonian has the correct _data_type_name class attribute."""
     assert hasattr(Hamiltonian, "_data_type_name")
