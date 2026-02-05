@@ -18,7 +18,13 @@ from pathlib import Path
 project = "qdk-chemistry"
 copyright = "Microsoft Corporation. All rights reserved. Licensed under the MIT License"
 author = "QDK/Chemistry Team"
-release = "1.0.2"
+
+# Read version from VERSION file at repo root
+_version_file = Path(__file__).parent.parent.parent / "VERSION"
+try:
+    release = _version_file.read_text().strip()
+except FileNotFoundError:
+    release = "0.0.0.dev0"  # Fallback for incomplete checkouts
 
 # -----------------------------------------------------------------------------
 # Perform initial setup and tests
