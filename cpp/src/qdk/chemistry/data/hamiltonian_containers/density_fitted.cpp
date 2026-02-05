@@ -171,8 +171,8 @@ double DensityFittedHamiltonianContainer::get_two_body_element(
     throw std::out_of_range("Orbital index out of range");
   }
 
-  size_t ij = _get_geminal_index(i, j);
-  size_t kl = _get_geminal_index(k, l);
+  size_t ij = _get_orb_pair_index(i, j);
+  size_t kl = _get_orb_pair_index(k, l);
 
   // Select the appropriate integral based on spin channel
   switch (channel) {
@@ -194,12 +194,12 @@ double DensityFittedHamiltonianContainer::_get_two_body_element(
     const Eigen::MatrixXd& A, unsigned ij, const Eigen::MatrixXd& B,
     unsigned kl) const {
   QDK_LOG_TRACE_ENTERING();
-  // Note three-center integral stores each geminal in a column
+  // Note three-center integral stores each orb_pair in a column
   return A.col(ij).dot(B.col(kl));
 }
 
-size_t DensityFittedHamiltonianContainer::_get_geminal_index(size_t i,
-                                                             size_t j) const {
+size_t DensityFittedHamiltonianContainer::_get_orb_pair_index(size_t i,
+                                                              size_t j) const {
   QDK_LOG_TRACE_ENTERING();
   size_t norb = _orbitals->get_active_space_indices().first.size();
   return i * norb + j;
@@ -248,26 +248,26 @@ void DensityFittedHamiltonianContainer::validate_integral_dimensions() const {
   }
 
   // Check two-body integrals dimensions
-  // Three-center integrals have shape [n_aux x n_geminals] where n_geminals =
+  // Three-center integrals have shape [n_aux x n_orb_pairs] where n_orb_pairs =
   // norb^2
   size_t norb_alpha = _one_body_integrals.first->rows();
-  unsigned geminal_size = norb_alpha * norb_alpha;
+  unsigned orb_pair_size = norb_alpha * norb_alpha;
 
-  // Check alpha-alpha integrals - cols should equal geminal_size
+  // Check alpha-alpha integrals - cols should equal orb_pair_size
   if (static_cast<unsigned>(_three_center_integrals.first->cols()) !=
-      geminal_size) {
+      orb_pair_size) {
     throw std::invalid_argument(
         "Alpha-alpha three-center integrals columns (" +
         std::to_string(_three_center_integrals.first->cols()) +
-        ") does not match expected geminal size (" +
-        std::to_string(geminal_size) + " for " + std::to_string(norb_alpha) +
+        ") does not match expected orb_pair size (" +
+        std::to_string(orb_pair_size) + " for " + std::to_string(norb_alpha) +
         " orbitals)");
   }
 
   // Check beta-beta integrals (if different from alpha-alpha)
   if (_three_center_integrals.second != _three_center_integrals.first) {
     if (static_cast<unsigned>(_three_center_integrals.second->cols()) !=
-            geminal_size or
+            orb_pair_size or
         static_cast<unsigned>(_three_center_integrals.second->rows()) !=
             static_cast<unsigned>(_three_center_integrals.first->rows())) {
       throw std::invalid_argument(

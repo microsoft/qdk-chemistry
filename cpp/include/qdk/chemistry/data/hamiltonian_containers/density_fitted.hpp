@@ -20,29 +20,19 @@ namespace qdk::chemistry::data {
 /**
  * @class DensityFittedHamiltonianContainer
  * @brief Contains a molecular Hamiltonian using three center
- * integrals, implemented as a subclass of HamiltonianContainer.
+ * integrals.
  *
- * This class stores molecular Hamiltonian data for quantum chemistry
- * calculations, specifically designed for active space methods. It contains:
- * - One-electron integrals (kinetic + nuclear attraction) in MO representation
+ * In addition to those contained in HamiltonianContainer, this subclass also
+ * contains:
  * - Three-center two-electron integrals (electron-electron repulsion) in MO
- * representation
- * - Molecular orbital information for the active space
- * - Core energy contributions from inactive orbitals and nuclear repulsion
+ * representation.
  *
- * This class implies that all inactive orbitals are fully occupied for the
- * purpose of computing the core energy and inactive Fock matrix.
- *
- * The Hamiltonian is immutable after construction, meaning all data must be
- * provided during construction and cannot be modified afterwards. The
- * Hamiltonian supports both restricted and unrestricted calculations and
- * integrates with the broader quantum chemistry framework for active space
- * methods.
  */
 class DensityFittedHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
    * @brief Constructor for active space Hamiltonian with three center integrals
+   * (Q|ij)
    *
    * @param one_body_integrals One-electron integrals in MO basis [norb x norb]
    * @param three_center_integrals Three-center two-electron integrals in MO
@@ -234,7 +224,7 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
   /** Validation helper for integral dimensions */
   void validate_integral_dimensions() const override final;
 
-  size_t _get_geminal_index(size_t i, size_t j) const;
+  size_t _get_orb_pair_index(size_t i, size_t j) const;
 
   double _get_two_body_element(const Eigen::MatrixXd& A, unsigned ij,
                                const Eigen::MatrixXd& B, unsigned kl) const;
