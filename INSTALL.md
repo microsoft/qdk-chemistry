@@ -55,6 +55,7 @@ The following extras are available:
 
 | Extra | Description | Included Packages |
 |-------|-------------|-------------------|
+| `jupyter` | Jupyter notebook support | ipykernel, pandas, pyscf |
 | `plugins` | Third-party quantum chemistry backends | PySCF |
 | `qiskit-extras` | Optional Qiskit ecosystem packages | qiskit-aer, qiskit-nature |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |

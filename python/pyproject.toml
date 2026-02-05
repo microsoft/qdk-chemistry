@@ -78,6 +78,11 @@ docs = [
   "sphinxcontrib-bibtex",
   "sphinx_copybutton"
 ]
+jupyter = [
+  "ipykernel>=6.0",
+  "pandas>=2.0.0",
+  "pyscf>=2.9.0"
+]
 plugins = [
   "pyscf>=2.9.0"
 ]
