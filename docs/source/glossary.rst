@@ -44,6 +44,11 @@ Acronym definitions
    DFT
       Density Functional Theory.
 
+   DF
+      Density Fitting.
+      An approximation technique for two-electron integrals that uses an auxiliary basis to reduce storage from :math:`O(N^4)` to :math:`O(N_{aux} \\times N^2)`.
+      Also known as Resolution of the Identity (RI).
+
    DIIS
       Direct Inversion in the Iterative Subspace.
 
@@ -107,6 +112,10 @@ Acronym definitions
 
    RHF
       Restricted Hartree-Fock.
+
+   RI
+      Resolution of the Identity.
+      An approximation technique for two-electron integrals, synonymous with Density Fitting (DF).
 
    RKS
       Restricted Kohn-Sham.

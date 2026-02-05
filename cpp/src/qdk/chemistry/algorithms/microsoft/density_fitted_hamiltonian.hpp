@@ -9,24 +9,21 @@
 
 namespace qdk::chemistry::algorithms::microsoft {
 
-class HamiltonianSettings : public qdk::chemistry::data::Settings {
+class DensityFittedHamiltonianSettings : public qdk::chemistry::data::Settings {
  public:
-  HamiltonianSettings() {
-    set_default("eri_method", "direct");
-    set_default("scf_type", "auto");
-  }
-  ~HamiltonianSettings() override = default;
+  DensityFittedHamiltonianSettings() {}
+  ~DensityFittedHamiltonianSettings() override = default;
 };
 
-class HamiltonianConstructor
+class DensityFittedHamiltonianConstructor
     : public qdk::chemistry::algorithms::HamiltonianConstructor {
  public:
-  HamiltonianConstructor() {
-    _settings = std::make_unique<HamiltonianSettings>();
+  DensityFittedHamiltonianConstructor() {
+    _settings = std::make_unique<DensityFittedHamiltonianSettings>();
   };
-  ~HamiltonianConstructor() override = default;
+  ~DensityFittedHamiltonianConstructor() override = default;
 
-  virtual std::string name() const final { return "qdk"; };
+  virtual std::string name() const final { return "qdk_density_fitted"; };
 
  protected:
   std::shared_ptr<data::Hamiltonian> _run_impl(
