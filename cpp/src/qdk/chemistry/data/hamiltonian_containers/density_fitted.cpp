@@ -173,20 +173,25 @@ double DensityFittedHamiltonianContainer::get_two_body_element(
     throw std::out_of_range("Orbital index out of range");
   }
 
-  size_t ij = _get_orb_pair_index(i, j);
-  size_t kl = _get_orb_pair_index(k, l);
+  if (!_cached_four_center_integrals) {
+    _build_four_center_cache();
+  }
+
+  size_t ij = i * norb + j;
+  size_t kl = k * norb + l;
 
   // Select the appropriate integral based on spin channel
   switch (channel) {
     case SpinChannel::aaaa:
-      return _get_two_body_element(*_three_center_integrals.first, ij,
-                                   *_three_center_integrals.first, kl);
+      return (*std::get<0>(*_cached_four_center_integrals))(ij * norb * norb +
+                                                            kl);
     case SpinChannel::aabb:
-      return _get_two_body_element(*_three_center_integrals.first, ij,
-                                   *_three_center_integrals.second, kl);
+      return (*std::get<1>(*_cached_four_center_integrals))(ij * norb * norb +
+                                                            kl);
     case SpinChannel::bbbb:
-      return _get_two_body_element(*_three_center_integrals.second, ij,
-                                   *_three_center_integrals.second, kl);
+      return (*std::get<2>(*_cached_four_center_integrals))(ij * norb * norb +
+                                                            kl);
+
     default:
       throw std::invalid_argument("Invalid spin channel");
   }
@@ -198,13 +203,6 @@ double DensityFittedHamiltonianContainer::_get_two_body_element(
   QDK_LOG_TRACE_ENTERING();
   // Note three-center integral stores each orb_pair in a column
   return A.col(ij).dot(B.col(kl));
-}
-
-size_t DensityFittedHamiltonianContainer::_get_orb_pair_index(size_t i,
-                                                              size_t j) const {
-  QDK_LOG_TRACE_ENTERING();
-  size_t norb = _orbitals->get_active_space_indices().first.size();
-  return i * norb + j;
 }
 
 bool DensityFittedHamiltonianContainer::has_two_body_integrals() const {

@@ -224,8 +224,6 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
   /** Validation helper for integral dimensions */
   void validate_integral_dimensions() const override final;
 
-  size_t _get_orb_pair_index(size_t i, size_t j) const;
-
   double _get_two_body_element(const Eigen::MatrixXd& A, unsigned ij,
                                const Eigen::MatrixXd& B, unsigned kl) const;
 
