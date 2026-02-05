@@ -19,28 +19,20 @@ namespace qdk::chemistry::data {
 /**
  * @class CanonicalFourCenterHamiltonianContainer
  * @brief Contains a molecular Hamiltonian using canonical four center
- * integrals, implemented as a subclass of HamiltonianContainer.
+ * integrals (ij|kl).
  *
  * This class stores molecular Hamiltonian data for quantum chemistry
- * calculations, specifically designed for active space methods. It contains:
- * - One-electron integrals (kinetic + nuclear attraction) in MO representation
+ * calculations. In addition to those contained in HamiltonianContainer, it
+ * contains:
  * - Two-electron integrals (electron-electron repulsion) in MO representation
- * - Molecular orbital information for the active space
- * - Core energy contributions from inactive orbitals and nuclear repulsion
+ * in chemist's notation (ij|kl).
  *
- * This class implies that all inactive orbitals are fully occupied for the
- * purpose of computing the core energy and inactive Fock matrix.
- *
- * The Hamiltonian is immutable after construction, meaning all data must be
- * provided during construction and cannot be modified afterwards. The
- * Hamiltonian supports both restricted and unrestricted calculations and
- * integrates with the broader quantum chemistry framework for active space
- * methods.
  */
 class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
    * @brief Constructor for active space Hamiltonian with four center integrals
+   * (ij|kl)
    *
    * @param one_body_integrals One-electron integrals in MO basis [norb x norb]
    * @param two_body_integrals Two-electron integrals in MO basis [norb x norb x
