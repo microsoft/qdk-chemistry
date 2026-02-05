@@ -2029,6 +2029,70 @@ TEST_F(HamiltonianIntegrationTest, DensityFittedRestrictedO2MP2) {
 }
 
 // ============================================================================
+// Container Type Consistency Test
+// ============================================================================
+
+/**
+ * @brief Test that container type is preserved through JSON serialization.
+ *
+ * Verifies that serializing a canonical_four_center Hamiltonian to JSON and
+ * deserializing cannot produce a density_fitted container, and vice versa.
+ */
+TEST(HamiltonianContainerTypeTest, ContainerTypePreservedThroughSerialization) {
+  // Create test data
+  Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::VectorXd two_body = Eigen::VectorXd::Constant(16, 2.0);
+  // Three-center: 1.0^2 + 0.6^2 + 0.8^2 = 2.0 (matches two_body)
+  Eigen::MatrixXd three_center = (Eigen::MatrixXd(3, 4) << 1.0, 1.0, 1.0, 1.0,
+                                  0.6, 0.6, 0.6, 0.6, 0.8, 0.8, 0.8, 0.8)
+                                     .finished();
+  auto orbitals = std::make_shared<ModelOrbitals>(2, true);
+  Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
+
+  // Create canonical Hamiltonian
+  auto h_canonical = std::make_shared<Hamiltonian>(
+      std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          one_body, two_body, orbitals, 1.5, inactive_fock));
+
+  // Create density-fitted Hamiltonian
+  auto h_df = std::make_shared<Hamiltonian>(
+      std::make_unique<DensityFittedHamiltonianContainer>(
+          one_body, three_center, orbitals, 1.5, inactive_fock));
+
+  // Verify original types
+  EXPECT_EQ(h_canonical->get_container_type(), "canonical_four_center");
+  EXPECT_EQ(h_df->get_container_type(), "density_fitted");
+
+  // Serialize and deserialize canonical
+  nlohmann::json canonical_json = h_canonical->to_json();
+  auto h_canonical_restored = Hamiltonian::from_json(canonical_json);
+  EXPECT_EQ(h_canonical_restored->get_container_type(), "canonical_four_center")
+      << "Canonical container type must be preserved through JSON";
+  EXPECT_NE(h_canonical_restored->get_container_type(), "density_fitted")
+      << "Canonical JSON cannot produce density_fitted container";
+
+  // Serialize and deserialize density-fitted
+  nlohmann::json df_json = h_df->to_json();
+  auto h_df_restored = Hamiltonian::from_json(df_json);
+  EXPECT_EQ(h_df_restored->get_container_type(), "density_fitted")
+      << "Density-fitted container type must be preserved through JSON";
+  EXPECT_NE(h_df_restored->get_container_type(), "canonical_four_center")
+      << "Density-fitted JSON cannot produce canonical container";
+
+  // Verify HDF5 serialization as well
+  h_canonical->to_hdf5_file("test_canonical.hamiltonian.h5");
+  auto h_canonical_hdf5 =
+      Hamiltonian::from_hdf5_file("test_canonical.hamiltonian.h5");
+  EXPECT_EQ(h_canonical_hdf5->get_container_type(), "canonical_four_center");
+  std::filesystem::remove("test_canonical.hamiltonian.h5");
+
+  h_df->to_hdf5_file("test_df.hamiltonian.h5");
+  auto h_df_hdf5 = Hamiltonian::from_hdf5_file("test_df.hamiltonian.h5");
+  EXPECT_EQ(h_df_hdf5->get_container_type(), "density_fitted");
+  std::filesystem::remove("test_df.hamiltonian.h5");
+}
+
+// ============================================================================
 // Instantiate parameterized tests for all container types
 // ============================================================================
 INSTANTIATE_TEST_SUITE_P(

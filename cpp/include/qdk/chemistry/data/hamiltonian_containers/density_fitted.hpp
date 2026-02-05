@@ -186,7 +186,7 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Load Hamiltonian from JSON
    * @param j JSON object containing Hamiltonian data
-   * @return Shared pointer to const Hamiltonian loaded from JSON
+   * @return Unique pointer to const Hamiltonian loaded from JSON
    * @throws std::runtime_error if JSON is malformed
    */
   static std::unique_ptr<DensityFittedHamiltonianContainer> from_json(

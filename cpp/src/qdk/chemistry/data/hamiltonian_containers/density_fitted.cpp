@@ -70,14 +70,14 @@ std::unique_ptr<HamiltonianContainer> DensityFittedHamiltonianContainer::clone()
   QDK_LOG_TRACE_ENTERING();
   if (is_restricted()) {
     return std::make_unique<DensityFittedHamiltonianContainer>(
-        *_one_body_integrals.first, *std::get<0>(_three_center_integrals),
-        _orbitals, _core_energy, *_inactive_fock_matrix.first, _type);
+        *_one_body_integrals.first, *_three_center_integrals.first, _orbitals,
+        _core_energy, *_inactive_fock_matrix.first, _type);
   }
   return std::make_unique<DensityFittedHamiltonianContainer>(
       *_one_body_integrals.first, *_one_body_integrals.second,
-      *std::get<0>(_three_center_integrals),
-      *std::get<1>(_three_center_integrals), _orbitals, _core_energy,
-      *_inactive_fock_matrix.first, *_inactive_fock_matrix.second, _type);
+      *_three_center_integrals.first, *_three_center_integrals.second,
+      _orbitals, _core_energy, *_inactive_fock_matrix.first,
+      *_inactive_fock_matrix.second, _type);
 }
 
 std::string DensityFittedHamiltonianContainer::get_container_type() const {
@@ -132,17 +132,17 @@ void DensityFittedHamiltonianContainer::_build_four_center_cache() const {
   };
 
   // Build four-center integrals from three-center
-  auto aaaa = build_four_center(*std::get<0>(_three_center_integrals),
-                                *std::get<0>(_three_center_integrals));
+  auto aaaa = build_four_center(*_three_center_integrals.first,
+                                *_three_center_integrals.first);
 
   if (is_restricted()) {
     _cached_four_center_integrals.emplace(aaaa, aaaa, aaaa);
     return;
   } else {
-    auto aabb = build_four_center(*std::get<0>(_three_center_integrals),
-                                  *std::get<1>(_three_center_integrals));
-    auto bbbb = build_four_center(*std::get<1>(_three_center_integrals),
-                                  *std::get<1>(_three_center_integrals));
+    auto aabb = build_four_center(*_three_center_integrals.first,
+                                  *_three_center_integrals.second);
+    auto bbbb = build_four_center(*_three_center_integrals.second,
+                                  *_three_center_integrals.second);
     _cached_four_center_integrals.emplace(std::move(aaaa), std::move(aabb),
                                           std::move(bbbb));
   }
@@ -154,8 +154,8 @@ DensityFittedHamiltonianContainer::get_three_center_integrals() const {
   if (!has_two_body_integrals()) {
     throw std::runtime_error("Three-center two-body integrals are not set");
   }
-  return std::make_pair(std::cref(*std::get<0>(_three_center_integrals)),
-                        std::cref(*std::get<1>(_three_center_integrals)));
+  return std::make_pair(std::cref(*_three_center_integrals.first),
+                        std::cref(*_three_center_integrals.second));
 }
 
 double DensityFittedHamiltonianContainer::get_two_body_element(
@@ -177,14 +177,14 @@ double DensityFittedHamiltonianContainer::get_two_body_element(
   // Select the appropriate integral based on spin channel
   switch (channel) {
     case SpinChannel::aaaa:
-      return _get_two_body_element(*std::get<0>(_three_center_integrals), ij,
-                                   *std::get<0>(_three_center_integrals), kl);
+      return _get_two_body_element(*_three_center_integrals.first, ij,
+                                   *_three_center_integrals.first, kl);
     case SpinChannel::aabb:
-      return _get_two_body_element(*std::get<0>(_three_center_integrals), ij,
-                                   *std::get<1>(_three_center_integrals), kl);
+      return _get_two_body_element(*_three_center_integrals.first, ij,
+                                   *_three_center_integrals.second, kl);
     case SpinChannel::bbbb:
-      return _get_two_body_element(*std::get<1>(_three_center_integrals), ij,
-                                   *std::get<1>(_three_center_integrals), kl);
+      return _get_two_body_element(*_three_center_integrals.second, ij,
+                                   *_three_center_integrals.second, kl);
     default:
       throw std::invalid_argument("Invalid spin channel");
   }
@@ -207,8 +207,8 @@ size_t DensityFittedHamiltonianContainer::_get_geminal_index(size_t i,
 
 bool DensityFittedHamiltonianContainer::has_two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
-  return std::get<0>(_three_center_integrals) != nullptr &&
-         std::get<0>(_three_center_integrals)->size() > 0;
+  return _three_center_integrals.first != nullptr &&
+         _three_center_integrals.first->size() > 0;
 }
 
 bool DensityFittedHamiltonianContainer::is_restricted() const {
@@ -216,8 +216,7 @@ bool DensityFittedHamiltonianContainer::is_restricted() const {
   // Hamiltonian is restricted if alpha and beta components point to the same
   // data
   return (_one_body_integrals.first == _one_body_integrals.second) &&
-         (std::get<0>(_three_center_integrals) ==
-          std::get<1>(_three_center_integrals)) &&
+         (_three_center_integrals.first == _three_center_integrals.second) &&
          (_inactive_fock_matrix.first == _inactive_fock_matrix.second ||
           (!_inactive_fock_matrix.first && !_inactive_fock_matrix.second));
 }
@@ -255,24 +254,22 @@ void DensityFittedHamiltonianContainer::validate_integral_dimensions() const {
   unsigned geminal_size = norb_alpha * norb_alpha;
 
   // Check alpha-alpha integrals - cols should equal geminal_size
-  if (static_cast<unsigned>(std::get<0>(_three_center_integrals)->cols()) !=
+  if (static_cast<unsigned>(_three_center_integrals.first->cols()) !=
       geminal_size) {
     throw std::invalid_argument(
         "Alpha-alpha three-center integrals columns (" +
-        std::to_string(std::get<0>(_three_center_integrals)->cols()) +
+        std::to_string(_three_center_integrals.first->cols()) +
         ") does not match expected geminal size (" +
         std::to_string(geminal_size) + " for " + std::to_string(norb_alpha) +
         " orbitals)");
   }
 
   // Check beta-beta integrals (if different from alpha-alpha)
-  if (std::get<1>(_three_center_integrals) !=
-      std::get<0>(_three_center_integrals)) {
-    if (static_cast<unsigned>(std::get<1>(_three_center_integrals)->cols()) !=
+  if (_three_center_integrals.second != _three_center_integrals.first) {
+    if (static_cast<unsigned>(_three_center_integrals.second->cols()) !=
             geminal_size or
-        static_cast<unsigned>(std::get<1>(_three_center_integrals)->rows()) !=
-            static_cast<unsigned>(
-                std::get<0>(_three_center_integrals)->rows())) {
+        static_cast<unsigned>(_three_center_integrals.second->rows()) !=
+            static_cast<unsigned>(_three_center_integrals.first->rows())) {
       throw std::invalid_argument(
           "Alpha-beta three-center integrals size mismatch");
     }
@@ -352,22 +349,22 @@ nlohmann::json DensityFittedHamiltonianContainer::to_json() const {
 
     // Store aa
     std::vector<std::vector<double>> three_center_aa_vec;
-    for (int i = 0; i < std::get<0>(_three_center_integrals)->rows(); ++i) {
+    for (int i = 0; i < _three_center_integrals.first->rows(); ++i) {
       std::vector<double> row;
-      for (int j_idx = 0; j_idx < std::get<0>(_three_center_integrals)->cols();
+      for (int j_idx = 0; j_idx < _three_center_integrals.first->cols();
            ++j_idx) {
-        row.push_back((*std::get<0>(_three_center_integrals))(i, j_idx));
+        row.push_back((*_three_center_integrals.first)(i, j_idx));
       }
       three_center_aa_vec.push_back(row);
     }
     two_body_obj["aa"] = three_center_aa_vec;
     // Store bb
     std::vector<std::vector<double>> three_center_bb_vec;
-    for (int i = 0; i < std::get<1>(_three_center_integrals)->rows(); ++i) {
+    for (int i = 0; i < _three_center_integrals.second->rows(); ++i) {
       std::vector<double> row;
-      for (int j_idx = 0; j_idx < std::get<1>(_three_center_integrals)->cols();
+      for (int j_idx = 0; j_idx < _three_center_integrals.second->cols();
            ++j_idx) {
-        row.push_back((*std::get<1>(_three_center_integrals))(i, j_idx));
+        row.push_back((*_three_center_integrals.second)(i, j_idx));
       }
       three_center_bb_vec.push_back(row);
     }
@@ -623,10 +620,10 @@ void DensityFittedHamiltonianContainer::to_hdf5(H5::Group& group) const {
 
     if (has_two_body_integrals()) {
       save_matrix_to_group(group, "three_center_integrals_aa",
-                           *std::get<0>(_three_center_integrals));
+                           *_three_center_integrals.first);
       if (is_unrestricted()) {
         save_matrix_to_group(group, "three_center_integrals_bb",
-                             *std::get<1>(_three_center_integrals));
+                             *_three_center_integrals.second);
       }
     }
 

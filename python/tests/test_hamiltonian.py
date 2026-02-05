@@ -45,6 +45,8 @@ _coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
 _orbitals = Orbitals(_coeffs, None, None, create_test_basis_set(2))
 _rng = np.random.default_rng(42)
 _two_body = _rng.random(2**4)
+# Three-center integrals chosen so that contraction (ij|kl) = sum_P (ij|P)(P|kl)
+# produces two-body = 2.0 for all elements: 1.0^2 + 0.6^2 + 0.8^2 = 2.0
 _three_center = np.array(
     [
         [1.0, 1.0, 1.0, 1.0],
@@ -472,6 +474,12 @@ class TestRestrictedUnrestricted:
         # Verify integral access
         assert np.array_equal(h.get_one_body_integrals()[0], one_body)
         assert np.array_equal(h.get_one_body_integrals()[1], one_body)
+
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_get_container_type(self, container_type):
+        """Test get_container_type returns correct string."""
+        h = create_test_hamiltonian(2, container_type)
+        assert h.get_container_type() == container_type
 
     @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
     def test_unrestricted_hamiltonian_construction(self, container_type):
