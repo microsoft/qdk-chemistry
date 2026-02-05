@@ -81,7 +81,7 @@ docs = [
 jupyter = [
   "ipykernel>=6.0",
   "pandas>=2.0.0",
-  "pyscf>=2.9.0"
+  "pyscf>=2.9.0,<2.12.1"
 ]
 plugins = [
   "pyscf>=2.9.0,<2.12.1"
