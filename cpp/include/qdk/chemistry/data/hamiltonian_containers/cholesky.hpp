@@ -20,7 +20,7 @@ namespace qdk::chemistry::data {
 
 /**
  * @class CholeskyHamiltonianContainer
- * @brief Contains a molecular Hamiltonian and ao Cholesky vectors
+ * @brief Contains a molecular Hamiltonian and AO Cholesky vectors
  *
  * This class stores molecular Hamiltonian data for quantum chemistry
  * calculations, specifically designed for active space methods. It contains:

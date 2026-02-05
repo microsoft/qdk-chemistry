@@ -234,10 +234,6 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
     beta_space_is_contiguous = alpha_space_is_contiguous;
   }
 
-  // Overall contiguity requires both alpha and beta to be contiguous
-  bool active_space_is_contiguous =
-      alpha_space_is_contiguous && beta_space_is_contiguous;
-
   // Ensure alpha and beta active spaces have the same size
   if (nactive_alpha != nactive_beta) {
     throw std::runtime_error(

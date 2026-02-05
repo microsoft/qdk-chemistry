@@ -663,7 +663,6 @@ class ERI {
 
     const size_t num_aos = obs_.nbf();
     const size_t num_aos2 = num_aos * num_aos;
-    const size_t num_aos3 = num_aos2 * num_aos;
     const size_t num_shells = obs_.size();
     const size_t num_shell_pairs = num_shells * (num_shells + 1) / 2;
 

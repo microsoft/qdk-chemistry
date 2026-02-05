@@ -248,7 +248,7 @@ specifically designed for active space methods. It contains:
 
 * One-electron integrals (kinetic + nuclear attraction) in MO representation
 * Two-electron integrals (electron-electron repulsion) in MO representation
-* Cholesky vectors approximating the ao two-electron integrals
+* Cholesky vectors approximating the AO two-electron integrals
 * Molecular orbital information for the active space
 * Core energy contributions from inactive orbitals and nuclear repulsion
 
@@ -287,8 +287,8 @@ Examples:
     >>> import numpy as np
     >>> one_body = np.random.rand(4, 4)
     >>> two_body = np.random.rand(256)  # 4^4 elements
-    >>> cholesky_vecs = np.random.rand(16, 10)  # 16 = 4^2, 10 vectors
-    >>> fock_matrix = np.random.rand(4, 4)
+    >>> ao_cholesky_vecs = np.random.rand(16, 10)  # 16 = 4^2, 10 vectors
+    >>> inactive_fock_matrix = np.random.rand(4, 4)
     >>> container = CholeskyHamiltonianContainer(
     ...     one_body, two_body, orbitals, 10.5, inactive_fock_matrix, ao_cholesky_vectors
     ... )
