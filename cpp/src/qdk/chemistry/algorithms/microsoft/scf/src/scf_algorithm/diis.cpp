@@ -335,15 +335,18 @@ void DIIS::iterate(SCFImpl& scf_impl) {
                             num_atomic_orbitals, num_molecular_orbitals, i,
                             cfg->unrestricted);
   }
+  std::cout << "C after DIIS iterate: \n" << C << std::endl;
 
   // Update spin-blocked density matrices stored in SCFImpl
   auto& P_scf_impl = scf_impl.density_matrix();
-  if (rohf_enabled_) {
-    rohf_matrix_handler_->update_density_matrix(P_scf_impl, C, nelec[0],
-                                                       nelec[1]);
-  } else {
-    update_density_matrix(P_scf_impl, C, cfg->unrestricted,
-                                 nelec[0], nelec[1]);
+  if (cfg->scf_algorithm.method != SCFAlgorithmName::ASAHF) {
+    if (rohf_enabled_) {
+      rohf_matrix_handler_->update_density_matrix(P_scf_impl, C, nelec[0],
+                                                         nelec[1]);
+    } else {
+      update_density_matrix(P_scf_impl, C, cfg->unrestricted,
+                                   nelec[0], nelec[1]);
+    }
   }
 
   double diis_error = diis_impl_->get_diis_error();
