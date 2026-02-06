@@ -240,11 +240,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
       utils::microsoft::convert_basis_set_from_qdk(*basis_set);
   auto internal_aux_basis_set =
       utils::microsoft::convert_basis_set_from_qdk(*aux_basis_set);
-  // Create dummy SCFConfig
-  auto scf_config = std::make_unique<qcs::SCFConfig>();
 
-  // Create Integral Instance
-  auto eri = qcs::ERIMultiplexer::create(*internal_basis_set, *scf_config, 0.0);
   auto int1e = std::make_unique<qcs::OneBodyIntegral>(
       internal_basis_set.get(), mol.get(), qcs::mpi_default_input());
 
@@ -372,6 +368,19 @@ DensityFittedHamiltonianConstructor::_run_impl(
               dummy_fock_beta));
     }
   }
+
+  // Create dummy SCFConfig
+  auto scf_config = std::make_unique<qcs::SCFConfig>();
+  scf_config->do_dfj = true;
+  scf_config->basis = basis_set->get_name();
+  scf_config->aux_basis = aux_basis_set->get_name();
+  scf_config->eri.method = qcs::ERIMethod::Incore;
+  scf_config->unrestricted = orbitals->is_unrestricted();
+  scf_config->mpi = qcs::mpi_default_input();
+
+  // Create Integral Instance
+  auto eri = qcs::ERIMultiplexer::create(
+      *internal_basis_set, *internal_aux_basis_set, *scf_config, 0.0);
 
   if (is_restricted_calc) {
     // Restricted case
