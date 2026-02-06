@@ -851,11 +851,8 @@ void SCFImpl::init_density_matrix_() {
           H_, S_, X_, C_, eigenvalues_, P_, nelec_, num_atomic_orbitals_,
           num_molecular_orbitals_, i, ctx_.cfg->unrestricted);
     }
-    if (ctx_.cfg->scf_algorithm.method != SCFAlgorithmName::ASAHF) {
-      scf_algorithm_->update_density_matrix(
-          P_, C_, ctx_.cfg->unrestricted, nelec_[0],
-          nelec_[1]);
-    }
+    scf_algorithm_->update_density_matrix(P_, C_, ctx_.cfg->unrestricted,
+                                          nelec_[0], nelec_[1]);
   } else if (method == DensityInitializationMethod::Atom) {
     atom_guess(*ctx_.basis_set, mol, P_.data());
   } else if (method == DensityInitializationMethod::File) {

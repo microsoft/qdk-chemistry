@@ -7,7 +7,7 @@
 #include <qdk/chemistry/scf/core/basis_set.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 
-#include "diis.h"
+#include "diis_base.h"
 
 namespace qdk::chemistry::scf {
 
@@ -65,7 +65,7 @@ void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
  * This class implements an algorithm for spin-restricted atomic SCF
  * calculations using spherically averaged Fock matrices.
  */
-class AtomicSphericallyAveragedHartreeFock : public DIIS {
+class AtomicSphericallyAveragedHartreeFock : public DIISBase {
  public:
   /**
    * @brief Construct ASAHF solver
@@ -105,7 +105,15 @@ class AtomicSphericallyAveragedHartreeFock : public DIIS {
                                int num_molecular_orbitals, int idx_spin,
                                bool unrestricted) override;
 
+  void update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
+                             bool unrestricted, int nelec_alpha,
+                             int nelec_beta) override;
+
  private:
+  const RowMajorMatrix& get_active_fock(
+      const SCFImpl& scf_impl) const override;
+  RowMajorMatrix& active_density(SCFImpl& scf_impl) override;
+
   /**
    * @brief Custom orthogonalization matrix computation for ASAHF
    * @param S_ Overlap matrix
@@ -116,6 +124,13 @@ class AtomicSphericallyAveragedHartreeFock : public DIIS {
   void compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
                                          RowMajorMatrix* ret,
                                          size_t n_atom_orbs);
+
+  /**
+   * @brief Fractional occupation values per molecular orbital from the most
+   * recent ASAHF diagonalization; reused when rebuilding the density matrix
+   * outside of the eigenproblem.
+   */
+  std::vector<double> last_occupation_;
 };
 
 }  // namespace qdk::chemistry::scf

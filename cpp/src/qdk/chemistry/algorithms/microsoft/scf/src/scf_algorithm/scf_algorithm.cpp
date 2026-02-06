@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <limits>
+#include <stdexcept>
 #include <qdk/chemistry/utils/logger.hpp>
 
 #include "../scf/scf_impl.h"
@@ -22,7 +23,7 @@
 #include <lapack.hh>
 
 #include "asahf.h"
-#include "diis.h"
+#include "restricted_unrestricted_diis.h"
 #include "diis_gdm.h"
 #include "gdm.h"
 
@@ -65,8 +66,12 @@ std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx,
           ctx, cfg.scf_algorithm.diis_subspace_size);
 
     case SCFAlgorithmName::DIIS:
-      return std::make_shared<DIIS>(ctx, rohf_enabled,
-                                    cfg.scf_algorithm.diis_subspace_size);
+      if (rohf_enabled) {
+        throw std::runtime_error(
+        "ROHF-enabled DIIS temporarily unavailable during refactor");
+      }
+      return std::make_shared<RestrictedUnrestrictedDIIS>(
+          ctx, cfg.scf_algorithm.diis_subspace_size);
 
     case SCFAlgorithmName::GDM:
       return std::make_shared<GDM>(ctx, rohf_enabled,

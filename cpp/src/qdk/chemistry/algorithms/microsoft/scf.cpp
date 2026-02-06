@@ -119,11 +119,13 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     }
   } else if (scf_type == "restricted") {
     if (open_shell) {
-      rohf_enabled = true;
-      // throw std::invalid_argument(
-      //     "Restricted Open-Shell calculation is not currently supported in the "
-      //     "QDK/Chemistry SCFSolver");
+      QDK_LOGGER().error(
+          "Restricted open-shell (ROHF) calculations are temporarily disabled "
+          "due to DIIS refactor in progress.");
+      throw std::runtime_error(
+          "ROHF support temporarily unavailable during DIIS refactor");
     }
+    rohf_enabled = false;
     unrestricted = false;
   } else {
     throw std::invalid_argument(

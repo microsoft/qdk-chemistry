@@ -12,7 +12,7 @@
 #include <stdexcept>
 
 #include "../scf/scf_impl.h"
-#include "diis.h"
+#include "restricted_unrestricted_diis.h"
 #include "gdm.h"
 
 namespace qdk::chemistry::scf {
@@ -24,7 +24,12 @@ DIIS_GDM::DIIS_GDM(const SCFContext& ctx, bool rohf_enabled,
       use_gdm_(false) {
   QDK_LOG_TRACE_ENTERING();
   // Initialize DIIS algorithm
-  diis_algorithm_ = std::make_unique<DIIS>(ctx, rohf_enabled, subspace_size);
+  if (rohf_enabled) {
+    throw std::runtime_error(
+        "ROHF-enabled DIIS_GDM temporarily unavailable during refactor");
+  }
+  diis_algorithm_ =
+      std::make_unique<RestrictedUnrestrictedDIIS>(ctx, subspace_size);
 
   // Validate energy_thresh_diis_switch must be positive
   if (gdm_config_.energy_thresh_diis_switch <= 0.0) {

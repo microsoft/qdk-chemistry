@@ -110,9 +110,10 @@ class SCFAlgorithm {
    * @param[in] nelec_alpha Number of alpha electrons
    * @param[in] nelec_beta Number of beta electrons
    */
-  void update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
-                                        bool unrestricted, int nelec_alpha,
-                                        int nelec_beta);
+    virtual void update_density_matrix(RowMajorMatrix& P,
+                                                                         const RowMajorMatrix& C,
+                                                                         bool unrestricted, int nelec_alpha,
+                                                                         int nelec_beta);
 
   /**
    * @brief Calculate orbital gradient (OG) error for convergence checking
