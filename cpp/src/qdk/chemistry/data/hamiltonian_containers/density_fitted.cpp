@@ -125,9 +125,10 @@ void DensityFittedHamiltonianContainer::_build_four_center_cache() const {
 
     size_t naux = three_center_left->rows();
 
+    // resulting four center is row packed!
     blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-               norb2, norb2, naux, 1.0, three_center_left->data(), naux,
-               three_center_right->data(), naux, 0.0, four_center->data(),
+               norb2, norb2, naux, 1.0, three_center_right->data(), naux,
+               three_center_left->data(), naux, 0.0, four_center->data(),
                norb2);
 
     return four_center;
@@ -145,6 +146,12 @@ void DensityFittedHamiltonianContainer::_build_four_center_cache() const {
                                   _three_center_integrals.second);
     auto bbbb = build_four_center(_three_center_integrals.second,
                                   _three_center_integrals.second);
+    std::cout << "aaaa" << std::endl;
+    std::cout << *aaaa << std::endl;
+    std::cout << "aabb" << std::endl;
+    std::cout << *aabb << std::endl;
+    std::cout << "bbbb" << std::endl;
+    std::cout << *bbbb << std::endl;
     _cached_four_center_integrals.emplace(std::move(aaaa), std::move(aabb),
                                           std::move(bbbb));
   }

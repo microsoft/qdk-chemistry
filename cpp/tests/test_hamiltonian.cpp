@@ -1189,7 +1189,7 @@ auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
 
   auto rhf_hamiltonian =
-      (factory_name == "qdk_density_fitted")
+      (factory_name == "qdk_density_fitted_hamiltonian")
           ? ham_factory->run(rhf_orbitals, std::string("cc-pvdz-rifit"))
           : ham_factory->run(rhf_orbitals);
 
@@ -1214,7 +1214,7 @@ auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk") {
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
 
   auto uhf_hamiltonian =
-      (factory_name == "qdk_density_fitted")
+      (factory_name == "qdk_density_fitted_hamiltonian")
           ? ham_factory->run(uhf_orbitals, std::string("cc-pvdz-rifit"))
           : ham_factory->run(uhf_orbitals);
 
@@ -1225,7 +1225,7 @@ TEST_F(HamiltonianConstructorTest, Factory) {
   auto available_solvers = HamiltonianConstructorFactory::available();
   EXPECT_EQ(available_solvers.size(), 2);
   EXPECT_EQ(available_solvers[1], "qdk");
-  EXPECT_EQ(available_solvers[0], "qdk_density_fitted");
+  EXPECT_EQ(available_solvers[0], "qdk_density_fitted_hamiltonian");
   EXPECT_THROW(HamiltonianConstructorFactory::create("nonexistent_solver"),
                std::runtime_error);
   EXPECT_NO_THROW(HamiltonianConstructorFactory::register_instance(
@@ -1540,24 +1540,26 @@ TEST_F(HamiltonianConstructorTest, DensityFittedFactoryRegistration) {
 
   bool found_density_fitted = false;
   for (const auto& solver : available_solvers) {
-    if (solver == "qdk_density_fitted") {
+    if (solver == "qdk_density_fitted_hamiltonian") {
       found_density_fitted = true;
       break;
     }
   }
   EXPECT_TRUE(found_density_fitted)
-      << "qdk_density_fitted not found in available constructors";
+      << "qdk_density_fitted_hamiltonian not found in available constructors";
 
   // Test that we can create a density-fitted hamiltonian constructor
-  EXPECT_NO_THROW(HamiltonianConstructorFactory::create("qdk_density_fitted"));
+  EXPECT_NO_THROW(
+      HamiltonianConstructorFactory::create("qdk_density_fitted_hamiltonian"));
   auto density_fitted_hc =
-      HamiltonianConstructorFactory::create("qdk_density_fitted");
-  EXPECT_EQ(density_fitted_hc->name(), "qdk_density_fitted");
+      HamiltonianConstructorFactory::create("qdk_density_fitted_hamiltonian");
+  EXPECT_EQ(density_fitted_hc->name(), "qdk_density_fitted_hamiltonian");
 }
 
 TEST_F(HamiltonianConstructorTest, DensityFittedRestrictedO2) {
   // Run restricted O2 with density-fitted
-  auto [energy, hamiltonian, wfn] = run_restricted_o2("qdk_density_fitted");
+  auto [energy, hamiltonian, wfn] =
+      run_restricted_o2("qdk_density_fitted_hamiltonian");
 
   // Verify hamiltonian properties
   EXPECT_TRUE(hamiltonian->has_one_body_integrals());
@@ -1578,7 +1580,8 @@ TEST_F(HamiltonianConstructorTest, DensityFittedRestrictedO2) {
 
 TEST_F(HamiltonianConstructorTest, DensityFittedUnrestrictedO2) {
   // Run unrestricted O2 triplet with density-fitted
-  auto [energy, hamiltonian] = run_unrestricted_o2("qdk_density_fitted");
+  auto [energy, hamiltonian] =
+      run_unrestricted_o2("qdk_density_fitted_hamiltonian");
 
   // Verify hamiltonian properties
   EXPECT_TRUE(hamiltonian->has_one_body_integrals());
@@ -1992,7 +1995,8 @@ TEST_F(HamiltonianIntegrationTest,
 
 TEST_F(HamiltonianIntegrationTest, DensityFittedRestrictedO2MP2) {
   // Run restricted O2 with density-fitted
-  auto [energy, df_hamiltonian, wfn] = run_restricted_o2("qdk_density_fitted");
+  auto [energy, df_hamiltonian, wfn] =
+      run_restricted_o2("qdk_density_fitted_hamiltonian");
 
   // Verify hamiltonian properties
   EXPECT_TRUE(df_hamiltonian->has_one_body_integrals());
