@@ -48,6 +48,10 @@ class SciWavefunctionContainer : public WavefunctionContainer {
    * @param orbitals Shared pointer to orbital basis set
    * @param one_rdm_spin_traced Spin-traced 1-RDM for active orbitals (optional)
    * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
+   * @param single_orbital_entropies Single-orbital entropies for active
+   * orbitals (optional)
+   * @param mutual_information Mutual information matrix for active orbitals
+   * (optional)
    * @param type The type of wavefunction
    */
   SciWavefunctionContainer(
@@ -55,6 +59,9 @@ class SciWavefunctionContainer : public WavefunctionContainer {
       std::shared_ptr<Orbitals> orbitals,
       const std::optional<MatrixVariant>& one_rdm_spin_traced,
       const std::optional<VectorVariant>& two_rdm_spin_traced,
+      const std::optional<Eigen::VectorXd>& single_orbital_entropies =
+          std::nullopt,
+      const std::optional<Eigen::MatrixXd>& mutual_information = std::nullopt,
       WavefunctionType type = WavefunctionType::SelfDual);
 
   /**
@@ -74,6 +81,10 @@ class SciWavefunctionContainer : public WavefunctionContainer {
    * orbitals (optional)
    * @param two_rdm_bbbb Beta-beta-beta-beta block of 2-RDM for active orbitals
    * (optional)
+   * @param single_orbital_entropies Single-orbital entropies for active
+   * orbitals (optional)
+   * @param mutual_information Mutual information matrix for active orbitals
+   * (optional)
    * @param type The type of wavefunction
    */
   SciWavefunctionContainer(
@@ -86,6 +97,9 @@ class SciWavefunctionContainer : public WavefunctionContainer {
       const std::optional<VectorVariant>& two_rdm_aabb,
       const std::optional<VectorVariant>& two_rdm_aaaa,
       const std::optional<VectorVariant>& two_rdm_bbbb,
+      const std::optional<Eigen::VectorXd>& single_orbital_entropies =
+          std::nullopt,
+      const std::optional<Eigen::MatrixXd>& mutual_information = std::nullopt,
       WavefunctionType type = WavefunctionType::SelfDual);
 
   /** @brief Destructor */

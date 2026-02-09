@@ -32,6 +32,8 @@ CasWavefunctionContainer::CasWavefunctionContainer(
                                std::nullopt,  // two_rdm_aabb
                                std::nullopt,  // two_rdm_aaaa
                                std::nullopt,  // two_rdm_bbbb
+                               std::nullopt,  // single_orbital_entropies
+                               std::nullopt,  // mutual_information
                                type) {
   QDK_LOG_TRACE_ENTERING();
 }
@@ -41,6 +43,8 @@ CasWavefunctionContainer::CasWavefunctionContainer(
     std::shared_ptr<Orbitals> orbitals,
     const std::optional<MatrixVariant>& one_rdm_spin_traced,
     const std::optional<VectorVariant>& two_rdm_spin_traced,
+    const std::optional<Eigen::VectorXd>& single_orbital_entropies,
+    const std::optional<Eigen::MatrixXd>& mutual_information,
     WavefunctionType type)
     : CasWavefunctionContainer(coeffs, dets, orbitals, one_rdm_spin_traced,
                                std::nullopt,  // one_rdm_aa
@@ -49,6 +53,7 @@ CasWavefunctionContainer::CasWavefunctionContainer(
                                std::nullopt,  // two_rdm_aabb
                                std::nullopt,  // two_rdm_aaaa
                                std::nullopt,  // two_rdm_bbbb
+                               single_orbital_entropies, mutual_information,
                                type) {
   QDK_LOG_TRACE_ENTERING();
 }
@@ -62,10 +67,14 @@ CasWavefunctionContainer::CasWavefunctionContainer(
     const std::optional<VectorVariant>& two_rdm_spin_traced,
     const std::optional<VectorVariant>& two_rdm_aabb,
     const std::optional<VectorVariant>& two_rdm_aaaa,
-    const std::optional<VectorVariant>& two_rdm_bbbb, WavefunctionType type)
+    const std::optional<VectorVariant>& two_rdm_bbbb,
+    const std::optional<Eigen::VectorXd>& single_orbital_entropies,
+    const std::optional<Eigen::MatrixXd>& mutual_information,
+    WavefunctionType type)
     : WavefunctionContainer(one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
                             two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
-                            two_rdm_bbbb, type),
+                            two_rdm_bbbb, single_orbital_entropies,
+                            mutual_information, type),
       _coefficients(coeffs),
       _configuration_set(dets, orbitals) {
   QDK_LOG_TRACE_ENTERING();
@@ -96,6 +105,11 @@ std::unique_ptr<WavefunctionContainer> CasWavefunctionContainer::clone() const {
       _two_rdm_spin_dependent_bbbb
           ? std::optional<VectorVariant>(*_two_rdm_spin_dependent_bbbb)
           : std::nullopt,
+      _single_orbital_entropies
+          ? std::optional<Eigen::VectorXd>(*_single_orbital_entropies)
+          : std::nullopt,
+      _mutual_information ? std::optional<Eigen::MatrixXd>(*_mutual_information)
+                          : std::nullopt,
       this->get_type());
 }
 
@@ -473,6 +487,9 @@ nlohmann::json CasWavefunctionContainer::to_json() const {
 
   // Serialize RDMs if available
   _serialize_rdms_to_json(j);
+
+  // Serialize entropies if available
+  _serialize_entropies_to_json(j);
 
   return j;
 }

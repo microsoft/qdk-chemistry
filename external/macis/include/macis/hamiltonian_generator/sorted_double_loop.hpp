@@ -11,7 +11,9 @@
 #include <chrono>
 #include <macis/hamiltonian_generator.hpp>
 #include <macis/sd_operations.hpp>
+#include <macis/util/entropies.hpp>
 #include <macis/util/rdms.hpp>
+
 #ifdef _OPENMP
 #include <omp.h>
 #else
@@ -723,6 +725,132 @@ class SortedDoubleLoopHamiltonianGenerator
         }
       }
     }
+  }
+
+  void form_entropies(full_det_iterator bra_begin, full_det_iterator bra_end,
+                      full_det_iterator ket_begin, full_det_iterator ket_end,
+                      double* C, std::vector<double>& single_orbital_entropies,
+                      matrix_span_t mutual_information) override {
+    using wfn_traits = wavefunction_traits<WfnType>;
+    using spin_wfn_type = typename wfn_traits::spin_wfn_type;
+    using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
+    const size_t nbra_dets = std::distance(bra_begin, bra_end);
+    const size_t nket_dets = std::distance(ket_begin, ket_end);
+
+    OrbitalRDMIntermediates entropy_intermediates(
+        single_orbital_entropies.size());
+
+    const bool is_symm = bra_begin == ket_begin and bra_end == ket_end;
+#ifdef MACIS_ENABLE_MPI
+    auto world_rank = comm_rank(MPI_COMM_WORLD);
+#else
+    auto world_rank = 0;
+#endif /* MACIS_ENABLE_MPI */
+
+    // Get unique alpha strings
+    auto setup_st = std::chrono::high_resolution_clock::now();
+    auto unique_alpha_bra = get_unique_alpha(bra_begin, bra_end);
+    auto unique_alpha_ket =
+        is_symm ? unique_alpha_bra : get_unique_alpha(ket_begin, ket_end);
+
+    const size_t nuniq_bra = unique_alpha_bra.size();
+    const size_t nuniq_ket = unique_alpha_ket.size();
+
+    // Compute offsets
+    std::vector<size_t> unique_alpha_bra_idx(nuniq_bra + 1);
+    std::transform_exclusive_scan(
+        unique_alpha_bra.begin(), unique_alpha_bra.end(),
+        unique_alpha_bra_idx.begin(), 0ul, std::plus<size_t>{},
+        [](auto& x) { return x.second; });
+    std::vector<size_t> unique_alpha_ket_idx(nuniq_ket + 1);
+    if (is_symm) {
+      unique_alpha_ket_idx = unique_alpha_bra_idx;
+    } else {
+      std::transform_exclusive_scan(
+          unique_alpha_ket.begin(), unique_alpha_ket.end(),
+          unique_alpha_ket_idx.begin(), 0ul, std::plus<size_t>{},
+          [](auto& x) { return x.second; });
+    }
+
+    unique_alpha_bra_idx.back() = nbra_dets;
+    unique_alpha_ket_idx.back() = nket_dets;
+
+    auto count_st = std::chrono::high_resolution_clock::now();
+
+#pragma omp parallel
+    {
+      std::vector<uint32_t> bra_occ_alpha, bra_occ_beta;
+
+#pragma omp for schedule(dynamic)
+      for (size_t ia_bra = 0; ia_bra < nuniq_bra; ++ia_bra) {
+        if (!unique_alpha_bra[ia_bra].first.any()) continue;
+
+        // Extract alpha bra
+        const auto bra_alpha = unique_alpha_bra[ia_bra].first;
+        const size_t beta_st_bra = unique_alpha_bra_idx[ia_bra];
+        const size_t beta_en_bra = unique_alpha_bra_idx[ia_bra + 1];
+
+        const auto ket_lower = is_symm ? ia_bra : 0;
+        for (size_t ia_ket = ket_lower; ia_ket < nuniq_ket; ++ia_ket) {
+          if (!unique_alpha_ket[ia_ket].first.any()) continue;
+
+          // Extract alpha ket
+          const auto ket_alpha = unique_alpha_ket[ia_ket].first;
+
+          // Compute alpha excitation
+          const auto ex_alpha = bra_alpha ^ ket_alpha;
+          const auto ex_alpha_count = spin_wfn_traits::count(ex_alpha);
+
+          // Early exit if excitation level too high
+          if (ex_alpha_count > 4) continue;
+
+          const size_t beta_st_ket = unique_alpha_ket_idx[ia_ket];
+          const size_t beta_en_ket = unique_alpha_ket_idx[ia_ket + 1];
+
+          // Get occupied alpha indices
+          spin_wfn_traits::state_to_occ(bra_alpha, bra_occ_alpha);
+
+          // Loop over betas
+          for (size_t ibra = beta_st_bra; ibra < beta_en_bra; ++ibra) {
+            const auto bra_beta = wfn_traits::beta_string(*(bra_begin + ibra));
+
+            // Get occupied beta indices
+            spin_wfn_traits::state_to_occ(bra_beta, bra_occ_beta);
+
+            for (size_t iket = beta_st_ket; iket < beta_en_ket; ++iket) {
+              if (is_symm && (iket < ibra)) continue;
+
+              const auto ket_beta =
+                  wfn_traits::beta_string(*(ket_begin + iket));
+              const auto ex_beta = bra_beta ^ ket_beta;
+              const auto ex_beta_count = spin_wfn_traits::count(ex_beta);
+
+              // Skip if total excitation level too high
+              if ((ex_alpha_count + ex_beta_count) > 4) continue;
+
+              const double val = C[ibra] * C[iket];
+
+              // Compute intermediates
+              if (std::abs(val) > 1e-16) {
+                eval_ordm_intermediates(
+                    bra_alpha, ket_alpha, ex_alpha, bra_beta, ket_beta, ex_beta,
+                    bra_occ_alpha, bra_occ_beta, val, entropy_intermediates);
+              }
+            }
+          }
+        }
+      }
+    }
+    // Finalize entropy calculations
+    entropy_intermediates.update_diagonal();
+    build_s1_entropy(entropy_intermediates, single_orbital_entropies);
+    std::vector<double> empty_s2(
+        single_orbital_entropies.size() * single_orbital_entropies.size(), 0.0);
+    matrix_span_t s2_entropy(empty_s2.data(), single_orbital_entropies.size(),
+                             single_orbital_entropies.size());
+    build_s2_entropy(entropy_intermediates, s2_entropy);
+    build_mutual_information(single_orbital_entropies, s2_entropy,
+                             mutual_information);
   }
 
  public:
