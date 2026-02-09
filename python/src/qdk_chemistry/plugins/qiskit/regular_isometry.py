@@ -86,9 +86,9 @@ class RegularIsometryStatePreparation(StatePreparation):
             )
             circuit = pass_manager.run(circuit)
 
-        return Circuit(qasm=qasm3.dumps(circuit))
+        return Circuit(qasm=qasm3.dumps(circuit), encoding="jordan-wigner")
 
     def name(self) -> str:
         """Return the name of the state preparation method."""
         Logger.trace_entering()
-        return "regular_isometry"
+        return "qiskit_regular_isometry"

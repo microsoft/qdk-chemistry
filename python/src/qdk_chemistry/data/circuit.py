@@ -26,6 +26,8 @@ class Circuit(DataClass):
 
     Attributes:
         qasm (str): The quantum circuit in QASM format.
+        encoding (str | None): The fermion-to-qubit encoding assumed by this circuit (e.g., "jordan-wigner").
+            If None, no specific encoding is assumed.
 
     """
 
@@ -39,15 +41,20 @@ class Circuit(DataClass):
     def __init__(
         self,
         qasm: str | None = None,
+        encoding: str | None = None,
     ) -> None:
         """Initialize a Circuit.
 
         Args:
             qasm (str | None): The quantum circuit in QASM format. Defaults to None.
+            encoding (str | None): The fermion-to-qubit encoding assumed by this circuit.
+                Valid values include "jordan-wigner", "bravyi-kitaev", "parity", or None.
+                Defaults to None.
 
         """
         Logger.trace_entering()
         self.qasm = qasm
+        self.encoding = encoding
 
         # Check that a representation of the quantum circuit is given by the keyword arguments
         if self.qasm is None:
@@ -164,6 +171,8 @@ class Circuit(DataClass):
         lines = ["Circuit"]
         if self.qasm is not None:
             lines.append(f"  QASM string: {self.qasm}")
+        if self.encoding is not None:
+            lines.append(f"  Encoding: {self.encoding}")
         return "\n".join(lines)
 
     def to_json(self) -> dict[str, Any]:
@@ -176,6 +185,8 @@ class Circuit(DataClass):
         data: dict[str, Any] = {}
         if self.qasm is not None:
             data["qasm"] = self.qasm
+        if self.encoding is not None:
+            data["encoding"] = self.encoding
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -188,6 +199,8 @@ class Circuit(DataClass):
         self._add_hdf5_version(group)
         if self.qasm is not None:
             group.attrs["qasm"] = self.qasm
+        if self.encoding is not None:
+            group.attrs["encoding"] = self.encoding
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> "Circuit":
@@ -206,6 +219,7 @@ class Circuit(DataClass):
         cls._validate_json_version(cls._serialization_version, json_data)
         return cls(
             qasm=json_data.get("qasm"),
+            encoding=json_data.get("encoding"),
         )
 
     @classmethod
@@ -223,6 +237,11 @@ class Circuit(DataClass):
 
         """
         cls._validate_hdf5_version(cls._serialization_version, group)
+        encoding = group.attrs.get("encoding")
+        # Decode encoding if it's stored as bytes (HDF5 behavior can vary)
+        if encoding is not None and isinstance(encoding, bytes):
+            encoding = encoding.decode("utf-8")
         return cls(
             qasm=group.attrs.get("qasm"),
+            encoding=encoding,
         )

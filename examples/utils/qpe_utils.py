@@ -5,21 +5,10 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from collections import Counter
-from pathlib import Path
-
 import numpy as np
-from qdk.openqasm import compile
-from qdk.simulation import run_qir
-from qdk_chemistry.algorithms import IterativePhaseEstimation
-from qdk_chemistry.data import (
-    QpeResult,
-    QubitHamiltonian,
-    SciWavefunctionContainer,
-    Wavefunction,
-)
-from qdk_chemistry.utils import Logger
-from qiskit import QuantumCircuit, qasm3
+
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import QubitHamiltonian, SciWavefunctionContainer, Wavefunction
 
 
 def prepare_2_dets_trial_state(
@@ -67,116 +56,71 @@ def prepare_2_dets_trial_state(
     return rotated_wf, fidelity
 
 
-def run_single_trial_iqpe(
+def compute_evolution_time(
     qubit_hamiltonian: QubitHamiltonian,
-    state_prep: QuantumCircuit,
-    time: float,
-    precision: int,
-    shots: int,
-    trial_seed: int,
-    reference_energy: float,
-    output_dir: str | None = None,
-) -> QpeResult:
-    """Helper function to run a single IQPE trial with the given seed.
+    num_bits: int,
+    solve_hamiltonian: bool = True,
+    target_energy_precision: float = 1e-3,
+    initial_time_guess: float | None = None,
+) -> float:
+    """Compute an evolution time for iterative QPE to achieve a target energy precision.
+
+    Starts from a base time of pi / ||H|| (Schatten norm of qubit Hamiltonian), or an optional initial_time_guess.
+    If solve_hamiltonian is True, obtains a reference energy from qubit Hamiltonian via a sparse matrix solver
+    and refines the time to reduce phase discretization error given num_bits of precision.
+    If False, returns the base time without refinement.
 
     Args:
-        qubit_hamiltonian: Qubit Hamiltonian for the system
-        state_prep: Qiskit circuit for state preparation
-        time: Evolution time for IQPE
-        precision: Number of bits of precision
-        shots: Shots per iteration
-        trial_seed: Random seed for simulator
-        reference_energy: Reference energy for phase estimation
-        output_dir: Directory to save the result JSON file (optional)
+        qubit_hamiltonian: Qubit Hamiltonian.
+        num_bits: Number of precision bits used in iterative QPE.
+        solve_hamiltonian: Whether to solve for a reference energy to refine the time. Defaults to True.
+        target_energy_precision: Desired energy precision in Hartree. Defaults to 1e-3.
+        initial_time_guess: Optional initial evolution time guess.
+
     Returns:
-        `QpeResult` for a single IQPE trial
+        Computed evolution time.
 
     """
-    Logger.trace_entering()
-    iqpe = IterativePhaseEstimation(qubit_hamiltonian, time)
-    phase_feedback = 0.0
-    bits: list[int] = []
-
-    Logger.info(f"Running IQPE trial with seed {trial_seed}")
-
-    for iteration in range(precision):
-        Logger.info(f"Iteration {iteration + 1}/{precision}")
-        iter_info = iqpe.create_iteration(
-            state_prep,
-            iteration=iteration,
-            total_iterations=precision,
-            phase_correction=phase_feedback,
-        )
-        compiled = iter_info.circuit
-        Logger.info("Circuit generated")
-        circuit_qasm = qasm3.dumps(compiled)
-        Logger.info("Circuit is dumped to qasm")
-        qir = compile(circuit_qasm)
-        Logger.info("Circuit is compiled to qir")
-        result = run_qir(qir, shots=shots, seed=trial_seed, type="cpu")
-        Logger.info(f"Measurement results obtained: {result}")
-        flat_bitstring = [str(x[0]) for x in result]
-        counts = dict(Counter(flat_bitstring))
-        measured_bit = 0 if counts.get("Zero", 0) >= counts.get("One", 0) else 1
-
-        bits.append(measured_bit)
-        phase_feedback = iqpe.update_phase_feedback(phase_feedback, measured_bit)
-
-    phase_fraction = iqpe.phase_fraction_from_feedback(phase_feedback)
-    result = QpeResult.from_phase_fraction(
-        method=IterativePhaseEstimation.algorithm,
-        phase_fraction=phase_fraction,
-        evolution_time=time,
-        bits_msb_first=bits,
-        reference_energy=reference_energy,
+    # Compute base evolution time from Hamiltonian norm or use provided guess
+    bound_time = np.pi / qubit_hamiltonian.schatten_norm
+    base_time = (
+        min(initial_time_guess, bound_time)
+        if initial_time_guess is not None
+        else bound_time
     )
-    if output_dir is not None:
-        Path(output_dir).mkdir(exist_ok=True)
-        result.to_json_file(f"{output_dir}/iqpe_result_{trial_seed}.qpe_result.json")
-    return result
 
+    if not solve_hamiltonian:
+        return base_time
 
-def run_iqpe(
-    qubit_hamiltonian: QubitHamiltonian,
-    state_prep: QuantumCircuit,
-    *,
-    time: float,
-    precision: int,
-    shots: int,
-    seed: int,
-    reference_energy: float,
-    trials: int,
-    output_dir: str | None = None,
-) -> list[QpeResult]:
-    """Run multiple IQPE trials with different seeds.
+    # Use the reference energy from the qubit Hamiltonian
+    solver = create("qubit_hamiltonian_solver", "qdk_sparse_matrix_solver")
+    reference_energy, _ = solver.run(qubit_hamiltonian)
 
-    Args:
-        qubit_hamiltonian: Qubit Hamiltonian for the system
-        state_prep: Qiskit circuit for state preparation
-        time: Evolution time for IQPE
-        precision: Number of bits of precision
-        shots: Shots per iteration
-        seed: Base random seed for simulator
-        reference_energy: Reference energy for phase estimation
-        trials: Number of trials to run
-        output_dir: Directory to save the result JSON files (optional)
+    # Compute the expected phase from the reference energy
+    expected_phase = (base_time * reference_energy) / (2 * np.pi) % 1
 
-    Returns:
-        List of `QpeResult` for each trial
+    # Discretize to the nearest representable phase with given precision bits
+    bit_phase = round(expected_phase * 2**num_bits) / 2**num_bits
 
-    """
-    results = []
-    for trial in range(trials):
-        trial_seed = seed + trial  # Different seed per trial
-        result = run_single_trial_iqpe(
-            qubit_hamiltonian,
-            state_prep,
-            time,
-            precision,
-            shots,
-            trial_seed,
-            reference_energy,
-            output_dir=output_dir,
+    # Compute the energy error from phase discretization
+    if abs(base_time) < np.finfo(np.float64).eps:
+        raise ValueError(
+            f"Cannot compute discretization energy error: base_time {base_time} is too close to zero."
         )
-        results.append(result)
-    return results
+    discretization_energy_error = (2 * np.pi * (bit_phase - expected_phase)) / base_time
+
+    # Shift the energy error to achieve the target precision
+    shifted_energy = discretization_energy_error - target_energy_precision
+
+    # Compute the adjusted evolution time, guarding against division by zero
+    denominator = reference_energy + target_energy_precision
+    if abs(denominator) < np.finfo(np.float64).eps:
+        raise ValueError(
+            "Cannot compute adjusted evolution time: reference_energy + "
+            f"target_energy_precision is too close to zero "
+            f"(reference_energy={reference_energy}, "
+            f"target_energy_precision={target_energy_precision})."
+        )
+
+    proposed_time = base_time + shifted_energy * base_time / denominator
+    return proposed_time

@@ -26,9 +26,6 @@ namespace qdk::chemistry::algorithms {
  * The solver takes a Hamiltonian as input and produces the optimized energy and
  * multi-configurational wavefunction.
  *
- * Typical usage:
- * @code TODO @endcode
- *
  * @see data::Hamiltonian
  * @see data::Wavefunction
  * @see data::Settings

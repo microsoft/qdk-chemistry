@@ -82,7 +82,7 @@ int main() {
   auto [mc_energy, mc_wavefunction] = mc_calculator->run(
       active_hamiltonian, num_electrons / 2, num_electrons / 2);
 
-  // Print single orbital entropies which are used by AutoCAS to determine the
+  // Print single orbital entropies which are used by autoCAS to determine the
   // active space
   auto entropies = mc_wavefunction->get_single_orbital_entropies();
   std::cout << "Single orbital entropies:" << std::endl;
@@ -90,10 +90,10 @@ int main() {
     std::cout << "Orbital " << (idx + 1) << ": " << entropies[idx] << std::endl;
   }
 
-  // Select active space using AutoCAS
+  // Select active space using autoCAS
   auto autocas_selector = ActiveSpaceSelectorFactory::create("qdk_autocas_eos");
   auto active_autocas_wfn = autocas_selector->run(mc_wavefunction);
-  std::cout << "AutoCAS selected active orbitals summary:\n"
+  std::cout << "autoCAS selected active orbitals summary:\n"
             << active_autocas_wfn->get_orbitals()->get_summary() << std::endl;
   // end-cell-autocas
   // --------------------------------------------------------------------------------------------
