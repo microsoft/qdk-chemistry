@@ -118,15 +118,12 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
           "Consider providing a spin-broken initial guess if desired.");
     }
   } else if (scf_type == "restricted") {
-    if (open_shell) {
-      QDK_LOGGER().error(
-          "Restricted open-shell (ROHF) calculations are temporarily disabled "
-          "due to DIIS refactor in progress.");
-      throw std::runtime_error(
-          "ROHF support temporarily unavailable during DIIS refactor");
-    }
-    rohf_enabled = false;
     unrestricted = false;
+    rohf_enabled = open_shell;
+    if (rohf_enabled) {
+      QDK_LOGGER().info(
+          "Restricted open-shell request detected; enabling ROHF workflow.");
+    }
   } else {
     throw std::invalid_argument(
         "scf_type must be one of: auto, restricted, unrestricted");

@@ -12,7 +12,6 @@
 #include <qdk/chemistry/utils/logger.hpp>
 
 #include "../scf/scf_impl.h"
-#include "rohf_matrix_handler.h"
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
 #include <qdk/chemistry/scf/util/gpu/cusolver_utils.h>
@@ -23,6 +22,7 @@
 #include <lapack.hh>
 
 #include "asahf.h"
+#include "rohf_diis.h"
 #include "restricted_unrestricted_diis.h"
 #include "diis_gdm.h"
 #include "gdm.h"
@@ -43,12 +43,6 @@ SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx, bool rohf_enabled)
   QDK_LOG_TRACE_ENTERING();
   auto num_atomic_orbitals = ctx.basis_set->num_atomic_orbitals;
   auto num_density_matrices = (ctx.cfg->unrestricted || rohf_enabled) ? 2 : 1;
-  // Only create matrix handler for ROHF case
-  if (rohf_enabled) {
-    rohf_matrix_handler_ = std::make_unique<ROHFMatrixHandler>();
-  } else {
-    rohf_matrix_handler_ = nullptr;
-  }
   P_last_ = RowMajorMatrix::Zero(num_density_matrices * num_atomic_orbitals,
                                  num_atomic_orbitals);
 }
@@ -67,8 +61,8 @@ std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx,
 
     case SCFAlgorithmName::DIIS:
       if (rohf_enabled) {
-        throw std::runtime_error(
-        "ROHF-enabled DIIS temporarily unavailable during refactor");
+        return std::make_shared<ROHFDIIS>(
+            ctx, cfg.scf_algorithm.diis_subspace_size);
       }
       return std::make_shared<RestrictedUnrestrictedDIIS>(
           ctx, cfg.scf_algorithm.diis_subspace_size);
@@ -254,11 +248,17 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
   const int nelec[2] = {nelec_vec[0], nelec_vec[1]};
 
   if (rohf_enabled_) {
-    rohf_matrix_handler_->build_ROHF_F_P_matrix(
-        scf_impl.get_fock_matrix(), scf_impl.get_orbitals_matrix(),
-        scf_impl.get_density_matrix(), nelec[0], nelec[1]);
-    F_ptr = &rohf_matrix_handler_->get_fock_matrix();
-    P_ptr = &rohf_matrix_handler_->get_density_matrix();
+    auto* rohf_diis = dynamic_cast<ROHFDIIS*>(this);
+    if (rohf_diis == nullptr) {
+      throw std::logic_error(
+          "ROHF convergence requires ROHFDIIS implementation");
+    }
+    rohf_diis->build_rohf_f_p_matrix(scf_impl.get_fock_matrix(),
+                                     scf_impl.get_orbitals_matrix(),
+                                     scf_impl.get_density_matrix(), nelec[0],
+                                     nelec[1]);
+    F_ptr = &rohf_diis->get_fock_matrix();
+    P_ptr = &rohf_diis->get_density_matrix();
   } else {
     F_ptr = &scf_impl.get_fock_matrix();
     P_ptr = &scf_impl.get_density_matrix();

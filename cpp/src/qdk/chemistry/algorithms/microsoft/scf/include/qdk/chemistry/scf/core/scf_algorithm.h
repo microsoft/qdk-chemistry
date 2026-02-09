@@ -14,8 +14,6 @@ namespace qdk::chemistry::scf {
 
 // Forward declaration
 class SCFImpl;
-class ROHFMatrixHandler;
-
 /**
  * @brief Base class for SCF iteration algorithms
  *
@@ -152,8 +150,6 @@ class SCFAlgorithm {
       std::numeric_limits<double>::infinity();  ///< Energy change
   double density_rms_ = 0.0;                    ///< Last calculated density RMS
 
-  bool rohf_enabled_ = false;  ///< Flag indicating if ROHF is enabled
-  /// Unique pointer to ROHFMatrixHandler
-  std::unique_ptr<ROHFMatrixHandler> rohf_matrix_handler_;
+    bool rohf_enabled_ = false;  ///< Flag indicating if ROHF is enabled
 };
 }  // namespace qdk::chemistry::scf
