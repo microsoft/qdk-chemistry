@@ -48,7 +48,7 @@ RowMajorMatrix compute_schwarz_ints(const ::libint2::BasisSet& obs,
     for (auto i = 0; i < nsh; ++i) {
       for (auto j = 0; j <= i; ++j) {
         const size_t ni = obs[i].size();
-        const size_t nj = obs[i].size();
+        const size_t nj = obs[j].size();
         const size_t nij = ni * nj;
         engine.compute2<::libint2::Operator::coulomb, ::libint2::BraKet::xx_xx,
                         0>(obs[i], obs[j], obs[i], obs[j]);

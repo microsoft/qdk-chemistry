@@ -703,8 +703,8 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   double cholesky_tol = _settings->get<double>("cholesky_tolerance");
 
   // get cholesky vectors
-  auto [output, num_cholesky_vectors] = detail::compute_cholesky_vectors(
-      *internal_basis_set, cholesky_tol);
+  auto [output, num_cholesky_vectors] =
+      detail::compute_cholesky_vectors(*internal_basis_set, cholesky_tol);
 
   // map output to Eigen matrix
   Eigen::Map<const Eigen::MatrixXd> L_ao(
