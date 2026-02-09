@@ -73,7 +73,7 @@ Access to State-of-the-Art Algorithms
 Citing QDK/Chemistry
 =====================
 
-If you use QDK/Chemistry in your research, please cite our paper :cite:`Baker2026`:
+If you use QDK/Chemistry in your work, please cite our paper :cite:`Baker2026`:
 
    N. A. Baker *et al.*, "QDK/Chemistry: A Modular Toolkit for Quantum Chemistry Applications,"
    `arXiv:2601.15253 <https://arxiv.org/abs/2601.15253>`_ (2026).
