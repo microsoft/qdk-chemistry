@@ -226,7 +226,7 @@ Typical usage:
     constructor = alg.QdkCholeskyHamiltonianConstructor()
 
     # Configure settings if needed
-    constructor.settings().set("cholesky_threshold", 1e-8)
+    constructor.settings().set("cholesky_tolerance", 1e-8)
 
     # Construct Hamiltonian
     hamiltonian = constructor.run(orbitals)

@@ -85,6 +85,9 @@ auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
   auto rhf_orbitals = rhf_wavefunction->get_orbitals();
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
+  if (factory_name == "qdk_cholesky") {
+    ham_factory->settings().set("store_cholesky_vectors", true);
+  }
   auto rhf_hamiltonian = ham_factory->run(rhf_orbitals);
 
   return std::make_tuple(rhf_energy, rhf_hamiltonian);
@@ -106,6 +109,9 @@ auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk") {
   auto uhf_orbitals = uhf_wavefunction->get_orbitals();
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
+  if (factory_name == "qdk_cholesky") {
+    ham_factory->settings().set("store_cholesky_vectors", true);
+  }
   auto uhf_hamiltonian = ham_factory->run(uhf_orbitals);
 
   return std::make_tuple(uhf_energy, uhf_hamiltonian);

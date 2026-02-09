@@ -417,8 +417,9 @@ Eigen::MatrixXd transform_cholesky_to_mo(
   // iterate over each Cholesky vector
   for (size_t k = 0; k < rank; ++k) {
     // Reshape the flat AO vector to a matrix (n_ao x n_ao)
-    Eigen::Map<const Eigen::MatrixXd> V_ao(ao_cholesky_vectors.col(k).data(),
-                                           n_ao, n_ao);
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+                                   Eigen::RowMajor>>
+        V_ao(ao_cholesky_vectors.col(k).data(), n_ao, n_ao);
 
     // Transform from AO to MO basis: C^T * V_ao * C
     // Write directly to output column
@@ -455,7 +456,9 @@ Eigen::MatrixXd build_J_from_cholesky(
   Eigen::VectorXd J_vec = ao_cholesky_vectors * V;
 
   // Reshape back to matrix
-  Eigen::Map<const Eigen::MatrixXd> J(J_vec.data(), n_ao, n_ao);
+  Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+                                 Eigen::RowMajor>>
+      J(J_vec.data(), n_ao, n_ao);
   return J;
 }
 
@@ -482,8 +485,9 @@ Eigen::MatrixXd build_K_from_cholesky(
   // C_{\mu,i_occ}
   Eigen::MatrixXd L_sigma_occ(n_ao * n_occ, rank);
   for (size_t k = 0; k < rank; ++k) {
-    Eigen::Map<const Eigen::MatrixXd> L_k(ao_cholesky_vectors.col(k).data(),
-                                          n_ao, n_ao);
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+                                   Eigen::RowMajor>>
+        L_k(ao_cholesky_vectors.col(k).data(), n_ao, n_ao);
     Eigen::Map<Eigen::MatrixXd> L_k_occ(L_sigma_occ.col(k).data(), n_ao, n_occ);
     L_k_occ.noalias() = L_k * C_occ;
   }

@@ -124,7 +124,7 @@ The native QDK/Chemistry implementation for Hamiltonian construction. Transforms
      - Method for computing electron repulsion integrals ("direct" or "incore")
    * - ``scf_type``
      - string
-     - Type of :term:`SCF` reference ("rhf", "rohf", or "uhf")
+     - Type of :term:`SCF` reference ("auto", "unrestricted" or "restricted"). Default: "auto" (automatically detected from orbitals)
 
 QDK Cholesky
 ~~~~~~~~~~~~
@@ -146,7 +146,7 @@ The decomposition represents the four-center ERIs as products of three-center in
      - Description
    * - ``scf_type``
      - string
-     - Type of :term:`SCF` reference ("auto", "rhf", "rohf" or "uhf"). Default: "auto" (automatically detected from orbitals)
+     - Type of :term:`SCF` reference ("auto", "unrestricted" or "restricted"). Default: "auto" (automatically detected from orbitals)
    * - ``cholesky_tolerance``
      - float
      - Tolerance for Cholesky decomposition accuracy. Smaller values give higher accuracy but more Cholesky vectors. Default: 1e-8

@@ -55,7 +55,7 @@ class CholeskyHamiltonianSettings : public qdk::chemistry::data::Settings {
   CholeskyHamiltonianSettings() {
     set_default("scf_type", "auto");
     set_default("cholesky_tolerance", 1e-8);
-    set_default("store_cholesky_vectors", true);
+    set_default("store_cholesky_vectors", false);
   }
   ~CholeskyHamiltonianSettings() override = default;
 };
