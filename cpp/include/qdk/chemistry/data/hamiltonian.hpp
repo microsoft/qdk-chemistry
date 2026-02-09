@@ -265,7 +265,7 @@ class HamiltonianContainer {
    * @throws std::runtime_error if I/O error occurs
    */
   virtual void to_fcidump_file(const std::string& filename, size_t nalpha,
-                               size_t nbeta) const = 0;
+                               size_t nbeta) const;
 
   /**
    * @brief Check if the Hamiltonian data is complete and consistent

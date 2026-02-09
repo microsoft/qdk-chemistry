@@ -291,12 +291,6 @@ DensityFittedHamiltonianContainer::make_restricted_three_center_integrals(
   return std::make_pair(shared_integrals, shared_integrals);
 }
 
-void DensityFittedHamiltonianContainer::to_fcidump_file(
-    const std::string& filename, size_t nalpha, size_t nbeta) const {
-  QDK_LOG_TRACE_ENTERING();
-  _to_fcidump_file(filename, nalpha, nbeta);
-}
-
 nlohmann::json DensityFittedHamiltonianContainer::to_json() const {
   QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
@@ -773,111 +767,6 @@ DensityFittedHamiltonianContainer::from_hdf5(H5::Group& group) {
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
-}
-
-void DensityFittedHamiltonianContainer::_to_fcidump_file(
-    const std::string& filename, size_t nalpha, size_t nbeta) const {
-  QDK_LOG_TRACE_ENTERING();
-  // Check if this is an unrestricted Hamiltonian and throw error
-  if (is_unrestricted()) {
-    throw std::runtime_error(
-        "FCIDUMP format is not supported for unrestricted Hamiltonians.");
-  }
-
-  std::ofstream file(filename);
-  if (!file.is_open()) {
-    throw std::runtime_error("Cannot open file for writing: " + filename);
-  }
-
-  size_t num_molecular_orbitals;
-  if (has_orbitals()) {
-    if (_orbitals->has_active_space()) {
-      auto active_indices = _orbitals->get_active_space_indices();
-      size_t n_active_alpha = active_indices.first.size();
-      size_t n_active_beta = active_indices.second.size();
-
-      // For restricted case, alpha and beta should be the same
-      if (n_active_alpha != n_active_beta) {
-        throw std::invalid_argument(
-            "For restricted Hamiltonian, alpha and beta active spaces must "
-            "have "
-            "same size");
-      }
-      num_molecular_orbitals =
-          n_active_alpha;  // Can use either alpha or beta since they're equal
-    } else {
-      num_molecular_orbitals = _orbitals->get_num_molecular_orbitals();
-    }
-  } else {
-    throw std::runtime_error("Orbitals are not set");
-  }
-
-  const size_t nelec = nalpha + nbeta;
-  const double print_thresh =
-      std::numeric_limits<double>::epsilon();  // TODO: Make configurable?
-
-  // We don't use symmetry, so populate with C1 data
-  std::string orb_string;
-  for (auto i = 0ul; i < num_molecular_orbitals - 1; ++i) {
-    orb_string += "1,";
-  }
-  orb_string += "1";
-
-  // Write the header of the FCIDUMP file
-  file << "&FCI ";
-  file << "NORB=" << num_molecular_orbitals << ", ";
-  file << "NELEC=" << nelec << ", ";
-  file << "MS2=" << (nalpha - nbeta) << ",\n";
-  file << "ORBSYM=" << orb_string << ",\n";
-  file << "ISYM=1,\n";
-  file << "&END\n";
-
-  auto formatted_line = [&](size_t i, size_t j, size_t k, size_t l,
-                            double val) {
-    if (std::abs(val) < print_thresh) return;
-
-    file << std::setw(28) << std::scientific << std::setprecision(16)
-         << std::right << val << " ";
-    file << std::setw(4) << i << " ";
-    file << std::setw(4) << j << " ";
-    file << std::setw(4) << k << " ";
-    file << std::setw(4) << l;
-  };
-
-  auto write_eri = [&](size_t i, size_t j, size_t k, size_t l) {
-    auto eri = get_two_body_element(i, j, k, l, SpinChannel::aaaa);
-    formatted_line(i + 1, j + 1, k + 1, l + 1, eri);
-    file << "\n";
-  };
-
-  auto write_1body = [&](size_t i, size_t j) {
-    auto hel = (*_one_body_integrals.first)(i, j);
-
-    formatted_line(i + 1, j + 1, 0, 0, hel);
-    file << "\n";
-  };
-
-  // Write permutationally unique MO ERIs
-  // TODO: This is only valid for integrals with 8 fold symmetry
-  // TODO (NAB):  will this TODO be resolved before the release?
-  for (size_t i = 0, ij = 0; i < num_molecular_orbitals; ++i)
-    for (size_t j = i; j < num_molecular_orbitals; ++j, ij++) {
-      for (size_t k = 0, kl = 0; k < num_molecular_orbitals; ++k)
-        for (size_t l = k; l < num_molecular_orbitals; ++l, kl++) {
-          if (ij <= kl) {
-            write_eri(i, j, k, l);
-          }
-        }  // kl loop
-    }  // ij loop
-
-  // Write permutationally unique MO 1-body integrals
-  for (size_t i = 0; i < num_molecular_orbitals; ++i)
-    for (size_t j = 0; j <= i; ++j) {
-      write_1body(i, j);
-    }
-
-  // Write core energy
-  formatted_line(0, 0, 0, 0, _core_energy);
 }
 
 }  // namespace qdk::chemistry::data

@@ -183,16 +183,6 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
       const nlohmann::json& j);
 
   /**
-   * @brief Save Hamiltonian to an FCIDUMP file
-   * @param filename Path to FCIDUMP file to create/overwrite
-   * @param nalpha Number of alpha electrons
-   * @param nbeta Number of beta electrons
-   * @throws std::runtime_error if I/O error occurs
-   */
-  void to_fcidump_file(const std::string& filename, size_t nalpha,
-                       size_t nbeta) const override final;
-
-  /**
    * @brief Check if the Hamiltonian data is complete and consistent
    * @return True if all required data is set and dimensions are consistent
    */
@@ -230,16 +220,6 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
   static std::pair<std::shared_ptr<Eigen::MatrixXd>,
                    std::shared_ptr<Eigen::MatrixXd>>
   make_restricted_three_center_integrals(const Eigen::MatrixXd& integrals);
-
-  /**
-   * @brief Save FCIDUMP file without filename validation (internal use)
-   * @param filename Path to FCIDUMP file to create/overwrite
-   * @param nalpha Number of alpha electrons
-   * @param nbeta Number of beta electrons
-   * @throws std::runtime_error if I/O error occurs
-   */
-  void _to_fcidump_file(const std::string& filename, size_t nalpha,
-                        size_t nbeta) const;
 
   /** Serialization version */
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
