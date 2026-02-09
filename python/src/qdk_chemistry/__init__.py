@@ -15,6 +15,8 @@ import sys
 import warnings
 from pathlib import Path
 
+from qdk import TargetProfile, init
+
 # Import some tools for convenience
 import qdk_chemistry.constants
 from qdk_chemistry._core import QDKChemistryConfig
@@ -25,6 +27,9 @@ if TELEMETRY_ENABLED:
     telemetry_events.on_qdk_chemistry_import()
 
 _DOCS_MODE = os.getenv("QDK_CHEMISTRY_DOCS", "0") == "1"
+
+# Initialize Q#
+init(target_profile=TargetProfile.Base)
 
 
 def _setup_resources() -> None:

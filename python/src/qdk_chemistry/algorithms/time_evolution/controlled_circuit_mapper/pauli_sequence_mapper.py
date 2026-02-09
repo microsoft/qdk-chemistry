@@ -8,7 +8,8 @@
 from collections.abc import Sequence
 from pathlib import Path
 
-import qsharp
+import qdk
+from qdk import qsharp
 
 from qdk_chemistry.data import Settings
 from qdk_chemistry.data.circuit import Circuit
@@ -20,10 +21,6 @@ from qdk_chemistry.data.time_evolution.controlled_time_evolution import Controll
 from .base import ControlledEvolutionCircuitMapper
 
 __all__: list[str] = ["PauliSequenceMapper", "PauliSequenceMapperSettings"]
-
-# Import Q# code for controlled Pauli exponentiation
-code = (Path(__file__).parent / "ControlledPauliExp.qs").read_text()
-qsharp.eval(code)
 
 
 class PauliSequenceMapperSettings(Settings):
@@ -103,6 +100,10 @@ class PauliSequenceMapper(ControlledEvolutionCircuitMapper):
             ValueError: If multiple control qubits are provided.
 
         """
+        # Import Q# code for controlled Pauli exponentiation
+        code = (Path(__file__).parent / "ControlledPauliExp.qs").read_text()
+        qsharp.eval(code)
+
         unitary_container = controlled_evolution.time_evolution_unitary.get_container()
         if not isinstance(unitary_container, PauliProductFormulaContainer):
             raise ValueError(
@@ -133,13 +134,26 @@ class PauliSequenceMapper(ControlledEvolutionCircuitMapper):
             flattened_pauli_terms.extend(pauli_terms)
             flattened_angles.extend(angles)
 
+        controlled_evo_params = {
+            "pauliExponents": flattened_pauli_terms,
+            "pauliCoefficients": flattened_angles,
+            "repetitions": self._settings.get("power"),
+        }
+
         qsc = qsharp.circuit(
-            qsharp.code.RepControlledEvolution,
-            flattened_pauli_terms,
-            flattened_angles,
+            qdk.code.MakeRepControlledEvolutionCircuit,
+            controlled_evo_params,
             controlled_evolution.control_indices[0],
             target_indices,
-            self._settings.get("power"),
         )
 
-        return Circuit(qsharp=qsc)
+        qir = qsharp.compile(
+            qdk.code.MakeRepControlledEvolutionCircuit,
+            controlled_evo_params,
+            controlled_evolution.control_indices[0],
+            target_indices,
+        )
+
+        controlled_evolution_op = qdk.code.MakeRepControlledEvolutionOp(controlled_evo_params)
+
+        return Circuit(qsharp=qsc, qir=qir, qsharp_op=controlled_evolution_op)

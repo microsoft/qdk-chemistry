@@ -8,6 +8,12 @@ import Std.Convert.IntAsDouble;
 import Std.Arrays.Subarray;
 import Std.StatePreparation.PreparePureStateD;
 
+struct StatePreparationParams {
+    rowMap : Int[],
+    stateVector : Double[],
+    expansionOps : Int[][],
+}
+
 /// Performs state preparation for a sparse quantum state |ψ⟩ given its
 /// sparse representation and expansion operations.
 /// # Parameters
@@ -20,14 +26,11 @@ import Std.StatePreparation.PreparePureStateD;
 /// # Returns
 /// - `Unit`: The operation prepares the desired quantum state on the allocated qubits.
 operation StatePreparation(
-    rowMap : Int[],
-    stateVector : Double[],
-    expansionOps : Int[][],
-    numQubits : Int,
+    params : StatePreparationParams,
+    qs : Qubit[],
 ) : Unit {
-    use qs = Qubit[numQubits];
-    PreparePureStateD(stateVector, Subarray(rowMap, qs));
-    for op in expansionOps {
+    PreparePureStateD(params.stateVector, Subarray(params.rowMap, qs));
+    for op in params.expansionOps {
         if Length(op) == 2 {
             CNOT(qs[op[0]], qs[op[1]]);
         } elif Length(op) == 1 {
@@ -38,6 +41,18 @@ operation StatePreparation(
     }
 }
 
+function MakeStatePreparationOp(params : StatePreparationParams) : Qubit[] => Unit {
+    StatePreparation(params, _)
+}
+
+operation MakeStatePreparationCircuit(
+    params : StatePreparationParams,
+    numQubits : Int,
+) : Unit {
+    use qs = Qubit[numQubits];
+    StatePreparation(params, qs);
+}
+
 /// Prepares a single reference quantum state |ψ⟩ corresponding to a given bitstring.
 /// # Parameters
 /// - `bitstring`: An array of integers (0s and 1s) representing the desired quantum state.
@@ -45,14 +60,31 @@ operation StatePreparation(
 /// - `numQubits`: The number of qubits in the system register.
 /// # Returns
 /// - `Unit`: The operation prepares the desired quantum state on the allocated qubits.
+
+struct SingleReferenceParams {
+    bitStrings : Int[],
+}
+
 operation PrepareSingleReferenceState(
-    bitstring : Int[],
-    numQubits : Int,
+    params : SingleReferenceParams,
+    qs : Qubit[],
 ) : Unit {
-    use qs = Qubit[numQubits];
+    let numQubits = Length(params.bitStrings);
     for i in 0..numQubits - 1 {
-        if bitstring[i] == 1 {
+        if params.bitStrings[i] == 1 {
             X(qs[i]);
         }
     }
+}
+
+operation MakeSingleReferenceStateCircuit(
+    params : SingleReferenceParams,
+    numQubits : Int,
+) : Unit {
+    use qs = Qubit[numQubits];
+    PrepareSingleReferenceState(params, qs);
+}
+
+function MakePrepareSingleReferenceStateOp(params : SingleReferenceParams) : Qubit[] => Unit {
+    PrepareSingleReferenceState(params, _)
 }

@@ -37,17 +37,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-import qsharp
+import qdk
+from qdk import qsharp
 
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
 from qdk_chemistry.data import Circuit, Wavefunction
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
-
-# Import the Q# code from the StatePreparation.qs file
-code = (Path(__file__).parent / "StatePreparation.qs").read_text()
-qsharp.eval(code)
 
 
 class SparseIsometryGF2XStatePreparationSettings(StatePreparationSettings):
@@ -58,6 +56,9 @@ class SparseIsometryGF2XStatePreparationSettings(StatePreparationSettings):
         super().__init__()
         self._set_default(
             "prune_classical_qubits", "bool", False, "Whether to prune classical qubits and return the circuit."
+        )
+        self._set_default(
+            "dense_preparation_method", "string", "qdk", "The dense state preparation method to use.", ["qdk", "qiskit"]
         )
 
 
@@ -91,21 +92,24 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
     """
 
-    def __init__(self, prune_classical_qubits: bool = False):
+    def __init__(self) -> None:
         """Initialize the SparseIsometryGF2XStatePreparation."""
         Logger.trace_entering()
         super().__init__()
         self._settings = SparseIsometryGF2XStatePreparationSettings()
-        self._settings.set("prune_classical_qubits", prune_classical_qubits)
+        if self._settings.get("dense_preparation_method") == "qiskit" and not QDK_CHEMISTRY_HAS_QISKIT:
+            raise ImportError(
+                "Qiskit is not available. Please install Qiskit to use the 'qiskit' dense preparation method."
+            )
 
     def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
-        """Prepare a quantum circuit that encodes the given wavefunction using sparse isometry over GF(2^x).
+        """Prepare the quantum state for the given wavefunction.
 
         Args:
             wavefunction: The target wavefunction to prepare.
 
         Returns:
-            A Circuit object containing an OpenQASM3 string of the quantum circuit that prepares the wavefunction.
+            A Circuit object containing the quantum circuit that prepares the desired state.
 
         """
         Logger.trace_entering()
@@ -134,6 +138,106 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             return self._prepare_single_reference_state(bitstrings[0])
 
         n_qubits = len(bitstrings[0])
+        Logger.debug(f"Using {len(bitstrings)} determinants for state preparation")
+
+        # Perform GF2+X elimination with tracking
+        gf2x_operation_results, statevector_data = self._perform_gf2x(bitstrings, coeffs)
+        Logger.debug(f"gf2x_operation_results dense qubit: {gf2x_operation_results.row_map}")
+        Logger.debug(f"gf2x_operation_results state vector: {statevector_data}")
+
+        if self._settings.get("dense_preparation_method") == "qiskit":
+            from qiskit import QuantumCircuit, qasm3, transpile  # noqa: PLC0415
+            from qiskit.circuit.library import (  # noqa: PLC0415
+                StatePreparation as QiskitStatePreparation,
+            )
+            from qiskit.quantum_info import Statevector  # noqa: PLC0415
+            from qiskit.transpiler import PassManager  # noqa: PLC0415
+
+            from qdk_chemistry.plugins.qiskit._interop.transpiler import (  # noqa: PLC0415
+                MergeZBasisRotations,
+                RemoveZBasisOnZeroState,
+                SubstituteCliffordRz,
+            )
+
+            # Use Qiskit dense state preparation
+            qc = QuantumCircuit(n_qubits)
+            statevector = Statevector(statevector_data)
+            qc.append(QiskitStatePreparation(statevector, normalize=False), gf2x_operation_results.row_map)
+            for operation in reversed(gf2x_operation_results.operations):
+                if operation[0] == "cnot":
+                    # operation[1] should be a tuple for CNOT operations
+                    if isinstance(operation[1], tuple):
+                        target, control = operation[1]
+                        qc.cx(control, target)
+                elif operation[0] == "x" and isinstance(operation[1], int):
+                    # operation[1] should be an int for X operations
+                    qubit = operation[1]
+                    qc.x(qubit)
+
+            basis_gates = self._settings.get("basis_gates")
+            do_transpile = self._settings.get("transpile")
+            if do_transpile and basis_gates:
+                opt_level = self._settings.get("transpile_optimization_level")
+                qc = transpile(qc, basis_gates=basis_gates, optimization_level=opt_level)
+                pass_manager = PassManager([MergeZBasisRotations(), SubstituteCliffordRz(), RemoveZBasisOnZeroState()])
+                qc = pass_manager.run(qc)
+
+                Logger.info(
+                    f"Final circuit after transpilation: {qc.num_qubits} qubits, depth {qc.depth()}, {qc.size()} gates"
+                )
+            return Circuit(qasm=qasm3.dumps(qc), encoding="jordan-wigner")
+
+        # Use QDK dense state preparation
+        expansion_ops: list[list[int]] = []
+        for operation in reversed(gf2x_operation_results.operations):
+            if operation[0] == "cnot":
+                # operation[1] should be a tuple for CNOT operations
+                if isinstance(operation[1], tuple):
+                    target, control = operation[1]
+                    expansion_ops.append([control, target])
+            elif operation[0] == "x" and isinstance(operation[1], int):
+                # operation[1] should be an int for X operations
+                qubit = operation[1]
+                expansion_ops.append([qubit])
+
+        # Import the Q# code from the StatePreparation.qs file
+        code = (Path(__file__).parent / "StatePreparation.qs").read_text()
+        qsharp.eval(code)
+        # State vector indexing is in little-endian order, the row map is reversed for Q# convention
+        state_prep_params = {
+            "rowMap": gf2x_operation_results.row_map[::-1],  # Reverse for Q# convention
+            "stateVector": statevector_data.tolist(),
+            "expansionOps": expansion_ops,
+        }
+
+        qsharp_circuit = qsharp.circuit(
+            qdk.code.MakeStatePreparationCircuit,
+            state_prep_params,
+            n_qubits,
+            prune_classical_qubits=self._settings.get("prune_classical_qubits"),
+        )
+
+        qir = qsharp.compile(
+            qdk.code.MakeStatePreparationCircuit,
+            state_prep_params,
+            n_qubits,
+        )
+
+        state_prep_op = qdk.code.MakeStatePreparationOp(state_prep_params)
+        return Circuit(qsharp=qsharp_circuit, qir=qir, qsharp_op=state_prep_op, encoding="jordan-wigner")
+
+    def _perform_gf2x(self, bitstrings: list[str], coeffs: np.ndarray) -> tuple["GF2XEliminationResult", np.ndarray]:
+        """Perform Gaussian elimination over GF(2^x) on the given bitstrings.
+
+        Args:
+            bitstrings: The list of bitstrings representing the wavefunction.
+            coeffs: The coefficients corresponding to each determinant.
+
+        Returns:
+            A tuple containing the GF2X elimination result and the reduced binary matrix.
+
+        """
+        Logger.trace_entering()
         Logger.debug(f"Using {len(bitstrings)} determinants for state preparation")
 
         # Step 1: Convert bitstrings to binary matrix
@@ -201,30 +305,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 "need to use a single-determinant state preparation method."
             )
 
-        # Step 4: Apply recorded operations in reverse order to expand back to full space.
-        # Note: GF2+X can have both CNOT and X operations
-        expansion_ops: list[list[int]] = []
-        for operation in reversed(gf2x_operation_results.operations):
-            if operation[0] == "cnot":
-                # operation[1] should be a tuple for CNOT operations
-                if isinstance(operation[1], tuple):
-                    target, control = operation[1]
-                    expansion_ops.append([control, target])
-            elif operation[0] == "x" and isinstance(operation[1], int):
-                # operation[1] should be an int for X operations
-                qubit = operation[1]
-                expansion_ops.append([qubit])
-
-        qsharp_circuit = qsharp.circuit(
-            qsharp.code.StatePreparation,
-            gf2x_operation_results.row_map,
-            statevector_data.tolist(),
-            expansion_ops,
-            n_qubits,
-            prune_classical_qubits=self._settings.get("prune_classical_qubits"),
-        )
-
-        return Circuit(qsharp=qsharp_circuit, encoding="jordan-wigner")
+        return gf2x_operation_results, statevector_data
 
     def _bitstrings_to_binary_matrix(self, bitstrings: list[str]) -> np.ndarray:
         """Convert a list of bitstrings to a binary matrix.
@@ -233,7 +314,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         where each column represents a determinant and each row represents a qubit.
 
         Args:
-            bitstrings (list[str]): List of bitstrings in Qiskit little endian order.
+            bitstrings (list[str]): List of bitstrings in little-endian order.
                 Each bitstring represents a determinant where the string is ordered
                 as "q[N-1]...q[0]" (most significant bit first in the string).
 
@@ -243,12 +324,12 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 * N is the number of qubits (rows)
                 * k is the number of determinants (columns)
 
-            The matrix follows Qiskit circuit top-down convention with row ordering "q[0]...q[N-1]"
+            The matrix follows top-down convention with row ordering "q[0]...q[N-1]"
             (qubit 0 at the top).
 
         Note:
-            The input bitstrings are in Qiskit little endian order ("q[N-1]...q[0]"),
-            but the output binary matrix follows the Qiskit circuit convention with
+            The input bitstrings are in little-endian order ("q[N-1]...q[0]"),
+            but the output binary matrix follows the top-down convention with
             row ordering "q[0]...q[N-1]". This means each bitstring is reversed
             when converting to a column in the matrix.
 
@@ -316,16 +397,32 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         if not all(bit in "01" for bit in bitstring):
             raise ValueError("Bitstring must contain only '0' and '1' characters")
 
-        num_qubits = len(bitstring)
         bitstring_array = [int(bit) for bit in bitstring]
+        n_qubits = len(bitstring_array)
+        # Import the Q# code from the StatePreparation.qs file
+        code = (Path(__file__).parent / "StatePreparation.qs").read_text()
+        qsharp.eval(code)
+        params = {"bitStrings": bitstring_array[::-1]}  # Reverse for Q# convention
+
         qsharp_circuit = qsharp.circuit(
-            qsharp.code.PrepareSingleReferenceState,
-            reversed(bitstring_array),  # Reverse for little-endian convention
-            num_qubits,
+            qdk.code.MakeSingleReferenceStateCircuit,
+            params,
+            n_qubits,
             prune_classical_qubits=self._settings.get("prune_classical_qubits"),
         )
+        qir = qsharp.compile(
+            qdk.code.MakeSingleReferenceStateCircuit,
+            params,
+            n_qubits,
+        )
+        qsharp_op = qdk.code.MakePrepareSingleReferenceStateOp(params)
 
-        return Circuit(qsharp=qsharp_circuit, encoding="jordan-wigner")
+        return Circuit(
+            qsharp=qsharp_circuit,
+            qir=qir,
+            qsharp_op=qsharp_op,
+            encoding="jordan-wigner",
+        )
 
     def name(self) -> str:
         """Return the name of the state preparation method."""

@@ -11,15 +11,18 @@ from dataclasses import dataclass
 
 import numpy as np
 import pytest
-from qiskit import QuantumCircuit, qasm3
-from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (
     IterativePhaseEstimation,
     _validate_iteration_inputs,
 )
-from qdk_chemistry.data import Circuit, QpeResult, QuantumErrorProfile, QubitHamiltonian
+from qdk_chemistry.data import (
+    Circuit,
+    QpeResult,
+    QuantumErrorProfile,
+    QubitHamiltonian,
+)
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 from qdk_chemistry.utils.phase import (
     accumulated_phase_from_bits,
@@ -38,9 +41,14 @@ if QDK_CHEMISTRY_HAS_QISKIT_AER:
     from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
 
 if QDK_CHEMISTRY_HAS_QISKIT:
+    from qiskit import QuantumCircuit, qasm3
+    from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
+
     from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
 
 _SEED = 42
+
+pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 
 
 @dataclass(frozen=True)
@@ -117,6 +125,7 @@ def _run_iterative(problem: PhaseEstimationProblem) -> QpeResult:
         :class:`QpeResult` instance summarizing the iterative run.
 
     """
+    state_prep_circuit = problem.state_prep
     iqpe = IterativePhaseEstimation(
         num_bits=problem.num_bits, evolution_time=problem.evolution_time, shots_per_bit=problem.shots_iterative
     )
@@ -126,7 +135,7 @@ def _run_iterative(problem: PhaseEstimationProblem) -> QpeResult:
 
     return iqpe.run(
         qubit_hamiltonian=problem.hamiltonian,
-        state_preparation=problem.state_prep,
+        state_preparation=state_prep_circuit,
         circuit_executor=simulator,
         circuit_mapper=circuit_mapper,
         evolution_builder=evolution_builder,
@@ -253,7 +262,6 @@ def test_iterative_phase_estimation_extracts_phase_and_energy(two_qubit_phase_pr
     )
 
 
-@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 def test_iterative_and_traditional_results_match(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
     """Confirm iterative and traditional algorithms produce consistent estimates."""
     iterative_result = _run_iterative(two_qubit_phase_problem)
@@ -319,7 +327,6 @@ def test_iterative_phase_estimation_four_qubit_phase_and_energy(
     )
 
 
-@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 def test_iterative_and_traditional_match_on_four_qubits(four_qubit_phase_problem: PhaseEstimationProblem) -> None:
     """Ensure iterative and traditional approaches agree for four qubits."""
     iterative_result = _run_iterative(four_qubit_phase_problem)
@@ -412,7 +419,6 @@ def test_iterative_phase_estimation_second_non_commuting_example() -> None:
     )
 
 
-@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available")
 def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
     """Integration test showing NoiseModel impact on iterative phase estimation accuracy."""
     # Run noiseless QPE
@@ -600,9 +606,8 @@ def test_create_iteration_circuit_power_calculation() -> None:
         iteration=0,
         total_iterations=5,
     )
-
     # For the first iteration, powers should be 16
-    assert f"power_{2 ** (iqpe._settings.get('num_bits') - 0 - 1)}" in iter_0_circuit.qasm
+    assert iter_0_circuit.qasm.count("rz(pi)") == 2 ** (iqpe._settings.get("num_bits") - 0 - 1)
 
 
 def test_iterative_qpe_initialization() -> None:

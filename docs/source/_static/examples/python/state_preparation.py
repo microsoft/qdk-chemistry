@@ -51,8 +51,8 @@ E_cas, wfn_cas = cas_solver.run(hamiltonian, 1, 1)
 # Construct the circuit
 regular_circuit = regular_prep.run(wfn_cas)
 sparse_circuit = sparse_prep.run(wfn_cas)
-print(f"Regular isometry QASM:\n{regular_circuit.get_qasm()}")
-print(f"Sparse isometry QASM:\n{sparse_circuit.get_qasm()}")
+print(f"Regular isometry circuit:\n{regular_circuit.get_qiskit_circuit()}")
+print(f"Sparse isometry circuit:\n{sparse_circuit.get_qsharp_circuit()}")
 # end-cell-run
 ################################################################################
 

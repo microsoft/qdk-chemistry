@@ -7,7 +7,7 @@ Includes utilities for visualizing circuits with QDK widgets.
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-
+from collections.abc import Callable
 from typing import Any
 
 import h5py
@@ -21,14 +21,7 @@ __all__: list[str] = []
 
 
 class Circuit(DataClass):
-    """Data class for a quantum circuit.
-
-    Attributes:
-        qasm (str): The quantum circuit in QASM format.
-        encoding (str | None): The fermion-to-qubit encoding assumed by this circuit (e.g., "jordan-wigner").
-            If None, no specific encoding is assumed.
-
-    """
+    """Data class for a quantum circuit."""
 
     # Class attribute for filename validation
     _data_type_name = "circuit"
@@ -40,26 +33,29 @@ class Circuit(DataClass):
     def __init__(
         self,
         qasm: str | None = None,
-        qsharp: qsharp._native.Circuit | None = None,
         qir: qsharp._qsharp.QirInputData | None = None,
+        qsharp: qsharp._native.Circuit | None = None,
+        qsharp_op: Callable[..., Any] | None = None,
         encoding: str | None = None,
     ) -> None:
         """Initialize a Circuit.
 
         Args:
-            qasm (str | None): The quantum circuit in QASM format. Defaults to None.
-            qsharp (qsharp._native.Circuit | None): The quantum circuit as a Q# Circuit object. Defaults to None.
-            qir (qsharp._qsharp.QirInputData | None): The QIR representation of the quantum circuit. Defaults to None.
-            encoding (str | None): The fermion-to-qubit encoding assumed by this circuit.
+            qasm: The quantum circuit in QASM format. Defaults to None.
+            qir: The QIR representation of the quantum circuit. Defaults to None.
+            qsharp: The quantum circuit as a Q# program. Defaults to None.
+            qsharp_op: The Q# operation associated with the circuit. Defaults to None.
+            encoding: The fermion-to-qubit encoding assumed by this circuit.
                 Valid values include "jordan-wigner", "bravyi-kitaev", "parity", or None.
                 Defaults to None.
 
         """
         Logger.trace_entering()
         self.qasm = qasm
-        self.encoding = encoding
-        self.qsharp = qsharp
         self.qir = qir
+        self.qsharp = qsharp
+        self._qsharp_op = qsharp_op
+        self.encoding = encoding
 
         # Check that a representation of the quantum circuit is given by the keyword arguments
         if self.qasm is None and self.qsharp is None and self.qir is None:
@@ -80,15 +76,22 @@ class Circuit(DataClass):
 
         return self.qasm
 
-    # Utilities for visualizing circuits with QDK widgets.
-    def get_qsharp(self) -> qsharp._native.Circuit:
-        """Parse a Circuit object into a qsharp Circuit object with trimming options.
+    def get_qir(self) -> qsharp._qsharp.QirInputData:
+        """Get QIR representation of the quantum circuit.
 
-        Args:
-            remove_idle_qubits (bool): This is only applicable if parsing from QASM.
-                If True, remove qubits that are idle (no gates applied).
-            remove_classical_qubits (bool): This is only applicable if parsing from QASM.
-                If True, remove qubits with gates but deterministic bitstring outputs (0|1).
+        Returns:
+            The QIR representation of the quantum circuit.
+
+        """
+        if self.qir:
+            return self.qir
+        if self.qasm:
+            return qsharp.openqasm.compile(self.qasm)
+
+        raise RuntimeError("The QIR representation of the quantum circuit is not set.")
+
+    def get_qsharp_circuit(self) -> qsharp._native.Circuit:
+        """Parse a Circuit object into a qsharp Circuit object.
 
         Returns:
             qsharp._native.Circuit: A qsharp Circuit object representing the trimmed circuit.
@@ -102,21 +105,26 @@ class Circuit(DataClass):
 
         raise RuntimeError("The quantum circuit is not set in a qsharp format.")
 
-    def get_qir(self) -> qsharp._qsharp.QirInputData:
-        """Get QIR representation of the quantum circuit.
+    def get_qiskit_circuit(self):
+        """Convert the Circuit to a Qiskit QuantumCircuit.
 
-        Returns:
-            qsharp._qsharp.QirInputData: The QIR representation of the quantum circuit.
+        Raises:
+            RuntimeError: If Qiskit is not available or if the circuit cannot be converted.
 
         """
-        if self.qir:
-            return self.qir
-        if self.qsharp:
-            return qsharp.compile(self.qsharp)
-        if self.qasm:
-            return qsharp.openqasm.compile(self.qasm)
+        Logger.trace_entering()
+        try:
+            from qiskit import qasm3  # noqa: PLC0415
 
-        raise RuntimeError("The quantum circuit is not set in a QIR format.")
+            from qdk_chemistry.plugins.qiskit._interop.qir import qir_ir_to_qiskit  # noqa: PLC0415
+        except ImportError as err:
+            raise RuntimeError("Qiskit is not available. Cannot convert circuit to Qiskit format.") from err
+
+        if self.qir:
+            return qir_ir_to_qiskit(str(self.qir))
+        if self.qasm:
+            return qasm3.loads(self.qasm)
+        raise RuntimeError("The quantum circuit cannot be converted to Qiskit format.")
 
     # DataClass interface implementation
     def get_summary(self) -> str:

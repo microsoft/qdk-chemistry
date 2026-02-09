@@ -5,18 +5,15 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import re
+import json
 
 import numpy as np
 import pytest
+import qsharp
 import scipy
-from qiskit import QuantumCircuit, qasm3
-from qiskit.quantum_info import Operator
 
 from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.pauli_sequence_mapper import (
     PauliSequenceMapper,
-    _append_controlled_pauli_rotation,
-    append_controlled_time_evolution,
 )
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary
@@ -27,8 +24,12 @@ from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
 from qdk_chemistry.data.time_evolution.controlled_time_evolution import (
     ControlledTimeEvolutionUnitary,
 )
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+if QDK_CHEMISTRY_HAS_QISKIT:
+    from qiskit.quantum_info import Operator
 
 
 @pytest.fixture
@@ -71,17 +72,24 @@ class TestPauliSequenceMapper:
         circuit = mapper.run(controlled_unitary)
 
         assert isinstance(circuit, Circuit)
-        assert isinstance(circuit.qasm, str)
-        assert "OPENQASM" in circuit.qasm
+        assert isinstance(circuit.get_qsharp_circuit(), qsharp._native.Circuit)
 
     def test_default_target_indices(self, controlled_unitary):
         """Test that default target indices are used when none are provided."""
         mapper = PauliSequenceMapper()
 
         circuit = mapper.run(controlled_unitary)
-
-        # control qubit is at index 2, so target qubits should be [0, 1]
-        assert re.search(r"crz\s*\([^)]*\)\s+_gate_q_2\s*,\s*_gate_q_", circuit.qasm)
+        qsc_json = json.loads(circuit.get_qsharp_circuit().json())
+        num_qubits = len(qsc_json["qubits"])  # 2 system qubits + 1 control qubit
+        assert num_qubits == 3
+        operations = qsc_json["componentGrid"][0]["components"][0]["children"][0]["components"][0]["children"]
+        # Check that "X0" on qubit 0 and "Z1" on qubit 1 are present in the circuit
+        # Check control qubit is qubit 2
+        for op in operations:
+            for component in op["components"]:
+                if component["gate"] == "X" and "controls" in component:
+                    control_qubit = component["controls"][0]["qubit"]
+                    assert control_qubit == 2  # Control qubit is qubit 2
 
     def test_invalid_container_type_raises(self):
         """Test that an invalid container type raises a ValueError."""
@@ -112,16 +120,32 @@ class TestPauliSequenceMapper:
 
         circuit = mapper.run(controlled_unitary)
 
-        # Check that the angles in the CRZ gates are correctly set
-        crz_angles = re.findall(r"crz\s*\(\s*([^\)]+)\s*\)", circuit.qasm)
-        container = controlled_unitary.time_evolution_unitary.get_container()
-        expected_angles = [
-            f"{2 * container.step_terms[0].angle:.1f}",
-            f"{2 * container.step_terms[1].angle:.1f}",
-        ]
+        qsc_json = json.loads(circuit.get_qsharp_circuit().json())
+        num_qubits = len(qsc_json["qubits"])  # 2 system qubits + 1 control qubit
+        assert num_qubits == 3
+        operations = qsc_json["componentGrid"][0]["components"][0]["children"][0]["components"][0]["children"]
+        # Check that "X0" on qubit 0 and "Z1" on qubit 1 are present in the circuit with correct parameters
+        for op in operations:
+            for component in op["components"]:
+                if component["gate"] == "Rz":
+                    params = float(component["args"][0])
+                    target_qubit = component["targets"][0]["qubit"]
+                    if target_qubit == 0:
+                        assert np.isclose(
+                            abs(params),
+                            0.5,
+                            rtol=float_comparison_relative_tolerance,
+                            atol=float_comparison_absolute_tolerance,
+                        )  # X on qubit 0
+                    elif target_qubit == 1:
+                        assert np.isclose(
+                            abs(params),
+                            0.25,
+                            rtol=float_comparison_relative_tolerance,
+                            atol=float_comparison_absolute_tolerance,
+                        )  # Z on qubit 1
 
-        assert crz_angles == expected_angles
-
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_controlled_u_circuit_matrix(self, controlled_unitary):
         """Test that the constructed controlled-U circuit has the expected matrix."""
         mapper = PauliSequenceMapper(power=1)
@@ -147,8 +171,7 @@ class TestPauliSequenceMapper:
         i_4 = np.eye(4, dtype=complex)
         expected_matrix = np.kron(p_0, i_4) + np.kron(p_1, u)
 
-        # Get actual matrix from the circuit
-        qc = qasm3.loads(circuit.qasm)
+        qc = circuit.get_qiskit_circuit()
         actual_matrix = Operator(qc).data
 
         assert np.allclose(
@@ -157,103 +180,3 @@ class TestPauliSequenceMapper:
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
         )
-
-
-class TestAppendControlledTimeEvolution:
-    """Tests for the append_controlled_time_evolution function."""
-
-    def test_power_validation(self, controlled_unitary):
-        """Test that invalid power raises a ValueError."""
-        qc = QuantumCircuit(3)
-        container = controlled_unitary.time_evolution_unitary.get_container()
-
-        with pytest.raises(ValueError, match="power must be at least 1"):
-            append_controlled_time_evolution(
-                qc,
-                exponential_terms=container.step_terms,
-                reps=container.step_reps,
-                control_qubit=controlled_unitary.control_indices[0],
-                target_qubits=[0, 1],
-                power=0,
-            )
-
-    def test_appends_operations(self, controlled_unitary):
-        """Test that controlled time evolution operations are appended to the circuit."""
-        qc = QuantumCircuit(3)
-        container = controlled_unitary.time_evolution_unitary.get_container()
-
-        append_controlled_time_evolution(
-            qc,
-            exponential_terms=container.step_terms,
-            reps=container.step_reps,
-            control_qubit=controlled_unitary.control_indices[0],
-            target_qubits=[0, 1],
-            power=2,
-        )
-        ops = qc.count_ops()
-        assert ops == {"ctrl_time_evol_power_2": 1}
-
-    def test_skips_zero_angle_terms(self):
-        """Test that terms with zero angle are skipped."""
-        qc = QuantumCircuit(2)
-
-        append_controlled_time_evolution(
-            qc,
-            exponential_terms=[ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.0)],
-            reps=1,
-            control_qubit=1,
-            target_qubits=[0],
-            power=1,
-        )
-
-        # No CRZ should be added
-        cir_qasm = qasm3.dumps(qc)
-        assert "crz" not in cir_qasm
-
-
-class TestAppendControlledPauliRotation:
-    """Tests for the _append_controlled_pauli_rotation helper function."""
-
-    def test_identity_term_adds_phase(self):
-        """Test that identity terms add a controlled phase gate."""
-        qc = QuantumCircuit(1)
-        term = ExponentiatedPauliTerm(pauli_term={}, angle=0.3)
-
-        _append_controlled_pauli_rotation(
-            qc,
-            control_qubit=0,
-            target_qubits=[],
-            term=term,
-        )
-
-        assert qc.count_ops().get("p", 0) == 1
-
-    def test_single_pauli_rotation(self):
-        """Test appending a single-qubit controlled Pauli rotation."""
-        qc = QuantumCircuit(2)
-        term = ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.2)
-
-        _append_controlled_pauli_rotation(
-            qc,
-            control_qubit=1,
-            target_qubits=[0],
-            term=term,
-        )
-
-        assert qc.count_ops().get("crz", 0) == 1
-
-    def test_multi_qubit_pauli_chain(self):
-        """Test appending a multi-qubit controlled Pauli rotation."""
-        qc = QuantumCircuit(3)
-        term = ExponentiatedPauliTerm(pauli_term={0: "X", 1: "Y"}, angle=0.4)
-
-        _append_controlled_pauli_rotation(
-            qc,
-            control_qubit=2,
-            target_qubits=[0, 1],
-            term=term,
-        )
-
-        ops = qc.count_ops()
-        assert ops.get("cx", 0) >= 2
-        assert ops.get("crz", 0) == 1

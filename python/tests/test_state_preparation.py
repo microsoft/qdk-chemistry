@@ -13,10 +13,12 @@ This test module also checks various utility functions associated with state pre
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import re
 
 import numpy as np
 import pytest
+import qsharp
 
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
@@ -63,6 +65,26 @@ def test_sparse_isometry_gf2x_basic(wavefunction_4e4o):
     # Test circuit creation
     circuit = prep.run(wavefunction_4e4o)
     assert isinstance(circuit, Circuit)
+    qsc = circuit.get_qsharp_circuit()
+    assert isinstance(qsc, qsharp._native.Circuit)
+    qsc_json_str = qsc.json()
+    qsc_json = json.loads(qsc_json_str)
+    num_qubits = len(qsc_json["qubits"])
+    assert num_qubits == 2 * 4
+    # Test composite StatePreparation gate has been correctly decomposed
+    assert "StatePreparation" in qsc_json_str
+    assert "Rz" in qsc_json_str  # decomposed into RZ gate
+    expected_theta = 2 * np.arctan(9.8379475848252518e-01 / 1.7929827992011016e-01)
+    assert f"{expected_theta:.4f}" in qsc_json_str  # expected angle
+
+
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+def test_sparse_isometry_gf2x_qiskit_dense_prepare(wavefunction_4e4o):
+    """Test the sparse isometry GF(2^X) StatePreparation algorithm basic functionality."""
+    prep = create("state_prep", "sparse_isometry_gf2x", dense_preparation_method="qiskit")
+    # Test circuit creation
+    circuit = prep.run(wavefunction_4e4o)
+    assert isinstance(circuit, Circuit)
     qasm = circuit.get_qasm()
     assert isinstance(qasm, str)
     qubit_pattern = re.search(r"qubit\[(\d+)\] q;", qasm)
@@ -90,14 +112,26 @@ def test_sparse_isometry_gf2x_single_reference_state():
 
     single_ref_circuit = prep.run(wavefunction)
     assert isinstance(single_ref_circuit, Circuit)
-    single_ref_qasm = single_ref_circuit.get_qasm()
-    assert isinstance(single_ref_qasm, str)
-    # Count number of qubits in qasm
-    qubit_pattern = re.search(r"qubit\[(\d+)\] q;", single_ref_qasm)
-    assert qubit_pattern is not None
-    assert int(qubit_pattern.group(1)) == 4
-    # Count x operation on qubit "x q[*]"
-    assert single_ref_qasm.count("x q[") == 2
+    single_ref_qsc = single_ref_circuit.get_qsharp_circuit()
+    assert isinstance(single_ref_qsc, qsharp._native.Circuit)
+    single_ref_qsc_json_str = single_ref_qsc.json()
+    single_ref_qsc_json = json.loads(single_ref_qsc_json_str)
+    num_qubits = len(single_ref_qsc_json["qubits"])
+    assert num_qubits == 4
+    assert (
+        len(
+            single_ref_qsc_json["componentGrid"][0]["components"][0]["children"][0]["components"][0]["children"][0][
+                "components"
+            ]
+        )
+        == 2
+    )  # 2 operations
+    assert all(
+        child["gate"] == "X"
+        for child in single_ref_qsc_json["componentGrid"][0]["components"][0]["children"][0]["components"][0][
+            "children"
+        ][0]["components"]
+    )
 
 
 def test_gf2x_bitstrings_to_binary_matrix():

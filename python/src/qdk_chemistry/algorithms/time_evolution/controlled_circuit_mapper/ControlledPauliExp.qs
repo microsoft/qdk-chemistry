@@ -18,18 +18,21 @@ import Std.Arrays.Mapped;
 operation ControlledEvolution(
     pauliExponents : Pauli[][],
     pauliCoefficients : Double[],
-    control : Int,
-    system : Int[]
+    control : Qubit,
+    systems : Qubit[]
 ) : Unit {
-    let numQubits = Length(system) + 1;
-    use qs = Qubit[numQubits];
     for idx in 0..Length(pauliExponents) - 1 {
         let paulis = pauliExponents[idx];
         let coeff = pauliCoefficients[idx];
-        Controlled Exp([qs[control]], (paulis, -coeff, Subarray(system, qs)));
+        Controlled Exp([control], (paulis, -coeff, systems));
     }
 }
 
+struct RepControlledEvolutionParams {
+    pauliExponents : Pauli[][],
+    pauliCoefficients : Double[],
+    repetitions : Int,
+}
 /// Performs repeated Controlled Time Evolution for a set of Pauli exponentials.
 /// # Parameters
 /// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
@@ -40,33 +43,25 @@ operation ControlledEvolution(
 /// # Returns
 /// - `Unit`: The operation prepares the repeated controlled time evolution on the allocated qubits.
 operation RepControlledEvolution(
-    pauliExponents : Pauli[][],
-    pauliCoefficients : Double[],
-    control : Int,
-    system : Int[],
-    repetitions : Int,
+    params : RepControlledEvolutionParams,
+    control : Qubit,
+    systems : Qubit[],
 ) : Unit {
-    for i in 1..repetitions {
-        ControlledEvolution(pauliExponents, pauliCoefficients, control, system);
+    for i in 1..params.repetitions {
+        ControlledEvolution(params.pauliExponents, params.pauliCoefficients, control, systems);
     }
 }
 
-/// Performs rescaled Controlled Time Evolution for a set of Pauli exponentials.
-/// # Parameters
-/// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
-/// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
-/// - `control`: The index of the control qubit.
-/// - `system`: An array of integers representing the indices of the system qubits.
-/// - `scaleFactor`: The factor by which to rescale the coefficients.
-/// # Returns
-/// - `Unit`: The operation prepares the rescaled controlled time evolution on the allocated qubits
-operation RescaleControlledEvolution(
-    pauliExponents : Pauli[][],
-    pauliCoefficients : Double[],
+
+operation MakeRepControlledEvolutionCircuit(
+    params : RepControlledEvolutionParams,
     control : Int,
     system : Int[],
-    scaleFactor : Double,
 ) : Unit {
-    let rescaledCoefficients = Mapped(coeff -> coeff * scaleFactor, pauliCoefficients);
-    ControlledEvolution(pauliExponents, rescaledCoefficients, control, system);
+    use qs = Qubit[Length(system) + 1];
+    RepControlledEvolution(params, qs[control], Subarray(system, qs));
+}
+
+function MakeRepControlledEvolutionOp(params : RepControlledEvolutionParams) : (Qubit, Qubit[]) => Unit {
+    RepControlledEvolution(params, _, _)
 }
