@@ -864,10 +864,40 @@ void SCFImpl::init_density_matrix_() {
   if (num_density_matrices_ == 2 &&
       (method != DensityInitializationMethod::UserProvided &&
        method != DensityInitializationMethod::File)) {
+    // Copy the same density for beta initially
     memcpy(P_.data() + num_atomic_orbitals_ * num_atomic_orbitals_, P_.data(),
            sizeof(double) * num_atomic_orbitals_ * num_atomic_orbitals_);
     P_ *= 0.5;
-    if (nelec_[0] == nelec_[1]) {  // spin(2S) = alpha - beta = 0
+
+    // For open-shell systems with different alpha and beta electron counts,
+    // break spin symmetry by scaling alpha and beta densities appropriately
+    // to approximately match the target electron counts
+    if (nelec_[0] != nelec_[1]) {
+      // Compute current trace of the density matrix for one spin
+      Eigen::Map<RowMajorMatrix> P_alpha(P_.data(), num_atomic_orbitals_,
+                                         num_atomic_orbitals_);
+      double trace_per_density = P_alpha.trace();
+
+      if (trace_per_density > 1e-12) {
+        // Scale alpha and beta densities to approximately match target
+        // electron counts
+        double alpha_scale = static_cast<double>(nelec_[0]) / trace_per_density;
+        double beta_scale = static_cast<double>(nelec_[1]) / trace_per_density;
+        for (int i = 0; i < num_atomic_orbitals_ * num_atomic_orbitals_; ++i) {
+          P_.data()[i] *= alpha_scale;
+        }
+        double* P_beta_ptr =
+            P_.data() + num_atomic_orbitals_ * num_atomic_orbitals_;
+        for (int i = 0; i < num_atomic_orbitals_ * num_atomic_orbitals_; ++i) {
+          P_beta_ptr[i] *= beta_scale;
+        }
+
+        QDK_LOGGER().info(
+            "Spin-polarized initial guess: scaled alpha by {:.6f}, beta by "
+            "{:.6f}",
+            alpha_scale, beta_scale);
+      }
+    } else {
       QDK_LOGGER().warn(
           "Breaking symmetry not implemented for spin 0 molecule");
     }
