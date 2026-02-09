@@ -13,6 +13,7 @@ from qdk_chemistry.data import (
     CanonicalFourCenterHamiltonianContainer,
     CasWavefunctionContainer,
     Configuration,
+    DensityFittedHamiltonianContainer,
     Hamiltonian,
     Orbitals,
     OrbitalType,
@@ -72,13 +73,34 @@ def create_test_orbitals(num_orbitals: int):
     return Orbitals(coeffs, None, None, basis_set)
 
 
-def create_test_hamiltonian(num_orbitals: int):
-    """Helper function to create test Hamiltonian objects."""
+def create_test_hamiltonian(num_orbitals: int, container_type: str = "canonical_four_center"):
+    """Helper function to create test Hamiltonian objects.
+
+    Args:
+        num_orbitals: Number of molecular orbitals
+        container_type: Type of container to use. Options are:
+            - "canonical_four_center" (default): Uses CanonicalFourCenterHamiltonianContainer
+            - "density_fitted": Uses DensityFittedHamiltonianContainer
+
+    Returns:
+        Hamiltonian: A test Hamiltonian with the specified container type
+
+    """
     one_body = np.eye(num_orbitals)
-    two_body = np.zeros(num_orbitals**4)
     fock = np.eye(0)
     orbitals = create_test_orbitals(num_orbitals)
-    return Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 0.0, fock))
+
+    if container_type == "canonical_four_center":
+        two_body = np.zeros(num_orbitals**4)
+        return Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 0.0, fock))
+    if container_type == "density_fitted":
+        # Create three-center integrals [n_aux x n_geminals]
+        # Using n_aux = num_orbitals auxiliary basis functions
+        n_geminals = num_orbitals**2
+        n_aux = num_orbitals
+        three_center = np.zeros((n_aux, n_geminals))
+        return Hamiltonian(DensityFittedHamiltonianContainer(one_body, three_center, orbitals, 0.0, fock))
+    raise ValueError(f"Unknown container_type: {container_type}. Use 'canonical_four_center' or 'density_fitted'.")
 
 
 def create_test_shells(num_atoms: int = 1, atoms_types: list | None = None):

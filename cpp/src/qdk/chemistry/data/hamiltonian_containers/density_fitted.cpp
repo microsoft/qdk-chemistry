@@ -3,10 +3,13 @@
 // license information.
 
 #include <algorithm>
+#include <blas.hh>
+#include <cstddef>
 #include <fstream>
 #include <iostream>
 #include <macis/util/fcidump.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
+#include <memory>
+#include <qdk/chemistry/data/hamiltonian_containers/density_fitted.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
@@ -18,16 +21,15 @@
 
 namespace qdk::chemistry::data {
 
-CanonicalFourCenterHamiltonianContainer::
-    CanonicalFourCenterHamiltonianContainer(
-        const Eigen::MatrixXd& one_body_integrals,
-        const Eigen::VectorXd& two_body_integrals,
-        std::shared_ptr<Orbitals> orbitals, double core_energy,
-        const Eigen::MatrixXd& inactive_fock_matrix, HamiltonianType type)
+DensityFittedHamiltonianContainer::DensityFittedHamiltonianContainer(
+    const Eigen::MatrixXd& one_body_integrals,
+    const Eigen::MatrixXd& three_center_integrals,
+    std::shared_ptr<Orbitals> orbitals, double core_energy,
+    const Eigen::MatrixXd& inactive_fock_matrix, HamiltonianType type)
     : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
                            inactive_fock_matrix, type),
-      _two_body_integrals(
-          make_restricted_two_body_integrals(two_body_integrals)) {
+      _three_center_integrals(
+          make_restricted_three_center_integrals(three_center_integrals)) {
   QDK_LOG_TRACE_ENTERING();
 
   validate_integral_dimensions();
@@ -40,23 +42,20 @@ CanonicalFourCenterHamiltonianContainer::
   }
 }
 
-CanonicalFourCenterHamiltonianContainer::
-    CanonicalFourCenterHamiltonianContainer(
-        const Eigen::MatrixXd& one_body_integrals_alpha,
-        const Eigen::MatrixXd& one_body_integrals_beta,
-        const Eigen::VectorXd& two_body_integrals_aaaa,
-        const Eigen::VectorXd& two_body_integrals_aabb,
-        const Eigen::VectorXd& two_body_integrals_bbbb,
-        std::shared_ptr<Orbitals> orbitals, double core_energy,
-        const Eigen::MatrixXd& inactive_fock_matrix_alpha,
-        const Eigen::MatrixXd& inactive_fock_matrix_beta, HamiltonianType type)
+DensityFittedHamiltonianContainer::DensityFittedHamiltonianContainer(
+    const Eigen::MatrixXd& one_body_integrals_alpha,
+    const Eigen::MatrixXd& one_body_integrals_beta,
+    const Eigen::MatrixXd& three_center_integrals_aa,
+    const Eigen::MatrixXd& three_center_integrals_bb,
+    std::shared_ptr<Orbitals> orbitals, double core_energy,
+    const Eigen::MatrixXd& inactive_fock_matrix_alpha,
+    const Eigen::MatrixXd& inactive_fock_matrix_beta, HamiltonianType type)
     : HamiltonianContainer(one_body_integrals_alpha, one_body_integrals_beta,
                            orbitals, core_energy, inactive_fock_matrix_alpha,
                            inactive_fock_matrix_beta, type),
-      _two_body_integrals(
-          std::make_unique<Eigen::VectorXd>(two_body_integrals_aaaa),
-          std::make_unique<Eigen::VectorXd>(two_body_integrals_aabb),
-          std::make_unique<Eigen::VectorXd>(two_body_integrals_bbbb)) {
+      _three_center_integrals(
+          std::make_unique<Eigen::MatrixXd>(three_center_integrals_aa),
+          std::make_unique<Eigen::MatrixXd>(three_center_integrals_bb)) {
   QDK_LOG_TRACE_ENTERING();
 
   validate_integral_dimensions();
@@ -69,40 +68,106 @@ CanonicalFourCenterHamiltonianContainer::
   }
 }
 
-std::unique_ptr<HamiltonianContainer>
-CanonicalFourCenterHamiltonianContainer::clone() const {
-  QDK_LOG_TRACE_ENTERING();
-  if (is_restricted()) {
-    return std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-        *_one_body_integrals.first, *std::get<0>(_two_body_integrals),
-        _orbitals, _core_energy, *_inactive_fock_matrix.first, _type);
-  }
-  return std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-      *_one_body_integrals.first, *_one_body_integrals.second,
-      *std::get<0>(_two_body_integrals), *std::get<1>(_two_body_integrals),
-      *std::get<2>(_two_body_integrals), _orbitals, _core_energy,
-      *_inactive_fock_matrix.first, *_inactive_fock_matrix.second, _type);
-}
-
-std::string CanonicalFourCenterHamiltonianContainer::get_container_type()
+std::unique_ptr<HamiltonianContainer> DensityFittedHamiltonianContainer::clone()
     const {
   QDK_LOG_TRACE_ENTERING();
-  return "canonical_four_center";
+  if (is_restricted()) {
+    return std::make_unique<DensityFittedHamiltonianContainer>(
+        *_one_body_integrals.first, *_three_center_integrals.first, _orbitals,
+        _core_energy, *_inactive_fock_matrix.first, _type);
+  }
+  return std::make_unique<DensityFittedHamiltonianContainer>(
+      *_one_body_integrals.first, *_one_body_integrals.second,
+      *_three_center_integrals.first, *_three_center_integrals.second,
+      _orbitals, _core_energy, *_inactive_fock_matrix.first,
+      *_inactive_fock_matrix.second, _type);
+}
+
+std::string DensityFittedHamiltonianContainer::get_container_type() const {
+  QDK_LOG_TRACE_ENTERING();
+  return "density_fitted";
 }
 
 std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
            const Eigen::VectorXd&>
-CanonicalFourCenterHamiltonianContainer::get_two_body_integrals() const {
+DensityFittedHamiltonianContainer::get_two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_two_body_integrals()) {
-    throw std::runtime_error("Two-body integrals are not set");
+    throw std::runtime_error("Three-center integrals are not set");
   }
-  return std::make_tuple(std::cref(*std::get<0>(_two_body_integrals)),
-                         std::cref(*std::get<1>(_two_body_integrals)),
-                         std::cref(*std::get<2>(_two_body_integrals)));
+
+  // Lazily build and cache the four-center integrals on first access
+  if (!_cached_four_center_integrals) {
+    _build_four_center_cache();
+  }
+
+  return std::make_tuple(
+      std::cref(*std::get<0>(*_cached_four_center_integrals)),
+      std::cref(*std::get<1>(*_cached_four_center_integrals)),
+      std::cref(*std::get<2>(*_cached_four_center_integrals)));
 }
 
-double CanonicalFourCenterHamiltonianContainer::get_two_body_element(
+void DensityFittedHamiltonianContainer::_build_four_center_cache() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  size_t norb = _orbitals->get_active_space_indices().first.size();
+  size_t norb2 = norb * norb;
+  size_t norb4 = norb2 * norb2;
+
+  // Helper lambda to build 4-center from 3-center: (ij|kl) = sum_P A_P,ij *
+  // B_P,kl This computes G = A^T * B using BLAS GEMM
+  auto build_four_center =
+      [&](std::shared_ptr<const Eigen::MatrixXd> three_center_left,
+          std::shared_ptr<const Eigen::MatrixXd> three_center_right)
+      -> std::shared_ptr<Eigen::VectorXd> {
+    // Allocate output vector
+    auto four_center = std::make_shared<Eigen::VectorXd>(norb4);
+
+    size_t naux = three_center_left->rows();
+
+    // resulting four center is row packed!
+    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+               norb2, norb2, naux, 1.0, three_center_right->data(), naux,
+               three_center_left->data(), naux, 0.0, four_center->data(),
+               norb2);
+
+    return four_center;
+  };
+
+  // Build four-center integrals from three-center
+  auto aaaa = build_four_center(_three_center_integrals.first,
+                                _three_center_integrals.first);
+
+  if (is_restricted()) {
+    _cached_four_center_integrals.emplace(aaaa, aaaa, aaaa);
+    return;
+  } else {
+    auto aabb = build_four_center(_three_center_integrals.first,
+                                  _three_center_integrals.second);
+    auto bbbb = build_four_center(_three_center_integrals.second,
+                                  _three_center_integrals.second);
+    std::cout << "aaaa" << std::endl;
+    std::cout << *aaaa << std::endl;
+    std::cout << "aabb" << std::endl;
+    std::cout << *aabb << std::endl;
+    std::cout << "bbbb" << std::endl;
+    std::cout << *bbbb << std::endl;
+    _cached_four_center_integrals.emplace(std::move(aaaa), std::move(aabb),
+                                          std::move(bbbb));
+  }
+}
+
+std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
+DensityFittedHamiltonianContainer::get_three_center_integrals() const {
+  QDK_LOG_TRACE_ENTERING();
+  if (!has_two_body_integrals()) {
+    throw std::runtime_error("Three-center two-body integrals are not set");
+  }
+  return std::make_pair(std::cref(*_three_center_integrals.first),
+                        std::cref(*_three_center_integrals.second));
+}
+
+double DensityFittedHamiltonianContainer::get_two_body_element(
     unsigned i, unsigned j, unsigned k, unsigned l, SpinChannel channel) const {
   QDK_LOG_TRACE_ENTERING();
 
@@ -115,48 +180,55 @@ double CanonicalFourCenterHamiltonianContainer::get_two_body_element(
     throw std::out_of_range("Orbital index out of range");
   }
 
-  size_t index = get_two_body_index(i, j, k, l);
+  if (!_cached_four_center_integrals) {
+    _build_four_center_cache();
+  }
+
+  size_t ij = i * norb + j;
+  size_t kl = k * norb + l;
 
   // Select the appropriate integral based on spin channel
   switch (channel) {
     case SpinChannel::aaaa:
-      return (*std::get<0>(_two_body_integrals))[index];
+      return (*std::get<0>(*_cached_four_center_integrals))(ij * norb * norb +
+                                                            kl);
     case SpinChannel::aabb:
-      return (*std::get<1>(_two_body_integrals))[index];
+      return (*std::get<1>(*_cached_four_center_integrals))(ij * norb * norb +
+                                                            kl);
     case SpinChannel::bbbb:
-      return (*std::get<2>(_two_body_integrals))[index];
+      return (*std::get<2>(*_cached_four_center_integrals))(ij * norb * norb +
+                                                            kl);
+
     default:
       throw std::invalid_argument("Invalid spin channel");
   }
 }
 
-size_t CanonicalFourCenterHamiltonianContainer::get_two_body_index(
-    size_t i, size_t j, size_t k, size_t l) const {
+double DensityFittedHamiltonianContainer::_get_two_body_element(
+    const Eigen::MatrixXd& A, unsigned ij, const Eigen::MatrixXd& B,
+    unsigned kl) const {
   QDK_LOG_TRACE_ENTERING();
-  size_t norb = _orbitals->get_active_space_indices().first.size();
-  return i * norb * norb * norb + j * norb * norb + k * norb + l;
+  // Note three-center integral stores each orb_pair in a column
+  return A.col(ij).dot(B.col(kl));
 }
 
-bool CanonicalFourCenterHamiltonianContainer::has_two_body_integrals() const {
+bool DensityFittedHamiltonianContainer::has_two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
-  return std::get<0>(_two_body_integrals) != nullptr &&
-         std::get<0>(_two_body_integrals)->size() > 0;
+  return _three_center_integrals.first != nullptr &&
+         _three_center_integrals.first->size() > 0;
 }
 
-bool CanonicalFourCenterHamiltonianContainer::is_restricted() const {
+bool DensityFittedHamiltonianContainer::is_restricted() const {
   QDK_LOG_TRACE_ENTERING();
   // Hamiltonian is restricted if alpha and beta components point to the same
   // data
   return (_one_body_integrals.first == _one_body_integrals.second) &&
-         (std::get<0>(_two_body_integrals) ==
-          std::get<1>(_two_body_integrals)) &&
-         (std::get<0>(_two_body_integrals) ==
-          std::get<2>(_two_body_integrals)) &&
+         (_three_center_integrals.first == _three_center_integrals.second) &&
          (_inactive_fock_matrix.first == _inactive_fock_matrix.second ||
           (!_inactive_fock_matrix.first && !_inactive_fock_matrix.second));
 }
 
-bool CanonicalFourCenterHamiltonianContainer::is_valid() const {
+bool DensityFittedHamiltonianContainer::is_valid() const {
   QDK_LOG_TRACE_ENTERING();
   // Check if essential data is present
   if (!has_one_body_integrals() || !has_two_body_integrals()) {
@@ -173,8 +245,7 @@ bool CanonicalFourCenterHamiltonianContainer::is_valid() const {
   return true;
 }
 
-void CanonicalFourCenterHamiltonianContainer::validate_integral_dimensions()
-    const {
+void DensityFittedHamiltonianContainer::validate_integral_dimensions() const {
   QDK_LOG_TRACE_ENTERING();
   // Check alpha one-body integrals
   HamiltonianContainer::validate_integral_dimensions();
@@ -184,49 +255,43 @@ void CanonicalFourCenterHamiltonianContainer::validate_integral_dimensions()
   }
 
   // Check two-body integrals dimensions
+  // Three-center integrals have shape [n_aux x n_orb_pairs] where n_orb_pairs =
+  // norb^2
   size_t norb_alpha = _one_body_integrals.first->rows();
-  unsigned expected_size = norb_alpha * norb_alpha * norb_alpha * norb_alpha;
+  unsigned orb_pair_size = norb_alpha * norb_alpha;
 
-  // Check alpha-alpha integrals
-  if (static_cast<unsigned>(std::get<0>(_two_body_integrals)->size()) !=
-      expected_size) {
+  // Check alpha-alpha integrals - cols should equal orb_pair_size
+  if (static_cast<unsigned>(_three_center_integrals.first->cols()) !=
+      orb_pair_size) {
     throw std::invalid_argument(
-        "Alpha-alpha two-body integrals size (" +
-        std::to_string(std::get<0>(_two_body_integrals)->size()) +
-        ") does not match expected size (" + std::to_string(expected_size) +
-        ") for " + std::to_string(norb_alpha) + " orbitals");
-  }
-
-  // Check alpha-beta integrals (if different from alpha-alpha)
-  if (std::get<1>(_two_body_integrals) != std::get<0>(_two_body_integrals)) {
-    if (static_cast<unsigned>(std::get<1>(_two_body_integrals)->size()) !=
-        expected_size) {
-      throw std::invalid_argument(
-          "Alpha-beta two-body integrals size mismatch");
-    }
+        "Alpha-alpha three-center integrals columns (" +
+        std::to_string(_three_center_integrals.first->cols()) +
+        ") does not match expected orb_pair size (" +
+        std::to_string(orb_pair_size) + " for " + std::to_string(norb_alpha) +
+        " orbitals)");
   }
 
   // Check beta-beta integrals (if different from alpha-alpha)
-  if (std::get<2>(_two_body_integrals) != std::get<0>(_two_body_integrals)) {
-    if (static_cast<unsigned>(std::get<2>(_two_body_integrals)->size()) !=
-        expected_size) {
-      throw std::invalid_argument("Beta-beta two-body integrals size mismatch");
+  if (_three_center_integrals.second != _three_center_integrals.first) {
+    if (static_cast<unsigned>(_three_center_integrals.second->cols()) !=
+            orb_pair_size or
+        static_cast<unsigned>(_three_center_integrals.second->rows()) !=
+            static_cast<unsigned>(_three_center_integrals.first->rows())) {
+      throw std::invalid_argument(
+          "Alpha-beta three-center integrals size mismatch");
     }
   }
 }
 
-std::tuple<std::shared_ptr<Eigen::VectorXd>, std::shared_ptr<Eigen::VectorXd>,
-           std::shared_ptr<Eigen::VectorXd>>
-CanonicalFourCenterHamiltonianContainer::make_restricted_two_body_integrals(
-    const Eigen::VectorXd& integrals) {
+std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
+DensityFittedHamiltonianContainer::make_restricted_three_center_integrals(
+    const Eigen::MatrixXd& integrals) {
   QDK_LOG_TRACE_ENTERING();
-  auto shared_integrals = std::make_shared<Eigen::VectorXd>(integrals);
-  return std::make_tuple(
-      shared_integrals, shared_integrals,
-      shared_integrals);  // aaaa, aabb, bbbb all point to same data
+  auto shared_integrals = std::make_shared<Eigen::MatrixXd>(integrals);
+  return std::make_pair(shared_integrals, shared_integrals);
 }
 
-nlohmann::json CanonicalFourCenterHamiltonianContainer::to_json() const {
+nlohmann::json DensityFittedHamiltonianContainer::to_json() const {
   QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
 
@@ -280,31 +345,33 @@ nlohmann::json CanonicalFourCenterHamiltonianContainer::to_json() const {
   if (has_two_body_integrals()) {
     j["has_two_body_integrals"] = true;
 
-    // Store as object {"aaaa": [...], "aabb": [...], "bbbb": [...]}
+    // Store as object {"aa": [...], "ab": [...], "bb": [...]}
     nlohmann::json two_body_obj;
 
-    // Store aaaa
-    std::vector<double> two_body_aaaa_vec;
-    for (int i = 0; i < std::get<0>(_two_body_integrals)->size(); ++i) {
-      two_body_aaaa_vec.push_back((*std::get<0>(_two_body_integrals))(i));
+    // Store aa
+    std::vector<std::vector<double>> three_center_aa_vec;
+    for (int i = 0; i < _three_center_integrals.first->rows(); ++i) {
+      std::vector<double> row;
+      for (int j_idx = 0; j_idx < _three_center_integrals.first->cols();
+           ++j_idx) {
+        row.push_back((*_three_center_integrals.first)(i, j_idx));
+      }
+      three_center_aa_vec.push_back(row);
     }
-    two_body_obj["aaaa"] = two_body_aaaa_vec;
-
-    // Store aabb
-    std::vector<double> two_body_aabb_vec;
-    for (int i = 0; i < std::get<1>(_two_body_integrals)->size(); ++i) {
-      two_body_aabb_vec.push_back((*std::get<1>(_two_body_integrals))(i));
+    two_body_obj["aa"] = three_center_aa_vec;
+    // Store bb
+    std::vector<std::vector<double>> three_center_bb_vec;
+    for (int i = 0; i < _three_center_integrals.second->rows(); ++i) {
+      std::vector<double> row;
+      for (int j_idx = 0; j_idx < _three_center_integrals.second->cols();
+           ++j_idx) {
+        row.push_back((*_three_center_integrals.second)(i, j_idx));
+      }
+      three_center_bb_vec.push_back(row);
     }
-    two_body_obj["aabb"] = two_body_aabb_vec;
+    two_body_obj["bb"] = three_center_bb_vec;
 
-    // Store bbbb
-    std::vector<double> two_body_bbbb_vec;
-    for (int i = 0; i < std::get<2>(_two_body_integrals)->size(); ++i) {
-      two_body_bbbb_vec.push_back((*std::get<2>(_two_body_integrals))(i));
-    }
-    two_body_obj["bbbb"] = two_body_bbbb_vec;
-
-    j["two_body_integrals"] = two_body_obj;
+    j["three_center_integrals"] = two_body_obj;
   } else {
     j["has_two_body_integrals"] = false;
   }
@@ -352,8 +419,8 @@ nlohmann::json CanonicalFourCenterHamiltonianContainer::to_json() const {
   return j;
 }
 
-std::unique_ptr<CanonicalFourCenterHamiltonianContainer>
-CanonicalFourCenterHamiltonianContainer::from_json(const nlohmann::json& j) {
+std::unique_ptr<DensityFittedHamiltonianContainer>
+DensityFittedHamiltonianContainer::from_json(const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version first
@@ -381,31 +448,19 @@ CanonicalFourCenterHamiltonianContainer::from_json(const nlohmann::json& j) {
     auto load_matrix =
         [](const nlohmann::json& matrix_json) -> Eigen::MatrixXd {
       auto matrix_vec = matrix_json.get<std::vector<std::vector<double>>>();
-      if (matrix_vec.empty()) {
-        return Eigen::MatrixXd(0, 0);
-      }
-
-      Eigen::MatrixXd matrix(matrix_vec.size(), matrix_vec[0].size());
-      for (Eigen::Index i = 0; i < matrix.rows(); ++i) {
-        if (static_cast<Eigen::Index>(matrix_vec[i].size()) != matrix.cols()) {
+      int rows = matrix_vec.size();
+      int cols = rows > 0 ? matrix_vec[0].size() : 0;
+      Eigen::MatrixXd matrix(rows, cols);
+      for (int i = 0; i < rows; ++i) {
+        if (static_cast<int>(matrix_vec[i].size()) != cols) {
           throw std::runtime_error(
               "Matrix rows have inconsistent column counts");
         }
-        matrix.row(i) =
-            Eigen::VectorXd::Map(matrix_vec[i].data(), matrix.cols());
+        for (int j_idx = 0; j_idx < cols; ++j_idx) {
+          matrix(i, j_idx) = matrix_vec[i][j_idx];
+        }
       }
       return matrix;
-    };
-
-    // Helper function to load vector from JSON
-    auto load_vector =
-        [](const nlohmann::json& vector_json) -> Eigen::VectorXd {
-      auto vector_vec = vector_json.get<std::vector<double>>();
-      Eigen::VectorXd vector(vector_vec.size());
-      for (size_t i = 0; i < vector_vec.size(); ++i) {
-        vector(i) = vector_vec[i];
-      }
-      return vector;
     };
 
     // Load one-body integrals
@@ -425,28 +480,27 @@ CanonicalFourCenterHamiltonianContainer::from_json(const nlohmann::json& j) {
     }
 
     // Load two-body integrals
-    Eigen::VectorXd two_body_aaaa, two_body_aabb, two_body_bbbb;
+    Eigen::MatrixXd three_center_aa, three_center_bb;
     bool has_two_body = j.value("has_two_body_integrals", false);
     if (has_two_body) {
-      if (!j.contains("two_body_integrals")) {
+      if (!j.contains("three_center_integrals")) {
         throw std::runtime_error("Two-body integrals data not found in JSON");
       }
 
-      auto two_body_obj = j["two_body_integrals"];
+      auto two_body_obj = j["three_center_integrals"];
       if (!two_body_obj.is_object()) {
         throw std::runtime_error(
-            "two_body_integrals must be an object with aaaa, aabb, bbbb keys");
+            "three_center_integrals must be an object with aa, bb "
+            "keys");
       }
 
-      if (!two_body_obj.contains("aaaa") || !two_body_obj.contains("aabb") ||
-          !two_body_obj.contains("bbbb")) {
+      if (!two_body_obj.contains("aa") || !two_body_obj.contains("bb")) {
         throw std::runtime_error(
-            "two_body_integrals must contain aaaa, aabb, and bbbb keys");
+            "three_center_integrals must contain aa and bb keys");
       }
 
-      two_body_aaaa = load_vector(two_body_obj["aaaa"]);
-      two_body_aabb = load_vector(two_body_obj["aabb"]);
-      two_body_bbbb = load_vector(two_body_obj["bbbb"]);
+      three_center_aa = load_matrix(two_body_obj["aa"]);
+      three_center_bb = load_matrix(two_body_obj["bb"]);
     }
 
     // Load inactive Fock matrix
@@ -499,15 +553,14 @@ CanonicalFourCenterHamiltonianContainer::from_json(const nlohmann::json& j) {
     if (is_restricted_data) {
       // Use restricted constructor - it will create shared pointers internally
       // so alpha and beta point to the same data
-      return std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-          one_body_alpha, two_body_aaaa, orbitals, core_energy,
+      return std::make_unique<DensityFittedHamiltonianContainer>(
+          one_body_alpha, three_center_aa, orbitals, core_energy,
           inactive_fock_alpha, type);
     } else {
       // Use unrestricted constructor with separate alpha and beta data
-      return std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-          one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
-          two_body_bbbb, orbitals, core_energy, inactive_fock_alpha,
-          inactive_fock_beta, type);
+      return std::make_unique<DensityFittedHamiltonianContainer>(
+          one_body_alpha, one_body_beta, three_center_aa, three_center_bb,
+          orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta, type);
     }
 
   } catch (const std::exception& e) {
@@ -516,7 +569,7 @@ CanonicalFourCenterHamiltonianContainer::from_json(const nlohmann::json& j) {
   }
 }
 
-void CanonicalFourCenterHamiltonianContainer::to_hdf5(H5::Group& group) const {
+void DensityFittedHamiltonianContainer::to_hdf5(H5::Group& group) const {
   QDK_LOG_TRACE_ENTERING();
   try {
     // Save version first
@@ -567,13 +620,11 @@ void CanonicalFourCenterHamiltonianContainer::to_hdf5(H5::Group& group) const {
     }
 
     if (has_two_body_integrals()) {
-      save_vector_to_group(group, "two_body_integrals_aaaa",
-                           *std::get<0>(_two_body_integrals));
+      save_matrix_to_group(group, "three_center_integrals_aa",
+                           *_three_center_integrals.first);
       if (is_unrestricted()) {
-        save_vector_to_group(group, "two_body_integrals_aabb",
-                             *std::get<1>(_two_body_integrals));
-        save_vector_to_group(group, "two_body_integrals_bbbb",
-                             *std::get<2>(_two_body_integrals));
+        save_matrix_to_group(group, "three_center_integrals_bb",
+                             *_three_center_integrals.second);
       }
     }
 
@@ -598,8 +649,8 @@ void CanonicalFourCenterHamiltonianContainer::to_hdf5(H5::Group& group) const {
   }
 }
 
-std::unique_ptr<CanonicalFourCenterHamiltonianContainer>
-CanonicalFourCenterHamiltonianContainer::from_hdf5(H5::Group& group) {
+std::unique_ptr<DensityFittedHamiltonianContainer>
+DensityFittedHamiltonianContainer::from_hdf5(H5::Group& group) {
   QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version first
@@ -658,7 +709,7 @@ CanonicalFourCenterHamiltonianContainer::from_hdf5(H5::Group& group) {
 
     // Load integral data based on restrictedness
     Eigen::MatrixXd one_body_alpha, one_body_beta;
-    Eigen::VectorXd two_body_aaaa, two_body_aabb, two_body_bbbb;
+    Eigen::MatrixXd three_center_aa, three_center_bb;
     Eigen::MatrixXd inactive_fock_alpha, inactive_fock_beta;
 
     // Load one-body integrals
@@ -674,19 +725,16 @@ CanonicalFourCenterHamiltonianContainer::from_hdf5(H5::Group& group) {
     }
 
     // Load two-body integrals
-    if (dataset_exists_in_group(group, "two_body_integrals_aaaa")) {
-      two_body_aaaa = load_vector_from_group(group, "two_body_integrals_aaaa");
+    if (dataset_exists_in_group(group, "three_center_integrals_aa")) {
+      three_center_aa =
+          load_matrix_from_group(group, "three_center_integrals_aa");
     }
 
-    // For unrestricted, load aabb and bbbb separately
+    // For unrestricted, load bb separately
     if (!is_restricted_data) {
-      if (dataset_exists_in_group(group, "two_body_integrals_aabb")) {
-        two_body_aabb =
-            load_vector_from_group(group, "two_body_integrals_aabb");
-      }
-      if (dataset_exists_in_group(group, "two_body_integrals_bbbb")) {
-        two_body_bbbb =
-            load_vector_from_group(group, "two_body_integrals_bbbb");
+      if (dataset_exists_in_group(group, "three_center_integrals_bb")) {
+        three_center_bb =
+            load_matrix_from_group(group, "three_center_integrals_bb");
       }
     }
 
@@ -706,15 +754,14 @@ CanonicalFourCenterHamiltonianContainer::from_hdf5(H5::Group& group) {
     // Create and return appropriate Hamiltonian using the correct constructor
     if (is_restricted_data) {
       // Use restricted constructor - it will create shared pointers internally
-      return std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-          one_body_alpha, two_body_aaaa, orbitals, core_energy,
+      return std::make_unique<DensityFittedHamiltonianContainer>(
+          one_body_alpha, three_center_aa, orbitals, core_energy,
           inactive_fock_alpha, type);
     } else {
       // Use unrestricted constructor with separate alpha and beta data
-      return std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-          one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
-          two_body_bbbb, orbitals, core_energy, inactive_fock_alpha,
-          inactive_fock_beta, type);
+      return std::make_unique<DensityFittedHamiltonianContainer>(
+          one_body_alpha, one_body_beta, three_center_aa, three_center_bb,
+          orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta, type);
     }
 
   } catch (const H5::Exception& e) {
