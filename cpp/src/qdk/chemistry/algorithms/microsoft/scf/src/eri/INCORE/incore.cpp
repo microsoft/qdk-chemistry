@@ -35,14 +35,6 @@ void ERIINCORE::quarter_trans_impl(size_t nt, const double* C, double* out) {
   eri_impl_->quarter_trans(nt, C, out);
 }
 
-std::unique_ptr<double[]> ERIINCORE::get_cholesky_vectors(double threshold,
-                                                          size_t* num_vectors) {
-  QDK_LOG_TRACE_ENTERING();
-
-  if (!eri_impl_) throw std::runtime_error("ERIINCORE NOT INITIALIZED");
-  return eri_impl_->get_cholesky_vectors(threshold, num_vectors);
-}
-
 void ERIINCORE::get_gradients(const double* P, double* dJ, double* dK,
                               double alpha, double beta, double omega) {
   QDK_LOG_TRACE_ENTERING();

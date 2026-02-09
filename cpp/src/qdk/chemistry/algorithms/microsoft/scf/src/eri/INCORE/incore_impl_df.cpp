@@ -333,13 +333,6 @@ ERI_DF::~ERI_DF() noexcept {
 #endif
 };
 
-std::unique_ptr<double[]> ERI_DF::get_cholesky_vectors(double threshold,
-                                                       size_t* num_vectors) {
-  QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
-      "INCORE::ERI_DF::get_cholesky_vectors NOT YET IMPLEMENTED");
-}
-
 std::unique_ptr<ERI_DF> ERI_DF::make_incore_eri(bool unr, const BasisSet& obs,
                                                 const BasisSet& abs,
                                                 ParallelConfig mpi) {

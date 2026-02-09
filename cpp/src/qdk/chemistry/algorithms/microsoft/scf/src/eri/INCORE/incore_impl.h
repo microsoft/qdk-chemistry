@@ -135,14 +135,6 @@ class ERI {
   void quarter_trans(size_t nt, const double* C, double* out);
 
   /**
-   * @brief Build cholesky vectors from stored integrals (NOT SUPPORTED)
-   * @throws std::runtime_error if invoked (not implemented)
-   * @see ERIINCORE for public API documentation
-   */
-  std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
-                                                 size_t* num_vectors);
-
-  /**
    * @brief Destructor
    */
   ~ERI() noexcept;
@@ -240,14 +232,6 @@ class ERI_DF : public DensityFittingBase {
    * @see ERIINCORE_DF for public API documentation
    */
   void quarter_trans(size_t nt, const double* C, double* out);
-
-  /**
-   * @brief Build cholesky vectors from stored integrals (NOT SUPPORTED)
-   * @throws std::runtime_error if invoked (not implemented)
-   * @see ERIINCORE_DF for public API documentation
-   */
-  std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
-                                                 size_t* num_vectors);
 
   /**
    * @brief Destructor

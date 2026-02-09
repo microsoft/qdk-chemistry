@@ -168,27 +168,6 @@ class ERI {
   };
 
   /**
-   * @brief Get Cholesky vectors
-   *
-   * Cholesky decomposition is not supported in SNK since it operates
-   * directly on density matrices via numerical integration rather than
-   * storing integrals.
-   *
-   * @param threshold Cholesky threshold
-   * @param full_debug_eris Full debug ERIs matrix
-   * @param num_vectors Output parameter for number of vectors
-   * @return nullptr - not supported
-   *
-   * @throws std::runtime_error Always - Cholesky vectors not supported
-   */
-  std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
-                                                 size_t* num_vectors) {
-    QDK_LOG_TRACE_ENTERING();
-
-    throw std::runtime_error("SNK cannot provide Cholesky vectors");
-  }
-
-  /**
    * @brief Factory method to create SNK ERI instance
    *
    * Static factory method that creates a new SNK ERI instance with the
@@ -258,12 +237,4 @@ void SNK::quarter_trans_impl(size_t nt, const double* C, double* out) {
   eri_impl_->quarter_trans(nt, C, out);
 };
 
-// Cholesky vectors interface
-std::unique_ptr<double[]> SNK::get_cholesky_vectors(double threshold,
-                                                    size_t* num_vectors) {
-  QDK_LOG_TRACE_ENTERING();
-
-  if (!eri_impl_) throw std::runtime_error("SNK NOT INITIALIZED");
-  return eri_impl_->get_cholesky_vectors(threshold, num_vectors);
-}
 }  // namespace qdk::chemistry::scf

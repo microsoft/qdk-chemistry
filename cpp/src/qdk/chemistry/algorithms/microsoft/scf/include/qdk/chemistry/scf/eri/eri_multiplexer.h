@@ -133,14 +133,5 @@ class ERIMultiplexer : public ERI {
    * The actual work is delegated to qt_impl_.
    */
   void quarter_trans_impl(size_t nt, const double* C, double* out) override {};
-
-  /**
-   * @brief Stub implementation for get_cholesky_vectors
-   */
-  std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
-                                                 size_t* num_vectors) override {
-    if (qt_impl_) return qt_impl_->get_cholesky_vectors(threshold, num_vectors);
-    return nullptr;
-  }
 };
 }  // namespace qdk::chemistry::scf

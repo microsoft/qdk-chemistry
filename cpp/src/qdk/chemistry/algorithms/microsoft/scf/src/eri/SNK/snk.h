@@ -63,14 +63,6 @@ class SNK : public ERI {
   void build_JK(const double* P, double* J, double* K, double alpha,
                 double beta, double omega) override;
 
-  /**
-   * @brief Build cholesky vectors (NOT SUPPORTED)
-   * @throws std::runtime_error if invoked
-   * @see ERI::get_cholesky_vectors for API details
-   */
-  std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
-                                                 size_t* num_vectors) override;
-
  private:
   /**
    * @brief Build semi-numerical exchange (K) matrix via numerical quadrature

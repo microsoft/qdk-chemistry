@@ -87,14 +87,6 @@ class ERIINCORE : public ERI {
    */
   void quarter_trans_impl(size_t nt, const double* C, double* out) override;
 
-  /**
-   * @brief Build cholesky vectors from stored integrals (NOT SUPPORTED)
-   * @throws std::runtime_error if invoked (not implemented)
-   * @see ERI::get_cholesky_vectors for API details
-   */
-  std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
-                                                 size_t* num_vectors) override;
-
   /// PIMPL pointer to implementation
   std::unique_ptr<incore::ERI> eri_impl_;
 };
@@ -176,16 +168,6 @@ class ERIINCORE_DF : public ERI {
    * will be thrown.
    */
   void quarter_trans_impl(size_t nt, const double* C, double* out) override;
-
-  /**
-   * @brief Build cholesky vectors from stored integrals (NOT SUPPORTED)
-   * @throws std::runtime_error if invoked (not implemented)
-   * @see ERI::get_cholesky_vectors for API details
-   */
-  std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
-                                                 size_t* num_vectors) override {
-    return nullptr;
-  };
 
   /// PIMPL pointer to DF implementation
   std::unique_ptr<incore::ERI_DF> eri_impl_;

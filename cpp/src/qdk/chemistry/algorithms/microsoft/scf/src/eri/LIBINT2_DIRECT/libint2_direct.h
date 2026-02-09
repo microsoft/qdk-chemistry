@@ -61,12 +61,6 @@ class LIBINT2_DIRECT : public ERI {
    */
   void build_JK(const double* P, double* J, double* K, double alpha,
                 double beta, double omega) override;
-  /**
-   * @brief Public interface for computing cholesky vectors
-   * @see ERI::get_cholesky_vectors for API details
-   */
-  std::unique_ptr<double[]> get_cholesky_vectors(double threshold,
-                                                 size_t* num_vectors) override;
 
  private:
   /**
