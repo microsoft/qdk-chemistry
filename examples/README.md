@@ -2,6 +2,14 @@
 
 This directory contains example scripts demonstrating how to use QDK/Chemistry for various quantum computing chemistry tasks.
 
+## Prerequisites
+
+To run the Jupyter notebook examples, install QDK/Chemistry with the `jupyter` extra:
+
+```bash
+python -m pip install 'qdk-chemistry[jupyter]'
+```
+
 ## Standalone examples and data
 
 - `data`: Data directory for examples
