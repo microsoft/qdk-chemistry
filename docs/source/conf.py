@@ -21,10 +21,12 @@ author = "QDK/Chemistry Team"
 
 # Read version from VERSION file at repo root
 _version_file = Path(__file__).parent.parent.parent / "VERSION"
-try:
-    release = _version_file.read_text().strip()
-except FileNotFoundError:
-    release = "0.0.0.dev0"  # Fallback for incomplete checkouts
+if not _version_file.exists():
+    raise FileNotFoundError(
+        f"VERSION file not found at {_version_file}. "
+        "Ensure you have a complete checkout of the repository."
+    )
+release = _version_file.read_text().strip()
 
 # -----------------------------------------------------------------------------
 # Perform initial setup and tests

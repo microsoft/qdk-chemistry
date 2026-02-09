@@ -12,9 +12,13 @@ try:
     __version__ = _get_version("qdk-chemistry")
 except PackageNotFoundError:
     # Fallback for development/uninstalled use - read from VERSION file
-    from pathlib import Path as _Path
+    try:
+        from pathlib import Path as _Path
 
-    __version__ = (_Path(__file__).parent.parent.parent.parent / "VERSION").read_text().strip()
+        __version__ = (_Path(__file__).parent.parent.parent.parent / "VERSION").read_text().strip()
+    except OSError:
+        # VERSION file not reachable (e.g. vendored copy without repo root)
+        __version__ = "0.0.0.dev0"
 
 import contextlib
 import os

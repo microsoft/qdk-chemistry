@@ -39,42 +39,46 @@ def check_versions() -> int:
     # Read the canonical version from the VERSION file
     version_file = repo_root / "VERSION"
     if not version_file.exists():
-        print("❌ Version check failed: VERSION file not found", file=sys.stderr)
+        print("Version check failed: VERSION file not found", file=sys.stderr)
         print(f"      Expected at: {version_file}", file=sys.stderr)
         return 1
 
     canonical_version = version_file.read_text().strip()
     if not canonical_version:
-        print("❌ Version check failed: VERSION file is empty", file=sys.stderr)
+        print("Version check failed: VERSION file is empty", file=sys.stderr)
         return 1
 
-    # Validate version format (should be X.Y.Z or X.Y.Z-rcN)
-    if not re.match(r"^\d+\.\d+\.\d+(-rc\d+)?$", canonical_version):
+    # Validate version format: X.Y.Z or X.Y.Z.T (4-component CMake-compatible)
+    # The .T suffix is used for pre-release/rc builds (e.g., 1.0.0.1 = rc1)
+    if not re.match(r"^\d+\.\d+\.\d+(\.\d+)?$", canonical_version):
         print(
-            f"❌ Version check failed: Invalid version format '{canonical_version}'",
+            f"Version check failed: Invalid version format '{canonical_version}'",
             file=sys.stderr,
         )
-        print("      Expected format: X.Y.Z or X.Y.Z-rcN", file=sys.stderr)
+        print("      Expected format: X.Y.Z or X.Y.Z.T", file=sys.stderr)
         return 1
 
     errors = []
 
     # Check 1: CMakeLists.txt files read from VERSION (not hardcoded)
     cmake_files = [
-        repo_root / "python/CMakeLists.txt",
-        repo_root / "cpp/CMakeLists.txt",
+        ("python/CMakeLists.txt", repo_root / "python/CMakeLists.txt"),
+        ("cpp/CMakeLists.txt", repo_root / "cpp/CMakeLists.txt"),
     ]
 
-    for cmake_file in cmake_files:
+    for cmake_label, cmake_file in cmake_files:
         if not cmake_file.exists():
-            errors.append(f"{cmake_file.name}: file not found")
+            errors.append(f"{cmake_label}: file not found")
             continue
 
         content = cmake_file.read_text()
-        if 'file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION"' not in content:
+        # Accept either direct path or via a variable
+        if "/../VERSION" not in content:
+            errors.append(f"{cmake_label}: does not read from VERSION file")
+        if "CMAKE_CONFIGURE_DEPENDS" not in content:
             errors.append(
-                f"{cmake_file.name}: does not read from VERSION file "
-                '(expected: file(READ "${{CMAKE_CURRENT_SOURCE_DIR}}/../VERSION" ...))'
+                f"{cmake_label}: missing CMAKE_CONFIGURE_DEPENDS for VERSION file "
+                "(CMake won't reconfigure when VERSION changes)"
             )
 
     # Check 2: pyproject.toml uses scikit-build-core metadata provider
@@ -124,8 +128,6 @@ def check_versions() -> int:
             errors.append(
                 "telemetry.py: missing importlib.metadata with PackageNotFoundError fallback"
             )
-        if '/ "VERSION"' not in content:
-            errors.append("telemetry.py: fallback does not read from VERSION file")
     else:
         errors.append("telemetry.py: file not found")
 
@@ -153,10 +155,10 @@ def check_versions() -> int:
 
     # Report results
     if errors:
-        print("❌ Version check failed:", file=sys.stderr)
+        print("FAIL: Version check failed:", file=sys.stderr)
         print(file=sys.stderr)
         for error in errors:
-            print(f"  ✗  {error}", file=sys.stderr)
+            print(f"  - {error}", file=sys.stderr)
         print(file=sys.stderr)
         print(
             "All version references should read from the VERSION file.",
@@ -165,7 +167,7 @@ def check_versions() -> int:
         return 1
 
     # All versions aligned
-    print(f"✓ All version strings are aligned: {canonical_version}")
+    print(f"OK: All version strings are aligned: {canonical_version}")
     print(f"  Source: {version_file}")
     print("  Verified:")
     print("    - cpp/CMakeLists.txt")
