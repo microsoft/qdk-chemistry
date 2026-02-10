@@ -62,11 +62,6 @@ class DIISBase : public SCFAlgorithm {
   virtual RowMajorMatrix& active_density(SCFImpl& scf_impl) = 0;
 
   /**
-   * @brief Optional pre-iteration hook (default no-op)
-   */
-  virtual void before_diis_iteration(SCFImpl& scf_impl);
-
-  /**
    * @brief Optional post-iteration hook (default handles damping)
    */
   virtual void after_diis_iteration(SCFImpl& scf_impl);

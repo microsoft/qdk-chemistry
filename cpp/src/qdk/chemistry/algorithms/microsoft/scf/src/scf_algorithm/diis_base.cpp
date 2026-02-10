@@ -206,7 +206,6 @@ DIISBase::~DIISBase() noexcept = default;
 
 void DIISBase::iterate(SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
-  before_diis_iteration(scf_impl);
 
   const RowMajorMatrix& F = get_active_fock(scf_impl);
   RowMajorMatrix& working_density = active_density(scf_impl);
@@ -236,10 +235,6 @@ void DIISBase::iterate(SCFImpl& scf_impl) {
   update_density_matrix(density_matrix, C, ctx_.cfg->unrestricted, nelec[0],
                         nelec[1]);
   after_diis_iteration(scf_impl);
-}
-
-void DIISBase::before_diis_iteration(SCFImpl& /*scf_impl*/) {
-  QDK_LOG_TRACE_ENTERING();
 }
 
 void DIISBase::after_diis_iteration(SCFImpl& scf_impl) {

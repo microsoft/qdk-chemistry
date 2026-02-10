@@ -409,14 +409,6 @@ double SCFImpl::total_energy_() {
 #ifdef QDK_CHEMISTRY_ENABLE_DFTD3
   _total += res.scf_dispersion_correction_energy;
 #endif
-  std::cout << std::setprecision(10);
-  std::cout << "density matrix P:" << std::endl;
-  std::cout << P_ << std::endl;
-  std::cout << "Fock matrix F:" << std::endl;
-  std::cout << F_ << std::endl;
-  std::cout << "repulsion energy: " << res.nuclear_repulsion_energy << std::endl;
-  std::cout << "One-electron energy: " << res.scf_one_electron_energy << std::endl;
-  std::cout << "Two-electron energy: " << res.scf_two_electron_energy << std::endl;
   return _total;
 }
 

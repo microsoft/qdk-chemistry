@@ -20,14 +20,6 @@ ROHFDIIS::ROHFDIIS(const SCFContext& ctx, size_t subspace_size)
   total_P_ = RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals);
 }
 
-void ROHFDIIS::before_diis_iteration(SCFImpl& scf_impl) {
-  QDK_LOG_TRACE_ENTERING();
-  const auto electrons = scf_impl.get_num_electrons();
-  build_rohf_f_p_matrix(scf_impl.get_fock_matrix(), scf_impl.get_orbitals_matrix(),
-                        scf_impl.get_density_matrix(), electrons[0],
-                        electrons[1]);
-}
-
 const RowMajorMatrix& ROHFDIIS::get_active_fock(
     const SCFImpl& /*scf_impl*/) const {
   QDK_LOG_TRACE_ENTERING();
@@ -83,24 +75,30 @@ void ROHFDIIS::build_rohf_f_p_matrix(const RowMajorMatrix& F,
                                      int nelec_alpha, int nelec_beta) {
   QDK_LOG_TRACE_ENTERING();
   const int num_atomic_orbitals = static_cast<int>(F.cols());
-  if (num_atomic_orbitals == 0) {
-    effective_F_.resize(0, 0);
-    total_P_.resize(0, 0);
+
+  RowMajorMatrix new_total =
+      P.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) +
+      P.block(num_atomic_orbitals, 0, num_atomic_orbitals, num_atomic_orbitals);
+  bool density_changed = true;
+  if (total_P_.rows() == num_atomic_orbitals &&
+      total_P_.cols() == num_atomic_orbitals) {
+    density_changed = !total_P_.isApprox(new_total);
+  }
+  if (!density_changed) {
     return;
   }
+
+  total_P_ = new_total;
 
   if (effective_F_.rows() != num_atomic_orbitals ||
       effective_F_.cols() != num_atomic_orbitals) {
     effective_F_ = RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals);
   }
-  if (total_P_.rows() != num_atomic_orbitals ||
-      total_P_.cols() != num_atomic_orbitals) {
-    total_P_ = RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals);
-  }
 
   if (C.isZero()) {
     effective_F_.noalias() =
         F.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
+    return;
   } else {
     const int num_molecular_orbitals = static_cast<int>(C.cols());
     RowMajorMatrix F_up_mo =
@@ -147,11 +145,6 @@ void ROHFDIIS::build_rohf_f_p_matrix(const RowMajorMatrix& F,
     effective_F_.noalias() = C_inv.transpose() * effective_F_mo * C_inv;
     effective_F_ = 0.5 * (effective_F_ + effective_F_.transpose().eval());
   }
-
-  total_P_.noalias() =
-      P.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) +
-      P.block(num_atomic_orbitals, 0, num_atomic_orbitals,
-              num_atomic_orbitals);
 }
 
 }  // namespace qdk::chemistry::scf
