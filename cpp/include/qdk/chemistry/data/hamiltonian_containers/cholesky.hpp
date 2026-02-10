@@ -40,6 +40,8 @@ namespace qdk::chemistry::data {
  * integrates with the broader quantum chemistry framework for active space
  * methods.
  */
+// TODO: Change Cholesky container to only store MO cholesky vectors and
+// optionally AO cholesky vecs. Make two body ints evaluated on request
 class CholeskyHamiltonianContainer
     : public CanonicalFourCenterHamiltonianContainer {
  public:
