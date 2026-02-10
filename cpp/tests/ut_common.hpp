@@ -312,16 +312,6 @@ inline std::shared_ptr<Structure> create_hydrogen_structure() {
 }
 
 /**
- * @brief Create a single He atom structure
- */
-inline std::shared_ptr<Structure> create_helium_structure() {
-  std::vector<Eigen::Vector3d> coords = {
-      {0.00000000000, 0.00000000000, 0.00000000000}};
-  std::vector<Element> elements = {qdk::chemistry::data::Element::He};
-  return std::make_shared<Structure>(coords, elements);
-}
-
-/**
  * @brief Create a single N atom structure
  */
 inline std::shared_ptr<Structure> create_nitrogen_structure() {

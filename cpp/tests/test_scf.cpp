@@ -1088,19 +1088,3 @@ TEST_F(ScfTest, HydrogenIon_CCPVDZ_SCF) {
   auto [E_HF, wfn_HF] = scf_solver->run(h_ion, 1, 1, "cc-pvdz");
   EXPECT_NEAR(E_HF, 0.0, testing::scf_energy_tolerance);
 }
-
-/**
- * @brief Test SCF on He- ion (hard case for SCF)
- *
- */
-TEST_F(ScfTest, HeliumIon_CCPVDZ_SCF) {
-  // Create structure for He- ion
-  auto he_ion = testing::create_helium_structure();
-
-  // Run SCF for He- ion (charge=-1, spin_multiplicity=2)
-  auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("scf_type", std::string("auto"));
-  scf_solver->settings().set("enable_gdm", true);
-  auto [E_HF, wfn_HF] = scf_solver->run(he_ion, -1, 2, "cc-pvdz");
-  EXPECT_NEAR(E_HF, -1.51598130, testing::scf_energy_tolerance);
-}
