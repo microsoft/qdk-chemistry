@@ -730,6 +730,7 @@ class SortedDoubleLoopHamiltonianGenerator
   void form_entropies(full_det_iterator bra_begin, full_det_iterator bra_end,
                       full_det_iterator ket_begin, full_det_iterator ket_end,
                       double* C, std::vector<double>& single_orbital_entropies,
+                      matrix_span_t s2_entropy,
                       matrix_span_t mutual_information) override {
     using wfn_traits = wavefunction_traits<WfnType>;
     using spin_wfn_type = typename wfn_traits::spin_wfn_type;
@@ -737,14 +738,19 @@ class SortedDoubleLoopHamiltonianGenerator
     const size_t nbra_dets = std::distance(bra_begin, bra_end);
     const size_t nket_dets = std::distance(ket_begin, ket_end);
 
+    const bool need_s2 =
+        s2_entropy.data_handle() || mutual_information.data_handle();
+
     OrbitalRDMIntermediates entropy_intermediates(
-        single_orbital_entropies.size());
+        single_orbital_entropies.size(), need_s2);
 
     const bool is_symm = bra_begin == ket_begin and bra_end == ket_end;
 #ifdef MACIS_ENABLE_MPI
-    auto world_rank = comm_rank(MPI_COMM_WORLD);
-#else
-    auto world_rank = 0;
+    if (comm_size(MPI_COMM_WORLD) > 1) {
+      throw std::runtime_error(
+          "SortedDoubleLoopHamiltonianGenerator::form_entropies "
+          "does not support MPI with more than one rank");
+    }
 #endif /* MACIS_ENABLE_MPI */
 
     // Get unique alpha strings
@@ -802,7 +808,7 @@ class SortedDoubleLoopHamiltonianGenerator
           const auto ex_alpha_count = spin_wfn_traits::count(ex_alpha);
 
           // Early exit if excitation level too high
-          if (ex_alpha_count > 4) continue;
+          if (ex_alpha_count > (need_s2 ? 2 : 0)) continue;
 
           const size_t beta_st_ket = unique_alpha_ket_idx[ia_ket];
           const size_t beta_en_ket = unique_alpha_ket_idx[ia_ket + 1];
@@ -826,7 +832,7 @@ class SortedDoubleLoopHamiltonianGenerator
               const auto ex_beta_count = spin_wfn_traits::count(ex_beta);
 
               // Skip if total excitation level too high
-              if ((ex_alpha_count + ex_beta_count) > 4) continue;
+              if (ex_beta_count > (need_s2 ? 2 : 0)) continue;
 
               const double val = C[ibra] * C[iket];
 
@@ -844,13 +850,22 @@ class SortedDoubleLoopHamiltonianGenerator
     // Finalize entropy calculations
     entropy_intermediates.update_diagonal();
     build_s1_entropy(entropy_intermediates, single_orbital_entropies);
-    std::vector<double> empty_s2(
-        single_orbital_entropies.size() * single_orbital_entropies.size(), 0.0);
-    matrix_span_t s2_entropy(empty_s2.data(), single_orbital_entropies.size(),
-                             single_orbital_entropies.size());
-    build_s2_entropy(entropy_intermediates, s2_entropy);
-    build_mutual_information(single_orbital_entropies, s2_entropy,
-                             mutual_information);
+
+    if (need_s2) {
+      const size_t norb = single_orbital_entropies.size();
+      // Use caller's buffer if provided, otherwise allocate internally
+      std::vector<double> s2_local;
+      matrix_span<double> s2_span = s2_entropy;
+      if (!s2_entropy.data_handle()) {
+        s2_local.resize(norb * norb, 0.0);
+        s2_span = matrix_span<double>(s2_local.data(), norb, norb);
+      }
+      build_s2_entropy(entropy_intermediates, s2_span);
+      if (mutual_information.data_handle()) {
+        build_mutual_information(single_orbital_entropies, s2_span,
+                                 mutual_information);
+      }
+    }
   }
 
  public:

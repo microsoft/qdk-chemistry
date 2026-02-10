@@ -116,8 +116,7 @@ WavefunctionContainer::WavefunctionContainer(WavefunctionType type)
                             std::nullopt,  // two_rdm_aabb
                             std::nullopt,  // two_rdm_aaaa
                             std::nullopt,  // two_rdm_bbbb
-                            std::nullopt,  // single_orbital_entropies
-                            std::nullopt,  // mutual_information
+                            {},            // entropies
                             type) {
   QDK_LOG_TRACE_ENTERING();
 }
@@ -126,9 +125,7 @@ WavefunctionContainer::WavefunctionContainer(WavefunctionType type)
 WavefunctionContainer::WavefunctionContainer(
     const std::optional<ContainerTypes::MatrixVariant>& one_rdm_spin_traced,
     const std::optional<ContainerTypes::VectorVariant>& two_rdm_spin_traced,
-    const std::optional<Eigen::VectorXd>& single_orbital_entropies,
-    const std::optional<Eigen::MatrixXd>& mutual_information,
-    WavefunctionType type)
+    const OrbitalEntropies& entropies, WavefunctionType type)
     : WavefunctionContainer(one_rdm_spin_traced,
                             std::nullopt,  // one_rdm_aa
                             std::nullopt,  // one_rdm_bb
@@ -136,8 +133,7 @@ WavefunctionContainer::WavefunctionContainer(
                             std::nullopt,  // two_rdm_aabb
                             std::nullopt,  // two_rdm_aaaa
                             std::nullopt,  // two_rdm_bbbb
-                            single_orbital_entropies, mutual_information,
-                            type) {
+                            entropies, type) {
   QDK_LOG_TRACE_ENTERING();
 }
 // \endcond
@@ -151,10 +147,8 @@ WavefunctionContainer::WavefunctionContainer(
     const std::optional<ContainerTypes::VectorVariant>& two_rdm_aabb,
     const std::optional<ContainerTypes::VectorVariant>& two_rdm_aaaa,
     const std::optional<ContainerTypes::VectorVariant>& two_rdm_bbbb,
-    const std::optional<Eigen::VectorXd>& single_orbital_entropies,
-    const std::optional<Eigen::MatrixXd>& mutual_information,
-    WavefunctionType type)
-    : _type(type) {
+    const OrbitalEntropies& entropies, WavefunctionType type)
+    : _type(type), _entropies(entropies) {
   QDK_LOG_TRACE_ENTERING();
   if (one_rdm_spin_traced.has_value()) {
     _one_rdm_spin_traced = std::make_shared<ContainerTypes::MatrixVariant>(
@@ -197,18 +191,6 @@ WavefunctionContainer::WavefunctionContainer(
         std::make_shared<ContainerTypes::VectorVariant>(two_rdm_bbbb.value());
   } else {
     _two_rdm_spin_dependent_bbbb = nullptr;
-  }
-  if (single_orbital_entropies.has_value()) {
-    _single_orbital_entropies =
-        std::make_shared<Eigen::VectorXd>(single_orbital_entropies.value());
-  } else {
-    _single_orbital_entropies = nullptr;
-  }
-  if (mutual_information.has_value()) {
-    _mutual_information =
-        std::make_shared<Eigen::MatrixXd>(mutual_information.value());
-  } else {
-    _mutual_information = nullptr;
   }
 }
 // \endcond
@@ -404,9 +386,9 @@ bool WavefunctionContainer::has_two_rdm_spin_traced() const {
 // entropies
 Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
   QDK_LOG_TRACE_ENTERING();
-  // Return pre-computed entropies if available
-  if (_single_orbital_entropies != nullptr) {
-    return *_single_orbital_entropies;
+  // Return pre-computed / cached entropies if available
+  if (_entropies.single_orbital) {
+    return *_entropies.single_orbital;
   }
   if (!has_one_rdm_spin_dependent()) {
     throw std::runtime_error(
@@ -476,29 +458,83 @@ Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
       s1_entropies(i) -= ordm4 * std::log(ordm4);
     }
   }
+  // Cache the result
+  _entropies.single_orbital = s1_entropies;
   return s1_entropies;
 }
 
 bool WavefunctionContainer::has_single_orbital_entropies() const {
   QDK_LOG_TRACE_ENTERING();
-  return _single_orbital_entropies != nullptr ||
+  return _entropies.single_orbital.has_value() ||
          (has_one_rdm_spin_dependent() &&
           _two_rdm_spin_dependent_aabb != nullptr);
 }
 
 bool WavefunctionContainer::has_mutual_information() const {
   QDK_LOG_TRACE_ENTERING();
-  return _mutual_information != nullptr;
+  // Available directly, or derivable from s1 + s2
+  return _entropies.mutual_information.has_value() ||
+         (_entropies.two_orbital.has_value() && has_single_orbital_entropies());
+}
+
+bool WavefunctionContainer::has_two_orbital_entropies() const {
+  QDK_LOG_TRACE_ENTERING();
+  // Available directly, or derivable from s1 + mut inf
+  return _entropies.two_orbital.has_value() ||
+         (_entropies.mutual_information.has_value() &&
+          has_single_orbital_entropies());
+}
+
+Eigen::MatrixXd WavefunctionContainer::get_two_orbital_entropies() const {
+  QDK_LOG_TRACE_ENTERING();
+  if (_entropies.two_orbital) {
+    return *_entropies.two_orbital;
+  }
+  // Derive from s1 and mutual information: s2_{ij} = s1_i + s1_j - I_{ij}
+  if (_entropies.mutual_information && has_single_orbital_entropies()) {
+    Eigen::VectorXd s1 = get_single_orbital_entropies();
+    const Eigen::MatrixXd& mi = *_entropies.mutual_information;
+    Eigen::Index norbs = s1.size();
+    Eigen::MatrixXd s2 = Eigen::MatrixXd::Zero(norbs, norbs);
+    for (Eigen::Index i = 0; i < norbs; ++i) {
+      for (Eigen::Index j = i + 1; j < norbs; ++j) {
+        s2(i, j) = s1(i) + s1(j) - mi(i, j);
+        s2(j, i) = s2(i, j);
+      }
+    }
+    _entropies.two_orbital = s2;
+    return s2;
+  }
+  throw std::runtime_error(
+      "Two-orbital entropies are not available. Provide them at construction "
+      "time, or provide both single-orbital entropies (or RDMs) and mutual "
+      "information.");
 }
 
 Eigen::MatrixXd WavefunctionContainer::get_mutual_information() const {
   QDK_LOG_TRACE_ENTERING();
-  if (_mutual_information == nullptr) {
-    throw std::runtime_error(
-        "Mutual information is not available. It must be provided at "
-        "construction time.");
+  if (_entropies.mutual_information) {
+    return *_entropies.mutual_information;
   }
-  return *_mutual_information;
+  // Derive from s1 and s2: I_{ij} = s1_i + s1_j - s2_{ij}
+  if (_entropies.two_orbital && has_single_orbital_entropies()) {
+    Eigen::VectorXd s1 = get_single_orbital_entropies();
+    const Eigen::MatrixXd& s2 = *_entropies.two_orbital;
+    Eigen::Index norbs = s1.size();
+    Eigen::MatrixXd mi = Eigen::MatrixXd::Zero(norbs, norbs);
+    for (Eigen::Index i = 0; i < norbs; ++i) {
+      for (Eigen::Index j = i + 1; j < norbs; ++j) {
+        mi(i, j) = s1(i) + s1(j) - s2(i, j);
+        mi(j, i) = mi(i, j);
+      }
+    }
+    _entropies.mutual_information = mi;
+    return mi;
+  }
+  throw std::runtime_error(
+      "Mutual information is not available. Provide it at construction time, "
+      "or provide both single-orbital entropies (or RDMs) and two-orbital "
+      "entropies.");
 }
 
 void WavefunctionContainer::_clear_rdms() const {
@@ -963,19 +999,19 @@ void WavefunctionContainer::_serialize_entropies_to_json(
     nlohmann::json& j) const {
   QDK_LOG_TRACE_ENTERING();
 
-  if (_single_orbital_entropies != nullptr) {
+  if (_entropies.single_orbital) {
     j["single_orbital_entropies"] = std::vector<double>(
-        _single_orbital_entropies->data(),
-        _single_orbital_entropies->data() + _single_orbital_entropies->size());
+        _entropies.single_orbital->data(),
+        _entropies.single_orbital->data() + _entropies.single_orbital->size());
   }
-  if (_mutual_information != nullptr) {
-    const auto& mi = *_mutual_information;
+  if (_entropies.mutual_information) {
+    const auto& mi = *_entropies.mutual_information;
     j["mutual_information_rows"] = mi.rows();
     j["mutual_information_cols"] = mi.cols();
     std::vector<double> mi_data(mi.rows() * mi.cols());
-    for (Eigen::Index r = 0; r < mi.rows(); ++r)
-      for (Eigen::Index c = 0; c < mi.cols(); ++c)
-        mi_data[r * mi.cols() + c] = mi(r, c);
+    Eigen::Map<
+        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(
+        mi_data.data(), mi.rows(), mi.cols()) = mi;
     j["mutual_information"] = mi_data;
   }
 }
@@ -1147,11 +1183,10 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
     }
 
     // Load entropies if available
-    std::optional<Eigen::VectorXd> single_orbital_entropies;
-    std::optional<Eigen::MatrixXd> mutual_information;
+    OrbitalEntropies entropies;
     if (j.contains("single_orbital_entropies")) {
       std::vector<double> soe_data = j["single_orbital_entropies"];
-      single_orbital_entropies =
+      entropies.single_orbital =
           Eigen::Map<Eigen::VectorXd>(soe_data.data(), soe_data.size());
     }
     if (j.contains("mutual_information")) {
@@ -1162,11 +1197,10 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
           j.value("mutual_information_cols", static_cast<Eigen::Index>(0));
       if (mi_rows > 0 && mi_cols > 0 &&
           static_cast<size_t>(mi_rows * mi_cols) == mi_data.size()) {
-        Eigen::MatrixXd mi_mat(mi_rows, mi_cols);
-        for (Eigen::Index r = 0; r < mi_rows; ++r)
-          for (Eigen::Index c = 0; c < mi_cols; ++c)
-            mi_mat(r, c) = mi_data[r * mi_cols + c];
-        mutual_information = mi_mat;
+        entropies.mutual_information =
+            Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+                                     Eigen::RowMajor>>(mi_data.data(), mi_rows,
+                                                       mi_cols);
       }
     }
 
@@ -1201,36 +1235,36 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
           return std::make_unique<CasWavefunctionContainer>(
               coefficients, determinants, orbitals, std::nullopt, one_rdm_aa,
               one_rdm_bb, std::nullopt, std::nullopt, std::nullopt,
-              std::nullopt, single_orbital_entropies, mutual_information, type);
+              std::nullopt, entropies, type);
         } else if (container_type == "sci") {
           return std::make_unique<SciWavefunctionContainer>(
               coefficients, determinants, orbitals, std::nullopt, one_rdm_aa,
               one_rdm_bb, std::nullopt, std::nullopt, std::nullopt,
-              std::nullopt, single_orbital_entropies, mutual_information, type);
+              std::nullopt, entropies, type);
         }
       } else if (!has_one_rdm && has_two_rdm) {
         if (container_type == "cas") {
           return std::make_unique<CasWavefunctionContainer>(
               coefficients, determinants, orbitals, std::nullopt, std::nullopt,
               std::nullopt, std::nullopt, two_rdm_aabb, two_rdm_aaaa,
-              two_rdm_bbbb, single_orbital_entropies, mutual_information, type);
+              two_rdm_bbbb, entropies, type);
         } else if (container_type == "sci") {
           return std::make_unique<SciWavefunctionContainer>(
               coefficients, determinants, orbitals, std::nullopt, std::nullopt,
               std::nullopt, std::nullopt, two_rdm_aabb, two_rdm_aaaa,
-              two_rdm_bbbb, single_orbital_entropies, mutual_information, type);
+              two_rdm_bbbb, entropies, type);
         }
       } else if (has_one_rdm && has_two_rdm) {
         if (container_type == "cas") {
           return std::make_unique<CasWavefunctionContainer>(
               coefficients, determinants, orbitals, std::nullopt, one_rdm_aa,
               one_rdm_bb, std::nullopt, two_rdm_aabb, two_rdm_aaaa,
-              two_rdm_bbbb, single_orbital_entropies, mutual_information, type);
+              two_rdm_bbbb, entropies, type);
         } else if (container_type == "sci") {
           return std::make_unique<SciWavefunctionContainer>(
               coefficients, determinants, orbitals, std::nullopt, one_rdm_aa,
               one_rdm_bb, std::nullopt, two_rdm_aabb, two_rdm_aaaa,
-              two_rdm_bbbb, single_orbital_entropies, mutual_information, type);
+              two_rdm_bbbb, entropies, type);
         }
       }
       // Throw if RDMs are present but the container type is not supported
@@ -1246,11 +1280,11 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
     if (container_type == "cas") {
       return std::make_unique<CasWavefunctionContainer>(
           coefficients, determinants, orbitals, std::nullopt, std::nullopt,
-          single_orbital_entropies, mutual_information, type);
+          entropies, type);
     } else if (container_type == "sci") {
       return std::make_unique<SciWavefunctionContainer>(
           coefficients, determinants, orbitals, std::nullopt, std::nullopt,
-          single_orbital_entropies, mutual_information, type);
+          entropies, type);
     } else {
       throw std::runtime_error(
           "Did not expect to get here for containers other than cas/sci. "
@@ -1546,6 +1580,16 @@ bool Wavefunction::has_single_orbital_entropies() const {
 Eigen::VectorXd Wavefunction::get_single_orbital_entropies() const {
   QDK_LOG_TRACE_ENTERING();
   return _container->get_single_orbital_entropies();
+}
+
+bool Wavefunction::has_two_orbital_entropies() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->has_two_orbital_entropies();
+}
+
+Eigen::MatrixXd Wavefunction::get_two_orbital_entropies() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->get_two_orbital_entropies();
 }
 
 bool Wavefunction::has_mutual_information() const {
@@ -1893,16 +1937,16 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
     _serialize_rdms_to_hdf5(group);
 
     // Serialize entropies if available
-    if (_single_orbital_entropies != nullptr) {
-      hsize_t soe_dims = _single_orbital_entropies->size();
+    if (_entropies.single_orbital) {
+      hsize_t soe_dims = _entropies.single_orbital->size();
       H5::DataSpace soe_space(1, &soe_dims);
       H5::DataSet soe_dataset = group.createDataSet(
           "single_orbital_entropies", H5::PredType::NATIVE_DOUBLE, soe_space);
-      soe_dataset.write(_single_orbital_entropies->data(),
+      soe_dataset.write(_entropies.single_orbital->data(),
                         H5::PredType::NATIVE_DOUBLE);
     }
-    if (_mutual_information != nullptr) {
-      const auto& mi = *_mutual_information;
+    if (_entropies.mutual_information) {
+      const auto& mi = *_entropies.mutual_information;
       hsize_t mi_dims[2] = {static_cast<hsize_t>(mi.rows()),
                             static_cast<hsize_t>(mi.cols())};
       H5::DataSpace mi_space(2, mi_dims);
@@ -2025,15 +2069,14 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
     }
 
     // Load entropies if available
-    std::optional<Eigen::VectorXd> single_orbital_entropies;
-    std::optional<Eigen::MatrixXd> mutual_information;
+    OrbitalEntropies entropies;
     if (group.nameExists("single_orbital_entropies")) {
       H5::DataSet soe_dataset = group.openDataSet("single_orbital_entropies");
       H5::DataSpace soe_space = soe_dataset.getSpace();
       hsize_t soe_size = soe_space.getSimpleExtentNpoints();
       Eigen::VectorXd soe_vec(soe_size);
       soe_dataset.read(soe_vec.data(), H5::PredType::NATIVE_DOUBLE);
-      single_orbital_entropies = soe_vec;
+      entropies.single_orbital = soe_vec;
     }
     if (group.nameExists("mutual_information")) {
       H5::DataSet mi_dataset = group.openDataSet("mutual_information");
@@ -2043,7 +2086,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
           mi_row_major(mi_dims[0], mi_dims[1]);
       mi_dataset.read(mi_row_major.data(), H5::PredType::NATIVE_DOUBLE);
-      mutual_information = Eigen::MatrixXd(mi_row_major);
+      entropies.mutual_information = Eigen::MatrixXd(mi_row_major);
     }
 
     // Load RDMs if they are available
@@ -2083,38 +2126,36 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
           return std::make_unique<CasWavefunctionContainer>(
               coefficients, determinants, orbitals, one_rdm_spin_traced,
               one_rdm_aa, one_rdm_bb, std::nullopt, std::nullopt, std::nullopt,
-              std::nullopt, single_orbital_entropies, mutual_information, type);
+              std::nullopt, entropies, type);
         } else if (container_type == "sci") {
           return std::make_unique<SciWavefunctionContainer>(
               coefficients, determinants, orbitals, one_rdm_spin_traced,
               one_rdm_aa, one_rdm_bb, std::nullopt, std::nullopt, std::nullopt,
-              std::nullopt, single_orbital_entropies, mutual_information, type);
+              std::nullopt, entropies, type);
         }
       } else if (!has_one_rdm && has_two_rdm) {
         if (container_type == "cas") {
           return std::make_unique<CasWavefunctionContainer>(
               coefficients, determinants, orbitals, std::nullopt, std::nullopt,
               std::nullopt, two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
-              two_rdm_bbbb, single_orbital_entropies, mutual_information, type);
+              two_rdm_bbbb, entropies, type);
         } else if (container_type == "sci") {
           return std::make_unique<SciWavefunctionContainer>(
               coefficients, determinants, orbitals, std::nullopt, std::nullopt,
               std::nullopt, two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
-              two_rdm_bbbb, single_orbital_entropies, mutual_information, type);
+              two_rdm_bbbb, entropies, type);
         }
       } else if (has_one_rdm && has_two_rdm) {
         if (container_type == "cas") {
           return std::make_unique<CasWavefunctionContainer>(
               coefficients, determinants, orbitals, one_rdm_spin_traced,
               one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-              two_rdm_aaaa, two_rdm_bbbb, single_orbital_entropies,
-              mutual_information, type);
+              two_rdm_aaaa, two_rdm_bbbb, entropies, type);
         } else if (container_type == "sci") {
           return std::make_unique<SciWavefunctionContainer>(
               coefficients, determinants, orbitals, one_rdm_spin_traced,
               one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-              two_rdm_aaaa, two_rdm_bbbb, single_orbital_entropies,
-              mutual_information, type);
+              two_rdm_aaaa, two_rdm_bbbb, entropies, type);
         }
       }
     }
@@ -2122,11 +2163,11 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
     if (container_type == "cas") {
       return std::make_unique<CasWavefunctionContainer>(
           coefficients, determinants, orbitals, std::nullopt, std::nullopt,
-          single_orbital_entropies, mutual_information, type);
+          entropies, type);
     } else if (container_type == "sci") {
       return std::make_unique<SciWavefunctionContainer>(
           coefficients, determinants, orbitals, std::nullopt, std::nullopt,
-          single_orbital_entropies, mutual_information, type);
+          entropies, type);
     } else {
       throw std::runtime_error(
           "Did not expect to get here for containers other than cas/sci. "

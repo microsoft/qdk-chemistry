@@ -145,6 +145,23 @@ transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
 }  // namespace detail
 
 /**
+ * @brief Container for orbital entropy data
+ *
+ * Groups single-orbital entropies, two-orbital entropies, and mutual
+ * information into a single struct for cleaner constructor interfaces.
+ */
+struct OrbitalEntropies {
+  std::optional<Eigen::VectorXd> single_orbital;
+  std::optional<Eigen::MatrixXd> two_orbital;
+  std::optional<Eigen::MatrixXd> mutual_information;
+
+  /** @brief Check if any entropy data is present */
+  bool has_any() const {
+    return single_orbital || two_orbital || mutual_information;
+  }
+};
+
+/**
  * @brief Abstract base class for wavefunction containers
  *
  * This class provides the interface for different types of wavefunction
@@ -173,19 +190,13 @@ class WavefunctionContainer {
    *
    * @param one_rdm_spin_traced Spin-traced 1-RDM for active orbitals (optional)
    * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
-   * @param single_orbital_entropies Single-orbital entropies for active
-   * orbitals (optional)
-   * @param mutual_information Mutual information matrix for active orbitals
-   * (optional)
+   * @param entropies Orbital entropy data (optional)
    * @param type The type of wavefunction
    */
-  WavefunctionContainer(
-      const std::optional<MatrixVariant>& one_rdm_spin_traced,
-      const std::optional<VectorVariant>& two_rdm_spin_traced,
-      const std::optional<Eigen::VectorXd>& single_orbital_entropies =
-          std::nullopt,
-      const std::optional<Eigen::MatrixXd>& mutual_information = std::nullopt,
-      WavefunctionType type = WavefunctionType::SelfDual);
+  WavefunctionContainer(const std::optional<MatrixVariant>& one_rdm_spin_traced,
+                        const std::optional<VectorVariant>& two_rdm_spin_traced,
+                        const OrbitalEntropies& entropies = {},
+                        WavefunctionType type = WavefunctionType::SelfDual);
 
   /**
    * @brief Constructs a wavefunction container with reduced density matrix
@@ -201,24 +212,18 @@ class WavefunctionContainer {
    * orbitals (optional)
    * @param two_rdm_bbbb Beta-beta-beta-beta block of 2-RDM for active orbitals
    * (optional)
-   * @param single_orbital_entropies Single-orbital entropies for active
-   * orbitals (optional)
-   * @param mutual_information Mutual information matrix for active orbitals
-   * (optional)
+   * @param entropies Orbital entropy data (optional)
    * @param type The type of wavefunction
    */
-  WavefunctionContainer(
-      const std::optional<MatrixVariant>& one_rdm_spin_traced,
-      const std::optional<MatrixVariant>& one_rdm_aa,
-      const std::optional<MatrixVariant>& one_rdm_bb,
-      const std::optional<VectorVariant>& two_rdm_spin_traced,
-      const std::optional<VectorVariant>& two_rdm_aabb,
-      const std::optional<VectorVariant>& two_rdm_aaaa,
-      const std::optional<VectorVariant>& two_rdm_bbbb,
-      const std::optional<Eigen::VectorXd>& single_orbital_entropies =
-          std::nullopt,
-      const std::optional<Eigen::MatrixXd>& mutual_information = std::nullopt,
-      WavefunctionType type = WavefunctionType::SelfDual);
+  WavefunctionContainer(const std::optional<MatrixVariant>& one_rdm_spin_traced,
+                        const std::optional<MatrixVariant>& one_rdm_aa,
+                        const std::optional<MatrixVariant>& one_rdm_bb,
+                        const std::optional<VectorVariant>& two_rdm_spin_traced,
+                        const std::optional<VectorVariant>& two_rdm_aabb,
+                        const std::optional<VectorVariant>& two_rdm_aaaa,
+                        const std::optional<VectorVariant>& two_rdm_bbbb,
+                        const OrbitalEntropies& entropies = {},
+                        WavefunctionType type = WavefunctionType::SelfDual);
 
   virtual ~WavefunctionContainer() = default;
 
@@ -313,6 +318,21 @@ class WavefunctionContainer {
    * @return Vector of orbital entropies for active orbitals (always real)
    */
   virtual Eigen::VectorXd get_single_orbital_entropies() const;
+
+  /**
+   * @brief Checks if two-orbital entropies for active orbitals are available
+   *
+   * @return True if two-orbital entropies are available, false otherwise
+   */
+  virtual bool has_two_orbital_entropies() const;
+
+  /**
+   * @brief Get the two-orbital entropies matrix for active orbitals
+   *
+   * @return Matrix of two-orbital entropies for active orbitals
+   * @throws std::runtime_error if two-orbital entropies are not available
+   */
+  virtual Eigen::MatrixXd get_two_orbital_entropies() const;
 
   /**
    * @brief Checks if mutual information for active orbitals is available
@@ -492,10 +512,8 @@ class WavefunctionContainer {
   mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_aabb = nullptr;
   mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_bbbb = nullptr;
 
-  // Single orbital entropies
-  mutable std::shared_ptr<Eigen::VectorXd> _single_orbital_entropies = nullptr;
-  // Mutual information matrix
-  mutable std::shared_ptr<Eigen::MatrixXd> _mutual_information = nullptr;
+  // Orbital entropies
+  mutable OrbitalEntropies _entropies;
 
   /** @brief Clear cached RDMs */
   void _clear_rdms() const;
@@ -839,6 +857,19 @@ class Wavefunction : public DataClass,
    * @return Vector of orbital entropies for active orbitals (always real)
    */
   virtual Eigen::VectorXd get_single_orbital_entropies() const;
+
+  /**
+   * @brief Checks if two-orbital entropies for active orbitals are available
+   * @return True if two-orbital entropies are available, false otherwise
+   */
+  virtual bool has_two_orbital_entropies() const;
+
+  /**
+   * @brief Get the two-orbital entropy matrix for active orbitals
+   * @return Matrix of two-orbital entropies for active orbitals
+   * @throws std::runtime_error if two-orbital entropies are not available
+   */
+  virtual Eigen::MatrixXd get_two_orbital_entropies() const;
 
   /**
    * @brief Checks if mutual information for active orbitals is available

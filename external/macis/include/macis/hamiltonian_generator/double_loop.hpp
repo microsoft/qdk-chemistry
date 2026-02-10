@@ -298,13 +298,17 @@ class DoubleLoopHamiltonianGenerator : public HamiltonianGenerator<WfnType> {
   void form_entropies(full_det_iterator bra_begin, full_det_iterator bra_end,
                       full_det_iterator ket_begin, full_det_iterator ket_end,
                       double *C, std::vector<double> &single_orbital_entropies,
+                      matrix_span_t s2_entropy,
                       matrix_span_t mutual_information) override {
     using wfn_traits = wavefunction_traits<WfnType>;
     const size_t nbra_dets = std::distance(bra_begin, bra_end);
     const size_t nket_dets = std::distance(ket_begin, ket_end);
 
+    const bool need_s2 =
+        s2_entropy.data_handle() || mutual_information.data_handle();
+
     OrbitalRDMIntermediates entropy_intermediates(
-        single_orbital_entropies.size());
+        single_orbital_entropies.size(), need_s2);
 
     std::vector<uint32_t> bra_occ_alpha, bra_occ_beta;
 
@@ -328,7 +332,7 @@ class DoubleLoopHamiltonianGenerator : public HamiltonianGenerator<WfnType> {
             spin_det_t ket_beta = wfn_traits::beta_string(ket);
 
             full_det_t ex_total = bra ^ ket;
-            if (wfn_traits::count(ex_total) <= 4) {
+            if (wfn_traits::count(ex_total) <= (need_s2 ? 4 : 0)) {
               spin_det_t ex_alpha = wfn_traits::alpha_string(ex_total);
               spin_det_t ex_beta = wfn_traits::beta_string(ex_total);
 
@@ -351,12 +355,22 @@ class DoubleLoopHamiltonianGenerator : public HamiltonianGenerator<WfnType> {
     // Finalize entropy calculations
     entropy_intermediates.update_diagonal();
     build_s1_entropy(entropy_intermediates, single_orbital_entropies);
-    const size_t norb = single_orbital_entropies.size();
-    std::vector<double> s2_data(norb * norb, 0.0);
-    matrix_span<double> s2_entropy(s2_data.data(), norb, norb);
-    build_s2_entropy(entropy_intermediates, s2_entropy);
-    build_mutual_information(single_orbital_entropies, s2_entropy,
-                             mutual_information);
+
+    if (need_s2) {
+      const size_t norb = single_orbital_entropies.size();
+      // Use caller's buffer if provided, otherwise allocate internally
+      std::vector<double> s2_local;
+      matrix_span<double> s2_span = s2_entropy;
+      if (!s2_entropy.data_handle()) {
+        s2_local.resize(norb * norb, 0.0);
+        s2_span = matrix_span<double>(s2_local.data(), norb, norb);
+      }
+      build_s2_entropy(entropy_intermediates, s2_span);
+      if (mutual_information.data_handle()) {
+        build_mutual_information(single_orbital_entropies, s2_span,
+                                 mutual_information);
+      }
+    }
   }
 
  public:

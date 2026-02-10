@@ -39,6 +39,8 @@ class MultiConfigurationSettings : public data::Settings {
     set_default<bool>("calculate_two_rdm", false);
     // evaluate single orbital entropies
     set_default<bool>("calculate_single_orbital_entropies", false);
+    // evaluate two-orbital entropies
+    set_default<bool>("calculate_two_orbital_entropies", false);
     // evaluate mutual information
     set_default<bool>("calculate_mutual_information", false);
     // energy convergence threshold
