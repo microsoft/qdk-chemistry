@@ -4,7 +4,7 @@ set -e
 MARCH=${1:-x86-64-v3}
 PYTHON_VERSION=${2:-3.11}
 BUILD_TYPE=${3:-Release}
-BUILD_TESTING=${4:-OFF}
+BUILD_TESTING=${4:-ON}
 ENABLE_COVERAGE=${5:-OFF}
 CMAKE_VERSION=${6:-3.28.3}
 HDF5_VERSION=${7:-1.13.0}
@@ -143,7 +143,8 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
         -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
         -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
-        -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
+        -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
+        -C cmake.define.QDK_RUN_LONG_TESTS=ON
 
     echo "Checking shared dependencies..."
     ldd build/cp*/_core.*.so
