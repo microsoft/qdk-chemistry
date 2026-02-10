@@ -9,7 +9,7 @@
 
 #include <qdk/chemistry/utils/logger.hpp>
 
-#include "schwarz.h"
+#include "../schwarz.h"
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -203,7 +203,9 @@ class ERI {
     std::tie(splist_, spdata_) = compute_shellpairs(obs_);
 
     // Compute Schwarz Screening
-    K_schwarz_ = compute_schwarz_ints(obs_, true);
+    K_schwarz_ = RowMajorMatrix(obs_.size(), obs_.size());
+    auto mpi = mpi_default_input();
+    schwarz_integral(&basis_set, mpi, K_schwarz_.data(), true);
   }
 
   /**

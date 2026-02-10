@@ -24,7 +24,7 @@
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
 // Schwarz screening
-#include "scf/src/eri/LIBINT2_DIRECT/schwarz.h"
+#include "scf/src/eri/schwarz.h"
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -73,8 +73,10 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   auto shell2bf = obs.shell2bf();
 
   // Compute Schwarz screening matrix
-  RowMajorMatrix K_schwarz =
-      qdk::chemistry::scf::libint2::direct::compute_schwarz_ints(obs);
+  const size_t num_shells_schwarz = obs.size();
+  RowMajorMatrix K_schwarz(num_shells_schwarz, num_shells_schwarz);
+  auto mpi = qdk::chemistry::scf::mpi_default_input();
+  qdk::chemistry::scf::schwarz_integral(&basis_set, mpi, K_schwarz.data());
 
   const size_t num_aos = obs.nbf();
   const size_t num_aos2 = num_aos * num_aos;

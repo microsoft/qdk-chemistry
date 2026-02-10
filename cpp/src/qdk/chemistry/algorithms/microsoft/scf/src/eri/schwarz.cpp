@@ -24,7 +24,7 @@
 
 namespace qdk::chemistry::scf {
 void schwarz_integral(const BasisSet* iobs, const ParallelConfig& mpi,
-                      double* res) {
+                      double* res, bool use_2norm) {
   QDK_LOG_TRACE_ENTERING();
 
   AutoTimer timer("schwarz_integral");
@@ -61,7 +61,9 @@ void schwarz_integral(const BasisSet* iobs, const ParallelConfig& mpi,
         assert(buf[0] != nullptr);
         size_t n1 = obs[i].size(), n2 = obs[j].size();
         Eigen::Map<const RowMajorMatrix> buf_mat(buf[0], n1 * n1, n2 * n2);
-        S(i, j) = S(j, i) = std::sqrt(buf_mat.lpNorm<Eigen::Infinity>());
+        auto norm =
+            use_2norm ? buf_mat.norm() : buf_mat.lpNorm<Eigen::Infinity>();
+        S(i, j) = S(j, i) = std::sqrt(norm);
       }
     }
   }
@@ -102,4 +104,5 @@ void compute_shell_norm(const BasisSet* obs, const double* D, double* res) {
     pi += num_atomic_orbitals_i;
   }
 }
+
 }  // namespace qdk::chemistry::scf
