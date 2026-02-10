@@ -100,6 +100,9 @@ void ROHFDIIS::build_rohf_f_p_matrix(const RowMajorMatrix& F,
         F.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
     return;
   } else {
+    // Build the ROHF effective Fock matrix using the standard MO-based construction
+    // The form of effective Fock matrix can be found in Guest and Saunders (1974)
+    // and Plakhutin and Davidson (2014)
     const int num_molecular_orbitals = static_cast<int>(C.cols());
     RowMajorMatrix F_up_mo =
         RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);

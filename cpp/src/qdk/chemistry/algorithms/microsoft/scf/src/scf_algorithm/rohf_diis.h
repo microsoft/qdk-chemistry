@@ -31,6 +31,12 @@ class ROHFDIIS : public DIISBase {
 
   /**
   * @brief Build cached ROHF Fock/density matrices from spin-blocked inputs
+  * References: 
+  * Guest, M. F., and V. R. Saunders. "On methods for converging open-shell 
+  * Hartree-Fock wave-functions." Molecular Physics 28, no. 3 (1974): 819-828.
+  * Plakhutin, Boris N., and Ernest R. Davidson. "Canonical form of the
+  * Hartree-Fock orbitals in open-shell systems." The Journal of Chemical Physics
+  * 140, no. 1 (2014): 014102.
   * @param F Spin-blocked Fock matrix (alpha stacked on beta)
   * @param C Molecular orbital coefficient matrix
   * @param P Spin-blocked density matrix
@@ -69,6 +75,11 @@ class ROHFDIIS : public DIISBase {
 
   /**
   * @brief Update the spin-blocked density matrix after solving the eigenproblem
+  * @param P Spin-blocked density matrix to overwrite
+  * @param C Molecular orbital coefficients used to rebuild densities
+  * @param unrestricted Indicates if the SCF run is unrestricted
+  * @param nelec_alpha Number of alpha electrons
+  * @param nelec_beta Number of beta electrons
   */
   void update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
                              bool unrestricted, int nelec_alpha,

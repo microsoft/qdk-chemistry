@@ -62,11 +62,6 @@ class DIISBase : public SCFAlgorithm {
   virtual RowMajorMatrix& active_density(SCFImpl& scf_impl) = 0;
 
   /**
-   * @brief Optional post-iteration hook (default handles damping)
-   */
-  virtual void after_diis_iteration(SCFImpl& scf_impl);
-
-  /**
    * @brief Indicates whether the subclass exposes a total-density view
    */
   virtual bool uses_total_density_view() const;
