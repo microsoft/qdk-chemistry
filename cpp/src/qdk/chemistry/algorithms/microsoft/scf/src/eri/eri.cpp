@@ -53,14 +53,16 @@ std::shared_ptr<ERI> ERI::create(BasisSet& basis_set, const SCFConfig& cfg,
                                       basis_set, cfg.mpi);
 #endif
     case ERIMethod::Incore:
-      return std::make_shared<ERIINCORE>(cfg.unrestricted, cfg.rohf_enabled, basis_set, cfg.mpi,
-                                         omega);
+      return std::make_shared<ERIINCORE>(cfg.unrestricted, cfg.rohf_enabled,
+                                         basis_set, cfg.mpi, omega);
     case ERIMethod::SnK:
-      return std::make_shared<SNK>(cfg.unrestricted, cfg.rohf_enabled, basis_set, cfg.snk_input,
-                                   cfg.exc.xc_name, cfg.mpi);
+      return std::make_shared<SNK>(cfg.unrestricted, cfg.rohf_enabled,
+                                   basis_set, cfg.snk_input, cfg.exc.xc_name,
+                                   cfg.mpi);
     case ERIMethod::Libint2Direct:
-      return std::make_shared<LIBINT2_DIRECT>(cfg.unrestricted, cfg.rohf_enabled,
-                                              basis_set, cfg.mpi, cfg.eri.use_atomics);
+      return std::make_shared<LIBINT2_DIRECT>(cfg.unrestricted,
+                                              cfg.rohf_enabled, basis_set,
+                                              cfg.mpi, cfg.eri.use_atomics);
     default:
       throw std::runtime_error("Invalid ERI Method");
   }

@@ -617,9 +617,8 @@ void SCFImpl::iterate_() {
           F_, S_, X_, C_, eigenvalues_, P_, nelec_, num_atomic_orbitals_,
           num_molecular_orbitals_, i, ctx_.cfg->unrestricted);
     }
-    scf_algorithm_->update_density_matrix(
-        P_, C_, ctx_.cfg->unrestricted, nelec_[0],
-        nelec_[1]);
+    scf_algorithm_->update_density_matrix(P_, C_, ctx_.cfg->unrestricted,
+                                          nelec_[0], nelec_[1]);
   }
 }
 

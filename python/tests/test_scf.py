@@ -239,7 +239,7 @@ class TestScfSolver:
         """Test SCF solver on OH system with ROHF/sto-3g."""
         oh_structure = create_oh_structure()
         scf_solver = algorithms.create("scf_solver")
-        
+
         scf_solver.settings().set("method", "hf")
         scf_solver.settings().set("scf_type", "restricted")
         scf_solver.settings().set("enable_gdm", False)

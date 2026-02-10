@@ -31,7 +31,8 @@ class ERI {
    * @param basis_set The atomic orbital basis set
    * @param mpi Parallelism configuration
    */
-  ERI(bool unrestricted, bool rohf_enabled, double tol, BasisSet& basis_set, ParallelConfig mpi)
+  ERI(bool unrestricted, bool rohf_enabled, double tol, BasisSet& basis_set,
+      ParallelConfig mpi)
       : unrestricted_(unrestricted),
         rohf_enabled_(rohf_enabled),
         tolerance_(tol),
@@ -154,7 +155,7 @@ class ERI {
   virtual void quarter_trans_impl(size_t nt, const double* C, double* out) = 0;
 
   bool unrestricted_;    ///< Whether this is an unrestricted calculation
-  bool rohf_enabled_;   ///< Whether ROHF is enabled
+  bool rohf_enabled_;    ///< Whether ROHF is enabled
   double tolerance_;     ///< Integral screening threshold
   BasisSet& basis_set_;  ///< Reference to the atomic orbital basis set
   ParallelConfig mpi_;   ///< MPI parallelization configuration

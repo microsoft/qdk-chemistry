@@ -11,8 +11,8 @@
 
 namespace qdk::chemistry::scf {
 
-ERIINCORE::ERIINCORE(bool unr, bool rohf_enabled, BasisSet& basis_set, ParallelConfig _mpi,
-                     double omega)
+ERIINCORE::ERIINCORE(bool unr, bool rohf_enabled, BasisSet& basis_set,
+                     ParallelConfig _mpi, double omega)
     : ERI(unr, rohf_enabled, 0.0, basis_set, _mpi),
       eri_impl_(incore::ERI::make_incore_eri(unr, basis_set, _mpi, omega)) {
   QDK_LOG_TRACE_ENTERING();
@@ -42,8 +42,8 @@ void ERIINCORE::get_gradients(const double* P, double* dJ, double* dK,
   throw std::runtime_error("INCORE GRADIENTS NYI");
 }
 
-ERIINCORE_DF::ERIINCORE_DF(bool unr, bool rohf_enabled, BasisSet& obs, BasisSet& abs,
-                           ParallelConfig _mpi)
+ERIINCORE_DF::ERIINCORE_DF(bool unr, bool rohf_enabled, BasisSet& obs,
+                           BasisSet& abs, ParallelConfig _mpi)
     : ERI(unr, rohf_enabled, 0.0, obs, _mpi),
       eri_impl_(incore::ERI_DF::make_incore_eri(unr, obs, abs, _mpi)) {
   QDK_LOG_TRACE_ENTERING();

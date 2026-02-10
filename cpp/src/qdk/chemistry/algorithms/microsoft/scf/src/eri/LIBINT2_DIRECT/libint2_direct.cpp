@@ -305,7 +305,8 @@ class ERI {
     AutoTimer t("ERI::build_JK");
     const size_t num_atomic_orbitals = obs_.nbf();
     const size_t nsh = obs_.size();
-    const size_t num_density_matrices = (unrestricted_ || rohf_enabled_) ? 2 : 1;
+    const size_t num_density_matrices =
+        (unrestricted_ || rohf_enabled_) ? 2 : 1;
     const size_t mat_size =
         num_density_matrices * num_atomic_orbitals * num_atomic_orbitals;
     const bool is_rsx = std::abs(omega) > 1e-12;
@@ -932,8 +933,8 @@ class ERI {
 LIBINT2_DIRECT::LIBINT2_DIRECT(bool unr, bool rohf_enabled, BasisSet& basis_set,
                                ParallelConfig _mpi, bool use_atomics)
     : ERI(unr, rohf_enabled, 0.0, basis_set, _mpi),
-      eri_impl_(libint2::direct::ERI::make_libint2_direct_eri(unr, rohf_enabled, basis_set,
-                                                              use_atomics)) {
+      eri_impl_(libint2::direct::ERI::make_libint2_direct_eri(
+          unr, rohf_enabled, basis_set, use_atomics)) {
   QDK_LOG_TRACE_ENTERING();
   if (_mpi.world_size > 1) throw std::runtime_error("LIBINT2_DIRECT + MPI NYI");
 }

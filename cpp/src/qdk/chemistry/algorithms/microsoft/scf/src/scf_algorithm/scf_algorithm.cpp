@@ -8,8 +8,8 @@
 
 #include <cmath>
 #include <limits>
-#include <stdexcept>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <stdexcept>
 
 #include "../scf/scf_impl.h"
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
@@ -22,10 +22,10 @@
 #include <lapack.hh>
 
 #include "asahf.h"
-#include "rohf_diis.h"
-#include "restricted_unrestricted_diis.h"
 #include "diis_gdm.h"
 #include "gdm.h"
+#include "restricted_unrestricted_diis.h"
+#include "rohf_diis.h"
 
 #ifdef ENABLE_NVTX3
 #include <nvtx3/nvtx3.hpp>
@@ -61,8 +61,8 @@ std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx,
 
     case SCFAlgorithmName::DIIS:
       if (rohf_enabled) {
-        return std::make_shared<ROHFDIIS>(
-            ctx, cfg.scf_algorithm.diis_subspace_size);
+        return std::make_shared<ROHFDIIS>(ctx,
+                                          cfg.scf_algorithm.diis_subspace_size);
       }
       return std::make_shared<RestrictedUnrestrictedDIIS>(
           ctx, cfg.scf_algorithm.diis_subspace_size);
@@ -158,8 +158,8 @@ void SCFAlgorithm::solve_fock_eigenproblem(
 
 void SCFAlgorithm::update_density_matrix(RowMajorMatrix& P,
                                          const RowMajorMatrix& C,
-                                         bool unrestricted,
-                                         int nelec_alpha, int nelec_beta) {
+                                         bool unrestricted, int nelec_alpha,
+                                         int nelec_beta) {
   QDK_LOG_TRACE_ENTERING();
   const int num_orbital_sets = unrestricted ? 2 : 1;
   const int num_atomic_orbitals =
@@ -180,8 +180,8 @@ void SCFAlgorithm::update_density_matrix(RowMajorMatrix& P,
       continue;
     }
 
-    const auto coeff_block = C.block(i * num_atomic_orbitals, 0,
-                                     num_atomic_orbitals, n_occ);
+    const auto coeff_block =
+        C.block(i * num_atomic_orbitals, 0, num_atomic_orbitals, n_occ);
     block.noalias() = occupancy_factor * coeff_block * coeff_block.transpose();
   }
 }
@@ -253,10 +253,9 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
       throw std::logic_error(
           "ROHF convergence requires ROHFDIIS implementation");
     }
-    rohf_diis->build_rohf_f_p_matrix(scf_impl.get_fock_matrix(),
-                                     scf_impl.get_orbitals_matrix(),
-                                     scf_impl.get_density_matrix(), nelec[0],
-                                     nelec[1]);
+    rohf_diis->build_rohf_f_p_matrix(
+        scf_impl.get_fock_matrix(), scf_impl.get_orbitals_matrix(),
+        scf_impl.get_density_matrix(), nelec[0], nelec[1]);
     F_ptr = &rohf_diis->get_fock_matrix();
     P_ptr = &rohf_diis->get_density_matrix();
   } else {

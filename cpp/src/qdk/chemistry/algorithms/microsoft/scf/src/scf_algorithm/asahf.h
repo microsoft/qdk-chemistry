@@ -110,8 +110,7 @@ class AtomicSphericallyAveragedHartreeFock : public DIISBase {
                              int nelec_beta) override;
 
  private:
-  const RowMajorMatrix& get_active_fock(
-      const SCFImpl& scf_impl) const override;
+  const RowMajorMatrix& get_active_fock(const SCFImpl& scf_impl) const override;
   RowMajorMatrix& active_density(SCFImpl& scf_impl) override;
 
   /**

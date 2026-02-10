@@ -6,8 +6,8 @@
 
 #include <qdk/chemistry/utils/logger.hpp>
 
-#include "util/macros.h"
 #include "../scf/scf_impl.h"
+#include "util/macros.h"
 
 namespace qdk::chemistry::scf {
 
@@ -26,11 +26,14 @@ class ROHFDIIS {
    * @param num_atomic_orbitals Number of atomic orbitals for matrix sizing
    */
   explicit ROHFDIIS(int num_atomic_orbitals)
-      : effective_F_(RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals)),
-        total_P_(RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals)) {}
+      : effective_F_(
+            RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals)),
+        total_P_(
+            RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals)) {}
 
   /**
-   * @brief Update the spin-blocked density matrix after solving the eigenproblem
+   * @brief Update the spin-blocked density matrix after solving the
+   * eigenproblem
    * @param P Spin-blocked density matrix to overwrite
    * @param C Molecular orbital coefficients used to rebuild densities
    * @param nelec_alpha Number of alpha electrons
@@ -73,7 +76,8 @@ class ROHFDIIS {
 
     RowMajorMatrix new_total =
         P.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) +
-        P.block(num_atomic_orbitals, 0, num_atomic_orbitals, num_atomic_orbitals);
+        P.block(num_atomic_orbitals, 0, num_atomic_orbitals,
+                num_atomic_orbitals);
     bool density_changed = true;
     if (total_P_.rows() == num_atomic_orbitals &&
         total_P_.cols() == num_atomic_orbitals) {
@@ -87,7 +91,8 @@ class ROHFDIIS {
 
     if (effective_F_.rows() != num_atomic_orbitals ||
         effective_F_.cols() != num_atomic_orbitals) {
-      effective_F_ = RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals);
+      effective_F_ =
+          RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals);
     }
 
     if (C.isZero()) {
@@ -95,18 +100,18 @@ class ROHFDIIS {
           F.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
       return;
     } else {
-      // Build the ROHF effective Fock matrix using the standard MO-based construction
-      // The form of effective Fock matrix can be found in Guest and Saunders (1974)
-      // and Plakhutin and Davidson (2014)
+      // Build the ROHF effective Fock matrix using the standard MO-based
+      // construction The form of effective Fock matrix can be found in Guest
+      // and Saunders (1974) and Plakhutin and Davidson (2014)
       const int num_molecular_orbitals = static_cast<int>(C.cols());
       RowMajorMatrix F_up_mo =
           RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
       RowMajorMatrix F_dn_mo = F_up_mo;
       RowMajorMatrix effective_F_mo = F_up_mo;
 
-      F_up_mo.noalias() = C.transpose() *
-                          F.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) *
-                          C;
+      F_up_mo.noalias() =
+          C.transpose() *
+          F.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) * C;
       F_dn_mo.noalias() = C.transpose() *
                           F.block(num_atomic_orbitals, 0, num_atomic_orbitals,
                                   num_atomic_orbitals) *
@@ -118,8 +123,8 @@ class ROHFDIIS {
             0.5 * (F_up_mo.block(row, col, rows, cols) +
                    F_dn_mo.block(row, col, rows, cols));
       };
-      auto copy_block = [&](const RowMajorMatrix& src, int row, int col, int rows,
-                            int cols) {
+      auto copy_block = [&](const RowMajorMatrix& src, int row, int col,
+                            int rows, int cols) {
         if (rows <= 0 || cols <= 0) return;
         effective_F_mo.block(row, col, rows, cols) =
             src.block(row, col, rows, cols);
@@ -204,8 +209,7 @@ RowMajorMatrix& ROHFDIIS::density_matrix() {
   return impl_->get_total_P();
 }
 
-void ROHFDIIS::update_density_matrix(RowMajorMatrix& P,
-                                     const RowMajorMatrix& C,
+void ROHFDIIS::update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
                                      bool /*unrestricted*/, int nelec_alpha,
                                      int nelec_beta) {
   impl_->update_density_matrix(P, C, nelec_alpha, nelec_beta);
@@ -213,8 +217,8 @@ void ROHFDIIS::update_density_matrix(RowMajorMatrix& P,
 
 void ROHFDIIS::build_rohf_f_p_matrix(const RowMajorMatrix& F,
                                      const RowMajorMatrix& C,
-                                     const RowMajorMatrix& P,
-                                     int nelec_alpha, int nelec_beta) {
+                                     const RowMajorMatrix& P, int nelec_alpha,
+                                     int nelec_beta) {
   impl_->build_rohf_f_p_matrix(F, C, P, nelec_alpha, nelec_beta);
 }
 

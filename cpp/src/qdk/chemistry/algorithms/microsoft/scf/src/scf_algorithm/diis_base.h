@@ -36,8 +36,7 @@ class DIISBase : public SCFAlgorithm {
    * @param rohf_enabled Indicates whether ROHF support is requested
    * @param subspace_size Max number of stored Fock/error pairs for DIIS
    */
-  DIISBase(const SCFContext& ctx, bool rohf_enabled,
-           size_t subspace_size = 8);
+  DIISBase(const SCFContext& ctx, bool rohf_enabled, size_t subspace_size = 8);
 
   /**
    * @brief Virtual destructor

@@ -48,8 +48,8 @@ class LIBINT2_DIRECT : public ERI {
    * @throws std::runtime_error if Libint2 initialization fails
    * @throws std::runtime_error if screening matrix computation fails
    */
-  LIBINT2_DIRECT(bool unrestricted, bool rohf_enabled, BasisSet& basis_set, ParallelConfig mpi,
-                 bool use_atomics);
+  LIBINT2_DIRECT(bool unrestricted, bool rohf_enabled, BasisSet& basis_set,
+                 ParallelConfig mpi, bool use_atomics);
 
   /**
    * @brief Destructor

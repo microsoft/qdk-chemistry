@@ -21,8 +21,7 @@ const RowMajorMatrix& RestrictedUnrestrictedDIIS::get_active_fock(
   return scf_impl.get_fock_matrix();
 }
 
-RowMajorMatrix& RestrictedUnrestrictedDIIS::active_density(
-    SCFImpl& scf_impl) {
+RowMajorMatrix& RestrictedUnrestrictedDIIS::active_density(SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
   return scf_impl.density_matrix();
 }

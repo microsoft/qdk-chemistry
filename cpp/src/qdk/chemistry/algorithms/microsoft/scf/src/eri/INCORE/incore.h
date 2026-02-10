@@ -54,8 +54,8 @@ class ERIINCORE : public ERI {
    * @throws std::bad_alloc if insufficient memory to store all integrals
    * @throws std::runtime_error if integral computation fails
    */
-  ERIINCORE(bool unrestricted, bool rohf_enabled, BasisSet& basis_set, ParallelConfig mpi,
-            double omega);
+  ERIINCORE(bool unrestricted, bool rohf_enabled, BasisSet& basis_set,
+            ParallelConfig mpi, double omega);
 
   /**
    * @brief Destructor - releases all stored integral data
@@ -124,8 +124,9 @@ class ERIINCORE_DF : public ERI {
    * 3. Inverting the metric to obtain (Q|P)⁻¹ via Cholesky decomposition
    * 4. Storing both (Q|μν) and (Q|P)⁻¹ in memory for subsequent Fock builds
    *
-  * @param unrestricted Whether this is an unrestricted (UHF/UKS) calculation
-  * @param rohf_enabled Whether ROHF calculations should allocate alpha/beta blocks
+   * @param unrestricted Whether this is an unrestricted (UHF/UKS) calculation
+   * @param rohf_enabled Whether ROHF calculations should allocate alpha/beta
+   * blocks
    * @param orbital_basis_set Primary basis set for molecular orbitals
    * @param aux_basis_set Auxiliary basis set for density fitting
    * @param mpi MPI parallelization configuration
@@ -133,8 +134,9 @@ class ERIINCORE_DF : public ERI {
    * @throws std::bad_alloc if insufficient memory for 3-center integral storage
    * @throws std::runtime_error if metric matrix is singular or ill-conditioned
    */
-  ERIINCORE_DF(bool unrestricted, bool rohf_enabled, BasisSet& orbital_basis_set,
-               BasisSet& aux_basis_set, ParallelConfig mpi);
+  ERIINCORE_DF(bool unrestricted, bool rohf_enabled,
+               BasisSet& orbital_basis_set, BasisSet& aux_basis_set,
+               ParallelConfig mpi);
 
   /**
    * @brief Destructor - releases stored integral data and metric

@@ -108,10 +108,9 @@ class SCFAlgorithm {
    * @param[in] nelec_alpha Number of alpha electrons
    * @param[in] nelec_beta Number of beta electrons
    */
-    virtual void update_density_matrix(RowMajorMatrix& P,
-                                                                         const RowMajorMatrix& C,
-                                                                         bool unrestricted, int nelec_alpha,
-                                                                         int nelec_beta);
+  virtual void update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
+                                     bool unrestricted, int nelec_alpha,
+                                     int nelec_beta);
 
   /**
    * @brief Calculate orbital gradient (OG) error for convergence checking
@@ -150,6 +149,6 @@ class SCFAlgorithm {
       std::numeric_limits<double>::infinity();  ///< Energy change
   double density_rms_ = 0.0;                    ///< Last calculated density RMS
 
-    bool rohf_enabled_ = false;  ///< Flag indicating if ROHF is enabled
+  bool rohf_enabled_ = false;  ///< Flag indicating if ROHF is enabled
 };
 }  // namespace qdk::chemistry::scf

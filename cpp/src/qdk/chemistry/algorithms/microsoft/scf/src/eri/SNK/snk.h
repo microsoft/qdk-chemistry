@@ -47,8 +47,8 @@ class SNK : public ERI {
    *
    * @throws std::runtime_error if GauXC initialization fails
    */
-  SNK(bool unrestricted, bool rohf_enabled, BasisSet& basis_set, GAUXCInput gauxc_input,
-      std::string xc_name, ParallelConfig mpi);
+  SNK(bool unrestricted, bool rohf_enabled, BasisSet& basis_set,
+      GAUXCInput gauxc_input, std::string xc_name, ParallelConfig mpi);
 
   /**
    * @brief Destructor

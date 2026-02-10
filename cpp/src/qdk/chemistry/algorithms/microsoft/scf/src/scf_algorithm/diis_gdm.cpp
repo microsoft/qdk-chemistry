@@ -12,8 +12,8 @@
 #include <stdexcept>
 
 #include "../scf/scf_impl.h"
-#include "restricted_unrestricted_diis.h"
 #include "gdm.h"
+#include "restricted_unrestricted_diis.h"
 
 namespace qdk::chemistry::scf {
 
