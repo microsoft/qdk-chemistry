@@ -9,11 +9,33 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.time_evolution.builder.qdrift import QDrift
+from qdk_chemistry.algorithms.time_evolution.builder.qdrift import QDrift, QDriftSettings
 from qdk_chemistry.data import QubitHamiltonian, TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import PauliProductFormulaContainer
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+
+class TestQDriftSettings:
+    """Tests for QDriftSettings configuration."""
+
+    def test_default_settings(self):
+        """Verify default settings are properly initialized."""
+        settings = QDriftSettings()
+        assert settings.get("num_samples") == 100
+        assert settings.get("seed") == -1
+        assert settings.get("tolerance") == pytest.approx(1e-12)
+
+    def test_settings_can_be_updated(self):
+        """Verify settings can be modified."""
+        settings = QDriftSettings()
+        settings.set("num_samples", 500)
+        settings.set("seed", 42)
+        settings.set("tolerance", 1e-10)
+
+        assert settings.get("num_samples") == 500
+        assert settings.get("seed") == 42
+        assert settings.get("tolerance") == 1e-10
 
 
 class TestQDriftBasics:
@@ -82,30 +104,24 @@ class TestQDriftConstruction:
             assert t1.pauli_term == t2.pauli_term
             assert t1.angle == t2.angle
 
-    def test_different_results_without_seed(self):
-        """Test that results differ without a fixed seed (probabilistic)."""
+    def test_different_seeds_produce_different_results(self):
+        """Test that different seeds produce different sampling."""
         hamiltonian = QubitHamiltonian(
             pauli_strings=["XI", "YI", "ZI", "XX", "ZZ"],
             coefficients=[1.0, 0.5, 0.25, 0.1, 0.05],
         )
 
-        builder1 = QDrift(num_samples=100, seed=-1)
-        builder2 = QDrift(num_samples=100, seed=-1)
-
-        # Use different random states by running at different "times" in the RNG
-        import time
-
-        time.sleep(0.01)
+        builder1 = QDrift(num_samples=30, seed=42)
+        builder2 = QDrift(num_samples=30, seed=123)
 
         unitary1 = builder1.run(hamiltonian, time=0.1)
         unitary2 = builder2.run(hamiltonian, time=0.1)
 
-        terms1 = unitary1.get_container().step_terms
-        terms2 = unitary2.get_container().step_terms
+        terms1 = [(t.pauli_term, t.angle) for t in unitary1.get_container().step_terms]
+        terms2 = [(t.pauli_term, t.angle) for t in unitary2.get_container().step_terms]
 
-        # They should be very unlikely to be identical
-        # (but this is probabilistic, so we check a weaker condition)
-        assert len(terms1) == len(terms2) == 100
+        # Results should be different with high probability
+        assert terms1 != terms2
 
 
 class TestQDriftSampling:
@@ -201,13 +217,26 @@ class TestQDriftEdgeCases:
             pauli_strings=["X", "Z"],
             coefficients=[-1.0, 0.5],
         )
-        builder = QDrift(num_samples=20, seed=42)
-        unitary = builder.run(hamiltonian, time=0.1)
+        time = 0.1
+        num_samples = 20
+        builder = QDrift(num_samples=num_samples, seed=42)
+        unitary = builder.run(hamiltonian, time=time)
 
         terms = unitary.get_container().step_terms
 
-        # Check that X terms have negative angles and Z terms have positive
+        # λ = |-1.0| + |0.5| = 1.5
+        # angle magnitude = λ * t / N = 1.5 * 0.1 / 20 = 0.0075
+        expected_magnitude = 1.5 * time / num_samples
+
+        # Check that X terms have negative angles, Z terms have positive,
+        # and all angles have the correct magnitude.
         for term in terms:
+            assert np.isclose(
+                abs(term.angle),
+                expected_magnitude,
+                atol=float_comparison_absolute_tolerance,
+                rtol=float_comparison_relative_tolerance,
+            )
             if term.pauli_term == {0: "X"}:
                 assert term.angle < 0
             elif term.pauli_term == {0: "Z"}:
@@ -225,6 +254,17 @@ class TestQDriftEdgeCases:
         container = unitary.get_container()
         assert container.num_qubits == 2
         assert len(container.step_terms) == 50
+
+    def test_num_qubits_preserved_four_qubits(self):
+        """Verify the output preserves the correct number of qubits for larger systems."""
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XXII", "IIZZ", "IYIY"],
+            coefficients=[0.3, 0.3, 0.4],
+        )
+        builder = QDrift(num_samples=10, seed=42)
+        unitary = builder.run(hamiltonian, time=1.0)
+
+        assert unitary.get_container().num_qubits == 4
 
 
 class TestQDriftPauliLabelToMap:
