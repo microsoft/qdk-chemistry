@@ -104,14 +104,14 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
    * @brief Create a deep copy of this container
    * @return Unique pointer to a cloned container
    */
-  std::unique_ptr<HamiltonianContainer> clone() const override final;
+  std::unique_ptr<HamiltonianContainer> clone() const override;
 
   /**
    * @brief Get the type of the underlying container
    * @return String identifying the container type (e.g.,
    * "canonical_four_center", "density_fitted")
    */
-  std::string get_container_type() const override final;
+  std::string get_container_type() const override;
 
   /**
    * @brief Get two-electron integrals in MO basis for all spin channels
@@ -154,14 +154,14 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
    * @brief Convert Hamiltonian to JSON
    * @return JSON object containing Hamiltonian data
    */
-  nlohmann::json to_json() const override final;
+  nlohmann::json to_json() const override;
 
   /**
    * @brief Serialize Hamiltonian data to HDF5 group
    * @param group HDF5 group to write data to
    * @throws std::runtime_error if I/O error occurs
    */
-  void to_hdf5(H5::Group& group) const override final;
+  void to_hdf5(H5::Group& group) const override;
 
   /**
    * @brief Deserialize Hamiltonian data from HDF5 group
@@ -189,7 +189,7 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
    * @throws std::runtime_error if I/O error occurs
    */
   void to_fcidump_file(const std::string& filename, size_t nalpha,
-                       size_t nbeta) const override final;
+                       size_t nbeta) const override;
 
   /**
    * @brief Check if the Hamiltonian data is complete and consistent
@@ -197,7 +197,7 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
    */
   bool is_valid() const override final;
 
- private:
+ protected:
   /// Two-electron integrals in MO basis, stored as flattened arrays [norb^4]
   /// Access pattern: V[i*norb^3 + j*norb^2 + k*norb + l] = (ij|kl)
   const std::tuple<std::shared_ptr<Eigen::VectorXd>,

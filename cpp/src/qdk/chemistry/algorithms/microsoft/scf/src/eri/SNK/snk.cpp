@@ -236,4 +236,5 @@ void SNK::quarter_trans_impl(size_t nt, const double* C, double* out) {
   if (!eri_impl_) throw std::runtime_error("SNK NOT INITIALIZED");
   eri_impl_->quarter_trans(nt, C, out);
 };
+
 }  // namespace qdk::chemistry::scf
