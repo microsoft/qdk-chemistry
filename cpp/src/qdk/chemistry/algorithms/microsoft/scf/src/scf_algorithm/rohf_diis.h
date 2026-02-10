@@ -6,7 +6,13 @@
 
 #include "diis_base.h"
 
+#include <memory>
+
 namespace qdk::chemistry::scf {
+
+namespace impl {
+class ROHFDIIS;
+}  // namespace impl
 
 /**
  * @brief Pulay DIIS accelerator specialized for ROHF spin blocking
@@ -27,7 +33,7 @@ class ROHFDIIS : public DIISBase {
   */
   explicit ROHFDIIS(const SCFContext& ctx, size_t subspace_size = 8);
 
-  ~ROHFDIIS() noexcept override = default;
+  ~ROHFDIIS() noexcept override;
 
   /**
   * @brief Build cached ROHF Fock/density matrices from spin-blocked inputs
@@ -85,10 +91,8 @@ class ROHFDIIS : public DIISBase {
                              bool unrestricted, int nelec_alpha,
                              int nelec_beta) override;
 
-  /// Cached effective Fock matrix expressed in the AO basis
-  RowMajorMatrix effective_F_;
-  /// Cached total density matrix (alpha + beta) exposed to DIIS
-  RowMajorMatrix total_P_;
+  /// PIMPL pointer to implementation
+  std::unique_ptr<impl::ROHFDIIS> impl_;
 };
 
 }  // namespace qdk::chemistry::scf
