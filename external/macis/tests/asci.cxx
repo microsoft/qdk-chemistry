@@ -58,8 +58,12 @@ auto make_quad(unsigned i, unsigned j, unsigned k, unsigned l) {
   string_type C = 0;
   C.flip(i).flip(j).flip(k).flip(l);
   string_type B = 1;
-  B <<= l;
-  B = B.to_ullong() - 1;
+  if constexpr (string_type{}.size() <= 64) {
+    B <<= l;
+    B = B.to_ullong() - 1;
+  } else {
+    B = macis::full_mask<string_type{}.size()>(l);
+  }
 
   return constraint_type(C, B, l);
 }
@@ -230,6 +234,88 @@ TEST_CASE("Triplets") {
   }
 
   REQUIRE(quad_hist == new_quad_hist);
+}
+
+TEST_CASE("make_triplet and make_quad large bitset") {
+  // Verify that make_triplet and make_quad produce correct constraints
+  // when instantiated with bitset widths beyond 64 bits.
+  // Indices are chosen to exercise orbitals beyond the 64-bit boundary
+  // while satisfying the constraint ordering i > j > k (> l).
+  SECTION("make_triplet<256>") {
+    // N=256 -> spin string is bitset<128>
+    constexpr unsigned norb = 128;
+    unsigned i = norb / 2 + 6;   // 70 — above 64-bit boundary
+    unsigned j = norb / 2 - 24;  // 40
+    unsigned k = 10;
+    auto constraint = macis::make_triplet<256>(i, j, k);
+    auto C = constraint.C();
+    auto B = constraint.B();
+    // C should have exactly bits i, j, k set
+    REQUIRE(C.count() == 3);
+    REQUIRE(C.test(i));
+    REQUIRE(C.test(j));
+    REQUIRE(C.test(k));
+    // B should be a mask with the lowest k bits set
+    REQUIRE(B.count() == k);
+    for (unsigned b = 0; b < k; ++b) REQUIRE(B.test(b));
+    for (unsigned b = k; b < norb; ++b) REQUIRE_FALSE(B.test(b));
+  }
+
+  SECTION("make_triplet<512>") {
+    // N=512 -> spin string is bitset<256>
+    constexpr unsigned norb = 256;
+    unsigned i = norb - 56;      // 200 — well into upper bits
+    unsigned j = norb / 2 - 28;  // 100
+    unsigned k = 50;
+    auto constraint = macis::make_triplet<512>(i, j, k);
+    auto C = constraint.C();
+    auto B = constraint.B();
+    REQUIRE(C.count() == 3);
+    REQUIRE(C.test(i));
+    REQUIRE(C.test(j));
+    REQUIRE(C.test(k));
+    REQUIRE(B.count() == k);
+    for (unsigned b = 0; b < k; ++b) REQUIRE(B.test(b));
+    for (unsigned b = k; b < norb; ++b) REQUIRE_FALSE(B.test(b));
+  }
+
+  SECTION("make_quad<256>") {
+    constexpr unsigned norb = 128;
+    unsigned i = norb - 28;     // 100 — upper quarter
+    unsigned j = norb / 2 + 6;  // 70 — above 64-bit boundary
+    unsigned k = 40;
+    unsigned l = 10;
+    auto constraint = make_quad<256>(i, j, k, l);
+    auto C = constraint.C();
+    auto B = constraint.B();
+    REQUIRE(C.count() == 4);
+    REQUIRE(C.test(i));
+    REQUIRE(C.test(j));
+    REQUIRE(C.test(k));
+    REQUIRE(C.test(l));
+    REQUIRE(B.count() == l);
+    for (unsigned b = 0; b < l; ++b) REQUIRE(B.test(b));
+    for (unsigned b = l; b < norb; ++b) REQUIRE_FALSE(B.test(b));
+  }
+
+  SECTION("make_quad<512>") {
+    constexpr unsigned norb = 256;
+    unsigned i = norb - 56;      // 200
+    unsigned j = norb / 2 + 22;  // 150
+    unsigned k = norb / 2 - 28;  // 100
+    unsigned l = 50;
+    auto constraint = make_quad<512>(i, j, k, l);
+    auto C = constraint.C();
+    auto B = constraint.B();
+    REQUIRE(C.count() == 4);
+    REQUIRE(C.test(i));
+    REQUIRE(C.test(j));
+    REQUIRE(C.test(k));
+    REQUIRE(C.test(l));
+    REQUIRE(B.count() == l);
+    for (unsigned b = 0; b < l; ++b) REQUIRE(B.test(b));
+    for (unsigned b = l; b < norb; ++b) REQUIRE_FALSE(B.test(b));
+  }
 }
 
 TEST_CASE("Constraints") {
