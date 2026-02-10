@@ -70,6 +70,8 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   // Refinement Loop
   size_t ndets = wfn.size();
   bool converged = false;
+  double prev_E_delta = 0.0;
+  int oscillation_count = 0;
   for (size_t iter = 0; iter < asci_settings.max_refine_iter; ++iter) {
     double E;
     std::tie(E, wfn, X) = asci_iter<N, index_t>(
@@ -97,11 +99,30 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 
     const auto E_delta = E - E0;
     logger->info(fmt_string, iter + 1, E, E_delta);
-    E0 = E;
+
     if (std::abs(E_delta) < asci_settings.refine_energy_tol) {
+      E0 = E;
       converged = true;
       break;
     }
+
+    // Detect oscillation: sign change in energy delta with similar magnitude
+    if (iter > 0 && prev_E_delta * E_delta < 0 &&
+        std::abs(prev_E_delta + E_delta) < asci_settings.refine_energy_tol) {
+      oscillation_count++;
+      if (oscillation_count > 2) {
+        throw std::runtime_error(
+            "ASCI Refine detected oscillation. "
+            "Consider using another core_selection_strategy, increasing "
+            "core_selection_threshold, ncdets_max, or ntdets_max, or loosening "
+            "refine_energy_tol.");
+      }
+    } else {
+      oscillation_count = 0;
+    }
+    prev_E_delta = E_delta;
+
+    E0 = E;
   }  // Refinement loop
 
   if (converged)
