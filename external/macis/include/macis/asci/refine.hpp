@@ -100,15 +100,20 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     const auto E_delta = E - E0;
     logger->info(fmt_string, iter + 1, E, E_delta);
 
+    if (std::abs(E_delta) < asci_settings.refine_energy_tol) {
+      E0 = E;
+      converged = true;
+      break;
+    }
+
     // Detect oscillation: sign change in energy delta with similar magnitude
     if (iter > 0 && prev_E_delta * E_delta < 0 &&
         std::abs(prev_E_delta + E_delta) < asci_settings.refine_energy_tol) {
       oscillation_count++;
       if (oscillation_count > 2) {
         throw std::runtime_error(
-            "ASCI Refine detected oscillation: energy alternating between " +
-            std::to_string(E0) + " and " + std::to_string(E) +
-            ". Consider using another core_selection_strategy, increasing "
+            "ASCI Refine detected oscillation. "
+            "Consider using another core_selection_strategy, increasing "
             "core_selection_threshold, ncdets_max, or ntdets_max, or loosening "
             "refine_energy_tol.");
       }
@@ -118,10 +123,6 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     prev_E_delta = E_delta;
 
     E0 = E;
-    if (std::abs(E_delta) < asci_settings.refine_energy_tol) {
-      converged = true;
-      break;
-    }
   }  // Refinement loop
 
   if (converged)
