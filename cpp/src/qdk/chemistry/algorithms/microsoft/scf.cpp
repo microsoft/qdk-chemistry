@@ -243,7 +243,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   auto saved_level = Logger::get_global_level();
 
   // Disable SCF logging
-  Logger::set_global_level(LogLevel::info);
+  Logger::set_global_level(LogLevel::off);
 
   // Create SCF solver based on method and basis set type
   std::shared_ptr<qcs::SCF> scf;

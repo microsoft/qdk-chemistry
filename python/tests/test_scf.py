@@ -47,6 +47,16 @@ def create_o2_structure():
     return Structure(symbols, coords)
 
 
+def create_oh_structure():
+    """Create an OH molecule structure.
+
+    Same geometry as used in C++ tests.
+    """
+    symbols = ["O", "H"]
+    coords = np.array([[0.0, 0.0, 0.0], [0.9697 * ANGSTROM_TO_BOHR, 0.0, 0.0]])
+    return Structure(symbols, coords)
+
+
 def create_oxygen_structure():
     """Create an oxygen atom structure.
 
@@ -224,6 +234,21 @@ class TestScfSolver:
                 rtol=float_comparison_relative_tolerance,
                 atol=scf_energy_tolerance,
             )
+
+    def test_scf_solver_oh_rohf_diis(self):
+        """Test SCF solver on OH system with ROHF/sto-3g."""
+        oh_structure = create_oh_structure()
+        scf_solver = algorithms.create("scf_solver")
+        
+        scf_solver.settings().set("method", "hf")
+        scf_solver.settings().set("scf_type", "restricted")
+        scf_solver.settings().set("enable_gdm", False)
+
+        energy, wavefunction = scf_solver.run(oh_structure, 0, 2, "sto-3g")
+        orbitals = wavefunction.get_orbitals()
+
+        assert abs(energy - (-74.361530753176)) < scf_energy_tolerance
+        assert orbitals.is_restricted()
 
     def test_scf_solver_oxygen_atom_gdm(self):
         """Test SCF solver on oxygen atom with PBE/cc-pvdz."""

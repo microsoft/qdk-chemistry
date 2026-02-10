@@ -121,6 +121,30 @@ TEST_F(ScfTest, Oxygen) {
   EXPECT_FALSE(wfn_triplet->get_orbitals()->is_restricted());
 }
 
+TEST_F(ScfTest, OH_ROHF_DIIS) {
+  auto oh = testing::create_oh_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("enable_gdm", false);
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("scf_type", "restricted");
+  auto [E_doublet, wfn_doublet] = scf_solver->run(oh, 0, 2, "sto-3g");
+
+  EXPECT_NEAR(E_doublet, -74.361530753176, testing::scf_energy_tolerance);
+
+  // Check doublet orbitals
+  EXPECT_TRUE(wfn_doublet->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, OH_ROHF_Invalid_GDM) {
+  auto oh = testing::create_oh_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("enable_gdm", true);
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("scf_type", "restricted");
+
+  EXPECT_THROW(scf_solver->run(oh, 0, 2, "sto-3g"), std::runtime_error);
+}
+
 TEST_F(ScfTest, Oxygen_atom_gdm) {
   auto oxygen = testing::create_oxygen_structure();
   auto scf_solver = ScfSolverFactory::create();
