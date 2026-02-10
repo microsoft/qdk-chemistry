@@ -152,7 +152,7 @@ The decomposition represents the four-center ERIs as products of three-center in
      - Tolerance for Cholesky decomposition accuracy. Smaller values give higher accuracy but more Cholesky vectors. Default: 1e-8
    * - ``store_cholesky_vectors``
      - bool
-     - Whether to store the AO Cholesky vectors in the output Hamiltonian container for potential reuse. Default: true
+     - Whether to store the AO Cholesky vectors in the output Hamiltonian container for potential reuse. Default: false
 
 Related classes
 ---------------
