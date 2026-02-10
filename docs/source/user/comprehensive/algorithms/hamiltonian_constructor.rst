@@ -124,7 +124,35 @@ The native QDK/Chemistry implementation for Hamiltonian construction. Transforms
      - Method for computing electron repulsion integrals ("direct" or "incore")
    * - ``scf_type``
      - string
-     - Type of :term:`SCF` reference ("rhf", "rohf", or "uhf")
+     - Type of :term:`SCF` reference ("auto", "unrestricted" or "restricted"). Default: "auto" (automatically detected from orbitals)
+
+QDK Cholesky
+~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_cholesky"``
+
+A Cholesky decomposition-based implementation for Hamiltonian construction.
+This method uses Cholesky decomposition of the electron repulsion integral (ERI) tensor to reduce memory requirements and computational cost while maintaining high accuracy.
+The decomposition represents the four-center ERIs as products of three-center integrals (Cholesky vectors), which are then transformed to the molecular one- and two-electron integrals.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Setting
+     - Type
+     - Description
+   * - ``scf_type``
+     - string
+     - Type of :term:`SCF` reference ("auto", "unrestricted" or "restricted"). Default: "auto" (automatically detected from orbitals)
+   * - ``cholesky_tolerance``
+     - float
+     - Tolerance for Cholesky decomposition accuracy. Smaller values give higher accuracy but more Cholesky vectors. Default: 1e-8
+   * - ``store_cholesky_vectors``
+     - bool
+     - Whether to store the AO Cholesky vectors in the output Hamiltonian container for potential reuse. Default: false
 
 Related classes
 ---------------

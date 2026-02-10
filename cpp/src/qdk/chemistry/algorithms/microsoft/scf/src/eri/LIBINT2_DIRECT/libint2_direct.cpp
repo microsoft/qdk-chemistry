@@ -9,10 +9,14 @@
 
 #include <qdk/chemistry/utils/logger.hpp>
 
+#include "../schwarz.h"
+
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+#include <blas.hh>
 #include <stdexcept>
+#include <unordered_set>
 
 #include "util/timer.h"
 
@@ -146,71 +150,6 @@ std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(
 }
 
 /**
- * @brief Compute Schwarz integral bounds for screening
- *
- * Calculates the Schwarz inequality bounds (μν|μν)^{1/2} for all shell pairs,
- * which provide upper bounds for two-electron integrals. These bounds are used
- * for efficient integral screening: if (μν|λσ) ≤ K(μν) × K(λσ), then the
- * integral can be neglected if this product is below the required precision.
- *
- * @param obs Libint2 orbital basis set
- * @param use_2norm Whether to use 2-norm (true) or infinity norm (false)
- * @return Matrix of Schwarz bounds K(μν) = sqrt(|(μν|μν)|)
- *
- * @note The returned matrix is symmetric: K(μν) = K(νμ)
- * @note 2-norm typically provides tighter bounds but is more expensive
- */
-RowMajorMatrix compute_schwarz_ints(const ::libint2::BasisSet& obs,
-                                    bool use_2norm) {
-  QDK_LOG_TRACE_ENTERING();
-
-  const size_t nsh = obs.size();
-
-  // Setup the engine
-#ifdef _OPENMP
-  const int nthreads = omp_get_max_threads();
-#else
-  const int nthreads = 1;
-#endif
-  std::vector<::libint2::Engine> engines(nthreads);
-  engines[0] = ::libint2::Engine(::libint2::Operator::coulomb, obs.max_nprim(),
-                                 obs.max_l(), 0, 0.0);
-  for (int i = 1; i < nthreads; ++i) engines[i] = engines[0];
-
-  RowMajorMatrix K(nsh, nsh);
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-  {
-#ifdef _OPENMP
-    auto& engine = engines[omp_get_thread_num()];
-#else
-    auto& engine = engines[0];
-#endif
-    const auto& buf = engine.results();
-#ifdef _OPENMP
-#pragma omp for collapse(2)
-#endif
-    for (auto i = 0; i < nsh; ++i) {
-      for (auto j = 0; j <= i; ++j) {
-        const size_t ni = obs[i].size();
-        const size_t nj = obs[i].size();
-        const size_t nij = ni * nj;
-        engine.compute2<::libint2::Operator::coulomb, ::libint2::BraKet::xx_xx,
-                        0>(obs[i], obs[j], obs[i], obs[j]);
-
-        Eigen::Map<const RowMajorMatrix> bmap(buf[0], nij, nij);
-        auto norm = use_2norm ? bmap.norm() : bmap.lpNorm<Eigen::Infinity>();
-        K(i, j) = std::sqrt(norm);
-        K(j, i) = K(i, j);
-      }
-    }
-  }
-
-  return K;
-}
-
-/**
  * @brief ERI class for direct computation of electron repulsion integrals using
  * Libint2
  *
@@ -267,7 +206,9 @@ class ERI {
     std::tie(splist_, spdata_) = compute_shellpairs(obs_);
 
     // Compute Schwarz Screening
-    K_schwarz_ = compute_schwarz_ints(obs_, true);
+    K_schwarz_ = RowMajorMatrix(obs_.size(), obs_.size());
+    auto mpi = mpi_default_input();
+    schwarz_integral(&basis_set, mpi, K_schwarz_.data(), true);
   }
 
   /**
@@ -972,4 +913,5 @@ void LIBINT2_DIRECT::quarter_trans_impl(size_t nt, const double* C,
   if (!eri_impl_) throw std::runtime_error("LIBINT2_DIRECT NOT INITIALIZED");
   eri_impl_->quarter_trans(nt, C, out);
 };
+
 }  // namespace qdk::chemistry::scf
