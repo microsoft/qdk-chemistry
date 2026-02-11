@@ -100,7 +100,6 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   if (cfg.scf_algorithm.method == SCFAlgorithmName::ASAHF) {
     rohf_enabled_ = false;
   }
-  skip_verify = skip_verify || rohf_enabled_;
   num_density_matrices_ = (cfg.unrestricted || rohf_enabled_) ? 2 : 1;
   num_orbital_sets_ = cfg.unrestricted ? 2 : 1;
 

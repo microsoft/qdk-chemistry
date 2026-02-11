@@ -124,7 +124,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     unrestricted = false;
     rohf_enabled = open_shell;
     if (rohf_enabled) {
-      QDK_LOGGER().info(
+      QDK_LOGGER().warn(
           "Restricted open-shell request detected; enabling ROHF workflow.");
     }
   } else {

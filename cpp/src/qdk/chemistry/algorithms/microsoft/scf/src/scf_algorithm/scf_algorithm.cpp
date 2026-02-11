@@ -56,6 +56,9 @@ std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx,
 
   switch (cfg.scf_algorithm.method) {
     case SCFAlgorithmName::ASAHF:
+      if (rohf_enabled) {
+        throw std::runtime_error( "ROHF-enabled ASAHF is not supported!");
+      }
       return std::make_shared<AtomicSphericallyAveragedHartreeFock>(
           ctx, cfg.scf_algorithm.diis_subspace_size);
 
@@ -68,10 +71,16 @@ std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx,
           ctx, cfg.scf_algorithm.diis_subspace_size);
 
     case SCFAlgorithmName::GDM:
+      if (rohf_enabled) {
+        throw std::runtime_error( "ROHF-enabled GDM is not supported!");
+      }
       return std::make_shared<GDM>(ctx, rohf_enabled,
                                    cfg.scf_algorithm.gdm_config);
 
     case SCFAlgorithmName::DIIS_GDM:
+      if (rohf_enabled) {
+        throw std::runtime_error( "ROHF-enabled DIIS_GDM is not supported!");
+      }
       return std::make_shared<DIIS_GDM>(ctx, rohf_enabled,
                                         cfg.scf_algorithm.diis_subspace_size,
                                         cfg.scf_algorithm.gdm_config);
@@ -170,6 +179,8 @@ void SCFAlgorithm::update_density_matrix(RowMajorMatrix& P,
         "Coefficient matrix rows do not match orbital set count");
   }
 
+  // For ASAHF and ROHF, the density matrix construction is different and
+  // will be handled in the overridden methods
   const double occupancy_factor = unrestricted ? 1.0 : 2.0;
   for (int i = 0; i < num_orbital_sets; ++i) {
     const int n_occ = (i == 0) ? nelec_alpha : nelec_beta;
@@ -248,7 +259,10 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
   const int nelec[2] = {nelec_vec[0], nelec_vec[1]};
 
   if (rohf_enabled_) {
-    auto* rohf_diis = dynamic_cast<ROHFDIIS*>(this);
+    // To be modified when ROHFGDM is implemented: in that case, the pointer will
+    // come from ROHFDIIS instance saved in ROHFDIIS_GDM, like the current
+    // DIIS_GDM implementation
+    ROHFDIIS* rohf_diis = dynamic_cast<ROHFDIIS*>(this);
     if (rohf_diis == nullptr) {
       throw std::logic_error(
           "ROHF convergence requires ROHFDIIS implementation");

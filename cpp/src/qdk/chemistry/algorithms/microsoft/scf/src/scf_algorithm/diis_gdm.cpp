@@ -24,10 +24,6 @@ DIIS_GDM::DIIS_GDM(const SCFContext& ctx, bool rohf_enabled,
       use_gdm_(false) {
   QDK_LOG_TRACE_ENTERING();
   // Initialize DIIS algorithm
-  if (rohf_enabled) {
-    throw std::runtime_error(
-        "ROHF-enabled DIIS_GDM temporarily unavailable during refactor");
-  }
   diis_algorithm_ =
       std::make_unique<RestrictedUnrestrictedDIIS>(ctx, subspace_size);
 
