@@ -48,12 +48,12 @@ class PartiallyRandomizedSettings(Settings):
     """
 
     def __init__(self):
-        """Initialize PartiallyRandomizedSettings with default values.
+        r"""Initialize PartiallyRandomizedSettings with default values.
 
         Attributes:
             num_deterministic_terms: Number of largest-weight terms to treat deterministically.
                 Use -1 for automatic determination based on weight_threshold or default (top 10%).
-            weight_threshold: Terms with |h_j| >= threshold are treated deterministically.
+            weight_threshold: Terms with \|h_j\| >= threshold are treated deterministically.
                 Use -1.0 for automatic. Ignored if num_deterministic_terms >= 0.
             trotter_order: Order of Trotter formula for deterministic terms (1 or 2).
             num_random_samples: Number of random samples for the randomized part.
@@ -72,7 +72,7 @@ class PartiallyRandomizedSettings(Settings):
             "weight_threshold",
             "float",
             -1.0,
-            "Terms with |h_j| >= threshold are treated deterministically. Use -1.0 for automatic.",
+            r"Terms with \|h_j\| >= threshold are treated deterministically. Use -1.0 for automatic.",
         )
         self._set_default(
             "trotter_order",
@@ -159,13 +159,13 @@ class PartiallyRandomized(TimeEvolutionBuilder):
         seed: int = -1,
         tolerance: float = 1e-12,
     ):
-        """Initialize partially randomized builder with specified settings.
+        r"""Initialize partially randomized builder with specified settings.
 
         Args:
             num_deterministic_terms: Number of largest-weight terms to treat
                 deterministically with Trotter. Use -1 for automatic determination
                 based on weight_threshold or default (top 10% of terms).
-            weight_threshold: Terms with |h_j| >= threshold are treated
+            weight_threshold: Terms with \|h_j\| >= threshold are treated
                 deterministically. Use -1.0 for automatic. Only used if
                 num_deterministic_terms is -1.
             trotter_order: Order of Trotter formula for deterministic part.
