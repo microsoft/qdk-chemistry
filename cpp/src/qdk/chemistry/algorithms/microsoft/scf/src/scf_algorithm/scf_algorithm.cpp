@@ -57,7 +57,7 @@ std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx,
   switch (cfg.scf_algorithm.method) {
     case SCFAlgorithmName::ASAHF:
       if (rohf_enabled) {
-        throw std::runtime_error( "ROHF-enabled ASAHF is not supported!");
+        throw std::runtime_error("ROHF-enabled ASAHF is not supported!");
       }
       return std::make_shared<AtomicSphericallyAveragedHartreeFock>(
           ctx, cfg.scf_algorithm.diis_subspace_size);
@@ -72,14 +72,14 @@ std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx,
 
     case SCFAlgorithmName::GDM:
       if (rohf_enabled) {
-        throw std::runtime_error( "ROHF-enabled GDM is not supported!");
+        throw std::runtime_error("ROHF-enabled GDM is not supported!");
       }
       return std::make_shared<GDM>(ctx, rohf_enabled,
                                    cfg.scf_algorithm.gdm_config);
 
     case SCFAlgorithmName::DIIS_GDM:
       if (rohf_enabled) {
-        throw std::runtime_error( "ROHF-enabled DIIS_GDM is not supported!");
+        throw std::runtime_error("ROHF-enabled DIIS_GDM is not supported!");
       }
       return std::make_shared<DIIS_GDM>(ctx, rohf_enabled,
                                         cfg.scf_algorithm.diis_subspace_size,
@@ -259,8 +259,8 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
   const int nelec[2] = {nelec_vec[0], nelec_vec[1]};
 
   if (rohf_enabled_) {
-    // To be modified when ROHFGDM is implemented: in that case, the pointer will
-    // come from ROHFDIIS instance saved in ROHFDIIS_GDM, like the current
+    // To be modified when ROHFGDM is implemented: in that case, the pointer
+    // will come from ROHFDIIS instance saved in ROHFDIIS_GDM, like the current
     // DIIS_GDM implementation
     ROHFDIIS* rohf_diis = dynamic_cast<ROHFDIIS*>(this);
     if (rohf_diis == nullptr) {

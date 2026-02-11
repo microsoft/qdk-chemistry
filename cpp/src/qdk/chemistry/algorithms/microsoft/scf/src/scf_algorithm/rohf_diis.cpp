@@ -5,9 +5,7 @@
 #include "rohf_diis.h"
 
 #include <lapack.hh>
-
 #include <qdk/chemistry/utils/logger.hpp>
-
 #include <stdexcept>
 #include <vector>
 
@@ -146,32 +144,33 @@ class ROHFDIIS {
       // to avoid forming C^{-1} explicitly.
       // Unlike blasxx, lapackxx only handles column-major matrices
       const int matrix_dim = num_molecular_orbitals;
-      using ColMajorMatrix =
-        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
-                Eigen::ColMajor>;
+      using ColMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic,
+                                           Eigen::Dynamic, Eigen::ColMajor>;
       // Row-major storage implies the raw buffer already matches (C^T) in
       // column-major ordering, so this copy materializes C^T without an
       // explicit transpose.
-      ColMajorMatrix Ct = Eigen::Map<const ColMajorMatrix>(
-        C.data(), matrix_dim, C.rows());
+      ColMajorMatrix Ct =
+          Eigen::Map<const ColMajorMatrix>(C.data(), matrix_dim, C.rows());
       ColMajorMatrix temp_rhs = effective_F_mo;
       std::vector<int64_t> ipiv(matrix_dim);
 
-      auto info = lapack::getrf(matrix_dim, matrix_dim, Ct.data(),
-                                 matrix_dim, ipiv.data());
+      auto info = lapack::getrf(matrix_dim, matrix_dim, Ct.data(), matrix_dim,
+                                ipiv.data());
       if (info != 0) {
         throw std::runtime_error("getrf failed while factorizing C^T");
       }
 
-      info = lapack::getrs(lapack::Op::NoTrans, matrix_dim, matrix_dim,
-          Ct.data(), matrix_dim, ipiv.data(), temp_rhs.data(), matrix_dim);
+      info =
+          lapack::getrs(lapack::Op::NoTrans, matrix_dim, matrix_dim, Ct.data(),
+                        matrix_dim, ipiv.data(), temp_rhs.data(), matrix_dim);
       if (info != 0) {
         throw std::runtime_error("getrs failed while solving C^T X = F_mo");
       }
 
-      temp_rhs.transposeInPlace(); // get F_mo^T C^{-1}
-      info = lapack::getrs(lapack::Op::NoTrans, matrix_dim, matrix_dim,
-          Ct.data(), matrix_dim, ipiv.data(), temp_rhs.data(), matrix_dim);
+      temp_rhs.transposeInPlace();  // get F_mo^T C^{-1}
+      info =
+          lapack::getrs(lapack::Op::NoTrans, matrix_dim, matrix_dim, Ct.data(),
+                        matrix_dim, ipiv.data(), temp_rhs.data(), matrix_dim);
       if (info != 0) {
         throw std::runtime_error("getrs failed while solving C^T X = M^T");
       }
