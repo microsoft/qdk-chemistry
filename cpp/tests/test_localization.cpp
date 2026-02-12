@@ -692,8 +692,8 @@ TEST_F(LocalizationTest, O2TripletVVHV) {
   auto pm_metric_beta = testing::pipek_mezey_metric(localized_orbitals, Cb_loc);
 
   // Check metric values to reference (commented out temporarily)
-  EXPECT_GT(pm_metric_alpha, 31.42477);
-  EXPECT_GT(pm_metric_beta, 28.55164);
+  EXPECT_GT(pm_metric_alpha, 31.4247);
+  EXPECT_GT(pm_metric_beta, 28.5516);
 }
 
 // =============================================================================

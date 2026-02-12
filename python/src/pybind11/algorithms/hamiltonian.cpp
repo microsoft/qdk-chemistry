@@ -10,6 +10,7 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/cholesky_hamiltonian.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -201,6 +202,45 @@ See Also:
 Default constructor.
 
 Initializes a Hamiltonian constructor with default settings.
+
+)");
+
+  // Bind concrete microsoft::CholeskyHamiltonianConstructor implementation
+  py::class_<microsoft::CholeskyHamiltonianConstructor, HamiltonianConstructor,
+             py::smart_holder>(m, "QdkCholeskyHamiltonianConstructor", R"(
+QDK implementation of the Cholesky Hamiltonian constructor.
+
+This class provides a concrete implementation of the Hamiltonian constructor
+using Cholesky decomposition to approximate two-electron integrals. It
+efficiently constructs molecular Hamiltonian matrices from orbital data by
+decomposing the integral tensor.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+    import qdk_chemistry.data as data
+
+    # Assuming you have orbitals from an SCF calculation
+    constructor = alg.QdkCholeskyHamiltonianConstructor()
+
+    # Configure settings if needed
+    constructor.settings().set("cholesky_tolerance", 1e-8)
+
+    # Construct Hamiltonian
+    hamiltonian = constructor.run(orbitals)
+
+See Also:
+    :class:`HamiltonianConstructor`
+    :class:`qdk_chemistry.data.Orbitals`
+    :class:`qdk_chemistry.data.Hamiltonian`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a Cholesky Hamiltonian constructor with default settings.
 
 )");
 }
