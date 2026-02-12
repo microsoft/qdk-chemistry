@@ -28,20 +28,18 @@ operation ControlledEvolution(
     }
 }
 
+
+/// Performs repeated Controlled Time Evolution for a set of Pauli exponentials.
+/// # Parameters
+/// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
+/// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
+/// - `repetitions`: The number of times to repeat the controlled evolution.
 struct RepControlledEvolutionParams {
     pauliExponents : Pauli[][],
     pauliCoefficients : Double[],
     repetitions : Int,
 }
-/// Performs repeated Controlled Time Evolution for a set of Pauli exponentials.
-/// # Parameters
-/// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
-/// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
-/// - `control`: The index of the control qubit.
-/// - `system`: An array of integers representing the indices of the system qubits.
-/// - `repetitions`: The number of times to repeat the controlled evolution.
-/// # Returns
-/// - `Unit`: The operation prepares the repeated controlled time evolution on the allocated qubits.
+
 operation RepControlledEvolution(
     params : RepControlledEvolutionParams,
     control : Qubit,

@@ -103,7 +103,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             )
 
     def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
-        """Prepare the quantum state for the given wavefunction.
+        """Prepare a quantum circuit that encodes the given wavefunction using sparse isometry over GF(2^x).
 
         Args:
             wavefunction: The target wavefunction to prepare.
@@ -146,46 +146,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         Logger.debug(f"gf2x_operation_results state vector: {statevector_data}")
 
         if self._settings.get("dense_preparation_method") == "qiskit":
-            from qiskit import QuantumCircuit, qasm3, transpile  # noqa: PLC0415
-            from qiskit.circuit.library import (  # noqa: PLC0415
-                StatePreparation as QiskitStatePreparation,
-            )
-            from qiskit.quantum_info import Statevector  # noqa: PLC0415
-            from qiskit.transpiler import PassManager  # noqa: PLC0415
-
-            from qdk_chemistry.plugins.qiskit._interop.transpiler import (  # noqa: PLC0415
-                MergeZBasisRotations,
-                RemoveZBasisOnZeroState,
-                SubstituteCliffordRz,
-            )
-
-            # Use Qiskit dense state preparation
-            qc = QuantumCircuit(n_qubits)
-            statevector = Statevector(statevector_data)
-            qc.append(QiskitStatePreparation(statevector, normalize=False), gf2x_operation_results.row_map)
-            for operation in reversed(gf2x_operation_results.operations):
-                if operation[0] == "cnot":
-                    # operation[1] should be a tuple for CNOT operations
-                    if isinstance(operation[1], tuple):
-                        target, control = operation[1]
-                        qc.cx(control, target)
-                elif operation[0] == "x" and isinstance(operation[1], int):
-                    # operation[1] should be an int for X operations
-                    qubit = operation[1]
-                    qc.x(qubit)
-
-            basis_gates = self._settings.get("basis_gates")
-            do_transpile = self._settings.get("transpile")
-            if do_transpile and basis_gates:
-                opt_level = self._settings.get("transpile_optimization_level")
-                qc = transpile(qc, basis_gates=basis_gates, optimization_level=opt_level)
-                pass_manager = PassManager([MergeZBasisRotations(), SubstituteCliffordRz(), RemoveZBasisOnZeroState()])
-                qc = pass_manager.run(qc)
-
-                Logger.info(
-                    f"Final circuit after transpilation: {qc.num_qubits} qubits, depth {qc.depth()}, {qc.size()} gates"
-                )
-            return Circuit(qasm=qasm3.dumps(qc), encoding="jordan-wigner")
+            return self._qiskit_dense_preparation(gf2x_operation_results, statevector_data, n_qubits)
 
         # Use QDK dense state preparation
         expansion_ops: list[list[int]] = []
@@ -225,6 +186,62 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
         state_prep_op = qdk.code.MakeStatePreparationOp(state_prep_params)
         return Circuit(qsharp=qsharp_circuit, qir=qir, qsharp_op=state_prep_op, encoding="jordan-wigner")
+
+    def _qiskit_dense_preparation(
+        self, gf2x_operation_results: "GF2XEliminationResult", statevector_data: np.ndarray, num_qubits: int
+    ) -> Circuit:
+        """Perform dense state preparation using Qiskit and apply GF2+X operations in reverse.
+
+        Args:
+            gf2x_operation_results: The result of GF2+X elimination containing the reduced matrix and operations.
+            statevector_data: The statevector corresponding to the reduced matrix.
+            num_qubits: The total number of qubits in the original space.
+
+        Returns:
+            A Circuit object containing the quantum circuit that prepares the desired state using Qiskit
+            for dense preparation.
+
+        """
+        from qiskit import QuantumCircuit, qasm3, transpile  # noqa: PLC0415
+        from qiskit.circuit.library import (  # noqa: PLC0415
+            StatePreparation as QiskitStatePreparation,
+        )
+        from qiskit.quantum_info import Statevector  # noqa: PLC0415
+        from qiskit.transpiler import PassManager  # noqa: PLC0415
+
+        from qdk_chemistry.plugins.qiskit._interop.transpiler import (  # noqa: PLC0415
+            MergeZBasisRotations,
+            RemoveZBasisOnZeroState,
+            SubstituteCliffordRz,
+        )
+
+        # Use Qiskit dense state preparation
+        qc = QuantumCircuit(num_qubits)
+        statevector = Statevector(statevector_data)
+        qc.append(QiskitStatePreparation(statevector, normalize=False), gf2x_operation_results.row_map)
+        for operation in reversed(gf2x_operation_results.operations):
+            if operation[0] == "cnot":
+                # operation[1] should be a tuple for CNOT operations
+                if isinstance(operation[1], tuple):
+                    target, control = operation[1]
+                    qc.cx(control, target)
+            elif operation[0] == "x" and isinstance(operation[1], int):
+                # operation[1] should be an int for X operations
+                qubit = operation[1]
+                qc.x(qubit)
+
+        basis_gates = self._settings.get("basis_gates")
+        do_transpile = self._settings.get("transpile")
+        if do_transpile and basis_gates:
+            opt_level = self._settings.get("transpile_optimization_level")
+            qc = transpile(qc, basis_gates=basis_gates, optimization_level=opt_level)
+            pass_manager = PassManager([MergeZBasisRotations(), SubstituteCliffordRz(), RemoveZBasisOnZeroState()])
+            qc = pass_manager.run(qc)
+
+            Logger.info(
+                f"Final circuit after transpilation: {qc.num_qubits} qubits, depth {qc.depth()}, {qc.size()} gates"
+            )
+        return Circuit(qasm=qasm3.dumps(qc), encoding="jordan-wigner")
 
     def _perform_gf2x(self, bitstrings: list[str], coeffs: np.ndarray) -> tuple["GF2XEliminationResult", np.ndarray]:
         """Perform Gaussian elimination over GF(2^x) on the given bitstrings.

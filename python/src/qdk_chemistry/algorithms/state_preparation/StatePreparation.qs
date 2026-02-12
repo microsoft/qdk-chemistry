@@ -8,11 +8,7 @@ import Std.Convert.IntAsDouble;
 import Std.Arrays.Subarray;
 import Std.StatePreparation.PreparePureStateD;
 
-struct StatePreparationParams {
-    rowMap : Int[],
-    stateVector : Double[],
-    expansionOps : Int[][],
-}
+
 
 /// Performs state preparation for a sparse quantum state |ψ⟩ given its
 /// sparse representation and expansion operations.
@@ -22,9 +18,12 @@ struct StatePreparationParams {
 /// - `stateVector`: The sparse representation of the initial quantum state |ψ⟩ as a vector of doubles.
 /// - `expansionOps`: A list of operations (as arrays of qubit indices) to expand the initial
 ///   state preparation into the non-sparse |ψ⟩.
-/// - `numQubits`: The number of qubits in the system register representing the quantum state |ψ⟩.
-/// # Returns
-/// - `Unit`: The operation prepares the desired quantum state on the allocated qubits.
+struct StatePreparationParams {
+    rowMap : Int[],
+    stateVector : Double[],
+    expansionOps : Int[][],
+}
+
 operation StatePreparation(
     params : StatePreparationParams,
     qs : Qubit[],
@@ -55,12 +54,8 @@ operation MakeStatePreparationCircuit(
 
 /// Prepares a single reference quantum state |ψ⟩ corresponding to a given bitstring.
 /// # Parameters
-/// - `bitstring`: An array of integers (0s and 1s) representing the desired quantum state.
+/// - `bitStrings`: An array of integers (0s and 1s) representing the desired quantum state.
 ///   For example, [0, 1, 0, 1].
-/// - `numQubits`: The number of qubits in the system register.
-/// # Returns
-/// - `Unit`: The operation prepares the desired quantum state on the allocated qubits.
-
 struct SingleReferenceParams {
     bitStrings : Int[],
 }

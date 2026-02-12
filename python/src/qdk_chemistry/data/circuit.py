@@ -1,6 +1,12 @@
 """QDK/Chemistry Quantum Circuits module.
 
-Includes utilities for visualizing circuits with QDK widgets.
+The Circuit class represents a quantum circuit in various formats
+(QASM, QIR, Q#) and provides conversion methods between them.
+
+Supported formats and conversions:
+- QASM to QIR or Qiskit QuantumCircuit (with Qiskit installed)
+- QIR to Qiskit QuantumCircuit (with Qiskit installed)
+- Q# circuit programs for visualization via QDK widgets
 """
 
 # --------------------------------------------------------------------------------------------

@@ -7,14 +7,20 @@ import Std.Convert.IntAsDouble;
 import Std.Arrays.Subarray;
 import Std.Arrays.Mapped;
 
-
+/// Prepare iterative Quantum Phase Estimation (IQPE) circuit.
+/// # Parameters
+/// - `statePrep`: A function to prepare the initial quantum state.
+/// - `repControlledEvolution`: A function to perform repeated controlled evolution.
+/// - `accumulatePhase`: The phase to accumulate during the evolution.
+/// - `control`: The index of the control qubit.
+/// - `systems`: An array of indices representing the system qubits.
 operation MakeIQPECircuit(
     statePrep : Qubit[] => Unit,
     repControlledEvolution : (Qubit, Qubit[]) => Unit,
     accumulatePhase : Double,
     control : Int,
     systems : Int[],
-) : Result {
+) : Unit {
     use qs = Qubit[Length(systems) + 1];
     let control = qs[control];
     let system = Subarray(systems, qs);
@@ -30,5 +36,5 @@ operation MakeIQPECircuit(
         repControlledEvolution(control, system);
     }
     ResetAll(system);
-    return MResetZ(control);
+    MResetZ(control);
 }
