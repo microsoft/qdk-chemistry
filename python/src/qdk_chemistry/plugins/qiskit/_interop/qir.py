@@ -32,10 +32,18 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
 
     def __init__(self) -> None:
         super().__init__()
-        self._circuit: QuantumCircuit | None = None
+        self._circuit: QuantumCircuit = QuantumCircuit()
 
     def convert(self, qir: pyqir.Module) -> QuantumCircuit:
-        """Convert a QIR module to a Qiskit QuantumCircuit."""
+        """Convert a QIR module to a Qiskit QuantumCircuit.
+
+        Args:
+            qir: The QIR module to convert.
+
+        Returns:
+            A Qiskit QuantumCircuit representing the same quantum operations as the QIR module.
+
+        """
         # Get qubit/result counts from entry point function attributes
         entry_point = next(filter(pyqir.is_entry_point, qir.functions))
         num_qubits = pyqir.required_num_qubits(entry_point)
@@ -104,97 +112,277 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
     # Single-qubit gates
     # =========================================================================
 
-    def _on_qis_h(self, call: pyqir.Call, target: pyqir.Value) -> None:
+    def _on_qis_h(self, call: pyqir.Call, target: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply a Hadamard gate to the target qubit.
+
+        Args:
+            call: The QIR call instruction for the H gate.
+            target: The QIR value representing the target qubit.
+
+        """
         self._circuit.h(self._qubit(target))
 
-    def _on_qis_x(self, call: pyqir.Call, target: pyqir.Value) -> None:
+    def _on_qis_x(self, call: pyqir.Call, target: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply a Pauli-X (NOT) gate to the target qubit.
+
+        Args:
+            call: The QIR call instruction for the X gate.
+            target: The QIR value representing the target qubit.
+
+        """
         self._circuit.x(self._qubit(target))
 
-    def _on_qis_y(self, call: pyqir.Call, target: pyqir.Value) -> None:
+    def _on_qis_y(self, call: pyqir.Call, target: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply a Pauli-Y gate to the target qubit.
+
+        Args:
+            call: The QIR call instruction for the Y gate.
+            target: The QIR value representing the target qubit.
+
+        """
         self._circuit.y(self._qubit(target))
 
-    def _on_qis_z(self, call: pyqir.Call, target: pyqir.Value) -> None:
+    def _on_qis_z(self, call: pyqir.Call, target: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply a Pauli-Z gate to the target qubit.
+
+        Args:
+            call: The QIR call instruction for the Z gate.
+            target: The QIR value representing the target qubit.
+
+        """
         self._circuit.z(self._qubit(target))
 
-    def _on_qis_s(self, call: pyqir.Call, target: pyqir.Value) -> None:
+    def _on_qis_s(self, call: pyqir.Call, target: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply an S gate to the target qubit.
+
+        Args:
+            call: The QIR call instruction for the S gate.
+            target: The QIR value representing the target qubit.
+
+        """
         self._circuit.s(self._qubit(target))
 
-    def _on_qis_s_adj(self, call: pyqir.Call, target: pyqir.Value) -> None:
+    def _on_qis_s_adj(self, call: pyqir.Call, target: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply an S† (adjoint S) gate to the target qubit.
+
+        Args:
+            call: The QIR call instruction for the S† gate.
+            target: The QIR value representing the target qubit.
+
+        """
         self._circuit.sdg(self._qubit(target))
 
-    def _on_qis_t(self, call: pyqir.Call, target: pyqir.Value) -> None:
+    def _on_qis_t(self, call: pyqir.Call, target: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply a T gate to the target qubit.
+
+        Args:
+            call: The QIR call instruction for the T gate.
+            target: The QIR value representing the target qubit.
+
+        """
         self._circuit.t(self._qubit(target))
 
-    def _on_qis_t_adj(self, call: pyqir.Call, target: pyqir.Value) -> None:
+    def _on_qis_t_adj(self, call: pyqir.Call, target: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply a T† (adjoint T) gate to the target qubit.
+
+        Args:
+            call: The QIR call instruction for the T† gate.
+            target: The QIR value representing the target qubit.
+
+        """
         self._circuit.tdg(self._qubit(target))
 
     # =========================================================================
     # Rotation gates
     # =========================================================================
 
-    def _on_qis_rx(self, call: pyqir.Call, angle: pyqir.Value, target: pyqir.Value) -> None:
+    def _on_qis_rx(self, call: pyqir.Call, angle: pyqir.Value, target: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply a RX gate to the target qubit.
+
+        Args:
+            call: The QIR call instruction for the RX gate.
+            angle: The QIR value representing the rotation angle.
+            target: The QIR value representing the target qubit.
+
+        """
         self._circuit.rx(self._angle(angle), self._qubit(target))
 
-    def _on_qis_ry(self, call: pyqir.Call, angle: pyqir.Value, target: pyqir.Value) -> None:
+    def _on_qis_ry(self, call: pyqir.Call, angle: pyqir.Value, target: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply a RY gate to the target qubit.
+
+        Args:
+            call: The QIR call instruction for the RY gate.
+            angle: The QIR value representing the rotation angle.
+            target: The QIR value representing the target qubit.
+
+        """
         self._circuit.ry(self._angle(angle), self._qubit(target))
 
-    def _on_qis_rz(self, call: pyqir.Call, angle: pyqir.Value, target: pyqir.Value) -> None:
+    def _on_qis_rz(self, call: pyqir.Call, angle: pyqir.Value, target: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply a RZ gate to the target qubit.
+
+        Args:
+            call: The QIR call instruction for the RZ gate.
+            angle: The QIR value representing the rotation angle.
+            target: The QIR value representing the target qubit.
+
+        """
         self._circuit.rz(self._angle(angle), self._qubit(target))
 
     # =========================================================================
     # Two-qubit gates
     # =========================================================================
 
-    def _on_qis_cx(self, call: pyqir.Call, ctrl: pyqir.Value, target: pyqir.Value) -> None:
+    def _on_qis_cx(self, call: pyqir.Call, ctrl: pyqir.Value, target: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply a CX (CNOT) gate to the target qubit.
+
+        Args:
+            call: The QIR call instruction for the CX gate.
+            ctrl: The QIR value representing the control qubit.
+            target: The QIR value representing the target qubit.
+
+        """
         self._circuit.cx(self._qubit(ctrl), self._qubit(target))
 
-    def _on_qis_cy(self, call: pyqir.Call, ctrl: pyqir.Value, target: pyqir.Value) -> None:
+    def _on_qis_cy(self, call: pyqir.Call, ctrl: pyqir.Value, target: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply a CY gate to the target qubit.
+
+        Args:
+            call: The QIR call instruction for the CY gate.
+            ctrl: The QIR value representing the control qubit.
+            target: The QIR value representing the target qubit.
+
+        """
         self._circuit.cy(self._qubit(ctrl), self._qubit(target))
 
-    def _on_qis_cz(self, call: pyqir.Call, ctrl: pyqir.Value, target: pyqir.Value) -> None:
+    def _on_qis_cz(self, call: pyqir.Call, ctrl: pyqir.Value, target: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply a CZ gate to the target qubit.
+
+        Args:
+            call: The QIR call instruction for the CZ gate.
+            ctrl: The QIR value representing the control qubit.
+            target: The QIR value representing the target qubit.
+
+        """
         self._circuit.cz(self._qubit(ctrl), self._qubit(target))
 
-    def _on_qis_swap(self, call: pyqir.Call, t1: pyqir.Value, t2: pyqir.Value) -> None:
+    def _on_qis_swap(self, call: pyqir.Call, t1: pyqir.Value, t2: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply a SWAP gate to the target qubits.
+
+        Args:
+            call: The QIR call instruction for the SWAP gate.
+            t1: The QIR value representing the first target qubit.
+            t2: The QIR value representing the second target qubit.
+
+        """
         self._circuit.swap(self._qubit(t1), self._qubit(t2))
 
-    def _on_qis_rxx(self, call: pyqir.Call, angle: pyqir.Value, t1: pyqir.Value, t2: pyqir.Value) -> None:
+    def _on_qis_rxx(self, call: pyqir.Call, angle: pyqir.Value, t1: pyqir.Value, t2: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply an RXX gate to the target qubits.
+
+        Args:
+            call: The QIR call instruction for the RXX gate.
+            angle: The QIR value representing the rotation angle.
+            t1: The QIR value representing the first target qubit.
+            t2: The QIR value representing the second target qubit.
+
+        """
         self._circuit.rxx(self._angle(angle), self._qubit(t1), self._qubit(t2))
 
-    def _on_qis_ryy(self, call: pyqir.Call, angle: pyqir.Value, t1: pyqir.Value, t2: pyqir.Value) -> None:
+    def _on_qis_ryy(self, call: pyqir.Call, angle: pyqir.Value, t1: pyqir.Value, t2: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply an RYY gate to the target qubits.
+
+        Args:
+            call: The QIR call instruction for the RYY gate.
+            angle: The QIR value representing the rotation angle.
+            t1: The QIR value representing the first target qubit.
+            t2: The QIR value representing the second target qubit.
+
+        """
         self._circuit.ryy(self._angle(angle), self._qubit(t1), self._qubit(t2))
 
-    def _on_qis_rzz(self, call: pyqir.Call, angle: pyqir.Value, t1: pyqir.Value, t2: pyqir.Value) -> None:
+    def _on_qis_rzz(self, call: pyqir.Call, angle: pyqir.Value, t1: pyqir.Value, t2: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply an RZZ gate to the target qubits.
+
+        Args:
+            call: The QIR call instruction for the RZZ gate.
+            angle: The QIR value representing the rotation angle.
+            t1: The QIR value representing the first target qubit.
+            t2: The QIR value representing the second target qubit.
+
+        """
         self._circuit.rzz(self._angle(angle), self._qubit(t1), self._qubit(t2))
 
     # =========================================================================
     # Three-qubit gates
     # =========================================================================
 
-    def _on_qis_ccx(self, call: pyqir.Call, c1: pyqir.Value, c2: pyqir.Value, target: pyqir.Value) -> None:
+    def _on_qis_ccx(self, call: pyqir.Call, c1: pyqir.Value, c2: pyqir.Value, target: pyqir.Value) -> None:  # noqa: ARG002
+        """Apply a CCX (Toffoli) gate to the target qubit.
+
+        Args:
+            call: The QIR call instruction for the CCX gate.
+            c1: The QIR value representing the first control qubit.
+            c2: The QIR value representing the second control qubit.
+            target: The QIR value representing the target qubit.
+
+        """
         self._circuit.ccx(self._qubit(c1), self._qubit(c2), self._qubit(target))
 
     # =========================================================================
     # Measurement and reset
     # =========================================================================
 
-    def _on_qis_m(self, call: pyqir.Call, target: pyqir.Value, result: pyqir.Value) -> None:
+    def _on_qis_m(self, call: pyqir.Call, target: pyqir.Value, result: pyqir.Value) -> None:  # noqa: ARG002
+        """Measure the target qubit and store the result in the classical bit.
+
+        Args:
+            call: The QIR call instruction for the measurement.
+            target: The QIR value representing the target qubit.
+            result: The QIR value representing the classical bit to store the measurement result.
+
+        """
         self._circuit.measure(self._qubit(target), self._clbit(result))
 
-    def _on_qis_mz(self, call: pyqir.Call, target: pyqir.Value, result: pyqir.Value) -> None:
+    def _on_qis_mz(self, call: pyqir.Call, target: pyqir.Value, result: pyqir.Value) -> None:  # noqa: ARG002
+        """Measure the target qubit in the Z basis and store the result in the classical bit.
+
+        Args:
+            call: The QIR call instruction for the measurement in the Z basis.
+            target: The QIR value representing the target qubit.
+            result: The QIR value representing the classical bit to store the measurement result.
+
+        """
         self._circuit.measure(self._qubit(target), self._clbit(result))
 
-    def _on_qis_mresetz(self, call: pyqir.Call, target: pyqir.Value, result: pyqir.Value) -> None:
+    def _on_qis_mresetz(self, call: pyqir.Call, target: pyqir.Value, result: pyqir.Value) -> None:  # noqa: ARG002
+        """Measure the target qubit in the Z basis, store the result in the classical bit, and reset the qubit.
+
+        Args:
+            call: The QIR call instruction for the measurement and reset in the Z basis.
+            target: The QIR value representing the target qubit.
+            result: The QIR value representing the classical bit to store the measurement result.
+
+        """
         self._circuit.measure(self._qubit(target), self._clbit(result))
         self._circuit.reset(self._qubit(target))
 
-    def _on_qis_reset(self, call: pyqir.Call, target: pyqir.Value) -> None:
+    def _on_qis_reset(self, call: pyqir.Call, target: pyqir.Value) -> None:  # noqa: ARG002
+        """Reset the target qubit to the |0> state.
+
+        Args:
+            call: The QIR call instruction for the reset operation.
+            target: The QIR value representing the target qubit.
+
+        """
         self._circuit.reset(self._qubit(target))
 
     # =========================================================================
     # Unsupported operations
     # =========================================================================
 
-    def _on_qis_read_result(self, call: pyqir.Call, result: pyqir.Value) -> None:
+    def _on_qis_read_result(self) -> None:
+        """Handle read_result operation, which is not supported in Qiskit."""
         raise UnsupportedQIROperationError("read_result is not supported in Qiskit QuantumCircuit.")
 
     # =========================================================================
@@ -202,6 +390,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
     # =========================================================================
 
     def _on_call_instr(self, call: pyqir.Call) -> None:
+        """Handle call instructions."""
         # Handle CNOT alias (parent only dispatches cx)
         if call.callee.name == "__quantum__qis__cnot__body":
             self._on_qis_cx(call, call.args[0], call.args[1])

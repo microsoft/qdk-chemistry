@@ -22,7 +22,6 @@ try:
         ClassicalRegister,
         QuantumCircuit,
         QuantumRegister,
-        qasm3,
         transpile,
     )
     from qiskit.circuit.library import PauliEvolutionGate
