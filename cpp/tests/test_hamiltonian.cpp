@@ -56,12 +56,12 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
 
     inactive_fock_non_empty = Eigen::MatrixXd::Random(2, 2);
 
-    // For density-fitted: 3-center integrals [n_aux x n_orb^2]
+    // For density-fitted: 3-center integrals [n_orb^2 x n_aux]
     // Using 3 auxiliary basis functions for 2 orbitals (4 geminals)
     // These numbers are selected because they correspond to two_body that is
     // used for canonical four-center tests
-    three_center = (Eigen::MatrixXd(3, 4) << 1.0, 1.0, 1.0, 1.0, 0.6, 0.6, 0.6,
-                    0.6, 0.8, 0.8, 0.8, 0.8)
+    three_center = (Eigen::MatrixXd(4, 3) << 1.0, 0.6, 0.8, 1.0, 0.6, 0.8, 1.0,
+                    0.6, 0.8, 1.0, 0.6, 0.8)
                        .finished();
 
     container_type = GetParam();
@@ -232,10 +232,10 @@ TEST_P(HamiltonianTest, ConstructorWithInactiveFock) {
             inactive_fock_non_empty));
   } else if (test_p == "density_fitted") {
     // For density fitted, need 3-center integrals
-    Eigen::MatrixXd three_center_2x2 = Eigen::MatrixXd::Random(3, 4);
+    Eigen::MatrixXd three_center_2x2 = Eigen::MatrixXd::Random(4, 3);
     h_active_space = std::make_shared<Hamiltonian>(
         std::make_unique<DensityFittedHamiltonianContainer>(
-            one_body, three_center, orbitals_with_inactive, core_energy,
+            one_body, three_center_2x2, orbitals_with_inactive, core_energy,
             inactive_fock_non_empty));
   }
 
@@ -425,15 +425,15 @@ TEST_P(HamiltonianTest, TwoBodyElementAccess) {
     EXPECT_DOUBLE_EQ(h_large.get_two_body_element(1, 2, 2, 1), 8.0);
   } else if (test_p == "density_fitted") {
     Eigen::MatrixXd test_one_body = Eigen::MatrixXd::Identity(2, 2);
-    Eigen::MatrixXd test_three_center = Eigen::MatrixXd::Zero(3, 4);
+    Eigen::MatrixXd test_three_center = Eigen::MatrixXd::Zero(4, 3);
 
     // Set specific three center index values
-    test_three_center(0, 0) = 1.0;  // (1, 0, 4, 0)
-    test_three_center(1, 0) = 2.0;  // (2, 5, 0, 0)
-    test_three_center(2, 0) = 3.0;  // (3, 0, 0, 6)
-    test_three_center(0, 2) = 4.0;  //
+    test_three_center(0, 0) = 1.0;  // (1, 2, 3)
+    test_three_center(0, 1) = 2.0;  // (0, 5, 0)
+    test_three_center(0, 2) = 3.0;  // (4, 0, 0)
+    test_three_center(2, 0) = 4.0;  // (0, 0, 6)
     test_three_center(1, 1) = 5.0;  //
-    test_three_center(2, 3) = 6.0;  //
+    test_three_center(3, 2) = 6.0;  //
 
     Hamiltonian h(std::make_unique<DensityFittedHamiltonianContainer>(
         test_one_body, test_three_center, orbitals, core_energy,
@@ -479,13 +479,13 @@ TEST_P(HamiltonianTest, TwoBodyElementAccess) {
     Eigen::MatrixXd large_inact_f = Eigen::MatrixXd::Identity(0, 0);
     Eigen::MatrixXd large_one_body = Eigen::MatrixXd::Identity(3, 3);
     Eigen::MatrixXd large_three_center =
-        Eigen::MatrixXd::Zero(81, 9);  // 3^2 = 9
+        Eigen::MatrixXd::Zero(9, 81);  // 3^2 = 9
 
-    // Test specific indices: (aux,1,2) should give index 1*3 + 2 =
-    large_three_center(78, 5) = 7.0;
-    // Test (aux,1,0) should give index 1*3 + 0 = 27 + 18 + 6 + 1 =
+    // Test specific indices: (1,2,aux) should give index 1*3 + 2 =
+    large_three_center(5, 78) = 7.0;
+    // Test (1,0, aux) should give index 1*3 + 0 = 27 + 18 + 6 + 1 =
     // 52
-    large_three_center(52, 3) = 8.0;
+    large_three_center(3, 52) = 8.0;
 
     // Create orbitals for the larger system
     auto large_orbitals =
@@ -704,7 +704,7 @@ TEST_P(HamiltonianTest, ValidationTests) {
     // Test validation passes with correct dimensions
     Eigen::MatrixXd correct_one_body = Eigen::MatrixXd::Identity(2, 2);
     Eigen::MatrixXd correct_two_body =
-        Eigen::MatrixXd::Random(9, 4);  // 2*2 = 4
+        Eigen::MatrixXd::Random(4, 9);  // 2*2 = 4
     EXPECT_NO_THROW(
         Hamiltonian(std::make_unique<DensityFittedHamiltonianContainer>(
             correct_one_body, correct_two_body, orbitals, core_energy,
@@ -740,7 +740,7 @@ TEST_P(HamiltonianTest, ValidationEdgeCases) {
   Eigen::MatrixXd large_one_body = Eigen::MatrixXd::Identity(10, 10);
   Eigen::VectorXd large_two_body =
       Eigen::VectorXd::Random(10000);  // 10^4 = 10000
-  Eigen::MatrixXd large_three_center = Eigen::MatrixXd::Random(1000, 100);
+  Eigen::MatrixXd large_three_center = Eigen::MatrixXd::Random(100, 1000);
 
   // Need orbitals that match the 10x10 size
   Eigen::MatrixXd large_coeffs = Eigen::MatrixXd::Identity(10, 10);
@@ -767,7 +767,7 @@ TEST_P(HamiltonianTest, ValidationEdgeCases) {
   Eigen::MatrixXd three_by_three = Eigen::MatrixXd::Identity(3, 3);
   Eigen::VectorXd off_by_one_4c =
       Eigen::VectorXd::Random(80);  // Should be 81 for 3x3
-  Eigen::MatrixXd off_by_one_3c = Eigen::MatrixXd::Random(1000, 8);
+  Eigen::MatrixXd off_by_one_3c = Eigen::MatrixXd::Random(8, 1000);
 
   if (test_p == "canonical_four_center") {
     EXPECT_THROW(
@@ -841,8 +841,8 @@ TEST_P(HamiltonianTest, UnrestrictedSpinChannelAccess) {
   Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Zero(16);
   Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Zero(16);
 
-  Eigen::MatrixXd three_center_aa = Eigen::MatrixXd::Zero(3, 4);
-  Eigen::MatrixXd three_center_bb = Eigen::MatrixXd::Zero(3, 4);
+  Eigen::MatrixXd three_center_aa = Eigen::MatrixXd::Zero(4, 3);
+  Eigen::MatrixXd three_center_bb = Eigen::MatrixXd::Zero(4, 3);
 
   // canonical four center case
   two_body_aaaa[0] = 1.0;   // (0,0,0,0) in aaaa channel
@@ -850,12 +850,12 @@ TEST_P(HamiltonianTest, UnrestrictedSpinChannelAccess) {
   two_body_bbbb[15] = 3.0;  // (1,1,1,1) in bbbb channel
 
   // three center case
-  // (a,a,a,a) (a,a,b,b)
-  // (0,1,0,0) (0,0,0,0)
-  // (0,0,0,0) (0,0,2,0)
-  // (0,0,0,0) (0,0,0,0)
-  three_center_aa(1, 0) = 1.0;
-  three_center_bb(1, 2) = 2.0;
+  //(0,1,0) (0,0,0)
+  //(0,0,0) (0,0,0)
+  //(0,0,0) (0,2,0)
+  //(0,0,0) (0,0,0)
+  three_center_aa(0, 1) = 1.0;
+  three_center_bb(2, 1) = 2.0;
 
   Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
 
@@ -896,7 +896,7 @@ TEST_P(HamiltonianTest, UnrestrictedSpinChannelAccess) {
     // Test accessing elements through different spin channels
     EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::aaaa),
                      1.0);
-    EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 1, 0, SpinChannel::aabb),
+    EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 0, 0, 0, SpinChannel::aabb),
                      2.0);
     EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 0, 1, 0, SpinChannel::bbbb),
                      4.0);
@@ -2047,8 +2047,8 @@ TEST(HamiltonianContainerTypeTest, ContainerTypePreservedThroughSerialization) {
   Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
   Eigen::VectorXd two_body = Eigen::VectorXd::Constant(16, 2.0);
   // Three-center: 1.0^2 + 0.6^2 + 0.8^2 = 2.0 (matches two_body)
-  Eigen::MatrixXd three_center = (Eigen::MatrixXd(3, 4) << 1.0, 1.0, 1.0, 1.0,
-                                  0.6, 0.6, 0.6, 0.6, 0.8, 0.8, 0.8, 0.8)
+  Eigen::MatrixXd three_center = (Eigen::MatrixXd(4, 3) << 1.0, 0.6, 0.8, 1.0,
+                                  0.6, 0.8, 1.0, 0.6, 0.8, 1.0, 0.6, 0.8)
                                      .finished();
   auto orbitals = std::make_shared<ModelOrbitals>(2, true);
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);

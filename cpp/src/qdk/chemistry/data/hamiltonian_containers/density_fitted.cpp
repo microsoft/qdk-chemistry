@@ -114,8 +114,8 @@ void DensityFittedHamiltonianContainer::_build_four_center_cache() const {
   size_t norb2 = norb * norb;
   size_t norb4 = norb2 * norb2;
 
-  // Helper lambda to build 4-center from 3-center: (ij|kl) = sum_P A_P,ij *
-  // B_P,kl This computes G = A^T * B using BLAS GEMM
+  // Helper lambda to build 4-center from 3-center: (ij|kl) = sum_P A_ij,P *
+  // B_kl,P This computes G = A^T * B using BLAS GEMM
   auto build_four_center =
       [&](std::shared_ptr<const Eigen::MatrixXd> three_center_left,
           std::shared_ptr<const Eigen::MatrixXd> three_center_right)
@@ -123,14 +123,12 @@ void DensityFittedHamiltonianContainer::_build_four_center_cache() const {
     // Allocate output vector
     auto four_center = std::make_shared<Eigen::VectorXd>(norb4);
 
-    size_t naux = three_center_left->rows();
+    size_t naux = three_center_left->cols();
 
-    // resulting four center is row packed!
-    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-               norb2, norb2, naux, 1.0, three_center_right->data(), naux,
-               three_center_left->data(), naux, 0.0, four_center->data(),
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+               norb2, norb2, naux, 1.0, three_center_left->data(), norb2,
+               three_center_right->data(), norb2, 0.0, four_center->data(),
                norb2);
-
     return four_center;
   };
 
@@ -140,18 +138,11 @@ void DensityFittedHamiltonianContainer::_build_four_center_cache() const {
 
   if (is_restricted()) {
     _cached_four_center_integrals.emplace(aaaa, aaaa, aaaa);
-    return;
   } else {
     auto aabb = build_four_center(_three_center_integrals.first,
                                   _three_center_integrals.second);
     auto bbbb = build_four_center(_three_center_integrals.second,
                                   _three_center_integrals.second);
-    std::cout << "aaaa" << std::endl;
-    std::cout << *aaaa << std::endl;
-    std::cout << "aabb" << std::endl;
-    std::cout << *aabb << std::endl;
-    std::cout << "bbbb" << std::endl;
-    std::cout << *bbbb << std::endl;
     _cached_four_center_integrals.emplace(std::move(aaaa), std::move(aabb),
                                           std::move(bbbb));
   }
@@ -255,17 +246,17 @@ void DensityFittedHamiltonianContainer::validate_integral_dimensions() const {
   }
 
   // Check two-body integrals dimensions
-  // Three-center integrals have shape [n_aux x n_orb_pairs] where n_orb_pairs =
+  // Three-center integrals have shape [n_orb_pairs x n_aux] where n_orb_pairs =
   // norb^2
   size_t norb_alpha = _one_body_integrals.first->rows();
   unsigned orb_pair_size = norb_alpha * norb_alpha;
 
-  // Check alpha-alpha integrals - cols should equal orb_pair_size
-  if (static_cast<unsigned>(_three_center_integrals.first->cols()) !=
+  // Check alpha-alpha integrals - rows should equal orb_pair_size
+  if (static_cast<unsigned>(_three_center_integrals.first->rows()) !=
       orb_pair_size) {
     throw std::invalid_argument(
-        "Alpha-alpha three-center integrals columns (" +
-        std::to_string(_three_center_integrals.first->cols()) +
+        "Alpha-alpha three-center integrals rows (" +
+        std::to_string(_three_center_integrals.first->rows()) +
         ") does not match expected orb_pair size (" +
         std::to_string(orb_pair_size) + " for " + std::to_string(norb_alpha) +
         " orbitals)");
@@ -273,10 +264,10 @@ void DensityFittedHamiltonianContainer::validate_integral_dimensions() const {
 
   // Check beta-beta integrals (if different from alpha-alpha)
   if (_three_center_integrals.second != _three_center_integrals.first) {
-    if (static_cast<unsigned>(_three_center_integrals.second->cols()) !=
+    if (static_cast<unsigned>(_three_center_integrals.second->rows()) !=
             orb_pair_size or
-        static_cast<unsigned>(_three_center_integrals.second->rows()) !=
-            static_cast<unsigned>(_three_center_integrals.first->rows())) {
+        static_cast<unsigned>(_three_center_integrals.second->cols()) !=
+            static_cast<unsigned>(_three_center_integrals.first->cols())) {
       throw std::invalid_argument(
           "Alpha-beta three-center integrals size mismatch");
     }

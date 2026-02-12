@@ -32,11 +32,11 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
    * @brief Constructor for active space Hamiltonian with three center integrals
-   * (Q|ij)
+   * (ij|Q)
    *
    * @param one_body_integrals One-electron integrals in MO basis [norb x norb]
    * @param three_center_integrals Three-center two-electron integrals in MO
-   * basis [naux x (norb x norb)]
+   * basis [(norb x norb) x naux]
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital
    * energy)
@@ -62,9 +62,11 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
    * @param one_body_integrals_beta One-electron integrals for beta spin in MO
    * basis
    * @param three_center_integrals_aa Three-center two-electron alpha-alpha
-   * integrals
+   * integrals (ij|Q), where the orbital pair index ij are stored in row-major
+   * order
    * @param three_center_integrals_bb Three-center two-electron beta-beta
-   * integrals
+   * integrals (ij|Q), where the orbital pair index ij are stored in row-major
+   * order
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital
    * energy)
@@ -118,7 +120,8 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Get three-center integrals in MO basis for all spin channels
    * @return Pair of references to (aa, bb) three-center two-electron
-   * integrals matrices
+   * integrals matrices, where each matrix is of dimension [(norb x norb) x
+   * naux], with the (norb x norb) part stored in row-major order
    * @throws std::runtime_error if integrals are not set
    */
   std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
@@ -190,8 +193,9 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
 
  private:
   /**
-   * Three-center integrals in MO basis, stored as matrices [naux x n_geminals]
-   * where n_geminals = norb * norb for each spin channel
+   * Three-center integrals in MO basis, where each channel is stored as a
+   * matrix of dimension [(norb x norb) x naux] where norb x norb is stored in
+   * row major order
    */
   const std::pair<std::shared_ptr<Eigen::MatrixXd>,
                   std::shared_ptr<Eigen::MatrixXd>>
