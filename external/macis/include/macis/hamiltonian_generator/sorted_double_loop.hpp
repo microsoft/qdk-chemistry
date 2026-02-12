@@ -848,7 +848,6 @@ class SortedDoubleLoopHamiltonianGenerator
       }
     }
     // Finalize entropy calculations
-    entropy_intermediates.update_diagonal();
     build_s1_entropy(entropy_intermediates, single_orbital_entropies);
 
     if (need_s2) {

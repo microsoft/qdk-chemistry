@@ -21,139 +21,65 @@ namespace detail {
 
 /**
  * @brief Compute the four eigenvalues of a real symmetric 4x4 matrix
- *        using Ferrari's analytical method.
+ *        using Jacobi eigenvalue algorithm.
  *
- * @param mat  Flat array of 16 doubles in row-major order.
- *             Only the 10 unique entries of the symmetric matrix are read.
+ * Iteratively applies 2x2 Givens (Jacobi) rotations to annihilate the
+ * largest off-diagonal element until the matrix is effectively diagonal.
+ *
+ * @param a    4x4 array representing a symmetric matrix. The array is
+ *             modified in place during diagonalization.
  * @return     Sorted array of the four eigenvalues in ascending order.
  */
-inline std::array<double, 4> eigenvalues_4x4(const double* mat) noexcept {
-  // ---- Stage 1: extract unique entries of the symmetric matrix ----
-  double m00 = mat[0], m01 = mat[1], m02 = mat[2], m03 = mat[3];
-  double m11 = mat[5], m12 = mat[6], m13 = mat[7];
-  double m22 = mat[10], m23 = mat[11];
-  double m33 = mat[15];
+inline std::array<double, 4> eigenvalues_4x4(double (&a)[4][4]) noexcept {
+  // Jacobi iteration: sweep over all 6 off-diagonal pairs (p,q) with p<q,
+  // applying a Givens rotation to zero a[p][q].
+  constexpr double eps = std::numeric_limits<double>::epsilon();
+  constexpr int max_sweeps = 50;
+  for (int sweep = 0; sweep < max_sweeps; ++sweep) {
+    // Check convergence: sum of squares of off-diagonal elements
+    double off_diag = 0.0;
+    for (int p = 0; p < 4; ++p)
+      for (int q = p + 1; q < 4; ++q) off_diag += a[p][q] * a[p][q];
 
-  // Squares of off-diagonal entries (used repeatedly)
-  double sq01 = m01 * m01, sq02 = m02 * m02, sq03 = m03 * m03;
-  double sq12 = m12 * m12, sq13 = m13 * m13, sq23 = m23 * m23;
+    if (off_diag < eps * eps) break;  // converged
 
-  // Power-sum traces s_k = tr(A^k)
-  double s1 = m00 + m11 + m22 + m33;
-  // s2 = tr(A^2) = sum_ij A_ij^2  (A is symmetric)
-  double s2 = m00 * m00 + m11 * m11 + m22 * m22 + m33 * m33 +
-              2.0 * (sq01 + sq02 + sq03 + sq12 + sq13 + sq23);
+    for (int p = 0; p < 4; ++p) {
+      for (int q = p + 1; q < 4; ++q) {
+        double apq = a[p][q];
+        if (std::abs(apq) < eps) continue;
 
-  // Compute A^2 (symmetric) — only upper triangle needed.
-  double a2_00 = m00 * m00 + sq01 + sq02 + sq03;
-  double a2_01 = m00 * m01 + m01 * m11 + m02 * m12 + m03 * m13;
-  double a2_02 = m00 * m02 + m01 * m12 + m02 * m22 + m03 * m23;
-  double a2_03 = m00 * m03 + m01 * m13 + m02 * m23 + m03 * m33;
-  double a2_11 = sq01 + m11 * m11 + sq12 + sq13;
-  double a2_12 = m01 * m02 + m11 * m12 + m12 * m22 + m13 * m23;
-  double a2_13 = m01 * m03 + m11 * m13 + m12 * m23 + m13 * m33;
-  double a2_22 = sq02 + sq12 + m22 * m22 + sq23;
-  double a2_23 = m02 * m03 + m12 * m13 + m22 * m23 + m23 * m33;
-  double a2_33 = sq03 + sq13 + sq23 + m33 * m33;
+        // Compute the Jacobi rotation angle
+        double h = a[q][q] - a[p][p];
+        double theta = 0.5 * h / apq;
+        double t = 1.0 / (std::abs(theta) + std::sqrt(1.0 + theta * theta));
+        if (theta < 0.0) t = -t;
 
-  // s3 = tr(A^3) = sum_ij (A^2)_ij * A_ji = sum_ij (A^2)_ij * A_ij
-  double s3 = a2_00 * m00 + a2_11 * m11 + a2_22 * m22 + a2_33 * m33 +
-              2.0 * (a2_01 * m01 + a2_02 * m02 + a2_03 * m03 + a2_12 * m12 +
-                     a2_13 * m13 + a2_23 * m23);
-  // s4 = tr(A^4) = ||A^2||_F^2
-  double s4 = a2_00 * a2_00 + a2_11 * a2_11 + a2_22 * a2_22 + a2_33 * a2_33 +
-              2.0 * (a2_01 * a2_01 + a2_02 * a2_02 + a2_03 * a2_03 +
-                     a2_12 * a2_12 + a2_13 * a2_13 + a2_23 * a2_23);
+        double c = 1.0 / std::sqrt(1.0 + t * t);  // cos(theta)
+        double s = t * c;                         // sin(theta)
+        double tau = s / (1.0 + c);               // tan(theta/2)
 
-  // ---- Stage 2: elementary symmetric polynomials (Newton's identities) ----
-  // c_k = e_k(lambda_1,...,lambda_4), the k-th elementary symmetric
-  // polynomial of the eigenvalues.  The characteristic polynomial is
-  //     t^4 - c1 t^3 + c2 t^2 - c3 t + c4 = 0.
-  double c1 = s1;
-  double c2 = (s1 * s1 - s2) / 2.0;
-  double c3 = (s1 * s1 * s1 - 3.0 * s1 * s2 + 2.0 * s3) / 6.0;
-  double c4 = (s1 * s1 * s1 * s1 - 6.0 * s1 * s1 * s2 + 3.0 * s2 * s2 +
-               8.0 * s1 * s3 - 6.0 * s4) /
-              24.0;
+        // Update diagonal elements
+        double delta = t * apq;
+        a[p][p] -= delta;
+        a[q][q] += delta;
+        a[p][q] = 0.0;
+        a[q][p] = 0.0;
 
-  // ---- Stage 3: depress the quartic ----
-  // Substitute t = x + c1/4 to eliminate the cubic term, giving
-  //     x^4 + dp x^2 + dq x + dr = 0.
-  double shift = c1 / 4.0;
-  double dp = c2 - 3.0 * c1 * c1 / 8.0;
-  double dq = -c1 * c1 * c1 / 8.0 + c1 * c2 / 2.0 - c3;
-  double dr = -3.0 * c1 * c1 * c1 * c1 / 256.0 + c1 * c1 * c2 / 16.0 -
-              c1 * c3 / 4.0 + c4;
-
-  std::array<double, 4> roots;
-
-  // Biquadratic when dq ~ 0 relative to the other depressed coefficients
-  double scale = std::max({std::abs(dp), std::abs(dr), 1.0});
-  if (std::abs(dq) < 1e-14 * scale) {
-    // ---- Special case: biquadratic (q ~ 0) ----
-    // x^4 + dp x^2 + dr = 0  =>  quadratic in u = x^2:
-    //     u = (-dp +/- sqrt(dp^2 - 4 dr)) / 2
-    // then  x = +/- sqrt(u).
-    double disc = dp * dp - 4.0 * dr;
-    double sqrt_disc = std::sqrt(std::max(disc, 0.0));
-    double u1 = (-dp + sqrt_disc) / 2.0;
-    double u2 = (-dp - sqrt_disc) / 2.0;
-    double su1 = std::sqrt(std::max(u1, 0.0));
-    double su2 = std::sqrt(std::max(u2, 0.0));
-    roots = {-su1 + shift, su1 + shift, -su2 + shift, su2 + shift};
-  } else {
-    // ---- Stage 4: solve the resolvent cubic ----
-    // The resolvent cubic for Ferrari's method is
-    //     m^3 + dp m^2 + ((dp^2 - 4 dr) / 4) m - dq^2 / 8 = 0.
-    // Depress it via m = u - dp/3 to obtain  u^3 + P u + Q = 0.
-    double rc_b = (dp * dp - 4.0 * dr) / 4.0;
-    double rc_c = -dq * dq / 8.0;
-    double P = rc_b - dp * dp / 3.0;
-    double Q = 2.0 * dp * dp * dp / 27.0 - dp * rc_b / 3.0 + rc_c;
-
-    // Discriminant of the depressed cubic:
-    //     Delta = Q^2/4 + P^3/27.
-    double m0;
-    double cubic_disc = Q * Q / 4.0 + P * P * P / 27.0;
-    if (cubic_disc <= 0) {
-      // Three real roots — use the trigonometric (Viete) form:
-      //     u_k = 2 sqrt(-P/3) cos(1/3 arccos(-Q / (2 (-P/3)^{3/2})) - 2kpi/3)
-      // We pick k=0 (the largest root).
-      double mag = std::sqrt(-P / 3.0);
-      double arg = std::clamp(-Q / (2.0 * mag * mag * mag), -1.0, 1.0);
-      m0 = 2.0 * mag * std::cos(std::acos(arg) / 3.0);
-    } else {
-      // One real root — Cardano's formula:
-      //     u = cbrt(-Q/2 + sqrt(Delta)) + cbrt(-Q/2 - sqrt(Delta))
-      double sd = std::sqrt(cubic_disc);
-      m0 = std::cbrt(-Q / 2.0 + sd) + std::cbrt(-Q / 2.0 - sd);
+        // Rotate remaining off-diagonal elements
+        for (int r = 0; r < 4; ++r) {
+          if (r == p || r == q) continue;
+          double arp = a[r][p];
+          double arq = a[r][q];
+          a[r][p] = arp - s * (arq + tau * arp);
+          a[p][r] = a[r][p];
+          a[r][q] = arq + s * (arp - tau * arq);
+          a[q][r] = a[r][q];
+        }
+      }
     }
-    // Un-depress: m0 = u - dp/3
-    m0 -= dp / 3.0;
-    // Numerical guard: m0 must be non-negative for real factorization
-    m0 = std::max(m0, 0.0);
-
-    // ---- Stage 5: factor the depressed quartic (Ferrari) ----
-    // With S = sqrt(2 m0), the depressed quartic factors as
-    //   (x^2 - S x + (alpha + dq/(2S))) (x^2 + S x + (alpha - dq/(2S))) = 0
-    // where alpha = dp/2 + m0.
-    double S = std::sqrt(2.0 * m0);
-    double hqs = dq / (2.0 * S);  // dq / (2S)
-    double alpha = dp / 2.0 + m0;
-
-    // Discriminants of the two quadratics:
-    //   x^2 - S x + (alpha + hqs) = 0  =>  disc1 = S^2 - 4(alpha + hqs)
-    //   x^2 + S x + (alpha - hqs) = 0  =>  disc2 = S^2 - 4(alpha - hqs)
-    double d1 = S * S - 4.0 * (alpha + hqs);
-    double d2 = S * S - 4.0 * (alpha - hqs);
-    double sd1 = std::sqrt(std::max(d1, 0.0));
-    double sd2 = std::sqrt(std::max(d2, 0.0));
-
-    // Solve both quadratics and shift back by c1/4
-    roots = {(S - sd1) / 2.0 + shift, (S + sd1) / 2.0 + shift,
-             (-S - sd2) / 2.0 + shift, (-S + sd2) / 2.0 + shift};
   }
 
+  std::array<double, 4> roots = {a[0][0], a[1][1], a[2][2], a[3][3]};
   std::sort(roots.begin(), roots.end());
   return roots;
 }
@@ -401,10 +327,9 @@ inline void orbital_rdm_contrib_diag(
       if (p == q) {
 #pragma omp atomic
         ab_iiii[q] += val;
-      } else {
-#pragma omp atomic
-        ab_iijj(p, q) += val;
       }
+#pragma omp atomic
+      ab_iijj(p, q) += val;
     }
   }
 }
@@ -647,7 +572,7 @@ inline void build_s2_entropy(const OrbitalRDMIntermediates& intermediates,
   auto& aab_iijjij = intermediates.aab_iijjij;
   auto& aabb_iijjiijj = intermediates.aabb_iijjiijj;
 
-  // Analytical eigenvalues of a symmetric 2x2 matrix [[a, b], [b, d]]
+  // Eigenvalues of a symmetric 2x2 matrix [[a, b], [b, d]]
   auto eigenvalues_2x2 = [](double a, double b, double d) {
     double half_sum = 0.5 * (a + d);
     double half_diff = 0.5 * (a - d);
@@ -656,11 +581,13 @@ inline void build_s2_entropy(const OrbitalRDMIntermediates& intermediates,
   };
 
   double val, val1, val2;
-  std::vector<double> block_4x4(16, 0.0);
+  double block_4x4[4][4] = {};
   for (size_t i = 0; i < norb; ++i) {
-    for (size_t j = i; j < norb; ++j) {
+    s2_entropy(i, i) = 0.0;
+    for (size_t j = i + 1; j < norb; ++j) {
       s2_entropy(i, j) = 0.0;
 
+      // evaluate von Neumann entropy contribution
       auto add_entropy = [&](double v) {
         if (v > std::numeric_limits<double>::epsilon()) {
           s2_entropy(i, j) -= v * std::log(v);
@@ -711,47 +638,47 @@ inline void build_s2_entropy(const OrbitalRDMIntermediates& intermediates,
       add_entropy(val);
 
       // 7, 7
-      block_4x4[0] = ab_iijj(j, j) - aab_iijjjj(i, j) - abb_jjiijj(i, j) +
-                     aabb_iijjiijj(i, j);
+      block_4x4[0][0] = ab_iijj(j, j) - aab_iijjjj(i, j) - abb_jjiijj(i, j) +
+                        aabb_iijjiijj(i, j);
 
-      // 7, 8
-      block_4x4[1] = ab_ijjj(i, j) - abb_ijiijj(i, j);
-      block_4x4[4] = block_4x4[1];  // 8, 7
+      // 7, 8 = 8, 7
+      block_4x4[0][1] = ab_ijjj(i, j) - abb_ijiijj(i, j);
+      block_4x4[1][0] = block_4x4[0][1];
 
-      // 7, 9
-      block_4x4[2] = -ab_jjij(i, j) + aab_iijjij(i, j);
-      block_4x4[8] = block_4x4[2];  // 9, 7
+      // 7, 9 = 9, 7
+      block_4x4[0][2] = -ab_jjij(i, j) + aab_iijjij(i, j);
+      block_4x4[2][0] = block_4x4[0][2];
 
-      // 7, 10
-      block_4x4[3] = ab_ijij(i, j);
-      block_4x4[12] = block_4x4[3];  // 10, 7
+      // 7, 10 = 10, 7
+      block_4x4[0][3] = ab_ijij(i, j);
+      block_4x4[3][0] = block_4x4[0][3];
 
       // 8, 8
-      block_4x4[5] = ab_iijj(i, j) - abb_iiiijj(i, j) - aab_iijjjj(i, j) +
-                     aabb_iijjiijj(i, j);
+      block_4x4[1][1] = ab_iijj(i, j) - abb_iiiijj(i, j) - aab_iijjjj(i, j) +
+                        aabb_iijjiijj(i, j);
 
-      // 8, 9
-      block_4x4[6] = -ab_ijji(j, i);
-      block_4x4[9] = block_4x4[6];  // 9, 8
+      // 8, 9 = 9, 8
+      block_4x4[1][2] = -ab_ijji(j, i);
+      block_4x4[2][1] = block_4x4[1][2];
 
-      // 8, 10
-      block_4x4[7] = ab_jjji(j, i) - aab_iijjij(i, j);
-      block_4x4[13] = block_4x4[7];  // 10, 8
+      // 8, 10 = 10, 8
+      block_4x4[1][3] = ab_jjji(j, i) - aab_iijjij(i, j);
+      block_4x4[3][1] = block_4x4[1][3];
 
       // 9, 9
-      block_4x4[10] = ab_iijj(j, i) - aab_iijjii(i, j) - abb_jjiijj(i, j) +
-                      aabb_iijjiijj(i, j);
+      block_4x4[2][2] = ab_iijj(j, i) - aab_iijjii(i, j) - abb_jjiijj(i, j) +
+                        aabb_iijjiijj(i, j);
 
-      // 9, 10
-      block_4x4[11] = -ab_jijj(j, i) + abb_ijiijj(i, j);
-      block_4x4[14] = block_4x4[11];  // 10, 9
+      // 9, 10 = 10, 9
+      block_4x4[2][3] = -ab_jijj(j, i) + abb_ijiijj(i, j);
+      block_4x4[3][2] = block_4x4[2][3];
 
       // 10, 10
-      block_4x4[15] = ab_iiii[i] - aab_iijjii(i, j) - abb_iiiijj(i, j) +
-                      aabb_iijjiijj(i, j);
+      block_4x4[3][3] = ab_iiii[i] - aab_iijjii(i, j) - abb_iiiijj(i, j) +
+                        aabb_iijjiijj(i, j);
       // compute eigenvalues of the 4x4 block 7-10, 7-10
       {
-        auto eigs_4x4 = detail::eigenvalues_4x4(block_4x4.data());
+        auto eigs_4x4 = detail::eigenvalues_4x4(block_4x4);
         for (auto ev : eigs_4x4) add_entropy(ev);
       }
 
@@ -913,7 +840,12 @@ inline void build_2ordm(const OrbitalRDMIntermediates& intermediates,
   matrix_span<double> block_span(block.data(), 16, 16);
 
   for (size_t i = 0; i < norb; ++i) {
-    for (size_t j = i; j < norb; ++j) {
+    for (size_t p = 0; p < 16; ++p) {
+      for (size_t q = 0; q < 16; ++q) {
+        tordm(i, i, p, q) = 0.0;
+      }
+    }
+    for (size_t j = i + 1; j < norb; ++j) {
       // Zero the block
       std::fill(block.begin(), block.end(), 0.0);
 
@@ -943,6 +875,7 @@ inline void build_mutual_information(const std::vector<double>& s1_entropy,
                                      matrix_span<double>& mutual_info) {
   size_t norb = s1_entropy.size();
   for (size_t i = 0; i < norb; ++i) {
+    mutual_info(i, i) = 0.0;
     for (size_t j = i + 1; j < norb; ++j) {
       mutual_info(i, j) = s1_entropy[i] + s1_entropy[j] - s2_entropy(i, j);
       mutual_info(j, i) = mutual_info(i, j);
