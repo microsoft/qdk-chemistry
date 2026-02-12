@@ -14,13 +14,15 @@ import Std.Arrays.Mapped;
 /// - `accumulatePhase`: The phase to accumulate during the evolution.
 /// - `control`: The index of the control qubit.
 /// - `systems`: An array of indices representing the system qubits.
+/// # Returns
+/// The result of measuring the control qubit after the IQPE circuit is executed.
 operation MakeIQPECircuit(
     statePrep : Qubit[] => Unit,
     repControlledEvolution : (Qubit, Qubit[]) => Unit,
     accumulatePhase : Double,
     control : Int,
     systems : Int[],
-) : Unit {
+) : Result[] {
     use qs = Qubit[Length(systems) + 1];
     let control = qs[control];
     let system = Subarray(systems, qs);
@@ -36,5 +38,5 @@ operation MakeIQPECircuit(
         repControlledEvolution(control, system);
     }
     ResetAll(system);
-    MResetZ(control);
+    return [MResetZ(control)]
 }
