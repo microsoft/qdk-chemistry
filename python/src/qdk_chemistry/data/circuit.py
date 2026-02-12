@@ -39,7 +39,7 @@ class Circuit(DataClass):
     def __init__(
         self,
         qasm: str | None = None,
-        qir: qsharp._qsharp.QirInputData | None = None,
+        qir: qsharp._qsharp.QirInputData | str | None = None,
         qsharp: qsharp._native.Circuit | None = None,
         qsharp_op: Callable[..., Any] | None = None,
         encoding: str | None = None,
@@ -64,7 +64,7 @@ class Circuit(DataClass):
         self.encoding = encoding
 
         # Check that a representation of the quantum circuit is given by the keyword arguments
-        if self.qasm is None and self.qsharp is None and self.qir is None:
+        if not any([self.qasm, self.qsharp, self.qir]):
             raise RuntimeError("No representation of the quantum circuit is set.")
 
         # Make instance immutable after construction (handled by base class)
@@ -82,7 +82,7 @@ class Circuit(DataClass):
 
         return self.qasm
 
-    def get_qir(self) -> qsharp._qsharp.QirInputData:
+    def get_qir(self) -> qsharp._qsharp.QirInputData | str:
         """Get QIR representation of the quantum circuit.
 
         Returns:
@@ -157,6 +157,8 @@ class Circuit(DataClass):
         data: dict[str, Any] = {}
         if self.qasm is not None:
             data["qasm"] = self.qasm
+        if self.qir is not None:
+            data["qir"] = str(self.qir)
         if self.encoding is not None:
             data["encoding"] = self.encoding
         return self._add_json_version(data)
@@ -171,6 +173,8 @@ class Circuit(DataClass):
         self._add_hdf5_version(group)
         if self.qasm is not None:
             group.attrs["qasm"] = self.qasm
+        if self.qir is not None:
+            group.attrs["qir"] = str(self.qir)
         if self.encoding is not None:
             group.attrs["encoding"] = self.encoding
 
@@ -191,6 +195,7 @@ class Circuit(DataClass):
         cls._validate_json_version(cls._serialization_version, json_data)
         return cls(
             qasm=json_data.get("qasm"),
+            qir=json_data.get("qir"),
             encoding=json_data.get("encoding"),
         )
 
@@ -215,5 +220,6 @@ class Circuit(DataClass):
             encoding = encoding.decode("utf-8")
         return cls(
             qasm=group.attrs.get("qasm"),
+            qir=group.attrs.get("qir"),
             encoding=encoding,
         )
