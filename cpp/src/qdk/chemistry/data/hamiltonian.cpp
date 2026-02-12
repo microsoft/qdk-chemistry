@@ -10,6 +10,7 @@
 #include <macis/util/fcidump.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/density_fitted.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
@@ -358,16 +359,16 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_json(
     throw std::runtime_error("JSON missing required 'container_type' field");
   }
 
-  std::string container_type = j["container_type"];
-
   // Forward to appropriate container implementation
+  std::string container_type = j["container_type"];
   if (container_type == "canonical_four_center") {
     return CanonicalFourCenterHamiltonianContainer::from_json(j);
   } else if (container_type == "density_fitted") {
     return DensityFittedHamiltonianContainer::from_json(j);
-  } else {
-    throw std::runtime_error("Unknown container type: " + container_type);
+  } else if (container_type == "cholesky") {
+    return CholeskyHamiltonianContainer::from_json(j);
   }
+  throw std::runtime_error("Unknown container type: " + container_type);
 }
 
 std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_hdf5(
@@ -390,9 +391,10 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_hdf5(
       return CanonicalFourCenterHamiltonianContainer::from_hdf5(group);
     } else if (container_type == "density_fitted") {
       return DensityFittedHamiltonianContainer::from_hdf5(group);
-    } else {
-      throw std::runtime_error("Unknown container type: " + container_type);
+    } else if (container_type == "cholesky") {
+      return CholeskyHamiltonianContainer::from_hdf5(group);
     }
+    throw std::runtime_error("Unknown container type: " + container_type);
 
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));

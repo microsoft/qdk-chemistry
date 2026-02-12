@@ -16,9 +16,10 @@ namespace qdk::chemistry::scf {
  * @param obs Orbital basis set
  * @param mpi MPI configuration
  * @param res Output array of Schwarz estimates
+ * @param use_2norm Whether to use 2-norm (true) or infinity norm (false)
  */
 void schwarz_integral(const BasisSet* obs, const ParallelConfig& mpi,
-                      double* res);
+                      double* res, bool use_2norm = false);
 
 /**
  * @brief Compute shell-pair density norms

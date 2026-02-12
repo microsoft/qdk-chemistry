@@ -9,9 +9,17 @@
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
+#include "microsoft/cholesky_hamiltonian.hpp"
 #include "microsoft/density_fitted_hamiltonian.hpp"
 
 namespace qdk::chemistry::algorithms {
+
+std::unique_ptr<HamiltonianConstructor> make_microsoft_cholesky_hamiltonian() {
+  QDK_LOG_TRACE_ENTERING();
+
+  return std::make_unique<
+      qdk::chemistry::algorithms::microsoft::CholeskyHamiltonianConstructor>();
+}
 
 std::unique_ptr<HamiltonianConstructor> make_microsoft_hamiltonian() {
   QDK_LOG_TRACE_ENTERING();
@@ -34,6 +42,8 @@ void HamiltonianConstructorFactory::register_default_instances() {
   HamiltonianConstructorFactory::register_instance(&make_microsoft_hamiltonian);
   HamiltonianConstructorFactory::register_instance(
       &make_microsoft_density_fitted_hamiltonian);
+  HamiltonianConstructorFactory::register_instance(
+      &make_microsoft_cholesky_hamiltonian);
 }
 
 }  // namespace qdk::chemistry::algorithms

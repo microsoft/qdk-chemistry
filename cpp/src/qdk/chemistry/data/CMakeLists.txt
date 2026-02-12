@@ -9,6 +9,7 @@ target_sources(chemistry PRIVATE
     hamiltonian.cpp
     hamiltonian_containers/canonical_four_center.cpp
     hamiltonian_containers/density_fitted.cpp
+    hamiltonian_containers/cholesky.cpp
     orbitals.cpp
     pauli_operator.cpp
     settings.cpp
