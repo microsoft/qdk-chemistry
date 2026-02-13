@@ -45,6 +45,7 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_);
  *  - `norb < 32`  -> `N = 64`
  *  - `norb < 64`  -> `N = 128`
  *  - `norb < 128` -> `N = 256`
+ *  - `norb < 256` -> `N = 512`
  *
  * @tparam Func Helper struct exposing `template <size_t N> static return_type
  * impl(...)`.
@@ -52,7 +53,7 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_);
  * @param args Argument pack to forward.
  * @param norb Number of active orbitals.
  * @return Return value of the selected `Func::impl<N>`.
- * @throws std::runtime_error if `norb >= 128` (unsupported size).
+ * @throws std::runtime_error if `norb >= 256` (unsupported size).
  */
 template <typename Func, typename... Args>
 auto dispatch_by_norb(size_t norb, Args&&... args) {
@@ -62,9 +63,11 @@ auto dispatch_by_norb(size_t norb, Args&&... args) {
     return Func::template impl<128>(std::forward<Args>(args)...);
   } else if (norb < 128) {
     return Func::template impl<256>(std::forward<Args>(args)...);
+  } else if (norb < 256) {
+    return Func::template impl<512>(std::forward<Args>(args)...);
   } else {
     throw std::runtime_error(
-        "Function not implemented for more than 127 orbitals");
+        "Function not implemented for more than 255 orbitals");
   }
 }
 

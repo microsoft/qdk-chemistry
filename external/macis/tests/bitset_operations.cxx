@@ -189,6 +189,7 @@ TEST_CASE("Bitset Operations") {
     SECTION("64") { mask_test<64>(); }
     SECTION("128") { mask_test<128>(); }
     SECTION("256") { mask_test<256>(); }
+    SECTION("512") { mask_test<512>(); }
   }
 
   SECTION("FFS") {
