@@ -172,12 +172,12 @@ class QDrift(TimeEvolutionBuilder):
 
         terms = self._sample_qdrift_terms(all_terms, time, num_samples, rng)
 
-        # Optionally merge consecutive mutually-commuting terms to reduce
-        # circuit depth.  This is exact: commuting unitaries can be freely
-        # reordered, so identical Pauli operators within a commuting run
-        # are fused by summing their rotation angles.  Non-commuting
-        # boundaries are preserved to keep the Campbell (2019) error bound
-        # intact.
+        # Optionally deduplicate repeated Pauli operators within
+        # consecutive commuting runs.  Within such a run, identical
+        # Pauli strings satisfy e^{-iaP} e^{-ibP} = e^{-i(a+b)P}
+        # exactly, reducing circuit depth.  Distinct Pauli strings are
+        # kept as separate rotations and non-commuting boundaries are
+        # never crossed, preserving the Campbell (2019) error bound.
         if self._settings.get("merge_commuting"):
             terms = self._merge_commuting_runs(terms)
 
@@ -236,10 +236,7 @@ class QDrift(TimeEvolutionBuilder):
         for idx in term_indices:
             label, coeff = terms[idx]
             sign = 1.0 if coeff >= 0 else -1.0
-            mapping: dict[int, str] = {}
-            for i, char in enumerate(reversed(label)):
-                if char != "I":
-                    mapping[i] = char
+            mapping = TimeEvolutionBuilder._pauli_label_to_map(label)  # noqa: SLF001
             result.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=sign * angle_magnitude))
 
         return result
@@ -264,15 +261,20 @@ class QDrift(TimeEvolutionBuilder):
 
     @classmethod
     def _merge_commuting_runs(cls, terms: list[ExponentiatedPauliTerm]) -> list[ExponentiatedPauliTerm]:
-        """Merge consecutive mutually-commuting terms to reduce circuit depth.
+        r"""Deduplicate repeated Pauli operators within consecutive commuting runs.
 
-        Walks through the term sequence and accumulates runs of mutually
-        commuting terms.  Within each run, terms with the same Pauli
-        operator are fused by summing their rotation angles.  Terms whose
-        merged angle is zero are dropped.
+        Walks through the term sequence and accumulates maximal runs of
+        mutually commuting terms.  Within each run, *identical* Pauli
+        operators (same string) have their rotation angles summed:
 
-        The unitary is unchanged because the order of commuting operators
-        is irrelevant.  Non-commuting boundaries are never crossed.
+        .. math::
+
+            e^{-i a P}\,e^{-i b P} = e^{-i(a+b)P}
+
+        This is exact because scalar multiples of the same operator
+        trivially commute.  Distinct Pauli strings are **not** combined;
+        they remain as separate rotations.  Non-commuting boundaries are
+        never crossed.
 
         Args:
             terms: Ordered list of exponentiated Pauli terms.
@@ -301,10 +303,12 @@ class QDrift(TimeEvolutionBuilder):
     def _flush_commuting_group(
         group: list[ExponentiatedPauliTerm],
     ) -> list[ExponentiatedPauliTerm]:
-        """Fuse terms within a mutually-commuting group.
+        """Fuse *identical* Pauli operators within a mutually-commuting group.
 
-        Terms acting on the same Pauli operator have their angles summed.
-        Terms whose fused angle is exactly zero are dropped.
+        Only rotations around the **same** Pauli string have their angles
+        summed (e^{-iaP} e^{-ibP} = e^{-i(a+b)P}).  Distinct Pauli
+        strings are emitted as separate terms.  Terms whose fused angle
+        is exactly zero are dropped.
 
         """
         merged: dict[tuple[tuple[int, str], ...], float] = {}
