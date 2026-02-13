@@ -41,22 +41,10 @@ template <size_t N>
 double single_excitation_sign(std::bitset<N> state, unsigned p, unsigned q) {
   std::bitset<N> mask = 0ul;
 
-  if constexpr (N <= 64) {
-    auto hi = std::max(p, q);
-    auto lo = std::min(p, q);
-    std::bitset<N> hi_mask = 1;
-    hi_mask <<= hi;
-    hi_mask = hi_mask.to_ullong() - 1;
-    std::bitset<N> lo_mask = 1;
-    lo_mask <<= (lo + 1);
-    lo_mask = lo_mask.to_ullong() - 1;
-    mask = state & (hi_mask ^ lo_mask);
+  if (p > q) {
+    mask = state & (full_mask<N>(p) ^ full_mask<N>(q + 1));
   } else {
-    if (p > q) {
-      mask = state & (full_mask<N>(p) ^ full_mask<N>(q + 1));
-    } else {
-      mask = state & (full_mask<N>(q) ^ full_mask<N>(p + 1));
-    }
+    mask = state & (full_mask<N>(q) ^ full_mask<N>(p + 1));
   }
   return (mask.count() % 2) ? -1. : 1.;
 }

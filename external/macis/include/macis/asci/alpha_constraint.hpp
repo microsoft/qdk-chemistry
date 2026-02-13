@@ -166,13 +166,7 @@ class alpha_constraint {
   static alpha_constraint make_triplet(unsigned i, unsigned j, unsigned k) {
     constraint_type C = 0;
     C.flip(i).flip(j).flip(k);
-    constraint_type B = 1;
-    if constexpr (constraint_type{}.size() <= 64) {
-      B <<= k;
-      B = B.to_ullong() - 1;
-    } else {
-      B = full_mask<constraint_type{}.size()>(k);
-    }
+    constraint_type B = full_mask<constraint_type{}.size()>(k);
     return alpha_constraint(C, B, k);
   }
 };

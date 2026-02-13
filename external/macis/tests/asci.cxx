@@ -57,13 +57,7 @@ auto make_quad(unsigned i, unsigned j, unsigned k, unsigned l) {
 
   string_type C = 0;
   C.flip(i).flip(j).flip(k).flip(l);
-  string_type B = 1;
-  if constexpr (string_type{}.size() <= 64) {
-    B <<= l;
-    B = B.to_ullong() - 1;
-  } else {
-    B = macis::full_mask<string_type{}.size()>(l);
-  }
+  string_type B = macis::full_mask<string_type{}.size()>(l);
 
   return constraint_type(C, B, l);
 }

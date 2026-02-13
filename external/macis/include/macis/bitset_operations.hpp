@@ -178,8 +178,15 @@ std::bitset<M> full_mask() {
 template <size_t N>
 std::bitset<N> full_mask(size_t i) {
   assert(i <= N);
-  std::bitset<N> mask(0ul);
-  return (~mask) >> (N - i);
+  if constexpr (N <= 64) {
+    std::bitset<N> B = 1;
+    B <<= i;
+    B = B.to_ullong() - 1;
+    return B;
+  } else {
+    std::bitset<N> mask(0ul);
+    return (~mask) >> (N - i);
+  }
 }
 
 /**
