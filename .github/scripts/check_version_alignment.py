@@ -49,7 +49,7 @@ def check_versions() -> int:
         return 1
 
     # Validate version format: X.Y.Z or X.Y.Z.T (4-component CMake-compatible)
-    # The .T suffix is used for pre-release/rc builds (e.g., 1.0.0.1 = rc1)
+    # The optional .T suffix is a numeric build/tweak component for CMake compatibility
     if not re.match(r"^\d+\.\d+\.\d+(\.\d+)?$", canonical_version):
         print(
             f"Version check failed: Invalid version format '{canonical_version}'",
