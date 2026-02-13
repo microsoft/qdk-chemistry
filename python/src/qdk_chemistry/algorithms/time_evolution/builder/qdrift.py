@@ -5,7 +5,9 @@ an alternative to deterministic Trotter decomposition by using randomized sampli
 
 References:
     Campbell, E. (2019). Random Compiler for Fast Hamiltonian Simulation.
-    Physical Review Letters, 123(7), 070503. https://arxiv.org/abs/1811.08017
+    Physical Review Letters, 123(7), 070503.
+    https://arxiv.org/abs/1811.08017
+    https://doi.org/10.1103/PhysRevLett.123.070503
 
 """
 
@@ -41,8 +43,9 @@ class QDriftSettings(Settings):
         Attributes:
             num_samples: Number of random samples N. More samples = higher accuracy.
                          Error scales as O(λ²t²/N).
-            seed: Random seed for reproducibility. None for non-deterministic behavior.
-            tolerance: Absolute tolerance for filtering small coefficients.
+            seed: Random seed for reproducibility. Use -1 for non-deterministic behavior.
+            merge_commuting: Whether to merge consecutive commuting terms to reduce
+                circuit depth.  The merging is exact and preserves the error bound.
 
         """
         super().__init__()
@@ -59,10 +62,10 @@ class QDriftSettings(Settings):
             "Random seed for reproducibility. Use -1 for non-deterministic.",
         )
         self._set_default(
-            "tolerance",
-            "float",
-            1e-12,
-            "Absolute tolerance for filtering small coefficients.",
+            "merge_commuting",
+            "bool",
+            True,
+            "Merge consecutive commuting samples to reduce circuit depth.",
         )
 
 
@@ -90,7 +93,7 @@ class QDrift(TimeEvolutionBuilder):
     Attributes:
         num_samples: Number of random samples to draw.
         seed: Random seed for reproducibility.
-        tolerance: Threshold for filtering negligible coefficients.
+        merge_commuting: Whether to fuse consecutive commuting terms.
 
     Examples:
         >>> from qdk_chemistry.algorithms import create
@@ -101,7 +104,9 @@ class QDrift(TimeEvolutionBuilder):
 
     References:
         Campbell, E. (2019). Random Compiler for Fast Hamiltonian Simulation.
+        Physical Review Letters, 123(7), 070503.
         https://arxiv.org/abs/1811.08017
+        https://doi.org/10.1103/PhysRevLett.123.070503
 
     """
 
@@ -109,7 +114,7 @@ class QDrift(TimeEvolutionBuilder):
         self,
         num_samples: int = 100,
         seed: int = -1,
-        tolerance: float = 1e-12,
+        merge_commuting: bool = True,
     ):
         """Initialize qDRIFT builder with specified settings.
 
@@ -119,15 +124,17 @@ class QDrift(TimeEvolutionBuilder):
                 Defaults to 100.
             seed: Random seed for reproducibility. Use -1 for non-deterministic
                 sampling. Defaults to -1.
-            tolerance: Absolute threshold for filtering small Hamiltonian
-                coefficients. Defaults to 1e-12.
+            merge_commuting: If ``True``, consecutive mutually-commuting
+                sampled terms are fused to reduce circuit depth.  The
+                merging is exact and preserves the Campbell (2019) error
+                bound.  Defaults to ``True``.
 
         """
         super().__init__()
         self._settings = QDriftSettings()
         self._settings.set("num_samples", num_samples)
         self._settings.set("seed", seed)
-        self._settings.set("tolerance", tolerance)
+        self._settings.set("merge_commuting", merge_commuting)
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
         r"""Construct the time evolution unitary using qDRIFT randomized sampling.
@@ -150,63 +157,29 @@ class QDrift(TimeEvolutionBuilder):
         rng = np.random.default_rng(seed if seed >= 0 else None)
 
         num_samples: int = self._settings.get("num_samples")
-        tolerance: float = self._settings.get("tolerance")
 
-        # Extract Hamiltonian terms and coefficients
-        paulis = list(qubit_hamiltonian.pauli_ops.paulis)
-        coeffs_raw = qubit_hamiltonian.pauli_ops.coeffs
+        if not qubit_hamiltonian.is_hermitian():
+            raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
-        # Convert coefficients to real values and validate Hermiticity
-        coeffs: list[float] = []
-        for idx, coeff in enumerate(coeffs_raw):
-            coeff_complex = complex(coeff)
-            if abs(coeff_complex.imag) > tolerance:
-                raise ValueError(
-                    f"Non-Hermitian Hamiltonian: coefficient {coeff} for term "
-                    f"{paulis[idx].to_label()} has nonzero imaginary part."
-                )
-            coeffs.append(coeff_complex.real)
-
-        # Filter small terms
-        filtered_paulis: list = []
-        filtered_coeffs: list[float] = []
-        for pauli, coeff in zip(paulis, coeffs, strict=True):
-            if abs(coeff) > tolerance:
-                filtered_paulis.append(pauli)
-                filtered_coeffs.append(coeff)
-
-        if len(filtered_coeffs) == 0:
-            # Identity evolution (no significant terms)
-            return TimeEvolutionUnitary(
-                container=PauliProductFormulaContainer(
-                    step_terms=[],
-                    step_reps=1,
-                    num_qubits=qubit_hamiltonian.num_qubits,
-                )
+        # Build (label, real_coeff) pairs from the full Hamiltonian
+        all_terms = list(
+            zip(
+                qubit_hamiltonian.pauli_strings,
+                np.real(qubit_hamiltonian.coefficients).tolist(),
+                strict=True,
             )
+        )
 
-        # Compute λ (1-norm) and probabilities
-        abs_coeffs = np.array([abs(c) for c in filtered_coeffs])
-        lambda_norm = float(np.sum(abs_coeffs))
-        probabilities = abs_coeffs / lambda_norm
+        terms = self._sample_qdrift_terms(all_terms, time, num_samples, rng)
 
-        # Sample N term indices according to the probability distribution
-        term_indices = rng.choice(len(filtered_coeffs), size=num_samples, p=probabilities)
-
-        # Build the sequence of exponentiated Pauli terms
-        # Each sample: exp(-i * sign(h_j) * λ * t / N * P_j)
-        angle_magnitude = lambda_norm * time / num_samples
-
-        terms: list[ExponentiatedPauliTerm] = []
-        for idx in term_indices:
-            pauli = filtered_paulis[idx]
-            coeff = filtered_coeffs[idx]
-            sign = 1.0 if coeff >= 0 else -1.0
-
-            mapping = self._pauli_label_to_map(pauli.to_label())
-            angle = sign * angle_magnitude
-
-            terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+        # Optionally merge consecutive mutually-commuting terms to reduce
+        # circuit depth.  This is exact: commuting unitaries can be freely
+        # reordered, so identical Pauli operators within a commuting run
+        # are fused by summing their rotation angles.  Non-commuting
+        # boundaries are preserved to keep the Campbell (2019) error bound
+        # intact.
+        if self._settings.get("merge_commuting"):
+            terms = self._merge_commuting_runs(terms)
 
         return TimeEvolutionUnitary(
             container=PauliProductFormulaContainer(
@@ -216,22 +189,132 @@ class QDrift(TimeEvolutionBuilder):
             )
         )
 
+    # ------------------------------------------------------------------
+    # qDRIFT sampling and commuting-term merge helpers
+    # ------------------------------------------------------------------
+
     @staticmethod
-    def _pauli_label_to_map(label: str) -> dict[int, str]:
-        """Translate a Pauli label to a mapping ``qubit -> {X, Y, Z}``.
+    def _sample_qdrift_terms(
+        terms: list[tuple[str, float]],
+        time: float,
+        num_samples: int,
+        rng: np.random.Generator,
+    ) -> list[ExponentiatedPauliTerm]:
+        """Build qDRIFT-style random samples from a set of Pauli terms.
+
+        Each term ``(label, coeff)`` is sampled with probability proportional
+        to ``|coeff|``.  Every sample contributes a rotation
+        ``exp(-i * sign(coeff) * λ * t / N * P)`` where ``λ`` is the 1-norm
+        of the coefficients and ``N`` is the number of samples.
 
         Args:
-            label: Pauli string label in little-endian ordering.
+            terms: List of ``(pauli_label, coefficient)`` pairs.
+            time: Evolution time for this block.
+            num_samples: Number of random samples (N).
+            rng: Random number generator.
 
         Returns:
-            Dictionary assigning each non-identity qubit index to its Pauli axis.
+            List of :class:`ExponentiatedPauliTerm` for the sampled sequence.
 
         """
-        mapping: dict[int, str] = {}
-        for index, char in enumerate(reversed(label)):  # reversed: right-most char -> qubit 0
-            if char != "I":
-                mapping[index] = char
-        return mapping
+        if len(terms) == 0:
+            return []
+
+        coeffs = np.array([c for _, c in terms])
+        abs_coeffs = np.abs(coeffs)
+        lambda_norm = float(abs_coeffs.sum())
+
+        if lambda_norm < 1e-14:
+            return []
+
+        probabilities = abs_coeffs / lambda_norm
+        term_indices = rng.choice(len(terms), size=num_samples, p=probabilities)
+
+        angle_magnitude = lambda_norm * time / num_samples
+
+        result: list[ExponentiatedPauliTerm] = []
+        for idx in term_indices:
+            label, coeff = terms[idx]
+            sign = 1.0 if coeff >= 0 else -1.0
+            mapping: dict[int, str] = {}
+            for i, char in enumerate(reversed(label)):
+                if char != "I":
+                    mapping[i] = char
+            result.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=sign * angle_magnitude))
+
+        return result
+
+    @staticmethod
+    def _pauli_terms_commute(a: dict[int, str], b: dict[int, str]) -> bool:
+        """Check whether two Pauli terms commute.
+
+        Two Pauli strings commute if and only if the number of qubit
+        positions where both are non-identity *and* different is even.
+
+        Args:
+            a: First Pauli term mapping (qubit index → Pauli axis).
+            b: Second Pauli term mapping (qubit index → Pauli axis).
+
+        Returns:
+            ``True`` if the terms commute.
+
+        """
+        anti_commuting = sum(1 for q in a if q in b and a[q] != b[q])
+        return anti_commuting % 2 == 0
+
+    @classmethod
+    def _merge_commuting_runs(cls, terms: list[ExponentiatedPauliTerm]) -> list[ExponentiatedPauliTerm]:
+        """Merge consecutive mutually-commuting terms to reduce circuit depth.
+
+        Walks through the term sequence and accumulates runs of mutually
+        commuting terms.  Within each run, terms with the same Pauli
+        operator are fused by summing their rotation angles.  Terms whose
+        merged angle is zero are dropped.
+
+        The unitary is unchanged because the order of commuting operators
+        is irrelevant.  Non-commuting boundaries are never crossed.
+
+        Args:
+            terms: Ordered list of exponentiated Pauli terms.
+
+        Returns:
+            A (potentially shorter) list producing the same unitary.
+
+        """
+        if not terms:
+            return terms
+
+        result: list[ExponentiatedPauliTerm] = []
+        group: list[ExponentiatedPauliTerm] = [terms[0]]
+
+        for term in terms[1:]:
+            if all(cls._pauli_terms_commute(term.pauli_term, g.pauli_term) for g in group):
+                group.append(term)
+            else:
+                result.extend(cls._flush_commuting_group(group))
+                group = [term]
+
+        result.extend(cls._flush_commuting_group(group))
+        return result
+
+    @staticmethod
+    def _flush_commuting_group(
+        group: list[ExponentiatedPauliTerm],
+    ) -> list[ExponentiatedPauliTerm]:
+        """Fuse terms within a mutually-commuting group.
+
+        Terms acting on the same Pauli operator have their angles summed.
+        Terms whose fused angle is exactly zero are dropped.
+
+        """
+        merged: dict[tuple[tuple[int, str], ...], float] = {}
+        for term in group:
+            key = tuple(sorted(term.pauli_term.items()))
+            merged[key] = merged.get(key, 0.0) + term.angle
+
+        return [
+            ExponentiatedPauliTerm(pauli_term=dict(key), angle=angle) for key, angle in merged.items() if angle != 0.0
+        ]
 
     def name(self) -> str:
         """Return the name of the time evolution unitary builder."""

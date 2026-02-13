@@ -26,6 +26,7 @@ from __future__ import annotations
 import numpy as np
 
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
+from qdk_chemistry.algorithms.time_evolution.builder.qdrift import QDrift
 from qdk_chemistry.data import QubitHamiltonian, Settings, TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
@@ -51,10 +52,8 @@ class PartiallyRandomizedSettings(Settings):
         r"""Initialize PartiallyRandomizedSettings with default values.
 
         Attributes:
-            num_deterministic_terms: Number of largest-weight terms to treat deterministically.
-                Use -1 for automatic determination based on weight_threshold or default (top 10%).
             weight_threshold: Terms with \|h_j\| >= threshold are treated deterministically.
-                Use -1.0 for automatic. Ignored if num_deterministic_terms >= 0.
+                Use -1.0 for automatic determination (top 10% of terms by weight).
             trotter_order: Order of Trotter formula for deterministic terms (1 or 2).
             num_random_samples: Number of random samples for the randomized part.
             seed: Random seed for reproducibility. Use -1 for non-deterministic.
@@ -62,12 +61,6 @@ class PartiallyRandomizedSettings(Settings):
 
         """
         super().__init__()
-        self._set_default(
-            "num_deterministic_terms",
-            "int",
-            -1,
-            "Number of largest-weight terms to treat deterministically. Use -1 for automatic.",
-        )
         self._set_default(
             "weight_threshold",
             "float",
@@ -98,9 +91,15 @@ class PartiallyRandomizedSettings(Settings):
             1e-12,
             "Absolute tolerance for filtering small coefficients.",
         )
+        self._set_default(
+            "merge_commuting",
+            "bool",
+            True,
+            "Merge consecutive commuting random samples to reduce circuit depth.",
+        )
 
 
-class PartiallyRandomized(TimeEvolutionBuilder):
+class PartiallyRandomized(QDrift):
     r"""Partially randomized product formula builder.
 
     Implements a hybrid Hamiltonian simulation method that combines deterministic
@@ -118,19 +117,15 @@ class PartiallyRandomized(TimeEvolutionBuilder):
     - :math:`\lambda_R = \sum_m |h_m| \ll \lambda` (random part has small total weight)
     - :math:`L_D \ll M` (few deterministic terms, many random terms)
 
-    For a second-order Trotter formula, each step has the structure:
+    For a second-order Trotter formula, each step applies the deterministic
+    part :math:`H_D` with half-angles in a symmetric (palindromic) sweep, with the
+    randomized part :math:`H_R` sandwiched in between. The first-order variant
+    applies :math:`H_D` at full angle followed by :math:`H_R`.
 
-    .. math::
-
-        S_2(\delta) = e^{-\frac{i}{2}\delta H_1} \cdots e^{-\frac{i}{2}\delta H_{L_D}}
-                      e^{-i\delta H_R}
-                      e^{-\frac{i}{2}\delta H_{L_D}} \cdots e^{-\frac{i}{2}\delta H_1}
-
-    where :math:`e^{-i\delta H_R}` is approximated using randomized sampling.
-
-    The total cost scales as:
-    - :math:`O(L_D \cdot C_{gs}^{1/p} \cdot \epsilon^{-1-1/p})` for deterministic evolutions
-    - :math:`O(\lambda_R^2 \cdot \epsilon^{-2})` for Pauli rotations
+    The total cost scales as
+    :math:`O(\lambda_R^2 / \epsilon^2)` Pauli rotations for the randomized part,
+    where :math:`\lambda_R = \sum_m |h_m|` is the 1-norm of :math:`H_R`
+    (Theorem 2 of :cite:`Guenther2025`).
 
     Examples:
         >>> from qdk_chemistry.algorithms import create
@@ -138,7 +133,7 @@ class PartiallyRandomized(TimeEvolutionBuilder):
         >>> builder = create(
         ...     "time_evolution_builder",
         ...     "partially_randomized",
-        ...     num_deterministic_terms=10,  # Top 10 terms treated deterministically
+        ...     weight_threshold=0.1,  # Terms with |h_j| >= 0.1 treated deterministically
         ...     num_random_samples=200,
         ...     trotter_order=2,
         ... )
@@ -152,22 +147,19 @@ class PartiallyRandomized(TimeEvolutionBuilder):
 
     def __init__(
         self,
-        num_deterministic_terms: int = -1,
         weight_threshold: float = -1.0,
         trotter_order: int = 2,
         num_random_samples: int = 100,
         seed: int = -1,
         tolerance: float = 1e-12,
+        merge_commuting: bool = True,
     ):
         r"""Initialize partially randomized builder with specified settings.
 
         Args:
-            num_deterministic_terms: Number of largest-weight terms to treat
-                deterministically with Trotter. Use -1 for automatic determination
-                based on weight_threshold or default (top 10% of terms).
             weight_threshold: Terms with \|h_j\| >= threshold are treated
-                deterministically. Use -1.0 for automatic. Only used if
-                num_deterministic_terms is -1.
+                deterministically with Trotter. Use -1.0 for automatic
+                determination (top 10% of terms by weight).
             trotter_order: Order of Trotter formula for deterministic part.
                 1 = first order, 2 = second order (symmetric). Defaults to 2.
             num_random_samples: Number of random samples for the qDRIFT-style
@@ -176,16 +168,21 @@ class PartiallyRandomized(TimeEvolutionBuilder):
                 Defaults to -1.
             tolerance: Threshold for filtering negligible coefficients.
                 Defaults to 1e-12.
+            merge_commuting: If ``True``, consecutive mutually-commuting
+                sampled terms in the random block are fused to reduce
+                circuit depth.  Defaults to ``True``.
 
         """
-        super().__init__()
+        # Bypass QDrift.__init__ which creates QDriftSettings; we have our
+        # own settings class.
+        TimeEvolutionBuilder.__init__(self)
         self._settings = PartiallyRandomizedSettings()
-        self._settings.set("num_deterministic_terms", num_deterministic_terms)
         self._settings.set("weight_threshold", weight_threshold)
         self._settings.set("trotter_order", trotter_order)
         self._settings.set("num_random_samples", num_random_samples)
         self._settings.set("seed", seed)
         self._settings.set("tolerance", tolerance)
+        self._settings.set("merge_commuting", merge_commuting)
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
         r"""Construct the time evolution unitary using partially randomized product formula.
@@ -193,7 +190,7 @@ class PartiallyRandomized(TimeEvolutionBuilder):
         The algorithm:
         1. Sort Hamiltonian terms by coefficient magnitude
         2. Split into H_D (deterministic, large terms) and H_R (random, small terms)
-        3. Apply second-order Trotter structure with qDRIFT for the H_R block
+        3. Apply first- or second-order Trotter structure with qDRIFT for the H_R block
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
@@ -210,23 +207,13 @@ class PartiallyRandomized(TimeEvolutionBuilder):
         seed: int = self._settings.get("seed")
         rng = np.random.default_rng(seed if seed >= 0 else None)
 
-        # Extract and validate Hamiltonian terms
-        paulis = list(qubit_hamiltonian.pauli_ops.paulis)
-        coeffs_raw = qubit_hamiltonian.pauli_ops.coeffs
+        if not qubit_hamiltonian.is_hermitian(tolerance=tolerance):
+            raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
-        terms_data: list[tuple[int, str, float]] = []  # (original_idx, label, coeff)
-        for idx, (pauli, coeff) in enumerate(zip(paulis, coeffs_raw, strict=True)):
-            coeff_complex = complex(coeff)
-            if abs(coeff_complex.imag) > tolerance:
-                raise ValueError(
-                    f"Non-Hermitian Hamiltonian: coefficient {coeff} for term "
-                    f"{pauli.to_label()} has nonzero imaginary part."
-                )
-            real_coeff = coeff_complex.real
-            if abs(real_coeff) > tolerance:
-                terms_data.append((idx, pauli.to_label(), real_coeff))
+        # Get non-negligible real terms, sorted by descending weight
+        real_terms = qubit_hamiltonian.get_real_coefficients(tolerance=tolerance, sort_by_magnitude=True)
 
-        if len(terms_data) == 0:
+        if len(real_terms) == 0:
             # Identity evolution
             return TimeEvolutionUnitary(
                 container=PauliProductFormulaContainer(
@@ -236,15 +223,12 @@ class PartiallyRandomized(TimeEvolutionBuilder):
                 )
             )
 
-        # Sort terms by absolute coefficient (descending)
-        terms_data.sort(key=lambda x: abs(x[2]), reverse=True)
-
         # Determine split between deterministic and random terms
-        num_det = self._determine_num_deterministic(terms_data)
+        num_deterministic = self._determine_num_deterministic(real_terms)
 
         # Split into H_D and H_R
-        deterministic_terms = terms_data[:num_det]
-        random_terms = terms_data[num_det:]
+        deterministic_terms = real_terms[:num_deterministic]
+        random_terms = real_terms[num_deterministic:]
 
         # Build the product formula
         all_terms: list[ExponentiatedPauliTerm] = []
@@ -254,17 +238,19 @@ class PartiallyRandomized(TimeEvolutionBuilder):
             half_time = time / 2.0
 
             # Forward sweep of deterministic terms (half angle)
-            for _, label, coeff in deterministic_terms:
+            for label, coeff in deterministic_terms:
                 mapping = self._pauli_label_to_map(label)
                 angle = coeff * half_time
                 all_terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
 
             # Random part (full time)
-            random_part_terms = self._build_random_terms(random_terms, time, num_random_samples, rng)
+            random_part_terms = self._sample_qdrift_terms(random_terms, time, num_random_samples, rng)
+            if self._settings.get("merge_commuting"):
+                random_part_terms = self._merge_commuting_runs(random_part_terms)
             all_terms.extend(random_part_terms)
 
             # Backward sweep of deterministic terms (half angle, reversed order)
-            for _, label, coeff in reversed(deterministic_terms):
+            for label, coeff in reversed(deterministic_terms):
                 mapping = self._pauli_label_to_map(label)
                 angle = coeff * half_time
                 all_terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
@@ -272,13 +258,15 @@ class PartiallyRandomized(TimeEvolutionBuilder):
         else:
             # First-order: e^{-iδH_1} ... e^{-iδH_L} e^{-iδH_R}
             # Deterministic terms
-            for _, label, coeff in deterministic_terms:
+            for label, coeff in deterministic_terms:
                 mapping = self._pauli_label_to_map(label)
                 angle = coeff * time
                 all_terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
 
             # Random part
-            random_part_terms = self._build_random_terms(random_terms, time, num_random_samples, rng)
+            random_part_terms = self._sample_qdrift_terms(random_terms, time, num_random_samples, rng)
+            if self._settings.get("merge_commuting"):
+                random_part_terms = self._merge_commuting_runs(random_part_terms)
             all_terms.extend(random_part_terms)
 
         return TimeEvolutionUnitary(
@@ -289,98 +277,28 @@ class PartiallyRandomized(TimeEvolutionBuilder):
             )
         )
 
-    def _determine_num_deterministic(self, terms_data: list[tuple[int, str, float]]) -> int:
+    def _determine_num_deterministic(self, terms: list[tuple[str, float]]) -> int:
         """Determine how many terms to treat deterministically.
 
         Args:
-            terms_data: List of (idx, label, coeff) sorted by |coeff| descending.
+            terms: List of (label, coeff) sorted by |coeff| descending.
 
         Returns:
             Number of terms to treat deterministically.
 
         """
-        num_det_setting: int = self._settings.get("num_deterministic_terms")
-        if num_det_setting >= 0:
-            return min(num_det_setting, len(terms_data))
-
         weight_threshold: float = self._settings.get("weight_threshold")
         if weight_threshold >= 0.0:
             # Count terms with |coeff| >= threshold
-            count = sum(1 for _, _, c in terms_data if abs(c) >= weight_threshold)
+            count = sum(1 for _, c in terms if abs(c) >= weight_threshold)
             return max(1, count)  # At least 1 deterministic term
 
         # Default: top 10% of terms (at least 1, at most all but 1 for random)
-        num_det = max(1, len(terms_data) // 10)
+        num_deterministic = max(1, len(terms) // 10)
         # Ensure at least some terms remain for random treatment
-        if num_det >= len(terms_data):
-            num_det = max(1, len(terms_data) - 1)
-        return num_det
-
-    def _build_random_terms(
-        self,
-        random_terms: list[tuple[int, str, float]],
-        time: float,
-        num_samples: int,
-        rng: np.random.Generator,
-    ) -> list[ExponentiatedPauliTerm]:
-        """Build qDRIFT-style random samples for H_R.
-
-        Args:
-            random_terms: List of (idx, label, coeff) for terms in H_R.
-            time: Evolution time for this block.
-            num_samples: Number of random samples.
-            rng: Random number generator.
-
-        Returns:
-            List of ExponentiatedPauliTerm for the random part.
-
-        """
-        if len(random_terms) == 0:
-            return []
-
-        # Compute λ_R and probabilities
-        coeffs = np.array([c for _, _, c in random_terms])
-        abs_coeffs = np.abs(coeffs)
-        lambda_r = float(np.sum(abs_coeffs))
-
-        if lambda_r < 1e-14:
-            return []
-
-        probabilities = abs_coeffs / lambda_r
-
-        # Sample term indices
-        term_indices = rng.choice(len(random_terms), size=num_samples, p=probabilities)
-
-        # Build sampled terms
-        # Each sample: exp(-i * sign(h_m) * λ_R * t / r * P_m)
-        angle_magnitude = lambda_r * time / num_samples
-
-        terms: list[ExponentiatedPauliTerm] = []
-        for idx in term_indices:
-            _, label, coeff = random_terms[idx]
-            sign = 1.0 if coeff >= 0 else -1.0
-            mapping = self._pauli_label_to_map(label)
-            angle = sign * angle_magnitude
-            terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
-
-        return terms
-
-    @staticmethod
-    def _pauli_label_to_map(label: str) -> dict[int, str]:
-        """Translate a Pauli label to a mapping ``qubit -> {X, Y, Z}``.
-
-        Args:
-            label: Pauli string label in little-endian ordering.
-
-        Returns:
-            Dictionary assigning each non-identity qubit index to its Pauli axis.
-
-        """
-        mapping: dict[int, str] = {}
-        for index, char in enumerate(reversed(label)):
-            if char != "I":
-                mapping[index] = char
-        return mapping
+        if num_deterministic >= len(terms):
+            num_deterministic = max(1, len(terms) - 1)
+        return num_deterministic
 
     def name(self) -> str:
         """Return the name of the time evolution unitary builder."""
