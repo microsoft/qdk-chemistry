@@ -13,6 +13,7 @@
 #include <qdk/chemistry/data/configuration_set.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <tuple>
 #include <variant>
@@ -549,6 +550,14 @@ class Wavefunction : public DataClass,
                      public std::enable_shared_from_this<Wavefunction> {
  public:
   /**
+   * @brief Get the data type name for this class
+   * @return "wavefunction"
+   */
+  std::string get_data_type_name() const override {
+    return DATACLASS_TO_SNAKE_CASE(Wavefunction);
+  }
+
+  /**
    * @brief Get a summary string
    * @return String containing summary
    */
@@ -718,6 +727,34 @@ class Wavefunction : public DataClass,
    * @return Number of determinants in the wavefunction
    */
   size_t size() const;
+
+  /**
+   * @brief Get top N determinants ranked by absolute CI coefficient
+   * @param max_determinants Maximum number of determinants to return.
+   *        If nullopt, returns all determinants.
+   * @return Pair of (configurations, coefficients) where configurations is a
+   *         vector of Configuration objects and coefficients is a VectorVariant
+   *         (Eigen::VectorXd or Eigen::VectorXcd), both sorted by descending
+   *         absolute coefficient value.
+   */
+  std::pair<DeterminantVector, VectorVariant> get_top_determinants(
+      std::optional<size_t> max_determinants = std::nullopt) const;
+
+  /**
+   * @brief Create a truncated wavefunction with top N determinants
+   *
+   * Creates a new wavefunction containing only the top N determinants
+   * ranked by absolute coefficient value, with coefficients renormalized.
+   * The resulting wavefunction uses a SciWavefunctionContainer.
+   *
+   * @param max_determinants Maximum number of determinants to keep.
+   *        If nullopt, returns a copy with all determinants, with
+   *        coefficients renormalized.
+   * @return Shared pointer to new Wavefunction with truncated and
+   *         renormalized coefficients
+   */
+  std::shared_ptr<Wavefunction> truncate(
+      std::optional<size_t> max_determinants = std::nullopt) const;
 
   /**
    * @brief Calculate norm of the wavefunction

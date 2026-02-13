@@ -317,8 +317,10 @@ void VVHVLocalization::initialize() {
 
   // Create minimal basis set
   auto mol_structure = ori_bs->mol;
-  this->minimal_basis_fp_ = qcs::BasisSet::from_database_json(
-      mol_structure, minimal_basis_name_, ori_bs->mode, ori_bs->pure, true);
+  auto _min_basis = data::BasisSet::from_basis_name(
+      minimal_basis_name_, basis_set_->get_structure());
+  this->minimal_basis_fp_ =
+      utils::microsoft::convert_basis_set_from_qdk(*_min_basis);
   const auto* minimal_bs = this->minimal_basis_fp_.get();  // Minimal basis set
 
   const auto num_atoms = mol_structure->n_atoms;
@@ -1204,8 +1206,6 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
   auto [coeffs_alpha, coeffs_beta] = orbitals->get_coefficients();
   auto ao_overlap = orbitals->get_overlap_matrix();
 
-  // TODO (DBWY): Adding configurable inner localizer
-  // Work Item: 41816
   // Create reusable Pipek-Mezey localizer for inner localization
   const size_t num_atoms = basis_set->get_structure()->get_num_atoms();
   std::vector<int> bf_to_atom(num_atomic_orbitals);
@@ -1239,12 +1239,22 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
     C_lmo.block(0, num_occupied_orbitals, num_atomic_orbitals,
                 num_virtual_orbitals) = C_virt_loc;
 
+    // Preserve active space indices from input orbitals if they exist
+    std::optional<data::Orbitals::RestrictedCASIndices> restricted_indices;
+    if (orbitals->has_active_space()) {
+      auto [active_a, active_b] = orbitals->get_active_space_indices();
+      auto [inactive_a, inactive_b] = orbitals->get_inactive_space_indices();
+      restricted_indices = std::make_tuple(
+          std::vector<size_t>(active_a.begin(), active_a.end()),
+          std::vector<size_t>(inactive_a.begin(), inactive_a.end()));
+    }
+
     auto new_orbitals = std::make_shared<data::Orbitals>(
         C_lmo,
-        std::nullopt,   // no energies for localized orbitals
-        ao_overlap,     // Atomic Orbital overlap
-        basis_set,      // basis set
-        std::nullopt);  // no active space indices
+        std::nullopt,         // no energies for localized orbitals
+        ao_overlap,           // Atomic Orbital overlap
+        basis_set,            // basis set
+        restricted_indices);  // preserve active space indices from input
     return detail::new_wavefunction(wavefunction, new_orbitals);
   } else {
     // Unrestricted case: UHF - only handle virtual orbitals
@@ -1277,12 +1287,25 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
     C_beta.block(0, n_beta_electrons, num_atomic_orbitals,
                  num_beta_virtual_orbitals) = C_virt_beta_loc;
 
+    // Preserve active space indices from input orbitals if they exist
+    std::optional<data::Orbitals::UnrestrictedCASIndices> unrestricted_indices;
+    if (orbitals->has_active_space()) {
+      auto [active_a, active_b] = orbitals->get_active_space_indices();
+      auto [inactive_a, inactive_b] = orbitals->get_inactive_space_indices();
+      // Order: (active_alpha, active_beta, inactive_alpha, inactive_beta)
+      unrestricted_indices = std::make_tuple(
+          std::vector<size_t>(active_a.begin(), active_a.end()),
+          std::vector<size_t>(active_b.begin(), active_b.end()),
+          std::vector<size_t>(inactive_a.begin(), inactive_a.end()),
+          std::vector<size_t>(inactive_b.begin(), inactive_b.end()));
+    }
+
     auto new_orbitals = std::make_shared<data::Orbitals>(
         C_alpha, C_beta, std::nullopt,
-        std::nullopt,   // no energies for localized orbitals
-        ao_overlap,     // Atomic Orbital overlap
-        basis_set,      // basis set
-        std::nullopt);  // no active space indices
+        std::nullopt,           // no energies for localized orbitals
+        ao_overlap,             // Atomic Orbital overlap
+        basis_set,              // basis set
+        unrestricted_indices);  // preserve active space indices from input
     return detail::new_wavefunction(wavefunction, new_orbitals);
   }
 }

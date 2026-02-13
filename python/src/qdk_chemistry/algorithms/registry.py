@@ -497,21 +497,32 @@ def _register_python_factories():
     """Register all built-in Python algorithm factories.
 
     This internal initialization function registers all the Python-implemented
-    algorithm factories. This includes factories for energy estimators, qubit Hamiltonian solver,
-    qubit mappers, and state preparation algorithms that are implemented in Python.
+    algorithm factories. This includes factories for energy estimators, phase estimation algorithms,
+    qubit Hamiltonian solvers, qubit mappers, time evolution algorithms, and state preparation algorithms
+    that are implemented in Python.
 
     This function is automatically called during module import and should not
     be called by users.
     """
+    from qdk_chemistry.algorithms.circuit_executor import CircuitExecutorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.phase_estimation import PhaseEstimationFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolverFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.time_evolution.builder import TimeEvolutionBuilderFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import (  # noqa: PLC0415
+        ControlledEvolutionCircuitMapperFactory,
+    )
 
     register_factory(EnergyEstimatorFactory())
     register_factory(StatePreparationFactory())
     register_factory(QubitMapperFactory())
     register_factory(QubitHamiltonianSolverFactory())
+    register_factory(TimeEvolutionBuilderFactory())
+    register_factory(ControlledEvolutionCircuitMapperFactory())
+    register_factory(CircuitExecutorFactory())
+    register_factory(PhaseEstimationFactory())
 
 
 _ = _register_cpp_factories()
@@ -557,20 +568,36 @@ def _register_python_algorithms():
     """Register all built-in Python algorithm instances.
 
     This internal initialization function registers specific Python-implemented
-    algorithm instances as built-in algorithms. This includes the default QDK
-    energy estimator, qubit Hamiltonian solvers, and state preparation algorithms.
+    algorithm instances as built-in algorithms. This includes the default QDK energy estimator,
+    phase estimation algorithms, qubit Hamiltonian solvers, time evolution algorithms, and state preparation algorithms.
 
     This function is automatically called during module import and should not
     be called by users.
     """
+    from qdk_chemistry.algorithms.circuit_executor.qdk import QdkFullStateSimulator  # noqa: PLC0415
     from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator  # noqa: PLC0415
+    from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (  # noqa: PLC0415
+        IterativePhaseEstimation,
+    )
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
+    from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.time_evolution.builder.trotter import (  # noqa: PLC0415
+        Trotter,
+    )
+    from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import (  # noqa: PLC0415
+        PauliSequenceMapper,
+    )
 
     register(lambda: QDKEnergyEstimator())
     register(lambda: SparseIsometryGF2XStatePreparation())
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
+    register(lambda: QdkQubitMapper())
+    register(lambda: Trotter())
+    register(lambda: PauliSequenceMapper())
+    register(lambda: QdkFullStateSimulator())
+    register(lambda: IterativePhaseEstimation())
 
 
 _register_python_algorithms()

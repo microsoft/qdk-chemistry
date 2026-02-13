@@ -7,16 +7,22 @@
 
 import numpy as np
 import pytest
-from qiskit import QuantumCircuit
-from qiskit.circuit import Parameter
-from qiskit.circuit.library import IGate, SdgGate, SGate, ZGate
-from qiskit.transpiler import PassManager
 
-from qdk_chemistry.plugins.qiskit._interop.transpiler import (
-    MergeZBasisRotations,
-    RemoveZBasisOnZeroState,
-    SubstituteCliffordRz,
-)
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+
+if QDK_CHEMISTRY_HAS_QISKIT:
+    from qiskit import QuantumCircuit
+    from qiskit.circuit import Parameter
+    from qiskit.circuit.library import IGate, SdgGate, SGate, ZGate
+    from qiskit.transpiler import PassManager
+
+    from qdk_chemistry.plugins.qiskit._interop.transpiler import (
+        MergeZBasisRotations,
+        RemoveZBasisOnZeroState,
+        SubstituteCliffordRz,
+    )
+
+pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 
 
 def _run_pass(pass_class, circuit):

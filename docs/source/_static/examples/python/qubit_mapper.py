@@ -61,6 +61,26 @@ print(f"Qubit Hamiltonian has {qubit_hamiltonian.num_qubits} qubits")
 from qdk_chemistry.algorithms import registry  # noqa: E402
 
 print(registry.available("qubit_mapper"))
-# ['qiskit']
+# ['qdk', 'qiskit']
 # end-cell-list-implementations
+################################################################################
+
+################################################################################
+# start-cell-qdk-mapper
+from qdk_chemistry.algorithms import create as create_algorithm  # noqa: E402
+
+# Create a native QDK QubitMapper instance
+qdk_mapper = create_algorithm("qubit_mapper", "qdk")
+
+# Configure the encoding (jordan-wigner or bravyi-kitaev)
+qdk_mapper.settings().set("encoding", "jordan-wigner")
+
+# Optional: configure thresholds for numerical precision
+qdk_mapper.settings().set("threshold", 1e-12)
+qdk_mapper.settings().set("integral_threshold", 1e-12)
+
+# Map the fermionic Hamiltonian to a qubit Hamiltonian
+qdk_qubit_hamiltonian = qdk_mapper.run(hamiltonian)
+print(f"QDK mapper produced {len(qdk_qubit_hamiltonian.pauli_strings)} Pauli terms")
+# end-cell-qdk-mapper
 ################################################################################

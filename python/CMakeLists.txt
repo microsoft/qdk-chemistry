@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(qdk_chemistry_python VERSION 1.0.0.1 LANGUAGES CXX)
+project(qdk_chemistry_python VERSION 1.0.2 LANGUAGES CXX)
 
 # Set default build type to Release if not specified
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -61,7 +61,7 @@ else()
 endif()
 
 # Find Python first (required for pybind11)
-find_package(Python 3.11 REQUIRED COMPONENTS Interpreter Development.Module)
+find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
 
 # Find pybind11 - tell it to use the FindPython we already called
 set(PYBIND11_FINDPYTHON ON)
@@ -78,6 +78,7 @@ pybind11_add_module(_core
     src/pybind11/data/structure.cpp
     src/pybind11/data/basis_set.cpp
     src/pybind11/data/configuration.cpp
+    src/pybind11/data/configuration_set.cpp
     src/pybind11/data/ansatz.cpp
     src/pybind11/data/stability_result.cpp
     src/pybind11/data/pauli_operator.cpp
@@ -149,8 +150,6 @@ target_compile_definitions(_core PRIVATE VERSION_INFO=${PROJECT_VERSION})
 set_target_properties(_core PROPERTIES
     CXX_VISIBILITY_PRESET "hidden"
     VISIBILITY_INLINES_HIDDEN YES
-    # TODO(DBWY): See if this is still needed with static upstream builds (it's not)
-    # Set RPATH so _core.so can find libqdk_chemistry.so at runtime
     BUILD_RPATH "$ORIGIN:$ORIGIN/.."
     INSTALL_RPATH "$ORIGIN:$ORIGIN/.."
     BUILD_RPATH_USE_ORIGIN ON

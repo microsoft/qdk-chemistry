@@ -1408,7 +1408,6 @@ def test_basis_set_static_constants():
     # Test that the static constants exist and have expected values
     assert BasisSet.custom_name == "custom_basis_set"
     assert BasisSet.custom_ecp_name == "custom_ecp"
-    assert BasisSet.default_ecp_name == "default_ecp"
 
 
 def test_get_supported_basis_set_names():
@@ -1443,3 +1442,9 @@ def test_get_supported_elements_for_basis_set():
     assert Element.C in elements
     assert Element.O in elements
     assert Element.N in elements
+
+
+def test_basis_set_data_type_name():
+    """Test that BasisSet has the correct _data_type_name class attribute."""
+    assert hasattr(BasisSet, "_data_type_name")
+    assert BasisSet._data_type_name == "basis_set"

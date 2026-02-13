@@ -1072,3 +1072,19 @@ TEST_F(ScfTest, AtomInitGuessEnergyConvergence) {
     }
   }
 }
+
+/**
+ * @brief Test SCF on H+ ion (zero electron edge case)
+ *
+ */
+TEST_F(ScfTest, HydrogenIon_CCPVDZ_SCF) {
+  // Create structure for H+ ion
+  auto h_ion = testing::create_hydrogen_structure();
+
+  // Run SCF for H+ ion (charge=1, spin_multiplicity=1)
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("scf_type", std::string("auto"));
+  scf_solver->settings().set("enable_gdm", true);
+  auto [E_HF, wfn_HF] = scf_solver->run(h_ion, 1, 1, "cc-pvdz");
+  EXPECT_NEAR(E_HF, 0.0, testing::scf_energy_tolerance);
+}

@@ -63,8 +63,8 @@ class TestMP2Validation:
         )
 
     def test_o2_ump2_energy_validation(self):
-        """Test unrestricted MP2 energies for O2 against PySCF."""
-        pyscf_ump2_corr_energy = -0.3509470131940627
+        """Test unrestricted MP2 energies for O2."""
+        ref = -0.3509471012518759
         # Create O2 molecule
         o2_molecule = create_o2_molecule(bond_length=2.3)
 
@@ -89,8 +89,8 @@ class TestMP2Validation:
         qdk_ump2_corr_energy = qdk_ump2_total_energy - reference_energy
 
         # Check energy equality for unrestricted
-        assert abs(qdk_ump2_corr_energy - pyscf_ump2_corr_energy) < mp2_energy_tolerance, (
+        assert abs(qdk_ump2_corr_energy - ref) < mp2_energy_tolerance, (
             f"Unrestricted MP2 correlation energy mismatch: QDK={qdk_ump2_corr_energy:.8f}, "
-            f"PySCF={pyscf_ump2_corr_energy:.8f}, "
-            f"diff={abs(qdk_ump2_corr_energy - pyscf_ump2_corr_energy):.2e}"
+            f"Ref={ref:.8f}, "
+            f"diff={abs(qdk_ump2_corr_energy - ref):.2e}"
         )

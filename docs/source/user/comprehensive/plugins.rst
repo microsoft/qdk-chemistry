@@ -82,6 +82,62 @@ In addition to the native implementations packaged within QDK/Chemistry, plugins
 
 These plugins are enabled automatically when the corresponding package is installed.
 
+.. _qiskit-plugin-details:
+
+Qiskit plugin details
+^^^^^^^^^^^^^^^^^^^^^
+
+The Qiskit plugin uses **opportunistic loading** to maximize compatibility across different installation configurations.
+When Qiskit is installed, the plugin will load and register the available algorithms. The optional ecosystem packages (Qiskit Aer and Qiskit Nature) are loaded based on their availability in your environment.
+
+**Loading behavior:**
+
+- **Qiskit (core)**: Loaded when the plugin is initialized and Qiskit is installed.
+- **Qiskit Nature**: Loaded if ``qiskit-nature`` is installed.
+- **Qiskit Aer**: Loaded if ``qiskit-aer`` is installed.
+
+**Installing optional Qiskit packages:**
+
+To install the optional Qiskit ecosystem packages, use the ``qiskit-extras`` extra when installing QDK/Chemistry:
+
+.. code-block:: bash
+
+   pip install 'qdk-chemistry[qiskit-extras]'
+
+Alternatively, you can install them directly:
+
+.. code-block:: bash
+
+   pip install qiskit-aer qiskit-nature
+
+.. note::
+
+   The ``qiskit-extras`` extra is not currently supported on Python 3.14.
+
+**Checking what is loaded:**
+
+To determine which Qiskit components are available in your environment, you can check the following module-level variables:
+
+.. code-block:: python
+
+   from qdk_chemistry.plugins.qiskit import (
+       QDK_CHEMISTRY_HAS_QISKIT,
+       QDK_CHEMISTRY_HAS_QISKIT_NATURE,
+       QDK_CHEMISTRY_HAS_QISKIT_AER,
+   )
+
+   print(f"Qiskit core available: {QDK_CHEMISTRY_HAS_QISKIT}")
+   print(f"Qiskit Nature available: {QDK_CHEMISTRY_HAS_QISKIT_NATURE}")
+   print(f"Qiskit Aer available: {QDK_CHEMISTRY_HAS_QISKIT_AER}")
+
+These boolean variables are set at module load time and reflect the actual availability of each package in your Python environment.
+
+.. warning::
+
+   If you attempt to use an algorithm that requires an optional Qiskit package that is not installed,
+   the algorithm will not be available in the factory. Use the :ref:`listing-implementations` pattern
+   to see which implementations are currently available.
+
 .. _community-plugins:
 
 Community-developed plugins are also welcome. See :ref:`adding-plugins` for guidance on creating new plugins.

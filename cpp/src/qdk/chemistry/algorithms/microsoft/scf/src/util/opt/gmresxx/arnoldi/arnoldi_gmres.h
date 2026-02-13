@@ -6,6 +6,8 @@
 
 #include <iomanip>
 #include <iostream>
+#include <qdk/chemistry/utils/logger.hpp>
+#include <sstream>
 
 #include "arnoldi.h"
 
@@ -383,35 +385,27 @@ void arnoldi_gmres(int32_t N, int32_t NRHS, int32_t NS, const matrix_op_t<T>& A,
 
   std::vector<detail::real_t<T>> rhs_norms(NRHS);
 
-  // TODO Move this over to logger
   if (settings.verbosity > 1) {
-    std::cout << "GMRES Received " << NS << " Shifts:" << std::endl;
+    QDK_LOGGER().info("GMRES Received {} Shifts:", NS);
     for (int32_t iS = 0; iS < NS; ++iS)
-      std::cout << std::setw(5) << iS << ": " << std::setw(16) << shifts[iS]
-                << std::endl;
-    std::cout << std::endl;
+      QDK_LOGGER().info("  {:>5}: {:>16}", iS, shifts[iS]);
   }
 
   auto print_residuals = [&](const auto& res) {
-    // TODO Move this over to logger
-    std::cout << std::setw(5) << "LS" << std::setw(22) << "Residual"
-              << std::setw(22) << "Relative Residual" << std::endl;
+    QDK_LOGGER().info("{:>5} {:>22} {:>22}", "LS", "Residual",
+                      "Relative Residual");
     for (int32_t k = 0; k < NLS; ++k)
-      std::cout << std::setw(5) << k << std::setw(22) << res[k] << std::setw(22)
-                << res[k] / rhs_norms[k % NRHS] << std::endl;
+      QDK_LOGGER().info("{:>5} {:>22} {:>22}", k, res[k],
+                        res[k] / rhs_norms[k % NRHS]);
   };
 
   // Compute RHS norms
   for (int32_t k = 0; k < NRHS; ++k) rhs_norms[k] = two_norm(N, B + k * LDB, 1);
 
   if (settings.verbosity > 1) {
-    // TODO Move this over to logger
-    std::cout << "GMRES Received " << NRHS
-              << " Right Hand Sides with Norms:" << std::endl;
+    QDK_LOGGER().info("GMRES Received {} Right Hand Sides with Norms:", NRHS);
     for (int32_t iRHS = 0; iRHS < NRHS; ++iRHS)
-      std::cout << std::setw(5) << iRHS << ": " << std::setw(16)
-                << rhs_norms[iRHS] << std::endl;
-    std::cout << std::endl;
+      QDK_LOGGER().info("  {:>5}: {:>16}", iRHS, rhs_norms[iRHS]);
   }
 
   // Form residual R(S) = B - (A - S*I)X(S) = B + S*X(S) - AX(S)
@@ -419,8 +413,7 @@ void arnoldi_gmres(int32_t N, int32_t NRHS, int32_t NS, const matrix_op_t<T>& A,
                                   R.data(), LDR);
 
   if (settings.verbosity > 1) {
-    // TODO Move this over to logger
-    std::cout << "Initial Residual Norms" << std::endl;
+    QDK_LOGGER().info("Initial Residual Norms");
     print_residuals(res_norms);
   }
 
@@ -485,11 +478,8 @@ void arnoldi_gmres(int32_t N, int32_t NRHS, int32_t NS, const matrix_op_t<T>& A,
     }
 
     if (settings.verbosity > 2) {
-      // TODO Move this over to logger
-      std::cout << std::endl;
-      std::cout << "GMRES Iterations:" << std::endl;
-      std::cout << std::setw(5) << "It" << std::setw(5) << "LS" << std::setw(18)
-                << "Error Estimate" << std::endl;
+      QDK_LOGGER().info("GMRES Iterations:");
+      QDK_LOGGER().info("{:>5} {:>5} {:>18}", "It", "LS", "Error Estimate");
     }
 
     // GMRES Inner Iterations
@@ -529,14 +519,9 @@ void arnoldi_gmres(int32_t N, int32_t NRHS, int32_t NS, const matrix_op_t<T>& A,
       }
 
       if (settings.verbosity > 2) {
-        // TODO Move this over to logger
-        std::cout << std::setw(5) << krylov_m;
         for (int32_t k = 0; k < NLS; ++k) {
-          if (k) std::cout << std::setw(5) << " ";
-          std::cout << std::setw(5) << k << std::setw(18) << est_err[k]
-                    << std::endl;
+          QDK_LOGGER().info("{:>5} {:>5} {:>18}", krylov_m, k, est_err[k]);
         }
-        if (NLS > 1) std::cout << std::endl;
       }
 
       // Check initial convergence, based on preconditioned system, does not
@@ -605,13 +590,10 @@ void arnoldi_gmres(int32_t N, int32_t NRHS, int32_t NS, const matrix_op_t<T>& A,
   }
 
   if (settings.verbosity >= 0) {
-    // TODO Move this over to logger
-    std::cout << std::endl;
-    std::cout << "GMRES Converged in " << gmres_inner_it
-              << " inner iterations and " << gmres_outer_it - 1 << " restarts"
-              << std::endl;
+    QDK_LOGGER().info("GMRES Converged in {} inner iterations and {} restarts",
+                      gmres_inner_it, gmres_outer_it - 1);
     if (settings.verbosity > 0) {
-      std::cout << "GMRES Results:" << std::endl;
+      QDK_LOGGER().info("GMRES Results:");
       print_residuals(res_norms);
     }
   }

@@ -436,6 +436,21 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
     const int num_occupied_orbitals = num_electrons_[spin_index];
     const int num_virtual_orbitals =
         num_molecular_orbitals - num_occupied_orbitals;
+    // Validate dimensions (negative values indicate invalid input)
+    // Zero occupied or virtual orbitals is valid for unrestricted calculations
+    // (e.g., H atom has 0 beta electrons)
+    if (num_occupied_orbitals < 0) {
+      throw std::invalid_argument(
+          std::string("GDM: num_occupied_orbitals must be non-negative, got ") +
+          std::to_string(num_occupied_orbitals) + " for spin " +
+          std::to_string(spin_index));
+    }
+    if (num_virtual_orbitals < 0) {
+      throw std::invalid_argument(
+          std::string("GDM: num_virtual_orbitals must be non-negative, got ") +
+          std::to_string(num_virtual_orbitals) + " for spin " +
+          std::to_string(spin_index));
+    }
     rotation_size_[spin_index] = num_occupied_orbitals * num_virtual_orbitals;
     rotation_offset_[spin_index] = total_rotation_size_;
     total_rotation_size_ += rotation_size_[spin_index];
@@ -458,6 +473,19 @@ void GDM::transform_history_(Eigen::Block<RowMajorMatrix>& history,
   QDK_LOG_TRACE_ENTERING();
   const int num_virtual_orbitals =
       num_molecular_orbitals - num_occupied_orbitals;
+  // Validate dimensions (negative values indicate invalid input)
+  if (num_occupied_orbitals < 0 || num_virtual_orbitals < 0) {
+    throw std::invalid_argument(
+        std::string(
+            "transform_history_: invalid dimensions (num_occupied_orbitals=") +
+        std::to_string(num_occupied_orbitals) +
+        ", num_virtual_orbitals=" + std::to_string(num_virtual_orbitals) + ")");
+  }
+  // Skip transformation if either dimension is zero (no rotations for this
+  // spin)
+  if (num_occupied_orbitals == 0 || num_virtual_orbitals == 0) {
+    return;
+  }
   RowMajorMatrix temp =
       RowMajorMatrix::Zero(num_occupied_orbitals, num_virtual_orbitals);
   for (int line = 0; line < history_size; line++) {
@@ -485,6 +513,18 @@ void GDM::generate_pseudo_canonical_orbital_(
   const int num_occupied_orbitals = num_electrons_[spin_index];
   const int num_virtual_orbitals =
       num_molecular_orbitals - num_occupied_orbitals;
+  // Validate dimensions (negative values indicate invalid input)
+  if (num_occupied_orbitals < 0 || num_virtual_orbitals < 0) {
+    throw std::invalid_argument(
+        std::string("generate_pseudo_canonical_orbital_: invalid dimensions "
+                    "(num_occupied_orbitals=") +
+        std::to_string(num_occupied_orbitals) +
+        ", num_virtual_orbitals=" + std::to_string(num_virtual_orbitals) + ")");
+  }
+  // Skip if either dimension is zero (no rotations for this spin)
+  if (num_occupied_orbitals == 0 || num_virtual_orbitals == 0) {
+    return;
+  }
   const int rotation_size = num_occupied_orbitals * num_virtual_orbitals;
 
   RowMajorMatrix F_MO =
@@ -503,10 +543,11 @@ void GDM::generate_pseudo_canonical_orbital_(
   Uvv_ = F_MO.block(num_occupied_orbitals, num_occupied_orbitals,
                     num_virtual_orbitals, num_virtual_orbitals);
 
+  // Compute eigenvalues/eigenvectors of occupied-occupied and virtual-virtual
+  // blocks for pseudo-canonical orbital transformation
   lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_occupied_orbitals,
                Uoo_.data(), num_occupied_orbitals,
                pseudo_canonical_eigenvalues_.data());
-
   lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_virtual_orbitals,
                Uvv_.data(), num_virtual_orbitals,
                pseudo_canonical_eigenvalues_.data() + num_occupied_orbitals);
@@ -515,6 +556,7 @@ void GDM::generate_pseudo_canonical_orbital_(
   Uoo_.transposeInPlace();
   Uvv_.transposeInPlace();
 
+  // Transform occupied orbitals
   auto C_occ_view = C.block(num_molecular_orbitals * spin_index, 0,
                             num_molecular_orbitals, num_occupied_orbitals);
   RowMajorMatrix C_occ = C_occ_view.eval();
@@ -524,6 +566,7 @@ void GDM::generate_pseudo_canonical_orbital_(
              Uoo_.data(), num_occupied_orbitals, 0.0, C_occ_view.data(),
              num_molecular_orbitals);
 
+  // Transform virtual orbitals
   auto C_virt_view =
       C.block(num_molecular_orbitals * spin_index, num_occupied_orbitals,
               num_molecular_orbitals, num_virtual_orbitals);
@@ -561,6 +604,15 @@ void GDM::iterate(SCFImpl& scf_impl) {
   const int num_molecular_orbitals =
       static_cast<int>(ctx_.num_molecular_orbitals);
   const int num_density_matrices = cfg->unrestricted ? 2 : 1;
+
+  // Check if there are any virtual orbitals for any spin component
+  // If not, orbital rotation is not possible and we should skip GDM iteration
+  if (total_rotation_size_ == 0) {
+    QDK_LOGGER().warn(
+        "GDM: No virtual orbitals available for orbital rotation. "
+        "Skipping GDM iteration.");
+    return;
+  }
 
   // Compute current gradient and dgrad for each spin
   for (int i = 0; i < num_density_matrices; ++i) {

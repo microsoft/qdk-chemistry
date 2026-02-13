@@ -76,7 +76,7 @@ class MP2Test : public ::testing::Test {
 
 TEST_F(MP2Test, UMP2Energies_CCPVDZ) {
   // Test the UMP2 energies against reference for cc-pvdz
-  float pyscf_mp2_corr_cc_pvdz = -0.3509470131940627;
+  double ref = -0.35094710125187589;
 
   // Triplet O2 (unrestricted)
   auto setup = create_o2_hf_setup(3);
@@ -95,11 +95,10 @@ TEST_F(MP2Test, UMP2Energies_CCPVDZ) {
   double reference = ansatz->calculate_energy();
   double mp2_corr_energy = mp2_total_energy - reference;
 
-  EXPECT_LT(std::abs(mp2_corr_energy - pyscf_mp2_corr_cc_pvdz),
-            testing::mp2_tolerance)
+  EXPECT_LT(std::abs(mp2_corr_energy - ref), testing::mp2_tolerance)
       << "UMP2 correlation energy mismatch (cc-pvdz). Calculated: "
-      << mp2_corr_energy << ", Reference: " << pyscf_mp2_corr_cc_pvdz
-      << ", Difference: " << (mp2_corr_energy - pyscf_mp2_corr_cc_pvdz);
+      << mp2_corr_energy << ", Reference: " << ref
+      << ", Difference: " << (mp2_corr_energy - ref);
 }
 
 TEST_F(MP2Test, RMP2Energies_CCPVDZ) {

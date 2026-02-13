@@ -10,6 +10,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <qdk/chemistry/data/basis_set.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <utility>
 #include <vector>
@@ -64,9 +65,10 @@ class Orbitals : public DataClass,
    * @param energies_beta The beta orbital energies (optional)
    * @param ao_overlap The atomic orbital overlap matrix (optional)
    * @param basis_set The basis set as shared pointer
-   * @param indices Orbital indices as tuple of (active_alpha, inactive_alpha,
-   * active_beta, inactive_beta) space indices. For unrestricted calculations,
-   * separate indices can be specified for alpha and beta spin channels.
+   * @param indices Orbital indices as tuple of (active_alpha, active_beta,
+   * inactive_alpha, inactive_beta) space indices. For unrestricted
+   * calculations, separate indices can be specified for alpha and beta spin
+   * channels.
    */
   Orbitals(const Eigen::MatrixXd& coefficients_alpha,
            const Eigen::MatrixXd& coefficients_beta,
@@ -334,6 +336,14 @@ class Orbitals : public DataClass,
    */
   virtual Eigen::MatrixXd calculate_ao_density_matrix_from_rdm(
       const Eigen::MatrixXd& rdm) const;
+
+  /**
+   * @brief Get the data type name for this class
+   * @return "orbitals"
+   */
+  std::string get_data_type_name() const override {
+    return DATACLASS_TO_SNAKE_CASE(Orbitals);
+  }
 
   /**
    * @brief Get summary string of orbital information

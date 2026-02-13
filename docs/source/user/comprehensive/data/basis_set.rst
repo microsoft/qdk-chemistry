@@ -66,6 +66,38 @@ Spherical
 Cartesian
    Uses Cartesian coordinates with :math:`(l+1)(l+2)/2` functions per shell
 
+Loading from the basis set library
+-----------------------------------
+
+QDK/Chemistry provides a comprehensive library of predefined basis sets for convenience.
+This is the recommended approach for most calculations, as it ensures correct basis function definitions and supports a wide range of standard basis sets.
+
+The library supports three methods for loading basis sets:
+
+1. **By basis set name**: Apply the same basis set to all atoms
+2. **By element map**: Use different basis sets for different elements
+3. **By atom index map**: Use different basis sets for specific atoms
+
+.. note::
+   If a basis set includes an :term:`ECP` (Effective Core Potential), it will be automatically loaded. ECPs are commonly used to replace core electrons with pseudopotentials, particularly for heavy atoms.
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-loading
+      :end-before: // end-cell-loading
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
+      :language: python
+      :start-after: # start-cell-loading
+      :end-before: # end-cell-loading
+
+.. seealso::
+   For a complete list of available basis sets, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
+
 Creating a basis set
 --------------------
 
@@ -77,15 +109,15 @@ Creating a basis set
 
    .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
       :language: cpp
-      :start-after: // start-cell-basis-set-create
-      :end-before: // end-cell-basis-set-create
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
 
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
-      :start-after: # start-cell-basis-set-create
-      :end-before: # end-cell-basis-set-create
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
 
 Accessing basis set data
 ------------------------
@@ -101,15 +133,15 @@ This ensures that the basis set data remains consistent and prevents accidental 
 
    .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
       :language: cpp
-      :start-after: // start-cell-basis-set-get
-      :end-before: // end-cell-basis-set-get
+      :start-after: // start-cell-access
+      :end-before: // end-cell-access
 
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
-      :start-after: # start-cell-basis-set-get
-      :end-before: # end-cell-basis-set-get
+      :start-after: # start-cell-access
+      :end-before: # end-cell-access
 
 Working with shells
 -------------------

@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
     - '**'
+  merge_group:
   workflow_dispatch:
 
 concurrency:
@@ -20,23 +21,75 @@ permissions:
   statuses: write
 
 jobs:
+  check-up-to-date:
+    name: Check if branch is up to date with main
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Check if branch is up to date with main (Pull Request)
+      run: |
+        # Ensure origin/main is present
+        git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+
+        # Check if the current commit is ahead of main
+        # Kills pipeline if branch is not up to date with main
+        # For pull requests, we use github.event.pull_request.sha to get the commit SHA,
+        # as GitHub treats the current commit as one that would be produced by merging into main
+        if ! git merge-base --is-ancestor origin/main "${{ github.event.pull_request.head.sha }}"; then
+          echo "This branch is not up to date with main. Please merge the latest changes from main into your branch to continue."
+          exit 1
+        fi
+
+        echo "Branch is up to date, starting Build and Test workflow."
+
   coverage:
     name: ${{ matrix.os-name }} Build, Test, and Coverage Analysis
     runs-on: ${{ matrix.runner }}
     strategy:
+      fail-fast: false
       matrix:
         include:
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
           build-parallel: 120
           uarch: x86-64-v3
+          python-version: '3.10'
+          cpp-test-threads: 2
+          python-test-threads: 2
+        - os-name: Linux
+          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
+          build-parallel: 120
+          uarch: x86-64-v3
+          python-version: '3.13'
+          cpp-test-threads: 2
+          python-test-threads: 2
+        - os-name: Linux
+          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
+          build-parallel: 120
+          uarch: x86-64-v3
+          python-version: '3.14'
+          # qiskit-extras is not supported on Python 3.14
+          skip-qiskit-extras: true
+          cpp-test-threads: 2
+          python-test-threads: 2
         - os-name: macOS
           runner: macos-26-xlarge
-          build-parallel: 5
+          build-parallel: 3
           uarch: native
+          python-version: '3.13'
+          cpp-test-threads: 16
+          python-test-threads: 16
     env:
       BUILD_DIR: cpp/build
+      QSHARP_PYTHON_TELEMETRY: 'false'
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
+      CPP_DEPS_PREFIX: ${{ github.workspace }}/cpp_deps_install
       CTEST_OUTPUT_ON_FAILURE: 1
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
@@ -49,13 +102,13 @@ jobs:
     - name: Set up environment paths
       run: |
         echo "PATH=${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH" >> $GITHUB_ENV
-        echo "PYTHONPATH=${{ github.workspace }}/install/lib/python3.13/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
+        echo "PYTHONPATH=${{ github.workspace }}/install/lib/python${{ matrix.python-version }}/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
         echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
-    - name: Set up Python 3.13
+    - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.13'
+        python-version: ${{ matrix.python-version }}
         cache: pip
 
     - name: Install Linux system packages
@@ -69,7 +122,6 @@ jobs:
           libeigen3-dev \
           libboost-all-dev \
           libhdf5-dev \
-          liblapack-dev \
           libopenblas-dev \
           libgfortran5 \
           pkg-config \
@@ -95,8 +147,17 @@ jobs:
           flex \
           googletest
 
-    - name: Build doxygen from source on macOS
+    - name: Cache Doxygen (macOS)
       if: matrix.os-name == 'macOS'
+      id: cache-doxygen
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ github.workspace }}/doxygen_install
+        key: doxygen-${{ runner.os }}-Release_1_9_8
+
+    - name: Build doxygen from source on macOS
+      if: matrix.os-name == 'macOS' && steps.cache-doxygen.outputs.cache-hit != 'true'
       run: |
         # Clone repo for working Doxygen version
         git clone https://github.com/doxygen/doxygen.git
@@ -107,57 +168,43 @@ jobs:
         mkdir build && cd build
 
         cmake -DBISON_EXECUTABLE=/opt/homebrew/Cellar/bison/3.8.2/bin/bison \
+        -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/doxygen_install" \
         -DCMAKE_CXX_FLAGS="-Wno-missing-template-arg-list-after-template-kw $CMAKE_CXX_FLAGS" \
         -G "Unix Makefiles" ..
         make -j$(sysctl -n hw.ncpu)
         make install
 
+    - name: Add Doxygen to PATH (macOS)
+      if: matrix.os-name == 'macOS'
+      run: |
+        echo "PATH=${{ github.workspace }}/doxygen_install/bin:$PATH" >> $GITHUB_ENV
+
+    - name: Cache C++ dependency install # Checks if manifest files or build script have changed to rebuild dependencies
+      id: cache-cpp-deps
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ env.CPP_DEPS_PREFIX }}
+        key: >-
+          cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
+
+    - name: Add C++ deps prefix to CMake search path
+      run: |
+        echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+        echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
+
     - name: Install C++ dependencies
-      if: matrix.os-name == 'Linux'
+      if: steps.cache-cpp-deps.outputs.cache-hit != 'true' # Run the dependency build if we don't find the right hash in the cache
       env:
-        INSTALL_PREFIX: ${{ github.workspace }}/install
+        INSTALL_PREFIX: ${{ env.CPP_DEPS_PREFIX }}
         BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
+        KEEP_BUILD_DIR: 1
       run: |
         bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh \
           ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
           ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
-
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install --prefix=${{ github.workspace }}/install coverage pytest pytest-cov
-
-    - name: Configure C++ Release build
-      run: |
-        cmake -S cpp -B "$BUILD_DIR" \
-          -GNinja \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DQDK_UARCH="$QDK_UARCH" \
-          -DBUILD_TESTING=ON
-
-    - name: Build C++ Release library
-      run: cmake --build "$BUILD_DIR"
-
-    - name: Run C++ tests in Release mode (Linux)
-      if: matrix.os-name == 'Linux'
-      env:
-        OMP_NUM_THREADS: 16
-      run: |
-        cd "$BUILD_DIR"
-        echo "=== Running C++ Tests in Release Mode ==="
-        ctest --output-on-failure --verbose --timeout 300
-
-    - name: Run C++ tests in Release mode (macOS)
-      if: matrix.os-name == 'macOS'
-      env:
-        OMP_NUM_THREADS: 1
-      run: |
-        cd "$BUILD_DIR"
-        echo "=== Running C++ Tests in Release Mode ==="
-        ctest --output-on-failure --verbose -E "AtomInitGuessEnergyConvergence" --timeout 300
-
-    - name: Clean build directory for RelWithDebInfo/Coverage build
-      run: rm -rf "$BUILD_DIR"
 
     - name: Configure C++ RelWithDebInfo/Coverage build
       run: |
@@ -173,7 +220,7 @@ jobs:
 
     - name: Run C++ tests in RelWithDebInfo/Coverage mode with coverage
       env:
-        OMP_NUM_THREADS: 16
+        OMP_NUM_THREADS: ${{ matrix.cpp-test-threads }}
       run: |
         mkdir -p test-results ${{ github.workspace }}/coverage-reports
         cd "$BUILD_DIR"
@@ -224,7 +271,7 @@ jobs:
 
     - name: Test C++ installation
       run: |
-        cmake -S examples/cpp -B build_example -GNinja -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install
+        cmake -S examples/language/cpp -B build_example -GNinja -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install
         cmake --build build_example --target all
         echo "C++ Example Compiled with Pre-Installed QDK/Chemistry-C++ Libraries!"
 
@@ -237,19 +284,38 @@ jobs:
         # Remove CMake files to build Python package without picking the installed library
         rm -r ${{ github.workspace }}/install/lib/cmake/qdk
         # Use persistent build directory for coverage analysis
-        python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[all]
+        # Note: qiskit-extras is not supported on Python 3.14
+        if [ "${{ matrix.skip-qiskit-extras }}" == "true" ]; then
+          echo "Skipping qiskit-extras installation (not supported on Python ${{ matrix.python-version }})"
+          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[plugins,dev,docs,coverage]
+        else
+          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[all]
+        fi
         python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
+        # Install optional dependencies for tests
+        python -m pip install --prefix=${{ github.workspace }}/install pennylane ipykernel
+        # Register the Jupyter kernel for notebook tests
+        python -m ipykernel install --user --name python3 --display-name "Python 3"
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install --prefix=${{ github.workspace }}/install coverage pytest pytest-cov
 
     - name: Run Python tests
+      env:
+        OMP_NUM_THREADS: ${{ matrix.python-test-threads }}
+        QDK_CHEMISTRY_RUN_SLOW_TESTS: 0
       working-directory: python
       run: |
+        set -e
         mkdir -p ../test-results ../coverage-reports
 
-        BUILD_TEMP=$(find . -type d -path "./build/cp*" | head -1)
+        BUILD_TEMP=$(find . -type d -path './build/cp*' -print -quit)
         echo "Found build directory: $BUILD_TEMP"
-        echo "$BUILD_TEMP" > build_temp_path.txt
 
         set +e
+        set -o pipefail
         pytest \
           --cov=qdk_chemistry \
           --cov-report=xml:../coverage-reports/python_coverage.xml \
@@ -258,9 +324,9 @@ jobs:
           --junitxml=../test-results/pytest_report.xml \
           -v \
           --tb=short \
-          > ../coverage-reports/python_coverage.txt 2>&1
+          2>&1 | tee ../coverage-reports/python_coverage.txt
 
-        PYTEST_EXIT_CODE=$?
+        PYTEST_EXIT_CODE=${PIPESTATUS[0]}
         set -e
 
         echo "=== Python Test Output ==="
@@ -416,6 +482,7 @@ jobs:
         cat coverage-summary.md >> $GITHUB_STEP_SUMMARY
 
     - name: Build documentation
+      if: matrix.python-version == '3.13'
       working-directory: docs
       run: |
         set +e

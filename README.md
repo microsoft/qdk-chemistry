@@ -1,6 +1,6 @@
-# Quantum Applications Toolkit (QDK/Chemistry)
+# Microsoft Quantum Development Kit for Chemistry (QDK/Chemistry)
 
-QDK/Chemistry is an open-source C++ and Python package within the [Azure Quantum Development Kit (QDK)](https://github.com/microsoft/qdk).
+QDK/Chemistry is an open-source C++ and Python package within the [Microsoft Quantum Development Kit (QDK)](https://github.com/microsoft/qdk).
 It provides an end-to-end toolkit for quantum chemistry:  from molecular setup and Hamiltonian generation to quantum algorithm execution and results analysis.
 Designed for seamless integration with existing Python and chemistry workflows, QDK Chemistry enables researchers to simulate and run problems on near-term quantum hardware, explore strongly correlated systems, and advance toward practical quantum chemistry applications.
 
@@ -40,6 +40,31 @@ qdk-chemistry/
 ## Installing
 
 Detailed instructions for installing QDK/Chemistry can be found in [INSTALL.md](./INSTALL.md)
+
+## Telemetry
+
+By default, this library collects anonymous usage and performance data to help improve the user experience and product quality. The telemetry implementation can be found in [telemetry.py](./python/src/qdk_chemistry/utils/telemetry.py) and all telemetry events are defined in [telemetry_events.py](./python/src/qdk_chemistry/utils/telemetry_events.py).
+
+To disable telemetry via bash, set the environment variable `QSHARP_PYTHON_TELEMETRY` to one of the following values: `none`, `disabled`, `false`, or `0`. For example:
+
+```bash
+export QSHARP_PYTHON_TELEMETRY='false'
+```
+
+Alternatively, telemetry can be disabled within a python script by including the following at the top of the `.py` file:
+
+```python
+import os
+os.environ["QSHARP_PYTHON_TELEMETRY"] = "disabled"
+```
+
+If you have any questions about the library's use of Telemetry, please use the [Discussion forum](https://github.com/microsoft/qdk-chemistry/discussions).
+
+## Citing QDK/Chemistry
+
+If you use QDK/Chemistry in your work, please cite the following paper:
+
+> N. A. Baker, B. Bilodeau, C. Chen, Y. Chen, M. Eckhoff, A. Efimovskaya, P. Gasparotto, P. van Gerwen, R. Gong, K. Hoang, Z. Hooshmand, A. J. Jenkins, C. S. N. Johnston, R. R. Li, J. Liang, H. Liu, A. Mills, M. Mörchen, G. Nishibuchi, C. Sun, B. Ticehurst, M. Troyer, J. P. Unsleber, S. Wernli, D. B. Williams-Young, and B. Zhang, "QDK/Chemistry: A Modular Toolkit for Quantum Chemistry Applications," [arXiv:2601.15253](https://arxiv.org/abs/2601.15253) (2026).
 
 ## Contributing
 
