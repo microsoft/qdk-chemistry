@@ -19,8 +19,11 @@ project = "qdk-chemistry"
 copyright = "Microsoft Corporation. All rights reserved. Licensed under the MIT License"
 author = "QDK/Chemistry Team"
 
-# Read version from VERSION file at repo root
-_version_file = Path(__file__).parent.parent.parent / "VERSION"
+# Repo root (docs/source/conf.py -> docs/source -> docs -> repo root)
+_repo_root = Path(__file__).resolve().parent.parent.parent
+
+# Read version from VERSION file
+_version_file = _repo_root / "VERSION"
 if not _version_file.exists():
     raise FileNotFoundError(
         f"VERSION file not found at {_version_file}. "
@@ -36,9 +39,7 @@ release = _version_file.read_text().strip()
 os.environ.setdefault("QDK_CHEMISTRY_DOCS", "1")
 
 # Add path to the Python package
-sys.path.insert(
-    0, str(Path(__file__).parent.parent.joinpath("python", "src").absolute())
-)
+sys.path.insert(0, str(_repo_root / "python" / "src"))
 
 # Check if Graphviz 'dot' executable is available
 if shutil.which("dot") is None:
