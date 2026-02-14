@@ -29,7 +29,7 @@ class SCFAlgorithm {
    *
    * @param[in] ctx Reference to SCFContext
    */
-  explicit SCFAlgorithm(const SCFContext& ctx, bool rohf_enabled);
+  explicit SCFAlgorithm(const SCFContext& ctx);
 
   /**
    * @brief Default destructor
@@ -68,8 +68,7 @@ class SCFAlgorithm {
    * @return std::shared_ptr<SCFAlgorithm> Pointer to newly created algorithm
    * instance
    */
-  static std::shared_ptr<SCFAlgorithm> create(const SCFContext& ctx,
-                                              bool rohf_enabled);
+  static std::shared_ptr<SCFAlgorithm> create(const SCFContext& ctx);
 
   /**
    * @brief Solve the eigenvalue problem for the Fock matrix and update
@@ -151,7 +150,5 @@ class SCFAlgorithm {
   double delta_energy_ =
       std::numeric_limits<double>::infinity();  ///< Energy change
   double density_rms_ = 0.0;                    ///< Last calculated density RMS
-
-  bool rohf_enabled_ = false;  ///< Flag indicating if ROHF is enabled
 };
 }  // namespace qdk::chemistry::scf

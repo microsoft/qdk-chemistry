@@ -23,6 +23,7 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
+using qcs::DIISType;
 
 // Bring logger types into scope
 using qdk::chemistry::utils::Logger;
@@ -108,12 +109,11 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   std::string scf_type = _settings->get<std::string>("scf_type");
   std::transform(scf_type.begin(), scf_type.end(), scf_type.begin(), ::tolower);
 
-  bool unrestricted;
-  bool rohf_enabled = false;
+  auto diis_type = DIISType::Restricted;
   if (scf_type == "auto") {
-    unrestricted = open_shell;
+    diis_type = open_shell ? DIISType::Unrestricted : DIISType::Restricted;
   } else if (scf_type == "unrestricted") {
-    unrestricted = true;
+    diis_type = DIISType::Unrestricted;
     if (!open_shell && basis_set_type != BasisSetType::FromOrbitals) {
       QDK_LOGGER().warn(
           "Unrestricted reference requested for closed-shell system. "
@@ -121,9 +121,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
           "Consider providing a spin-broken initial guess if desired.");
     }
   } else if (scf_type == "restricted") {
-    unrestricted = false;
-    rohf_enabled = open_shell;
-    if (rohf_enabled) {
+    diis_type =
+        open_shell ? DIISType::RestrictedOpenShell : DIISType::Restricted;
+    if (diis_type == DIISType::RestrictedOpenShell) {
       QDK_LOGGER().warn(
           "Restricted open-shell request detected; enabling ROHF workflow.");
     }
@@ -166,8 +166,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
                  ms_scf_config->exc.xc_name.begin(), ::toupper);
   ms_scf_config->basis = basis_set_name;
   ms_scf_config->basis_mode = qcs::BasisMode::PSI4;
-  ms_scf_config->unrestricted = unrestricted;
-  ms_scf_config->rohf_enabled = rohf_enabled;
+  ms_scf_config->set_diis_type(diis_type);
   ms_scf_config->scf_algorithm.density_threshold = density_threshold;
   ms_scf_config->scf_algorithm.og_threshold = orbital_gradient_threshold;
   ms_scf_config->scf_algorithm.max_iteration = max_iterations;
@@ -304,7 +303,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     // Compute density matrix from MO coefficients
     qcs::RowMajorMatrix density_matrix;
 
-    if (unrestricted) {
+    if (ms_scf_config->is_unrestricted()) {
       if (initial_guess->is_restricted())
         QDK_LOGGER().warn(
             "Unrestricted calculation requested but restricted "
@@ -403,7 +402,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   auto nelec = scf->get_num_electrons();
 
   std::shared_ptr<data::Orbitals> orbitals;
-  if (unrestricted) {
+  if (ms_scf_config->is_unrestricted()) {
     // Unrestricted case - store matrices first to avoid
     // temporaries
     const auto& C_full = scf->get_orbitals_matrix();

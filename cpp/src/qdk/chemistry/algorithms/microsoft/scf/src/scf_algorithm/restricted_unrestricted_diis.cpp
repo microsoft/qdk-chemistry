@@ -13,7 +13,7 @@ namespace qdk::chemistry::scf {
 
 RestrictedUnrestrictedDIIS::RestrictedUnrestrictedDIIS(const SCFContext& ctx,
                                                        size_t subspace_size)
-    : DIISBase(ctx, false, subspace_size) {}
+    : DIISBase(ctx, subspace_size) {}
 
 const RowMajorMatrix& RestrictedUnrestrictedDIIS::get_active_fock(
     const SCFImpl& scf_impl) const {

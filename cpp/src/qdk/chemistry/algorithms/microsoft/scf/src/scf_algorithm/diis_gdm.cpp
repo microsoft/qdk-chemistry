@@ -17,11 +17,9 @@
 
 namespace qdk::chemistry::scf {
 
-DIIS_GDM::DIIS_GDM(const SCFContext& ctx, bool rohf_enabled,
-                   const size_t subspace_size, const GDMConfig& gdm_config)
-    : SCFAlgorithm(ctx, rohf_enabled),
-      gdm_config_(gdm_config),
-      use_gdm_(false) {
+DIIS_GDM::DIIS_GDM(const SCFContext& ctx, const size_t subspace_size,
+                   const GDMConfig& gdm_config)
+    : SCFAlgorithm(ctx), gdm_config_(gdm_config), use_gdm_(false) {
   QDK_LOG_TRACE_ENTERING();
   // Initialize DIIS algorithm
   diis_algorithm_ =
@@ -41,7 +39,7 @@ DIIS_GDM::DIIS_GDM(const SCFContext& ctx, bool rohf_enabled,
   }
 
   // Initialize GDM algorithm
-  gdm_algorithm_ = std::make_unique<GDM>(ctx, rohf_enabled, gdm_config_);
+  gdm_algorithm_ = std::make_unique<GDM>(ctx, gdm_config_);
 
   // Log initialization parameters
   QDK_LOGGER().debug(

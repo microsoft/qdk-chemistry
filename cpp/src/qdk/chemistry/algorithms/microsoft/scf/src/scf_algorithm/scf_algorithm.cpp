@@ -33,26 +33,26 @@
 
 namespace qdk::chemistry::scf {
 
-SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx, bool rohf_enabled)
+SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx)
     : ctx_(ctx),
-      rohf_enabled_(rohf_enabled),
       step_count_(0),
       last_energy_(0.0),
       density_rms_(std::numeric_limits<double>::infinity()),
       delta_energy_(std::numeric_limits<double>::infinity()) {
   QDK_LOG_TRACE_ENTERING();
   auto num_atomic_orbitals = ctx.basis_set->num_atomic_orbitals;
-  auto num_density_matrices = (ctx.cfg->unrestricted || rohf_enabled) ? 2 : 1;
+  auto num_density_matrices =
+      (ctx.cfg->is_unrestricted() || ctx.cfg->is_rohf_enabled()) ? 2 : 1;
   P_last_ = RowMajorMatrix::Zero(num_density_matrices * num_atomic_orbitals,
                                  num_atomic_orbitals);
 }
 
 SCFAlgorithm::~SCFAlgorithm() noexcept = default;
 
-std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx,
-                                                   bool rohf_enabled) {
+std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx) {
   QDK_LOG_TRACE_ENTERING();
   const auto& cfg = *ctx.cfg;
+  const bool rohf_enabled = cfg.is_rohf_enabled();
 
   switch (cfg.scf_algorithm.method) {
     case SCFAlgorithmName::ASAHF:
@@ -74,14 +74,13 @@ std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx,
       if (rohf_enabled) {
         throw std::runtime_error("ROHF-enabled GDM is not supported!");
       }
-      return std::make_shared<GDM>(ctx, rohf_enabled,
-                                   cfg.scf_algorithm.gdm_config);
+      return std::make_shared<GDM>(ctx, cfg.scf_algorithm.gdm_config);
 
     case SCFAlgorithmName::DIIS_GDM:
       if (rohf_enabled) {
         throw std::runtime_error("ROHF-enabled DIIS_GDM is not supported!");
       }
-      return std::make_shared<DIIS_GDM>(ctx, rohf_enabled,
+      return std::make_shared<DIIS_GDM>(ctx,
                                         cfg.scf_algorithm.diis_subspace_size,
                                         cfg.scf_algorithm.gdm_config);
 
@@ -258,7 +257,7 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
   std::vector<int> nelec_vec = scf_impl.get_num_electrons();
   const int nelec[2] = {nelec_vec[0], nelec_vec[1]};
 
-  if (rohf_enabled_) {
+  if (ctx_.cfg->is_rohf_enabled()) {
     // To be modified when ROHFGDM is implemented: in that case, the pointer
     // will come from ROHFDIIS instance saved in ROHFDIIS_GDM, like the current
     // DIIS_GDM implementation

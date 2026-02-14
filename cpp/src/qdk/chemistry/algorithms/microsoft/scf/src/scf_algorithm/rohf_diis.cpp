@@ -207,7 +207,7 @@ class ROHFDIIS {
 }  // namespace impl
 
 ROHFDIIS::ROHFDIIS(const SCFContext& ctx, size_t subspace_size)
-    : DIISBase(ctx, true, subspace_size),
+    : DIISBase(ctx, subspace_size),
       impl_(std::make_unique<impl::ROHFDIIS>(
           static_cast<int>(ctx.basis_set->num_atomic_orbitals))) {
   QDK_LOG_TRACE_ENTERING();

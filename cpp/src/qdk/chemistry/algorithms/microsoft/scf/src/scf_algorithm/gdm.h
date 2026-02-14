@@ -34,12 +34,10 @@ class GDM : public SCFAlgorithm {
   /**
    * @brief Constructor for the GDM (Geometric Direct Minimization) class
    * @param[in] ctx Reference to SCFContext
-   * @param[in] rohf_enabled Flag indicating if ROHF is enabled
    * @param[in] gdm_config GDM configuration parameters
    *
    */
-  explicit GDM(const SCFContext& ctx, bool rohf_enabled,
-               const GDMConfig& gdm_config);
+  explicit GDM(const SCFContext& ctx, const GDMConfig& gdm_config);
 
   /**
    * @brief Destructor

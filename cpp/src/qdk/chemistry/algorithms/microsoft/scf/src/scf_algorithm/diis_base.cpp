@@ -32,8 +32,7 @@ class DIIS {
    * @param[in] subspace_size Maximum number of vectors to retain in DIIS
    * subspace
    */
-  explicit DIIS(const SCFContext& ctx, bool rohf_enabled,
-                const size_t subspace_size);
+  explicit DIIS(const SCFContext& ctx, const size_t subspace_size);
 
   /**
    * @brief Perform one DIIS iteration
@@ -111,7 +110,6 @@ class DIIS {
                           const RowMajorMatrix& S, RowMajorMatrix& F_ls,
                           const double mu) const;
 
-  bool rohf_enabled_;                ///< Indicates if ROHF support is requested
   const SCFContext& ctx_;            ///< Reference to SCFContext
   size_t subspace_size_;             ///< Maximum number of vectors in subspace
   std::deque<RowMajorMatrix> hist_;  ///< History of Fock matrices
@@ -122,8 +120,8 @@ class DIIS {
       std::numeric_limits<double>::infinity();  ///< Current DIIS error
 };
 
-DIIS::DIIS(const SCFContext& ctx, bool rohf_enabled, const size_t subspace_size)
-    : rohf_enabled_(rohf_enabled), ctx_(ctx), subspace_size_(subspace_size) {
+DIIS::DIIS(const SCFContext& ctx, const size_t subspace_size)
+    : ctx_(ctx), subspace_size_(subspace_size) {
   QDK_LOG_TRACE_ENTERING();
   if (subspace_size <= 0) {
     throw std::invalid_argument("subspace_size must be greater than 0");
@@ -137,7 +135,7 @@ void DIIS::iterate(const RowMajorMatrix& P, const RowMajorMatrix& F,
   auto& res = ctx_.result;
 
   int num_atomic_orbitals = ctx_.basis_set->num_atomic_orbitals;
-  int num_orbital_sets = ctx_.cfg->unrestricted ? 2 : 1;
+  int num_orbital_sets = ctx_.cfg->is_unrestricted() ? 2 : 1;
 
   // Create error matrix for DIIS (use the base class error calculation)
   RowMajorMatrix error = RowMajorMatrix::Zero(
@@ -231,7 +229,7 @@ void DIIS::apply_level_shift_(const RowMajorMatrix& F, const RowMajorMatrix& P,
   QDK_LOG_TRACE_ENTERING();
   const auto* cfg = ctx_.cfg;
   int num_atomic_orbitals = static_cast<int>(S.cols());
-  int num_density_matrices = cfg->unrestricted ? 2 : 1;
+  int num_density_matrices = cfg->is_unrestricted() ? 2 : 1;
 
   RowMajorMatrix SPS = RowMajorMatrix::Zero(
       num_density_matrices * num_atomic_orbitals, num_atomic_orbitals);
@@ -266,11 +264,9 @@ void DIIS::apply_level_shift_(const RowMajorMatrix& F, const RowMajorMatrix& P,
 
 }  // namespace impl
 
-DIISBase::DIISBase(const SCFContext& ctx, bool rohf_enabled,
-                   const size_t subspace_size)
-    : SCFAlgorithm(ctx, rohf_enabled),
-      diis_impl_(
-          std::make_unique<impl::DIIS>(ctx, rohf_enabled, subspace_size)) {
+DIISBase::DIISBase(const SCFContext& ctx, const size_t subspace_size)
+    : SCFAlgorithm(ctx),
+      diis_impl_(std::make_unique<impl::DIIS>(ctx, subspace_size)) {
   QDK_LOG_TRACE_ENTERING();
 }
 
@@ -303,13 +299,13 @@ void DIISBase::iterate(SCFImpl& scf_impl) {
     // Use extrapolated Fock matrix for density matrix update
     solve_fock_eigenproblem(F_extrapolated, S, X, C, eigenvalues,
                             working_density, nelec, num_atomic_orbitals,
-                            num_molecular_orbitals, i, cfg->unrestricted);
+                            num_molecular_orbitals, i, cfg->is_unrestricted());
   }
 
   // Update the density matrix in SCFImpl using the new orbitals
   auto& density_matrix = scf_impl.density_matrix();
-  update_density_matrix(density_matrix, C, ctx_.cfg->unrestricted, nelec[0],
-                        nelec[1]);
+  update_density_matrix(density_matrix, C, ctx_.cfg->is_unrestricted(),
+                        nelec[0], nelec[1]);
   double diis_error = current_diis_error();
   bool should_apply_damping = cfg->scf_algorithm.enable_damping &&
                               diis_error > cfg->scf_algorithm.damping_threshold;

@@ -96,12 +96,13 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   auto spin = mol.multiplicity - 1;
   auto alpha = (mol.n_electrons - n_ecp_electrons + spin) / 2;
   auto beta = mol.n_electrons - n_ecp_electrons - alpha;
-  rohf_enabled_ = cfg.rohf_enabled;
-  if (cfg.scf_algorithm.method == SCFAlgorithmName::ASAHF) {
-    rohf_enabled_ = false;
+  if (cfg.scf_algorithm.method == SCFAlgorithmName::ASAHF &&
+      cfg.is_rohf_enabled()) {
+    throw std::runtime_error("ASAHF method cannot be used with ROHF!");
   }
-  num_density_matrices_ = (cfg.unrestricted || rohf_enabled_) ? 2 : 1;
-  num_orbital_sets_ = cfg.unrestricted ? 2 : 1;
+  num_density_matrices_ =
+      (cfg.is_unrestricted() || cfg.is_rohf_enabled()) ? 2 : 1;
+  num_orbital_sets_ = cfg.is_unrestricted() ? 2 : 1;
 
   if (cfg.mpi.world_rank == 0) {
     std::string fock_string = "";
@@ -128,7 +129,7 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
         "restricted={}, basis={}, pure={}, num_atomic_orbitals={}, "
         "density_threshold={:.2e}, "
         "og_threshold={:.2e}",
-        !cfg.unrestricted, ctx_.basis_set->name, ctx_.basis_set->pure,
+        !cfg.is_unrestricted(), ctx_.basis_set->name, ctx_.basis_set->pure,
         num_atomic_orbitals_, cfg.scf_algorithm.density_threshold,
         cfg.scf_algorithm.og_threshold);
     QDK_LOGGER().info("fock_alg={}", fock_string);
@@ -206,7 +207,7 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   if (cfg.mpi.world_rank == 0) {
     F_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
                               num_atomic_orbitals_);
-    scf_algorithm_ = SCFAlgorithm::create(ctx_, rohf_enabled_);
+    scf_algorithm_ = SCFAlgorithm::create(ctx_);
   }
 
   // MO and mixed AO/MO quantities
@@ -370,7 +371,7 @@ void SCFImpl::update_fock_() {
 #endif
 
   if (ctx_.cfg->mpi.world_rank == 0) {
-    if (ctx_.cfg->unrestricted || rohf_enabled_) {
+    if (ctx_.cfg->is_unrestricted() || ctx_.cfg->is_rohf_enabled()) {
       F_ += (J_.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_) +
              J_.block(num_atomic_orbitals_, 0, num_atomic_orbitals_,
                       num_atomic_orbitals_))
@@ -614,9 +615,9 @@ void SCFImpl::iterate_() {
     for (int i = 0; i < num_orbital_sets_; ++i) {
       scf_algorithm_->solve_fock_eigenproblem(
           F_, S_, X_, C_, eigenvalues_, P_, nelec_, num_atomic_orbitals_,
-          num_molecular_orbitals_, i, ctx_.cfg->unrestricted);
+          num_molecular_orbitals_, i, ctx_.cfg->is_unrestricted());
     }
-    scf_algorithm_->update_density_matrix(P_, C_, ctx_.cfg->unrestricted,
+    scf_algorithm_->update_density_matrix(P_, C_, ctx_.cfg->is_unrestricted(),
                                           nelec_[0], nelec_[1]);
   }
 }
@@ -840,9 +841,9 @@ void SCFImpl::init_density_matrix_() {
     for (int i = 0; i < num_orbital_sets_; ++i) {
       scf_algorithm_->solve_fock_eigenproblem(
           H_, S_, X_, C_, eigenvalues_, P_, nelec_, num_atomic_orbitals_,
-          num_molecular_orbitals_, i, ctx_.cfg->unrestricted);
+          num_molecular_orbitals_, i, ctx_.cfg->is_unrestricted());
     }
-    scf_algorithm_->update_density_matrix(P_, C_, ctx_.cfg->unrestricted,
+    scf_algorithm_->update_density_matrix(P_, C_, ctx_.cfg->is_unrestricted(),
                                           nelec_[0], nelec_[1]);
   } else if (method == DensityInitializationMethod::Atom) {
     atom_guess(*ctx_.basis_set, mol, P_.data());
@@ -1052,7 +1053,7 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
 #endif
 
   if (ctx_.cfg->mpi.world_rank == 0) {
-    if (ctx_.cfg->unrestricted) {
+    if (ctx_.cfg->is_unrestricted()) {
       F_matrix +=
           (J_matrix.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_) +
            J_matrix.block(num_atomic_orbitals_, 0, num_atomic_orbitals_,

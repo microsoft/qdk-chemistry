@@ -32,6 +32,15 @@
 #endif
 
 namespace qdk::chemistry::scf {
+
+/**
+ * @brief Spin symmetry options for DIIS-style algorithms
+ */
+enum class DIISType {
+  Restricted,          ///< Closed-shell restricted reference (RHF/RKS)
+  Unrestricted,        ///< Unrestricted reference (UHF/UKS)
+  RestrictedOpenShell  ///< Restricted open-shell (ROHF/ROKS)
+};
 /**
  * @brief MPI parallel configuration
  */
@@ -161,6 +170,8 @@ struct CPSCFInput {
  * convergence criteria, integral methods, and optional features.
  */
 struct SCFConfig {
+  DIISType diis_type =
+      DIISType::Restricted;        ///< Spin symmetry used for DIIS-type solvers
   std::string basis = "def2-svp";  ///< Primary basis set name
   std::string aux_basis =
       "def2-universal-jfit";  ///< Auxiliary basis set for density fitting
@@ -221,6 +232,30 @@ struct SCFConfig {
 #ifdef QATK_ENABLE_QMMM
   std::shared_ptr<PointCharges> pointcharges;
 #endif
+
+  /**
+   * @brief Update spin configuration via DIIS type and keep legacy flags in
+   * sync.
+   */
+  void set_diis_type(DIISType type) {
+    diis_type = type;
+    unrestricted = (type == DIISType::Unrestricted);
+    rohf_enabled = (type == DIISType::RestrictedOpenShell);
+  }
+
+  /**
+   * @brief Return true when configuration uses an unrestricted reference.
+   */
+  [[nodiscard]] bool is_unrestricted() const {
+    return diis_type == DIISType::Unrestricted;
+  }
+
+  /**
+   * @brief Return true when configuration enables ROHF-style handling.
+   */
+  [[nodiscard]] bool is_rohf_enabled() const {
+    return diis_type == DIISType::RestrictedOpenShell;
+  }
 };
 
 /**

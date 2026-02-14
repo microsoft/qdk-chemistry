@@ -278,7 +278,7 @@ void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
   cfg.scf_algorithm.method = SCFAlgorithmName::ASAHF;
   cfg.density_init_method = DensityInitializationMethod::Core;
   cfg.require_gradient = false;
-  cfg.unrestricted = false;
+  cfg.set_diis_type(DIISType::Restricted);
   cfg.require_polarizability = false;
   cfg.exc.xc_name = "hf";
   cfg.eri.method = ERIMethod::Libint2Direct;
@@ -314,7 +314,7 @@ void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
 
 AtomicSphericallyAveragedHartreeFock::AtomicSphericallyAveragedHartreeFock(
     const SCFContext& ctx, size_t subspace_size)
-    : DIISBase(ctx, false, subspace_size) {}
+    : DIISBase(ctx, subspace_size) {}
 
 const RowMajorMatrix& AtomicSphericallyAveragedHartreeFock::get_active_fock(
     const SCFImpl& scf_impl) const {

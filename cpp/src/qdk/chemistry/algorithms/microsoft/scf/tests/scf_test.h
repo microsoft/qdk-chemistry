@@ -127,7 +127,14 @@ class SCFTest
       cfg.aux_basis = json["aux_basis"];
     }
     cfg.cartesian = json.value("cart", true);
-    cfg.unrestricted = scf_type == "uhf" || scf_type == "uks";
+    const bool is_unrestricted = scf_type == "uhf" || scf_type == "uks";
+    if (is_unrestricted) {
+      cfg.set_diis_type(DIISType::Unrestricted);
+    } else if (mol->multiplicity == 1) {
+      cfg.set_diis_type(DIISType::Restricted);
+    } else {
+      cfg.set_diis_type(DIISType::RestrictedOpenShell);
+    }
     cfg.scf_algorithm.max_iteration = 100;
     cfg.scf_algorithm.og_threshold = json.value("og_threshold", 1e-7);
     cfg.scf_algorithm.density_threshold = json.value("density_threshold", 1e-5);
