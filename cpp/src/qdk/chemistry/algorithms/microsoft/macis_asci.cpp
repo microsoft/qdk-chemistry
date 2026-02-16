@@ -132,6 +132,11 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MacisAsci::_run_impl(
   QDK_LOG_TRACE_ENTERING();
 
   const auto& orbitals = hamiltonian->get_orbitals();
+  if (orbitals->is_unrestricted()) {
+    throw std::runtime_error(
+        "MacisAsci does not support unrestricted orbitals. "
+        "Only restricted orbitals are supported.");
+  }
   const auto& [active_indices, active_indices_beta] =
       orbitals->get_active_space_indices();
   // check that alpha and beta active space indices are the same
