@@ -415,11 +415,13 @@ inline void orbital_rdm_contrib_2(
       // p, p, q, q, o1, v1
 #pragma omp atomic
       aab_iijjij(o1, v1) += signed_val;
+#pragma omp atomic
       aab_iijjij(v1, o1) += signed_val;
     } else {
       // o1, v1, p, p, q, q
 #pragma omp atomic
       abb_ijiijj(v1, o1) += signed_val;
+#pragma omp atomic
       abb_ijiijj(o1, v1) += signed_val;
     }
   }
