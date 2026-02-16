@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import numpy as np
 
-from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.builder.qdrift import QDrift
 from qdk_chemistry.data import QubitHamiltonian, Settings, TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
@@ -72,6 +71,7 @@ class PartiallyRandomizedSettings(Settings):
             "int",
             2,
             "Order of Trotter formula for deterministic terms (1 or 2).",
+            (1, 2),
         )
         self._set_default(
             "num_random_samples",
@@ -92,10 +92,10 @@ class PartiallyRandomizedSettings(Settings):
             "Absolute tolerance for filtering small coefficients.",
         )
         self._set_default(
-            "merge_commuting",
+            "merge_duplicate_terms",
             "bool",
             True,
-            "Merge consecutive commuting random samples to reduce circuit depth.",
+            "Fuse identical Pauli terms within consecutive commuting runs of the random block.",
         )
 
 
@@ -152,7 +152,7 @@ class PartiallyRandomized(QDrift):
         num_random_samples: int = 100,
         seed: int = -1,
         tolerance: float = 1e-12,
-        merge_commuting: bool = True,
+        merge_duplicate_terms: bool = True,
     ):
         r"""Initialize partially randomized builder with specified settings.
 
@@ -168,21 +168,23 @@ class PartiallyRandomized(QDrift):
                 Defaults to -1.
             tolerance: Threshold for filtering negligible coefficients.
                 Defaults to 1e-12.
-            merge_commuting: If ``True``, consecutive mutually-commuting
-                sampled terms in the random block are fused to reduce
-                circuit depth.  Defaults to ``True``.
+            merge_duplicate_terms: If ``True``, identical Pauli terms within
+                consecutive mutually-commuting runs in the random block
+                are fused to reduce circuit depth.  Distinct commuting
+                terms are kept separate.  Defaults to ``True``.
 
         """
-        # Bypass QDrift.__init__ which creates QDriftSettings; we have our
-        # own settings class.
-        TimeEvolutionBuilder.__init__(self)
+        super().__init__()
+        # Replace the QDriftSettings created by QDrift.__init__ with our own
+        # settings class that includes additional parameters (weight_threshold,
+        # trotter_order, etc.).
         self._settings = PartiallyRandomizedSettings()
         self._settings.set("weight_threshold", weight_threshold)
         self._settings.set("trotter_order", trotter_order)
         self._settings.set("num_random_samples", num_random_samples)
         self._settings.set("seed", seed)
         self._settings.set("tolerance", tolerance)
-        self._settings.set("merge_commuting", merge_commuting)
+        self._settings.set("merge_duplicate_terms", merge_duplicate_terms)
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
         r"""Construct the time evolution unitary using partially randomized product formula.
@@ -233,6 +235,12 @@ class PartiallyRandomized(QDrift):
         # Build the product formula
         all_terms: list[ExponentiatedPauliTerm] = []
 
+        if trotter_order not in (1, 2):
+            raise NotImplementedError(
+                f"Only first-order (1) and second-order (2) Trotter decompositions are supported, "
+                f"but got trotter_order={trotter_order}."
+            )
+
         if trotter_order == 2:
             # Second-order: e^{-iδH_1/2} ... e^{-iδH_L/2} e^{-iδH_R} e^{-iδH_L/2} ... e^{-iδH_1/2}
             half_time = time / 2.0
@@ -245,8 +253,8 @@ class PartiallyRandomized(QDrift):
 
             # Random part (full time)
             random_part_terms = self._sample_qdrift_terms(random_terms, time, num_random_samples, rng)
-            if self._settings.get("merge_commuting"):
-                random_part_terms = self._merge_commuting_runs(random_part_terms)
+            if self._settings.get("merge_duplicate_terms"):
+                random_part_terms = self._merge_duplicate_terms(random_part_terms)
             all_terms.extend(random_part_terms)
 
             # Backward sweep of deterministic terms (half angle, reversed order)
@@ -265,8 +273,8 @@ class PartiallyRandomized(QDrift):
 
             # Random part
             random_part_terms = self._sample_qdrift_terms(random_terms, time, num_random_samples, rng)
-            if self._settings.get("merge_commuting"):
-                random_part_terms = self._merge_commuting_runs(random_part_terms)
+            if self._settings.get("merge_duplicate_terms"):
+                random_part_terms = self._merge_duplicate_terms(random_part_terms)
             all_terms.extend(random_part_terms)
 
         return TimeEvolutionUnitary(

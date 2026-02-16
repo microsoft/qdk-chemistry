@@ -44,8 +44,11 @@ class QDriftSettings(Settings):
             num_samples: Number of random samples N. More samples = higher accuracy.
                          Error scales as O(λ²t²/N).
             seed: Random seed for reproducibility. Use -1 for non-deterministic behavior.
-            merge_commuting: Whether to merge consecutive commuting terms to reduce
-                circuit depth.  The merging is exact and preserves the error bound.
+            merge_duplicate_terms: Whether to fuse identical Pauli terms that
+                appear in consecutive mutually-commuting runs, reducing circuit
+                depth.  Only equal operators are combined; distinct commuting
+                terms are kept separate.  The merging is exact and preserves
+                the error bound.
 
         """
         super().__init__()
@@ -62,10 +65,10 @@ class QDriftSettings(Settings):
             "Random seed for reproducibility. Use -1 for non-deterministic.",
         )
         self._set_default(
-            "merge_commuting",
+            "merge_duplicate_terms",
             "bool",
             True,
-            "Merge consecutive commuting samples to reduce circuit depth.",
+            "Fuse identical Pauli terms within consecutive commuting runs to reduce circuit depth.",
         )
 
 
@@ -93,7 +96,8 @@ class QDrift(TimeEvolutionBuilder):
     Attributes:
         num_samples: Number of random samples to draw.
         seed: Random seed for reproducibility.
-        merge_commuting: Whether to fuse consecutive commuting terms.
+        merge_duplicate_terms: Whether to fuse identical Pauli terms within
+            consecutive commuting runs.
 
     Examples:
         >>> from qdk_chemistry.algorithms import create
@@ -114,7 +118,7 @@ class QDrift(TimeEvolutionBuilder):
         self,
         num_samples: int = 100,
         seed: int = -1,
-        merge_commuting: bool = True,
+        merge_duplicate_terms: bool = True,
     ):
         """Initialize qDRIFT builder with specified settings.
 
@@ -124,17 +128,18 @@ class QDrift(TimeEvolutionBuilder):
                 Defaults to 100.
             seed: Random seed for reproducibility. Use -1 for non-deterministic
                 sampling. Defaults to -1.
-            merge_commuting: If ``True``, consecutive mutually-commuting
-                sampled terms are fused to reduce circuit depth.  The
-                merging is exact and preserves the Campbell (2019) error
-                bound.  Defaults to ``True``.
+            merge_duplicate_terms: If ``True``, identical Pauli terms within
+                consecutive mutually-commuting runs are fused to reduce
+                circuit depth.  Distinct commuting terms are kept separate.
+                The merging is exact and preserves the Campbell (2019)
+                error bound.  Defaults to ``True``.
 
         """
         super().__init__()
         self._settings = QDriftSettings()
         self._settings.set("num_samples", num_samples)
         self._settings.set("seed", seed)
-        self._settings.set("merge_commuting", merge_commuting)
+        self._settings.set("merge_duplicate_terms", merge_duplicate_terms)
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
         r"""Construct the time evolution unitary using qDRIFT randomized sampling.
@@ -172,14 +177,14 @@ class QDrift(TimeEvolutionBuilder):
 
         terms = self._sample_qdrift_terms(all_terms, time, num_samples, rng)
 
-        # Optionally deduplicate repeated Pauli operators within
-        # consecutive commuting runs.  Within such a run, identical
-        # Pauli strings satisfy e^{-iaP} e^{-ibP} = e^{-i(a+b)P}
+        # Optionally fuse identical Pauli operators that appear within
+        # consecutive mutually-commuting runs.  Within such a run,
+        # identical Pauli strings satisfy e^{-iaP} e^{-ibP} = e^{-i(a+b)P}
         # exactly, reducing circuit depth.  Distinct Pauli strings are
         # kept as separate rotations and non-commuting boundaries are
         # never crossed, preserving the Campbell (2019) error bound.
-        if self._settings.get("merge_commuting"):
-            terms = self._merge_commuting_runs(terms)
+        if self._settings.get("merge_duplicate_terms"):
+            terms = self._merge_duplicate_terms(terms)
 
         return TimeEvolutionUnitary(
             container=PauliProductFormulaContainer(
@@ -190,7 +195,7 @@ class QDrift(TimeEvolutionBuilder):
         )
 
     # ------------------------------------------------------------------
-    # qDRIFT sampling and commuting-term merge helpers
+    # qDRIFT sampling and duplicate-term fusion helpers
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -242,11 +247,18 @@ class QDrift(TimeEvolutionBuilder):
         return result
 
     @staticmethod
-    def _pauli_terms_commute(a: dict[int, str], b: dict[int, str]) -> bool:
-        """Check whether two Pauli terms commute.
+    def _pauli_terms_qw_commute(a: dict[int, str], b: dict[int, str]) -> bool:
+        """Check whether two Pauli terms qubit-wise commute.
 
-        Two Pauli strings commute if and only if the number of qubit
-        positions where both are non-identity *and* different is even.
+        Two multi-qubit Pauli operators qubit-wise commute when every
+        corresponding single-qubit pair commutes individually.  This is
+        strictly stronger than general commutativity: qubit-wise
+        commuting operators always commute, but the converse is not true
+        (e.g. XY and YX commute but do not qubit-wise commute).
+
+        Equivalently, the operators qubit-wise commute if and only if
+        the number of qubit positions where both are non-identity *and*
+        different is even.
 
         Args:
             a: First Pauli term mapping (qubit index → Pauli axis).
@@ -260,12 +272,12 @@ class QDrift(TimeEvolutionBuilder):
         return anti_commuting % 2 == 0
 
     @classmethod
-    def _merge_commuting_runs(cls, terms: list[ExponentiatedPauliTerm]) -> list[ExponentiatedPauliTerm]:
-        r"""Deduplicate repeated Pauli operators within consecutive commuting runs.
+    def _merge_duplicate_terms(cls, terms: list[ExponentiatedPauliTerm]) -> list[ExponentiatedPauliTerm]:
+        r"""Fuse identical Pauli operators within consecutive qubit-wise commuting runs.
 
         Walks through the term sequence and accumulates maximal runs of
-        mutually commuting terms.  Within each run, *identical* Pauli
-        operators (same string) have their rotation angles summed:
+        mutually qubit-wise commuting terms.  Within each run, *identical*
+        Pauli operators (same string) have their rotation angles summed:
 
         .. math::
 
@@ -290,20 +302,20 @@ class QDrift(TimeEvolutionBuilder):
         group: list[ExponentiatedPauliTerm] = [terms[0]]
 
         for term in terms[1:]:
-            if all(cls._pauli_terms_commute(term.pauli_term, g.pauli_term) for g in group):
+            if all(cls._pauli_terms_qw_commute(term.pauli_term, g.pauli_term) for g in group):
                 group.append(term)
             else:
-                result.extend(cls._flush_commuting_group(group))
+                result.extend(cls._flush_duplicate_terms(group))
                 group = [term]
 
-        result.extend(cls._flush_commuting_group(group))
+        result.extend(cls._flush_duplicate_terms(group))
         return result
 
     @staticmethod
-    def _flush_commuting_group(
+    def _flush_duplicate_terms(
         group: list[ExponentiatedPauliTerm],
     ) -> list[ExponentiatedPauliTerm]:
-        """Fuse *identical* Pauli operators within a mutually-commuting group.
+        """Fuse *identical* Pauli operators within a mutually qubit-wise commuting group.
 
         Only rotations around the **same** Pauli string have their angles
         summed (e^{-iaP} e^{-ibP} = e^{-i(a+b)P}).  Distinct Pauli

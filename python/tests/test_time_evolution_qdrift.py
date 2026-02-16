@@ -27,18 +27,18 @@ class TestQDriftSettings:
         settings = QDriftSettings()
         assert settings.get("num_samples") == 100
         assert settings.get("seed") == -1
-        assert settings.get("merge_commuting") is True
+        assert settings.get("merge_duplicate_terms") is True
 
     def test_settings_can_be_updated(self):
         """Verify settings can be modified."""
         settings = QDriftSettings()
         settings.set("num_samples", 500)
         settings.set("seed", 42)
-        settings.set("merge_commuting", False)
+        settings.set("merge_duplicate_terms", False)
 
         assert settings.get("num_samples") == 500
         assert settings.get("seed") == 42
-        assert settings.get("merge_commuting") is False
+        assert settings.get("merge_duplicate_terms") is False
 
 
 class TestQDriftBasics:
@@ -87,15 +87,15 @@ class TestQDriftConstruction:
         unitary = builder.run(hamiltonian, time=0.1)
 
         container = unitary.get_container()
-        # Commuting-term merging may reduce the count below num_samples
+        # Duplicate-term merging may reduce the count below num_samples
         assert len(container.step_terms) <= num_samples
         assert len(container.step_terms) >= 1
 
     def test_exact_sample_count_without_merging(self):
-        """Disabling merge_commuting gives exactly num_samples terms."""
+        """Disabling merge_duplicate_terms gives exactly num_samples terms."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         num_samples = 50
-        builder = QDrift(num_samples=num_samples, seed=42, merge_commuting=False)
+        builder = QDrift(num_samples=num_samples, seed=42, merge_duplicate_terms=False)
         unitary = builder.run(hamiltonian, time=0.1)
 
         assert len(unitary.get_container().step_terms) == num_samples
@@ -297,8 +297,8 @@ class TestQDriftEdgeCases:
         assert unitary.get_container().num_qubits == 4
 
 
-class TestQDriftCommutingMerge:
-    """Tests for the commuting-term merging optimisation."""
+class TestQDriftDuplicateTermFusion:
+    """Tests for the duplicate-term fusion optimisation."""
 
     def test_identical_terms_merged(self):
         """Consecutive identical Pauli terms are fused into one."""
@@ -307,7 +307,7 @@ class TestQDriftCommutingMerge:
             ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.1),
             ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.1),
         ]
-        merged = QDrift._merge_commuting_runs(terms)
+        merged = QDrift._merge_duplicate_terms(terms)
         assert len(merged) == 1
         assert merged[0].pauli_term == {0: "X"}
         assert np.isclose(merged[0].angle, 0.3)
@@ -320,7 +320,7 @@ class TestQDriftCommutingMerge:
             ExponentiatedPauliTerm(pauli_term={0: "Y"}, angle=0.2),
             ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.1),
         ]
-        merged = QDrift._merge_commuting_runs(terms)
+        merged = QDrift._merge_duplicate_terms(terms)
         # Cannot merge across the Y boundary → 3 separate terms
         assert len(merged) == 3
 
@@ -331,7 +331,7 @@ class TestQDriftCommutingMerge:
             ExponentiatedPauliTerm(pauli_term={1: "X"}, angle=0.1),
             ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.2),
         ]
-        merged = QDrift._merge_commuting_runs(terms)
+        merged = QDrift._merge_duplicate_terms(terms)
         assert len(merged) == 2
 
     def test_commuting_duplicates_fused(self):
@@ -342,7 +342,7 @@ class TestQDriftCommutingMerge:
             ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.2),
             ExponentiatedPauliTerm(pauli_term={1: "X"}, angle=0.1),
         ]
-        merged = QDrift._merge_commuting_runs(terms)
+        merged = QDrift._merge_duplicate_terms(terms)
         assert len(merged) == 2
         angles = {str(sorted(t.pauli_term.items())): t.angle for t in merged}
         assert np.isclose(angles[str(sorted({1: "X"}.items()))], 0.2)
@@ -354,23 +354,23 @@ class TestQDriftCommutingMerge:
             ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.5),
             ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=-0.5),
         ]
-        merged = QDrift._merge_commuting_runs(terms)
+        merged = QDrift._merge_duplicate_terms(terms)
         assert len(merged) == 0
 
     def test_empty_input(self):
         """Empty term list returns empty."""
-        assert QDrift._merge_commuting_runs([]) == []
+        assert QDrift._merge_duplicate_terms([]) == []
 
-    def test_pauli_terms_commute(self):
-        """Verify commutation checks for known cases."""
+    def test_pauli_terms_qw_commute(self):
+        """Verify qubit-wise commutation checks for known cases."""
         # Same qubit, same Pauli → commute
-        assert QDrift._pauli_terms_commute({0: "X"}, {0: "X"}) is True
+        assert QDrift._pauli_terms_qw_commute({0: "X"}, {0: "X"}) is True
         # Same qubit, different Pauli → anti-commute
-        assert QDrift._pauli_terms_commute({0: "X"}, {0: "Y"}) is False
+        assert QDrift._pauli_terms_qw_commute({0: "X"}, {0: "Y"}) is False
         # Different qubits → commute
-        assert QDrift._pauli_terms_commute({0: "X"}, {1: "Y"}) is True
+        assert QDrift._pauli_terms_qw_commute({0: "X"}, {1: "Y"}) is True
         # Two differing positions → commute (even number of anti-commutations)
-        assert QDrift._pauli_terms_commute({0: "X", 1: "Y"}, {0: "Y", 1: "X"}) is True
+        assert QDrift._pauli_terms_qw_commute({0: "X", 1: "Y"}, {0: "Y", 1: "X"}) is True
 
 
 class TestQDriftPauliLabelToMap:

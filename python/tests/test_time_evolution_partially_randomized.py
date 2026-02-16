@@ -78,7 +78,7 @@ class TestPartiallyRandomizedConstruction:
             num_random_samples=5,
             trotter_order=2,
             seed=42,
-            merge_commuting=False,
+            merge_duplicate_terms=False,
         )
         unitary = builder.run(hamiltonian, time=0.2)
         terms = unitary.get_container().step_terms
@@ -106,7 +106,7 @@ class TestPartiallyRandomizedConstruction:
             num_random_samples=5,
             trotter_order=1,
             seed=42,
-            merge_commuting=False,
+            merge_duplicate_terms=False,
         )
         unitary = builder.run(hamiltonian, time=0.2)
         terms = unitary.get_container().step_terms
@@ -156,7 +156,7 @@ class TestPartiallyRandomizedSplitting:
             num_random_samples=10,
             trotter_order=2,
             seed=42,
-            merge_commuting=False,
+            merge_duplicate_terms=False,
         )
         unitary = builder.run(hamiltonian, time=0.1)
         terms = unitary.get_container().step_terms
@@ -183,7 +183,7 @@ class TestPartiallyRandomizedSplitting:
             num_random_samples=10,
             trotter_order=1,
             seed=42,
-            merge_commuting=False,
+            merge_duplicate_terms=False,
         )
         unitary = builder.run(hamiltonian, time=0.1)
         terms = unitary.get_container().step_terms
@@ -202,7 +202,7 @@ class TestPartiallyRandomizedSplitting:
             num_random_samples=10,
             trotter_order=1,
             seed=42,
-            merge_commuting=False,
+            merge_duplicate_terms=False,
         )
         unitary = builder.run(hamiltonian, time=0.1)
         terms = unitary.get_container().step_terms
@@ -230,7 +230,7 @@ class TestPartiallyRandomizedRandomPart:
             num_random_samples=num_samples,
             trotter_order=1,
             seed=42,
-            merge_commuting=False,
+            merge_duplicate_terms=False,
         )
         unitary = builder.run(hamiltonian, time=time)
         terms = unitary.get_container().step_terms
