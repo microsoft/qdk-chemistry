@@ -45,7 +45,7 @@ struct cas_helper {
     // check that alpha and beta active space indices are the same
     if (active_indices != active_indices_beta) {
       throw std::runtime_error(
-          "MacisAsci only supports identical alpha and beta active "
+          "MacisCas only supports identical alpha and beta active "
           "space indices.");
     }
     const size_t num_molecular_orbitals = active_indices.size();
