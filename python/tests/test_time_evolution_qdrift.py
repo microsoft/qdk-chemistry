@@ -363,14 +363,18 @@ class TestQDriftDuplicateTermFusion:
 
     def test_pauli_terms_qw_commute(self):
         """Verify qubit-wise commutation checks for known cases."""
-        # Same qubit, same Pauli → commute
+        # Same qubit, same Pauli → qw-commute
         assert QDrift._pauli_terms_qw_commute({0: "X"}, {0: "X"}) is True
-        # Same qubit, different Pauli → anti-commute
+        # Same qubit, different Pauli → do not qw-commute
         assert QDrift._pauli_terms_qw_commute({0: "X"}, {0: "Y"}) is False
-        # Different qubits → commute
+        # Different qubits → qw-commute
         assert QDrift._pauli_terms_qw_commute({0: "X"}, {1: "Y"}) is True
-        # Two differing positions → commute (even number of anti-commutations)
-        assert QDrift._pauli_terms_qw_commute({0: "X", 1: "Y"}, {0: "Y", 1: "X"}) is True
+        # XY vs YX: commute globally but do NOT qubit-wise commute
+        assert QDrift._pauli_terms_qw_commute({0: "X", 1: "Y"}, {0: "Y", 1: "X"}) is False
+        # Same Paulis on overlapping qubits → qw-commute
+        assert QDrift._pauli_terms_qw_commute({0: "X", 1: "Z"}, {0: "X", 1: "Z"}) is True
+        # One differing, one matching → do not qw-commute
+        assert QDrift._pauli_terms_qw_commute({0: "X", 1: "Z"}, {0: "Y", 1: "Z"}) is False
 
 
 class TestQDriftPauliLabelToMap:

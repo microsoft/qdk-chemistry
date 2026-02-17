@@ -6,7 +6,7 @@ This is particularly effective for quantum chemistry Hamiltonians where a few te
 dominate the weight while many small terms form a long tail.
 
 The method is based on:
-    Günther, J., Witteveen, F., et al. (2024). Phase estimation with partially
+    Günther, J., Witteveen, F., et al. (2025). Phase estimation with partially
     randomized time evolution. https://doi.org/10.48550/arXiv.2503.05647
 
 See Also:
@@ -97,6 +97,13 @@ class PartiallyRandomizedSettings(Settings):
             True,
             "Fuse identical Pauli terms within consecutive commuting runs of the random block.",
         )
+        self._set_default(
+            "commutation_type",
+            "str",
+            "qubit_wise",
+            "Commutation check for merging: 'qubit_wise' (per-qubit) or 'general' (standard Pauli).",
+            ("qubit_wise", "general"),
+        )
 
 
 class PartiallyRandomized(QDrift):
@@ -153,6 +160,7 @@ class PartiallyRandomized(QDrift):
         seed: int = -1,
         tolerance: float = 1e-12,
         merge_duplicate_terms: bool = True,
+        commutation_type: str = "qubit_wise",
     ):
         r"""Initialize partially randomized builder with specified settings.
 
@@ -172,12 +180,14 @@ class PartiallyRandomized(QDrift):
                 consecutive mutually-commuting runs in the random block
                 are fused to reduce circuit depth.  Distinct commuting
                 terms are kept separate.  Defaults to ``True``.
+            commutation_type: Commutation check used when merging duplicate
+                terms.  ``"qubit_wise"`` (default) requires every single-qubit
+                pair to commute individually — stricter but always safe.
+                ``"general"`` uses standard Pauli commutation (even number of
+                anti-commuting positions), which allows larger merge groups.
 
         """
         super().__init__()
-        # Replace the QDriftSettings created by QDrift.__init__ with our own
-        # settings class that includes additional parameters (weight_threshold,
-        # trotter_order, etc.).
         self._settings = PartiallyRandomizedSettings()
         self._settings.set("weight_threshold", weight_threshold)
         self._settings.set("trotter_order", trotter_order)
@@ -185,6 +195,7 @@ class PartiallyRandomized(QDrift):
         self._settings.set("seed", seed)
         self._settings.set("tolerance", tolerance)
         self._settings.set("merge_duplicate_terms", merge_duplicate_terms)
+        self._settings.set("commutation_type", commutation_type)
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
         r"""Construct the time evolution unitary using partially randomized product formula.
@@ -254,7 +265,8 @@ class PartiallyRandomized(QDrift):
             # Random part (full time)
             random_part_terms = self._sample_qdrift_terms(random_terms, time, num_random_samples, rng)
             if self._settings.get("merge_duplicate_terms"):
-                random_part_terms = self._merge_duplicate_terms(random_part_terms)
+                commute_fn = self._get_commutation_checker(self._settings.get("commutation_type"))
+                random_part_terms = self._merge_duplicate_terms(random_part_terms, commute_fn=commute_fn)
             all_terms.extend(random_part_terms)
 
             # Backward sweep of deterministic terms (half angle, reversed order)
@@ -274,7 +286,8 @@ class PartiallyRandomized(QDrift):
             # Random part
             random_part_terms = self._sample_qdrift_terms(random_terms, time, num_random_samples, rng)
             if self._settings.get("merge_duplicate_terms"):
-                random_part_terms = self._merge_duplicate_terms(random_part_terms)
+                commute_fn = self._get_commutation_checker(self._settings.get("commutation_type"))
+                random_part_terms = self._merge_duplicate_terms(random_part_terms, commute_fn=commute_fn)
             all_terms.extend(random_part_terms)
 
         return TimeEvolutionUnitary(
@@ -297,9 +310,8 @@ class PartiallyRandomized(QDrift):
         """
         weight_threshold: float = self._settings.get("weight_threshold")
         if weight_threshold >= 0.0:
-            # Count terms with |coeff| >= threshold
-            count = sum(1 for _, c in terms if abs(c) >= weight_threshold)
-            return max(1, count)  # At least 1 deterministic term
+            # Count terms with |coeff| >= threshold; may be 0 (all-random)
+            return sum(1 for _, c in terms if abs(c) >= weight_threshold)
 
         # Default: top 10% of terms (at least 1, at most all but 1 for random)
         num_deterministic = max(1, len(terms) // 10)

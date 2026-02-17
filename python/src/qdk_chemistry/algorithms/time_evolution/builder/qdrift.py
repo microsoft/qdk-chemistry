@@ -70,6 +70,13 @@ class QDriftSettings(Settings):
             True,
             "Fuse identical Pauli terms within consecutive commuting runs to reduce circuit depth.",
         )
+        self._set_default(
+            "commutation_type",
+            "str",
+            "qubit_wise",
+            "Commutation check for merging: 'qubit_wise' (per-qubit) or 'general' (standard Pauli).",
+            ("qubit_wise", "general"),
+        )
 
 
 class QDrift(TimeEvolutionBuilder):
@@ -119,6 +126,7 @@ class QDrift(TimeEvolutionBuilder):
         num_samples: int = 100,
         seed: int = -1,
         merge_duplicate_terms: bool = True,
+        commutation_type: str = "qubit_wise",
     ):
         """Initialize qDRIFT builder with specified settings.
 
@@ -133,6 +141,11 @@ class QDrift(TimeEvolutionBuilder):
                 circuit depth.  Distinct commuting terms are kept separate.
                 The merging is exact and preserves the Campbell (2019)
                 error bound.  Defaults to ``True``.
+            commutation_type: Commutation check used when merging duplicate
+                terms.  ``"qubit_wise"`` (default) requires every single-qubit
+                pair to commute individually — stricter but always safe.
+                ``"general"`` uses standard Pauli commutation (even number of
+                anti-commuting positions), which allows larger merge groups.
 
         """
         super().__init__()
@@ -140,6 +153,7 @@ class QDrift(TimeEvolutionBuilder):
         self._settings.set("num_samples", num_samples)
         self._settings.set("seed", seed)
         self._settings.set("merge_duplicate_terms", merge_duplicate_terms)
+        self._settings.set("commutation_type", commutation_type)
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
         r"""Construct the time evolution unitary using qDRIFT randomized sampling.
@@ -184,7 +198,8 @@ class QDrift(TimeEvolutionBuilder):
         # kept as separate rotations and non-commuting boundaries are
         # never crossed, preserving the Campbell (2019) error bound.
         if self._settings.get("merge_duplicate_terms"):
-            terms = self._merge_duplicate_terms(terms)
+            commute_fn = self._get_commutation_checker(self._settings.get("commutation_type"))
+            terms = self._merge_duplicate_terms(terms, commute_fn=commute_fn)
 
         return TimeEvolutionUnitary(
             container=PauliProductFormulaContainer(
@@ -225,6 +240,9 @@ class QDrift(TimeEvolutionBuilder):
         if len(terms) == 0:
             return []
 
+        if num_samples <= 0:
+            raise ValueError(f"num_samples must be a positive integer, got {num_samples}.")
+
         coeffs = np.array([c for _, c in terms])
         abs_coeffs = np.abs(coeffs)
         lambda_norm = float(abs_coeffs.sum())
@@ -254,11 +272,29 @@ class QDrift(TimeEvolutionBuilder):
         corresponding single-qubit pair commutes individually.  This is
         strictly stronger than general commutativity: qubit-wise
         commuting operators always commute, but the converse is not true
-        (e.g. XY and YX commute but do not qubit-wise commute).
+        (e.g. XY and YX commute globally but do not qubit-wise commute).
 
-        Equivalently, the operators qubit-wise commute if and only if
-        the number of qubit positions where both are non-identity *and*
-        different is even.
+        The operators qubit-wise commute if and only if there are **no**
+        qubit positions where both are non-identity and different.
+
+        Args:
+            a: First Pauli term mapping (qubit index → Pauli axis).
+            b: Second Pauli term mapping (qubit index → Pauli axis).
+
+        Returns:
+            ``True`` if the terms qubit-wise commute.
+
+        """
+        return not any(a[q] != b[q] for q in a if q in b)
+
+    @staticmethod
+    def _pauli_terms_commute(a: dict[int, str], b: dict[int, str]) -> bool:
+        """Check whether two Pauli terms commute (general/standard commutation).
+
+        Two multi-qubit Pauli operators commute if and only if the number
+        of qubit positions where both are non-identity *and* different is
+        even.  This is weaker than qubit-wise commutation and allows
+        larger merge groups.
 
         Args:
             a: First Pauli term mapping (qubit index → Pauli axis).
@@ -272,12 +308,32 @@ class QDrift(TimeEvolutionBuilder):
         return anti_commuting % 2 == 0
 
     @classmethod
-    def _merge_duplicate_terms(cls, terms: list[ExponentiatedPauliTerm]) -> list[ExponentiatedPauliTerm]:
-        r"""Fuse identical Pauli operators within consecutive qubit-wise commuting runs.
+    def _get_commutation_checker(cls, commutation_type: str):
+        """Return the commutation checker function for the given type.
+
+        Args:
+            commutation_type: ``"qubit_wise"`` or ``"general"``.
+
+        Returns:
+            A callable ``(a, b) -> bool`` that checks commutation.
+
+        """
+        if commutation_type == "general":
+            return cls._pauli_terms_commute
+        return cls._pauli_terms_qw_commute
+
+    @classmethod
+    def _merge_duplicate_terms(
+        cls,
+        terms: list[ExponentiatedPauliTerm],
+        commute_fn=None,
+    ) -> list[ExponentiatedPauliTerm]:
+        r"""Fuse identical Pauli operators within consecutive commuting runs.
 
         Walks through the term sequence and accumulates maximal runs of
-        mutually qubit-wise commuting terms.  Within each run, *identical*
-        Pauli operators (same string) have their rotation angles summed:
+        mutually commuting terms (using the supplied commutation checker).
+        Within each run, *identical* Pauli operators (same string) have
+        their rotation angles summed:
 
         .. math::
 
@@ -290,6 +346,9 @@ class QDrift(TimeEvolutionBuilder):
 
         Args:
             terms: Ordered list of exponentiated Pauli terms.
+            commute_fn: A callable ``(a, b) -> bool`` that checks whether
+                two Pauli term mappings commute.  Defaults to
+                :meth:`_pauli_terms_qw_commute` if ``None``.
 
         Returns:
             A (potentially shorter) list producing the same unitary.
@@ -298,11 +357,14 @@ class QDrift(TimeEvolutionBuilder):
         if not terms:
             return terms
 
+        if commute_fn is None:
+            commute_fn = cls._pauli_terms_qw_commute
+
         result: list[ExponentiatedPauliTerm] = []
         group: list[ExponentiatedPauliTerm] = [terms[0]]
 
         for term in terms[1:]:
-            if all(cls._pauli_terms_qw_commute(term.pauli_term, g.pauli_term) for g in group):
+            if all(commute_fn(term.pauli_term, g.pauli_term) for g in group):
                 group.append(term)
             else:
                 result.extend(cls._flush_duplicate_terms(group))
