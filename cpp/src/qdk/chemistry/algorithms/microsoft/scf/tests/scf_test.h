@@ -129,11 +129,11 @@ class SCFTest
     cfg.cartesian = json.value("cart", true);
     const bool is_unrestricted = scf_type == "uhf" || scf_type == "uks";
     if (is_unrestricted) {
-      cfg.set_diis_type(DIISType::Unrestricted);
+      cfg.set_scf_orbital_type(SCFOrbitalType::Unrestricted);
     } else if (mol->multiplicity == 1) {
-      cfg.set_diis_type(DIISType::Restricted);
+      cfg.set_scf_orbital_type(SCFOrbitalType::Restricted);
     } else {
-      cfg.set_diis_type(DIISType::RestrictedOpenShell);
+      cfg.set_scf_orbital_type(SCFOrbitalType::RestrictedOpenShell);
     }
     cfg.scf_algorithm.max_iteration = 100;
     cfg.scf_algorithm.og_threshold = json.value("og_threshold", 1e-7);

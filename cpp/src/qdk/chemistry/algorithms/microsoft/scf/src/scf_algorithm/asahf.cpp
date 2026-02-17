@@ -278,7 +278,7 @@ void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
   cfg.scf_algorithm.method = SCFAlgorithmName::ASAHF;
   cfg.density_init_method = DensityInitializationMethod::Core;
   cfg.require_gradient = false;
-  cfg.set_diis_type(DIISType::Restricted);
+  cfg.set_scf_orbital_type(SCFOrbitalType::Restricted);
   cfg.require_polarizability = false;
   cfg.exc.xc_name = "hf";
   cfg.eri.method = ERIMethod::Libint2Direct;

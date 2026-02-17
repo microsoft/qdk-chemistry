@@ -23,7 +23,7 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
-using qcs::DIISType;
+using qcs::SCFOrbitalType;
 
 // Bring logger types into scope
 using qdk::chemistry::utils::Logger;
@@ -109,11 +109,12 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   std::string scf_type = _settings->get<std::string>("scf_type");
   std::transform(scf_type.begin(), scf_type.end(), scf_type.begin(), ::tolower);
 
-  auto diis_type = DIISType::Restricted;
+  auto scf_orbital_type = SCFOrbitalType::Restricted;
   if (scf_type == "auto") {
-    diis_type = open_shell ? DIISType::Unrestricted : DIISType::Restricted;
+    scf_orbital_type =
+        open_shell ? SCFOrbitalType::Unrestricted : SCFOrbitalType::Restricted;
   } else if (scf_type == "unrestricted") {
-    diis_type = DIISType::Unrestricted;
+    scf_orbital_type = SCFOrbitalType::Unrestricted;
     if (!open_shell && basis_set_type != BasisSetType::FromOrbitals) {
       QDK_LOGGER().warn(
           "Unrestricted reference requested for closed-shell system. "
@@ -121,9 +122,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
           "Consider providing a spin-broken initial guess if desired.");
     }
   } else if (scf_type == "restricted") {
-    diis_type =
-        open_shell ? DIISType::RestrictedOpenShell : DIISType::Restricted;
-    if (diis_type == DIISType::RestrictedOpenShell) {
+    scf_orbital_type = open_shell ? SCFOrbitalType::RestrictedOpenShell
+                                  : SCFOrbitalType::Restricted;
+    if (scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
       QDK_LOGGER().warn(
           "Restricted open-shell request detected; enabling ROHF workflow.");
     }
@@ -166,7 +167,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
                  ms_scf_config->exc.xc_name.begin(), ::toupper);
   ms_scf_config->basis = basis_set_name;
   ms_scf_config->basis_mode = qcs::BasisMode::PSI4;
-  ms_scf_config->set_diis_type(diis_type);
+  ms_scf_config->set_scf_orbital_type(scf_orbital_type);
   ms_scf_config->scf_algorithm.density_threshold = density_threshold;
   ms_scf_config->scf_algorithm.og_threshold = orbital_gradient_threshold;
   ms_scf_config->scf_algorithm.max_iteration = max_iterations;

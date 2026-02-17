@@ -34,14 +34,6 @@
 namespace qdk::chemistry::scf {
 
 /**
- * @brief Spin symmetry options for DIIS-style algorithms
- */
-enum class DIISType {
-  Restricted,          ///< Closed-shell restricted reference (RHF/RKS)
-  Unrestricted,        ///< Unrestricted reference (UHF/UKS)
-  RestrictedOpenShell  ///< Restricted open-shell (ROHF/ROKS)
-};
-/**
  * @brief MPI parallel configuration
  */
 struct ParallelConfig {
@@ -170,8 +162,8 @@ struct CPSCFInput {
  * convergence criteria, integral methods, and optional features.
  */
 struct SCFConfig {
-  DIISType diis_type =
-      DIISType::Restricted;        ///< Spin symmetry used for DIIS-type solvers
+  SCFOrbitalType scf_orbital_type =
+      SCFOrbitalType::Restricted;  ///< Spin symmetry used across SCF algorithms
   std::string basis = "def2-svp";  ///< Primary basis set name
   std::string aux_basis =
       "def2-universal-jfit";  ///< Auxiliary basis set for density fitting
@@ -237,24 +229,24 @@ struct SCFConfig {
    * @brief Update spin configuration via DIIS type and keep legacy flags in
    * sync.
    */
-  void set_diis_type(DIISType type) {
-    diis_type = type;
-    unrestricted = (type == DIISType::Unrestricted);
-    rohf_enabled = (type == DIISType::RestrictedOpenShell);
+  void set_scf_orbital_type(SCFOrbitalType type) {
+    scf_orbital_type = type;
+    unrestricted = (type == SCFOrbitalType::Unrestricted);
+    rohf_enabled = (type == SCFOrbitalType::RestrictedOpenShell);
   }
 
   /**
    * @brief Return true when configuration uses an unrestricted reference.
    */
   [[nodiscard]] bool is_unrestricted() const {
-    return diis_type == DIISType::Unrestricted;
+    return scf_orbital_type == SCFOrbitalType::Unrestricted;
   }
 
   /**
    * @brief Return true when configuration enables ROHF-style handling.
    */
   [[nodiscard]] bool is_rohf_enabled() const {
-    return diis_type == DIISType::RestrictedOpenShell;
+    return scf_orbital_type == SCFOrbitalType::RestrictedOpenShell;
   }
 };
 
