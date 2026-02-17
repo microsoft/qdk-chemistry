@@ -72,7 +72,7 @@ class QDriftSettings(Settings):
         )
         self._set_default(
             "commutation_type",
-            "str",
+            "string",
             "general",
             "Commutation check for merging: 'qubit_wise' (per-qubit) or 'general' (standard Pauli).",
             ("qubit_wise", "general"),
@@ -126,7 +126,7 @@ class QDrift(TimeEvolutionBuilder):
         num_samples: int = 100,
         seed: int = -1,
         merge_duplicate_terms: bool = True,
-        commutation_type: str = "qubit_wise",
+        commutation_type: str = "general",
     ):
         """Initialize qDRIFT builder with specified settings.
 
@@ -142,9 +142,9 @@ class QDrift(TimeEvolutionBuilder):
                 The merging is exact and preserves the Campbell (2019)
                 error bound.  Defaults to ``True``.
             commutation_type: Commutation check used when merging duplicate
-                terms.  ``"qubit_wise"`` (default) requires every single-qubit
+                terms.  ``"qubit_wise"`` requires every single-qubit
                 pair to commute individually — stricter but always safe.
-                ``"general"`` uses standard Pauli commutation (even number of
+                ``"general"`` (default) uses standard Pauli commutation (even number of
                 anti-commuting positions), which allows larger merge groups.
 
         """

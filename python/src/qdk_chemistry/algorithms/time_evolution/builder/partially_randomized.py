@@ -99,7 +99,7 @@ class PartiallyRandomizedSettings(Settings):
         )
         self._set_default(
             "commutation_type",
-            "str",
+            "string",
             "general",
             "Commutation check for merging: 'qubit_wise' (per-qubit) or 'general' (standard Pauli).",
             ("qubit_wise", "general"),
@@ -160,7 +160,7 @@ class PartiallyRandomized(QDrift):
         seed: int = -1,
         tolerance: float = 1e-12,
         merge_duplicate_terms: bool = True,
-        commutation_type: str = "qubit_wise",
+        commutation_type: str = "general",
     ):
         r"""Initialize partially randomized builder with specified settings.
 
@@ -181,9 +181,9 @@ class PartiallyRandomized(QDrift):
                 are fused to reduce circuit depth.  Distinct commuting
                 terms are kept separate.  Defaults to ``True``.
             commutation_type: Commutation check used when merging duplicate
-                terms.  ``"qubit_wise"`` (default) requires every single-qubit
+                terms.  ``"qubit_wise"`` requires every single-qubit
                 pair to commute individually — stricter but always safe.
-                ``"general"`` uses standard Pauli commutation (even number of
+                ``"general"`` (default) uses standard Pauli commutation (even number of
                 anti-commuting positions), which allows larger merge groups.
 
         """
