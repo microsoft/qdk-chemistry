@@ -52,7 +52,12 @@ else:
 
 # Application Insights configuration
 AIKEY = os.environ.get("QSHARP_PYTHON_AI_KEY") or "95d25b22-8b6d-448e-9677-78ad4047a95a"
-AIURL = os.environ.get("QSHARP_PYTHON_AI_URL") or "https://westus2-2.in.applicationinsights.azure.com/v2.1/track"
+_AIURL_DEFAULT = "https://westus2-2.in.applicationinsights.azure.com/v2.1/track"
+_aiurl_env = os.environ.get("QSHARP_PYTHON_AI_URL")
+if _aiurl_env and not _aiurl_env.startswith("https://"):
+    logger.warning("QSHARP_PYTHON_AI_URL must use HTTPS scheme; falling back to default URL.")
+    _aiurl_env = None
+AIURL = _aiurl_env or _AIURL_DEFAULT
 
 # Environment variables take precedence, else disable telemetry for non 'stable' builds
 QSHARP_PYTHON_TELEMETRY = (os.environ.get("QSHARP_PYTHON_TELEMETRY") or "").lower()
@@ -66,7 +71,8 @@ TELEMETRY_ENABLED = (
     )
 )
 
-BATCH_INTERVAL_SEC = int(os.environ.get("QSHARP_PYTHON_TELEMETRY_INTERVAL") or 60)
+_raw_interval = int(os.environ.get("QSHARP_PYTHON_TELEMETRY_INTERVAL") or 60)
+BATCH_INTERVAL_SEC = max(10, min(_raw_interval, 3600))  # Clamp to 10s-1h
 
 
 # The below is taken from the Azure Monitor Python SDK
