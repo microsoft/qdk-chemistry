@@ -844,7 +844,7 @@ TEST_F(SciWavefunctionTest, Hdf5SerializationRDMsOpenShell) {
     EXPECT_TRUE(restored->has_two_rdm_spin_traced());
 
     // Verify it's restricted
-  EXPECT_TRUE(restored->get_orbitals()->is_restricted());
+    EXPECT_TRUE(restored->get_orbitals()->is_restricted());
 
     // Verify that alpha and beta RDMs match
     auto [restored_aa_rdm, restored_bb_rdm] =
