@@ -632,6 +632,33 @@ TEST_F(MacisAsciTest, NoActiveSpaceSetup) {
   // trigger the expensive ASCI computation with all orbitals active.
 }
 
+// Test that macis_asci throws on unrestricted Hamiltonians
+TEST_F(MacisAsciTest, ThrowsOnUnrestrictedHamiltonian) {
+  auto orbitals_scf = water_scf_wavefunction_->get_orbitals();
+  auto [alpha_coeffs, beta_coeffs] = orbitals_scf->get_coefficients();
+  auto [alpha_energies, beta_energies] = orbitals_scf->get_energies();
+
+  // Perturb beta coefficients and energies to ensure truly unrestricted
+  auto beta_coeffs_mod = beta_coeffs;
+  auto beta_energies_mod = beta_energies;
+  beta_coeffs_mod(0, 0) += 0.01;
+  beta_energies_mod(0) += 0.1;
+
+  std::vector<size_t> active = {2, 3, 4, 5};
+  std::vector<size_t> inactive = {0, 1};
+  Orbitals unrestricted_orbitals(
+      alpha_coeffs, beta_coeffs_mod, std::make_optional(alpha_energies),
+      std::make_optional(beta_energies_mod), std::nullopt,
+      orbitals_scf->has_basis_set() ? orbitals_scf->get_basis_set() : nullptr,
+      std::make_tuple(active, active, inactive, inactive));
+
+  auto hamiltonian = hamiltonian_constructor_->run(
+      std::make_shared<Orbitals>(unrestricted_orbitals));
+
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+  EXPECT_THROW(calculator->run(hamiltonian, 3, 3), std::runtime_error);
+}
+
 // ========== Tests for macis_cas.cpp functions ==========
 // Test MACIS CAS (Complete Active Space Configuration Interaction)
 // functionality These tests exercise the macis_cas.cpp implementation through
@@ -1001,6 +1028,34 @@ TEST_F(MacisAsciTest, MacisCasSelectiveRDMEvaluation) {
   run_variant(false, true, false, true, false, true);
 }
 
+// Test that macis_cas throws on unrestricted Hamiltonians
+TEST_F(MacisAsciTest, MacisCasThrowsOnUnrestrictedHamiltonian) {
+  auto orbitals_scf = water_scf_wavefunction_->get_orbitals();
+  auto [alpha_coeffs, beta_coeffs] = orbitals_scf->get_coefficients();
+  auto [alpha_energies, beta_energies] = orbitals_scf->get_energies();
+
+  // Perturb beta coefficients and energies to ensure truly unrestricted
+  auto beta_coeffs_mod = beta_coeffs;
+  auto beta_energies_mod = beta_energies;
+  beta_coeffs_mod(0, 0) += 0.01;
+  beta_energies_mod(0) += 0.1;
+
+  std::vector<size_t> active = {2, 3, 4, 5};
+  std::vector<size_t> inactive = {0, 1};
+  Orbitals unrestricted_orbitals(
+      alpha_coeffs, beta_coeffs_mod, std::make_optional(alpha_energies),
+      std::make_optional(beta_energies_mod), std::nullopt,
+      orbitals_scf->has_basis_set() ? orbitals_scf->get_basis_set() : nullptr,
+      std::make_tuple(active, active, inactive, inactive));
+
+  auto hamiltonian = hamiltonian_constructor_->run(
+      std::make_shared<Orbitals>(unrestricted_orbitals));
+
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_cas");
+
+  EXPECT_THROW(calculator->run(hamiltonian, 3, 3), std::runtime_error);
+}
+
 // ========== Tests for MacisPmc (Projected Multi-Configuration) ==========
 // Test suite for the newly added PMC functionality using MACIS library
 
@@ -1208,6 +1263,36 @@ TEST_F(MacisPmcTest, InvalidConfigurationHandling) {
   wrong_length_configs.emplace_back("22");  // Too short for 6-orbital system
   EXPECT_THROW(calculator->run(hamiltonian, wrong_length_configs),
                std::exception);
+}
+
+// Test that macis_pmc throws on unrestricted Hamiltonians
+TEST_F(MacisPmcTest, ThrowsOnUnrestrictedHamiltonian) {
+  auto orbitals_scf = water_scf_wavefunction_->get_orbitals();
+  auto [alpha_coeffs, beta_coeffs] = orbitals_scf->get_coefficients();
+  auto [alpha_energies, beta_energies] = orbitals_scf->get_energies();
+
+  // Perturb beta coefficients and energies to ensure truly unrestricted
+  auto beta_coeffs_mod = beta_coeffs;
+  auto beta_energies_mod = beta_energies;
+  beta_coeffs_mod(0, 0) += 0.01;
+  beta_energies_mod(0) += 0.1;
+
+  std::vector<size_t> active = {2, 3, 4, 5};
+  std::vector<size_t> inactive = {0, 1};
+  Orbitals unrestricted_orbitals(
+      alpha_coeffs, beta_coeffs_mod, std::make_optional(alpha_energies),
+      std::make_optional(beta_energies_mod), std::nullopt,
+      orbitals_scf->has_basis_set() ? orbitals_scf->get_basis_set() : nullptr,
+      std::make_tuple(active, active, inactive, inactive));
+
+  auto hamiltonian = hamiltonian_constructor_->run(
+      std::make_shared<Orbitals>(unrestricted_orbitals));
+
+  auto calculator =
+      ProjectedMultiConfigurationCalculatorFactory::create("macis_pmc");
+
+  EXPECT_THROW(calculator->run(hamiltonian, test_configurations_),
+               std::runtime_error);
 }
 
 // Test fixture for ASCI exponential backoff tests
