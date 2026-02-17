@@ -111,6 +111,51 @@ class QubitHamiltonian(DataClass):
         """
         return SparsePauliOp(self.pauli_strings, self.coefficients)
 
+    def is_hermitian(self, tolerance: float = 1e-12) -> bool:
+        """Check whether all coefficients are real within ``tolerance``.
+
+        A qubit Hamiltonian is Hermitian if and only if every coefficient in
+        its Pauli expansion is real.
+
+        Args:
+            tolerance: Maximum allowed magnitude of the imaginary part of
+                any coefficient.  Defaults to 1e-12.
+
+        Returns:
+            ``True`` if every coefficient has ``|imag| <= tolerance``.
+
+        """
+        return all(abs(complex(c).imag) <= tolerance for c in self.pauli_ops.coeffs)
+
+    def get_real_coefficients(
+        self, tolerance: float = 1e-12, sort_by_magnitude: bool = False
+    ) -> list[tuple[str, float]]:
+        """Return ``(label, real_coeff)`` pairs for non-negligible terms.
+
+        Only terms whose real-part magnitude exceeds ``tolerance`` are
+        included.  Callers should verify Hermiticity via
+        :meth:`is_hermitian` before invoking this method; imaginary parts
+        are silently discarded here.
+
+        Args:
+            tolerance: Threshold for filtering small real coefficients.
+                Defaults to 1e-12.
+            sort_by_magnitude: If ``True``, return terms sorted by
+                descending ``|coefficient|``.  Defaults to ``False``.
+
+        Returns:
+            List of ``(pauli_label, coefficient)`` tuples.
+
+        """
+        terms: list[tuple[str, float]] = []
+        for pauli, coeff in zip(self.pauli_ops.paulis, self.pauli_ops.coeffs, strict=True):
+            real = complex(coeff).real
+            if abs(real) > tolerance:
+                terms.append((pauli.to_label(), real))
+        if sort_by_magnitude:
+            terms.sort(key=lambda t: abs(t[1]), reverse=True)
+        return terms
+
     def reorder_qubits(self, permutation: list[int]) -> "QubitHamiltonian":
         """Reorder qubits in all Pauli strings according to a permutation.
 
