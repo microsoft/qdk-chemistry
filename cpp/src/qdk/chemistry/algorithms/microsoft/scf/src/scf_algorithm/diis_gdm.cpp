@@ -12,8 +12,8 @@
 #include <stdexcept>
 
 #include "../scf/scf_impl.h"
+#include "diis.h"
 #include "gdm.h"
-#include "restricted_unrestricted_diis.h"
 
 namespace qdk::chemistry::scf {
 
@@ -22,8 +22,7 @@ DIIS_GDM::DIIS_GDM(const SCFContext& ctx, const size_t subspace_size,
     : SCFAlgorithm(ctx), gdm_config_(gdm_config), use_gdm_(false) {
   QDK_LOG_TRACE_ENTERING();
   // Initialize DIIS algorithm
-  diis_algorithm_ =
-      std::make_unique<RestrictedUnrestrictedDIIS>(ctx, subspace_size);
+  diis_algorithm_ = std::make_unique<DIIS>(ctx, subspace_size);
 
   // Validate energy_thresh_diis_switch must be positive
   if (gdm_config_.energy_thresh_diis_switch <= 0.0) {

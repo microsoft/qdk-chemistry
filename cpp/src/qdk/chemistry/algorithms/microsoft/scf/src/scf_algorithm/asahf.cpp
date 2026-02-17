@@ -314,19 +314,7 @@ void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
 
 AtomicSphericallyAveragedHartreeFock::AtomicSphericallyAveragedHartreeFock(
     const SCFContext& ctx, size_t subspace_size)
-    : DIISBase(ctx, subspace_size) {}
-
-const RowMajorMatrix& AtomicSphericallyAveragedHartreeFock::get_active_fock(
-    const SCFImpl& scf_impl) const {
-  QDK_LOG_TRACE_ENTERING();
-  return scf_impl.get_fock_matrix();
-}
-
-RowMajorMatrix& AtomicSphericallyAveragedHartreeFock::active_density(
-    SCFImpl& scf_impl) {
-  QDK_LOG_TRACE_ENTERING();
-  return scf_impl.density_matrix();
-}
+    : DIIS(ctx, subspace_size) {}
 
 void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
     const RowMajorMatrix& F, const RowMajorMatrix& S, const RowMajorMatrix& X,

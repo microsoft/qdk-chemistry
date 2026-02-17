@@ -22,10 +22,9 @@
 #include <lapack.hh>
 
 #include "asahf.h"
+#include "diis.h"
 #include "diis_gdm.h"
 #include "gdm.h"
-#include "restricted_unrestricted_diis.h"
-#include "rohf_diis.h"
 
 #ifdef ENABLE_NVTX3
 #include <nvtx3/nvtx3.hpp>
@@ -63,12 +62,7 @@ std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx) {
           ctx, cfg.scf_algorithm.diis_subspace_size);
 
     case SCFAlgorithmName::DIIS:
-      if (rohf_enabled) {
-        return std::make_shared<ROHFDIIS>(ctx,
-                                          cfg.scf_algorithm.diis_subspace_size);
-      }
-      return std::make_shared<RestrictedUnrestrictedDIIS>(
-          ctx, cfg.scf_algorithm.diis_subspace_size);
+      return std::make_shared<DIIS>(ctx, cfg.scf_algorithm.diis_subspace_size);
 
     case SCFAlgorithmName::GDM:
       if (rohf_enabled) {
@@ -259,18 +253,17 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
 
   if (ctx_.cfg->is_rohf_enabled()) {
     // To be modified when ROHFGDM is implemented: in that case, the pointer
-    // will come from ROHFDIIS instance saved in ROHFDIIS_GDM, like the current
+    // will come from the DIIS instance saved in DIIS_GDM, like the current
     // DIIS_GDM implementation
-    ROHFDIIS* rohf_diis = dynamic_cast<ROHFDIIS*>(this);
+    DIIS* rohf_diis = dynamic_cast<DIIS*>(this);
     if (rohf_diis == nullptr) {
-      throw std::logic_error(
-          "ROHF convergence requires ROHFDIIS implementation");
+      throw std::logic_error("ROHF convergence requires DIIS implementation");
     }
     rohf_diis->build_rohf_f_p_matrix(
         scf_impl.get_fock_matrix(), scf_impl.get_orbitals_matrix(),
         scf_impl.get_density_matrix(), nelec[0], nelec[1]);
-    F_ptr = &rohf_diis->get_fock_matrix();
-    P_ptr = &rohf_diis->get_density_matrix();
+    F_ptr = &rohf_diis->get_rohf_fock_matrix();
+    P_ptr = &rohf_diis->get_rohf_density_matrix();
   } else {
     F_ptr = &scf_impl.get_fock_matrix();
     P_ptr = &scf_impl.get_density_matrix();

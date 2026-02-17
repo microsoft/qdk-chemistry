@@ -7,7 +7,7 @@
 #include <qdk/chemistry/scf/core/basis_set.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 
-#include "diis_base.h"
+#include "diis.h"
 
 namespace qdk::chemistry::scf {
 
@@ -65,7 +65,7 @@ void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
  * This class implements an algorithm for spin-restricted atomic SCF
  * calculations using spherically averaged Fock matrices.
  */
-class AtomicSphericallyAveragedHartreeFock : public DIISBase {
+class AtomicSphericallyAveragedHartreeFock : public DIIS {
  public:
   /**
    * @brief Construct ASAHF solver
@@ -110,9 +110,6 @@ class AtomicSphericallyAveragedHartreeFock : public DIISBase {
                              int nelec_beta) override;
 
  private:
-  const RowMajorMatrix& get_active_fock(const SCFImpl& scf_impl) const override;
-  RowMajorMatrix& active_density(SCFImpl& scf_impl) override;
-
   /**
    * @brief Custom orthogonalization matrix computation for ASAHF
    * @param S_ Overlap matrix

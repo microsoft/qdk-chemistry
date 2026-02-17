@@ -14,7 +14,7 @@
 namespace qdk::chemistry::scf {
 
 // Forward declarations
-class DIISBase;
+class DIIS;
 class GDM;
 
 /**
@@ -65,7 +65,7 @@ class DIIS_GDM : public SCFAlgorithm {
 
  private:
   /// Pointer to DIIS algorithm instance
-  std::unique_ptr<DIISBase> diis_algorithm_;
+  std::unique_ptr<DIIS> diis_algorithm_;
 
   /// Pointer to GDM algorithm instance
   std::unique_ptr<GDM> gdm_algorithm_;
