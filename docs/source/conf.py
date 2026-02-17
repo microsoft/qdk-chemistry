@@ -38,8 +38,11 @@ release = _version_file.read_text().strip()
 # Signal to qdk_chemistry that we're in a docs build so runtime hooks stay idle
 os.environ.setdefault("QDK_CHEMISTRY_DOCS", "1")
 
-# Add path to the Python package
-sys.path.insert(0, str(_repo_root / "python" / "src"))
+# Add the Python source tree so Sphinx can find qdk_chemistry when the
+# package has not been pip-installed (e.g. local docs builds).
+# NOTE: The path must stay *after* any pip-installed copy so that the
+# compiled C++ extension (_core) from the installed package is preferred.
+sys.path.append(str(_repo_root / "python" / "src"))
 
 # Check if Graphviz 'dot' executable is available
 if shutil.which("dot") is None:
