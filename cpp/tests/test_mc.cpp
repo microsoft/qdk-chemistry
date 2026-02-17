@@ -300,7 +300,16 @@ TEST_F(MCTest, HydrogenAtom_CCPVDZ_SCI) {
       qdk::chemistry::algorithms::HamiltonianConstructorFactory::create();
   auto orbitals_with_active_space = testing::with_active_space(
       wfn_HF->get_orbitals(), std::vector<size_t>{0, 1}, std::vector<size_t>{});
-  auto ham = hamiltonian_constructor->run(orbitals_with_active_space);
+  // fake restricted orbitals from unrestricted SCF
+  auto restricted_orbitals = std::make_shared<Orbitals>(
+      orbitals_with_active_space->get_coefficients().first,
+      orbitals_with_active_space->get_energies().first,
+      orbitals_with_active_space->get_overlap_matrix(),
+      orbitals_with_active_space->get_basis_set(),
+      std::make_tuple(
+          orbitals_with_active_space->get_active_space_indices().first,
+          orbitals_with_active_space->get_inactive_space_indices().first));
+  auto ham = hamiltonian_constructor->run(restricted_orbitals);
 
   // Run selected CI calculation (1 alpha electron, 0 beta electrons)
   auto mc =
@@ -332,7 +341,16 @@ TEST_F(MCTest, NitrogenAtom_CCPVDZ_SCI) {
   auto orbitals_with_active_space = testing::with_active_space(
       wfn_HF->get_orbitals(), std::vector<size_t>{1, 2, 3, 4},
       std::vector<size_t>{0});
-  auto ham = hamiltonian_constructor->run(orbitals_with_active_space);
+  // fake restricted orbitals from unrestricted SCF
+  auto restricted_orbitals = std::make_shared<Orbitals>(
+      orbitals_with_active_space->get_coefficients().first,
+      orbitals_with_active_space->get_energies().first,
+      orbitals_with_active_space->get_overlap_matrix(),
+      orbitals_with_active_space->get_basis_set(),
+      std::make_tuple(
+          orbitals_with_active_space->get_active_space_indices().first,
+          orbitals_with_active_space->get_inactive_space_indices().first));
+  auto ham = hamiltonian_constructor->run(restricted_orbitals);
 
   // Run selected CI calculation (4 alpha electrons, 1 beta electron)
   auto mc =
@@ -340,5 +358,5 @@ TEST_F(MCTest, NitrogenAtom_CCPVDZ_SCI) {
           "macis_asci");
   mc->settings().set("core_selection_strategy", "fixed");
   auto [E_sci, wfn_sci] = mc->run(ham, 4, 1);
-  EXPECT_NEAR(E_sci, -54.385841001513917, testing::ci_energy_tolerance);
+  EXPECT_NEAR(E_sci, -54.385428499370562, testing::ci_energy_tolerance);
 }
