@@ -73,7 +73,7 @@ class QDriftSettings(Settings):
         self._set_default(
             "commutation_type",
             "str",
-            "qubit_wise",
+            "general",
             "Commutation check for merging: 'qubit_wise' (per-qubit) or 'general' (standard Pauli).",
             ("qubit_wise", "general"),
         )
