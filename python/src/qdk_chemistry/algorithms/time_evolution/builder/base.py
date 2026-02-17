@@ -33,6 +33,28 @@ class TimeEvolutionBuilder(Algorithm):
 
         """
 
+    # ------------------------------------------------------------------
+    # Shared helpers used by Trotter, qDRIFT, and partially-randomized
+    # builders.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _pauli_label_to_map(label: str) -> dict[int, str]:
+        """Translate a Pauli label to a mapping ``qubit -> {X, Y, Z}``.
+
+        Args:
+            label: Pauli string label in little-endian ordering.
+
+        Returns:
+            Dictionary assigning each non-identity qubit index to its Pauli axis.
+
+        """
+        mapping: dict[int, str] = {}
+        for index, char in enumerate(reversed(label)):  # reversed: right-most char -> qubit 0
+            if char != "I":
+                mapping[index] = char
+        return mapping
+
 
 class TimeEvolutionBuilderFactory(AlgorithmFactory):
     """Factory class for creating TimeEvolutionBuilder instances."""

@@ -582,6 +582,12 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.time_evolution.builder.partially_randomized import (  # noqa: PLC0415
+        PartiallyRandomized,
+    )
+    from qdk_chemistry.algorithms.time_evolution.builder.qdrift import (  # noqa: PLC0415
+        QDrift,
+    )
     from qdk_chemistry.algorithms.time_evolution.builder.trotter import (  # noqa: PLC0415
         Trotter,
     )
@@ -595,6 +601,8 @@ def _register_python_algorithms():
     register(lambda: SparseMatrixSolver())
     register(lambda: QdkQubitMapper())
     register(lambda: Trotter())
+    register(lambda: QDrift())
+    register(lambda: PartiallyRandomized())
     register(lambda: PauliSequenceMapper())
     register(lambda: QdkFullStateSimulator())
     register(lambda: IterativePhaseEstimation())
