@@ -36,7 +36,7 @@ namespace snk {
 class ERI {
   GAUXCInput
       gauxc_input_;  ///< Configuration for GauXC numerical integration settings
-  bool unrestricted_;  ///< Whether to use unrestricted (UKS) formalism
+  size_t spin_density_factor_;  ///< Number of spin-resolved density blocks
   std::string
       xc_name_;  ///< Functional name (used for GauXC grid configuration)
   size_t num_atomic_orbitals_;  ///< Number of atomic orbitals
@@ -49,23 +49,26 @@ class ERI {
    * configuration. The GauXC implementation is obtained from the registry for
    * efficient reuse.
    *
-   * @param unr Whether to use unrestricted formalism
+   * @param spin_density_factor Number of spin-resolved density matrices (1 or
+   * 2)
    * @param basis_set Orbital basis set
    * @param gauxc_input GauXC configuration for numerical integration
    * @param xc_name Functional name (used for grid setup, not XC evaluation)
    */
-  ERI(bool unr, const BasisSet& basis_set, GAUXCInput gauxc_input,
-      std::string xc_name) {
+  ERI(size_t spin_density_factor, const BasisSet& basis_set,
+      GAUXCInput gauxc_input, std::string xc_name) {
     QDK_LOG_TRACE_ENTERING();
 
-    unrestricted_ = unr;
+    spin_density_factor_ = spin_density_factor;
     gauxc_input_ = gauxc_input;
     xc_name_ = xc_name == "HF" ? "PBE0" : xc_name;  // does not matter
     num_atomic_orbitals_ = basis_set.num_atomic_orbitals;
 
+    const bool has_spin_split_density = spin_density_factor_ > 1;
     // Get or create the GauXC implementation from the registry
     util::GAUXCRegistry::get_or_create(const_cast<BasisSet&>(basis_set),
-                                       gauxc_input_, unrestricted_, xc_name_);
+                                       gauxc_input_, has_spin_split_density,
+                                       xc_name_);
   }
 
   /**
@@ -98,7 +101,7 @@ class ERI {
 
     AutoTimer t("ERI::build_JK");
     const size_t mat_size =
-        (unrestricted_ ? 2 : 1) * num_atomic_orbitals_ * num_atomic_orbitals_;
+        spin_density_factor_ * num_atomic_orbitals_ * num_atomic_orbitals_;
 
     // RSH check
     const bool is_rsx = std::abs(omega) > 1e-12;
@@ -174,29 +177,32 @@ class ERI {
    * specified configuration. This provides a clean interface for creating
    * SNK instances from external code.
    *
-   * @param unr Whether to use unrestricted formalism
+   * @param spin_density_factor Number of spin-resolved density matrices (1 or
+   * 2)
    * @param basis_set Orbital basis set
    * @param gauxc_input GauXC configuration for numerical integration
    * @param xc_name Functional name (used for grid configuration)
    * @return Unique pointer to new SNK ERI instance
    */
-  static std::unique_ptr<ERI> make_gauxc_snk(bool unr,
+  static std::unique_ptr<ERI> make_gauxc_snk(size_t spin_density_factor,
                                              const BasisSet& basis_set,
                                              GAUXCInput gauxc_input,
                                              std::string xc_name) {
     QDK_LOG_TRACE_ENTERING();
 
-    return std::make_unique<ERI>(unr, basis_set, gauxc_input, xc_name);
+    return std::make_unique<ERI>(spin_density_factor, basis_set, gauxc_input,
+                                 xc_name);
   }
 };
 
 }  // namespace snk
 
-SNK::SNK(bool unr, bool rohf_enabled, BasisSet& basis_set,
+SNK::SNK(SCFOrbitalType scf_orbital_type, BasisSet& basis_set,
          GAUXCInput gauxc_input, std::string xc_name, ParallelConfig _mpi)
-    : ERI(unr, rohf_enabled, 0.0, basis_set, _mpi),
-      eri_impl_(
-          snk::ERI::make_gauxc_snk(unr, basis_set, gauxc_input, xc_name)) {
+    : ERI(scf_orbital_type, 0.0, basis_set, _mpi),
+      eri_impl_(snk::ERI::make_gauxc_snk(
+          scf_orbital_type == SCFOrbitalType::Restricted ? 1 : 2, basis_set,
+          gauxc_input, xc_name)) {
   QDK_LOG_TRACE_ENTERING();
 }
 

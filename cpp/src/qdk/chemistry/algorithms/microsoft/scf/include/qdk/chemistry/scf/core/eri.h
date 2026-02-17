@@ -25,16 +25,14 @@ class ERI {
   /**
    * @brief Construct ERI engine
    *
-   * @param unrestricted Whether this is an unrestricted calculation (UHF/UKS)
-   * @param rohf_enabled Whether ROHF is enabled
+   * @param scf_orbital_type Spin symmetry classification (RHF/ROHF/UHF)
    * @param tol Integral screening tolerance
    * @param basis_set The atomic orbital basis set
    * @param mpi Parallelism configuration
    */
-  ERI(bool unrestricted, bool rohf_enabled, double tol, BasisSet& basis_set,
+  ERI(SCFOrbitalType scf_orbital_type, double tol, BasisSet& basis_set,
       ParallelConfig mpi)
-      : unrestricted_(unrestricted),
-        rohf_enabled_(rohf_enabled),
+      : scf_orbital_type_(scf_orbital_type),
         tolerance_(tol),
         basis_set_(basis_set),
         mpi_(mpi) {}
@@ -154,8 +152,19 @@ class ERI {
    */
   virtual void quarter_trans_impl(size_t nt, const double* C, double* out) = 0;
 
-  bool unrestricted_;    ///< Whether this is an unrestricted calculation
-  bool rohf_enabled_;    ///< Whether ROHF is enabled
+  [[nodiscard]] bool has_spin_split_density() const {
+    return scf_orbital_type_ != SCFOrbitalType::Restricted;
+  }
+
+  [[nodiscard]] bool is_rohf_reference() const {
+    return scf_orbital_type_ == SCFOrbitalType::RestrictedOpenShell;
+  }
+
+  [[nodiscard]] bool is_unrestricted_reference() const {
+    return scf_orbital_type_ == SCFOrbitalType::Unrestricted;
+  }
+
+  SCFOrbitalType scf_orbital_type_;
   double tolerance_;     ///< Integral screening threshold
   BasisSet& basis_set_;  ///< Reference to the atomic orbital basis set
   ParallelConfig mpi_;   ///< MPI parallelization configuration

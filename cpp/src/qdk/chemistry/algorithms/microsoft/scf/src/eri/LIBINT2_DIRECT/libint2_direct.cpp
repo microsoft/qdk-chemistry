@@ -871,11 +871,14 @@ class ERI {
 
 }  // namespace libint2::direct
 
-LIBINT2_DIRECT::LIBINT2_DIRECT(bool unr, bool rohf_enabled, BasisSet& basis_set,
-                               ParallelConfig _mpi, bool use_atomics)
-    : ERI(unr, rohf_enabled, 0.0, basis_set, _mpi),
+LIBINT2_DIRECT::LIBINT2_DIRECT(SCFOrbitalType scf_orbital_type,
+                               BasisSet& basis_set, ParallelConfig _mpi,
+                               bool use_atomics)
+    : ERI(scf_orbital_type, 0.0, basis_set, _mpi),
       eri_impl_(libint2::direct::ERI::make_libint2_direct_eri(
-          unr, rohf_enabled, basis_set, use_atomics)) {
+          scf_orbital_type != SCFOrbitalType::Restricted,
+          scf_orbital_type == SCFOrbitalType::RestrictedOpenShell, basis_set,
+          use_atomics)) {
   QDK_LOG_TRACE_ENTERING();
   if (_mpi.world_size > 1) throw std::runtime_error("LIBINT2_DIRECT + MPI NYI");
 }
