@@ -52,7 +52,7 @@ class TestTrotter:
     def test_single_step_construction(self):
         """Test construction of time evolution unitary with a single Trotter step."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
-        builder = Trotter(num_trotter_steps=1)
+        builder = Trotter(num_steps=1)
         unitary = builder.run(hamiltonian, time=0.2)
 
         assert isinstance(unitary, TimeEvolutionUnitary)
@@ -70,7 +70,7 @@ class TestTrotter:
             coefficients=[2.0, 1.0],
         )
 
-        builder = Trotter(num_trotter_steps=4)
+        builder = Trotter(num_steps=4)
         unitary = builder.run(hamiltonian, time=0.2)
 
         container = unitary.get_container()
@@ -139,7 +139,7 @@ class TestTrotter:
         # Hamiltonian H = X + Z
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
 
-        builder = Trotter(num_trotter_steps=1)
+        builder = Trotter(num_steps=1)
         t = 0.1
         unitary = builder.run(hamiltonian, time=t)
         container = unitary.get_container()
@@ -215,9 +215,9 @@ class TestTrotterAccuracyAware:
         assert container.step_reps == 1
 
     def test_manual_steps_as_lower_bound(self):
-        """Test that manual num_trotter_steps acts as a lower bound."""
+        """Test that manual num_steps acts as a lower bound."""
         hamiltonian = QubitHamiltonian(pauli_strings=["XI", "IX"], coefficients=[1.0, 1.0])
-        builder = Trotter(num_trotter_steps=10, target_accuracy=0.01)
+        builder = Trotter(num_steps=10, target_accuracy=0.01)
         unitary = builder.run(hamiltonian, time=1.0)
         container = unitary.get_container()
         # Commutator bound gives 1, but manual gives 10 -> max(1, 10) = 10
@@ -226,7 +226,7 @@ class TestTrotterAccuracyAware:
     def test_no_target_accuracy_backward_compatible(self):
         """Test that the builder is backward compatible when target_accuracy is None."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        builder = Trotter(num_trotter_steps=3)
+        builder = Trotter(num_steps=3)
         unitary = builder.run(hamiltonian, time=0.5)
         container = unitary.get_container()
         assert container.step_reps == 3

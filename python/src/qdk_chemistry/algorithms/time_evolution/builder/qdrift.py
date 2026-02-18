@@ -19,7 +19,7 @@ References:
 import numpy as np
 
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
-from qdk_chemistry.algorithms.time_evolution.builder.pauli_commutation import (
+from qdk_chemistry.utils.pauli_commutation import (
     do_pauli_terms_qw_commute,
     get_commutation_checker,
 )

@@ -1,15 +1,18 @@
 r"""Trotter error bound estimation for accuracy-aware parameterization.
 
 This module provides functions to compute the number of Trotter steps
-required to achieve a target accuracy for the first-order (Lie-Trotter)
-product formula.
+required to achieve a target accuracy for product-formula decompositions.
 
-Two bounds are offered:
+Currently implemented for first-order (Lie–Trotter).  The framework is
+designed to be extended to higher-order formulas — see the stub
+:func:`trotter_steps` for the intended entry point.
 
-* **naive** - uses the triangle-inequality bound
+Two bounds are offered for first order:
+
+* **naive** – uses the triangle-inequality bound
   :math:`N = \\lceil (\\sum_j |\\alpha_j|)^2 t^2 / \\epsilon \\rceil`.
 
-* **commutator** (tighter) - uses the commutator-based bound from
+* **commutator** (tighter) – uses the commutator-based bound from
   Childs *et al.* (2021) :cite:`Childs2021`:
   :math:`N = \\lceil \\frac{t^2}{2\\epsilon}
   \\sum_{j<k} \\lVert [\\alpha_j P_j, \\alpha_k P_k] \\rVert \\rceil`.
@@ -26,24 +29,89 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import math
+from __future__ import annotations
 
-from qdk_chemistry.algorithms.time_evolution.builder.pauli_commutation import (
-    commutator_bound_first_order,
-)
+import math
+from typing import TYPE_CHECKING
+
+from qdk_chemistry.utils.pauli_commutation import commutator_bound_first_order
+
+if TYPE_CHECKING:
+    from qdk_chemistry.data import QubitHamiltonian
 
 __all__: list[str] = [
+    "trotter_steps",
     "trotter_steps_commutator",
     "trotter_steps_naive",
 ]
 
 
-def trotter_steps_naive(
-    one_norm: float,
+# =====================================================================
+# Public entry point (order-aware dispatcher)
+# =====================================================================
+
+
+def trotter_steps(
+    hamiltonian: QubitHamiltonian,
     time: float,
     target_accuracy: float,
+    *,
+    order: int = 1,
+    error_bound: str = "commutator",
+    weight_threshold: float = 1e-12,
 ) -> int:
-    r"""Compute the number of Trotter steps using the naive bound.
+    r"""Compute the minimum number of Trotter steps for a target accuracy.
+
+    This is the primary entry point for accuracy-aware step-count
+    estimation.  It dispatches to the appropriate order-specific
+    implementation.
+
+    Args:
+        hamiltonian: The qubit Hamiltonian to simulate.
+        time: The total evolution time *t*.
+        target_accuracy: The target accuracy :math:`\epsilon > 0`.
+        order: The order of the Trotter–Suzuki product formula.
+            Currently only ``1`` (Lie–Trotter) is implemented.
+        error_bound: Strategy for computing the error bound.
+            ``"commutator"`` (default, tighter) or ``"naive"``.
+        weight_threshold: Absolute threshold below which Hamiltonian
+            coefficients are treated as zero.  Defaults to 1e-12.
+
+    Returns:
+        The minimum number of Trotter steps (at least 1).
+
+    Raises:
+        ValueError: If ``target_accuracy`` is not positive.
+        NotImplementedError: If *order* is not yet supported.
+
+    """
+    if target_accuracy <= 0:
+        raise ValueError(f"target_accuracy must be positive, got {target_accuracy}.")
+    if order != 1:
+        raise NotImplementedError(
+            f"Trotter step estimation for order {order} is not yet implemented. "
+            "Only first-order (order=1) is currently supported."
+        )
+    if error_bound == "commutator":
+        return trotter_steps_commutator(hamiltonian, time, target_accuracy, weight_threshold=weight_threshold)
+    if error_bound == "naive":
+        return trotter_steps_naive(hamiltonian, time, target_accuracy, weight_threshold=weight_threshold)
+    raise ValueError(f"error_bound must be 'commutator' or 'naive', got {error_bound!r}.")
+
+
+# =====================================================================
+# First-order bounds
+# =====================================================================
+
+
+def trotter_steps_naive(
+    hamiltonian: QubitHamiltonian,
+    time: float,
+    target_accuracy: float,
+    *,
+    weight_threshold: float = 1e-12,
+) -> int:
+    r"""Compute the number of first-order Trotter steps using the naive bound.
 
     The naive (triangle-inequality) bound is
 
@@ -51,13 +119,15 @@ def trotter_steps_naive(
 
         N = \left\lceil \frac{(\sum_j |\alpha_j|)^2 \, t^2}{\epsilon} \right\rceil
 
-    where :math:`\sum_j |\alpha_j|` is the 1-norm (Schatten norm) of the
-    Hamiltonian coefficients.
+    where :math:`\sum_j |\alpha_j|` is the 1-norm of the Hamiltonian
+    coefficients.
 
     Args:
-        one_norm: The 1-norm :math:`\sum_j |\alpha_j|` of the Hamiltonian.
+        hamiltonian: The qubit Hamiltonian to simulate.
         time: The total evolution time *t*.
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
+        weight_threshold: Absolute threshold below which coefficients
+            are treated as zero.  Defaults to 1e-12.
 
     Returns:
         The minimum number of Trotter steps (at least 1).
@@ -68,16 +138,19 @@ def trotter_steps_naive(
     """
     if target_accuracy <= 0:
         raise ValueError(f"target_accuracy must be positive, got {target_accuracy}.")
+    real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
+    one_norm = sum(abs(coeff) for _, coeff in real_terms)
     return max(1, math.ceil(one_norm**2 * time**2 / target_accuracy))
 
 
 def trotter_steps_commutator(
-    pauli_labels: list[str],
-    coefficients: list[float],
+    hamiltonian: QubitHamiltonian,
     time: float,
     target_accuracy: float,
+    *,
+    weight_threshold: float = 1e-12,
 ) -> int:
-    r"""Compute the number of Trotter steps using the commutator bound.
+    r"""Compute the number of first-order Trotter steps using the commutator bound.
 
     The tighter commutator-based bound from Childs *et al.* (2021) is
 
@@ -93,10 +166,11 @@ def trotter_steps_commutator(
     terms commute.
 
     Args:
-        pauli_labels: List of Pauli string labels for each Hamiltonian term.
-        coefficients: Corresponding real coefficients.
+        hamiltonian: The qubit Hamiltonian to simulate.
         time: The total evolution time *t*.
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
+        weight_threshold: Absolute threshold below which coefficients
+            are treated as zero.  Defaults to 1e-12.
 
     Returns:
         The minimum number of Trotter steps (at least 1).
@@ -107,5 +181,5 @@ def trotter_steps_commutator(
     """
     if target_accuracy <= 0:
         raise ValueError(f"target_accuracy must be positive, got {target_accuracy}.")
-    comm_bound = commutator_bound_first_order(pauli_labels, coefficients)
+    comm_bound = commutator_bound_first_order(hamiltonian, weight_threshold=weight_threshold)
     return max(1, math.ceil(comm_bound * time**2 / (2.0 * target_accuracy)))

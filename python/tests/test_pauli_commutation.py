@@ -7,7 +7,8 @@
 
 import pytest
 
-from qdk_chemistry.algorithms.time_evolution.builder.pauli_commutation import (
+from qdk_chemistry.data import QubitHamiltonian
+from qdk_chemistry.utils.pauli_commutation import (
     commutator_bound_first_order,
     do_pauli_strings_commute,
     do_pauli_strings_qw_commute,
@@ -99,47 +100,43 @@ class TestCommutatorBoundFirstOrder:
     def test_all_commuting_terms(self):
         """Test that commuting terms give zero bound."""
         # XI and IX commute
-        bound = commutator_bound_first_order(["XI", "IX"], [1.0, 1.0])
+        h = QubitHamiltonian(pauli_strings=["XI", "IX"], coefficients=[1.0, 1.0])
+        bound = commutator_bound_first_order(h)
         assert bound == 0.0
 
     def test_anticommuting_pair(self):
         """Test a single anticommuting pair."""
         # X and Z anticommute -> bound = 2 * |a1| * |a2| = 2 * 1 * 1 = 2
-        bound = commutator_bound_first_order(["X", "Z"], [1.0, 1.0])
+        h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
+        bound = commutator_bound_first_order(h)
         assert bound == 2.0
 
     def test_anticommuting_pair_with_coefficients(self):
         """Test an anticommuting pair with non-unit coefficients."""
         # X and Z anticommute -> bound = 2 * |2| * |3| = 12
-        bound = commutator_bound_first_order(["X", "Z"], [2.0, 3.0])
+        h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[2.0, 3.0])
+        bound = commutator_bound_first_order(h)
         assert bound == 12.0
 
     def test_mixed_commuting_and_anticommuting(self):
         """Test a mix of commuting and anticommuting pairs."""
         # XI, IX, ZI: XI and IX commute, XI and ZI anticommute, IX and ZI commute
-        bound = commutator_bound_first_order(["XI", "IX", "ZI"], [1.0, 1.0, 1.0])
+        h = QubitHamiltonian(pauli_strings=["XI", "IX", "ZI"], coefficients=[1.0, 1.0, 1.0])
+        bound = commutator_bound_first_order(h)
         # Only XI/ZI anticommute -> 2 * 1 * 1 = 2
         assert bound == 2.0
 
     def test_negative_coefficients(self):
         """Test that negative coefficients are handled via absolute values."""
-        bound = commutator_bound_first_order(["X", "Z"], [-2.0, -3.0])
+        h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[-2.0, -3.0])
+        bound = commutator_bound_first_order(h)
         assert bound == 12.0
 
     def test_single_term(self):
         """Test that a single term gives zero bound."""
-        bound = commutator_bound_first_order(["X"], [1.0])
+        h = QubitHamiltonian(pauli_strings=["X"], coefficients=[1.0])
+        bound = commutator_bound_first_order(h)
         assert bound == 0.0
-
-    def test_empty_hamiltonian(self):
-        """Test that an empty Hamiltonian gives zero bound."""
-        bound = commutator_bound_first_order([], [])
-        assert bound == 0.0
-
-    def test_mismatched_lengths_raises(self):
-        """Test that mismatched labels/coefficients raise ValueError."""
-        with pytest.raises(ValueError, match="must match"):
-            commutator_bound_first_order(["X", "Z"], [1.0])
 
 
 class TestDoPauliStringsQwCommute:
@@ -221,6 +218,14 @@ class TestDoPauliTermsQwCommute:
         b = {0: "Y", 1: "X"}
         assert do_pauli_terms_commute(a, b) is True
         assert do_pauli_terms_qw_commute(a, b) is False
+
+    def test_same_paulis_overlapping(self):
+        """Same Paulis on overlapping qubits qw-commute."""
+        assert do_pauli_terms_qw_commute({0: "X", 1: "Z"}, {0: "X", 1: "Z"}) is True
+
+    def test_one_differing_one_matching(self):
+        """One differing, one matching position does not qw-commute."""
+        assert do_pauli_terms_qw_commute({0: "X", 1: "Z"}, {0: "Y", 1: "Z"}) is False
 
 
 class TestGetCommutationChecker:

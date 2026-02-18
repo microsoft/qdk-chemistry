@@ -5,13 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import numpy as np
-
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
-from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
-    trotter_steps_commutator,
-    trotter_steps_naive,
-)
+from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import trotter_steps
 from qdk_chemistry.data import QubitHamiltonian, Settings, TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
@@ -29,14 +24,14 @@ class TrotterSettings(Settings):
 
         Attributes:
             order: The order of the Trotter decomposition (currently only first order is supported).
-            num_trotter_steps: The number of Trotter steps to use in the construction.
-            tolerance: The absolute tolerance for filtering small coefficients.
+            weight_threshold: The absolute threshold for filtering small coefficients.
 
         """
         super().__init__()
         self._set_default("order", "int", 1, "The order of the Trotter decomposition.")
-        self._set_default("num_trotter_steps", "int", 1, "The number of Trotter steps.")
-        self._set_default("tolerance", "float", 1e-12, "The absolute tolerance for filtering small coefficients.")
+        self._set_default(
+            "weight_threshold", "float", 1e-12, "The absolute threshold for filtering small coefficients."
+        )
 
 
 class Trotter(TimeEvolutionBuilder):
@@ -45,17 +40,28 @@ class Trotter(TimeEvolutionBuilder):
     def __init__(
         self,
         order: int = 1,
-        num_trotter_steps: int = 1,
-        tolerance: float = 1e-12,
+        *,
         target_accuracy: float | None = None,
+        num_steps: int | None = None,
         error_bound: str = "commutator",
+        weight_threshold: float = 1e-12,
     ):
         r"""Initialize Trotter builder with specified Trotter decomposition settings.
 
-        When *target_accuracy* is provided the builder automatically computes
-        the number of Trotter steps *N* required so that the product-formula
-        error is at most *target_accuracy*.  Two error-bound strategies are
-        available:
+        Exactly one of *target_accuracy* or *num_steps* should be supplied.
+
+        * When *target_accuracy* is provided the builder automatically
+          computes the number of Trotter steps *N* required so that the
+          product-formula error is at most *target_accuracy*.
+        * When *num_steps* is provided it is used directly, bypassing
+          error-bound computation.
+        * When **neither** is provided, *num_steps* defaults to ``1``
+          for backward compatibility.
+        * When **both** are provided, the larger of the two values is
+          used (so *num_steps* acts as a floor).
+
+        Two error-bound strategies are available (used only when
+        *target_accuracy* is set):
 
         * ``"commutator"`` (default, tighter): uses the commutator-based bound
           from Childs *et al.* (2021).  :math:`N = \lceil \frac{t^{2}}{2\epsilon}
@@ -63,31 +69,34 @@ class Trotter(TimeEvolutionBuilder):
         * ``"naive"``: uses the triangle-inequality bound.
           :math:`N = \lceil (\sum_j|\alpha_j|)^{2}t^{2}/\epsilon \rceil`
 
-        The automatically determined *N* is combined with
-        *num_trotter_steps* via ``max(num_trotter_steps, N)``, so specifying
-        a manual lower bound is safe.
-
         Args:
-            order: The order of the Trotter decomposition (currently only first order is supported). Defaults to 1.
-            num_trotter_steps: Number of Trotter steps for the decomposition. Higher values improve accuracy
-                but increase circuit depth. Defaults to 1.
-            tolerance: Absolute threshold for filtering small Hamiltonian coefficients. Defaults to 1e-12.
-            target_accuracy: If given, automatically compute the number of Trotter steps needed to achieve this
-                accuracy.  Must be positive.  Defaults to ``None`` (disabled).
-            error_bound: Strategy for computing the Trotter error bound when *target_accuracy* is set.
-                Either ``"commutator"`` (default, tighter) or ``"naive"``.
+            order: The order of the Trotter decomposition (currently only
+                first order is supported). Defaults to 1.
+            target_accuracy: If given, automatically compute the number of
+                Trotter steps needed to achieve this accuracy.  Must be
+                positive.  Defaults to ``None`` (disabled).
+            num_steps: Explicit number of Trotter steps. When both
+                *num_steps* and *target_accuracy* are given the larger
+                value is used.  Defaults to ``None``.
+            error_bound: Strategy for computing the Trotter error bound
+                when *target_accuracy* is set.  Either ``"commutator"``
+                (default, tighter) or ``"naive"``.
+            weight_threshold: Absolute threshold for filtering small
+                Hamiltonian coefficients. Defaults to 1e-12.
 
         """
         super().__init__()
         if target_accuracy is not None and target_accuracy <= 0:
             raise ValueError(f"target_accuracy must be positive, got {target_accuracy}.")
+        if num_steps is not None and num_steps < 1:
+            raise ValueError(f"num_steps must be >= 1, got {num_steps}.")
         if error_bound not in ("commutator", "naive"):
             raise ValueError(f"error_bound must be 'commutator' or 'naive', got {error_bound!r}.")
         self._settings = TrotterSettings()
         self._settings.set("order", order)
-        self._settings.set("num_trotter_steps", num_trotter_steps)
-        self._settings.set("tolerance", tolerance)
+        self._settings.set("weight_threshold", weight_threshold)
         self._target_accuracy = target_accuracy
+        self._num_steps = num_steps
         self._error_bound = error_bound
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
@@ -128,9 +137,9 @@ class Trotter(TimeEvolutionBuilder):
 
         # Calculate evolution time per Trotter step
         delta = time / num_trotter_steps
-        tolerance = self._settings.get("tolerance")
+        weight_threshold = self._settings.get("weight_threshold")
 
-        terms = self._decompose_trotter_step(qubit_hamiltonian, time=delta, atol=tolerance)
+        terms = self._decompose_trotter_step(qubit_hamiltonian, time=delta, atol=weight_threshold)
 
         num_qubits = qubit_hamiltonian.num_qubits
 
@@ -145,26 +154,25 @@ class Trotter(TimeEvolutionBuilder):
     def _resolve_num_trotter_steps(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> int:
         """Determine the number of Trotter steps to use.
 
-        If *target_accuracy* was set at construction, this method computes the
-        minimum *N* required by the chosen error bound and returns
-        ``max(num_trotter_steps, N)``; otherwise it returns the user-supplied
-        *num_trotter_steps*.
+        When both *num_steps* and *target_accuracy* are provided, the
+        larger value wins.  When neither is provided, the default is 1.
 
         """
-        manual_steps: int = self._settings.get("num_trotter_steps")
+        manual_steps: int = self._num_steps if self._num_steps is not None else 1
+
         if self._target_accuracy is None:
             return manual_steps
 
-        tolerance = self._settings.get("tolerance")
-        real_terms = qubit_hamiltonian.get_real_coefficients(tolerance=tolerance)
-        pauli_labels = [label for label, _ in real_terms]
-        coefficients = [coeff for _, coeff in real_terms]
-
-        if self._error_bound == "commutator":
-            auto_steps = trotter_steps_commutator(pauli_labels, coefficients, time, self._target_accuracy)
-        else:
-            one_norm = float(np.sum(np.abs(coefficients)))
-            auto_steps = trotter_steps_naive(one_norm, time, self._target_accuracy)
+        order = self._settings.get("order")
+        weight_threshold = self._settings.get("weight_threshold")
+        auto_steps = trotter_steps(
+            hamiltonian=qubit_hamiltonian,
+            time=time,
+            target_accuracy=self._target_accuracy,
+            order=order,
+            error_bound=self._error_bound,
+            weight_threshold=weight_threshold,
+        )
         return max(manual_steps, auto_steps)
 
     def _decompose_trotter_step(
