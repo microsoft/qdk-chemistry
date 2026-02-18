@@ -20,7 +20,6 @@ import numpy as np
 
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.builder.pauli_commutation import (
-    do_pauli_terms_commute,
     do_pauli_terms_qw_commute,
     get_commutation_checker,
 )
@@ -203,7 +202,7 @@ class QDrift(TimeEvolutionBuilder):
         # kept as separate rotations and non-commuting boundaries are
         # never crossed, preserving the Campbell (2019) error bound.
         if self._settings.get("merge_duplicate_terms"):
-            commute_fn = self._get_commutation_checker(self._settings.get("commutation_type"))
+            commute_fn = get_commutation_checker(self._settings.get("commutation_type"))
             terms = self._merge_duplicate_terms(terms, commute_fn=commute_fn)
 
         return TimeEvolutionUnitary(
@@ -269,30 +268,6 @@ class QDrift(TimeEvolutionBuilder):
 
         return result
 
-    @staticmethod
-    def _pauli_terms_qw_commute(a: dict[int, str], b: dict[int, str]) -> bool:
-        """Check whether two Pauli terms qubit-wise commute.
-
-        Delegates to :func:`~.pauli_commutation.do_pauli_terms_qw_commute`.
-        """
-        return do_pauli_terms_qw_commute(a, b)
-
-    @staticmethod
-    def _pauli_terms_commute(a: dict[int, str], b: dict[int, str]) -> bool:
-        """Check whether two Pauli terms commute (general/standard commutation).
-
-        Delegates to :func:`~.pauli_commutation.do_pauli_terms_commute`.
-        """
-        return do_pauli_terms_commute(a, b)
-
-    @classmethod
-    def _get_commutation_checker(cls, commutation_type: str):
-        """Return the commutation checker function for the given type.
-
-        Delegates to :func:`~.pauli_commutation.get_commutation_checker`.
-        """
-        return get_commutation_checker(commutation_type)
-
     @classmethod
     def _merge_duplicate_terms(
         cls,
@@ -319,7 +294,7 @@ class QDrift(TimeEvolutionBuilder):
             terms: Ordered list of exponentiated Pauli terms.
             commute_fn: A callable ``(a, b) -> bool`` that checks whether
                 two Pauli term mappings commute.  Defaults to
-                :meth:`_pauli_terms_qw_commute` if ``None``.
+                :func:`~.pauli_commutation.do_pauli_terms_qw_commute` if ``None``.
 
         Returns:
             A (potentially shorter) list producing the same unitary.
@@ -329,7 +304,7 @@ class QDrift(TimeEvolutionBuilder):
             return terms
 
         if commute_fn is None:
-            commute_fn = cls._pauli_terms_qw_commute
+            commute_fn = do_pauli_terms_qw_commute
 
         result: list[ExponentiatedPauliTerm] = []
         group: list[ExponentiatedPauliTerm] = [terms[0]]
