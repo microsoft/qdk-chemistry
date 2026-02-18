@@ -478,7 +478,8 @@ StabilityChecker::_run_impl(
   scf_config->require_gradient = false;
   scf_config->basis = basis_set_internal->name;
   scf_config->cartesian = !basis_set_internal->pure;
-  // Currently ROHF is not supported yet
+  // Note: ROHF/ROKS is rejected earlier by StabilityChecker; only RHF/UKS is
+  // configured here
   scf_config->set_scf_orbital_type(
       unrestricted ? qcs::SCFOrbitalType::Unrestricted
                    : qcs::SCFOrbitalType::RestrictedClosedShell);

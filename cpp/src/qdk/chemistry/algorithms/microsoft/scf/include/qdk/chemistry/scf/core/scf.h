@@ -226,8 +226,9 @@ struct SCFConfig {
 #endif
 
   /**
-   * @brief Update spin configuration via DIIS type and keep legacy flags in
-   * sync.
+   * @brief Set the SCF orbital type and keep legacy flags in sync
+   * Orbital types include RestrictedClosedShell (RHF/RKS), Unrestricted
+   * (UHF/UKS), and RestrictedOpenShell (ROHF/ROKS)
    */
   void set_scf_orbital_type(SCFOrbitalType type) {
     scf_orbital_type = type;

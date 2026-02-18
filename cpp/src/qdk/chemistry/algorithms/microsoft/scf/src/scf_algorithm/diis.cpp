@@ -213,11 +213,19 @@ class ROHFHelper {
     copy_block(F_up_mo, nd, nd + ns, ns, nv);
     copy_block(F_up_mo, nd + ns, nd, nv, ns);
 
+    // Transform the effective Fock matrix back to AO basis by solving
+    // C^{-T} * F_MO * C^{-1} = F_AO
+    // We use LAPACK's getrf/getrs to solve the linear systems involving C^T and
+    // C without explicitly inverting C
     const int matrix_dim = num_molecular_orbitals;
     using ColMajorMatrix =
         Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
+    // LAPACK expects column-major layout, so we copy the row-major data into a
+    // column-major matrix without transposing the logical layout
     ColMajorMatrix Ct =
         Eigen::Map<const ColMajorMatrix>(C.data(), matrix_dim, C.rows());
+    // F_MO is symmetric, so we can use it directly as the right-hand side
+    // without transposing
     ColMajorMatrix temp_rhs = effective_F_mo;
     std::vector<int64_t> ipiv(matrix_dim);
 
