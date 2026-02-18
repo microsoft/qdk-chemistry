@@ -9,6 +9,8 @@
 #include <qdk/chemistry/scf/core/enums.h>
 #include <qdk/chemistry/scf/core/scf.h>
 
+#include <stdexcept>
+
 namespace qdk::chemistry::scf {
 class ERIMultiplexer;  // Forward declaration
 
@@ -16,7 +18,7 @@ class ERIMultiplexer;  // Forward declaration
  * @brief Base class for Electron Repulsion Integral (ERI) engines
  *
  * Provides interface for computing J (Coulomb) and K (exchange) matrices,
- * their energtic gradients, and molecular orbital transformations.
+ * their energetic gradients, and molecular orbital transformations.
  */
 class ERI {
   friend ERIMultiplexer;
@@ -35,7 +37,18 @@ class ERI {
       : scf_orbital_type_(scf_orbital_type),
         tolerance_(tol),
         basis_set_(basis_set),
-        mpi_(mpi) {}
+        mpi_(mpi) {
+    switch (scf_orbital_type_) {
+      case SCFOrbitalType::RestrictedClosedShell:
+      case SCFOrbitalType::Unrestricted:
+      case SCFOrbitalType::RestrictedOpenShell:
+        break;
+      default:
+        throw std::invalid_argument(
+            "ERI only supports RestrictedClosedShell, Unrestricted, or "
+            "RestrictedOpenShell references");
+    }
+  }
 
   /**
    * @brief Virtual destructor
@@ -154,14 +167,6 @@ class ERI {
 
   [[nodiscard]] bool has_spin_split_density() const {
     return scf_orbital_type_ != SCFOrbitalType::RestrictedClosedShell;
-  }
-
-  [[nodiscard]] bool is_rohf_reference() const {
-    return scf_orbital_type_ == SCFOrbitalType::RestrictedOpenShell;
-  }
-
-  [[nodiscard]] bool is_unrestricted_reference() const {
-    return scf_orbital_type_ == SCFOrbitalType::Unrestricted;
   }
 
   SCFOrbitalType scf_orbital_type_;

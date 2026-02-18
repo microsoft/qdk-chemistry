@@ -228,9 +228,10 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
                          orbitals->is_restricted();
   }
 
-  // SCFOrbitalType::RestrictedOpenShell is not currently supported
+  // SCFOrbitalType::RestrictedOpenShell is not supported for Hamiltonian
+  // construction, so we only use RestrictedClosedShell in restricted case
   scf_config->set_scf_orbital_type(
-      is_restricted_calc ? qcs::SCFOrbitalType::RestrictedForHamiltonian
+      is_restricted_calc ? qcs::SCFOrbitalType::RestrictedClosedShell
                          : qcs::SCFOrbitalType::Unrestricted);
 
   // Compute integrals (same size for alpha and beta)
