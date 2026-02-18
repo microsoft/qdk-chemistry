@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from .base import TimeEvolutionBuilderFactory
+from .partially_randomized import PartiallyRandomized, PartiallyRandomizedSettings
 from .pauli_commutation import (
     commutator_bound_first_order,
     do_pauli_strings_commute,
@@ -14,7 +15,6 @@ from .pauli_commutation import (
     do_pauli_terms_qw_commute,
     get_commutation_checker,
 )
-from .partially_randomized import PartiallyRandomized, PartiallyRandomizedSettings
 from .qdrift import QDrift, QDriftSettings
 from .trotter import Trotter, TrotterSettings
 

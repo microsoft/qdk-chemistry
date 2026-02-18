@@ -57,10 +57,10 @@ class Trotter(TimeEvolutionBuilder):
         error is at most *target_accuracy*.  Two error-bound strategies are
         available:
 
-        * ``"commutator"`` (default, tighter) – uses the commutator-based bound
+        * ``"commutator"`` (default, tighter): uses the commutator-based bound
           from Childs *et al.* (2021).  :math:`N = \lceil \frac{t^{2}}{2\epsilon}
           \sum_{j<k}\lVert[\alpha_jP_j,\alpha_kP_k]\rVert \rceil`
-        * ``"naive"`` – uses the triangle-inequality bound.
+        * ``"naive"``: uses the triangle-inequality bound.
           :math:`N = \lceil (\sum_j|\alpha_j|)^{2}t^{2}/\epsilon \rceil`
 
         The automatically determined *N* is combined with
@@ -142,9 +142,7 @@ class Trotter(TimeEvolutionBuilder):
 
         return TimeEvolutionUnitary(container=container)
 
-    def _resolve_num_trotter_steps(
-        self, qubit_hamiltonian: QubitHamiltonian, time: float
-    ) -> int:
+    def _resolve_num_trotter_steps(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> int:
         """Determine the number of Trotter steps to use.
 
         If *target_accuracy* was set at construction, this method computes the
@@ -163,14 +161,10 @@ class Trotter(TimeEvolutionBuilder):
         coefficients = [coeff for _, coeff in real_terms]
 
         if self._error_bound == "commutator":
-            auto_steps = trotter_steps_commutator(
-                pauli_labels, coefficients, time, self._target_accuracy
-            )
+            auto_steps = trotter_steps_commutator(pauli_labels, coefficients, time, self._target_accuracy)
         else:
             one_norm = float(np.sum(np.abs(coefficients)))
-            auto_steps = trotter_steps_naive(
-                one_norm, time, self._target_accuracy
-            )
+            auto_steps = trotter_steps_naive(one_norm, time, self._target_accuracy)
         return max(manual_steps, auto_steps)
 
     def _decompose_trotter_step(
