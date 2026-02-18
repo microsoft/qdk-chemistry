@@ -14,9 +14,6 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from pathlib import Path
-
-import qdk
 from qdk import qsharp
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
@@ -31,6 +28,7 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.phase import iterative_phase_feedback_update, phase_fraction_from_feedback
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import PhaseEstimation, PhaseEstimationSettings
 
@@ -197,10 +195,8 @@ class IterativePhaseEstimation(PhaseEstimation):
         if state_preparation._qsharp_op and ctrl_evol_circuit._qsharp_op:  # noqa: SLF001
             state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
             ctrl_evol_op = ctrl_evol_circuit._qsharp_op  # noqa: SLF001
-            code = (Path(__file__).parent / "IterativePhaseEstimation.qs").read_text()
-            qsharp.eval(code)
             iqpe_iter_qsc = qsharp.circuit(
-                qdk.code.MakeIQPECircuit,
+                QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
                 state_prep_op,
                 ctrl_evol_op,
                 phase_correction,
@@ -208,7 +204,7 @@ class IterativePhaseEstimation(PhaseEstimation):
                 [1 + i for i in range(num_system_qubits)],  # target qubits
             )
             iqpe_iter_qir = qsharp.compile(
-                qdk.code.MakeIQPECircuit,
+                QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
                 state_prep_op,
                 ctrl_evol_op,
                 phase_correction,

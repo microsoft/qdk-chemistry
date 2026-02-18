@@ -6,7 +6,7 @@ The Circuit class represents a quantum circuit in various formats
 Supported formats and conversions:
 - QASM to QIR or Qiskit QuantumCircuit (with Qiskit installed)
 - QIR to Qiskit QuantumCircuit (with Qiskit installed)
-- Q# circuit programs for visualization via QDK widgets
+- Q# circuit object for visualization via QDK widgets
 """
 
 # --------------------------------------------------------------------------------------------

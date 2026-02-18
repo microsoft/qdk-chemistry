@@ -6,9 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from collections.abc import Sequence
-from pathlib import Path
 
-import qdk
 from qdk import qsharp
 
 from qdk_chemistry.data import Settings
@@ -17,6 +15,7 @@ from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.data.time_evolution.controlled_time_evolution import ControlledTimeEvolutionUnitary
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledEvolutionCircuitMapper
 
@@ -100,10 +99,6 @@ class PauliSequenceMapper(ControlledEvolutionCircuitMapper):
             ValueError: If multiple control qubits are provided.
 
         """
-        # Import Q# code for controlled Pauli exponentiation
-        code = (Path(__file__).parent / "ControlledPauliExp.qs").read_text()
-        qsharp.eval(code)
-
         unitary_container = controlled_evolution.time_evolution_unitary.get_container()
         if not isinstance(unitary_container, PauliProductFormulaContainer):
             raise ValueError(
@@ -141,19 +136,19 @@ class PauliSequenceMapper(ControlledEvolutionCircuitMapper):
         }
 
         qsc = qsharp.circuit(
-            qdk.code.MakeRepControlledEvolutionCircuit,
+            QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
             controlled_evo_params,
             controlled_evolution.control_indices[0],
             target_indices,
         )
 
         qir = qsharp.compile(
-            qdk.code.MakeRepControlledEvolutionCircuit,
+            QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
             controlled_evo_params,
             controlled_evolution.control_indices[0],
             target_indices,
         )
 
-        controlled_evolution_op = qdk.code.MakeRepControlledEvolutionOp(controlled_evo_params)
+        controlled_evolution_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(controlled_evo_params)
 
         return Circuit(qsharp=qsc, qir=qir, qsharp_op=controlled_evolution_op)

@@ -34,16 +34,15 @@ Algorithm Details:
 # --------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
-import qdk
 from qdk import qsharp
 
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
 from qdk_chemistry.data import Circuit, Wavefunction
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 __all__: list[str] = []
 
@@ -161,9 +160,6 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 qubit = operation[1]
                 expansion_ops.append([qubit])
 
-        # Import the Q# code from the StatePreparation.qs file
-        code = (Path(__file__).parent / "StatePreparation.qs").read_text()
-        qsharp.eval(code)
         # State vector indexing is in little-endian order, the row map is reversed for Q# convention
         state_prep_params = {
             "rowMap": gf2x_operation_results.row_map[::-1],  # Reverse for Q# convention
@@ -172,19 +168,19 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         }
 
         qsharp_circuit = qsharp.circuit(
-            qdk.code.MakeStatePreparationCircuit,
+            QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
             state_prep_params,
             n_qubits,
             prune_classical_qubits=self._settings.get("prune_classical_qubits"),
         )
 
         qir = qsharp.compile(
-            qdk.code.MakeStatePreparationCircuit,
+            QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
             state_prep_params,
             n_qubits,
         )
 
-        state_prep_op = qdk.code.MakeStatePreparationOp(state_prep_params)
+        state_prep_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
         return Circuit(qsharp=qsharp_circuit, qir=qir, qsharp_op=state_prep_op, encoding="jordan-wigner")
 
     def _qiskit_dense_preparation(
@@ -416,23 +412,20 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
         bitstring_array = [int(bit) for bit in bitstring]
         n_qubits = len(bitstring_array)
-        # Import the Q# code from the StatePreparation.qs file
-        code = (Path(__file__).parent / "StatePreparation.qs").read_text()
-        qsharp.eval(code)
         params = {"bitStrings": bitstring_array[::-1]}  # Reverse for Q# convention
 
         qsharp_circuit = qsharp.circuit(
-            qdk.code.MakeSingleReferenceStateCircuit,
+            QSHARP_UTILS.StatePreparation.MakeSingleReferenceStateCircuit,
             params,
             n_qubits,
             prune_classical_qubits=self._settings.get("prune_classical_qubits"),
         )
         qir = qsharp.compile(
-            qdk.code.MakeSingleReferenceStateCircuit,
+            QSHARP_UTILS.StatePreparation.MakeSingleReferenceStateCircuit,
             params,
             n_qubits,
         )
-        qsharp_op = qdk.code.MakePrepareSingleReferenceStateOp(params)
+        qsharp_op = QSHARP_UTILS.StatePreparation.MakePrepareSingleReferenceStateOp(params)
 
         return Circuit(
             qsharp=qsharp_circuit,
