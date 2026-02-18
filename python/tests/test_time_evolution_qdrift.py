@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms.time_evolution.builder.pauli_commutation import do_pauli_terms_qw_commute
 from qdk_chemistry.algorithms.time_evolution.builder.qdrift import QDrift, QDriftSettings
 from qdk_chemistry.data import QubitHamiltonian, TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
@@ -364,17 +365,17 @@ class TestQDriftDuplicateTermFusion:
     def test_pauli_terms_qw_commute(self):
         """Verify qubit-wise commutation checks for known cases."""
         # Same qubit, same Pauli → qw-commute
-        assert QDrift._pauli_terms_qw_commute({0: "X"}, {0: "X"}) is True
+        assert do_pauli_terms_qw_commute({0: "X"}, {0: "X"}) is True
         # Same qubit, different Pauli → do not qw-commute
-        assert QDrift._pauli_terms_qw_commute({0: "X"}, {0: "Y"}) is False
+        assert do_pauli_terms_qw_commute({0: "X"}, {0: "Y"}) is False
         # Different qubits → qw-commute
-        assert QDrift._pauli_terms_qw_commute({0: "X"}, {1: "Y"}) is True
+        assert do_pauli_terms_qw_commute({0: "X"}, {1: "Y"}) is True
         # XY vs YX: commute globally but do NOT qubit-wise commute
-        assert QDrift._pauli_terms_qw_commute({0: "X", 1: "Y"}, {0: "Y", 1: "X"}) is False
+        assert do_pauli_terms_qw_commute({0: "X", 1: "Y"}, {0: "Y", 1: "X"}) is False
         # Same Paulis on overlapping qubits → qw-commute
-        assert QDrift._pauli_terms_qw_commute({0: "X", 1: "Z"}, {0: "X", 1: "Z"}) is True
+        assert do_pauli_terms_qw_commute({0: "X", 1: "Z"}, {0: "X", 1: "Z"}) is True
         # One differing, one matching → do not qw-commute
-        assert QDrift._pauli_terms_qw_commute({0: "X", 1: "Z"}, {0: "Y", 1: "Z"}) is False
+        assert do_pauli_terms_qw_commute({0: "X", 1: "Z"}, {0: "Y", 1: "Z"}) is False
 
 
 class TestQDriftPauliLabelToMap:
