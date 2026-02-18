@@ -193,64 +193,94 @@ class IterativePhaseEstimation(PhaseEstimation):
         ctrl_evol_circuit = self._create_ctrl_time_evol_circuit(controlled_evolution, power, circuit_mapper)
 
         if state_preparation._qsharp_op and ctrl_evol_circuit._qsharp_op:  # noqa: SLF001
-            state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
-            ctrl_evol_op = ctrl_evol_circuit._qsharp_op  # noqa: SLF001
-            iqpe_iter_qsc = qsharp.circuit(
-                QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
-                state_prep_op,
-                ctrl_evol_op,
-                phase_correction,
-                0,
-                [1 + i for i in range(num_system_qubits)],  # target qubits
-            )
-            iqpe_iter_qir = qsharp.compile(
-                QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
-                state_prep_op,
-                ctrl_evol_op,
-                phase_correction,
-                0,
-                [1 + i for i in range(num_system_qubits)],  # target qubits
+            return self._create_circuit_from_qsharp_op(
+                state_preparation, ctrl_evol_circuit, phase_correction, num_system_qubits
             )
 
-            return Circuit(qsharp=iqpe_iter_qsc, qir=iqpe_iter_qir)
-
-        state_prep_qc = None
-        ctrl_evol_qc = None
-        try:
-            state_prep_qc = state_preparation.get_qiskit_circuit()
-            ctrl_evol_qc = ctrl_evol_circuit.get_qiskit_circuit()
-        except ImportError as err:
-            raise RuntimeError(
-                "Failed to create iteration circuit: Qiskit is not available to construct the circuits from QASM."
-            ) from err
-
-        if state_prep_qc is not None and ctrl_evol_qc is not None:
-            from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3  # noqa: PLC0415
-
-            # Parse the state preparation circuit from QASM
-            ancilla = QuantumRegister(1, "ancilla")
-            system_target = QuantumRegister(num_system_qubits, "system")
-            classical = ClassicalRegister(1, f"c{iteration}")
-            circuit = QuantumCircuit(ancilla, system_target, classical)
-            circuit.append(state_prep_qc.to_gate(), system_target)
-            control = ancilla[0]
-            target_qubits = list(system_target)
-            circuit.h(control)
-
-            # Apply phase correction if provided
-            if phase_correction:
-                circuit.rz(phase_correction, control)
-
-            # Append the controlled evolution circuit
-            circuit.append(ctrl_evol_qc.to_gate(), [control, *target_qubits])
-            circuit.h(control)
-            circuit.measure(control, classical[0])
-
-            return Circuit(qasm=qasm3.dumps(circuit))
+        if state_preparation.get_qiskit_circuit() and ctrl_evol_circuit.get_qiskit_circuit():
+            return self._create_circuit_from_qiskit(
+                state_preparation, ctrl_evol_circuit, phase_correction, num_system_qubits
+            )
 
         raise RuntimeError(
             "Failed to create iteration circuit: Q# operations or Qiskit dependencies are not available."
         )
+
+    def _create_circuit_from_qsharp_op(
+        self, state_preparation: Circuit, controlled_evolution: Circuit, phase_correction: float, num_system_qubits: int
+    ) -> Circuit:
+        """Create a Circuit object from a Q# operation.
+
+        Args:
+            state_preparation: Circuit object containing a Q# operation for state preparation.
+            controlled_evolution: Circuit object containing a Q# operation for the controlled time evolution.
+            phase_correction: Feedback phase angle to apply before controlled evolution.
+            num_system_qubits: Number of system qubits.
+
+        Returns:
+            A Circuit object representing the IQPE iteration.
+
+        """
+        state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
+        ctrl_evol_op = controlled_evolution._qsharp_op  # noqa: SLF001
+        iqpe_iter_qsc = qsharp.circuit(
+            QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
+            state_prep_op,
+            ctrl_evol_op,
+            phase_correction,
+            0,
+            [1 + i for i in range(num_system_qubits)],  # target qubits
+        )
+        iqpe_iter_qir = qsharp.compile(
+            QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
+            state_prep_op,
+            ctrl_evol_op,
+            phase_correction,
+            0,
+            [1 + i for i in range(num_system_qubits)],  # target qubits
+        )
+
+        return Circuit(qsharp=iqpe_iter_qsc, qir=iqpe_iter_qir)
+
+    def _create_circuit_from_qiskit(
+        self, state_preparation: Circuit, controlled_evolution: Circuit, phase_correction: float, num_system_qubits: int
+    ) -> Circuit:
+        """Create a Circuit object from Qiskit QuantumCircuit objects.
+
+        Args:
+            state_preparation: Circuit object containing a Qiskit QuantumCircuit for state preparation.
+            controlled_evolution: Circuit object containing a Qiskit QuantumCircuit for the controlled time evolution.
+            phase_correction: Feedback phase angle to apply before controlled evolution.
+            num_system_qubits: Number of system qubits.
+
+        Returns:
+            A Circuit object representing the IQPE iteration.
+
+        """
+        from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3  # noqa: PLC0415
+
+        state_prep_qc = state_preparation.get_qiskit_circuit()
+        ctrl_evol_qc = controlled_evolution.get_qiskit_circuit()
+        # Parse the state preparation circuit from QASM
+        ancilla = QuantumRegister(1, "ancilla")
+        system_target = QuantumRegister(num_system_qubits, "system")
+        classical = ClassicalRegister(1, "c")
+        circuit = QuantumCircuit(ancilla, system_target, classical)
+        circuit.append(state_prep_qc.to_gate(), system_target)
+        control = ancilla[0]
+        target_qubits = list(system_target)
+        circuit.h(control)
+
+        # Apply phase correction if provided
+        if phase_correction:
+            circuit.rz(phase_correction, control)
+
+        # Append the controlled evolution circuit
+        circuit.append(ctrl_evol_qc.to_gate(), [control, *target_qubits])
+        circuit.h(control)
+        circuit.measure(control, classical[0])
+
+        return Circuit(qasm=qasm3.dumps(circuit))
 
     def get_circuits(self) -> list[Circuit]:
         """Get the list of iteration circuits generated during algorithm execution.

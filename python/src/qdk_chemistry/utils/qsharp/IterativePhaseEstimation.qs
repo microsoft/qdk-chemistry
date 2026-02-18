@@ -35,9 +35,7 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         within {
             H(control);
         } apply {
-            if accumulatePhase > 0.0 or accumulatePhase < 0.0 {
-                Rz(accumulatePhase, control);
-            }
+            Rz(accumulatePhase, control);
             repControlledEvolution(control, system);
         }
         ResetAll(system);

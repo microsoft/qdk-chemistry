@@ -593,6 +593,7 @@ def test_create_iteration_circuit_power_calculation() -> None:
     """Test that the power calculation is correct for different iterations."""
     hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
     state_prep = QuantumCircuit(1)
+    state_prep.h(0)
     state_prep_circuit = Circuit(qasm=qasm3.dumps(state_prep))
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
     evolution_builder = create("time_evolution_builder", "trotter")

@@ -130,6 +130,7 @@ class Circuit(DataClass):
             return qir_ir_to_qiskit(str(self.qir))
         if self.qasm:
             return qasm3.loads(self.qasm)
+
         raise RuntimeError("The quantum circuit cannot be converted to Qiskit format.")
 
     # DataClass interface implementation
