@@ -9,12 +9,14 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <optional>
+#include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
@@ -68,7 +70,7 @@ class HamiltonianConstructorTest : public ::testing::Test {
 };
 
 // Helper lambda to run restricted O2 calculation
-auto run_restricted_o2 = []() {
+auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
                                               Eigen::Vector3d(2.3, 0.0, 0.0)};
   std::vector<std::string> symbols = {"O", "O"};
@@ -82,14 +84,17 @@ auto run_restricted_o2 = []() {
       scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
   auto rhf_orbitals = rhf_wavefunction->get_orbitals();
 
-  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
+  if (factory_name == "qdk_cholesky") {
+    ham_factory->settings().set("store_cholesky_vectors", true);
+  }
   auto rhf_hamiltonian = ham_factory->run(rhf_orbitals);
 
   return std::make_tuple(rhf_energy, rhf_hamiltonian);
 };
 
 // Helper lambda to run unrestricted O2 triplet calculation
-auto run_unrestricted_o2 = []() {
+auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk") {
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
                                               Eigen::Vector3d(2.3, 0.0, 0.0)};
   std::vector<std::string> symbols = {"O", "O"};
@@ -103,7 +108,10 @@ auto run_unrestricted_o2 = []() {
       scf_factory->run(o2_structure_ptr, 0, 3, "cc-pvdz");
   auto uhf_orbitals = uhf_wavefunction->get_orbitals();
 
-  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
+  if (factory_name == "qdk_cholesky") {
+    ham_factory->settings().set("store_cholesky_vectors", true);
+  }
   auto uhf_hamiltonian = ham_factory->run(uhf_orbitals);
 
   return std::make_tuple(uhf_energy, uhf_hamiltonian);
@@ -521,8 +529,7 @@ TEST_F(HamiltonianTest, ValidationEdgeCases) {
 
 TEST_F(HamiltonianConstructorTest, Factory) {
   auto available_solvers = HamiltonianConstructorFactory::available();
-  EXPECT_EQ(available_solvers.size(), 1);
-  EXPECT_EQ(available_solvers[0], "qdk");
+  EXPECT_EQ(available_solvers.size(), 2);
   EXPECT_THROW(HamiltonianConstructorFactory::create("nonexistent_solver"),
                std::runtime_error);
   EXPECT_NO_THROW(HamiltonianConstructorFactory::register_instance(
@@ -827,6 +834,240 @@ TEST_F(HamiltonianConstructorTest, NonContiguousInactiveSpace) {
     EXPECT_TRUE(hamiltonian->has_one_body_integrals());
     EXPECT_TRUE(hamiltonian->has_two_body_integrals());
   });
+}
+
+// Cholesky Hamiltonian Constructor Tests
+TEST_F(HamiltonianConstructorTest, CholeskyFactory) {
+  // Test that qdk_cholesky is available
+  auto available_solvers = HamiltonianConstructorFactory::available();
+  EXPECT_GE(available_solvers.size(), 2);
+
+  bool found_cholesky = false;
+  for (const auto& solver : available_solvers) {
+    if (solver == "qdk_cholesky") {
+      found_cholesky = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_cholesky)
+      << "qdk_cholesky not found in available constructors";
+
+  // Test that we can create a cholesky hamiltonian constructor
+  EXPECT_NO_THROW(HamiltonianConstructorFactory::create("qdk_cholesky"));
+
+  auto cholesky_hc = HamiltonianConstructorFactory::create("qdk_cholesky");
+  EXPECT_EQ(cholesky_hc->name(), "qdk_cholesky");
+}
+
+TEST_F(HamiltonianConstructorTest, CholeskyRestrictedO2) {
+  // Run restricted O2 with cholesky
+  auto [energy, hamiltonian] = run_restricted_o2("qdk_cholesky");
+
+  // Verify hamiltonian properties
+  EXPECT_TRUE(hamiltonian->has_one_body_integrals());
+  EXPECT_TRUE(hamiltonian->has_two_body_integrals());
+  EXPECT_TRUE(hamiltonian->has_orbitals());
+  EXPECT_TRUE(hamiltonian->is_restricted());
+  EXPECT_EQ(hamiltonian->get_container_type(), "cholesky");
+
+  // Verify we can access the typed container
+  EXPECT_TRUE(hamiltonian->has_container_type<CholeskyHamiltonianContainer>());
+  EXPECT_NO_THROW({
+    const auto& container =
+        hamiltonian->get_container<CholeskyHamiltonianContainer>();
+    EXPECT_EQ(container.get_container_type(), "cholesky");
+  });
+}
+
+TEST_F(HamiltonianConstructorTest, CholeskyUnrestrictedO2) {
+  // Run unrestricted O2 triplet with cholesky
+  auto [energy, hamiltonian] = run_unrestricted_o2("qdk_cholesky");
+
+  // Verify hamiltonian properties
+  EXPECT_TRUE(hamiltonian->has_one_body_integrals());
+  EXPECT_TRUE(hamiltonian->has_two_body_integrals());
+  EXPECT_TRUE(hamiltonian->has_orbitals());
+  EXPECT_TRUE(hamiltonian->is_unrestricted());
+  EXPECT_EQ(hamiltonian->get_container_type(), "cholesky");
+
+  // Verify we can access the typed container
+  EXPECT_TRUE(hamiltonian->has_container_type<CholeskyHamiltonianContainer>());
+  EXPECT_NO_THROW({
+    const auto& container =
+        hamiltonian->get_container<CholeskyHamiltonianContainer>();
+    EXPECT_EQ(container.get_container_type(), "cholesky");
+  });
+}
+
+TEST_F(HamiltonianConstructorTest, CholeskyDeterministicBehavior) {
+  // Test that running the same calculation twice gives identical results
+  auto [energy1, hamiltonian1] = run_restricted_o2("qdk_cholesky");
+  auto [energy2, hamiltonian2] = run_restricted_o2("qdk_cholesky");
+
+  // Energies should be identical
+  EXPECT_DOUBLE_EQ(energy1, energy2)
+      << "Cholesky restricted O2 energies should be identical across runs";
+
+  // Core energies should be identical
+  EXPECT_DOUBLE_EQ(hamiltonian1->get_core_energy(),
+                   hamiltonian2->get_core_energy())
+      << "Cholesky core energies should be identical across runs";
+
+  // One-body integrals should be identical
+  auto [h1_one_alpha, h1_one_beta] = hamiltonian1->get_one_body_integrals();
+  auto [h2_one_alpha, h2_one_beta] = hamiltonian2->get_one_body_integrals();
+
+  EXPECT_EQ(h1_one_alpha.rows(), h2_one_alpha.rows());
+  EXPECT_EQ(h1_one_alpha.cols(), h2_one_alpha.cols());
+
+  for (int i = 0; i < h1_one_alpha.rows(); ++i) {
+    for (int j = 0; j < h1_one_alpha.cols(); ++j) {
+      EXPECT_DOUBLE_EQ(h1_one_alpha(i, j), h2_one_alpha(i, j))
+          << "Cholesky one-body integral (" << i << "," << j
+          << ") differs across runs";
+    }
+  }
+}
+
+// Cholesky Hamiltonian Container Tests
+TEST_F(HamiltonianTest, CholeskyContainerConstruction) {
+  // Create test data with cholesky vectors
+  Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
+  one_body(0, 1) = 0.5;
+  one_body(1, 0) = 0.5;
+
+  Eigen::VectorXd two_body = 2 * Eigen::VectorXd::Ones(16);
+
+  auto orbitals = std::make_shared<ModelOrbitals>(2, true);
+
+  double core_energy = 1.5;
+  Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
+
+  // Create cholesky vectors (2x2 AO basis, 3 cholesky vectors)
+  Eigen::MatrixXd L_ao = Eigen::MatrixXd::Random(4, 3);
+
+  // Test restricted constructor
+  Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
+      one_body, two_body, orbitals, core_energy, inactive_fock, L_ao));
+
+  EXPECT_TRUE(h.has_one_body_integrals());
+  EXPECT_TRUE(h.has_two_body_integrals());
+  EXPECT_TRUE(h.has_orbitals());
+  EXPECT_EQ(h.get_container_type(), "cholesky");
+  EXPECT_TRUE(h.is_restricted());
+}
+
+TEST_F(HamiltonianTest, CholeskyContainerUnrestrictedConstruction) {
+  // Create unrestricted orbitals
+  auto unrestricted_orbitals = std::make_shared<ModelOrbitals>(2, false);
+
+  // Create different alpha and beta data
+  Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Ones(2, 2);
+
+  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Constant(16, 1.0);
+  Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Constant(16, 2.0);
+  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Constant(16, 3.0);
+
+  Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Constant(2, 2, 4.0);
+  Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Constant(2, 2, 5.0);
+
+  double core_energy = 1.5;
+
+  // Create cholesky vectors
+  Eigen::MatrixXd L_ao = Eigen::MatrixXd::Random(4, 3);
+
+  // Test unrestricted constructor
+  Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
+      one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+      two_body_bbbb, unrestricted_orbitals, core_energy, inactive_fock_alpha,
+      inactive_fock_beta, L_ao));
+
+  EXPECT_TRUE(h.has_one_body_integrals());
+  EXPECT_TRUE(h.has_two_body_integrals());
+  EXPECT_TRUE(h.has_orbitals());
+  EXPECT_EQ(h.get_container_type(), "cholesky");
+  EXPECT_TRUE(h.is_unrestricted());
+}
+
+TEST_F(HamiltonianTest, CholeskyContainerJSONSerialization) {
+  // Create test data
+  Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::VectorXd two_body = 2 * Eigen::VectorXd::Ones(16);
+  auto orbitals = std::make_shared<ModelOrbitals>(2, true);
+  double core_energy = 1.5;
+  Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
+  Eigen::MatrixXd L_ao = Eigen::MatrixXd::Random(4, 3);
+
+  Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
+      one_body, two_body, orbitals, core_energy, inactive_fock, L_ao));
+
+  // Test JSON conversion
+  nlohmann::json j = h.to_json();
+
+  EXPECT_EQ(j["container"]["container_type"], "cholesky");
+  EXPECT_EQ(j["container"]["core_energy"], 1.5);
+  EXPECT_TRUE(j["container"]["has_one_body_integrals"]);
+  EXPECT_TRUE(j["container"]["has_two_body_integrals"]);
+  EXPECT_TRUE(j["container"]["has_ao_cholesky_vectors"]);
+
+  // Test deserialization
+  auto h_loaded = Hamiltonian::from_json(j);
+  EXPECT_TRUE(h_loaded->has_one_body_integrals());
+  EXPECT_TRUE(h_loaded->has_two_body_integrals());
+  EXPECT_EQ(h_loaded->get_container_type(), "cholesky");
+  EXPECT_DOUBLE_EQ(h_loaded->get_core_energy(), 1.5);
+}
+
+TEST_F(HamiltonianTest, CholeskyContainerHDF5Serialization) {
+  // Create test data
+  Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::VectorXd two_body = 2 * Eigen::VectorXd::Ones(16);
+  auto orbitals = std::make_shared<ModelOrbitals>(2, true);
+  double core_energy = 1.5;
+  Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
+  Eigen::MatrixXd L_ao = Eigen::MatrixXd::Random(4, 3);
+
+  Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
+      one_body, two_body, orbitals, core_energy, inactive_fock, L_ao));
+
+  // Save to HDF5
+  std::string filename = "test.cholesky.hamiltonian.h5";
+  h.to_file(filename, "hdf5");
+
+  // Load from HDF5
+  auto h_loaded = Hamiltonian::from_file(filename, "hdf5");
+
+  EXPECT_TRUE(h_loaded->has_one_body_integrals());
+  EXPECT_TRUE(h_loaded->has_two_body_integrals());
+  EXPECT_EQ(h_loaded->get_container_type(), "cholesky");
+  EXPECT_DOUBLE_EQ(h_loaded->get_core_energy(), 1.5);
+
+  // Clean up
+  std::filesystem::remove(filename);
+}
+
+TEST_F(HamiltonianTest, CholeskyContainerClone) {
+  // Create test data
+  Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::VectorXd two_body = 2 * Eigen::VectorXd::Ones(16);
+  auto orbitals = std::make_shared<ModelOrbitals>(2, true);
+  double core_energy = 1.5;
+  Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
+  Eigen::MatrixXd L_ao = Eigen::MatrixXd::Random(4, 3);
+
+  Hamiltonian h1(std::make_unique<CholeskyHamiltonianContainer>(
+      one_body, two_body, orbitals, core_energy, inactive_fock, L_ao));
+
+  // Test copy constructor (uses clone internally)
+  Hamiltonian h2(h1);
+
+  EXPECT_EQ(h2.get_container_type(), "cholesky");
+  EXPECT_DOUBLE_EQ(h2.get_core_energy(), h1.get_core_energy());
+
+  auto [h1_one_alpha, h1_one_beta] = h1.get_one_body_integrals();
+  auto [h2_one_alpha, h2_one_beta] = h2.get_one_body_integrals();
+  EXPECT_TRUE(h1_one_alpha.isApprox(h2_one_alpha));
 }
 
 TEST_F(HamiltonianTest, UnrestrictedConstructor) {
@@ -1668,6 +1909,373 @@ TEST_F(HamiltonianTest, GetContainerTypedAccess) {
 
   // Test that accessing with incorrect container type throws std::bad_cast
   EXPECT_THROW(h.get_container<DummyHamiltonianContainer>(), std::bad_cast);
+}
+class CholeskyTest : public ::testing::Test {
+ protected:
+  void SetUp() override {}
+  void TearDown() override {}
+};
+
+TEST_F(CholeskyTest, N2_Restricted_Comparison) {
+  // 1. Setup N2
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(0.0, 0.0, 3.0)};
+  std::vector<std::string> symbols = {"N", "N"};
+  Structure structure(coordinates, symbols);
+  auto structure_ptr = std::make_shared<Structure>(structure);
+
+  // 2. Run SCF (RHF)
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("method", "hf");
+  auto [energy, wavefunction] =
+      scf_factory->run(structure_ptr, 0, 1, "cc-pvdz");
+  auto orbitals_scf = wavefunction->get_orbitals();
+
+  // Create new Orbitals with active space
+  auto coeffs = orbitals_scf->get_coefficients();
+  auto energies = orbitals_scf->get_energies();
+  auto overlap = orbitals_scf->get_overlap_matrix();
+  auto basis = orbitals_scf->get_basis_set();
+
+  // cholesky tolerance
+  double tolerance = testing::integral_tolerance;
+
+  // full space
+  {
+    auto orbitals = wavefunction->get_orbitals();
+
+    // 3. Run Hamiltonian with Incore (Exact)
+    auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");
+    ham_incore_factory->settings().set("eri_method", "incore");
+    auto ham_incore = ham_incore_factory->run(orbitals);
+
+    // 4. Run Hamiltonian with Cholesky
+    auto ham_chol_factory =
+        HamiltonianConstructorFactory::create("qdk_cholesky");
+    ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
+    auto ham_chol = ham_chol_factory->run(orbitals);
+
+    // 5. Compare
+    // One-body
+    auto [aa_incore, bb_incore] = ham_incore->get_one_body_integrals();
+    auto [aa_chol, bb_chol] = ham_chol->get_one_body_integrals();
+
+    EXPECT_TRUE(aa_incore.isApprox(aa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(bb_incore.isApprox(bb_chol, testing::numerical_zero_tolerance));
+
+    // Two-body
+    auto [aaaa_incore, aabb_incore, bbbb_incore] =
+        ham_incore->get_two_body_integrals();
+    auto [aaaa_chol, aabb_chol, bbbb_chol] = ham_chol->get_two_body_integrals();
+
+    EXPECT_EQ(aaaa_incore.size(), aaaa_chol.size());
+    double max_diff = (aaaa_incore - aaaa_chol).cwiseAbs().maxCoeff();
+    EXPECT_LT(max_diff, testing::numerical_zero_tolerance);
+
+    EXPECT_EQ(aabb_incore.size(), aabb_chol.size());
+    max_diff = (aabb_incore - aabb_chol).cwiseAbs().maxCoeff();
+    EXPECT_LT(max_diff, testing::numerical_zero_tolerance);
+
+    EXPECT_EQ(bbbb_incore.size(), bbbb_chol.size());
+    max_diff = (bbbb_incore - bbbb_chol).cwiseAbs().maxCoeff();
+    EXPECT_LT(max_diff, testing::numerical_zero_tolerance);
+  }
+
+  // continuous active space
+  {
+    auto active_space_selector =
+        ActiveSpaceSelectorFactory::create("qdk_valence");
+    active_space_selector->settings().set("num_active_electrons", 6);
+    active_space_selector->settings().set("num_active_orbitals", 6);
+    auto wavefunction_active = active_space_selector->run(wavefunction);
+    auto orbitals = wavefunction_active->get_orbitals();
+
+    // 3. Run Hamiltonian with Incore (Exact)
+    auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");
+    ham_incore_factory->settings().set("eri_method", "incore");
+    auto ham_incore = ham_incore_factory->run(orbitals);
+
+    // 4. Run Hamiltonian with Cholesky
+    auto ham_chol_factory =
+        HamiltonianConstructorFactory::create("qdk_cholesky");
+    ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
+    auto ham_chol = ham_chol_factory->run(orbitals);
+
+    // 5. Compare
+    // One-body
+    auto [aa_incore, bb_incore] = ham_incore->get_one_body_integrals();
+    auto [aa_chol, bb_chol] = ham_chol->get_one_body_integrals();
+
+    EXPECT_TRUE(aa_incore.isApprox(aa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(bb_incore.isApprox(bb_chol, testing::numerical_zero_tolerance));
+
+    // Two-body
+    auto [aaaa_incore, aabb_incore, bbbb_incore] =
+        ham_incore->get_two_body_integrals();
+    auto [aaaa_chol, aabb_chol, bbbb_chol] = ham_chol->get_two_body_integrals();
+
+    EXPECT_TRUE(
+        aaaa_incore.isApprox(aaaa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        aabb_incore.isApprox(aabb_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        bbbb_incore.isApprox(bbbb_chol, testing::numerical_zero_tolerance));
+
+    // inactive fock matrix
+    auto fock_incore = ham_incore->get_inactive_fock_matrix();
+    auto fock_chol = ham_chol->get_inactive_fock_matrix();
+    EXPECT_TRUE(fock_incore.first.isApprox(fock_chol.first,
+                                           testing::numerical_zero_tolerance));
+    EXPECT_TRUE(fock_incore.second.isApprox(fock_chol.second,
+                                            testing::numerical_zero_tolerance));
+
+    // core energy
+    auto core_incore = ham_incore->get_core_energy();
+    auto core_chol = ham_chol->get_core_energy();
+    EXPECT_NEAR(core_incore, core_chol, testing::numerical_zero_tolerance);
+  }
+
+  // discontinuous active space
+  {
+    auto full_orbitals = wavefunction->get_orbitals();
+    // manual active space selection
+    std::vector<size_t> active_alpha = {2, 3, 5, 6, 7, 9};
+    std::vector<size_t> inactive_alpha = {0, 1, 4};
+    auto orbitals = std::make_shared<Orbitals>(
+        full_orbitals->get_coefficients().first,
+        full_orbitals->get_energies().first,
+        full_orbitals->get_overlap_matrix(), full_orbitals->get_basis_set(),
+        std::make_tuple(active_alpha, inactive_alpha));
+
+    // 3. Run Hamiltonian with Incore (Exact)
+    auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");
+    ham_incore_factory->settings().set("eri_method", "incore");
+    auto ham_incore = ham_incore_factory->run(orbitals);
+
+    // 4. Run Hamiltonian with Cholesky
+    auto ham_chol_factory =
+        HamiltonianConstructorFactory::create("qdk_cholesky");
+    ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
+    auto ham_chol = ham_chol_factory->run(orbitals);
+
+    // 5. Compare
+    // One-body
+    auto [aa_incore, bb_incore] = ham_incore->get_one_body_integrals();
+    auto [aa_chol, bb_chol] = ham_chol->get_one_body_integrals();
+
+    EXPECT_TRUE(aa_incore.isApprox(aa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(bb_incore.isApprox(bb_chol, testing::numerical_zero_tolerance));
+
+    // Two-body
+    auto [aaaa_incore, aabb_incore, bbbb_incore] =
+        ham_incore->get_two_body_integrals();
+    auto [aaaa_chol, aabb_chol, bbbb_chol] = ham_chol->get_two_body_integrals();
+
+    EXPECT_TRUE(
+        aaaa_incore.isApprox(aaaa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        aabb_incore.isApprox(aabb_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        bbbb_incore.isApprox(bbbb_chol, testing::numerical_zero_tolerance));
+
+    // inactive fock matrix
+    auto fock_incore = ham_incore->get_inactive_fock_matrix();
+    auto fock_chol = ham_chol->get_inactive_fock_matrix();
+    EXPECT_TRUE(fock_incore.first.isApprox(fock_chol.first,
+                                           testing::numerical_zero_tolerance));
+    EXPECT_TRUE(fock_incore.second.isApprox(fock_chol.second,
+                                            testing::numerical_zero_tolerance));
+
+    // core energy
+    auto core_incore = ham_incore->get_core_energy();
+    auto core_chol = ham_chol->get_core_energy();
+    EXPECT_NEAR(core_incore, core_chol, testing::numerical_zero_tolerance);
+  }
+}
+
+TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
+  // 1. Setup O2 (Triplet)
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(0.0, 0.0, 3.0)};
+  std::vector<std::string> symbols = {"O", "O"};
+  Structure structure(coordinates, symbols);
+  auto structure_ptr = std::make_shared<Structure>(structure);
+
+  // 2. Run SCF (UHF)
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("method", "hf");
+  auto [energy, wavefunction] =
+      scf_factory->run(structure_ptr, 0, 3, "def2-svp");
+  auto orbitals_scf = wavefunction->get_orbitals();
+
+  // Create new Orbitals with active space
+  auto coeffs = orbitals_scf->get_coefficients();
+  auto energies = orbitals_scf->get_energies();
+  auto overlap = orbitals_scf->get_overlap_matrix();
+  auto basis = orbitals_scf->get_basis_set();
+
+  // cholesky tolerance
+  double tolerance = testing::integral_tolerance;
+
+  // full space
+  {
+    auto orbitals = wavefunction->get_orbitals();
+
+    // 3. Run Hamiltonian with Incore (Exact)
+    auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");
+    ham_incore_factory->settings().set("eri_method", "incore");
+    auto ham_incore = ham_incore_factory->run(orbitals);
+
+    // 4. Run Hamiltonian with Cholesky
+    auto ham_chol_factory =
+        HamiltonianConstructorFactory::create("qdk_cholesky");
+    ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
+    auto ham_chol = ham_chol_factory->run(orbitals);
+
+    // 5. Compare
+    // One-body
+    auto [aa_incore, bb_incore] = ham_incore->get_one_body_integrals();
+    auto [aa_chol, bb_chol] = ham_chol->get_one_body_integrals();
+
+    EXPECT_TRUE(aa_incore.isApprox(aa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(bb_incore.isApprox(bb_chol, testing::numerical_zero_tolerance));
+
+    // Two-body
+    auto [aaaa_incore, aabb_incore, bbbb_incore] =
+        ham_incore->get_two_body_integrals();
+    auto [aaaa_chol, aabb_chol, bbbb_chol] = ham_chol->get_two_body_integrals();
+
+    EXPECT_TRUE(
+        aaaa_incore.isApprox(aaaa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        aabb_incore.isApprox(aabb_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        bbbb_incore.isApprox(bbbb_chol, testing::numerical_zero_tolerance));
+  }
+
+  // continuous active space
+  {
+    auto full_orbitals = wavefunction->get_orbitals();
+    // manual active space selection
+    std::vector<size_t> active_alpha = {2, 3, 4, 5, 6, 7, 8, 9};
+    std::vector<size_t> inactive_alpha = {0, 1};
+    std::vector<size_t> active_beta = {2, 3, 4, 5, 6, 7, 8, 9};
+    std::vector<size_t> inactive_beta = {0, 1};
+    auto orbitals = std::make_shared<Orbitals>(
+        full_orbitals->get_coefficients().first,
+        full_orbitals->get_coefficients().second,
+        full_orbitals->get_energies().first,
+        full_orbitals->get_energies().second,
+        full_orbitals->get_overlap_matrix(), full_orbitals->get_basis_set(),
+        std::make_tuple(active_alpha, active_beta, inactive_alpha,
+                        inactive_beta));
+
+    // 3. Run Hamiltonian with Incore (Exact)
+    auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");
+    ham_incore_factory->settings().set("eri_method", "incore");
+    auto ham_incore = ham_incore_factory->run(orbitals);
+
+    // 4. Run Hamiltonian with Cholesky
+    auto ham_chol_factory =
+        HamiltonianConstructorFactory::create("qdk_cholesky");
+    ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
+    auto ham_chol = ham_chol_factory->run(orbitals);
+
+    // 5. Compare
+    // One-body
+    auto [aa_incore, bb_incore] = ham_incore->get_one_body_integrals();
+    auto [aa_chol, bb_chol] = ham_chol->get_one_body_integrals();
+
+    EXPECT_TRUE(aa_incore.isApprox(aa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(bb_incore.isApprox(bb_chol, testing::numerical_zero_tolerance));
+
+    // Two-body
+    auto [aaaa_incore, aabb_incore, bbbb_incore] =
+        ham_incore->get_two_body_integrals();
+    auto [aaaa_chol, aabb_chol, bbbb_chol] = ham_chol->get_two_body_integrals();
+
+    EXPECT_TRUE(
+        aaaa_incore.isApprox(aaaa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        aabb_incore.isApprox(aabb_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        bbbb_incore.isApprox(bbbb_chol, testing::numerical_zero_tolerance));
+
+    // inactive fock matrix
+    auto fock_incore = ham_incore->get_inactive_fock_matrix();
+    auto fock_chol = ham_chol->get_inactive_fock_matrix();
+    EXPECT_TRUE(fock_incore.first.isApprox(fock_chol.first,
+                                           testing::numerical_zero_tolerance));
+    EXPECT_TRUE(fock_incore.second.isApprox(fock_chol.second,
+                                            testing::numerical_zero_tolerance));
+
+    // core energy
+    auto core_incore = ham_incore->get_core_energy();
+    auto core_chol = ham_chol->get_core_energy();
+    EXPECT_NEAR(core_incore, core_chol, testing::numerical_zero_tolerance);
+  }
+
+  // discontinuous active space
+  {
+    auto full_orbitals = wavefunction->get_orbitals();
+    // manual active space selection
+    std::vector<size_t> active_alpha = {2, 3, 5, 6, 7, 9};
+    std::vector<size_t> inactive_alpha = {0, 1, 4};
+    std::vector<size_t> active_beta = {2, 3, 5, 6, 7, 9};
+    std::vector<size_t> inactive_beta = {0, 1, 4};
+    auto orbitals = std::make_shared<Orbitals>(
+        full_orbitals->get_coefficients().first,
+        full_orbitals->get_coefficients().second,
+        full_orbitals->get_energies().first,
+        full_orbitals->get_energies().second,
+        full_orbitals->get_overlap_matrix(), full_orbitals->get_basis_set(),
+        std::make_tuple(active_alpha, active_beta, inactive_alpha,
+                        inactive_beta));
+
+    // 3. Run Hamiltonian with Incore (Exact)
+    auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");
+    ham_incore_factory->settings().set("eri_method", "incore");
+    auto ham_incore = ham_incore_factory->run(orbitals);
+
+    // 4. Run Hamiltonian with Cholesky
+    auto ham_chol_factory =
+        HamiltonianConstructorFactory::create("qdk_cholesky");
+    ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
+    auto ham_chol = ham_chol_factory->run(orbitals);
+
+    // 5. Compare
+    // One-body
+    auto [aa_incore, bb_incore] = ham_incore->get_one_body_integrals();
+    auto [aa_chol, bb_chol] = ham_chol->get_one_body_integrals();
+
+    EXPECT_TRUE(aa_incore.isApprox(aa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(bb_incore.isApprox(bb_chol, testing::numerical_zero_tolerance));
+
+    // Two-body
+    auto [aaaa_incore, aabb_incore, bbbb_incore] =
+        ham_incore->get_two_body_integrals();
+    auto [aaaa_chol, aabb_chol, bbbb_chol] = ham_chol->get_two_body_integrals();
+
+    EXPECT_TRUE(
+        aaaa_incore.isApprox(aaaa_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        aabb_incore.isApprox(aabb_chol, testing::numerical_zero_tolerance));
+    EXPECT_TRUE(
+        bbbb_incore.isApprox(bbbb_chol, testing::numerical_zero_tolerance));
+
+    // inactive fock matrix
+    auto fock_incore = ham_incore->get_inactive_fock_matrix();
+    auto fock_chol = ham_chol->get_inactive_fock_matrix();
+    EXPECT_TRUE(fock_incore.first.isApprox(fock_chol.first,
+                                           testing::numerical_zero_tolerance));
+    EXPECT_TRUE(fock_incore.second.isApprox(fock_chol.second,
+                                            testing::numerical_zero_tolerance));
+
+    // core energy
+    auto core_incore = ham_incore->get_core_energy();
+    auto core_chol = ham_chol->get_core_energy();
+    EXPECT_NEAR(core_incore, core_chol, testing::numerical_zero_tolerance);
+  }
 }
 
 TEST_F(HamiltonianTest, DataTypeName) {

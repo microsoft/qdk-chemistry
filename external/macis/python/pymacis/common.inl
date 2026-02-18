@@ -31,9 +31,11 @@ auto dispatch_by_norb(size_t norb, Args &&...args) {
     return Func::template impl<128>(std::forward<Args>(args)...);
   } else if (norb < 128) {
     return Func::template impl<256>(std::forward<Args>(args)...);
+  } else if (norb < 256) {
+    return Func::template impl<512>(std::forward<Args>(args)...);
   } else {
     throw std::runtime_error(
-        "Function not implemented for more than 128 orbitals");
+        "Function not implemented for more than 255 orbitals");
     return Func::template impl<64>(std::forward<Args>(args)...);
   }
 }
