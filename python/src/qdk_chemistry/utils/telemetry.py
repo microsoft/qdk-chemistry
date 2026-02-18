@@ -30,8 +30,7 @@ import urllib.error
 import urllib.request
 import warnings
 from datetime import datetime, timezone
-from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 from queue import Empty, SimpleQueue
 from threading import Thread
 from typing import Any, Literal, TypedDict
@@ -41,7 +40,7 @@ logger = logging.getLogger(__name__)
 try:
     # Define the package version
     QDK_CHEMISTRY_VERSION = version("qdk-chemistry")
-except _PackageNotFoundError:
+except PackageNotFoundError:
     # Package is not installed (e.g. running from source tree).
     # Use a dev sentinel - telemetry does not require the real version.
     QDK_CHEMISTRY_VERSION = "0.0.0.dev0"
