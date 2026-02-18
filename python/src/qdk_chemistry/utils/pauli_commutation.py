@@ -1,16 +1,11 @@
 """Pauli string commutation utilities.
 
 This module provides reusable functions for checking commutativity of
-Pauli strings and computing commutator norms.  The functions are used by
-time-evolution builders (Trotter, qDRIFT, PartiallyRandomized) for
-accuracy-aware step-count estimation and duplicate-term merging.
+Pauli operators and computing commutator norms.
 
-Two representations are supported:
-
-* **Label-based** – Pauli strings as plain ``str`` labels
-  (e.g. ``"XIZI"``), used in error-bound computation.
-* **Map-based** – sparse ``dict[int, str]`` mappings
-  (qubit index → Pauli axis), used in circuit-level duplicate merging.
+Label-based functions (``do_pauli_labels_*``) operate on Pauli string
+labels such as ``"XIZI"``.  Map-based functions (``do_pauli_maps_*``)
+operate on sparse ``dict[int, str]`` qubit-index-to-Pauli-axis mappings.
 
 References:
     Childs, A. M., et al. "Toward the first quantum simulation with
@@ -38,20 +33,15 @@ if TYPE_CHECKING:
 
 __all__: list[str] = [
     "commutator_bound_first_order",
-    "do_pauli_strings_commute",
-    "do_pauli_strings_qw_commute",
-    "do_pauli_terms_commute",
-    "do_pauli_terms_qw_commute",
+    "do_pauli_labels_commute",
+    "do_pauli_labels_qw_commute",
+    "do_pauli_maps_commute",
+    "do_pauli_maps_qw_commute",
     "get_commutation_checker",
 ]
 
 
-# =====================================================================
-# Label-based commutation (operate on Pauli string labels)
-# =====================================================================
-
-
-def do_pauli_strings_commute(label_a: str, label_b: str) -> bool:
+def do_pauli_labels_commute(label_a: str, label_b: str) -> bool:
     r"""Check whether two Pauli strings commute.
 
     Two multi-qubit Pauli strings :math:`P_a` and :math:`P_b` commute if and
@@ -72,13 +62,13 @@ def do_pauli_strings_commute(label_a: str, label_b: str) -> bool:
         ValueError: If the labels have different lengths.
 
     Examples:
-        >>> do_pauli_strings_commute("XI", "IX")
+        >>> do_pauli_labels_commute("XI", "IX")
         True
-        >>> do_pauli_strings_commute("XX", "YY")
+        >>> do_pauli_labels_commute("XX", "YY")
         True
-        >>> do_pauli_strings_commute("XY", "YX")
+        >>> do_pauli_labels_commute("XY", "YX")
         True
-        >>> do_pauli_strings_commute("XI", "YI")
+        >>> do_pauli_labels_commute("XI", "YI")
         False
 
     """
@@ -91,7 +81,7 @@ def do_pauli_strings_commute(label_a: str, label_b: str) -> bool:
     return anticommuting_count % 2 == 0
 
 
-def do_pauli_strings_qw_commute(label_a: str, label_b: str) -> bool:
+def do_pauli_labels_qw_commute(label_a: str, label_b: str) -> bool:
     r"""Check whether two Pauli strings qubit-wise commute.
 
     Two multi-qubit Pauli operators qubit-wise commute when every
@@ -115,11 +105,11 @@ def do_pauli_strings_qw_commute(label_a: str, label_b: str) -> bool:
         ValueError: If the labels have different lengths.
 
     Examples:
-        >>> do_pauli_strings_qw_commute("XI", "IX")
+        >>> do_pauli_labels_qw_commute("XI", "IX")
         True
-        >>> do_pauli_strings_qw_commute("XI", "YI")
+        >>> do_pauli_labels_qw_commute("XI", "YI")
         False
-        >>> do_pauli_strings_qw_commute("XY", "YX")   # commute, but NOT qw-commute
+        >>> do_pauli_labels_qw_commute("XY", "YX")   # commute, but NOT qw-commute
         False
 
     """
@@ -128,12 +118,7 @@ def do_pauli_strings_qw_commute(label_a: str, label_b: str) -> bool:
     return not any(ca != "I" and cb not in ("I", ca) for ca, cb in zip(label_a, label_b, strict=False))
 
 
-# =====================================================================
-# Map-based commutation (operate on qubit→Pauli-axis dicts)
-# =====================================================================
-
-
-def do_pauli_terms_commute(a: dict[int, str], b: dict[int, str]) -> bool:
+def do_pauli_maps_commute(a: dict[int, str], b: dict[int, str]) -> bool:
     """Check whether two Pauli terms commute (general/standard commutation).
 
     Two multi-qubit Pauli operators commute if and only if the number
@@ -153,7 +138,7 @@ def do_pauli_terms_commute(a: dict[int, str], b: dict[int, str]) -> bool:
     return anti_commuting % 2 == 0
 
 
-def do_pauli_terms_qw_commute(a: dict[int, str], b: dict[int, str]) -> bool:
+def do_pauli_maps_qw_commute(a: dict[int, str], b: dict[int, str]) -> bool:
     """Check whether two Pauli terms qubit-wise commute.
 
     Two multi-qubit Pauli operators qubit-wise commute when every
@@ -194,15 +179,10 @@ def get_commutation_checker(
 
     """
     if commutation_type == "general":
-        return do_pauli_terms_commute
+        return do_pauli_maps_commute
     if commutation_type == "qubit_wise":
-        return do_pauli_terms_qw_commute
+        return do_pauli_maps_qw_commute
     raise ValueError(f"Unknown commutation_type {commutation_type!r}; expected 'general' or 'qubit_wise'.")
-
-
-# =====================================================================
-# Commutator-bound computation (for Trotter error estimation)
-# =====================================================================
 
 
 def commutator_bound_first_order(
@@ -247,6 +227,6 @@ def commutator_bound_first_order(
     n = len(pauli_labels)
     for j in range(n):
         for k in range(j + 1, n):
-            if not do_pauli_strings_commute(pauli_labels[j], pauli_labels[k]):
+            if not do_pauli_labels_commute(pauli_labels[j], pauli_labels[k]):
                 total += 2.0 * abs(coefficients[j]) * abs(coefficients[k])
     return total

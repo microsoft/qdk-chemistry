@@ -20,7 +20,7 @@ import numpy as np
 
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.utils.pauli_commutation import (
-    do_pauli_terms_qw_commute,
+    do_pauli_maps_qw_commute,
     get_commutation_checker,
 )
 from qdk_chemistry.data import QubitHamiltonian, Settings, TimeEvolutionUnitary
@@ -294,7 +294,7 @@ class QDrift(TimeEvolutionBuilder):
             terms: Ordered list of exponentiated Pauli terms.
             commute_fn: A callable ``(a, b) -> bool`` that checks whether
                 two Pauli term mappings commute.  Defaults to
-                :func:`~.pauli_commutation.do_pauli_terms_qw_commute` if ``None``.
+                :func:`~qdk_chemistry.utils.pauli_commutation.do_pauli_maps_qw_commute` if ``None``.
 
         Returns:
             A (potentially shorter) list producing the same unitary.
@@ -304,7 +304,7 @@ class QDrift(TimeEvolutionBuilder):
             return terms
 
         if commute_fn is None:
-            commute_fn = do_pauli_terms_qw_commute
+            commute_fn = do_pauli_maps_qw_commute
 
         result: list[ExponentiatedPauliTerm] = []
         group: list[ExponentiatedPauliTerm] = [terms[0]]

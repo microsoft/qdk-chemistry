@@ -10,7 +10,6 @@ import math
 import pytest
 
 from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
-    trotter_steps,
     trotter_steps_commutator,
     trotter_steps_naive,
 )
@@ -55,6 +54,12 @@ class TestTrotterStepsNaive:
         h = QubitHamiltonian(pauli_strings=["X"], coefficients=[1.0])
         with pytest.raises(ValueError, match="positive"):
             trotter_steps_naive(h, 1.0, -0.1)
+
+    def test_order_2_raises(self):
+        """Test that order > 1 raises NotImplementedError."""
+        h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
+        with pytest.raises(NotImplementedError, match="order 2"):
+            trotter_steps_naive(h, 1.0, 0.1, order=2)
 
 
 class TestTrotterStepsCommutator:
@@ -102,32 +107,8 @@ class TestTrotterStepsCommutator:
         with pytest.raises(ValueError, match="positive"):
             trotter_steps_commutator(h, 1.0, 0.0)
 
-
-class TestTrotterSteps:
-    """Tests for the order-aware trotter_steps dispatcher."""
-
-    def test_dispatches_to_commutator(self):
-        """Test that default dispatch uses commutator bound."""
-        h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        n_direct = trotter_steps_commutator(h, 1.0, 0.1)
-        n_dispatch = trotter_steps(h, 1.0, 0.1, order=1, error_bound="commutator")
-        assert n_dispatch == n_direct
-
-    def test_dispatches_to_naive(self):
-        """Test that 'naive' dispatch uses naive bound."""
-        h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        n_direct = trotter_steps_naive(h, 1.0, 0.1)
-        n_dispatch = trotter_steps(h, 1.0, 0.1, order=1, error_bound="naive")
-        assert n_dispatch == n_direct
-
     def test_order_2_raises(self):
         """Test that order > 1 raises NotImplementedError."""
         h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
         with pytest.raises(NotImplementedError, match="order 2"):
-            trotter_steps(h, 1.0, 0.1, order=2)
-
-    def test_invalid_error_bound_raises(self):
-        """Test that invalid error_bound raises ValueError."""
-        h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        with pytest.raises(ValueError, match="error_bound"):
-            trotter_steps(h, 1.0, 0.1, error_bound="invalid")
+            trotter_steps_commutator(h, 1.0, 0.1, order=2)
