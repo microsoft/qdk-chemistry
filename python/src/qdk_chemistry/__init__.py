@@ -5,13 +5,13 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from importlib.metadata import PackageNotFoundError
+from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
 from importlib.metadata import version as _get_version
 from pathlib import Path
 
 try:
     __version__ = _get_version("qdk-chemistry")
-except PackageNotFoundError:
+except _PackageNotFoundError:
     # Fallback for development/uninstalled use - read from VERSION file
     try:
         __version__ = (Path(__file__).parent.parent.parent.parent / "VERSION").read_text().strip()
