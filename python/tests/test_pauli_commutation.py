@@ -117,9 +117,7 @@ class TestCommutatorBoundFirstOrder:
     def test_mixed_commuting_and_anticommuting(self):
         """Test a mix of commuting and anticommuting pairs."""
         # XI, IX, ZI: XI and IX commute, XI and ZI anticommute, IX and ZI commute
-        bound = commutator_bound_first_order(
-            ["XI", "IX", "ZI"], [1.0, 1.0, 1.0]
-        )
+        bound = commutator_bound_first_order(["XI", "IX", "ZI"], [1.0, 1.0, 1.0])
         # Only XI/ZI anticommute -> 2 * 1 * 1 = 2
         assert bound == 2.0
 

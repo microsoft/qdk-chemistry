@@ -9,9 +9,9 @@ merging within commuting blocks).
 
 Two representations are supported:
 
-* **Label-based** – Pauli strings as plain ``str`` labels
+* **Label-based** - Pauli strings as plain ``str`` labels
   (e.g. ``"XIZI"``), used in error-bound computation.
-* **Map-based** – sparse ``dict[int, str]`` mappings
+* **Map-based** - sparse ``dict[int, str]`` mappings
   (qubit index → Pauli axis), used in circuit-level duplicate merging.
 
 References:
@@ -30,7 +30,7 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Callable
+from collections.abc import Callable
 
 __all__: list[str] = [
     "commutator_bound_first_order",
@@ -79,12 +79,10 @@ def do_pauli_strings_commute(label_a: str, label_b: str) -> bool:
 
     """
     if len(label_a) != len(label_b):
-        raise ValueError(
-            f"Pauli labels must have the same length, got {len(label_a)} and {len(label_b)}."
-        )
+        raise ValueError(f"Pauli labels must have the same length, got {len(label_a)} and {len(label_b)}.")
     anticommuting_count = 0
-    for char_a, char_b in zip(label_a, label_b):
-        if char_a != "I" and char_b != "I" and char_a != char_b:
+    for char_a, char_b in zip(label_a, label_b, strict=False):
+        if char_a != "I" and char_b not in ("I", char_a):
             anticommuting_count += 1
     return anticommuting_count % 2 == 0
 
@@ -122,13 +120,8 @@ def do_pauli_strings_qw_commute(label_a: str, label_b: str) -> bool:
 
     """
     if len(label_a) != len(label_b):
-        raise ValueError(
-            f"Pauli labels must have the same length, got {len(label_a)} and {len(label_b)}."
-        )
-    return not any(
-        ca != "I" and cb != "I" and ca != cb
-        for ca, cb in zip(label_a, label_b)
-    )
+        raise ValueError(f"Pauli labels must have the same length, got {len(label_a)} and {len(label_b)}.")
+    return not any(ca != "I" and cb not in ("I", ca) for ca, cb in zip(label_a, label_b, strict=False))
 
 
 # =====================================================================
@@ -200,10 +193,7 @@ def get_commutation_checker(
         return do_pauli_terms_commute
     if commutation_type == "qubit_wise":
         return do_pauli_terms_qw_commute
-    raise ValueError(
-        f"Unknown commutation_type {commutation_type!r}; "
-        "expected 'general' or 'qubit_wise'."
-    )
+    raise ValueError(f"Unknown commutation_type {commutation_type!r}; expected 'general' or 'qubit_wise'.")
 
 
 # =====================================================================
@@ -218,7 +208,7 @@ def commutator_bound_first_order(
     r"""Compute the first-order Trotter commutator bound.
 
     For a Hamiltonian :math:`H = \sum_j \alpha_j P_j` the first-order
-    (Lie–Trotter) product formula has error bounded by
+    (Lie-Trotter) product formula has error bounded by
 
     .. math::
 
@@ -249,8 +239,7 @@ def commutator_bound_first_order(
     """
     if len(pauli_labels) != len(coefficients):
         raise ValueError(
-            f"Number of Pauli labels ({len(pauli_labels)}) and "
-            f"coefficients ({len(coefficients)}) must match."
+            f"Number of Pauli labels ({len(pauli_labels)}) and coefficients ({len(coefficients)}) must match."
         )
     total = 0.0
     n = len(pauli_labels)

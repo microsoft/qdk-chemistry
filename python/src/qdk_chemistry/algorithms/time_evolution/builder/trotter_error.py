@@ -1,15 +1,15 @@
-"""Trotter error bound estimation for accuracy-aware parameterization.
+r"""Trotter error bound estimation for accuracy-aware parameterization.
 
 This module provides functions to compute the number of Trotter steps
-required to achieve a target accuracy for the first-order (Lie–Trotter)
+required to achieve a target accuracy for the first-order (Lie-Trotter)
 product formula.
 
 Two bounds are offered:
 
-* **naive** – uses the triangle-inequality bound
+* **naive** - uses the triangle-inequality bound
   :math:`N = \\lceil (\\sum_j |\\alpha_j|)^2 t^2 / \\epsilon \\rceil`.
 
-* **commutator** (tighter) – uses the commutator-based bound from
+* **commutator** (tighter) - uses the commutator-based bound from
   Childs *et al.* (2021) :cite:`Childs2021`:
   :math:`N = \\lceil \\frac{t^2}{2\\epsilon}
   \\sum_{j<k} \\lVert [\\alpha_j P_j, \\alpha_k P_k] \\rVert \\rceil`.
@@ -33,8 +33,8 @@ from qdk_chemistry.algorithms.time_evolution.builder.pauli_commutation import (
 )
 
 __all__: list[str] = [
-    "trotter_steps_naive",
     "trotter_steps_commutator",
+    "trotter_steps_naive",
 ]
 
 
