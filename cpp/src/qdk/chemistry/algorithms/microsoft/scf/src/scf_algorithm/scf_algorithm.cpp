@@ -41,7 +41,7 @@ SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx)
   QDK_LOG_TRACE_ENTERING();
   auto num_atomic_orbitals = ctx.basis_set->num_atomic_orbitals;
   auto num_density_matrices =
-      (ctx.cfg->is_unrestricted() || ctx.cfg->is_rohf_enabled()) ? 2 : 1;
+      (ctx.cfg->unrestricted || ctx.cfg->rohf_enabled) ? 2 : 1;
   P_last_ = RowMajorMatrix::Zero(num_density_matrices * num_atomic_orbitals,
                                  num_atomic_orbitals);
 }
@@ -51,7 +51,7 @@ SCFAlgorithm::~SCFAlgorithm() noexcept = default;
 std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx) {
   QDK_LOG_TRACE_ENTERING();
   const auto& cfg = *ctx.cfg;
-  const bool rohf_enabled = cfg.is_rohf_enabled();
+  const bool rohf_enabled = cfg.rohf_enabled;
 
   switch (cfg.scf_algorithm.method) {
     case SCFAlgorithmName::ASAHF:
@@ -251,7 +251,7 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
   std::vector<int> nelec_vec = scf_impl.get_num_electrons();
   const int nelec[2] = {nelec_vec[0], nelec_vec[1]};
 
-  if (ctx_.cfg->is_rohf_enabled()) {
+  if (ctx_.cfg->rohf_enabled) {
     // To be modified when ROHFGDM is implemented: in that case, the pointer
     // will come from the DIIS instance saved in DIIS_GDM, like the current
     // DIIS_GDM implementation

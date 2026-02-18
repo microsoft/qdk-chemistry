@@ -131,7 +131,7 @@ class SCFTest
     if (is_unrestricted) {
       cfg.set_scf_orbital_type(SCFOrbitalType::Unrestricted);
     } else if (mol->multiplicity == 1) {
-      cfg.set_scf_orbital_type(SCFOrbitalType::Restricted);
+      cfg.set_scf_orbital_type(SCFOrbitalType::RestrictedClosedShell);
     } else {
       cfg.set_scf_orbital_type(SCFOrbitalType::RestrictedOpenShell);
     }

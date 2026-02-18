@@ -135,6 +135,21 @@ TEST_F(ScfTest, OH_ROHF_DIIS) {
   EXPECT_TRUE(wfn_doublet->get_orbitals()->is_restricted());
 }
 
+TEST_F(ScfTest, OH_ROHF_INCORE_DIIS) {
+  auto oh = testing::create_oh_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("enable_gdm", false);
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("scf_type", "restricted");
+  scf_solver->settings().set("eri_method", "incore");
+  auto [E_doublet, wfn_doublet] = scf_solver->run(oh, 0, 2, "sto-3g");
+
+  EXPECT_NEAR(E_doublet, -74.361530753176, testing::scf_energy_tolerance);
+
+  // Check doublet orbitals
+  EXPECT_TRUE(wfn_doublet->get_orbitals()->is_restricted());
+}
+
 TEST_F(ScfTest, OH_ROHF_Invalid_GDM) {
   auto oh = testing::create_oh_structure();
   auto scf_solver = ScfSolverFactory::create();

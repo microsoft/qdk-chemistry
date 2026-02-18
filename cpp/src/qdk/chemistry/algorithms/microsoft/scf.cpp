@@ -109,10 +109,10 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   std::string scf_type = _settings->get<std::string>("scf_type");
   std::transform(scf_type.begin(), scf_type.end(), scf_type.begin(), ::tolower);
 
-  auto scf_orbital_type = SCFOrbitalType::Restricted;
+  auto scf_orbital_type = SCFOrbitalType::RestrictedClosedShell;
   if (scf_type == "auto") {
-    scf_orbital_type =
-        open_shell ? SCFOrbitalType::Unrestricted : SCFOrbitalType::Restricted;
+    scf_orbital_type = open_shell ? SCFOrbitalType::Unrestricted
+                                  : SCFOrbitalType::RestrictedClosedShell;
   } else if (scf_type == "unrestricted") {
     scf_orbital_type = SCFOrbitalType::Unrestricted;
     if (!open_shell && basis_set_type != BasisSetType::FromOrbitals) {
@@ -123,7 +123,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     }
   } else if (scf_type == "restricted") {
     scf_orbital_type = open_shell ? SCFOrbitalType::RestrictedOpenShell
-                                  : SCFOrbitalType::Restricted;
+                                  : SCFOrbitalType::RestrictedClosedShell;
     if (scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
       QDK_LOGGER().warn(
           "Restricted open-shell request detected; enabling ROHF workflow.");
@@ -304,7 +304,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     // Compute density matrix from MO coefficients
     qcs::RowMajorMatrix density_matrix;
 
-    if (ms_scf_config->is_unrestricted()) {
+    if (ms_scf_config->unrestricted) {
       if (initial_guess->is_restricted())
         QDK_LOGGER().warn(
             "Unrestricted calculation requested but restricted "
@@ -403,7 +403,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   auto nelec = scf->get_num_electrons();
 
   std::shared_ptr<data::Orbitals> orbitals;
-  if (ms_scf_config->is_unrestricted()) {
+  if (ms_scf_config->unrestricted) {
     // Unrestricted case - store matrices first to avoid
     // temporaries
     const auto& C_full = scf->get_orbitals_matrix();

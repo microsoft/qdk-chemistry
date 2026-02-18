@@ -876,7 +876,7 @@ LIBINT2_DIRECT::LIBINT2_DIRECT(SCFOrbitalType scf_orbital_type,
                                bool use_atomics)
     : ERI(scf_orbital_type, 0.0, basis_set, _mpi),
       eri_impl_(libint2::direct::ERI::make_libint2_direct_eri(
-          scf_orbital_type != SCFOrbitalType::Restricted,
+          scf_orbital_type != SCFOrbitalType::RestrictedClosedShell,
           scf_orbital_type == SCFOrbitalType::RestrictedOpenShell, basis_set,
           use_atomics)) {
   QDK_LOG_TRACE_ENTERING();

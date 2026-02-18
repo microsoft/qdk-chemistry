@@ -153,7 +153,7 @@ class ERI {
   virtual void quarter_trans_impl(size_t nt, const double* C, double* out) = 0;
 
   [[nodiscard]] bool has_spin_split_density() const {
-    return scf_orbital_type_ != SCFOrbitalType::Restricted;
+    return scf_orbital_type_ != SCFOrbitalType::RestrictedClosedShell;
   }
 
   [[nodiscard]] bool is_rohf_reference() const {

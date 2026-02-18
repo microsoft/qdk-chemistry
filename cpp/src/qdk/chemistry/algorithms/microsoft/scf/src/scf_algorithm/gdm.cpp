@@ -424,7 +424,7 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
 
   QDK_LOGGER().debug("GDM initialized with history_size_limit = {}",
                      history_size_limit_);
-  num_density_matrices_ = cfg.is_unrestricted() ? 2 : 1;
+  num_density_matrices_ = cfg.unrestricted ? 2 : 1;
 
   // Calculate rotation sizes for each spin
   rotation_size_.resize(num_density_matrices_);
@@ -602,7 +602,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
   const auto* cfg = ctx_.cfg;
   const int num_molecular_orbitals =
       static_cast<int>(ctx_.num_molecular_orbitals);
-  const int num_density_matrices = cfg->is_unrestricted() ? 2 : 1;
+  const int num_density_matrices = cfg->unrestricted ? 2 : 1;
 
   // Check if there are any virtual orbitals for any spin component
   // If not, orbital rotation is not possible and we should skip GDM iteration
@@ -636,9 +636,9 @@ void GDM::iterate(SCFImpl& scf_impl) {
     // gradient is computed separately for each spin component, in that case the
     // coefficient before F_{ia, spin} is -2.0
     RowMajorMatrix current_gradient_matrix =
-        -(cfg->is_unrestricted() ? 2.0 : 4.0) *
-        F_MO.block(0, num_occupied_orbitals, num_occupied_orbitals,
-                   num_virtual_orbitals);
+        -(cfg->unrestricted ? 2.0 : 4.0) * F_MO.block(0, num_occupied_orbitals,
+                                                      num_occupied_orbitals,
+                                                      num_virtual_orbitals);
     current_gradient_.segment(rotation_offset_[i], rotation_size_[i]) =
         Eigen::Map<const Eigen::VectorXd>(current_gradient_matrix.data(),
                                           rotation_size);
@@ -697,7 +697,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
     // 4.0 is for restricted closed-shell system. For unrestricted systems, the
     // gradient is computed separately for each spin component, in that case the
     // coefficient should be 2.0
-    double initial_hessian_coeff = cfg->is_unrestricted() ? 2.0 : 4.0;
+    double initial_hessian_coeff = cfg->unrestricted ? 2.0 : 4.0;
     for (int j = 0; j < num_occupied_orbitals; j++) {
       for (int v = 0; v < num_virtual_orbitals; v++) {
         int index = rotation_offset_[i] + j * num_virtual_orbitals + v;
@@ -827,7 +827,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
   // Create line search functor for energy evaluation
   GDMLineFunctor line_functor(scf_impl, C_pseudo_canonical, num_electrons_,
                               rotation_offset_, rotation_size_,
-                              num_molecular_orbitals, cfg->is_unrestricted());
+                              num_molecular_orbitals, cfg->unrestricted);
 
   Eigen::VectorXd start_kappa = Eigen::VectorXd::Zero(kappa_.size());
   Eigen::VectorXd kappa_dir = kappa_;  // Search direction
@@ -880,7 +880,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
       // |FPS-SPF|^2 / 2 = |grad / 4|^2 for restricted case and
       // |FPS-SPF|^2 / 2 = |grad / 2|^2 for unrestricted case.
       const double grad_norm_coeff =
-          cfg->is_unrestricted() ? std::sqrt(2.0) : std::sqrt(8.0);
+          cfg->unrestricted ? std::sqrt(2.0) : std::sqrt(8.0);
       if (grad_norm < og_threshold * grad_norm_coeff) {
         QDK_LOGGER().warn(
             "Gradient norm {:.6e} below threshold; accepting zero orbital "

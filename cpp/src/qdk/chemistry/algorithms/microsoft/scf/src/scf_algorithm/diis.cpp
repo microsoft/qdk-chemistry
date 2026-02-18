@@ -185,14 +185,15 @@ class ROHFHelper {
                                 num_atomic_orbitals) *
                         C;
 
-    auto average_block = [&](int row, int col, int rows, int cols) {
+    auto average_block = [&effective_F_mo, &F_up_mo, &F_dn_mo](
+                             int row, int col, int rows, int cols) {
       if (rows <= 0 || cols <= 0) return;
       effective_F_mo.block(row, col, rows, cols).noalias() =
           0.5 * (F_up_mo.block(row, col, rows, cols) +
                  F_dn_mo.block(row, col, rows, cols));
     };
-    auto copy_block = [&](const RowMajorMatrix& src, int row, int col, int rows,
-                          int cols) {
+    auto copy_block = [&effective_F_mo](const RowMajorMatrix& src, int row,
+                                        int col, int rows, int cols) {
       if (rows <= 0 || cols <= 0) return;
       effective_F_mo.block(row, col, rows, cols) =
           src.block(row, col, rows, cols);
@@ -306,7 +307,7 @@ void DIIS::iterate(const RowMajorMatrix& P, const RowMajorMatrix& F,
   auto& res = ctx_.result;
 
   int num_atomic_orbitals = ctx_.basis_set->num_atomic_orbitals;
-  int num_orbital_sets = ctx_.cfg->is_unrestricted() ? 2 : 1;
+  int num_orbital_sets = ctx_.cfg->unrestricted ? 2 : 1;
 
   // Build Pulay error (F P S - S P F) in the AO basis for each spin block.
   RowMajorMatrix error = RowMajorMatrix::Zero(
@@ -401,7 +402,7 @@ void DIIS::apply_level_shift_(const RowMajorMatrix& F, const RowMajorMatrix& P,
   QDK_LOG_TRACE_ENTERING();
   const auto* cfg = ctx_.cfg;
   int num_atomic_orbitals = static_cast<int>(S.cols());
-  int num_density_matrices = cfg->is_unrestricted() ? 2 : 1;
+  int num_density_matrices = cfg->unrestricted ? 2 : 1;
 
   RowMajorMatrix SPS = RowMajorMatrix::Zero(
       num_density_matrices * num_atomic_orbitals, num_atomic_orbitals);
@@ -440,7 +441,7 @@ DIIS::DIIS(const SCFContext& ctx, const size_t subspace_size)
     : SCFAlgorithm(ctx),
       diis_impl_(std::make_unique<impl::DIIS>(ctx, subspace_size)) {
   QDK_LOG_TRACE_ENTERING();
-  if (ctx.cfg->is_rohf_enabled()) {
+  if (ctx.cfg->rohf_enabled) {
     rohf_helper_ = std::make_unique<impl::ROHFHelper>(
         static_cast<int>(ctx.basis_set->num_atomic_orbitals));
   }
@@ -476,12 +477,12 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   for (int i = 0; i < num_orbital_sets; ++i) {
     solve_fock_eigenproblem(F_extrapolated, S, X, C, eigenvalues,
                             working_density, nelec, num_atomic_orbitals,
-                            num_molecular_orbitals, i, cfg->is_unrestricted());
+                            num_molecular_orbitals, i, cfg->unrestricted);
   }
 
   auto& density_matrix = scf_impl.density_matrix();
-  update_density_matrix(density_matrix, C, ctx_.cfg->is_unrestricted(),
-                        nelec[0], nelec[1]);
+  update_density_matrix(density_matrix, C, ctx_.cfg->unrestricted, nelec[0],
+                        nelec[1]);
 
   // Optional damping blends the new density with the previous iteration when
   // DIIS error spikes
@@ -498,7 +499,7 @@ void DIIS::update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
                                  bool unrestricted, int nelec_alpha,
                                  int nelec_beta) {
   QDK_LOG_TRACE_ENTERING();
-  if (ctx_.cfg->is_rohf_enabled()) {
+  if (ctx_.cfg->rohf_enabled) {
     if (!rohf_helper_) {
       throw std::logic_error("ROHF helper not initialized");
     }
@@ -514,7 +515,7 @@ void DIIS::build_rohf_f_p_matrix(const RowMajorMatrix& F,
                                  const RowMajorMatrix& P, int nelec_alpha,
                                  int nelec_beta) {
   QDK_LOG_TRACE_ENTERING();
-  if (!ctx_.cfg->is_rohf_enabled()) {
+  if (!ctx_.cfg->rohf_enabled) {
     throw std::logic_error("ROHF matrix build requested for non-ROHF run");
   }
   if (!rohf_helper_) {
@@ -555,7 +556,7 @@ double DIIS::current_diis_error() const {
 
 RowMajorMatrix& DIIS::select_working_density(SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
-  if (ctx_.cfg->is_rohf_enabled()) {
+  if (ctx_.cfg->rohf_enabled) {
     // The ROHF helper is refreshed inside SCFAlgorithm::check_convergence(),
     // so by the time iterate() is invoked the total density view is already
     // up to date.
@@ -567,7 +568,7 @@ RowMajorMatrix& DIIS::select_working_density(SCFImpl& scf_impl) {
 
 const RowMajorMatrix& DIIS::select_working_fock(const SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
-  if (ctx_.cfg->is_rohf_enabled()) {
+  if (ctx_.cfg->rohf_enabled) {
     return get_rohf_fock_matrix();
   }
   return scf_impl.get_fock_matrix();

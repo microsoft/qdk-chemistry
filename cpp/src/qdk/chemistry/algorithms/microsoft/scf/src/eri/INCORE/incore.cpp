@@ -15,8 +15,8 @@ ERIINCORE::ERIINCORE(SCFOrbitalType scf_orbital_type, BasisSet& basis_set,
                      ParallelConfig _mpi, double omega)
     : ERI(scf_orbital_type, 0.0, basis_set, _mpi),
       eri_impl_(incore::ERI::make_incore_eri(
-          scf_orbital_type == SCFOrbitalType::Restricted ? 1 : 2, basis_set,
-          _mpi, omega)) {
+          scf_orbital_type == SCFOrbitalType::RestrictedClosedShell ? 1 : 2,
+          basis_set, _mpi, omega)) {
   QDK_LOG_TRACE_ENTERING();
 }
 
@@ -48,7 +48,8 @@ ERIINCORE_DF::ERIINCORE_DF(SCFOrbitalType scf_orbital_type, BasisSet& obs,
                            BasisSet& abs, ParallelConfig _mpi)
     : ERI(scf_orbital_type, 0.0, obs, _mpi),
       eri_impl_(incore::ERI_DF::make_incore_eri(
-          scf_orbital_type != SCFOrbitalType::Restricted, obs, abs, _mpi)) {
+          scf_orbital_type == SCFOrbitalType::RestrictedClosedShell ? 1 : 2,
+          obs, abs, _mpi)) {
   QDK_LOG_TRACE_ENTERING();
 }
 

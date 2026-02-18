@@ -201,8 +201,8 @@ SNK::SNK(SCFOrbitalType scf_orbital_type, BasisSet& basis_set,
          GAUXCInput gauxc_input, std::string xc_name, ParallelConfig _mpi)
     : ERI(scf_orbital_type, 0.0, basis_set, _mpi),
       eri_impl_(snk::ERI::make_gauxc_snk(
-          scf_orbital_type == SCFOrbitalType::Restricted ? 1 : 2, basis_set,
-          gauxc_input, xc_name)) {
+          scf_orbital_type == SCFOrbitalType::RestrictedClosedShell ? 1 : 2,
+          basis_set, gauxc_input, xc_name)) {
   QDK_LOG_TRACE_ENTERING();
 }
 

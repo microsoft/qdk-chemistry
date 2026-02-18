@@ -12,9 +12,11 @@ namespace qdk::chemistry::scf {
  * @brief Spin symmetry options for SCF orbital references
  */
 enum class SCFOrbitalType {
-  Restricted,          ///< Closed-shell restricted reference (RHF/RKS)
-  Unrestricted,        ///< Unrestricted reference (UHF/UKS)
-  RestrictedOpenShell  ///< Restricted open-shell (ROHF/ROKS)
+  RestrictedClosedShell,    ///< Closed-shell restricted reference (RHF/RKS)
+  Unrestricted,             ///< Unrestricted reference (UHF/UKS)
+  RestrictedOpenShell,      ///< Restricted open-shell (ROHF/ROKS)
+  RestrictedForHamiltonian  ///< Restricted reference for Hamiltonian
+                            ///< construction (e.g. Cholesky)
 };
 
 /// An enum to classify the available backends for electron-repulsion (ERI)

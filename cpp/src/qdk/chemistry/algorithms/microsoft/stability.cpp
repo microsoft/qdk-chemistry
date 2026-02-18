@@ -478,9 +478,10 @@ StabilityChecker::_run_impl(
   scf_config->require_gradient = false;
   scf_config->basis = basis_set_internal->name;
   scf_config->cartesian = !basis_set_internal->pure;
-  scf_config->set_scf_orbital_type(unrestricted
-                                       ? qcs::SCFOrbitalType::Unrestricted
-                                       : qcs::SCFOrbitalType::Restricted);
+  // Currently ROHF is not supported yet
+  scf_config->set_scf_orbital_type(
+      unrestricted ? qcs::SCFOrbitalType::Unrestricted
+                   : qcs::SCFOrbitalType::RestrictedClosedShell);
   scf_config->eri.method = qcs::ERIMethod::Libint2Direct;
 
   // Create ERI instance
