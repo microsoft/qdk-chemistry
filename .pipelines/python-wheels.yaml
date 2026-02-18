@@ -30,7 +30,7 @@ parameters:
     os: linux
     arch: x86_64
     march: x86-64-v3
-    imageName: ubuntu-22.04
+    imageName: ubuntu-22.04-azure-pipelines
   - name: linux_aarch64
     os: linux
     arch: aarch64
