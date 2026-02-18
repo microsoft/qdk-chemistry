@@ -32,7 +32,6 @@
 #endif
 
 namespace qdk::chemistry::scf {
-
 /**
  * @brief MPI parallel configuration
  */
