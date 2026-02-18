@@ -6,7 +6,30 @@
 # --------------------------------------------------------------------------------------------
 
 from .base import TimeEvolutionBuilderFactory
+from .pauli_commutation import (
+    commutator_bound_first_order,
+    do_pauli_strings_commute,
+    do_pauli_strings_qw_commute,
+    do_pauli_terms_commute,
+    do_pauli_terms_qw_commute,
+    get_commutation_checker,
+)
+from .partially_randomized import PartiallyRandomized, PartiallyRandomizedSettings
+from .qdrift import QDrift, QDriftSettings
+from .trotter import Trotter, TrotterSettings
 
 __all__ = [
+    "PartiallyRandomized",
+    "PartiallyRandomizedSettings",
+    "QDrift",
+    "QDriftSettings",
     "TimeEvolutionBuilderFactory",
+    "Trotter",
+    "TrotterSettings",
+    "commutator_bound_first_order",
+    "do_pauli_strings_commute",
+    "do_pauli_strings_qw_commute",
+    "do_pauli_terms_commute",
+    "do_pauli_terms_qw_commute",
+    "get_commutation_checker",
 ]

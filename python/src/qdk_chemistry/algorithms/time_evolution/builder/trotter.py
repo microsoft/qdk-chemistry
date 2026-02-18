@@ -158,17 +158,9 @@ class Trotter(TimeEvolutionBuilder):
             return manual_steps
 
         tolerance = self._settings.get("tolerance")
-        pauli_labels: list[str] = []
-        coefficients: list[float] = []
-        for pauli, coeff in zip(
-            qubit_hamiltonian.pauli_ops.paulis,
-            qubit_hamiltonian.pauli_ops.coeffs,
-            strict=True,
-        ):
-            if abs(coeff) < tolerance:
-                continue
-            pauli_labels.append(pauli.to_label())
-            coefficients.append(float(np.real(coeff)))
+        real_terms = qubit_hamiltonian.get_real_coefficients(tolerance=tolerance)
+        pauli_labels = [label for label, _ in real_terms]
+        coefficients = [coeff for _, coeff in real_terms]
 
         if self._error_bound == "commutator":
             auto_steps = trotter_steps_commutator(
@@ -180,23 +172,6 @@ class Trotter(TimeEvolutionBuilder):
                 one_norm, time, self._target_accuracy
             )
         return max(manual_steps, auto_steps)
-
-    @staticmethod
-    def _pauli_label_to_map(label: str) -> dict[int, str]:
-        """Translate a Pauli label to a mapping ``qubit -> {X, Y, Z}``.
-
-        Args:
-            label: Pauli string label in little-endian ordering.
-
-        Returns:
-            Dictionary assigning each non-identity qubit index to its Pauli axis.
-
-        """
-        mapping: dict[int, str] = {}
-        for index, char in enumerate(reversed(label)):  # reversed: right-most char -> qubit 0
-            if char != "I":
-                mapping[index] = char
-        return mapping
 
     def _decompose_trotter_step(
         self, qubit_hamiltonian: QubitHamiltonian, time: float, *, atol: float = 1e-12
@@ -214,23 +189,12 @@ class Trotter(TimeEvolutionBuilder):
         """
         terms: list[ExponentiatedPauliTerm] = []
 
-        for pauli, coeff in zip(
-            qubit_hamiltonian.pauli_ops.paulis,
-            qubit_hamiltonian.pauli_ops.coeffs,
-            strict=True,
-        ):
-            if abs(coeff) < atol:
-                continue
+        if not qubit_hamiltonian.is_hermitian(tolerance=atol):
+            raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
-            coeff_complex = complex(coeff)
-            if abs(coeff_complex.imag) > atol:
-                raise ValueError(
-                    f"Non-Hermitian Hamiltonian: coefficient {coeff} for term "
-                    f"{pauli.to_label()} has nonzero imaginary part."
-                )
-            mapping = self._pauli_label_to_map(pauli.to_label())
-
-            angle = coeff_complex.real * time
+        for label, coeff in qubit_hamiltonian.get_real_coefficients(tolerance=atol):
+            mapping = self._pauli_label_to_map(label)
+            angle = coeff * time
             terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
 
         return terms

@@ -175,8 +175,12 @@ class QuantumErrorProfile(DataClass):
                         error_type = error_dict["type"]
                     else:
                         error_type = SupportedErrorTypes(error_dict["type"])
-                    assert isinstance(error_dict["rate"], float)
-                    assert isinstance(error_dict["num_qubits"], int)
+                    if not isinstance(error_dict["rate"], int | float):
+                        raise TypeError(f"Expected 'rate' to be a float, got {type(error_dict['rate']).__name__}")
+                    if not isinstance(error_dict["num_qubits"], int):
+                        raise TypeError(
+                            f"Expected 'num_qubits' to be an int, got {type(error_dict['num_qubits']).__name__}"
+                        )
                     self.errors[gate] = GateErrorDef(
                         type=error_type,
                         rate=error_dict["rate"],

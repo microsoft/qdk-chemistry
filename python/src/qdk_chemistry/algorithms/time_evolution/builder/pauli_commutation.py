@@ -1,7 +1,18 @@
-"""Pauli string commutation utilities for Trotter error bounds.
+"""Pauli string commutation utilities for time-evolution builders.
 
-This module provides functions to check whether Pauli strings commute
-and to compute commutator norms used in tighter Trotter error bounds.
+This module provides reusable functions for checking commutativity of
+Pauli strings and computing commutator norms.  The functions are used by
+:class:`~.trotter.Trotter` (for accuracy-aware step-count estimation),
+:class:`~.qdrift.QDrift`, and
+:class:`~.partially_randomized.PartiallyRandomized` (for duplicate-term
+merging within commuting blocks).
+
+Two representations are supported:
+
+* **Label-based** – Pauli strings as plain ``str`` labels
+  (e.g. ``"XIZI"``), used in error-bound computation.
+* **Map-based** – sparse ``dict[int, str]`` mappings
+  (qubit index → Pauli axis), used in circuit-level duplicate merging.
 
 References:
     Childs, A. M., et al. "Toward the first quantum simulation with
@@ -19,10 +30,21 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import Callable
+
 __all__: list[str] = [
-    "do_pauli_strings_commute",
     "commutator_bound_first_order",
+    "do_pauli_strings_commute",
+    "do_pauli_strings_qw_commute",
+    "do_pauli_terms_commute",
+    "do_pauli_terms_qw_commute",
+    "get_commutation_checker",
 ]
+
+
+# =====================================================================
+# Label-based commutation (operate on Pauli string labels)
+# =====================================================================
 
 
 def do_pauli_strings_commute(label_a: str, label_b: str) -> bool:
@@ -65,6 +87,128 @@ def do_pauli_strings_commute(label_a: str, label_b: str) -> bool:
         if char_a != "I" and char_b != "I" and char_a != char_b:
             anticommuting_count += 1
     return anticommuting_count % 2 == 0
+
+
+def do_pauli_strings_qw_commute(label_a: str, label_b: str) -> bool:
+    r"""Check whether two Pauli strings qubit-wise commute.
+
+    Two multi-qubit Pauli operators qubit-wise commute when every
+    corresponding single-qubit pair commutes individually.  This is
+    strictly stronger than general commutativity: qubit-wise commuting
+    operators always commute, but the converse is not true
+    (e.g. ``"XY"`` and ``"YX"`` commute globally but do **not**
+    qubit-wise commute).
+
+    The operators qubit-wise commute if and only if there are **no**
+    qubit positions where both are non-identity and different.
+
+    Args:
+        label_a: Pauli string label (e.g. ``"XIZI"``).
+        label_b: Pauli string label of the same length.
+
+    Returns:
+        ``True`` if the terms qubit-wise commute.
+
+    Raises:
+        ValueError: If the labels have different lengths.
+
+    Examples:
+        >>> do_pauli_strings_qw_commute("XI", "IX")
+        True
+        >>> do_pauli_strings_qw_commute("XI", "YI")
+        False
+        >>> do_pauli_strings_qw_commute("XY", "YX")   # commute, but NOT qw-commute
+        False
+
+    """
+    if len(label_a) != len(label_b):
+        raise ValueError(
+            f"Pauli labels must have the same length, got {len(label_a)} and {len(label_b)}."
+        )
+    return not any(
+        ca != "I" and cb != "I" and ca != cb
+        for ca, cb in zip(label_a, label_b)
+    )
+
+
+# =====================================================================
+# Map-based commutation (operate on qubit→Pauli-axis dicts)
+# =====================================================================
+
+
+def do_pauli_terms_commute(a: dict[int, str], b: dict[int, str]) -> bool:
+    """Check whether two Pauli terms commute (general/standard commutation).
+
+    Two multi-qubit Pauli operators commute if and only if the number
+    of qubit positions where both are non-identity *and* different is
+    even.  This is weaker than qubit-wise commutation and allows
+    larger merge groups.
+
+    Args:
+        a: First Pauli term mapping (qubit index → Pauli axis).
+        b: Second Pauli term mapping (qubit index → Pauli axis).
+
+    Returns:
+        ``True`` if the terms commute.
+
+    """
+    anti_commuting = sum(1 for q in a if q in b and a[q] != b[q])
+    return anti_commuting % 2 == 0
+
+
+def do_pauli_terms_qw_commute(a: dict[int, str], b: dict[int, str]) -> bool:
+    """Check whether two Pauli terms qubit-wise commute.
+
+    Two multi-qubit Pauli operators qubit-wise commute when every
+    corresponding single-qubit pair commutes individually.  This is
+    strictly stronger than general commutativity: qubit-wise
+    commuting operators always commute, but the converse is not true
+    (e.g. ``{0: 'X', 1: 'Y'}`` and ``{0: 'Y', 1: 'X'}`` commute
+    globally but do not qubit-wise commute).
+
+    The operators qubit-wise commute if and only if there are **no**
+    qubit positions where both are non-identity and different.
+
+    Args:
+        a: First Pauli term mapping (qubit index → Pauli axis).
+        b: Second Pauli term mapping (qubit index → Pauli axis).
+
+    Returns:
+        ``True`` if the terms qubit-wise commute.
+
+    """
+    return not any(a[q] != b[q] for q in a if q in b)
+
+
+def get_commutation_checker(
+    commutation_type: str,
+) -> Callable[[dict[int, str], dict[int, str]], bool]:
+    """Return the commutation checker function for the given type.
+
+    Args:
+        commutation_type: ``"qubit_wise"`` or ``"general"``.
+
+    Returns:
+        A callable ``(a, b) -> bool`` that checks commutation of two
+        Pauli term mappings.
+
+    Raises:
+        ValueError: If *commutation_type* is not recognised.
+
+    """
+    if commutation_type == "general":
+        return do_pauli_terms_commute
+    if commutation_type == "qubit_wise":
+        return do_pauli_terms_qw_commute
+    raise ValueError(
+        f"Unknown commutation_type {commutation_type!r}; "
+        "expected 'general' or 'qubit_wise'."
+    )
+
+
+# =====================================================================
+# Commutator-bound computation (for Trotter error estimation)
+# =====================================================================
 
 
 def commutator_bound_first_order(

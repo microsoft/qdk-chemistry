@@ -10,6 +10,10 @@ import pytest
 from qdk_chemistry.algorithms.time_evolution.builder.pauli_commutation import (
     commutator_bound_first_order,
     do_pauli_strings_commute,
+    do_pauli_strings_qw_commute,
+    do_pauli_terms_commute,
+    do_pauli_terms_qw_commute,
+    get_commutation_checker,
 )
 
 
@@ -138,3 +142,103 @@ class TestCommutatorBoundFirstOrder:
         """Test that mismatched labels/coefficients raise ValueError."""
         with pytest.raises(ValueError, match="must match"):
             commutator_bound_first_order(["X", "Z"], [1.0])
+
+
+class TestDoPauliStringsQwCommute:
+    """Tests for the do_pauli_strings_qw_commute function."""
+
+    def test_identity_commutes(self):
+        """Test that identity strings qubit-wise commute."""
+        assert do_pauli_strings_qw_commute("II", "II") is True
+
+    def test_different_qubits_commute(self):
+        """Test operators on different qubits qw-commute."""
+        assert do_pauli_strings_qw_commute("XI", "IX") is True
+
+    def test_same_pauli_same_qubit(self):
+        """Test same Pauli on same qubit qw-commutes."""
+        assert do_pauli_strings_qw_commute("XI", "XI") is True
+
+    def test_different_pauli_same_qubit(self):
+        """Test different Paulis on same qubit do not qw-commute."""
+        assert do_pauli_strings_qw_commute("XI", "YI") is False
+
+    def test_commuting_but_not_qw_commuting(self):
+        """Test that XY and YX commute globally but NOT qubit-wise."""
+        # They commute (even number of anticommuting positions)
+        assert do_pauli_strings_commute("XY", "YX") is True
+        # But NOT qubit-wise (two positions differ)
+        assert do_pauli_strings_qw_commute("XY", "YX") is False
+
+    def test_different_length_raises(self):
+        """Test that different-length labels raise ValueError."""
+        with pytest.raises(ValueError, match="same length"):
+            do_pauli_strings_qw_commute("XI", "XII")
+
+
+class TestDoPauliTermsCommute:
+    """Tests for the map-based do_pauli_terms_commute function."""
+
+    def test_disjoint_qubits_commute(self):
+        """Operators on different qubits commute."""
+        assert do_pauli_terms_commute({0: "X"}, {1: "Y"}) is True
+
+    def test_same_pauli_commutes(self):
+        """Same Pauli on same qubit commutes."""
+        assert do_pauli_terms_commute({0: "X"}, {0: "X"}) is True
+
+    def test_single_anticommuting(self):
+        """Different Paulis on same qubit anticommute."""
+        assert do_pauli_terms_commute({0: "X"}, {0: "Y"}) is False
+
+    def test_even_anticommuting_commutes(self):
+        """Two anticommuting positions → commute."""
+        a = {0: "X", 1: "Y"}
+        b = {0: "Y", 1: "X"}
+        assert do_pauli_terms_commute(a, b) is True
+
+    def test_empty_terms_commute(self):
+        """Empty terms commute with anything."""
+        assert do_pauli_terms_commute({}, {0: "X"}) is True
+
+
+class TestDoPauliTermsQwCommute:
+    """Tests for the map-based do_pauli_terms_qw_commute function."""
+
+    def test_disjoint_qubits(self):
+        """Operators on different qubits qw-commute."""
+        assert do_pauli_terms_qw_commute({0: "X"}, {1: "Y"}) is True
+
+    def test_same_pauli(self):
+        """Same Pauli on same qubit qw-commutes."""
+        assert do_pauli_terms_qw_commute({0: "X"}, {0: "X"}) is True
+
+    def test_different_pauli(self):
+        """Different Paulis on same qubit do NOT qw-commute."""
+        assert do_pauli_terms_qw_commute({0: "X"}, {0: "Y"}) is False
+
+    def test_commuting_but_not_qw(self):
+        """Even number of anticommuting positions: commute but NOT qw-commute."""
+        a = {0: "X", 1: "Y"}
+        b = {0: "Y", 1: "X"}
+        assert do_pauli_terms_commute(a, b) is True
+        assert do_pauli_terms_qw_commute(a, b) is False
+
+
+class TestGetCommutationChecker:
+    """Tests for get_commutation_checker factory."""
+
+    def test_general(self):
+        """Test that 'general' returns do_pauli_terms_commute."""
+        fn = get_commutation_checker("general")
+        assert fn is do_pauli_terms_commute
+
+    def test_qubit_wise(self):
+        """Test that 'qubit_wise' returns do_pauli_terms_qw_commute."""
+        fn = get_commutation_checker("qubit_wise")
+        assert fn is do_pauli_terms_qw_commute
+
+    def test_invalid_raises(self):
+        """Test that an invalid type raises ValueError."""
+        with pytest.raises(ValueError, match="Unknown commutation_type"):
+            get_commutation_checker("invalid")
