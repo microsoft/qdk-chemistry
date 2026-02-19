@@ -25,13 +25,13 @@ from __future__ import annotations
 
 import numpy as np
 
-from qdk_chemistry.utils.pauli_commutation import get_commutation_checker
 from qdk_chemistry.algorithms.time_evolution.builder.qdrift import QDrift
 from qdk_chemistry.data import QubitHamiltonian, Settings, TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
+from qdk_chemistry.utils.pauli_commutation import get_commutation_checker
 
 __all__: list[str] = ["PartiallyRandomized", "PartiallyRandomizedSettings"]
 

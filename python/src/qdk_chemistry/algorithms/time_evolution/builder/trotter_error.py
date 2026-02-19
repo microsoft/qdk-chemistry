@@ -5,10 +5,10 @@ required to achieve a target accuracy for product-formula decompositions.
 
 Two bounds are offered:
 
-* **naive** – uses the triangle-inequality bound
+* **naive** - uses the triangle-inequality bound
   :math:`N = \\lceil (\\sum_j |\\alpha_j|)^2 t^2 / \\epsilon \\rceil`.
 
-* **commutator** (tighter) – uses the commutator-based bound from
+* **commutator** (tighter) - uses the commutator-based bound from
   Childs *et al.* (2021):
   :math:`N = \\lceil \\frac{t^2}{2\\epsilon}
   \\sum_{j<k} \\lVert [\\alpha_j P_j, \\alpha_k P_k] \\rVert \\rceil`.
@@ -64,7 +64,7 @@ def trotter_steps_naive(
         hamiltonian: The qubit Hamiltonian to simulate.
         time: The total evolution time *t*.
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
-        order: The order of the Trotter–Suzuki product formula.
+        order: The order of the Trotter-Suzuki product formula.
         weight_threshold: Absolute threshold below which coefficients
             are treated as zero.  Defaults to 1e-12.
 
@@ -115,7 +115,7 @@ def trotter_steps_commutator(
         hamiltonian: The qubit Hamiltonian to simulate.
         time: The total evolution time *t*.
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
-        order: The order of the Trotter–Suzuki product formula.
+        order: The order of the Trotter-Suzuki product formula.
         weight_threshold: Absolute threshold below which coefficients
             are treated as zero.  Defaults to 1e-12.
 

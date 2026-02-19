@@ -25,10 +25,11 @@ References:
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from qdk_chemistry.data import QubitHamiltonian
 
 __all__: list[str] = [
@@ -192,7 +193,7 @@ def commutator_bound_first_order(
     r"""Compute the first-order Trotter commutator bound.
 
     For a Hamiltonian :math:`H = \sum_j \alpha_j P_j` the first-order
-    (Lie–Trotter) product formula has error bounded by
+    (Lie-Trotter) product formula has error bounded by
 
     .. math::
 
