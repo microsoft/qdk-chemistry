@@ -220,5 +220,3 @@ __marimo__/
 python/src/qdk_chemistry/_core/*.pyi
 python/src/qdk_chemistry/algorithms/registry.pyi
 
-# Test-generated resources directory
-python/src/qdk_chemistry/share/
