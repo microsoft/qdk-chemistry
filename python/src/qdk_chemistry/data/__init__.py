@@ -24,7 +24,9 @@ Exposed classes are:
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
+- :class:`LatticeGraph`: Lattice graph defining the connectivity and geometry of a model Hamiltonian.
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitHamiltonian objects.
+- :class:`ModelHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
 - :class:`MP2Container`: Container for MP2 wavefunction with Hamiltonian reference and optional amplitudes.
 - :class:`Orbitals`: Molecular orbital information and properties.
@@ -76,6 +78,8 @@ from qdk_chemistry._core.data import (
     Hamiltonian,
     HamiltonianContainer,
     HamiltonianType,
+    LatticeGraph,
+    ModelHamiltonianContainer,
     ModelOrbitals,
     MP2Container,
     Orbitals,
@@ -138,8 +142,10 @@ __all__ = [
     "Hamiltonian",
     "HamiltonianContainer",
     "HamiltonianType",
+    "LatticeGraph",
     "MP2Container",
     "MeasurementData",
+    "ModelHamiltonianContainer",
     "ModelOrbitals",
     "OrbitalType",
     "Orbitals",
