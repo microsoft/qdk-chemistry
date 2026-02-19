@@ -143,8 +143,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
         -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
         -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
-        -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
-        -C cmake.define.QDK_RUN_LONG_TESTS=ON
+        -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
 
     echo "Checking shared dependencies..."
     ldd build/cp*/_core.*.so
