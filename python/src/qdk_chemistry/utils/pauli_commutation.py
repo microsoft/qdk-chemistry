@@ -213,8 +213,7 @@ def commutator_bound_first_order(
 
     Args:
         hamiltonian: The qubit Hamiltonian whose terms to analyse.
-        weight_threshold: Absolute threshold below which coefficients
-            are treated as zero.  Defaults to 1e-12.
+        weight_threshold: Absolute threshold below which coefficients are discarded.
 
     Returns:
         The sum of commutator norms over all unique pairs.

@@ -65,8 +65,7 @@ def trotter_steps_naive(
         time: The total evolution time *t*.
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
         order: The order of the Trotter-Suzuki product formula.
-        weight_threshold: Absolute threshold below which coefficients
-            are treated as zero.  Defaults to 1e-12.
+        weight_threshold: Absolute threshold below which coefficients are discarded.
 
     Returns:
         The minimum number of Trotter steps (at least 1).
@@ -116,8 +115,7 @@ def trotter_steps_commutator(
         time: The total evolution time *t*.
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
         order: The order of the Trotter-Suzuki product formula.
-        weight_threshold: Absolute threshold below which coefficients
-            are treated as zero.  Defaults to 1e-12.
+        weight_threshold: Absolute threshold below which coefficients are discarded.
 
     Returns:
         The minimum number of Trotter steps (at least 1).
