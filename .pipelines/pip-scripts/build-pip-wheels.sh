@@ -74,8 +74,8 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
 
     export PYENV_ROOT="/workspace/.pyenv"
 elif [ "$MAC_BUILD" == "ON" ]; then
-    brew update
-    brew upgrade
+    arch -arm64 brew update
+    arch -arm64 brew upgrade
     arch -arm64 brew install \
         ninja \
         eigen \
