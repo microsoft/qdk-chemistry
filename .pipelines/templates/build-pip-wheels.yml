@@ -7,7 +7,7 @@ parameters:
   default: Debug
 - name: buildTesting
   type: string
-  default: OFF
+  default: ON
 - name: enableCoverage
   type: string
   default: OFF
