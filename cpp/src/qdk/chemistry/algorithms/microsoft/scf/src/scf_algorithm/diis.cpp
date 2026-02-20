@@ -153,7 +153,7 @@ class ROHFHelper {
                              const RowMajorMatrix& P, int nelec_alpha,
                              int nelec_beta) {
     QDK_LOG_TRACE_ENTERING();
-    const int num_atomic_orbitals = static_cast<int>(C.rows()) / 2;
+    const int num_atomic_orbitals = static_cast<int>(C.rows());
     const int num_molecular_orbitals = static_cast<int>(C.cols());
     if (num_atomic_orbitals != num_molecular_orbitals) {
       throw std::runtime_error(
