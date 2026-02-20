@@ -7,17 +7,15 @@
 
 from collections.abc import Sequence
 
-import numpy as np
-from qiskit import QuantumCircuit, qasm3
+from qdk import qsharp
 
 from qdk_chemistry.data import Settings
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
-    ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.data.time_evolution.controlled_time_evolution import ControlledTimeEvolutionUnitary
-from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledEvolutionCircuitMapper
 
@@ -116,125 +114,41 @@ class PauliSequenceMapper(ControlledEvolutionCircuitMapper):
         if target_indices is None:
             target_indices = [i for i in range(total_qubits) if i not in controlled_evolution.control_indices]
 
-        circuit = QuantumCircuit(total_qubits)
+        pauli_terms: list[list[qsharp.Pauli]] = []
+        angles: list[float] = []
+        for term in unitary_container.step_terms:
+            base_terms = [qsharp.Pauli.I] * unitary_container.num_qubits
+            for index, pauli in term.pauli_term.items():
+                base_terms[index] = getattr(qsharp.Pauli, pauli)
+            pauli_terms.append(base_terms.copy())
+            angles.append(term.angle)
 
-        append_controlled_time_evolution(
-            circuit,
-            exponential_terms=unitary_container.step_terms,
-            reps=unitary_container.step_reps,
-            control_qubit=controlled_evolution.control_indices[0],
-            target_qubits=target_indices,
-            power=self._settings.get("power"),
+        flattened_pauli_terms: list[list[qsharp.Pauli]] = []
+        flattened_angles: list[float] = []
+        for _ in range(unitary_container.step_reps):
+            flattened_pauli_terms.extend(pauli_terms)
+            flattened_angles.extend(angles)
+
+        controlled_evo_params = {
+            "pauliExponents": flattened_pauli_terms,
+            "pauliCoefficients": flattened_angles,
+            "repetitions": self._settings.get("power"),
+        }
+
+        qsc = qsharp.circuit(
+            QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
+            controlled_evo_params,
+            controlled_evolution.control_indices[0],
+            target_indices,
         )
 
-        qasm_str = qasm3.dumps(circuit)
-        return Circuit(qasm=qasm_str)
+        qir = qsharp.compile(
+            QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
+            controlled_evo_params,
+            controlled_evolution.control_indices[0],
+            target_indices,
+        )
 
+        controlled_evolution_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(controlled_evo_params)
 
-def _append_controlled_pauli_rotation(
-    circuit: QuantumCircuit,
-    control_qubit: int,
-    target_qubits: Sequence[int],
-    term: ExponentiatedPauliTerm,
-) -> QuantumCircuit:
-    """Append a controlled ``exp(-i angle * P)`` to ``circuit``.
-
-    Args:
-        circuit: Quantum circuit receiving the controlled rotation.
-        control_qubit: Index of the ancilla qubit providing the control.
-        target_qubits: Ordered collection of target qubit indices.
-        term: Pauli term describing the rotation axis.
-
-    Returns:
-        The quantum circuit with the controlled rotation appended.
-
-    """
-    Logger.trace_entering()
-    if not term.pauli_term:
-        # Identity contribution results in a controlled phase on the ancilla.
-        circuit.p(-term.angle, control_qubit)
-        return circuit
-
-    involved_indices = sorted(term.pauli_term.keys())
-    involved_qubits = [target_qubits[i] for i in involved_indices]
-
-    # Basis-change into Z
-    for idx, qubit in zip(involved_indices, involved_qubits, strict=True):
-        pauli = term.pauli_term[idx]
-        if pauli == "X":
-            circuit.h(qubit)
-        elif pauli == "Y":
-            circuit.sdg(qubit)
-            circuit.h(qubit)
-
-    target = involved_qubits[-1]
-    for qubit in involved_qubits[:-1]:
-        circuit.cx(qubit, target)
-
-    circuit.crz(2 * term.angle, control_qubit, target)
-
-    for qubit in reversed(involved_qubits[:-1]):
-        circuit.cx(qubit, target)
-
-    for idx, qubit in reversed(list(zip(involved_indices, involved_qubits, strict=True))):
-        pauli = term.pauli_term[idx]
-        if pauli == "X":
-            circuit.h(qubit)
-        elif pauli == "Y":
-            circuit.h(qubit)
-            circuit.s(qubit)
-
-    return circuit
-
-
-def append_controlled_time_evolution(
-    circuit: QuantumCircuit,
-    *,
-    exponential_terms: list[ExponentiatedPauliTerm],
-    reps: int,
-    control_qubit: int,
-    target_qubits: Sequence[int],
-    power: int = 1,
-) -> None:
-    """Append the controlled unitary ``(exp(-i H time))**power``.
-
-    Args:
-        circuit: Circuit being extended.
-        exponential_terms: List of exponentiated Pauli terms describing the rotation axes.
-        reps: Number of repetitions for each step.
-        control_qubit: Index of the control qubit.
-        target_qubits: The target qubit indices.
-            If None, assumes target qubits are all qubits except the control qubit.
-        power: Number of repeated applications (``U`` raised to ``power``).
-
-    Raises:
-        ValueError: If ``power`` is less than 1.
-
-    """
-    Logger.trace_entering()
-
-    if power < 1:
-        raise ValueError("power must be at least 1 for controlled time evolution.")
-
-    # Create a new circuit for the controlled time evolution
-    num_qubits = len(target_qubits) + 1
-    power_evolution_circuit = QuantumCircuit(num_qubits, name=f"ctrl_time_evol_power_{power}")
-
-    ctrl_evol_circuit = QuantumCircuit(num_qubits, name="ctrl_time_evol")
-    for _ in range(reps):
-        for term in exponential_terms:
-            if np.isclose(term.angle, 0.0):
-                continue
-            _append_controlled_pauli_rotation(
-                ctrl_evol_circuit,
-                control_qubit,
-                target_qubits,
-                term,
-            )
-    # Convert to gate and repeat for the specified power
-    ctrl_evol_gate = ctrl_evol_circuit.to_gate()
-    for _ in range(power):
-        power_evolution_circuit.append(ctrl_evol_gate, list(range(num_qubits)))
-
-    # Convert to gate and append to original circuit
-    circuit.append(power_evolution_circuit.to_gate(), list(range(num_qubits)))
+        return Circuit(qsharp=qsc, qir=qir, qsharp_op=controlled_evolution_op)

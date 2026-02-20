@@ -158,7 +158,7 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         qc = QuantumCircuit(ancilla, system, classical)
 
         Logger.debug(f"Creating traditional QPE circuit with {num_bits} ancilla qubits and measurements.")
-        state_prep = qasm3.loads(state_preparation.qasm)
+        state_prep = state_preparation.get_qiskit_circuit()
         if state_prep.num_qubits != qubit_hamiltonian.num_qubits:
             raise ValueError(
                 "state_preparation must prepare the same number of system qubits as the Hamiltonian "
@@ -230,7 +230,7 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         ctrl_time_evol_circuit = self._create_ctrl_time_evol_circuit(
             controlled_evolution=ctrl_time_evol, power=power, circuit_mapper=circuit_mapper
         )
-        cu_circuit = qasm3.loads(ctrl_time_evol_circuit.qasm)
+        cu_circuit = ctrl_time_evol_circuit.get_qiskit_circuit()
 
         mapping = [control_qubit, *target_qubits]
         circuit.compose(cu_circuit, qubits=mapping, inplace=True)
