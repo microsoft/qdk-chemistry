@@ -633,7 +633,7 @@ TEST_F(LocalizationTest, WaterVVHV) {
   EXPECT_EQ(Cb_loc.rows(), Cb_can.rows());
 
   auto pm_metric = testing::pipek_mezey_metric(localized_orbitals, Ca_loc);
-  EXPECT_GT(pm_metric, 23.61863);
+  EXPECT_NEAR(pm_metric, 23.693199816318174, testing::localization_tolerance);
 }
 
 TEST_F(LocalizationTest, O2TripletVVHV) {
@@ -692,8 +692,165 @@ TEST_F(LocalizationTest, O2TripletVVHV) {
   auto pm_metric_beta = testing::pipek_mezey_metric(localized_orbitals, Cb_loc);
 
   // Check metric values to reference (commented out temporarily)
-  EXPECT_GT(pm_metric_alpha, 31.4247);
-  EXPECT_GT(pm_metric_beta, 28.5516);
+  EXPECT_NEAR(pm_metric_alpha, 31.567921344122617, testing::localization_tolerance);
+  EXPECT_NEAR(pm_metric_beta, 28.668299405893769, testing::localization_tolerance);
+}
+
+auto scramble_basis_shells(std::shared_ptr<BasisSet> basis) {
+  
+  std::vector<Shell> shells = basis->get_shells();
+  
+  auto sort_shell_primitives = [](Shell& shell) {
+    // get exponent sorting indices
+    std::vector<size_t> indices(shell.get_num_primitives());
+    std::iota(indices.begin(), indices.end(), 0);
+    std::sort(indices.begin(), indices.end(), [&shell](size_t a, size_t b) {
+      return shell.exponents(a) > shell.exponents(b);
+    });
+
+    // sort exponents, coefficients, and rpowers
+    Eigen::VectorXd sorted_exponents(shell.get_num_primitives());
+    Eigen::VectorXd sorted_coefficients(shell.get_num_primitives());
+    Eigen::VectorXi sorted_rpowers(shell.get_num_primitives());
+    for (size_t i = 0; i < indices.size(); i++) {
+      sorted_exponents(i) = shell.exponents(indices[i]);
+      sorted_coefficients(i) = shell.coefficients(indices[i]);
+      if (shell.has_radial_powers()) {
+        sorted_rpowers(i) = shell.rpowers(indices[i]);
+      }
+    }
+    shell.exponents = sorted_exponents;
+    shell.coefficients = sorted_coefficients;
+    if (shell.has_radial_powers()) {
+      shell.rpowers = sorted_rpowers;
+    }
+  };
+
+  // sorting shells by atom type -> angular momentum -> exponent
+  auto shell_comparator_ascending = [](const Shell& a, const Shell& b) {
+    // s -> p -> d -> f ...
+    if (a.orbital_type != b.orbital_type) {
+      return a.orbital_type < b.orbital_type;
+    }
+    // ascending order of largest exponent
+    return a.exponents(0) < b.exponents(0);
+  };
+
+  // ensure primitives are sorted by exponent within each shell
+  std::for_each(shells.begin(), shells.end(), sort_shell_primitives);
+  // sort shells by angular momentum and exponent
+  std::stable_sort(shells.begin(), shells.end(), shell_comparator_ascending);
+
+  return std::make_shared<BasisSet>(basis->get_name() + "_scrambled", shells, basis->get_structure());
+}
+
+TEST_F(LocalizationTest, ScrambledShellsWaterVVHV) {
+  auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
+  auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
+  EXPECT_NO_THROW({ auto settings = vvhv_localizer->settings(); });
+
+  // Set the minimal basis to lowercase as required by VVHV
+  vvhv_localizer->settings().set("minimal_basis", "sto-3g");
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "hf");
+
+  auto def2_svp = BasisSet::from_basis_name("def2-svp", water);
+  auto def2_svp_scrambled = scramble_basis_shells(def2_svp);
+
+  auto [E, wfn] = scf_solver->run(water, 0, 1, def2_svp_scrambled);
+  auto orbitals = wfn->get_orbitals();
+  const auto& [Ca_can, Cb_can] = orbitals->get_coefficients();
+
+  const size_t num_occupied_orbitals = wfn->get_total_num_electrons().first;
+
+  // First localize occupied orbitals with Pipek-Mezey
+  std::vector<size_t> occ_indices, virt_indices;
+  for (unsigned i = 0; i < num_occupied_orbitals; ++i) {
+    occ_indices.push_back(i);
+  }
+  for (unsigned i = num_occupied_orbitals;
+       i < orbitals->get_num_molecular_orbitals(); ++i) {
+    virt_indices.push_back(i);
+  }
+
+  auto localized_occ_ptr = pm_localizer->run(wfn, occ_indices, occ_indices);
+
+  // Then pass all orbitals (localized occupied + canonical virtual) to VVHV
+  auto localized_wfn_ptr =
+      vvhv_localizer->run(localized_occ_ptr, virt_indices, virt_indices);
+  auto& localized_orbitals = *localized_wfn_ptr->get_orbitals();
+
+  // Simple checks
+  const auto& [Ca_loc, Cb_loc] = localized_orbitals.get_coefficients();
+  EXPECT_EQ(Ca_loc.rows(), Ca_can.rows());
+  EXPECT_EQ(Cb_loc.rows(), Cb_can.rows());
+
+  auto pm_metric = testing::pipek_mezey_metric(localized_orbitals, Ca_loc);
+  EXPECT_NEAR(pm_metric, 23.693199816318174, testing::localization_tolerance);
+}
+
+TEST_F(LocalizationTest, ScrambledShellsO2TripletVVHV) {
+  auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
+  auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
+  EXPECT_NO_THROW({ auto settings = vvhv_localizer->settings(); });
+
+  // Set the minimal basis to lowercase as required by VVHV
+  vvhv_localizer->settings().set("minimal_basis", "sto-3g");
+
+  // Get a canonical set of o2 orbitals
+  auto o2 = testing::create_o2_structure();
+  auto scf_solver = ScfSolverFactory::create();
+
+  auto def2_svp = BasisSet::from_basis_name("def2-svp", o2);
+  auto def2_svp_scrambled = scramble_basis_shells(def2_svp);
+
+  auto [E, wfn] = scf_solver->run(o2, 0, 3, def2_svp_scrambled);
+  auto orbitals = wfn->get_orbitals();
+  const auto& [Ca_can, Cb_can] = orbitals->get_coefficients();
+
+  // Get dimensions
+  const auto [_na, _nb] = wfn->get_total_num_electrons();
+  const size_t num_alpha = std::round(_na);
+  const size_t num_beta = std::round(_nb);
+
+  // First localize occupied orbitals with Pipek-Mezey
+  std::vector<size_t> occ_indices_alpha, virt_indices_alpha;
+  std::vector<size_t> occ_indices_beta, virt_indices_beta;
+
+  for (unsigned i = 0; i < num_alpha; ++i) {
+    occ_indices_alpha.push_back(i);
+  }
+  for (unsigned i = num_alpha; i < orbitals->get_num_molecular_orbitals();
+       ++i) {
+    virt_indices_alpha.push_back(i);
+  }
+  for (unsigned i = 0; i < num_beta; ++i) {
+    occ_indices_beta.push_back(i);
+  }
+  for (unsigned i = num_beta; i < orbitals->get_num_molecular_orbitals(); ++i) {
+    virt_indices_beta.push_back(i);
+  }
+
+  auto localized_occ_ptr =
+      pm_localizer->run(wfn, occ_indices_alpha, occ_indices_beta);
+
+  // Then pass all orbitals (localized occupied + canonical virtual) to VVHV
+  auto localized_orbitals_ptr = vvhv_localizer->run(
+      localized_occ_ptr, virt_indices_alpha, virt_indices_beta);
+  auto& localized_orbitals = *localized_orbitals_ptr->get_orbitals();
+
+  // Simple checks
+  const auto& [Ca_loc, Cb_loc] = localized_orbitals.get_coefficients();
+  EXPECT_EQ(Ca_loc.rows(), Ca_can.rows());
+  EXPECT_EQ(Cb_loc.rows(), Cb_can.rows());
+
+  auto pm_metric_alpha = testing::pipek_mezey_metric(localized_orbitals, Ca_loc);
+  auto pm_metric_beta = testing::pipek_mezey_metric(localized_orbitals, Cb_loc);
+
+  // Check metric values to reference
+  EXPECT_NEAR(pm_metric_alpha, 31.567921344122617, testing::localization_tolerance);
+  EXPECT_NEAR(pm_metric_beta, 28.668299405893769, testing::localization_tolerance);
 }
 
 // =============================================================================
