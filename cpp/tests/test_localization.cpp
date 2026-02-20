@@ -692,14 +692,15 @@ TEST_F(LocalizationTest, O2TripletVVHV) {
   auto pm_metric_beta = testing::pipek_mezey_metric(localized_orbitals, Cb_loc);
 
   // Check metric values to reference (commented out temporarily)
-  EXPECT_NEAR(pm_metric_alpha, 31.567921344122617, testing::localization_tolerance);
-  EXPECT_NEAR(pm_metric_beta, 28.668299405893769, testing::localization_tolerance);
+  EXPECT_NEAR(pm_metric_alpha, 31.567921344122617,
+              testing::localization_tolerance);
+  EXPECT_NEAR(pm_metric_beta, 28.668299405893769,
+              testing::localization_tolerance);
 }
 
 auto scramble_basis_shells(std::shared_ptr<BasisSet> basis) {
-  
   std::vector<Shell> shells = basis->get_shells();
-  
+
   auto sort_shell_primitives = [](Shell& shell) {
     // get exponent sorting indices
     std::vector<size_t> indices(shell.get_num_primitives());
@@ -741,7 +742,8 @@ auto scramble_basis_shells(std::shared_ptr<BasisSet> basis) {
   // sort shells by angular momentum and exponent
   std::stable_sort(shells.begin(), shells.end(), shell_comparator_ascending);
 
-  return std::make_shared<BasisSet>(basis->get_name() + "_scrambled", shells, basis->get_structure());
+  return std::make_shared<BasisSet>(basis->get_name() + "_scrambled", shells,
+                                    basis->get_structure());
 }
 
 TEST_F(LocalizationTest, ScrambledShellsWaterVVHV) {
@@ -845,12 +847,15 @@ TEST_F(LocalizationTest, ScrambledShellsO2TripletVVHV) {
   EXPECT_EQ(Ca_loc.rows(), Ca_can.rows());
   EXPECT_EQ(Cb_loc.rows(), Cb_can.rows());
 
-  auto pm_metric_alpha = testing::pipek_mezey_metric(localized_orbitals, Ca_loc);
+  auto pm_metric_alpha =
+      testing::pipek_mezey_metric(localized_orbitals, Ca_loc);
   auto pm_metric_beta = testing::pipek_mezey_metric(localized_orbitals, Cb_loc);
 
   // Check metric values to reference
-  EXPECT_NEAR(pm_metric_alpha, 31.567921344122617, testing::localization_tolerance);
-  EXPECT_NEAR(pm_metric_beta, 28.668299405893769, testing::localization_tolerance);
+  EXPECT_NEAR(pm_metric_alpha, 31.567921344122617,
+              testing::localization_tolerance);
+  EXPECT_NEAR(pm_metric_beta, 28.668299405893769,
+              testing::localization_tolerance);
 }
 
 // =============================================================================
