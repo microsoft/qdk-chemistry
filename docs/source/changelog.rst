@@ -2,6 +2,23 @@
 Changelog
 =========
 
+Unreleased
+==========
+
+- Added accuracy-aware Trotter parameterization with automatic step-count
+  determination via ``target_accuracy`` parameter
+- Added unified Pauli commutation utility module
+  (``qdk_chemistry.utils.pauli_commutation``)
+- Added Trotter error estimation functions (``trotter_steps_naive``,
+  ``trotter_steps_commutator``) with commutator-based bounds from
+  Childs *et al.* (2021)
+- **Breaking:** Renamed Trotter parameter ``num_trotter_steps`` to
+  ``num_divisions``
+- **Breaking:** Renamed Trotter parameter ``tolerance`` to
+  ``weight_threshold``
+- New Trotter keyword-only parameters: ``target_accuracy``,
+  ``error_bound``
+
 Version 1.0.2
 =============
 
