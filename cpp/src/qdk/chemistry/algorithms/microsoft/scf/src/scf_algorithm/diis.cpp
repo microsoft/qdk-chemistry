@@ -153,7 +153,13 @@ class ROHFHelper {
                              const RowMajorMatrix& P, int nelec_alpha,
                              int nelec_beta) {
     QDK_LOG_TRACE_ENTERING();
-    const int num_atomic_orbitals = static_cast<int>(F.cols());
+    const int num_atomic_orbitals = static_cast<int>(C.rows()) / 2;
+    const int num_molecular_orbitals = static_cast<int>(C.cols());
+    if (num_atomic_orbitals != num_molecular_orbitals) {
+      throw std::runtime_error(
+          "ROHFHelper requires number of atomic orbitals to equal number of "
+          "molecular orbitals!");
+    }
 
     total_P_ = P.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) +
                P.block(num_atomic_orbitals, 0, num_atomic_orbitals,
@@ -171,7 +177,6 @@ class ROHFHelper {
       return;
     }
 
-    const int num_molecular_orbitals = static_cast<int>(C.cols());
     RowMajorMatrix F_up_mo =
         RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
     RowMajorMatrix F_dn_mo = F_up_mo;
