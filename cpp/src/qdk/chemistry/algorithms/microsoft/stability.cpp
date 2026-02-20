@@ -478,7 +478,11 @@ StabilityChecker::_run_impl(
   scf_config->require_gradient = false;
   scf_config->basis = basis_set_internal->name;
   scf_config->cartesian = !basis_set_internal->pure;
-  scf_config->unrestricted = unrestricted;
+  // Note: ROHF/ROKS is rejected earlier by StabilityChecker; only RHF/UKS is
+  // configured here
+  scf_config->set_scf_orbital_type(
+      unrestricted ? qcs::SCFOrbitalType::Unrestricted
+                   : qcs::SCFOrbitalType::RestrictedClosedShell);
   scf_config->eri.method = qcs::ERIMethod::Libint2Direct;
 
   // Create ERI instance
@@ -605,7 +609,8 @@ StabilityChecker::_run_impl(
     if (method != "HF") {
       // deep copy the scf_config to avoid modifying the original
       auto scf_config_external = std::make_unique<qcs::SCFConfig>(*scf_config);
-      scf_config_external->unrestricted = true;
+      scf_config_external->set_scf_orbital_type(
+          qcs::SCFOrbitalType::Unrestricted);
       scf_config_external->exc.xc_name = method;
       exc_external = qcs::EXC::create(basis_set_internal, *scf_config_external);
     }

@@ -161,7 +161,10 @@ struct CPSCFInput {
  * convergence criteria, integral methods, and optional features.
  */
 struct SCFConfig {
-  std::string basis = "def2-svp";  ///< Primary basis set name
+  SCFOrbitalType scf_orbital_type =
+      SCFOrbitalType::RestrictedClosedShell;  ///< Spin symmetry used across
+                                              ///< SCF algorithms
+  std::string basis = "def2-svp";             ///< Primary basis set name
   std::string aux_basis =
       "def2-universal-jfit";  ///< Auxiliary basis set for density fitting
   BasisMode basis_mode =
@@ -175,6 +178,8 @@ struct SCFConfig {
   bool do_dfj = false;  ///< Use density fitting for Coulomb (J) integrals
   bool unrestricted =
       false;  ///< Use unrestricted (UHF/UKS) rather than restricted (RHF/RKS)
+  bool rohf_enabled =
+      false;  ///< Use restricted open-shell (ROHF) formalism if applicable
   double lindep_threshold =
       1e-6;  ///< Linear dependency threshold for basis set orthogonalization
   DensityInitializationMethod density_init_method =
@@ -219,6 +224,17 @@ struct SCFConfig {
 #ifdef QATK_ENABLE_QMMM
   std::shared_ptr<PointCharges> pointcharges;
 #endif
+
+  /**
+   * @brief Set the SCF orbital type and keep legacy flags in sync
+   * Orbital types include RestrictedClosedShell (RHF/RKS), Unrestricted
+   * (UHF/UKS), and RestrictedOpenShell (ROHF/ROKS)
+   */
+  void set_scf_orbital_type(SCFOrbitalType type) {
+    scf_orbital_type = type;
+    unrestricted = (type == SCFOrbitalType::Unrestricted);
+    rohf_enabled = (type == SCFOrbitalType::RestrictedOpenShell);
+  }
 };
 
 /**

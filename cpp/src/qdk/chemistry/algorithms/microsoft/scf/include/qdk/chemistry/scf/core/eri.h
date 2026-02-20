@@ -9,6 +9,8 @@
 #include <qdk/chemistry/scf/core/enums.h>
 #include <qdk/chemistry/scf/core/scf.h>
 
+#include <stdexcept>
+
 namespace qdk::chemistry::scf {
 class ERIMultiplexer;  // Forward declaration
 
@@ -16,7 +18,7 @@ class ERIMultiplexer;  // Forward declaration
  * @brief Base class for Electron Repulsion Integral (ERI) engines
  *
  * Provides interface for computing J (Coulomb) and K (exchange) matrices,
- * their energtic gradients, and molecular orbital transformations.
+ * their energetic gradients, and molecular orbital transformations.
  */
 class ERI {
   friend ERIMultiplexer;
@@ -25,16 +27,28 @@ class ERI {
   /**
    * @brief Construct ERI engine
    *
-   * @param unrestricted Whether this is an unrestricted calculation (UHF/UKS)
+   * @param scf_orbital_type Spin symmetry classification (RHF/ROHF/UHF)
    * @param tol Integral screening tolerance
    * @param basis_set The atomic orbital basis set
    * @param mpi Parallelism configuration
    */
-  ERI(bool unrestricted, double tol, BasisSet& basis_set, ParallelConfig mpi)
-      : unrestricted_(unrestricted),
+  ERI(SCFOrbitalType scf_orbital_type, double tol, BasisSet& basis_set,
+      ParallelConfig mpi)
+      : scf_orbital_type_(scf_orbital_type),
         tolerance_(tol),
         basis_set_(basis_set),
-        mpi_(mpi) {}
+        mpi_(mpi) {
+    switch (scf_orbital_type_) {
+      case SCFOrbitalType::RestrictedClosedShell:
+      case SCFOrbitalType::Unrestricted:
+      case SCFOrbitalType::RestrictedOpenShell:
+        break;
+      default:
+        throw std::invalid_argument(
+            "ERI only supports RestrictedClosedShell, Unrestricted, or "
+            "RestrictedOpenShell references");
+    }
+  }
 
   /**
    * @brief Virtual destructor
@@ -151,7 +165,11 @@ class ERI {
    */
   virtual void quarter_trans_impl(size_t nt, const double* C, double* out) = 0;
 
-  bool unrestricted_;    ///< Whether this is an unrestricted calculation
+  [[nodiscard]] bool has_spin_split_density() const {
+    return scf_orbital_type_ != SCFOrbitalType::RestrictedClosedShell;
+  }
+
+  SCFOrbitalType scf_orbital_type_;
   double tolerance_;     ///< Integral screening threshold
   BasisSet& basis_set_;  ///< Reference to the atomic orbital basis set
   ParallelConfig mpi_;   ///< MPI parallelization configuration

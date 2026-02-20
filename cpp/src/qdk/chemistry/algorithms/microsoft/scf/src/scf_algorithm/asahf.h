@@ -105,6 +105,10 @@ class AtomicSphericallyAveragedHartreeFock : public DIIS {
                                int num_molecular_orbitals, int idx_spin,
                                bool unrestricted) override;
 
+  void update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
+                             bool unrestricted, int nelec_alpha,
+                             int nelec_beta) override;
+
  private:
   /**
    * @brief Custom orthogonalization matrix computation for ASAHF
@@ -116,6 +120,13 @@ class AtomicSphericallyAveragedHartreeFock : public DIIS {
   void compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
                                          RowMajorMatrix* ret,
                                          size_t n_atom_orbs);
+
+  /**
+   * @brief Fractional occupation values per molecular orbital from the most
+   * recent ASAHF diagonalization; reused when rebuilding the density matrix
+   * outside of the eigenproblem.
+   */
+  std::vector<double> last_occupation_;
 };
 
 }  // namespace qdk::chemistry::scf

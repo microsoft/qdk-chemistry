@@ -88,7 +88,6 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   num_atomic_orbitals_ = ctx_.basis_set->num_atomic_orbitals;
   num_molecular_orbitals_ = ctx_.basis_set->num_atomic_orbitals;
   ctx_.num_molecular_orbitals = num_molecular_orbitals_;
-  num_density_matrices_ = cfg.unrestricted ? 2 : 1;
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
   add_mm_charge_ = cfg.pointcharges != nullptr;
 #endif
@@ -97,6 +96,11 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   auto spin = mol.multiplicity - 1;
   auto alpha = (mol.n_electrons - n_ecp_electrons + spin) / 2;
   auto beta = mol.n_electrons - n_ecp_electrons - alpha;
+  if (cfg.scf_algorithm.method == SCFAlgorithmName::ASAHF && cfg.rohf_enabled) {
+    throw std::runtime_error("ASAHF method cannot be used with ROHF!");
+  }
+  num_density_matrices_ = (cfg.unrestricted || cfg.rohf_enabled) ? 2 : 1;
+  num_orbital_sets_ = cfg.unrestricted ? 2 : 1;
 
   if (cfg.mpi.world_rank == 0) {
     std::string fock_string = "";
@@ -206,10 +210,10 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
 
   // MO and mixed AO/MO quantities
   // These may be resized after the orthonormality check
-  C_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
+  C_ = RowMajorMatrix::Zero(num_orbital_sets_ * num_atomic_orbitals_,
                             num_molecular_orbitals_);
   eigenvalues_ =
-      RowMajorMatrix::Zero(num_density_matrices_, num_molecular_orbitals_);
+      RowMajorMatrix::Zero(num_orbital_sets_, num_molecular_orbitals_);
 
 #ifdef QDK_CHEMISTRY_ENABLE_DFTD3
   ctx_.result.scf_dispersion_correction_energy = 0.0;
@@ -365,7 +369,7 @@ void SCFImpl::update_fock_() {
 #endif
 
   if (ctx_.cfg->mpi.world_rank == 0) {
-    if (ctx_.cfg->unrestricted) {
+    if (ctx_.cfg->unrestricted || ctx_.cfg->rohf_enabled) {
       F_ += (J_.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_) +
              J_.block(num_atomic_orbitals_, 0, num_atomic_orbitals_,
                       num_atomic_orbitals_))
@@ -606,11 +610,13 @@ void SCFImpl::iterate_() {
     auto [alpha, beta, omega] = get_hyb_coeff_();
     eri_->build_JK(P_.data(), J_.data(), K_.data(), alpha, beta, omega);
     update_fock_();
-    for (int i = 0; i < num_density_matrices_; ++i) {
+    for (int i = 0; i < num_orbital_sets_; ++i) {
       scf_algorithm_->solve_fock_eigenproblem(
           F_, S_, X_, C_, eigenvalues_, P_, nelec_, num_atomic_orbitals_,
           num_molecular_orbitals_, i, ctx_.cfg->unrestricted);
     }
+    scf_algorithm_->update_density_matrix(P_, C_, ctx_.cfg->unrestricted,
+                                          nelec_[0], nelec_[1]);
   }
 }
 
@@ -830,11 +836,13 @@ void SCFImpl::init_density_matrix_() {
     P_ *= 2.0;
   } else if (method == DensityInitializationMethod::Core) {
     // Use the SCF algorithm to update density matrix for each spin
-    for (int i = 0; i < num_density_matrices_; ++i) {
+    for (int i = 0; i < num_orbital_sets_; ++i) {
       scf_algorithm_->solve_fock_eigenproblem(
           H_, S_, X_, C_, eigenvalues_, P_, nelec_, num_atomic_orbitals_,
           num_molecular_orbitals_, i, ctx_.cfg->unrestricted);
     }
+    scf_algorithm_->update_density_matrix(P_, C_, ctx_.cfg->unrestricted,
+                                          nelec_[0], nelec_[1]);
   } else if (method == DensityInitializationMethod::Atom) {
     atom_guess(*ctx_.basis_set, mol, P_.data());
   } else if (method == DensityInitializationMethod::File) {
@@ -894,10 +902,10 @@ void SCFImpl::build_one_electron_integrals_() {
         num_molecular_orbitals_;  // Update the context to ensure proper
                                   // serialization
     // Resize MO quantities
-    C_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
+    C_ = RowMajorMatrix::Zero(num_orbital_sets_ * num_atomic_orbitals_,
                               num_molecular_orbitals_);
     eigenvalues_ =
-        RowMajorMatrix::Zero(num_density_matrices_, num_molecular_orbitals_);
+        RowMajorMatrix::Zero(num_orbital_sets_, num_molecular_orbitals_);
   }
   RowMajorMatrix T =
       RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);

@@ -26,10 +26,11 @@
 
 namespace qdk::chemistry::scf::incore {
 
-ERI::ERI(bool unr, const BasisSet& basis, ParallelConfig mpi, double omega) {
+ERI::ERI(size_t spin_density_factor, const BasisSet& basis, ParallelConfig mpi,
+         double omega) {
   QDK_LOG_TRACE_ENTERING();
 
-  unrestricted_ = unr;
+  spin_density_factor_ = spin_density_factor;
   obs_ = libint2_util::convert_to_libint_basisset(basis);
   omega_ = omega;
   basis_mode_ = basis.mode;
@@ -103,10 +104,11 @@ void ERI::generate_eri_() {
 
   std::vector<int64_t> extents4 = {loc_i_en_ - loc_i_st_, num_atomic_orbitals,
                                    num_atomic_orbitals, num_atomic_orbitals};
-  std::vector<int64_t> extents2_P = {unrestricted_ ? 2 : 1, num_atomic_orbitals,
+  std::vector<int64_t> extents2_P = {static_cast<int64_t>(spin_density_factor_),
+                                     num_atomic_orbitals, num_atomic_orbitals};
+  std::vector<int64_t> extents2_R = {static_cast<int64_t>(spin_density_factor_),
+                                     loc_i_en_ - loc_i_st_,
                                      num_atomic_orbitals};
-  std::vector<int64_t> extents2_R = {
-      unrestricted_ ? 2 : 1, loc_i_en_ - loc_i_st_, num_atomic_orbitals};
   std::vector<int64_t> strides2 = {num_atomic_orbitals * num_atomic_orbitals,
                                    num_atomic_orbitals,
                                    1};  // Output is full space
@@ -140,7 +142,7 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
 
   const size_t num_atomic_orbitals = obs_.nbf();
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
-  const size_t mat_size = (unrestricted_ ? 2 : 1) * num_atomic_orbitals2;
+  const size_t mat_size = spin_density_factor_ * num_atomic_orbitals2;
 
   // Clear out data
   if (J) std::fill_n(J, mat_size, 0.0);
@@ -154,11 +156,8 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
   const auto* h_eri_ptr = h_eri_.get();
   const auto* h_eri_erf_ptr = h_eri_erf_.get();
 
-  const auto* Pa = P;
-  const auto* Pb = unrestricted_ ? Pa + num_atomic_orbitals2 : nullptr;
-
   if (J)
-    for (size_t idm = 0; idm < (unrestricted_ ? 2 : 1); ++idm) {
+    for (size_t idm = 0; idm < spin_density_factor_; ++idm) {
       blas::gemv(blas::Layout::ColMajor, blas::Op::Trans, num_atomic_orbitals2,
                  num_atomic_orbitals2, 1.0, h_eri_ptr, num_atomic_orbitals2,
                  P + idm * num_atomic_orbitals2, 1, 0.0,
@@ -166,7 +165,7 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
     }
 
   if (K)
-    for (size_t idm = 0; idm < (unrestricted_ ? 2 : 1); ++idm)
+    for (size_t idm = 0; idm < spin_density_factor_; ++idm)
       for (size_t i = loc_i_st_; i < loc_i_en_; ++i) {
         const double* eri_i = h_eri_ptr + i * num_atomic_orbitals3;
         double* K_i = K + i * num_atomic_orbitals + idm * num_atomic_orbitals2;
@@ -182,7 +181,7 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
       }
 
   if (K and is_rsx)
-    for (size_t idm = 0; idm < (unrestricted_ ? 2 : 1); ++idm)
+    for (size_t idm = 0; idm < spin_density_factor_; ++idm)
       for (size_t i = loc_i_st_; i < loc_i_en_; ++i) {
         const double* eri_i = h_eri_erf_ptr + i * num_atomic_orbitals3;
         double* K_i = K + i * num_atomic_orbitals + idm * num_atomic_orbitals2;
@@ -306,11 +305,12 @@ ERI::~ERI() noexcept {
 #endif
 };
 
-std::unique_ptr<ERI> ERI::make_incore_eri(bool unr, const BasisSet& basis,
+std::unique_ptr<ERI> ERI::make_incore_eri(size_t spin_density_factor,
+                                          const BasisSet& basis,
                                           ParallelConfig mpi, double omega) {
   QDK_LOG_TRACE_ENTERING();
 
-  return std::make_unique<ERI>(unr, basis, mpi, omega);
+  return std::make_unique<ERI>(spin_density_factor, basis, mpi, omega);
 }
 
 }  // namespace qdk::chemistry::scf::incore

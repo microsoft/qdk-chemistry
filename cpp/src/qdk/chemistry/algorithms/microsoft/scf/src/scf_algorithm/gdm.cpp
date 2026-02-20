@@ -404,7 +404,6 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
 
   const int num_molecular_orbitals =
       static_cast<int>(ctx.num_molecular_orbitals);
-  const bool unrestricted = cfg.unrestricted;
 
   auto n_ecp_electrons = ctx.basis_set->n_ecp_electrons;
   auto spin = mol.multiplicity - 1;
@@ -425,7 +424,7 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
 
   QDK_LOGGER().debug("GDM initialized with history_size_limit = {}",
                      history_size_limit_);
-  num_density_matrices_ = unrestricted ? 2 : 1;
+  num_density_matrices_ = cfg.unrestricted ? 2 : 1;
 
   // Calculate rotation sizes for each spin
   rotation_size_.resize(num_density_matrices_);

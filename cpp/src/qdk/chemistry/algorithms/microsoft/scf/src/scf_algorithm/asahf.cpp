@@ -13,6 +13,7 @@
 #include <spdlog/spdlog.h>
 
 #include <lapack.hh>
+#include <stdexcept>
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -277,7 +278,7 @@ void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
   cfg.scf_algorithm.method = SCFAlgorithmName::ASAHF;
   cfg.density_init_method = DensityInitializationMethod::Core;
   cfg.require_gradient = false;
-  cfg.unrestricted = false;
+  cfg.set_scf_orbital_type(SCFOrbitalType::RestrictedClosedShell);
   cfg.require_polarizability = false;
   cfg.exc.xc_name = "hf";
   cfg.eri.method = ERIMethod::Libint2Direct;
@@ -320,8 +321,6 @@ void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
     RowMajorMatrix& C, RowMajorMatrix& eigenvalues, RowMajorMatrix& P,
     const int num_occupied_orbitals[2], int num_atomic_orbitals,
     int num_molecular_orbitals, int idx_spin, bool unrestricted) {
-  Eigen::Map<RowMajorMatrix> P_dm(P.data(), num_atomic_orbitals,
-                                  num_atomic_orbitals);
   Eigen::Map<RowMajorMatrix> C_dm(C.data(), num_atomic_orbitals,
                                   num_molecular_orbitals);
 
@@ -481,17 +480,7 @@ void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
     }
   }
 
-  // Build density matrix
-  P_dm.setZero();
-  for (size_t mu = 0; mu < num_atomic_orbitals; ++mu) {
-    for (size_t nu = 0; nu < num_atomic_orbitals; ++nu) {
-      double density_value = 0.0;
-      for (size_t m = 0; m < num_molecular_orbitals; ++m) {
-        density_value += C_dm(mu, m) * C_dm(nu, m) * occupation[m];
-      }
-      P_dm(mu, nu) = density_value;
-    }
-  }
+  last_occupation_ = occupation;
 }
 
 void AtomicSphericallyAveragedHartreeFock::compute_orthogonalization_matrix_(
@@ -527,6 +516,32 @@ void AtomicSphericallyAveragedHartreeFock::compute_orthogonalization_matrix_(
   auto U_cond = U.block(0, n_atom_orbs - n_mol_orbs, n_atom_orbs, n_mol_orbs);
   RowMajorMatrix X_ = U_cond * sigma_invsqrt;
   *ret = X_;
+}
+
+void AtomicSphericallyAveragedHartreeFock::update_density_matrix(
+    RowMajorMatrix& P, const RowMajorMatrix& C, bool /*unrestricted*/,
+    int /*nelec_alpha*/, int /*nelec_beta*/) {
+  QDK_LOG_TRACE_ENTERING();
+  const int num_atomic_orbitals =
+      static_cast<int>(ctx_.basis_set->num_atomic_orbitals);
+  const int num_molecular_orbitals = static_cast<int>(C.cols());
+
+  if (static_cast<int>(last_occupation_.size()) != num_molecular_orbitals) {
+    throw std::runtime_error(
+        "ASAHF occupation vector is not synchronized with MO count");
+  }
+
+  P.setZero();
+  for (int mu = 0; mu < num_atomic_orbitals; ++mu) {
+    for (int nu = 0; nu < num_atomic_orbitals; ++nu) {
+      double density_value = 0.0;
+      for (int m = 0; m < num_molecular_orbitals; ++m) {
+        density_value +=
+            C(mu, m) * C(nu, m) * last_occupation_[static_cast<size_t>(m)];
+      }
+      P(mu, nu) = density_value;
+    }
+  }
 }
 
 }  // namespace qdk::chemistry::scf

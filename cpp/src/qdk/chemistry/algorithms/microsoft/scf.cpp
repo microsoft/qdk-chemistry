@@ -23,6 +23,7 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
+using qcs::SCFOrbitalType;
 
 // Bring logger types into scope
 using qdk::chemistry::utils::Logger;
@@ -108,11 +109,12 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   std::string scf_type = _settings->get<std::string>("scf_type");
   std::transform(scf_type.begin(), scf_type.end(), scf_type.begin(), ::tolower);
 
-  bool unrestricted;
+  auto scf_orbital_type = SCFOrbitalType::RestrictedClosedShell;
   if (scf_type == "auto") {
-    unrestricted = open_shell;
+    scf_orbital_type = open_shell ? SCFOrbitalType::Unrestricted
+                                  : SCFOrbitalType::RestrictedClosedShell;
   } else if (scf_type == "unrestricted") {
-    unrestricted = true;
+    scf_orbital_type = SCFOrbitalType::Unrestricted;
     if (!open_shell && basis_set_type != BasisSetType::FromOrbitals) {
       QDK_LOGGER().warn(
           "Unrestricted reference requested for closed-shell system. "
@@ -120,12 +122,12 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
           "Consider providing a spin-broken initial guess if desired.");
     }
   } else if (scf_type == "restricted") {
-    if (open_shell) {
-      throw std::invalid_argument(
-          "Restricted Open-Shell calculation is not currently supported in the "
-          "QDK/Chemistry SCFSolver");
+    scf_orbital_type = open_shell ? SCFOrbitalType::RestrictedOpenShell
+                                  : SCFOrbitalType::RestrictedClosedShell;
+    if (scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
+      QDK_LOGGER().warn(
+          "Restricted open-shell request detected; enabling ROHF workflow.");
     }
-    unrestricted = false;
   } else {
     throw std::invalid_argument(
         "scf_type must be one of: auto, restricted, unrestricted");
@@ -134,6 +136,12 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // Extract SCF settings
   std::string method = _settings->get<std::string>("method");
   std::transform(method.begin(), method.end(), method.begin(), ::tolower);
+  if (scf_orbital_type == SCFOrbitalType::RestrictedOpenShell &&
+      method != "hf") {
+    throw std::invalid_argument(
+        "Restricted open-shell calculations are only supported for "
+        "Hartree-Fock.");
+  }
 
   double convergence_threshold =
       _settings->get<double>("convergence_threshold");
@@ -165,7 +173,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
                  ms_scf_config->exc.xc_name.begin(), ::toupper);
   ms_scf_config->basis = basis_set_name;
   ms_scf_config->basis_mode = qcs::BasisMode::PSI4;
-  ms_scf_config->unrestricted = unrestricted;
+  ms_scf_config->set_scf_orbital_type(scf_orbital_type);
   ms_scf_config->scf_algorithm.density_threshold = density_threshold;
   ms_scf_config->scf_algorithm.og_threshold = orbital_gradient_threshold;
   ms_scf_config->scf_algorithm.max_iteration = max_iterations;
@@ -302,7 +310,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     // Compute density matrix from MO coefficients
     qcs::RowMajorMatrix density_matrix;
 
-    if (unrestricted) {
+    if (ms_scf_config->unrestricted) {
       if (initial_guess->is_restricted())
         QDK_LOGGER().warn(
             "Unrestricted calculation requested but restricted "
@@ -401,7 +409,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   auto nelec = scf->get_num_electrons();
 
   std::shared_ptr<data::Orbitals> orbitals;
-  if (unrestricted) {
+  if (ms_scf_config->unrestricted) {
     // Unrestricted case - store matrices first to avoid
     // temporaries
     const auto& C_full = scf->get_orbitals_matrix();
