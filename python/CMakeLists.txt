@@ -91,6 +91,7 @@ pybind11_add_module(_core
     src/pybind11/data/stability_result.cpp
     src/pybind11/data/pauli_operator.cpp
     src/pybind11/data/serialization.cpp
+    src/pybind11/data/lattice_graph.cpp
     src/pybind11/algorithms/localizer.cpp
     src/pybind11/algorithms/stability.cpp
     src/pybind11/algorithms/mc.cpp
@@ -105,6 +106,7 @@ pybind11_add_module(_core
     src/pybind11/utils/logger.cpp
     src/pybind11/utils/valence_space.cpp
     src/pybind11/utils/orbital_rotation.cpp
+    src/pybind11/utils/model_hamiltonians.cpp
     src/pybind11/constants.cpp
     src/pybind11/qdk_scf_config.cpp
     src/pybind11/module.cpp
