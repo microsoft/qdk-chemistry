@@ -109,14 +109,14 @@ transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
 
 // WavefunctionContainer constructor
 WavefunctionContainer::WavefunctionContainer(WavefunctionType type)
-    : WavefunctionContainer(std::nullopt,  // one_rdm_spin_traced
-                            std::nullopt,  // one_rdm_aa
-                            std::nullopt,  // one_rdm_bb
-                            std::nullopt,  // two_rdm_spin_traced
-                            std::nullopt,  // two_rdm_aabb
-                            std::nullopt,  // two_rdm_aaaa
-                            std::nullopt,  // two_rdm_bbbb
-                            {},            // entropies
+    : WavefunctionContainer(std::nullopt,        // one_rdm_spin_traced
+                            std::nullopt,        // one_rdm_aa
+                            std::nullopt,        // one_rdm_bb
+                            std::nullopt,        // two_rdm_spin_traced
+                            std::nullopt,        // two_rdm_aabb
+                            std::nullopt,        // two_rdm_aaaa
+                            std::nullopt,        // two_rdm_bbbb
+                            OrbitalEntropies{},  // entropies
                             type) {
   QDK_LOG_TRACE_ENTERING();
 }

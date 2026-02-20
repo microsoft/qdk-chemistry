@@ -57,7 +57,7 @@ class SciWavefunctionContainer : public WavefunctionContainer {
       std::shared_ptr<Orbitals> orbitals,
       const std::optional<MatrixVariant>& one_rdm_spin_traced,
       const std::optional<VectorVariant>& two_rdm_spin_traced,
-      const OrbitalEntropies& entropies = {},
+      const OrbitalEntropies& entropies = OrbitalEntropies{},
       WavefunctionType type = WavefunctionType::SelfDual);
 
   /**
@@ -91,7 +91,7 @@ class SciWavefunctionContainer : public WavefunctionContainer {
       const std::optional<VectorVariant>& two_rdm_aabb,
       const std::optional<VectorVariant>& two_rdm_aaaa,
       const std::optional<VectorVariant>& two_rdm_bbbb,
-      const OrbitalEntropies& entropies = {},
+      const OrbitalEntropies& entropies = OrbitalEntropies{},
       WavefunctionType type = WavefunctionType::SelfDual);
 
   /** @brief Destructor */

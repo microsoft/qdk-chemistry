@@ -27,14 +27,14 @@ SciWavefunctionContainer::SciWavefunctionContainer(
     const VectorVariant& coeffs, const DeterminantVector& dets,
     std::shared_ptr<Orbitals> orbitals, WavefunctionType type)
     : SciWavefunctionContainer(coeffs, dets, orbitals,
-                               std::nullopt,  // one_rdm_spin_traced
-                               std::nullopt,  // one_rdm_aa
-                               std::nullopt,  // one_rdm_bb
-                               std::nullopt,  // two_rdm_spin_traced
-                               std::nullopt,  // two_rdm_aabb
-                               std::nullopt,  // two_rdm_aaaa
-                               std::nullopt,  // two_rdm_bbbb
-                               {},            // entropies
+                               std::nullopt,        // one_rdm_spin_traced
+                               std::nullopt,        // one_rdm_aa
+                               std::nullopt,        // one_rdm_bb
+                               std::nullopt,        // two_rdm_spin_traced
+                               std::nullopt,        // two_rdm_aabb
+                               std::nullopt,        // two_rdm_aaaa
+                               std::nullopt,        // two_rdm_bbbb
+                               OrbitalEntropies{},  // entropies
                                type) {
   QDK_LOG_TRACE_ENTERING();
 }

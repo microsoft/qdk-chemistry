@@ -54,7 +54,7 @@ py::object variant_to_python(
 /// Passing ``py::none()`` (the default) yields an empty struct.
 qdk::chemistry::data::OrbitalEntropies parse_entropies(const py::object& obj) {
   using qdk::chemistry::data::OrbitalEntropies;
-  if (obj.is_none()) return {};
+  if (obj.is_none()) return OrbitalEntropies{};
   if (!py::isinstance<py::dict>(obj)) {
     throw py::type_error(
         "entropies must be a dict with keys from "
