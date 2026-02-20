@@ -78,6 +78,8 @@ auto dispatch_by_norb(size_t norb, Args&&... args) {
  * determined by flags stored in `settings`:
  *  - `calculate_one_rdm`
  *  - `calculate_two_rdm`
+ *  - `calculate_single_orbital_entropies`
+ *  - `calculate_mutual_information`
  *
  * The container type must provide:
  *  - `MatrixVariant`, `VectorVariant` typedefs
@@ -85,7 +87,8 @@ auto dispatch_by_norb(size_t norb, Args&&... args) {
  *    (coeffs, dets, orbitals)
  *    (coeffs, dets, orbitals, one_rdm_spin_traced, two_rdm_spin_traced)
  *    (coeffs, dets, orbitals, one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
- *       two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
+ *       two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb,
+ *       single_orbital_entropies, mutual_information, type)
  *
  * @tparam Container Concrete wavefunction container class.
  * @tparam Generator Hamiltonian generator type.
@@ -116,6 +119,10 @@ inline data::Wavefunction build_wavefunction(
 
   const bool eval_one_rdm = settings.get<bool>("calculate_one_rdm");
   const bool eval_two_rdm = settings.get<bool>("calculate_two_rdm");
+  const bool eval_s1 = settings.get<bool>("calculate_single_orbital_entropies");
+  const bool eval_mutual_info =
+      settings.get<bool>("calculate_mutual_information");
+  const bool eval_s2 = settings.get<bool>("calculate_two_orbital_entropies");
 
   std::optional<Eigen::MatrixXd> one_aa, one_bb;
   std::optional<Eigen::VectorXd> two_aabb, two_aaaa, two_bbbb;
@@ -164,6 +171,36 @@ inline data::Wavefunction build_wavefunction(
     }
   }
 
+  // evaluate single orbital entropies, two-orbital entropies, and mutual
+  // information
+  data::OrbitalEntropies computed_entropies;
+  if (eval_s1 || eval_s2 || eval_mutual_info) {
+    std::vector<double> s1_vec(nmo, 0.0);
+    std::vector<double> s2_data(eval_s2 ? nmo * nmo : 0, 0.0);
+    std::vector<double> mi_data(eval_mutual_info ? nmo * nmo : 0, 0.0);
+
+    ham_gen.form_entropies(
+        dets.begin(), dets.end(), dets.begin(), dets.end(), coeffs.data(),
+        s1_vec,
+        macis::matrix_span<double>(eval_s2 ? s2_data.data() : nullptr, nmo,
+                                   nmo),
+        macis::matrix_span<double>(eval_mutual_info ? mi_data.data() : nullptr,
+                                   nmo, nmo));
+
+    if (eval_s1) {
+      computed_entropies.single_orbital =
+          Eigen::Map<Eigen::VectorXd>(s1_vec.data(), nmo);
+    }
+    if (eval_s2) {
+      computed_entropies.two_orbital =
+          Eigen::Map<Eigen::MatrixXd>(s2_data.data(), nmo, nmo);
+    }
+    if (eval_mutual_info) {
+      computed_entropies.mutual_information =
+          Eigen::Map<Eigen::MatrixXd>(mi_data.data(), nmo, nmo);
+    }
+  }
+
   // helper function to convert optional Eigen types to MatrixVariant
   auto to_mv =
       [](const std::optional<Eigen::MatrixXd>& m) -> std::optional<MV> {
@@ -180,14 +217,17 @@ inline data::Wavefunction build_wavefunction(
 
   // build container with appropriate RDMs
   std::unique_ptr<data::WavefunctionContainer> container;
-  if (one_aa || one_bb || two_aabb || two_aaaa || two_bbbb) {
+  if (one_aa || one_bb || two_aabb || two_aaaa || two_bbbb ||
+      computed_entropies.has_any()) {
     container = std::make_unique<Container>(
         C_vector, dets_configs, hamiltonian.get_orbitals(), std::nullopt,
         to_mv(one_aa), to_mv(one_bb), std::nullopt, to_vv(two_aabb),
-        to_vv(two_aaaa), to_vv(two_bbbb));
+        to_vv(two_aaaa), to_vv(two_bbbb), computed_entropies,
+        data::WavefunctionType::SelfDual);
   } else {
     container = std::make_unique<Container>(C_vector, dets_configs,
-                                            hamiltonian.get_orbitals());
+                                            hamiltonian.get_orbitals(),
+                                            data::WavefunctionType::SelfDual);
   }
   return data::Wavefunction(std::move(container));
 }
