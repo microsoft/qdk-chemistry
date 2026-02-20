@@ -7,6 +7,7 @@
 #include <Eigen/Dense>
 #include <algorithm>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <numeric>
 #include <qdk/chemistry/data/wavefunction.hpp>
@@ -103,6 +104,51 @@ transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
             std::in_place_type<VecType>, output);
       },
       variant);
+}
+
+void consolidate_determinants(std::vector<Configuration>& determinants,
+                              ContainerTypes::VectorVariant& coefficients,
+                              double threshold) {
+  if (determinants.empty()) {
+    return;
+  }
+
+  std::visit(
+      [&determinants, threshold](auto& coef_vec) {
+        using VecType = std::decay_t<decltype(coef_vec)>;
+        using ScalarType = typename VecType::Scalar;
+
+        // Use a map with string keys to consolidate determinants
+        std::map<std::string, std::pair<Configuration, ScalarType>> det_map;
+
+        for (Eigen::Index i = 0; i < coef_vec.size(); ++i) {
+          std::string key = determinants[i].to_string();
+          auto it = det_map.find(key);
+          if (it == det_map.end()) {
+            det_map[key] = std::make_pair(determinants[i], coef_vec[i]);
+          } else {
+            it->second.second += coef_vec[i];
+          }
+        }
+
+        // Rebuild vectors, filtering out near-zero coefficients
+        determinants.clear();
+        std::vector<ScalarType> new_coeffs;
+
+        for (const auto& [key, det_coef] : det_map) {
+          if (std::abs(det_coef.second) > threshold) {
+            determinants.push_back(det_coef.first);
+            new_coeffs.push_back(det_coef.second);
+          }
+        }
+
+        // Resize and copy back to the Eigen vector
+        coef_vec.resize(new_coeffs.size());
+        for (size_t i = 0; i < new_coeffs.size(); ++i) {
+          coef_vec[i] = new_coeffs[i];
+        }
+      },
+      coefficients);
 }
 
 }  // namespace detail

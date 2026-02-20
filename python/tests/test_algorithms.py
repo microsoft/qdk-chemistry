@@ -348,7 +348,7 @@ class MockCoupledClusterCalculator(DynamicalCorrelationCalculator):
 
         updated_wavefunction = Wavefunction(cc_container)
 
-        return -10.0, updated_wavefunction
+        return -10.0, updated_wavefunction, None
 
 
 class TestAlgorithmClasses:
@@ -582,7 +582,7 @@ class TestAlgorithmClasses:
         assert settings["cc_type"] == "CCSD(T)"
 
         # Test calculate method with basic hamiltonian
-        energy, updated_wavefunction = coupled_cluster_calculator.run(test_ansatz)
+        energy, updated_wavefunction, _ = coupled_cluster_calculator.run(test_ansatz)
 
         # Check results
         assert isinstance(energy, float)

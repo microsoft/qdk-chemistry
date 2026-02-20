@@ -198,11 +198,8 @@ Typical usage:
     # Create an SCF solver instance
     scf_solver = alg.QdkScfSolver()
 
-    # Configure settings if needed
-    scf_solver.settings().set("basis_set", "sto-3g")
-
     # Perform SCF calculation
-    energy, wavefunction = scf_solver.run(water, 0, 1)
+    energy, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
 
 See Also:
     :class:`ScfSolver`

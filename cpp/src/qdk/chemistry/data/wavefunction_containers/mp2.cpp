@@ -6,6 +6,10 @@
 
 #include "../../algorithms/microsoft/mp2.hpp"
 
+#include <algorithm>
+#include <macis/hamiltonian_generator/double_loop.hpp>
+#include <macis/sd_operations.hpp>
+#include <macis/util/rdms.hpp>
 #include <optional>
 #include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
@@ -60,22 +64,43 @@ std::shared_ptr<Wavefunction> MP2Container::get_wavefunction() const {
 
 const MP2Container::VectorVariant& MP2Container::get_coefficients() const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
-      "get_coefficients() is not implemented for MP2 wavefunctions.");
+  if (!_coefficients_cache) {
+    _generate_ci_expansion();
+  }
+  return *_coefficients_cache;
 }
 
 MP2Container::ScalarVariant MP2Container::get_coefficient(
     const Configuration& det) const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
-      "get_coefficient() is not implemented for MP2 wavefunctions.");
+  // Ensure expansion is generated
+  if (!_coefficients_cache) {
+    _generate_ci_expansion();
+  }
+
+  // Find the determinant
+  auto it = std::find(_determinant_vector_cache->begin(),
+                      _determinant_vector_cache->end(), det);
+  if (it == _determinant_vector_cache->end()) {
+    throw std::runtime_error("Determinant not found in MP2 expansion");
+  }
+
+  size_t idx = std::distance(_determinant_vector_cache->begin(), it);
+
+  return std::visit(
+      [idx](const auto& vec) -> ScalarVariant {
+        return ScalarVariant(vec[idx]);
+      },
+      *_coefficients_cache);
 }
 
 const MP2Container::DeterminantVector& MP2Container::get_active_determinants()
     const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
-      "get_active_determinants() is not implemented for MP2 wavefunctions.");
+  if (!_determinant_vector_cache) {
+    _generate_ci_expansion();
+  }
+  return *_determinant_vector_cache;
 }
 
 void MP2Container::_compute_t1_amplitudes() const {
@@ -254,7 +279,10 @@ bool MP2Container::has_t2_amplitudes() const {
 
 size_t MP2Container::size() const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error("size() is not meaningful for MP2 wavefunctions.");
+  if (!_determinant_vector_cache) {
+    _generate_ci_expansion();
+  }
+  return _determinant_vector_cache->size();
 }
 
 MP2Container::ScalarVariant MP2Container::overlap(
@@ -291,6 +319,7 @@ void MP2Container::clear_caches() const {
   _t2_amplitudes_bbbb = nullptr;
 
   _determinant_vector_cache = nullptr;
+  _coefficients_cache = nullptr;
 }
 
 nlohmann::json MP2Container::to_json() const {
@@ -461,6 +490,585 @@ bool MP2Container::is_complex() const {
     }
   }
   return false;
+}
+
+Configuration MP2Container::_apply_excitations(
+    const Configuration& ref,
+    const std::vector<std::pair<size_t, size_t>>& alpha_excitations,
+    const std::vector<std::pair<size_t, size_t>>& beta_excitations) {
+  // Convert reference to string, apply excitations, convert back
+  std::string config_str = ref.to_string();
+
+  // Apply alpha excitations
+  for (const auto& [from_idx, to_idx] : alpha_excitations) {
+    if (from_idx >= config_str.size() || to_idx >= config_str.size()) {
+      throw std::out_of_range("Excitation index out of range");
+    }
+
+    char& from_char = config_str[from_idx];
+    char& to_char = config_str[to_idx];
+
+    // Remove alpha from source
+    if (from_char == '2') {
+      from_char = 'd';  // Doubly -> beta only
+    } else if (from_char == 'u') {
+      from_char = '0';  // Alpha -> unoccupied
+    } else {
+      throw std::runtime_error("Invalid alpha excitation: source has no alpha");
+    }
+
+    // Add alpha to target
+    if (to_char == '0') {
+      to_char = 'u';  // Unoccupied -> alpha
+    } else if (to_char == 'd') {
+      to_char = '2';  // Beta -> doubly
+    } else {
+      throw std::runtime_error(
+          "Invalid alpha excitation: target already has alpha");
+    }
+  }
+
+  // Apply beta excitations
+  for (const auto& [from_idx, to_idx] : beta_excitations) {
+    if (from_idx >= config_str.size() || to_idx >= config_str.size()) {
+      throw std::out_of_range("Excitation index out of range");
+    }
+
+    char& from_char = config_str[from_idx];
+    char& to_char = config_str[to_idx];
+
+    // Remove beta from source
+    if (from_char == '2') {
+      from_char = 'u';  // Doubly -> alpha only
+    } else if (from_char == 'd') {
+      from_char = '0';  // Beta -> unoccupied
+    } else {
+      throw std::runtime_error("Invalid beta excitation: source has no beta");
+    }
+
+    // Add beta to target
+    if (to_char == '0') {
+      to_char = 'd';  // Unoccupied -> beta
+    } else if (to_char == 'u') {
+      to_char = '2';  // Alpha -> doubly
+    } else {
+      throw std::runtime_error(
+          "Invalid beta excitation: target already has beta");
+    }
+  }
+
+  return Configuration(config_str);
+}
+
+void MP2Container::_generate_ci_expansion() const {
+  // MP2 is a perturbation theory method, not an exponential ansatz.
+  // The first-order wavefunction correction is:
+  //   |Ψ^(1)⟩ = Σ_{ijab} t_{ij}^{ab} |Φ_{ij}^{ab}⟩
+  // The complete MP2 wavefunction is |Ψ⟩ = |Φ₀⟩ + |Ψ^(1)⟩, i.e., the CI
+  // expansion includes the reference determinant and all double excitations.
+
+  // Get T2 amplitudes (T1 = 0 for MP2)
+  auto [t2_abab, t2_aaaa, t2_bbbb] = get_t2_amplitudes();
+
+  // Get reference determinant
+  const auto& references = _wavefunction->get_total_determinants();
+  if (references.empty()) {
+    throw std::runtime_error("No reference determinants for CI expansion");
+  }
+  const Configuration& ref = references[0];
+
+  // Get orbital information
+  auto [n_alpha, n_beta] = get_active_num_electrons();
+  size_t n_orbitals = get_orbitals()->get_num_molecular_orbitals();
+  size_t n_virt_alpha = n_orbitals - n_alpha;
+  size_t n_virt_beta = n_orbitals - n_beta;
+
+  // Determine if complex
+  bool is_complex_wfn = std::holds_alternative<Eigen::VectorXcd>(t2_abab) ||
+                        std::holds_alternative<Eigen::VectorXcd>(t2_aaaa) ||
+                        std::holds_alternative<Eigen::VectorXcd>(t2_bbbb);
+
+  if (is_complex_wfn) {
+    // Complex case
+    std::vector<std::complex<double>> coefficients;
+    DeterminantVector determinants;
+
+    // Reference determinant (coefficient = 1)
+    determinants.push_back(ref);
+    coefficients.push_back(std::complex<double>(1.0, 0.0));
+
+    // Helper to get T2 element (complex)
+    auto get_t2_abab_c = [&](size_t i, size_t j, size_t a,
+                             size_t b) -> std::complex<double> {
+      size_t idx = i * n_beta * n_virt_alpha * n_virt_beta +
+                   j * n_virt_alpha * n_virt_beta + a * n_virt_beta + b;
+      if (std::holds_alternative<Eigen::VectorXcd>(t2_abab)) {
+        const auto& vec = std::get<Eigen::VectorXcd>(t2_abab);
+        return idx < static_cast<size_t>(vec.size())
+                   ? vec[idx]
+                   : std::complex<double>(0.0, 0.0);
+      } else {
+        const auto& vec = std::get<Eigen::VectorXd>(t2_abab);
+        return idx < static_cast<size_t>(vec.size())
+                   ? std::complex<double>(vec[idx], 0.0)
+                   : std::complex<double>(0.0, 0.0);
+      }
+    };
+
+    auto get_t2_aaaa_c = [&](size_t i, size_t j, size_t a,
+                             size_t b) -> std::complex<double> {
+      if (i >= j || a >= b) return std::complex<double>(0.0, 0.0);
+      // Full rectangular storage: nocc * nocc * nvir * nvir
+      size_t idx = i * n_alpha * n_virt_alpha * n_virt_alpha +
+                   j * n_virt_alpha * n_virt_alpha + a * n_virt_alpha + b;
+      if (std::holds_alternative<Eigen::VectorXcd>(t2_aaaa)) {
+        const auto& vec = std::get<Eigen::VectorXcd>(t2_aaaa);
+        return idx < static_cast<size_t>(vec.size())
+                   ? vec[idx]
+                   : std::complex<double>(0.0, 0.0);
+      } else {
+        const auto& vec = std::get<Eigen::VectorXd>(t2_aaaa);
+        return idx < static_cast<size_t>(vec.size())
+                   ? std::complex<double>(vec[idx], 0.0)
+                   : std::complex<double>(0.0, 0.0);
+      }
+    };
+
+    auto get_t2_bbbb_c = [&](size_t i, size_t j, size_t a,
+                             size_t b) -> std::complex<double> {
+      if (i >= j || a >= b) return std::complex<double>(0.0, 0.0);
+      // Full rectangular storage: nocc * nocc * nvir * nvir
+      size_t idx = i * n_beta * n_virt_beta * n_virt_beta +
+                   j * n_virt_beta * n_virt_beta + a * n_virt_beta + b;
+      if (std::holds_alternative<Eigen::VectorXcd>(t2_bbbb)) {
+        const auto& vec = std::get<Eigen::VectorXcd>(t2_bbbb);
+        return idx < static_cast<size_t>(vec.size())
+                   ? vec[idx]
+                   : std::complex<double>(0.0, 0.0);
+      } else {
+        const auto& vec = std::get<Eigen::VectorXd>(t2_bbbb);
+        return idx < static_cast<size_t>(vec.size())
+                   ? std::complex<double>(vec[idx], 0.0)
+                   : std::complex<double>(0.0, 0.0);
+      }
+    };
+
+    // Doubles from T2 (first-order wavefunction correction)
+    // Alpha-beta doubles
+    for (size_t i = 0; i < n_alpha; ++i) {
+      for (size_t j = 0; j < n_beta; ++j) {
+        for (size_t a = 0; a < n_virt_alpha; ++a) {
+          for (size_t b = 0; b < n_virt_beta; ++b) {
+            auto t_ijab = get_t2_abab_c(i, j, a, b);
+            auto det =
+                _apply_excitations(ref, {{i, n_alpha + a}}, {{j, n_beta + b}});
+            determinants.push_back(det);
+            coefficients.push_back(t_ijab);
+          }
+        }
+      }
+    }
+
+    // Alpha-alpha doubles
+    for (size_t i = 0; i < n_alpha; ++i) {
+      for (size_t j = i + 1; j < n_alpha; ++j) {
+        for (size_t a = 0; a < n_virt_alpha; ++a) {
+          for (size_t b = a + 1; b < n_virt_alpha; ++b) {
+            auto t_ijab = get_t2_aaaa_c(i, j, a, b);
+            auto det = _apply_excitations(
+                ref, {{i, n_alpha + a}, {j, n_alpha + b}}, {});
+            determinants.push_back(det);
+            coefficients.push_back(t_ijab);
+          }
+        }
+      }
+    }
+
+    // Beta-beta doubles
+    for (size_t i = 0; i < n_beta; ++i) {
+      for (size_t j = i + 1; j < n_beta; ++j) {
+        for (size_t a = 0; a < n_virt_beta; ++a) {
+          for (size_t b = a + 1; b < n_virt_beta; ++b) {
+            auto t_ijab = get_t2_bbbb_c(i, j, a, b);
+            auto det =
+                _apply_excitations(ref, {}, {{i, n_beta + a}, {j, n_beta + b}});
+            determinants.push_back(det);
+            coefficients.push_back(t_ijab);
+          }
+        }
+      }
+    }
+
+    // Consolidate duplicates (shouldn't be any, but for safety)
+    // Convert to VectorVariant for consolidate_determinants
+    Eigen::VectorXcd coef_vec(coefficients.size());
+    for (size_t i = 0; i < coefficients.size(); ++i) {
+      coef_vec[i] = coefficients[i];
+    }
+    VectorVariant coef_variant(std::move(coef_vec));
+    detail::consolidate_determinants(determinants, coef_variant);
+
+    // Normalize the wavefunction: |Ψ⟩ = |Φ₀⟩ + Σ t_{ijab} |Φ_{ij}^{ab}⟩
+    // Norm² = 1 + Σ |t_{ijab}|², so we divide by sqrt(norm²)
+    auto& final_coefs = std::get<Eigen::VectorXcd>(coef_variant);
+    double norm_sq = 0.0;
+    for (Eigen::Index i = 0; i < final_coefs.size(); ++i) {
+      norm_sq += std::norm(final_coefs[i]);  // |c|² for complex
+    }
+    double norm = std::sqrt(norm_sq);
+    for (Eigen::Index i = 0; i < final_coefs.size(); ++i) {
+      final_coefs[i] /= norm;
+    }
+
+    // Store results
+    _determinant_vector_cache =
+        std::make_unique<DeterminantVector>(std::move(determinants));
+    _coefficients_cache =
+        std::make_unique<VectorVariant>(std::move(coef_variant));
+
+  } else {
+    // Real case
+    std::vector<double> coefficients;
+    DeterminantVector determinants;
+
+    // Reference determinant (coefficient = 1)
+    determinants.push_back(ref);
+    coefficients.push_back(1.0);
+
+    // Helper to get T2 element (real)
+    auto get_t2_abab_r = [&](size_t i, size_t j, size_t a, size_t b) -> double {
+      size_t idx = i * n_beta * n_virt_alpha * n_virt_beta +
+                   j * n_virt_alpha * n_virt_beta + a * n_virt_beta + b;
+      const auto& vec = std::get<Eigen::VectorXd>(t2_abab);
+      return idx < static_cast<size_t>(vec.size()) ? vec[idx] : 0.0;
+    };
+
+    auto get_t2_aaaa_r = [&](size_t i, size_t j, size_t a, size_t b) -> double {
+      if (i >= j || a >= b) return 0.0;
+      // Full rectangular storage: nocc * nocc * nvir * nvir
+      size_t idx = i * n_alpha * n_virt_alpha * n_virt_alpha +
+                   j * n_virt_alpha * n_virt_alpha + a * n_virt_alpha + b;
+      const auto& vec = std::get<Eigen::VectorXd>(t2_aaaa);
+      return idx < static_cast<size_t>(vec.size()) ? vec[idx] : 0.0;
+    };
+
+    auto get_t2_bbbb_r = [&](size_t i, size_t j, size_t a, size_t b) -> double {
+      if (i >= j || a >= b) return 0.0;
+      // Full rectangular storage: nocc * nocc * nvir * nvir
+      size_t idx = i * n_beta * n_virt_beta * n_virt_beta +
+                   j * n_virt_beta * n_virt_beta + a * n_virt_beta + b;
+      const auto& vec = std::get<Eigen::VectorXd>(t2_bbbb);
+      return idx < static_cast<size_t>(vec.size()) ? vec[idx] : 0.0;
+    };
+
+    // Doubles from T2 (first-order wavefunction correction)
+    // Alpha-beta doubles
+    for (size_t i = 0; i < n_alpha; ++i) {
+      for (size_t j = 0; j < n_beta; ++j) {
+        for (size_t a = 0; a < n_virt_alpha; ++a) {
+          for (size_t b = 0; b < n_virt_beta; ++b) {
+            double t_ijab = get_t2_abab_r(i, j, a, b);
+            auto det =
+                _apply_excitations(ref, {{i, n_alpha + a}}, {{j, n_beta + b}});
+            determinants.push_back(det);
+            coefficients.push_back(t_ijab);
+          }
+        }
+      }
+    }
+
+    // Alpha-alpha doubles
+    for (size_t i = 0; i < n_alpha; ++i) {
+      for (size_t j = i + 1; j < n_alpha; ++j) {
+        for (size_t a = 0; a < n_virt_alpha; ++a) {
+          for (size_t b = a + 1; b < n_virt_alpha; ++b) {
+            double t_ijab = get_t2_aaaa_r(i, j, a, b);
+            auto det = _apply_excitations(
+                ref, {{i, n_alpha + a}, {j, n_alpha + b}}, {});
+            determinants.push_back(det);
+            coefficients.push_back(t_ijab);
+          }
+        }
+      }
+    }
+
+    // Beta-beta doubles
+    for (size_t i = 0; i < n_beta; ++i) {
+      for (size_t j = i + 1; j < n_beta; ++j) {
+        for (size_t a = 0; a < n_virt_beta; ++a) {
+          for (size_t b = a + 1; b < n_virt_beta; ++b) {
+            double t_ijab = get_t2_bbbb_r(i, j, a, b);
+            auto det =
+                _apply_excitations(ref, {}, {{i, n_beta + a}, {j, n_beta + b}});
+            determinants.push_back(det);
+            coefficients.push_back(t_ijab);
+          }
+        }
+      }
+    }
+
+    // Consolidate duplicates (shouldn't be any, but for safety)
+    // Convert to VectorVariant for consolidate_determinants
+    Eigen::VectorXd coef_vec(coefficients.size());
+    for (size_t i = 0; i < coefficients.size(); ++i) {
+      coef_vec[i] = coefficients[i];
+    }
+    VectorVariant coef_variant(std::move(coef_vec));
+    detail::consolidate_determinants(determinants, coef_variant);
+
+    // Normalize the wavefunction: |Ψ⟩ = |Φ₀⟩ + Σ t_{ijab} |Φ_{ij}^{ab}⟩
+    // Norm² = 1 + Σ |t_{ijab}|², so we divide by sqrt(norm²)
+    auto& final_coefs = std::get<Eigen::VectorXd>(coef_variant);
+    double norm_sq = 0.0;
+    for (Eigen::Index i = 0; i < final_coefs.size(); ++i) {
+      norm_sq += final_coefs[i] * final_coefs[i];
+    }
+    double norm = std::sqrt(norm_sq);
+    for (Eigen::Index i = 0; i < final_coefs.size(); ++i) {
+      final_coefs[i] /= norm;
+    }
+
+    // Store results
+    _determinant_vector_cache =
+        std::make_unique<DeterminantVector>(std::move(determinants));
+    _coefficients_cache =
+        std::make_unique<VectorVariant>(std::move(coef_variant));
+  }
+}
+
+// =============================================================================
+// Lazy RDM computation from CI expansion
+// =============================================================================
+
+namespace {
+// Helper: Dispatch RDM computation using MACIS HamiltonianGenerator
+template <size_t N>
+void mp2_compute_rdms_with_ham_gen(
+    const std::vector<Configuration>& determinants,
+    const std::vector<double>& coeffs, size_t norb, const Eigen::MatrixXd& T,
+    const Eigen::VectorXd& V, std::vector<double>& one_rdm_aa,
+    std::vector<double>& one_rdm_bb, std::vector<double>& two_rdm_aaaa,
+    std::vector<double>& two_rdm_bbbb, std::vector<double>& two_rdm_aabb) {
+  using wfn_t = macis::wfn_t<N>;
+  using generator_t = macis::DoubleLoopHamiltonianGenerator<wfn_t>;
+
+  const size_t ndets = determinants.size();
+
+  // Convert QDK Configurations to MACIS wfn_t format
+  std::vector<wfn_t> macis_dets;
+  macis_dets.reserve(ndets);
+  for (const auto& config : determinants) {
+    auto bitset = config.to_bitset<N>();
+    macis_dets.push_back(wfn_t(bitset));
+  }
+
+  // Create Hamiltonian generator with one-body and two-body integrals
+  generator_t ham_gen(
+      macis::matrix_span<double>(const_cast<double*>(T.data()), norb, norb),
+      macis::rank4_span<double>(const_cast<double*>(V.data()), norb, norb, norb,
+                                norb));
+
+  // Create spans for RDM storage
+  macis::matrix_span<double> ordm_aa(one_rdm_aa.data(), norb, norb);
+  macis::matrix_span<double> ordm_bb(one_rdm_bb.data(), norb, norb);
+  macis::rank4_span<double> trdm_aaaa(two_rdm_aaaa.data(), norb, norb, norb,
+                                      norb);
+  macis::rank4_span<double> trdm_bbbb(two_rdm_bbbb.data(), norb, norb, norb,
+                                      norb);
+  macis::rank4_span<double> trdm_aabb(two_rdm_aabb.data(), norb, norb, norb,
+                                      norb);
+
+  // Make a non-const copy of coefficients for MACIS API
+  std::vector<double> coeffs_copy = coeffs;
+
+  // Use ham_gen.form_rdms_spin_dep to compute RDMs - same as macis_base.hpp
+  ham_gen.form_rdms_spin_dep(macis_dets.begin(), macis_dets.end(),
+                             macis_dets.begin(), macis_dets.end(),
+                             coeffs_copy.data(), ordm_aa, ordm_bb, trdm_aaaa,
+                             trdm_bbbb, trdm_aabb);
+}
+}  // namespace
+
+void MP2Container::_generate_rdms_from_ci_expansion() const {
+  // Ensure CI expansion is available
+  if (!_determinant_vector_cache || !_coefficients_cache) {
+    _generate_ci_expansion();
+  }
+
+  // Only support real coefficients for now
+  // MP2 should always be real, but check anyway for safety
+  if (is_complex()) {
+    throw std::runtime_error(
+        "Lazy RDM computation from complex MP2 amplitudes is not yet "
+        "supported. MP2 wavefunctions should always be real-valued.");
+  }
+
+  const auto& determinants = *_determinant_vector_cache;
+  const auto& coeffs_variant = *_coefficients_cache;
+  const auto& coeffs_eigen = std::get<Eigen::VectorXd>(coeffs_variant);
+
+  // Convert to std::vector<double> for ham_gen
+  std::vector<double> coeffs(coeffs_eigen.data(),
+                             coeffs_eigen.data() + coeffs_eigen.size());
+
+  size_t norb = get_orbitals()->get_num_molecular_orbitals();
+  size_t norb2 = norb * norb;
+  size_t norb4 = norb2 * norb2;
+
+  // Get integrals from Hamiltonian
+  const auto& [T_a, T_b] = _hamiltonian->get_one_body_integrals();
+  const auto& [V_aaaa, V_aabb, V_bbbb] = _hamiltonian->get_two_body_integrals();
+
+  // Allocate RDM storage
+  std::vector<double> one_rdm_aa(norb2, 0.0);
+  std::vector<double> one_rdm_bb(norb2, 0.0);
+  std::vector<double> two_rdm_aaaa(norb4, 0.0);
+  std::vector<double> two_rdm_bbbb(norb4, 0.0);
+  std::vector<double> two_rdm_aabb(norb4, 0.0);
+
+  // Dispatch based on number of orbitals
+  if (norb <= 32) {
+    mp2_compute_rdms_with_ham_gen<64>(determinants, coeffs, norb, T_a, V_aaaa,
+                                      one_rdm_aa, one_rdm_bb, two_rdm_aaaa,
+                                      two_rdm_bbbb, two_rdm_aabb);
+  } else if (norb <= 64) {
+    mp2_compute_rdms_with_ham_gen<128>(determinants, coeffs, norb, T_a, V_aaaa,
+                                       one_rdm_aa, one_rdm_bb, two_rdm_aaaa,
+                                       two_rdm_bbbb, two_rdm_aabb);
+  } else if (norb <= 128) {
+    mp2_compute_rdms_with_ham_gen<256>(determinants, coeffs, norb, T_a, V_aaaa,
+                                       one_rdm_aa, one_rdm_bb, two_rdm_aaaa,
+                                       two_rdm_bbbb, two_rdm_aabb);
+  } else {
+    throw std::runtime_error(
+        "Number of orbitals exceeds maximum supported (128) for RDM "
+        "computation");
+  }
+
+  // Store in base class RDM member variables
+  // Scale 2-RDMs by 2.0 to match convention (MACIS uses 0.5 prefactor)
+  Eigen::MatrixXd one_aa_mat =
+      Eigen::Map<Eigen::MatrixXd>(one_rdm_aa.data(), norb, norb);
+  Eigen::MatrixXd one_bb_mat =
+      Eigen::Map<Eigen::MatrixXd>(one_rdm_bb.data(), norb, norb);
+  Eigen::VectorXd two_aaaa_vec =
+      Eigen::Map<Eigen::VectorXd>(two_rdm_aaaa.data(), norb4) * 2.0;
+  Eigen::VectorXd two_bbbb_vec =
+      Eigen::Map<Eigen::VectorXd>(two_rdm_bbbb.data(), norb4) * 2.0;
+  Eigen::VectorXd two_aabb_vec =
+      Eigen::Map<Eigen::VectorXd>(two_rdm_aabb.data(), norb4) * 2.0;
+
+  _one_rdm_spin_dependent_aa =
+      std::make_shared<MatrixVariant>(std::move(one_aa_mat));
+  _one_rdm_spin_dependent_bb =
+      std::make_shared<MatrixVariant>(std::move(one_bb_mat));
+  _two_rdm_spin_dependent_aaaa =
+      std::make_shared<VectorVariant>(std::move(two_aaaa_vec));
+  _two_rdm_spin_dependent_bbbb =
+      std::make_shared<VectorVariant>(std::move(two_bbbb_vec));
+  _two_rdm_spin_dependent_aabb =
+      std::make_shared<VectorVariant>(std::move(two_aabb_vec));
+}
+
+bool MP2Container::has_one_rdm_spin_dependent() const {
+  // RDMs available if explicitly set OR if we have amplitudes to compute them
+  if (_one_rdm_spin_dependent_aa != nullptr &&
+      _one_rdm_spin_dependent_bb != nullptr) {
+    return true;
+  }
+  // Can compute from amplitudes if available (always have Hamiltonian)
+  return _hamiltonian != nullptr;
+}
+
+bool MP2Container::has_one_rdm_spin_traced() const {
+  if (_one_rdm_spin_traced != nullptr) {
+    return true;
+  }
+  return has_one_rdm_spin_dependent();
+}
+
+bool MP2Container::has_two_rdm_spin_dependent() const {
+  if (_two_rdm_spin_dependent_aabb != nullptr &&
+      _two_rdm_spin_dependent_aaaa != nullptr &&
+      _two_rdm_spin_dependent_bbbb != nullptr) {
+    return true;
+  }
+  // Can compute from amplitudes if available (always have Hamiltonian)
+  return _hamiltonian != nullptr;
+}
+
+bool MP2Container::has_two_rdm_spin_traced() const {
+  if (_two_rdm_spin_traced != nullptr) {
+    return true;
+  }
+  return has_two_rdm_spin_dependent();
+}
+
+std::tuple<const MP2Container::MatrixVariant&,
+           const MP2Container::MatrixVariant&>
+MP2Container::get_active_one_rdm_spin_dependent() const {
+  // If not already computed, generate from CI expansion
+  if (_one_rdm_spin_dependent_aa == nullptr ||
+      _one_rdm_spin_dependent_bb == nullptr) {
+    _generate_rdms_from_ci_expansion();
+  }
+  return std::make_tuple(std::cref(*_one_rdm_spin_dependent_aa),
+                         std::cref(*_one_rdm_spin_dependent_bb));
+}
+
+std::tuple<const MP2Container::VectorVariant&,
+           const MP2Container::VectorVariant&,
+           const MP2Container::VectorVariant&>
+MP2Container::get_active_two_rdm_spin_dependent() const {
+  // If not already computed, generate from CI expansion
+  if (_two_rdm_spin_dependent_aabb == nullptr ||
+      _two_rdm_spin_dependent_aaaa == nullptr ||
+      _two_rdm_spin_dependent_bbbb == nullptr) {
+    _generate_rdms_from_ci_expansion();
+  }
+  return std::make_tuple(std::cref(*_two_rdm_spin_dependent_aabb),
+                         std::cref(*_two_rdm_spin_dependent_aaaa),
+                         std::cref(*_two_rdm_spin_dependent_bbbb));
+}
+
+const MP2Container::MatrixVariant&
+MP2Container::get_active_one_rdm_spin_traced() const {
+  // If spin-traced already available, return it
+  if (_one_rdm_spin_traced != nullptr) {
+    return *_one_rdm_spin_traced;
+  }
+
+  // Ensure spin-dependent RDMs are computed (this triggers lazy eval)
+  get_active_one_rdm_spin_dependent();
+
+  // Now compute spin-traced from spin-dependent
+  _one_rdm_spin_traced = detail::add_matrix_variants(
+      *_one_rdm_spin_dependent_aa, *_one_rdm_spin_dependent_bb);
+  return *_one_rdm_spin_traced;
+}
+
+const MP2Container::VectorVariant&
+MP2Container::get_active_two_rdm_spin_traced() const {
+  // If spin-traced already available, return it
+  if (_two_rdm_spin_traced != nullptr) {
+    return *_two_rdm_spin_traced;
+  }
+
+  // Ensure spin-dependent RDMs are computed (this triggers lazy eval)
+  get_active_two_rdm_spin_dependent();
+
+  // Compute spin-traced from spin-dependent components
+  // spin-traced = aaaa + bbbb + aabb + bbaa
+  auto two_rdm_ss_part = detail::add_vector_variants(
+      *_two_rdm_spin_dependent_aaaa, *_two_rdm_spin_dependent_bbbb);
+  auto two_rdm_spin_bbaa = detail::transpose_ijkl_klij_vector_variant(
+      *_two_rdm_spin_dependent_aabb,
+      get_orbitals()->get_num_molecular_orbitals());
+  auto two_rdm_os_part = detail::add_vector_variants(
+      *_two_rdm_spin_dependent_aabb, *two_rdm_spin_bbaa);
+  _two_rdm_spin_traced =
+      detail::add_vector_variants(*two_rdm_os_part, *two_rdm_ss_part);
+  return *_two_rdm_spin_traced;
 }
 
 }  // namespace qdk::chemistry::data

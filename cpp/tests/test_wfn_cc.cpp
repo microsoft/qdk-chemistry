@@ -352,6 +352,210 @@ TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpatial) {
   std::remove(wf_filename.c_str());
 }
 
+// Test CI coefficients generation from CC amplitudes
+TEST_F(CoupledClusterContainerTest, CICoefficientsGeneration) {
+  size_t nocc = 2;
+  size_t nvirt = 2;
+  size_t nmo = nocc + nvirt;
+
+  auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
+  Configuration ref("2200");
+  auto wavefunction = create_test_wavefunction(ref, orbitals);
+
+  Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Random(nocc * nvirt);
+  Eigen::VectorXd t2_amplitudes =
+      Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
+
+  CoupledClusterContainer cc(orbitals, wavefunction, t1_amplitudes,
+                             t2_amplitudes);
+
+  // Test that CI coefficients can be retrieved (lazy evaluation)
+  const auto& coefficients = cc.get_coefficients();
+
+  // Verify coefficients are non-empty
+  std::visit(
+      [](const auto& vec) {
+        EXPECT_GT(vec.size(), 0) << "CI coefficients should not be empty";
+      },
+      coefficients);
+
+  // Test that determinants can be retrieved
+  const auto& determinants = cc.get_active_determinants();
+  EXPECT_GT(determinants.size(), 0)
+      << "Active determinants should not be empty";
+
+  // The number of coefficients should match the number of determinants
+  std::visit(
+      [&determinants](const auto& vec) {
+        EXPECT_EQ(static_cast<size_t>(vec.size()), determinants.size())
+            << "Number of coefficients should match number of determinants";
+      },
+      coefficients);
+
+  // The reference determinant should be in the expansion
+  bool found_reference = false;
+  for (const auto& det : determinants) {
+    if (det.to_string() == ref.to_string()) {
+      found_reference = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_reference)
+      << "Reference determinant should be in the CI expansion";
+
+  // Test get_coefficient for reference determinant
+  auto ref_coeff = cc.get_coefficient(ref);
+  std::visit(
+      [](const auto& coeff) {
+        using T = std::decay_t<decltype(coeff)>;
+        if constexpr (std::is_same_v<T, double>) {
+          // Reference coefficient should be close to 1.0 for well-behaved CC
+          EXPECT_TRUE(std::abs(coeff) > 0.0)
+              << "Reference coefficient should be non-zero";
+        } else {
+          EXPECT_TRUE(std::abs(coeff) > 0.0)
+              << "Reference coefficient should be non-zero";
+        }
+      },
+      ref_coeff);
+
+  // Test size() returns the number of determinants
+  EXPECT_EQ(cc.size(), determinants.size())
+      << "size() should return the number of determinants";
+}
+
+TEST_F(CoupledClusterContainerTest, CIExpansionConsistency) {
+  size_t nocc = 2;
+  size_t nvirt = 2;
+
+  auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
+  Configuration ref("2200");
+  auto wavefunction = create_test_wavefunction(ref, orbitals);
+
+  // Use small but non-zero amplitudes for testing
+  Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Ones(nocc * nvirt) * 0.1;
+  Eigen::VectorXd t2_amplitudes =
+      Eigen::VectorXd::Ones(nocc * nocc * nvirt * nvirt) * 0.05;
+
+  CoupledClusterContainer cc(orbitals, wavefunction, t1_amplitudes,
+                             t2_amplitudes);
+
+  const auto& coefficients = cc.get_coefficients();
+  const auto& determinants = cc.get_active_determinants();
+
+  // Verify each determinant can be looked up individually
+  for (size_t i = 0; i < determinants.size(); ++i) {
+    auto coeff = cc.get_coefficient(determinants[i]);
+    std::visit(
+        [i, &coefficients](const auto& individual_coeff) {
+          using T = std::decay_t<decltype(individual_coeff)>;
+          std::visit(
+              [i, &individual_coeff](const auto& all_coeffs) {
+                using U = std::decay_t<decltype(all_coeffs[0])>;
+                if constexpr (std::is_same_v<T, U>) {
+                  EXPECT_NEAR(std::abs(individual_coeff),
+                              std::abs(all_coeffs[i]), testing::wf_tolerance)
+                      << "Individual coefficient lookup should match vector";
+                }
+              },
+              coefficients);
+        },
+        coeff);
+  }
+}
+
+TEST_F(CoupledClusterContainerTest, RDMsRequireAdjointWavefunction) {
+  size_t nocc = 2;
+  size_t nvirt = 2;
+
+  auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
+  Configuration ref("2200");
+  auto wavefunction = create_test_wavefunction(ref, orbitals);
+
+  // Use small but non-zero amplitudes
+  Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Ones(nocc * nvirt) * 0.1;
+  Eigen::VectorXd t2_amplitudes =
+      Eigen::VectorXd::Ones(nocc * nocc * nvirt * nvirt) * 0.05;
+
+  // Create CC container with only amplitudes (no explicit RDMs)
+  CoupledClusterContainer cc(orbitals, wavefunction, t1_amplitudes,
+                             t2_amplitudes);
+
+  // CI coefficients should be available (lazy evaluation from amplitudes)
+  const auto& coefficients = cc.get_coefficients();
+  std::visit(
+      [](const auto& vec) {
+        EXPECT_EQ(vec.size(), 36) << "36 CI coefficients should be available";
+      },
+      coefficients);
+
+  const auto& determinants = cc.get_active_determinants();
+  EXPECT_EQ(determinants.size(), 36) << "36 determinants should be available";
+
+  // RDMs should NOT be available without the adjoint wavefunction
+  EXPECT_FALSE(cc.has_one_rdm_spin_traced())
+      << "Spin-traced 1-RDM requires adjoint wavefunction";
+  EXPECT_FALSE(cc.has_one_rdm_spin_dependent())
+      << "Spin-dependent 1-RDM requires adjoint wavefunction";
+  EXPECT_FALSE(cc.has_two_rdm_spin_traced())
+      << "Spin-traced 2-RDM requires adjoint wavefunction";
+  EXPECT_FALSE(cc.has_two_rdm_spin_dependent())
+      << "Spin-dependent 2-RDM requires adjoint wavefunction";
+
+  // Attempting to get RDMs should throw an error
+  EXPECT_THROW(
+      {
+        try {
+          cc.get_active_one_rdm_spin_traced();
+        } catch (const std::runtime_error& e) {
+          EXPECT_TRUE(std::string(e.what()).find("adjoint") !=
+                      std::string::npos)
+              << "Error message should mention adjoint wavefunction";
+          throw;
+        }
+      },
+      std::runtime_error);
+
+  EXPECT_THROW(
+      {
+        try {
+          cc.get_active_one_rdm_spin_dependent();
+        } catch (const std::runtime_error& e) {
+          EXPECT_TRUE(std::string(e.what()).find("adjoint") !=
+                      std::string::npos)
+              << "Error message should mention adjoint wavefunction";
+          throw;
+        }
+      },
+      std::runtime_error);
+
+  EXPECT_THROW(
+      {
+        try {
+          cc.get_active_two_rdm_spin_traced();
+        } catch (const std::runtime_error& e) {
+          EXPECT_TRUE(std::string(e.what()).find("adjoint") !=
+                      std::string::npos)
+              << "Error message should mention adjoint wavefunction";
+          throw;
+        }
+      },
+      std::runtime_error);
+
+  EXPECT_THROW(
+      {
+        try {
+          cc.get_active_two_rdm_spin_dependent();
+        } catch (const std::runtime_error& e) {
+          EXPECT_TRUE(std::string(e.what()).find("adjoint") !=
+                      std::string::npos)
+              << "Error message should mention adjoint wavefunction";
+          throw;
+        }
+      },
+      std::runtime_error);
+}
+
 // Test HDF5 serialization/deserialization
 TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpin) {
   size_t nocc = 2;

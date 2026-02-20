@@ -30,8 +30,7 @@ int main() {
 
   // Configure and run SCF calculation
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "cc-pvdz");
-  auto [scf_energy, wfn_hf] = scf_solver->run(molecule, 0, 1);
+  auto [scf_energy, wfn_hf] = scf_solver->run(molecule, 0, 1, "cc-pvdz");
 
   // Select active space orbitals
   auto active_selector = ActiveSpaceSelectorFactory::create("qdk_valence");

@@ -142,6 +142,22 @@ bool is_vector_variant_complex(const ContainerTypes::VectorVariant& variant);
 std::shared_ptr<ContainerTypes::VectorVariant>
 transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
                                    int norbs);
+
+/**
+ * @brief Consolidate duplicate determinants by summing their coefficients
+ *
+ * This utility function merges duplicate determinants in a CI expansion by
+ * summing their coefficients. Determinants with coefficients below the
+ * threshold are removed.
+ *
+ * @param determinants Vector of determinants (modified in place)
+ * @param coefficients VectorVariant of coefficients (modified in place)
+ * @param threshold Coefficient magnitude threshold for pruning (default
+ *                  1e-9)
+ */
+void consolidate_determinants(std::vector<Configuration>& determinants,
+                              ContainerTypes::VectorVariant& coefficients,
+                              double threshold = 1e-9);
 }  // namespace detail
 
 /**
