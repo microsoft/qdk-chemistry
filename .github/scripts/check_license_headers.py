@@ -56,7 +56,7 @@ PYTHON_LICENSE_PATTERNS = [
     # Hash-style comment header directly after module docstring or at top
     re.compile(
         r"\A(?:#!/usr/bin/env python3?\s*\n)?"  # Optional shebang
-        r'(?:""".*?"""\s*\n)?'  # Optional module docstring
+        r'(?:r?""".*?"""\s*\n)?'  # Optional module docstring (with optional r prefix)
         r"(?:[ \t]*\n)*"  # Optional blank lines only (no code allowed)
         r"#\s*-+\s*\n"  # Opening dashes
         r"#\s*Copyright \(c\) Microsoft\s+Corporation\.\s+All\s+rights\s+reserved\.\s*\n"

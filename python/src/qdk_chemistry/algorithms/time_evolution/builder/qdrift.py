@@ -24,6 +24,10 @@ from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
+from qdk_chemistry.utils.pauli_commutation import (
+    do_pauli_maps_qw_commute,
+    get_commutation_checker,
+)
 
 __all__: list[str] = ["QDrift", "QDriftSettings"]
 
@@ -198,7 +202,7 @@ class QDrift(TimeEvolutionBuilder):
         # kept as separate rotations and non-commuting boundaries are
         # never crossed, preserving the Campbell (2019) error bound.
         if self._settings.get("merge_duplicate_terms"):
-            commute_fn = self._get_commutation_checker(self._settings.get("commutation_type"))
+            commute_fn = get_commutation_checker(self._settings.get("commutation_type"))
             terms = self._merge_duplicate_terms(terms, commute_fn=commute_fn)
 
         return TimeEvolutionUnitary(
@@ -264,64 +268,6 @@ class QDrift(TimeEvolutionBuilder):
 
         return result
 
-    @staticmethod
-    def _pauli_terms_qw_commute(a: dict[int, str], b: dict[int, str]) -> bool:
-        """Check whether two Pauli terms qubit-wise commute.
-
-        Two multi-qubit Pauli operators qubit-wise commute when every
-        corresponding single-qubit pair commutes individually.  This is
-        strictly stronger than general commutativity: qubit-wise
-        commuting operators always commute, but the converse is not true
-        (e.g. XY and YX commute globally but do not qubit-wise commute).
-
-        The operators qubit-wise commute if and only if there are **no**
-        qubit positions where both are non-identity and different.
-
-        Args:
-            a: First Pauli term mapping (qubit index → Pauli axis).
-            b: Second Pauli term mapping (qubit index → Pauli axis).
-
-        Returns:
-            ``True`` if the terms qubit-wise commute.
-
-        """
-        return not any(a[q] != b[q] for q in a if q in b)
-
-    @staticmethod
-    def _pauli_terms_commute(a: dict[int, str], b: dict[int, str]) -> bool:
-        """Check whether two Pauli terms commute (general/standard commutation).
-
-        Two multi-qubit Pauli operators commute if and only if the number
-        of qubit positions where both are non-identity *and* different is
-        even.  This is weaker than qubit-wise commutation and allows
-        larger merge groups.
-
-        Args:
-            a: First Pauli term mapping (qubit index → Pauli axis).
-            b: Second Pauli term mapping (qubit index → Pauli axis).
-
-        Returns:
-            ``True`` if the terms commute.
-
-        """
-        anti_commuting = sum(1 for q in a if q in b and a[q] != b[q])
-        return anti_commuting % 2 == 0
-
-    @classmethod
-    def _get_commutation_checker(cls, commutation_type: str):
-        """Return the commutation checker function for the given type.
-
-        Args:
-            commutation_type: ``"qubit_wise"`` or ``"general"``.
-
-        Returns:
-            A callable ``(a, b) -> bool`` that checks commutation.
-
-        """
-        if commutation_type == "general":
-            return cls._pauli_terms_commute
-        return cls._pauli_terms_qw_commute
-
     @classmethod
     def _merge_duplicate_terms(
         cls,
@@ -348,7 +294,7 @@ class QDrift(TimeEvolutionBuilder):
             terms: Ordered list of exponentiated Pauli terms.
             commute_fn: A callable ``(a, b) -> bool`` that checks whether
                 two Pauli term mappings commute.  Defaults to
-                :meth:`_pauli_terms_qw_commute` if ``None``.
+                :func:`~qdk_chemistry.utils.pauli_commutation.do_pauli_maps_qw_commute` if ``None``.
 
         Returns:
             A (potentially shorter) list producing the same unitary.
@@ -358,7 +304,7 @@ class QDrift(TimeEvolutionBuilder):
             return terms
 
         if commute_fn is None:
-            commute_fn = cls._pauli_terms_qw_commute
+            commute_fn = do_pauli_maps_qw_commute
 
         result: list[ExponentiatedPauliTerm] = []
         group: list[ExponentiatedPauliTerm] = [terms[0]]
