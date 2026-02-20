@@ -4,7 +4,7 @@ set -e
 MARCH=${1:-x86-64-v3}
 PYTHON_VERSION=${2:-3.11}
 BUILD_TYPE=${3:-Release}
-BUILD_TESTING=${4:-OFF}
+BUILD_TESTING=${4:-ON}
 ENABLE_COVERAGE=${5:-OFF}
 CMAKE_VERSION=${6:-3.28.3}
 HDF5_VERSION=${7:-1.13.0}
@@ -74,8 +74,8 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
 
     export PYENV_ROOT="/workspace/.pyenv"
 elif [ "$MAC_BUILD" == "ON" ]; then
-    brew update
-    brew upgrade
+    arch -arm64 brew update
+    arch -arm64 brew upgrade
     arch -arm64 brew install \
         ninja \
         eigen \
