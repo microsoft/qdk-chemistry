@@ -673,7 +673,7 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMsOpenShell) {
   mc->settings().set("ntdets_max", 1);
   mc->settings().set("max_refine_iter", 0);
   mc->settings().set("grow_factor", 2);
-  auto [E_sci, wfn_sci] = mc->run(H, 3, 5);  // 3 electrons in 5 orbitals
+  auto [E_sci, wfn_sci] = mc->run(H, 2, 1);
 
   const auto& original = wfn_sci->get_container<SciWavefunctionContainer>();
 
@@ -813,7 +813,7 @@ TEST_F(SciWavefunctionTest, Hdf5SerializationRDMsOpenShell) {
   mc->settings().set("ntdets_max", 1);
   mc->settings().set("max_refine_iter", 0);
   mc->settings().set("grow_factor", 2);
-  auto [E_sci, wfn_sci] = mc->run(H, 3, 5);  // 3 electrons in 5 orbitals
+  auto [E_sci, wfn_sci] = mc->run(H, 2, 1);
 
   const auto& original = wfn_sci->get_container<SciWavefunctionContainer>();
 
@@ -826,7 +826,7 @@ TEST_F(SciWavefunctionTest, Hdf5SerializationRDMsOpenShell) {
   EXPECT_TRUE(original.get_orbitals()->is_restricted());
 
   // save to hdf5
-  std::string filename = "test_sci_rdm_unrestricted_serialization.h5";
+  std::string filename = "test_sci_rdm_openshell_serialization.h5";
   {
     H5::H5File file(filename, H5F_ACC_TRUNC);
     H5::Group root = file.openGroup("/");

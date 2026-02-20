@@ -598,7 +598,7 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMsOpenShell) {
 
   // scf
   auto scf_solver = ScfSolverFactory::create();
-  auto [E_default, wfn_default] = scf_solver->run(structure, 1, 2, basis_set);
+  auto [E_default, wfn_default] = scf_solver->run(structure, -1, 2, basis_set);
 
   // fake restricted orbitals from unrestricted SCF
   auto orbitals = wfn_default->get_orbitals();
@@ -616,8 +616,7 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMsOpenShell) {
   auto mc = MultiConfigurationCalculatorFactory::create();
   mc->settings().set("calculate_one_rdm", true);
   mc->settings().set("calculate_two_rdm", true);
-  auto [E_cas, wfn_cas] =
-      mc->run(H, 1, 2);  // 1 electron in active space, 2 orbitals
+  auto [E_cas, wfn_cas] = mc->run(H, 2, 1);
 
   const auto& original = wfn_cas->get_container<CasWavefunctionContainer>();
 
@@ -848,7 +847,7 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationRDMsOpenShell) {
 
   // scf
   auto scf_solver = ScfSolverFactory::create();
-  auto [E_default, wfn_default] = scf_solver->run(structure, 1, 2, basis_set);
+  auto [E_default, wfn_default] = scf_solver->run(structure, -1, 2, basis_set);
 
   // fake restricted orbitals from unrestricted SCF
   auto orbitals = wfn_default->get_orbitals();
@@ -866,8 +865,7 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationRDMsOpenShell) {
   auto mc = MultiConfigurationCalculatorFactory::create();
   mc->settings().set("calculate_one_rdm", true);
   mc->settings().set("calculate_two_rdm", true);
-  auto [E_cas, wfn_cas] =
-      mc->run(H, 1, 2);  // 1 electron in active space, 2 orbitals
+  auto [E_cas, wfn_cas] = mc->run(H, 2, 1);
 
   const auto& original = wfn_cas->get_container<CasWavefunctionContainer>();
 
@@ -880,7 +878,7 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationRDMsOpenShell) {
   EXPECT_TRUE(original.get_orbitals()->is_restricted());
 
   // save to hdf5
-  std::string filename = "test_cas_rdm_unrestricted_serialization.h5";
+  std::string filename = "test_cas_rdm_openshell_serialization.h5";
   {
     H5::H5File file(filename, H5F_ACC_TRUNC);
     H5::Group root = file.openGroup("/");
