@@ -135,13 +135,13 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
   // Extract SCF settings
   std::string method = _settings->get<std::string>("method");
+  std::transform(method.begin(), method.end(), method.begin(), ::tolower);
   if (scf_orbital_type == SCFOrbitalType::RestrictedOpenShell &&
       method != "hf") {
     throw std::invalid_argument(
         "Restricted open-shell calculations are only supported for "
         "Hartree-Fock.");
   }
-  std::transform(method.begin(), method.end(), method.begin(), ::tolower);
 
   double convergence_threshold =
       _settings->get<double>("convergence_threshold");

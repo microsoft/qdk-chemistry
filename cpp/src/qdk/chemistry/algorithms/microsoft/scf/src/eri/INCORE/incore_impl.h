@@ -250,7 +250,7 @@ class ERI_DF : public DensityFittingBase {
    * Static factory function that constructs and returns a fully initialized
    * DF-ERI implementation object. Provides a convenient interface that matches
    * the public API expectations.
-  /**
+   *
    * @param spin_density_factor Number of spin-resolved densities (1 for RHF,
    * 2 otherwise)
    * @param obs Orbital basis set (primary basis)
