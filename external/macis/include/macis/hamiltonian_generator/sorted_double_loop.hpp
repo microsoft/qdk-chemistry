@@ -509,9 +509,11 @@ class SortedDoubleLoopHamiltonianGenerator
 
     const bool is_symm = bra_begin == ket_begin and bra_end == ket_end;
 #ifdef MACIS_ENABLE_MPI
-    auto world_rank = comm_rank(MPI_COMM_WORLD);
-#else
-    auto world_rank = 0;
+    if (comm_size(MPI_COMM_WORLD) > 1) {
+      throw std::runtime_error(
+          "SortedDoubleLoopHamiltonianGenerator::form_rdms "
+          "does not support MPI with more than one rank");
+    }
 #endif /* MACIS_ENABLE_MPI */
 
     // Get unique alpha strings
@@ -625,9 +627,11 @@ class SortedDoubleLoopHamiltonianGenerator
 
     const bool is_symm = bra_begin == ket_begin and bra_end == ket_end;
 #ifdef MACIS_ENABLE_MPI
-    auto world_rank = comm_rank(MPI_COMM_WORLD);
-#else
-    auto world_rank = 0;
+    if (comm_size(MPI_COMM_WORLD) > 1) {
+      throw std::runtime_error(
+          "SortedDoubleLoopHamiltonianGenerator::form_rdms_spin_dep "
+          "does not support MPI with more than one rank");
+    }
 #endif /* MACIS_ENABLE_MPI */
 
     // Get unique alpha strings
