@@ -46,9 +46,9 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         curl \
         unzip
 elif [ "$MAC_BUILD" == "ON" ]; then
-    brew update
-    brew upgrade
-    brew install \
+    arch -arm64 brew update
+    arch -arm64 brew upgrade
+    arch -arm64 brew install \
         wget \
         curl \
         unzip
