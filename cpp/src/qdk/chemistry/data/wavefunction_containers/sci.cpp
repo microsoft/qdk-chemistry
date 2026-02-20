@@ -27,13 +27,14 @@ SciWavefunctionContainer::SciWavefunctionContainer(
     const VectorVariant& coeffs, const DeterminantVector& dets,
     std::shared_ptr<Orbitals> orbitals, WavefunctionType type)
     : SciWavefunctionContainer(coeffs, dets, orbitals,
-                               std::nullopt,  // one_rdm_spin_traced
-                               std::nullopt,  // one_rdm_aa
-                               std::nullopt,  // one_rdm_bb
-                               std::nullopt,  // two_rdm_spin_traced
-                               std::nullopt,  // two_rdm_aabb
-                               std::nullopt,  // two_rdm_aaaa
-                               std::nullopt,  // two_rdm_bbbb
+                               std::nullopt,        // one_rdm_spin_traced
+                               std::nullopt,        // one_rdm_aa
+                               std::nullopt,        // one_rdm_bb
+                               std::nullopt,        // two_rdm_spin_traced
+                               std::nullopt,        // two_rdm_aabb
+                               std::nullopt,        // two_rdm_aaaa
+                               std::nullopt,        // two_rdm_bbbb
+                               OrbitalEntropies{},  // entropies
                                type) {
   QDK_LOG_TRACE_ENTERING();
 }
@@ -43,7 +44,7 @@ SciWavefunctionContainer::SciWavefunctionContainer(
     std::shared_ptr<Orbitals> orbitals,
     const std::optional<MatrixVariant>& one_rdm_spin_traced,
     const std::optional<VectorVariant>& two_rdm_spin_traced,
-    WavefunctionType type)
+    const OrbitalEntropies& entropies, WavefunctionType type)
     : SciWavefunctionContainer(coeffs, dets, orbitals, one_rdm_spin_traced,
                                std::nullopt,  // one_rdm_aa
                                std::nullopt,  // one_rdm_bb
@@ -51,7 +52,7 @@ SciWavefunctionContainer::SciWavefunctionContainer(
                                std::nullopt,  // two_rdm_aabb
                                std::nullopt,  // two_rdm_aaaa
                                std::nullopt,  // two_rdm_bbbb
-                               type) {
+                               entropies, type) {
   QDK_LOG_TRACE_ENTERING();
 }
 
@@ -64,10 +65,11 @@ SciWavefunctionContainer::SciWavefunctionContainer(
     const std::optional<VectorVariant>& two_rdm_spin_traced,
     const std::optional<VectorVariant>& two_rdm_aabb,
     const std::optional<VectorVariant>& two_rdm_aaaa,
-    const std::optional<VectorVariant>& two_rdm_bbbb, WavefunctionType type)
+    const std::optional<VectorVariant>& two_rdm_bbbb,
+    const OrbitalEntropies& entropies, WavefunctionType type)
     : WavefunctionContainer(one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
                             two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
-                            two_rdm_bbbb, type),
+                            two_rdm_bbbb, entropies, type),
       _coefficients(coeffs),
       _configuration_set(dets, orbitals) {
   QDK_LOG_TRACE_ENTERING();
@@ -98,7 +100,7 @@ std::unique_ptr<WavefunctionContainer> SciWavefunctionContainer::clone() const {
       _two_rdm_spin_dependent_bbbb
           ? std::optional<VectorVariant>(*_two_rdm_spin_dependent_bbbb)
           : std::nullopt,
-      this->get_type());
+      _entropies, this->get_type());
 }
 
 ScalarVariant SciWavefunctionContainer::get_coefficient(
@@ -412,6 +414,9 @@ nlohmann::json SciWavefunctionContainer::to_json() const {
 
   // Serialize RDMs if available
   _serialize_rdms_to_json(j);
+
+  // Serialize entropies if available
+  _serialize_entropies_to_json(j);
 
   return j;
 }

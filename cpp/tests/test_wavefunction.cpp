@@ -346,6 +346,76 @@ TEST_F(WavefunctionCoreTest, ExplicitFunctionsWithInactiveOrbitals) {
       beta_total_occ.isApprox(expected_total_beta, testing::wf_tolerance));
 }
 
+// ===== Tests for Lazy Entropy Evaluation =====
+
+TEST_F(WavefunctionCoreTest, LazyMutualInformationFromS1AndS2) {
+  // Provide s1 and s2 entropies, verify MI is lazily derived
+  constexpr int norb = 2;
+  auto test_orbitals = testing::create_test_orbitals();
+  Wavefunction::DeterminantVector dets = {Configuration("20")};
+  Eigen::VectorXd coeffs(1);
+  coeffs << 1.0;
+
+  Eigen::VectorXd s1(norb);
+  s1 << 0.3, 0.5;
+  Eigen::MatrixXd s2 = Eigen::MatrixXd::Zero(norb, norb);
+  s2(0, 1) = 0.6;
+  s2(1, 0) = 0.6;
+
+  // Expected MI: I_ij = s1_i + s1_j - s2_ij
+  Eigen::MatrixXd expected_mi = Eigen::MatrixXd::Zero(norb, norb);
+  expected_mi(0, 1) = s1(0) + s1(1) - s2(0, 1);
+  expected_mi(1, 0) = expected_mi(0, 1);
+
+  OrbitalEntropies entropies;
+  entropies.single_orbital = s1;
+  entropies.two_orbital = s2;
+
+  Wavefunction wf(std::make_unique<CasWavefunctionContainer>(
+      coeffs, dets, test_orbitals, std::nullopt, std::nullopt, entropies));
+
+  EXPECT_TRUE(wf.has_single_orbital_entropies());
+  EXPECT_TRUE(wf.has_two_orbital_entropies());
+  // MI should be derivable (lazy)
+  EXPECT_TRUE(wf.has_mutual_information());
+  EXPECT_TRUE(
+      wf.get_mutual_information().isApprox(expected_mi, testing::wf_tolerance));
+}
+
+TEST_F(WavefunctionCoreTest, LazyTwoOrbitalEntropyFromS1AndMutualInfo) {
+  // Provide s1 and mutual information, verify s2 is lazily derived
+  constexpr int norb = 2;
+  auto test_orbitals = testing::create_test_orbitals();
+  Wavefunction::DeterminantVector dets = {Configuration("20")};
+  Eigen::VectorXd coeffs(1);
+  coeffs << 1.0;
+
+  Eigen::VectorXd s1(norb);
+  s1 << 0.3, 0.5;
+  Eigen::MatrixXd mi = Eigen::MatrixXd::Zero(norb, norb);
+  mi(0, 1) = 0.2;
+  mi(1, 0) = 0.2;
+
+  // Expected s2: s2_ij = s1_i + s1_j - I_ij
+  Eigen::MatrixXd expected_s2 = Eigen::MatrixXd::Zero(norb, norb);
+  expected_s2(0, 1) = s1(0) + s1(1) - mi(0, 1);
+  expected_s2(1, 0) = expected_s2(0, 1);
+
+  OrbitalEntropies entropies;
+  entropies.single_orbital = s1;
+  entropies.mutual_information = mi;
+
+  Wavefunction wf(std::make_unique<CasWavefunctionContainer>(
+      coeffs, dets, test_orbitals, std::nullopt, std::nullopt, entropies));
+
+  EXPECT_TRUE(wf.has_single_orbital_entropies());
+  EXPECT_TRUE(wf.has_mutual_information());
+  // s2 should be derivable (lazy)
+  EXPECT_TRUE(wf.has_two_orbital_entropies());
+  EXPECT_TRUE(wf.get_two_orbital_entropies().isApprox(expected_s2,
+                                                      testing::wf_tolerance));
+}
+
 // Test wavefunction serialization
 class WavefunctionSerializationTest : public ::testing::Test {
  protected:
@@ -364,10 +434,21 @@ class WavefunctionSerializationTest : public ::testing::Test {
     Wavefunction::DeterminantVector dets = {
         Configuration("20"), Configuration("ud"), Configuration("02")};
 
+    // Create entropy data for cas_real
+    s1_entropies = Eigen::VectorXd(2);
+    s1_entropies << 0.3, 0.5;
+    mutual_info = Eigen::MatrixXd::Zero(2, 2);
+    mutual_info(0, 1) = 0.2;
+    mutual_info(1, 0) = 0.2;
+    OrbitalEntropies entropies;
+    entropies.single_orbital = s1_entropies;
+    entropies.mutual_information = mutual_info;
+
     // Create test wavefunctions
     cas_real = std::make_shared<Wavefunction>(
-        std::make_unique<CasWavefunctionContainer>(coeffs_real, dets,
-                                                   orbitals));
+        std::make_unique<CasWavefunctionContainer>(coeffs_real, dets, orbitals,
+                                                   std::nullopt, std::nullopt,
+                                                   entropies));
 
     cas_complex = std::make_shared<Wavefunction>(
         std::make_unique<CasWavefunctionContainer>(coeffs_complex, dets,
@@ -407,6 +488,8 @@ class WavefunctionSerializationTest : public ::testing::Test {
   std::shared_ptr<Wavefunction> sd_wavefunction;
   std::shared_ptr<Wavefunction> sci_real;
   std::shared_ptr<Wavefunction> sci_complex;
+  Eigen::VectorXd s1_entropies;
+  Eigen::MatrixXd mutual_info;
 };
 
 TEST_F(WavefunctionSerializationTest, JSONSerializationCASReal) {
@@ -436,6 +519,18 @@ TEST_F(WavefunctionSerializationTest, JSONSerializationCASReal) {
   for (size_t i = 0; i < orig_dets.size(); ++i) {
     EXPECT_EQ(recon_dets[i].to_string(), orig_dets[i].to_string());
   }
+
+  // Verify entropies survive JSON roundtrip
+  EXPECT_TRUE(wf_reconstructed->has_single_orbital_entropies());
+  EXPECT_TRUE(wf_reconstructed->has_mutual_information());
+  EXPECT_TRUE(wf_reconstructed->get_single_orbital_entropies().isApprox(
+      s1_entropies, testing::wf_tolerance));
+  EXPECT_TRUE(wf_reconstructed->get_mutual_information().isApprox(
+      mutual_info, testing::wf_tolerance));
+  // Lazy s2 should be derivable from roundtripped s1 + MI
+  EXPECT_TRUE(wf_reconstructed->has_two_orbital_entropies());
+  EXPECT_TRUE(wf_reconstructed->get_two_orbital_entropies().isApprox(
+      cas_real->get_two_orbital_entropies(), testing::wf_tolerance));
 }
 
 TEST_F(WavefunctionSerializationTest, JSONSerializationCASComplex) {
@@ -554,6 +649,18 @@ TEST_F(WavefunctionSerializationTest, HDF5SerializationCASReal) {
   auto recon_dets = wf_reconstructed->get_active_determinants();
   EXPECT_EQ(recon_dets.size(), orig_dets.size());
 
+  // Verify entropies survive HDF5 roundtrip
+  EXPECT_TRUE(wf_reconstructed->has_single_orbital_entropies());
+  EXPECT_TRUE(wf_reconstructed->has_mutual_information());
+  EXPECT_TRUE(wf_reconstructed->get_single_orbital_entropies().isApprox(
+      s1_entropies, testing::wf_tolerance));
+  EXPECT_TRUE(wf_reconstructed->get_mutual_information().isApprox(
+      mutual_info, testing::wf_tolerance));
+  // Lazy s2 should be derivable from roundtripped s1 + MI
+  EXPECT_TRUE(wf_reconstructed->has_two_orbital_entropies());
+  EXPECT_TRUE(wf_reconstructed->get_two_orbital_entropies().isApprox(
+      cas_real->get_two_orbital_entropies(), testing::wf_tolerance));
+
   // Clean up
   std::remove(filename.c_str());
 }
@@ -671,6 +778,14 @@ TEST_F(WavefunctionSerializationTest, JSONFileIO) {
   EXPECT_EQ(wf_reconstructed->size(), cas_real->size());
   EXPECT_NEAR(wf_reconstructed->norm(), cas_real->norm(),
               testing::wf_tolerance);
+
+  // Verify entropies survive JSON file roundtrip
+  EXPECT_TRUE(wf_reconstructed->has_single_orbital_entropies());
+  EXPECT_TRUE(wf_reconstructed->has_mutual_information());
+  EXPECT_TRUE(wf_reconstructed->get_single_orbital_entropies().isApprox(
+      s1_entropies, testing::wf_tolerance));
+  EXPECT_TRUE(wf_reconstructed->get_mutual_information().isApprox(
+      mutual_info, testing::wf_tolerance));
 
   // Clean up
   std::remove(filename.c_str());

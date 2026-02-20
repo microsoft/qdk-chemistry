@@ -75,3 +75,7 @@ mp2_energy_tolerance = 1e-8
 # This is the tolerance to check the minimum eigenvalue of Hessian
 # of orbital rotation, used in stability checker.
 min_hessian_eig_tolerance = 1e-6
+
+# This is the tolerance for comparing entropies and mutual information values.
+# Consistency of the tested modules can only be expected to agree up to this tolerance.
+entropy_tol = 1e-6

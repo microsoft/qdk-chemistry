@@ -295,8 +295,8 @@ inline void rdm_contributions_2_spin_dep(
     }
   }
 
+  val *= sign * 0.5;
   if (trdm_ss.data_handle()) {
-    val *= sign * 0.5;
     for (auto p : bra_occ_ss) {
 #pragma omp atomic
       trdm_ss(v1, o1, p, p) += val;
