@@ -127,7 +127,7 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    *
    * @param C Input orbital coefficient matrix (num_atomic_orbitals x
    * num_orbitals)
-   * @param S Input overlap matrix S (num_orbitals x num_orbitals)git 
+   * @param S Input overlap matrix S (num_orbitals x num_orbitals)
    * Output canonicalized overlap matrix
    * @param evals Output eigenvalues of S
    * @param num_atomic_orbitals Number of atomic orbitals (rows in C and
