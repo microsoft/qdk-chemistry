@@ -10,6 +10,7 @@
 #pragma once
 #include <macis/hamiltonian_generator.hpp>
 #include <macis/sd_operations.hpp>
+#include <macis/util/entropies.hpp>
 #include <macis/util/rdms.hpp>
 
 namespace macis {
@@ -292,6 +293,83 @@ class DoubleLoopHamiltonianGenerator : public HamiltonianGenerator<WfnType> {
 
       }  // Non-zero bra determinant
     }  // Loop over bra determinants
+  }
+
+  void form_entropies(full_det_iterator bra_begin, full_det_iterator bra_end,
+                      full_det_iterator ket_begin, full_det_iterator ket_end,
+                      double *C, std::vector<double> &single_orbital_entropies,
+                      matrix_span_t s2_entropy,
+                      matrix_span_t mutual_information) override {
+    using wfn_traits = wavefunction_traits<WfnType>;
+    const size_t nbra_dets = std::distance(bra_begin, bra_end);
+    const size_t nket_dets = std::distance(ket_begin, ket_end);
+
+    const bool need_s2 =
+        s2_entropy.data_handle() || mutual_information.data_handle();
+
+    OrbitalRDMIntermediates entropy_intermediates(
+        single_orbital_entropies.size(), need_s2);
+
+    std::vector<uint32_t> bra_occ_alpha, bra_occ_beta;
+
+    // Loop over bra determinants
+    for (size_t i = 0; i < nbra_dets; ++i) {
+      const auto bra = *(bra_begin + i);
+      if (wfn_traits::count(bra)) {
+        // Separate out into alpha/beta components
+        spin_det_t bra_alpha = wfn_traits::alpha_string(bra);
+        spin_det_t bra_beta = wfn_traits::beta_string(bra);
+
+        // Get occupied indices
+        bits_to_indices(bra_alpha, bra_occ_alpha);
+        bits_to_indices(bra_beta, bra_occ_beta);
+
+        // Loop over ket determinants
+        for (size_t j = 0; j < nket_dets; ++j) {
+          const auto ket = *(ket_begin + j);
+          if (wfn_traits::count(ket)) {
+            spin_det_t ket_alpha = wfn_traits::alpha_string(ket);
+            spin_det_t ket_beta = wfn_traits::beta_string(ket);
+
+            full_det_t ex_total = bra ^ ket;
+            if (wfn_traits::count(ex_total) <= (need_s2 ? 4 : 0)) {
+              spin_det_t ex_alpha = wfn_traits::alpha_string(ex_total);
+              spin_det_t ex_beta = wfn_traits::beta_string(ex_total);
+
+              const double val = C[i] * C[j];
+
+              // Compute intermediates
+              if (std::abs(val) > 1e-16) {
+                eval_ordm_intermediates(
+                    bra_alpha, ket_alpha, ex_alpha, bra_beta, ket_beta, ex_beta,
+                    bra_occ_alpha, bra_occ_beta, val, entropy_intermediates);
+              }
+            }  // Possible non-zero connection (Hamming distance)
+
+          }  // Non-zero ket determinant
+        }  // Loop over ket determinants
+
+      }  // Non-zero bra determinant
+    }  // Loop over bra determinants
+
+    // Finalize entropy calculations
+    build_s1_entropy(entropy_intermediates, single_orbital_entropies);
+
+    if (need_s2) {
+      const size_t norb = single_orbital_entropies.size();
+      // Use caller's buffer if provided, otherwise allocate internally
+      std::vector<double> s2_local;
+      matrix_span<double> s2_span = s2_entropy;
+      if (!s2_entropy.data_handle()) {
+        s2_local.resize(norb * norb, 0.0);
+        s2_span = matrix_span<double>(s2_local.data(), norb, norb);
+      }
+      build_s2_entropy(entropy_intermediates, s2_span);
+      if (mutual_information.data_handle()) {
+        build_mutual_information(single_orbital_entropies, s2_span,
+                                 mutual_information);
+      }
+    }
   }
 
  public:

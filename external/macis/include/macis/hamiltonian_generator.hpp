@@ -267,6 +267,30 @@ class HamiltonianGenerator : public HamiltonianGeneratorBase<double> {
                                   matrix_span_t ordm_bb, rank4_span_t trdm_aaaa,
                                   rank4_span_t trdm_bbbb,
                                   rank4_span_t trdm_aabb) = 0;
+
+  /**
+   *  @brief Form single-orbital entropies and mutual information
+   *
+   *  Pure virtual function to compute single-orbital entropies and optionally
+   *  two-orbital entropies and mutual information from CI coefficients and
+   *  determinant ranges. Must be implemented by derived classes.
+   *
+   *  @param[in] bra_begin Iterator to beginning of bra determinants
+   *  @param[in] bra_end Iterator to end of bra determinants
+   *  @param[in] ket_begin Iterator to beginning of ket determinants
+   *  @param[in] ket_end Iterator to end of ket determinants
+   *  @param[in] C CI coefficient array
+   *  @param[in,out] single_orbital_entropies Single-orbital entropies
+   *  @param[in,out] s2_entropy Two-orbital entropies
+   *  @param[in,out] mutual_information Mutual information
+   */
+  virtual void form_entropies(full_det_iterator bra_begin,
+                              full_det_iterator bra_end,
+                              full_det_iterator ket_begin,
+                              full_det_iterator ket_end, double* C,
+                              std::vector<double>& single_orbital_entropies,
+                              matrix_span_t s2_entropy,
+                              matrix_span_t mutual_information) = 0;
 };
 
 }  // namespace macis

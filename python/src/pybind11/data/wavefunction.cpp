@@ -44,6 +44,36 @@ py::object variant_to_python(
       [](const auto& value) -> py::object { return py::cast(value); }, var);
 }
 
+/// Convert a Python dict to OrbitalEntropies.
+///
+/// Accepted keys (all optional):
+///   "single_orbital"     – 1-D array  (VectorXd)
+///   "two_orbital"        – 2-D array  (MatrixXd)
+///   "mutual_information" – 2-D array  (MatrixXd)
+///
+/// Passing ``py::none()`` (the default) yields an empty struct.
+qdk::chemistry::data::OrbitalEntropies parse_entropies(const py::object& obj) {
+  using qdk::chemistry::data::OrbitalEntropies;
+  if (obj.is_none()) return OrbitalEntropies{};
+  if (!py::isinstance<py::dict>(obj)) {
+    throw py::type_error(
+        "entropies must be a dict with keys from "
+        "{'single_orbital', 'two_orbital', 'mutual_information'}, or None");
+  }
+  auto d = obj.cast<py::dict>();
+  OrbitalEntropies e;
+  if (d.contains("single_orbital") && !d["single_orbital"].is_none()) {
+    e.single_orbital = d["single_orbital"].cast<Eigen::VectorXd>();
+  }
+  if (d.contains("two_orbital") && !d["two_orbital"].is_none()) {
+    e.two_orbital = d["two_orbital"].cast<Eigen::MatrixXd>();
+  }
+  if (d.contains("mutual_information") && !d["mutual_information"].is_none()) {
+    e.mutual_information = d["mutual_information"].cast<Eigen::MatrixXd>();
+  }
+  return e;
+}
+
 void bind_wavefunction(pybind11::module& data) {
   using namespace qdk::chemistry::algorithms;
   using namespace qdk::chemistry::data;
@@ -119,7 +149,25 @@ It uses variant types to support both real and complex arithmetic.
            "Check if spin-traced two-particle RDM for active orbitals is "
            "available")
       .def("is_complex", &WavefunctionContainer::is_complex,
-           "Check if the wavefunction is complex-valued");
+           "Check if the wavefunction is complex-valued")
+      .def("has_single_orbital_entropies",
+           &WavefunctionContainer::has_single_orbital_entropies,
+           "Check if single orbital entropies are available")
+      .def("get_single_orbital_entropies",
+           &WavefunctionContainer::get_single_orbital_entropies,
+           "Get single orbital entropies for active orbitals")
+      .def("has_two_orbital_entropies",
+           &WavefunctionContainer::has_two_orbital_entropies,
+           "Check if two-orbital entropies are available")
+      .def("get_two_orbital_entropies",
+           &WavefunctionContainer::get_two_orbital_entropies,
+           "Get two-orbital entropy matrix for active orbitals")
+      .def("has_mutual_information",
+           &WavefunctionContainer::has_mutual_information,
+           "Check if mutual information is available")
+      .def("get_mutual_information",
+           &WavefunctionContainer::get_mutual_information,
+           "Get mutual information matrix for active orbitals");
 
   // Wavefunction class
   py::class_<Wavefunction, DataClass, py::smart_holder> wavefunction(
@@ -547,6 +595,19 @@ Examples:
     >>> two_rdm = wf.get_active_two_rdm_spin_traced()
 )");
 
+  wavefunction.def("has_single_orbital_entropies",
+                   &Wavefunction::has_single_orbital_entropies,
+                   R"(
+Check if single orbital entropies for active orbitals are available.
+
+Returns:
+    bool: True if single orbital entropies are available
+
+Examples:
+    >>> if wf.has_single_orbital_entropies():
+    ...     entropies = wf.get_single_orbital_entropies()
+)");
+
   wavefunction.def("get_single_orbital_entropies",
                    &Wavefunction::get_single_orbital_entropies,
                    R"(
@@ -563,6 +624,65 @@ Raises:
 
 Examples:
     >>> entropies = wf.get_single_orbital_entropies()
+)");
+
+  wavefunction.def("has_mutual_information",
+                   &Wavefunction::has_mutual_information,
+                   R"(
+Check if mutual information for active orbitals is available.
+
+Returns:
+    bool: True if mutual information matrix is available
+
+Examples:
+    >>> if wf.has_mutual_information():
+    ...     mi = wf.get_mutual_information()
+)");
+
+  wavefunction.def("get_mutual_information",
+                   &Wavefunction::get_mutual_information,
+                   R"(
+Get the mutual information matrix for active orbitals.
+
+The mutual information is defined as:
+    I_{ij} = s_{1,i} + s_{1,j} - s_{2,ij}
+
+Returns:
+    numpy.ndarray: Matrix of mutual information values for active orbitals
+
+Raises:
+    RuntimeError: If mutual information is not available
+
+Examples:
+    >>> mi = wf.get_mutual_information()
+)");
+
+  wavefunction.def("has_two_orbital_entropies",
+                   &Wavefunction::has_two_orbital_entropies,
+                   R"(
+Check if two-orbital entropies for active orbitals are available.
+
+Returns:
+    bool: True if two-orbital entropies are available
+
+Examples:
+    >>> if wf.has_two_orbital_entropies():
+    ...     s2 = wf.get_two_orbital_entropies()
+)");
+
+  wavefunction.def("get_two_orbital_entropies",
+                   &Wavefunction::get_two_orbital_entropies,
+                   R"(
+Get the two-orbital entropy matrix for active orbitals.
+
+Returns:
+    numpy.ndarray: Matrix of two-orbital entropies for active orbitals
+
+Raises:
+    RuntimeError: If two-orbital entropies are not available
+
+Examples:
+    >>> s2 = wf.get_two_orbital_entropies()
 )");
 
   // RDM availability check methods
@@ -841,14 +961,19 @@ Examples:
 )",
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
            py::arg("type") = WavefunctionType::SelfDual)
-      // Constructor with spin-traced RDMs: coeffs, dets, orbitals,
-      // one_rdm_spin_traced, two_rdm_spin_traced, type
-      .def(py::init<const ContainerTypes::VectorVariant&,
-                    const ContainerTypes::DeterminantVector&,
-                    std::shared_ptr<Orbitals>,
-                    const std::optional<ContainerTypes::MatrixVariant>&,
-                    const std::optional<ContainerTypes::VectorVariant>&,
-                    WavefunctionType>(),
+      // Constructor with spin-traced RDMs and optional entropies dict
+      .def(py::init([](const ContainerTypes::VectorVariant& coeffs,
+                       const ContainerTypes::DeterminantVector& dets,
+                       std::shared_ptr<Orbitals> orbitals,
+                       std::optional<ContainerTypes::MatrixVariant>
+                           one_rdm_spin_traced,
+                       std::optional<ContainerTypes::VectorVariant>
+                           two_rdm_spin_traced,
+                       py::object entropies, WavefunctionType type) {
+             return SciWavefunctionContainer(
+                 coeffs, dets, std::move(orbitals), one_rdm_spin_traced,
+                 two_rdm_spin_traced, parse_entropies(entropies), type);
+           }),
            R"(
 Constructs a SCI wavefunction container with spin-traced RDMs.
 
@@ -858,6 +983,9 @@ Args:
     orbitals (Orbitals): Shared pointer to orbital basis set
     one_rdm_spin_traced (numpy.ndarray | None): Spin-traced one-particle reduced density matrix
     two_rdm_spin_traced (numpy.ndarray | None): Spin-traced two-particle reduced density matrix
+    entropies (dict | None): Orbital entropies, with optional keys
+        ``"single_orbital"`` (1-D), ``"two_orbital"`` (2-D),
+        and ``"mutual_information"`` (2-D)
     type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
 
 Examples:
@@ -866,24 +994,36 @@ Examples:
     >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
     >>> one_rdm = np.eye(4)  # Example 1-RDM
     >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals, one_rdm, None)
+    >>> # With entropies:
+    >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals,
+    ...     one_rdm, None, entropies={"single_orbital": s1_vec})
 )",
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
            py::arg("one_rdm_spin_traced") = std::nullopt,
            py::arg("two_rdm_spin_traced") = std::nullopt,
+           py::arg("entropies") = py::none(),
            py::arg("type") = WavefunctionType::SelfDual)
-      // Full constructor with all RDM components
-      .def(py::init<const ContainerTypes::VectorVariant&,
-                    const ContainerTypes::DeterminantVector&,
-                    std::shared_ptr<Orbitals>,
-                    const std::optional<ContainerTypes::MatrixVariant>&,
-                    const std::optional<ContainerTypes::MatrixVariant>&,
-                    const std::optional<ContainerTypes::MatrixVariant>&,
-                    const std::optional<ContainerTypes::VectorVariant>&,
-                    const std::optional<ContainerTypes::VectorVariant>&,
-                    const std::optional<ContainerTypes::VectorVariant>&,
-                    const std::optional<ContainerTypes::VectorVariant>&,
-                    WavefunctionType>(),
-           R"(
+      // Full constructor with all RDM components and optional entropies dict
+      .def(
+          py::init([](const ContainerTypes::VectorVariant& coeffs,
+                      const ContainerTypes::DeterminantVector& dets,
+                      std::shared_ptr<Orbitals> orbitals,
+                      std::optional<ContainerTypes::MatrixVariant>
+                          one_rdm_spin_traced,
+                      std::optional<ContainerTypes::MatrixVariant> one_rdm_aa,
+                      std::optional<ContainerTypes::MatrixVariant> one_rdm_bb,
+                      std::optional<ContainerTypes::VectorVariant>
+                          two_rdm_spin_traced,
+                      std::optional<ContainerTypes::VectorVariant> two_rdm_aabb,
+                      std::optional<ContainerTypes::VectorVariant> two_rdm_aaaa,
+                      std::optional<ContainerTypes::VectorVariant> two_rdm_bbbb,
+                      py::object entropies, WavefunctionType type) {
+            return SciWavefunctionContainer(
+                coeffs, dets, std::move(orbitals), one_rdm_spin_traced,
+                one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
+                two_rdm_aaaa, two_rdm_bbbb, parse_entropies(entropies), type);
+          }),
+          R"(
 Constructs a SCI wavefunction container with full RDM data.
 
 Args:
@@ -897,6 +1037,9 @@ Args:
     two_rdm_aabb (numpy.ndarray | None): Alpha-beta-beta-alpha block of two-particle RDM
     two_rdm_aaaa (numpy.ndarray | None): Alpha-alpha-alpha-alpha block of two-particle RDM
     two_rdm_bbbb (numpy.ndarray | None): Beta-beta-beta-beta block of two-particle RDM
+    entropies (dict | None): Orbital entropies, with optional keys
+        ``"single_orbital"`` (1-D), ``"two_orbital"`` (2-D),
+        and ``"mutual_information"`` (2-D)
     type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
 
 Examples:
@@ -904,18 +1047,19 @@ Examples:
     >>> coeffs = np.array([0.9, 0.1])
     >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
     >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals,
-    ...                                          one_rdm, one_rdm_aa, one_rdm_bb,
-    ...                                          two_rdm, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
+    ...     one_rdm, one_rdm_aa, one_rdm_bb,
+    ...     two_rdm, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
 )",
-           py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
-           py::arg("one_rdm_spin_traced") = std::nullopt,
-           py::arg("one_rdm_aa") = std::nullopt,
-           py::arg("one_rdm_bb") = std::nullopt,
-           py::arg("two_rdm_spin_traced") = std::nullopt,
-           py::arg("two_rdm_aabb") = std::nullopt,
-           py::arg("two_rdm_aaaa") = std::nullopt,
-           py::arg("two_rdm_bbbb") = std::nullopt,
-           py::arg("type") = WavefunctionType::SelfDual)
+          py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
+          py::arg("one_rdm_spin_traced") = std::nullopt,
+          py::arg("one_rdm_aa") = std::nullopt,
+          py::arg("one_rdm_bb") = std::nullopt,
+          py::arg("two_rdm_spin_traced") = std::nullopt,
+          py::arg("two_rdm_aabb") = std::nullopt,
+          py::arg("two_rdm_aaaa") = std::nullopt,
+          py::arg("two_rdm_bbbb") = std::nullopt,
+          py::arg("entropies") = py::none(),
+          py::arg("type") = WavefunctionType::SelfDual)
       .def("get_coefficients", &SciWavefunctionContainer::get_coefficients,
            "Get the coefficients of the wavefunction",
            py::return_value_policy::reference_internal);
@@ -949,14 +1093,19 @@ Examples:
 )",
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
            py::arg("type") = WavefunctionType::SelfDual)
-      // Constructor with spin-traced RDMs: coeffs, dets, orbitals,
-      // one_rdm_spin_traced, two_rdm_spin_traced, type
-      .def(py::init<const ContainerTypes::VectorVariant&,
-                    const ContainerTypes::DeterminantVector&,
-                    std::shared_ptr<Orbitals>,
-                    const std::optional<ContainerTypes::MatrixVariant>&,
-                    const std::optional<ContainerTypes::VectorVariant>&,
-                    WavefunctionType>(),
+      // Constructor with spin-traced RDMs and optional entropies dict
+      .def(py::init([](const ContainerTypes::VectorVariant& coeffs,
+                       const ContainerTypes::DeterminantVector& dets,
+                       std::shared_ptr<Orbitals> orbitals,
+                       std::optional<ContainerTypes::MatrixVariant>
+                           one_rdm_spin_traced,
+                       std::optional<ContainerTypes::VectorVariant>
+                           two_rdm_spin_traced,
+                       py::object entropies, WavefunctionType type) {
+             return CasWavefunctionContainer(
+                 coeffs, dets, std::move(orbitals), one_rdm_spin_traced,
+                 two_rdm_spin_traced, parse_entropies(entropies), type);
+           }),
            R"(
 Constructs a CAS wavefunction container with spin-traced RDMs.
 
@@ -966,6 +1115,9 @@ Args:
     orbitals (Orbitals): Shared pointer to orbital basis set
     one_rdm_spin_traced (numpy.ndarray | None): Spin-traced one-particle reduced density matrix
     two_rdm_spin_traced (numpy.ndarray | None): Spin-traced two-particle reduced density matrix
+    entropies (dict | None): Orbital entropies, with optional keys
+        ``"single_orbital"`` (1-D), ``"two_orbital"`` (2-D),
+        and ``"mutual_information"`` (2-D)
     type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
 
 Examples:
@@ -974,24 +1126,36 @@ Examples:
     >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
     >>> one_rdm = np.eye(4)  # Example 1-RDM
     >>> container = qdk_chemistry.CasWavefunctionContainer(coeffs, dets, orbitals, one_rdm, None)
+    >>> # With entropies:
+    >>> container = qdk_chemistry.CasWavefunctionContainer(coeffs, dets, orbitals,
+    ...     one_rdm, None, entropies={"single_orbital": s1_vec})
 )",
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
            py::arg("one_rdm_spin_traced") = std::nullopt,
            py::arg("two_rdm_spin_traced") = std::nullopt,
+           py::arg("entropies") = py::none(),
            py::arg("type") = WavefunctionType::SelfDual)
-      // Full constructor with all RDM components
-      .def(py::init<const ContainerTypes::VectorVariant&,
-                    const ContainerTypes::DeterminantVector&,
-                    std::shared_ptr<Orbitals>,
-                    const std::optional<ContainerTypes::MatrixVariant>&,
-                    const std::optional<ContainerTypes::MatrixVariant>&,
-                    const std::optional<ContainerTypes::MatrixVariant>&,
-                    const std::optional<ContainerTypes::VectorVariant>&,
-                    const std::optional<ContainerTypes::VectorVariant>&,
-                    const std::optional<ContainerTypes::VectorVariant>&,
-                    const std::optional<ContainerTypes::VectorVariant>&,
-                    WavefunctionType>(),
-           R"(
+      // Full constructor with all RDM components and optional entropies dict
+      .def(
+          py::init([](const ContainerTypes::VectorVariant& coeffs,
+                      const ContainerTypes::DeterminantVector& dets,
+                      std::shared_ptr<Orbitals> orbitals,
+                      std::optional<ContainerTypes::MatrixVariant>
+                          one_rdm_spin_traced,
+                      std::optional<ContainerTypes::MatrixVariant> one_rdm_aa,
+                      std::optional<ContainerTypes::MatrixVariant> one_rdm_bb,
+                      std::optional<ContainerTypes::VectorVariant>
+                          two_rdm_spin_traced,
+                      std::optional<ContainerTypes::VectorVariant> two_rdm_aabb,
+                      std::optional<ContainerTypes::VectorVariant> two_rdm_aaaa,
+                      std::optional<ContainerTypes::VectorVariant> two_rdm_bbbb,
+                      py::object entropies, WavefunctionType type) {
+            return CasWavefunctionContainer(
+                coeffs, dets, std::move(orbitals), one_rdm_spin_traced,
+                one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
+                two_rdm_aaaa, two_rdm_bbbb, parse_entropies(entropies), type);
+          }),
+          R"(
 Constructs a CAS wavefunction container with full RDM data.
 
 Args:
@@ -1005,6 +1169,9 @@ Args:
     two_rdm_aabb (numpy.ndarray | None): Alpha-beta-beta-alpha block of two-particle RDM
     two_rdm_aaaa (numpy.ndarray | None): Alpha-alpha-alpha-alpha block of two-particle RDM
     two_rdm_bbbb (numpy.ndarray | None): Beta-beta-beta-beta block of two-particle RDM
+    entropies (dict | None): Orbital entropies, with optional keys
+        ``"single_orbital"`` (1-D), ``"two_orbital"`` (2-D),
+        and ``"mutual_information"`` (2-D)
     type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
 
 Examples:
@@ -1012,18 +1179,19 @@ Examples:
     >>> coeffs = np.array([0.9, 0.1])
     >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
     >>> container = qdk_chemistry.CasWavefunctionContainer(coeffs, dets, orbitals,
-    ...                                          one_rdm, one_rdm_aa, one_rdm_bb,
-    ...                                          two_rdm, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
+    ...     one_rdm, one_rdm_aa, one_rdm_bb,
+    ...     two_rdm, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
 )",
-           py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
-           py::arg("one_rdm_spin_traced") = std::nullopt,
-           py::arg("one_rdm_aa") = std::nullopt,
-           py::arg("one_rdm_bb") = std::nullopt,
-           py::arg("two_rdm_spin_traced") = std::nullopt,
-           py::arg("two_rdm_aabb") = std::nullopt,
-           py::arg("two_rdm_aaaa") = std::nullopt,
-           py::arg("two_rdm_bbbb") = std::nullopt,
-           py::arg("type") = WavefunctionType::SelfDual)
+          py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
+          py::arg("one_rdm_spin_traced") = std::nullopt,
+          py::arg("one_rdm_aa") = std::nullopt,
+          py::arg("one_rdm_bb") = std::nullopt,
+          py::arg("two_rdm_spin_traced") = std::nullopt,
+          py::arg("two_rdm_aabb") = std::nullopt,
+          py::arg("two_rdm_aaaa") = std::nullopt,
+          py::arg("two_rdm_bbbb") = std::nullopt,
+          py::arg("entropies") = py::none(),
+          py::arg("type") = WavefunctionType::SelfDual)
       .def("get_coefficients", &CasWavefunctionContainer::get_coefficients,
            "Get the coefficients of the wavefunction",
            py::return_value_policy::reference_internal);
