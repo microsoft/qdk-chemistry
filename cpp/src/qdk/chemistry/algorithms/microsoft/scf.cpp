@@ -109,10 +109,10 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   std::string scf_type = _settings->get<std::string>("scf_type");
   std::transform(scf_type.begin(), scf_type.end(), scf_type.begin(), ::tolower);
 
-  auto scf_orbital_type = SCFOrbitalType::RestrictedClosedShell;
+  auto scf_orbital_type = SCFOrbitalType::Restricted;
   if (scf_type == "auto") {
-    scf_orbital_type = open_shell ? SCFOrbitalType::Unrestricted
-                                  : SCFOrbitalType::RestrictedClosedShell;
+    scf_orbital_type =
+        open_shell ? SCFOrbitalType::Unrestricted : SCFOrbitalType::Restricted;
   } else if (scf_type == "unrestricted") {
     scf_orbital_type = SCFOrbitalType::Unrestricted;
     if (!open_shell && basis_set_type != BasisSetType::FromOrbitals) {
@@ -123,7 +123,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     }
   } else if (scf_type == "restricted") {
     scf_orbital_type = open_shell ? SCFOrbitalType::RestrictedOpenShell
-                                  : SCFOrbitalType::RestrictedClosedShell;
+                                  : SCFOrbitalType::Restricted;
     if (scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
       QDK_LOGGER().warn(
           "Restricted open-shell request detected; enabling ROHF workflow.");
@@ -173,7 +173,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
                  ms_scf_config->exc.xc_name.begin(), ::toupper);
   ms_scf_config->basis = basis_set_name;
   ms_scf_config->basis_mode = qcs::BasisMode::PSI4;
-  ms_scf_config->set_scf_orbital_type(scf_orbital_type);
+  ms_scf_config->scf_orbital_type = scf_orbital_type;
   ms_scf_config->scf_algorithm.density_threshold = density_threshold;
   ms_scf_config->scf_algorithm.og_threshold = orbital_gradient_threshold;
   ms_scf_config->scf_algorithm.max_iteration = max_iterations;
@@ -310,7 +310,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     // Compute density matrix from MO coefficients
     qcs::RowMajorMatrix density_matrix;
 
-    if (ms_scf_config->unrestricted) {
+    const bool is_unrestricted =
+        (ms_scf_config->scf_orbital_type == SCFOrbitalType::Unrestricted);
+    if (is_unrestricted) {
       if (initial_guess->is_restricted())
         QDK_LOGGER().warn(
             "Unrestricted calculation requested but restricted "
@@ -409,7 +411,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   auto nelec = scf->get_num_electrons();
 
   std::shared_ptr<data::Orbitals> orbitals;
-  if (ms_scf_config->unrestricted) {
+  const bool is_unrestricted =
+      (ms_scf_config->scf_orbital_type == SCFOrbitalType::Unrestricted);
+  if (is_unrestricted) {
     // Unrestricted case - store matrices first to avoid
     // temporaries
     const auto& C_full = scf->get_orbitals_matrix();

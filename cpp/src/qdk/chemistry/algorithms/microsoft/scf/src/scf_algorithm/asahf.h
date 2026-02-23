@@ -95,15 +95,14 @@ class AtomicSphericallyAveragedHartreeFock : public DIIS {
    * @param[in] num_molecular_orbitals Number of molecular orbitals
    * @param[in] idx_spin Density matrix index (0 for alpha or restricted, 1 for
    * beta)
-   * @param[in] unrestricted Whether calculation is unrestricted
    */
   void solve_fock_eigenproblem(const RowMajorMatrix& F, const RowMajorMatrix& S,
                                const RowMajorMatrix& X, RowMajorMatrix& C,
                                RowMajorMatrix& eigenvalues, RowMajorMatrix& P,
                                const int num_occupied_orbitals[2],
                                int num_atomic_orbitals,
-                               int num_molecular_orbitals, int idx_spin,
-                               bool unrestricted) override;
+                               int num_molecular_orbitals,
+                               int idx_spin) override;
 
   void update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
                              bool unrestricted, int nelec_alpha,

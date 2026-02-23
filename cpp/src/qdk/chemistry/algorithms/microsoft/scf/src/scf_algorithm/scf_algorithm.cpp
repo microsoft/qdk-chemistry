@@ -41,7 +41,10 @@ SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx)
   QDK_LOG_TRACE_ENTERING();
   auto num_atomic_orbitals = ctx.basis_set->num_atomic_orbitals;
   auto num_density_matrices =
-      (ctx.cfg->unrestricted || ctx.cfg->rohf_enabled) ? 2 : 1;
+      (ctx.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted ||
+       ctx.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell)
+          ? 2
+          : 1;
   P_last_ = RowMajorMatrix::Zero(num_density_matrices * num_atomic_orbitals,
                                  num_atomic_orbitals);
 }
@@ -51,7 +54,8 @@ SCFAlgorithm::~SCFAlgorithm() noexcept = default;
 std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx) {
   QDK_LOG_TRACE_ENTERING();
   const auto& cfg = *ctx.cfg;
-  const bool rohf_enabled = cfg.rohf_enabled;
+  const bool rohf_enabled =
+      (cfg.scf_orbital_type == SCFOrbitalType::RestrictedOpenShell);
 
   switch (cfg.scf_algorithm.method) {
     case SCFAlgorithmName::ASAHF:
@@ -89,7 +93,7 @@ void SCFAlgorithm::solve_fock_eigenproblem(
     const RowMajorMatrix& F, const RowMajorMatrix& S, const RowMajorMatrix& X,
     RowMajorMatrix& C, RowMajorMatrix& eigenvalues, RowMajorMatrix& P,
     const int num_occupied_orbitals[2], int num_atomic_orbitals,
-    int num_molecular_orbitals, int idx_spin, bool unrestricted) {
+    int num_molecular_orbitals, int idx_spin) {
   QDK_LOG_TRACE_ENTERING();
 #ifdef ENABLE_NVTX3
   nvtx3::scoped_range r{nvtx3::rgb{0, 0, 255}, "solve_eigen"};
@@ -251,7 +255,7 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
   std::vector<int> nelec_vec = scf_impl.get_num_electrons();
   const int nelec[2] = {nelec_vec[0], nelec_vec[1]};
 
-  if (ctx_.cfg->rohf_enabled) {
+  if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
     // To be modified when ROHFGDM is implemented: in that case, the pointer
     // will come from the DIIS instance saved in DIIS_GDM, like the current
     // DIIS_GDM implementation

@@ -36,7 +36,9 @@ void SCFImpl::polarizability_() {
   const size_t num_beta_virtual_orbitals = num_molecular_orbitals_ - num_beta;
   const size_t novb = num_beta * num_beta_virtual_orbitals;
   size_t nov = nova;
-  if (ctx_.cfg->unrestricted) nov = nova + novb;
+  if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted) {
+    nov = nova + novb;
+  }
 
   auto dot = [](size_t n, const auto* a, const auto* b) {
     auto res = a[0] * b[0];
@@ -74,7 +76,7 @@ void SCFImpl::polarizability_() {
                  1.0, Ca_vir_ptr, num_molecular_orbitals_, temp.data(),
                  num_alpha, 0.0, R_vec.data(), num_alpha_virtual_orbitals);
 
-      if (ctx_.cfg->unrestricted) {
+      if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted) {
         blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
                    num_beta, num_atomic_orbitals_, num_atomic_orbitals_, 1.0,
                    Cb_occ_ptr, num_molecular_orbitals_, dipole_x_ptr,
@@ -103,7 +105,7 @@ void SCFImpl::polarizability_() {
                  num_atomic_orbitals_, num_atomic_orbitals_, num_alpha, 1.0,
                  temp.data(), num_alpha, Ca_occ_ptr, num_molecular_orbitals_,
                  0.0, Dx.data(), num_atomic_orbitals_);
-      if (ctx_.cfg->unrestricted) {
+      if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted) {
         blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
                    num_beta, num_atomic_orbitals_, num_beta_virtual_orbitals,
                    1.0, X_vec.data() + nova, num_beta_virtual_orbitals,
@@ -129,7 +131,7 @@ void SCFImpl::polarizability_() {
                 dipole.data() +
                     xyz_2d * num_atomic_orbitals_ * num_atomic_orbitals_,
                 Dx.data());
-        if (!ctx_.cfg->unrestricted)
+        if (ctx_.cfg->scf_orbital_type != SCFOrbitalType::Unrestricted)
           ctx_.result.scf_polarizability[xyz_1d * 3 + xyz_2d] *= 2;
       }
     }
@@ -168,7 +170,9 @@ void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
   const size_t num_beta_virtual_orbitals = num_molecular_orbitals_ - num_beta;
   const size_t novb = num_beta * num_beta_virtual_orbitals;
   size_t nov = nova;
-  if (ctx_.cfg->unrestricted) nov = nova + novb;
+  if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted) {
+    nov = nova + novb;
+  }
 
   const double* Ca_occ_ptr = C_.data();
   const double* Ca_vir_ptr = Ca_occ_ptr + num_alpha;
@@ -247,7 +251,7 @@ void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
                 X_rhs[i * num_alpha_virtual_orbitals +
                       a];  // δij δab δστ (ϵaσ − ϵiτ )
           }
-        if (ctx_.cfg->unrestricted) {
+        if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted) {
           for (size_t i = 0; i < num_beta; ++i)
             for (size_t a = 0; a < num_beta_virtual_orbitals; ++a)
               Y_rhs[nova + i * num_beta_virtual_orbitals + a] +=
@@ -272,7 +276,7 @@ void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
             tP_(i, j) = symm_ij;
             tP_(j, i) = symm_ij;
           }
-        if (ctx_.cfg->unrestricted) {
+        if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted) {
           blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
                      num_beta, num_atomic_orbitals_, num_beta_virtual_orbitals,
                      1.0, X_rhs + nova, num_beta_virtual_orbitals, Cb_vir_ptr,
@@ -324,7 +328,7 @@ void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
                    num_alpha_virtual_orbitals, num_alpha, num_atomic_orbitals_,
                    alpha, Ca_vir_ptr, num_molecular_orbitals_, temp.data(),
                    num_alpha, 1.0, Y_rhs, num_alpha_virtual_orbitals);
-        if (ctx_.cfg->unrestricted) {
+        if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted) {
           blas::gemm(
               blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
               num_beta, num_atomic_orbitals_, num_atomic_orbitals_, 1.0,
@@ -360,7 +364,7 @@ void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
             if (std::abs(energy_diff) > 1e-12)
               X_rhs[i * num_alpha_virtual_orbitals + a] /= energy_diff;
           }
-        if (ctx_.cfg->unrestricted) {
+        if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted) {
           for (size_t i = 0; i < num_beta; ++i)
             for (size_t a = 0; a < num_beta_virtual_orbitals; ++a) {
               double energy_diff =
@@ -400,7 +404,7 @@ void SCFImpl::update_trial_fock_() {
   auto [alpha, beta, omega] = get_hyb_coeff_();
   eri_->build_JK(tP_.data(), tJ_.data(), tK_.data(), alpha, beta, omega);
 
-  if (ctx_.cfg->unrestricted) {
+  if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted) {
     tFock_.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_) =
         tJ_.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_) +
         tJ_.block(num_atomic_orbitals_, 0, num_atomic_orbitals_,

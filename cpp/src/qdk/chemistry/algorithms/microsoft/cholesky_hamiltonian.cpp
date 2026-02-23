@@ -628,7 +628,7 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   scf_config->require_gradient = false;
   scf_config->basis = internal_basis_set->name;
   scf_config->cartesian = !internal_basis_set->pure;
-  scf_config->set_scf_orbital_type(qcs::SCFOrbitalType::RestrictedClosedShell);
+  scf_config->scf_orbital_type = qcs::SCFOrbitalType::Restricted;
   scf_config->eri.method = qcs::ERIMethod::Libint2Direct;
   scf_config->k_eri.method = qcs::ERIMethod::Libint2Direct;
 
@@ -691,10 +691,10 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   }
 
   // SCFOrbitalType::RestrictedOpenShell is not supported for Hamiltonian
-  // construction, so we only set RestrictedClosedShell for all restricted cases
-  scf_config->set_scf_orbital_type(
-      is_restricted_calc ? qcs::SCFOrbitalType::RestrictedClosedShell
-                         : qcs::SCFOrbitalType::Unrestricted);
+  // construction, so we only set Restricted for all restricted cases
+  scf_config->scf_orbital_type = is_restricted_calc
+                                     ? qcs::SCFOrbitalType::Restricted
+                                     : qcs::SCFOrbitalType::Unrestricted;
 
   // Compute integrals (same size for alpha and beta)
   const size_t nactive = nactive_alpha;

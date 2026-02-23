@@ -278,7 +278,7 @@ void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
   cfg.scf_algorithm.method = SCFAlgorithmName::ASAHF;
   cfg.density_init_method = DensityInitializationMethod::Core;
   cfg.require_gradient = false;
-  cfg.set_scf_orbital_type(SCFOrbitalType::RestrictedClosedShell);
+  cfg.scf_orbital_type = SCFOrbitalType::Restricted;
   cfg.require_polarizability = false;
   cfg.exc.xc_name = "hf";
   cfg.eri.method = ERIMethod::Libint2Direct;
@@ -320,7 +320,7 @@ void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
     const RowMajorMatrix& F, const RowMajorMatrix& S, const RowMajorMatrix& X,
     RowMajorMatrix& C, RowMajorMatrix& eigenvalues, RowMajorMatrix& P,
     const int num_occupied_orbitals[2], int num_atomic_orbitals,
-    int num_molecular_orbitals, int idx_spin, bool unrestricted) {
+    int num_molecular_orbitals, int idx_spin) {
   Eigen::Map<RowMajorMatrix> C_dm(C.data(), num_atomic_orbitals,
                                   num_molecular_orbitals);
 

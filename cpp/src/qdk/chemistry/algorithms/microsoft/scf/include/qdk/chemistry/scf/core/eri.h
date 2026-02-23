@@ -39,13 +39,13 @@ class ERI {
         basis_set_(basis_set),
         mpi_(mpi) {
     switch (scf_orbital_type_) {
-      case SCFOrbitalType::RestrictedClosedShell:
+      case SCFOrbitalType::Restricted:
       case SCFOrbitalType::Unrestricted:
       case SCFOrbitalType::RestrictedOpenShell:
         break;
       default:
         throw std::invalid_argument(
-            "ERI only supports RestrictedClosedShell, Unrestricted, or "
+            "ERI only supports Restricted, Unrestricted, or "
             "RestrictedOpenShell references");
     }
   }
@@ -165,8 +165,8 @@ class ERI {
    */
   virtual void quarter_trans_impl(size_t nt, const double* C, double* out) = 0;
 
-  [[nodiscard]] bool has_spin_split_density() const {
-    return scf_orbital_type_ != SCFOrbitalType::RestrictedClosedShell;
+  bool has_spin_split_density() const {
+    return scf_orbital_type_ != SCFOrbitalType::Restricted;
   }
 
   SCFOrbitalType scf_orbital_type_;
