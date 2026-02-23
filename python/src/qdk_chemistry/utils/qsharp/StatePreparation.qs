@@ -10,20 +10,23 @@ namespace QDKChemistry.Utils.StatePreparation {
     import Std.Arrays.Subarray;
     import Std.StatePreparation.PreparePureStateD;
 
-    /// Performs state preparation for a sparse quantum state |ψ⟩ given its
-    /// sparse representation and expansion operations.
-    /// # Parameters
-    /// - `rowMap`: An array mapping the indices of the non-zero, non-duplicate elements
-    ///   in the sparse state vector.
-    /// - `stateVector`: The sparse representation of the initial quantum state |ψ⟩ as a vector of doubles.
-    /// - `expansionOps`: A list of operations (as arrays of qubit indices) to expand the initial
-    ///   state preparation into the non-sparse |ψ⟩.
+    /// A struct to hold parameters for state preparation.
+    /// - `rowMap`: An array of integers representing the mapping of qubits to rows in the state vector.
+    /// - `stateVector`: An array of doubles representing the amplitudes of the quantum state
+    /// - `expansionOps`: An array of arrays of integers representing the operations to expand the state preparation (e.g., CNOTs, X gates).
     struct StatePreparationParams {
         rowMap : Int[],
         stateVector : Double[],
         expansionOps : Int[][],
     }
 
+
+    /// Prepares a quantum state based on the provided parameters.
+    /// # Parameters
+    /// - `params`: A `StatePreparationParams` struct containing the parameters for state preparation.
+    /// - `qs`: An array of qubits on which to prepare the state.
+    /// # Returns
+    /// - `Unit`: The operation prepares the quantum state on the allocated qubits.
     operation StatePreparation(
         params : StatePreparationParams,
         qs : Qubit[],
@@ -40,10 +43,22 @@ namespace QDKChemistry.Utils.StatePreparation {
         }
     }
 
+    /// A helper function to create a callable for state preparation.
+    /// # Parameters
+    /// - `params`: A `StatePreparationParams` struct containing the parameters for state preparation.
+    /// # Returns
+    /// - `Qubit[] => Unit`: A callable that takes an array of qubits and prepares the quantum state on those qubits.
     function MakeStatePreparationOp(params : StatePreparationParams) : Qubit[] => Unit {
         StatePreparation(params, _)
     }
 
+
+    /// A helper operation to create a circuit for state preparation.
+    /// # Parameters
+    /// - `params`: A `StatePreparationParams` struct containing the parameters for state preparation.
+    /// - `numQubits`: The number of qubits to allocate for the state preparation.
+    /// # Returns
+    /// - `Unit`: The operation prepares the quantum state on the allocated qubits.
     operation MakeStatePreparationCircuit(
         params : StatePreparationParams,
         numQubits : Int,
@@ -60,6 +75,13 @@ namespace QDKChemistry.Utils.StatePreparation {
         bitStrings : Int[],
     }
 
+
+    /// Prepares a single reference quantum state |ψ⟩ corresponding to a given bitstring.
+    /// # Parameters
+    /// - `params`: A `SingleReferenceParams` struct containing the parameters for state preparation.
+    /// - `qs`: An array of qubits on which to prepare the state.
+    /// # Returns
+    /// - `Unit`: The operation prepares the quantum state on the allocated qubits.
     operation PrepareSingleReferenceState(
         params : SingleReferenceParams,
         qs : Qubit[],
@@ -72,6 +94,12 @@ namespace QDKChemistry.Utils.StatePreparation {
         }
     }
 
+    /// A helper operation to create a circuit for preparing a single reference quantum state.
+    /// # Parameters
+    /// - `params`: A `SingleReferenceParams` struct containing the parameters for state preparation.
+    /// - `numQubits`: The number of qubits to allocate for the state preparation.
+    /// # Returns
+    /// - `Unit`: The operation prepares the quantum state on the allocated qubits.
     operation MakeSingleReferenceStateCircuit(
         params : SingleReferenceParams,
         numQubits : Int,
@@ -80,6 +108,11 @@ namespace QDKChemistry.Utils.StatePreparation {
         PrepareSingleReferenceState(params, qs);
     }
 
+    /// A helper function to create a callable for preparing a single reference quantum state.
+    /// # Parameters
+    /// - `params`: A `SingleReferenceParams` struct containing the parameters for state preparation.
+    /// # Returns
+    /// - `Qubit[] => Unit`: A callable that takes an array of qubits and prepares the single reference quantum state on those qubits.
     function MakePrepareSingleReferenceStateOp(params : SingleReferenceParams) : Qubit[] => Unit {
         PrepareSingleReferenceState(params, _)
     }

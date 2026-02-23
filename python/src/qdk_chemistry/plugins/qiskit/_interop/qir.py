@@ -391,11 +391,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
 
     def _on_call_instr(self, call: pyqir.Call) -> None:
         """Handle call instructions."""
-        # Handle CNOT alias (parent only dispatches cx)
-        if call.callee.name == "__quantum__qis__cnot__body":
-            self._on_qis_cx(call, call.args[0], call.args[1])
-        else:
-            super()._on_call_instr(call)
+        super()._on_call_instr(call)
 
 
 def qir_to_qiskit(qir: pyqir.Module) -> QuantumCircuit:

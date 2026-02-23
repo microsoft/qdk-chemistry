@@ -21,6 +21,7 @@ import qsharp._native
 import qsharp.openqasm
 
 from qdk_chemistry.data.base import DataClass
+from qdk_chemistry.plugins.qiskit._interop.qir import qir_ir_to_qiskit
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
@@ -55,6 +56,14 @@ class Circuit(DataClass):
                 Valid values include "jordan-wigner", "bravyi-kitaev", "parity", or None.
                 Defaults to None.
 
+        Notes:
+            At least one representation (qasm, qir, or qsharp) must be provided.
+            If multiple representations are available, conversion methods attempt to follow this priority order:
+            - get_qasm(): Returns qasm string if available, otherwise converts from qir via Qiskit if possible.
+            - get_qir(): Returns qir if available, otherwise converts from qasm
+            - get_qsharp_circuit(): Returns qsharp if available, otherwise converts from qasm
+            - get_qiskit_circuit(): Converts from qir if available, otherwise converts from qasm
+
         """
         Logger.trace_entering()
         self.qasm = qasm
@@ -62,6 +71,8 @@ class Circuit(DataClass):
         self.qsharp = qsharp
         self._qsharp_op = qsharp_op
         self.encoding = encoding
+
+        # Check for conflicting representations
 
         # Check that a representation of the quantum circuit is given by the keyword arguments
         if not any([self.qasm, self.qsharp, self.qir]):
@@ -76,11 +87,24 @@ class Circuit(DataClass):
         Returns:
             str: The quantum circuit in QASM format.
 
-        """
-        if self.qasm is None:
-            raise RuntimeError("The quantum circuit in QASM format is not set.")
+        Notes:
+            If both QASM and QIR representations are available, this method returns the QASM string.
+            If only QIR is available, it attempts to convert it to QASM using Qiskit.
 
-        return self.qasm
+        """
+        if self.qasm is not None:
+            if self.qir:
+                Logger.warn("Both QASM and QIR representations are available. Return QASM.")
+            return self.qasm
+        if self.qir:
+            try:
+                from qiskit import qasm3  # noqa: PLC0415
+            except ImportError as err:
+                raise RuntimeError("Qiskit is not available. Cannot convert circuit to Qiskit format.") from err
+
+            return qasm3.dumps(qir_ir_to_qiskit(str(self.qir)))
+
+        raise RuntimeError("The quantum circuit in QASM format is not set.")
 
     def get_qir(self) -> qsharp._qsharp.QirInputData | str:
         """Get QIR representation of the quantum circuit.
@@ -88,8 +112,14 @@ class Circuit(DataClass):
         Returns:
             The QIR representation of the quantum circuit.
 
+        Notes:
+            If both QIR and QASM representations are available, this method returns the QIR representation.
+            If only QASM is available, it attempts to convert it to QIR using the Q# OpenQASM compiler.
+
         """
         if self.qir:
+            if self.qasm:
+                Logger.warn("Both QIR and QASM representations are available. Return QIR.")
             return self.qir
         if self.qasm:
             return qsharp.openqasm.compile(self.qasm)
@@ -102,9 +132,14 @@ class Circuit(DataClass):
         Returns:
             qsharp._native.Circuit: A qsharp Circuit object representing the trimmed circuit.
 
+        Notes:
+            If both Q# and QASM representations are available, this method returns the Q# circuit.
+            If only QASM is available, it attempts to convert it to Q#.
+
         """
-        Logger.trace_entering()
         if self.qsharp:
+            if self.qasm:
+                Logger.warn("Both Q# and QASM representations are available. Return Q# circuit.")
             return self.qsharp
         if self.qasm:
             return qsharp.openqasm.circuit(self.qasm)
@@ -117,6 +152,11 @@ class Circuit(DataClass):
         Raises:
             RuntimeError: If Qiskit is not available or if the circuit cannot be converted.
 
+        Notes:
+            This method attempts to convert the Circuit to a Qiskit QuantumCircuit object when Qiskit is installed.
+            If both QIR and QASM representations are available, this method converts from QIR.
+            If only QASM is available, it attempts to convert it to a Qiskit QuantumCircuit using Qiskit's QASM parser.
+
         """
         Logger.trace_entering()
         try:
@@ -127,10 +167,13 @@ class Circuit(DataClass):
             raise RuntimeError("Qiskit is not available. Cannot convert circuit to Qiskit format.") from err
 
         if self.qir:
+            if self.qasm:
+                Logger.warn("Both QIR and QASM representations are available. Convert from QIR.")
             return qir_ir_to_qiskit(str(self.qir))
         if self.qasm:
             return qasm3.loads(self.qasm)
 
+        # Error message why conversion failed
         raise RuntimeError("The quantum circuit cannot be converted to Qiskit format.")
 
     # DataClass interface implementation

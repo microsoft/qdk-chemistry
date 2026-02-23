@@ -43,6 +43,13 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         repetitions : Int,
     }
 
+    /// Performs repeated Controlled Time Evolution for a set of Pauli exponentials.
+    /// # Parameters
+    /// - `params`: A `RepControlledPauliExpParams` struct containing the parameters for the operation.
+    /// - `control`: The control qubit for the operation.
+    /// - `systems`: An array of qubits representing the system on which the operation acts.
+    /// # Returns
+    /// - `Unit`: The operation prepares the repeated controlled time evolution on the allocated qubits.
     operation RepControlledPauliExp(
         params : RepControlledPauliExpParams,
         control : Qubit,
@@ -53,7 +60,13 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         }
     }
 
-
+    /// A helper operation to create a circuit for repeated Controlled Time Evolution for a set of Pauli exponentials.
+    /// # Parameters
+    /// - `params`: A `RepControlledPauliExpParams` struct containing the parameters for the operation.
+    /// - `control`: The index of the control qubit.
+    /// - `system`: An array of integers representing the indices of the system qubits.
+    /// # Returns
+    /// - `Unit`: The operation prepares the repeated controlled time evolution on the allocated qubits.
     operation MakeRepControlledPauliExpCircuit(
         params : RepControlledPauliExpParams,
         control : Int,
@@ -63,6 +76,11 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         RepControlledPauliExp(params, qs[control], Subarray(system, qs));
     }
 
+    /// A helper function to create a callable for repeated Controlled Time Evolution for a set of Pauli exponentials.
+    /// # Parameters
+    /// - `params`: A `RepControlledPauliExpParams` struct containing the parameters for the operation.
+    /// # Returns
+    /// - `(Qubit, Qubit[]) => Unit`: A callable that takes a control qubit and an array of system qubits, and prepares the repeated controlled time evolution on the allocated qubits.
     function MakeRepControlledPauliExpOp(params : RepControlledPauliExpParams) : (Qubit, Qubit[]) => Unit {
         RepControlledPauliExp(params, _, _)
     }

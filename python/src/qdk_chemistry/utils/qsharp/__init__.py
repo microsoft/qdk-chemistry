@@ -11,14 +11,17 @@ from qdk import qsharp
 
 __all__ = ["QSHARP_UTILS"]
 
+_QS_FILES = [
+    Path(__file__).parent / "StatePreparation.qs",
+    Path(__file__).parent / "IterativePhaseEstimation.qs",
+    Path(__file__).parent / "ControlledPauliExp.qs",
+]
+
 
 def get_qsharp_utils():
     """Returns the Q# namespace for chemistry operations."""
     if not hasattr(qdk.code, "QDKChemistry.Utils"):
-        state_preparation_code = (Path(__file__).parent / "StatePreparation.qs").read_text()
-        iterative_phase_estimation_code = (Path(__file__).parent / "IterativePhaseEstimation.qs").read_text()
-        controlled_pauli_exp_code = (Path(__file__).parent / "ControlledPauliExp.qs").read_text()
-        code = state_preparation_code + "\n" + iterative_phase_estimation_code + "\n" + controlled_pauli_exp_code
+        code = "\n".join(f.read_text() for f in _QS_FILES)
         qsharp.eval(code)
     return qdk.code.QDKChemistry.Utils
 
