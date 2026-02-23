@@ -73,12 +73,27 @@ class Trotter(TimeEvolutionBuilder):
     ):
         r"""Initialize Trotter builder with specified Trotter decomposition settings.
 
+        The Trotter decomposition approximates the time evolution operator :math:`e^{-iHt}`
+        when the Hamiltonian :math:`H` can be expressed as a sum of terms :math:`H = \sum_j \alpha_j P_j`
+        where :math:`P_j` are Pauli strings and :math:`\alpha_j` are scalar coefficients. Rather than
+        exponentiating the full Hamiltonian at once, the Trotter method constructs an approximation by
+        exponentiating each term separately and combining them in a product formula. For example,
+        the first-order Trotter formula approximates the time evolution operator as
+
+        :math:`e^{-iHt} \approx \left[\prod_j e^{-i\alpha_j P_j t/N}\right]^N`, where :math:`N` is the number of
+        divisions.
+
         The number of divisions *N* can be determined automatically from
         *target_accuracy*, fixed explicitly via *num_divisions*, or both
         (in which case the larger value is used).
 
-        Two error-bound strategies are available (used only when
-        *target_accuracy* is set):
+        The error associated with the Trotter decomposition, :math:`S(t)`, can be expressted in terms of the
+        spectral norm of the difference between the exact and approximate time evolution operators:
+
+        :math:`\lVert e^{-iHt} - S(t) \rVert \leq \epsilon`
+
+        However, the cost of computing this norm is equivalent to computing the exact exponential itself. For this
+        reason, we provide two approximate error-bound strategies (used only when *target_accuracy* is set):
 
         * ``"commutator"`` (default, tighter): uses the commutator-based bound
           from Childs *et al.* (2021).  :math:`N = \lceil \frac{t^{2}}{2\epsilon}
