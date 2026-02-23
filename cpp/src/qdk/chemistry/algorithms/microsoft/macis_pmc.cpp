@@ -184,6 +184,11 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MacisPmc::_run_impl(
   QDK_LOG_TRACE_ENTERING();
 
   const auto& orbitals = hamiltonian->get_orbitals();
+  if (hamiltonian->is_unrestricted()) {
+    throw std::runtime_error(
+        "MacisPmc does not support unrestricted orbitals. "
+        "Only restricted orbitals are supported.");
+  }
   std::vector<size_t> active_indices =
       orbitals->get_active_space_indices().first;
   auto result = dispatch_by_norb<pmc_helper>(

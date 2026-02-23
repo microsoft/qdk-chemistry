@@ -588,8 +588,8 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMs) {
                             testing::wf_tolerance));
 }
 
-// Test JSON serialization with RDMs for unrestricted system
-TEST_F(CasWavefunctionTest, JsonSerializationRDMsUnrestricted) {
+// Test JSON serialization with RDMs for open shell system
+TEST_F(CasWavefunctionTest, JsonSerializationRDMsOpenShell) {
   // create H2+ cation structure (charge=1, multiplicity=2)
   std::vector<Eigen::Vector3d> coords = {{0., 0., 0.}, {1.4, 0., 0.}};
   std::vector<std::string> symbols = {"H", "H"};
@@ -598,18 +598,25 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMsUnrestricted) {
 
   // scf
   auto scf_solver = ScfSolverFactory::create();
-  auto [E_default, wfn_default] = scf_solver->run(structure, 1, 2, basis_set);
+  auto [E_default, wfn_default] = scf_solver->run(structure, -1, 2, basis_set);
+
+  // fake restricted orbitals from unrestricted SCF
+  auto orbitals = wfn_default->get_orbitals();
+  auto restricted_orbitals = std::make_shared<Orbitals>(
+      orbitals->get_coefficients().first, orbitals->get_energies().first,
+      orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
+      std::make_tuple(orbitals->get_active_space_indices().first,
+                      orbitals->get_inactive_space_indices().first));
 
   // build hamiltonian
   auto ham_gen = HamiltonianConstructorFactory::create();
-  auto H = ham_gen->run(wfn_default->get_orbitals());
+  auto H = ham_gen->run(restricted_orbitals);
 
   // run CAS with RDM calculation
   auto mc = MultiConfigurationCalculatorFactory::create();
   mc->settings().set("calculate_one_rdm", true);
   mc->settings().set("calculate_two_rdm", true);
-  auto [E_cas, wfn_cas] =
-      mc->run(H, 1, 2);  // 1 electron in active space, 2 orbitals
+  auto [E_cas, wfn_cas] = mc->run(H, 2, 1);
 
   const auto& original = wfn_cas->get_container<CasWavefunctionContainer>();
 
@@ -618,8 +625,8 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMsUnrestricted) {
   EXPECT_TRUE(original.has_two_rdm_spin_dependent());
   EXPECT_TRUE(original.has_two_rdm_spin_traced());
 
-  // Verify it's unrestricted
-  EXPECT_FALSE(original.get_orbitals()->is_restricted());
+  // Verify it's restricted
+  EXPECT_TRUE(original.get_orbitals()->is_restricted());
 
   // Serialize to JSON
   nlohmann::json j = original.to_json();
@@ -643,8 +650,8 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMsUnrestricted) {
   EXPECT_TRUE(restored->has_two_rdm_spin_dependent());
   EXPECT_TRUE(restored->has_two_rdm_spin_traced());
 
-  // Verify it's still unrestricted
-  EXPECT_FALSE(restored->get_orbitals()->is_restricted());
+  // Verify it's still restricted
+  EXPECT_TRUE(restored->get_orbitals()->is_restricted());
 
   // Verify that alpha and beta RDMs match
   auto [restored_aa_rdm, restored_bb_rdm] =
@@ -830,8 +837,8 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationRDMs) {
   }
 }
 
-// Test serialization with RDMs for unrestricted system
-TEST_F(CasWavefunctionTest, Hdf5SerializationRDMsUnrestricted) {
+// Test serialization with RDMs for open shell system
+TEST_F(CasWavefunctionTest, Hdf5SerializationRDMsOpenShell) {
   // create H2+ cation structure (charge=1, multiplicity=2)
   std::vector<Eigen::Vector3d> coords = {{0., 0., 0.}, {1.4, 0., 0.}};
   std::vector<std::string> symbols = {"H", "H"};
@@ -840,18 +847,25 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationRDMsUnrestricted) {
 
   // scf
   auto scf_solver = ScfSolverFactory::create();
-  auto [E_default, wfn_default] = scf_solver->run(structure, 1, 2, basis_set);
+  auto [E_default, wfn_default] = scf_solver->run(structure, -1, 2, basis_set);
+
+  // fake restricted orbitals from unrestricted SCF
+  auto orbitals = wfn_default->get_orbitals();
+  auto restricted_orbitals = std::make_shared<Orbitals>(
+      orbitals->get_coefficients().first, orbitals->get_energies().first,
+      orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
+      std::make_tuple(orbitals->get_active_space_indices().first,
+                      orbitals->get_inactive_space_indices().first));
 
   // build hamiltonian
   auto ham_gen = HamiltonianConstructorFactory::create();
-  auto H = ham_gen->run(wfn_default->get_orbitals());
+  auto H = ham_gen->run(restricted_orbitals);
 
   // run CAS with RDM calculation
   auto mc = MultiConfigurationCalculatorFactory::create();
   mc->settings().set("calculate_one_rdm", true);
   mc->settings().set("calculate_two_rdm", true);
-  auto [E_cas, wfn_cas] =
-      mc->run(H, 1, 2);  // 1 electron in active space, 2 orbitals
+  auto [E_cas, wfn_cas] = mc->run(H, 2, 1);
 
   const auto& original = wfn_cas->get_container<CasWavefunctionContainer>();
 
@@ -860,11 +874,11 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationRDMsUnrestricted) {
   EXPECT_TRUE(original.has_two_rdm_spin_dependent());
   EXPECT_TRUE(original.has_two_rdm_spin_traced());
 
-  // Verify it's unrestricted
-  EXPECT_FALSE(original.get_orbitals()->is_restricted());
+  // Verify it's restricted
+  EXPECT_TRUE(original.get_orbitals()->is_restricted());
 
   // save to hdf5
-  std::string filename = "test_cas_rdm_unrestricted_serialization.h5";
+  std::string filename = "test_cas_rdm_openshell_serialization.h5";
   {
     H5::H5File file(filename, H5F_ACC_TRUNC);
     H5::Group root = file.openGroup("/");
@@ -881,8 +895,8 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationRDMsUnrestricted) {
     EXPECT_TRUE(restored->has_two_rdm_spin_dependent());
     EXPECT_TRUE(restored->has_two_rdm_spin_traced());
 
-    // Verify it's still unrestricted
-    EXPECT_FALSE(restored->get_orbitals()->is_restricted());
+    // Verify it's still restricted
+    EXPECT_TRUE(restored->get_orbitals()->is_restricted());
 
     // Verify that alpha and beta RDMs match
     auto [restored_aa_rdm, restored_bb_rdm] =
