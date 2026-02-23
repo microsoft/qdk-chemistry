@@ -30,8 +30,6 @@ class DIIS {
    * @brief Construct DIIS implementation
    *
    * @param[in] ctx SCFContext reference
-   * @param[in] rohf_enabled Indicates if ROHF support is requested (affects
-   * error construction)
    * @param[in] subspace_size Maximum number of vectors to retain in DIIS
    * subspace
    */
