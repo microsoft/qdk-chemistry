@@ -124,14 +124,24 @@ class LatticeGraph : public DataClass {
   std::uint64_t num_edges() const;
 
   /**
-   * @brief Create a one-dimensional chain (or ring) lattice.
+   * @brief Create a one-dimensional chain lattice.
    *
-   * Sites are labelled 0 ... n − 1 with nearest-neighbour edges.
+   * Sites are labelled 0 ... n-1 with nearest-neighbour edges.
+   *
+   * @code
+   *   Example: chain (n=4)
+   *
+   *     0 --- 1 --- 2 --- 3
+   *
+   * @endcode
+   *
+   *   With periodic boundary condition:
+   *     - Wrap bond: (n-1) -- 0  e.g. 3 -- 0
    *
    * @param n        Number of sites.
    * @param periodic If true, add an edge between the first and last site
-   *                 (ring topology). Requires n > 2.
-   * @param t        Uniform hopping weight for every edge (default 1.0).
+   *                 (ring topology). Requires n > 2. Default: false.
+   * @param t        Uniform hopping weight for every edge. Default: 1.0.
    * @throws std::invalid_argument If n == 0.
    */
   static LatticeGraph chain(std::uint64_t n, bool periodic = false,
@@ -141,16 +151,160 @@ class LatticeGraph : public DataClass {
    * @brief Create a two-dimensional square lattice.
    *
    * Sites are indexed in row-major order: site index = y * nx + x.
+   * Total sites: nx * ny.
    *
-   * @param nx       Number of sites along the x-axis.
-   * @param ny       Number of sites along the y-axis.
-   * @param periodic If true, apply periodic boundary conditions in both
-   *                 directions.
-   * @param t        Uniform hopping weight (default 1.0).
+   * @code
+   *   Example: 4x3 square lattice
+   *
+   *     8 --- 9 ---10 ---11
+   *     |     |     |     |
+   *     4 --- 5 --- 6 --- 7
+   *     |     |     |     |
+   *     0 --- 1 --- 2 --- 3
+   *
+   * @endcode
+   *
+   * With periodic boundary conditions (using the 4x3 example above):
+   *   - periodic_x wraps right to left:  3 -- 0, 7 -- 4, 11 -- 8
+   *   - periodic_y wraps top to bottom:  8 -- 0, 9 -- 1, 10 -- 2, 11 -- 3
+   *
+   * @param nx         Number of sites along the x-axis.
+   * @param ny         Number of sites along the y-axis.
+   * @param periodic_x If true, apply periodic boundary conditions along x.
+   * Requires nx >= 2. Default: false.
+   * @param periodic_y If true, apply periodic boundary conditions along y.
+   * Requires ny >= 2. Default: false.
+   * @param t          Uniform hopping weight. Default: 1.0.
    * @throws std::invalid_argument If nx or ny is 0.
    */
   static LatticeGraph square(std::uint64_t nx, std::uint64_t ny,
-                             bool periodic = false, double t = 1.0);
+                             bool periodic_x = false, bool periodic_y = false,
+                             double t = 1.0);
+
+  /**
+   * @brief Create a two-dimensional triangular lattice.
+   *
+   * Sites are indexed in row-major order: site index = y * nx + x.
+   * Total sites: nx * ny. Each site connects to its right and upper
+   * square-lattice neighbours plus the upper-right diagonal neighbour,
+   * forming a triangulation of the plane.
+   *
+   * @code
+   *   Example: 3x3 triangular lattice
+   *
+   *      6 --- 7 --- 8
+   *      |  /  |  /  |
+   *      3 --- 4 --- 5
+   *      |  /  |  /  |
+   *      0 --- 1 --- 2
+   *
+   * @endcode
+   *
+   * With periodic boundary conditions (using the 3x3 example above):
+   *   - periodic_x wraps right to left:  2 -- 0, 5 -- 3, 8 -- 6
+   *   - periodic_y wraps top to bottom:  6 -- 0, 7 -- 1, 8 -- 2
+   *   - Diagonal wraps require both periodic_x and periodic_y: 8 -- 0
+   *
+   * @param nx         Number of sites along the x-axis.
+   * @param ny         Number of sites along the y-axis.
+   * @param periodic_x If true, apply periodic boundary conditions along x.
+   * Requires nx >= 2. Default: false.
+   * @param periodic_y If true, apply periodic boundary conditions along y.
+   * Requires ny >= 2. Default: false.
+   * @param t          Uniform hopping weight. Default: 1.0.
+   * @throws std::invalid_argument If nx or ny is 0.
+   */
+  static LatticeGraph triangular(std::uint64_t nx, std::uint64_t ny,
+                                 bool periodic_x = false,
+                                 bool periodic_y = false, double t = 1.0);
+
+  /**
+   * @brief Create a two-dimensional honeycomb lattice.
+   *
+   * The honeycomb lattice has two sites per unit cell (A and B sublattices).
+   * Unit cells are arranged on a rectangular grid of size nx x ny, giving a
+   * total of 2 * nx * ny sites.  Sites are indexed as:
+   *   A-sublattice: 2 * (y * nx + x)
+   *   B-sublattice: 2 * (y * nx + x) + 1
+   *
+   * @code
+   *   Example: 3x4 honeycomb
+   *
+   *               18-19-20-21-22-23
+   *                |     |     |
+   *            12-13-14-15-16-17
+   *             |     |     |
+   *          6--7--8--9-10-11
+   *          |     |     |
+   *       0--1--2--3--4--5
+   *
+   * @endcode
+   *
+   * With periodic boundary conditions (using the 3x4 example above):
+   *   - periodic_x wraps right to left: 5 -- 0, 11 -- 6, 17 -- 12, 23 -- 18
+   *   - periodic_y wraps top to bottom: 19 -- 0, 15 -- 2, 17 -- 4
+   *
+   * @param nx         Number of unit cells along the x-axis.
+   * @param ny         Number of unit cells along the y-axis.
+   * @param periodic_x If true, apply periodic boundary conditions along x.
+   * Requires nx >= 2. Default: false.
+   * @param periodic_y If true, apply periodic boundary conditions along y.
+   * Requires ny >= 2. Default: false.
+   * @param t          Uniform hopping weight. Default: 1.0.
+   * @throws std::invalid_argument If nx or ny is 0.
+   */
+  static LatticeGraph honeycomb(std::uint64_t nx, std::uint64_t ny,
+                                bool periodic_x = false,
+                                bool periodic_y = false, double t = 1.0);
+
+  /**
+   * @brief Create a two-dimensional kagome lattice.
+   *
+   * The kagome lattice has three sites per unit cell, arranged as
+   * corner-sharing triangles.  Unit cells are on a rectangular grid of
+   * size nx x ny, giving a total of 3 * nx * ny sites.  Sites are indexed
+   * as:
+   *   site 0: 3 * (y * nx + x)
+   *   site 1: 3 * (y * nx + x) + 1
+   *   site 2: 3 * (y * nx + x) + 2
+   *
+   * @code
+   *   Unit cell (up-triangle):
+   *
+   *           2
+   *          / \
+   *         0---1
+   *
+   *   Example: 3x2 kagome
+   *
+   *         11       14       17
+   *        /  \     /  \     /  \
+   *       9---10--12---13--15---16
+   *      /     \  /     \  /
+   *     2       5        8
+   *    / \     / \      / \
+   *   0---1---3---4----6---7
+   *
+   * @endcode
+   *
+   * With periodic boundary conditions (using the 3x2 example above):
+   *   - periodic_x wraps right to left: 0 -- 7, 9 -- 16, 2 -- 16
+   *   - periodic_y wraps top to bottom: 0 -- 11, 3 -- 14, 6 -- 17, 1 -- 14, 4
+   * -- 17
+   *   - Diagonal wraps (require both periodic_x and periodic_y): 7 -- 11
+   *
+   * @param nx         Number of unit cells along the x-axis.
+   * @param ny         Number of unit cells along the y-axis.
+   * @param periodic_x If true, apply periodic boundary conditions along x.
+   * Requires nx >= 2. Default: false.
+   * @param periodic_y If true, apply periodic boundary conditions along y.
+   * Requires ny >= 2. Default: false.
+   * @param t          Uniform hopping weight. Default: 1.0.
+   * @throws std::invalid_argument If nx or ny is 0.
+   */
+  static LatticeGraph kagome(std::uint64_t nx, std::uint64_t ny,
+                             bool periodic_x = false, bool periodic_y = false,
+                             double t = 1.0);
 
   /**
    * @brief Get the data type name for this class.

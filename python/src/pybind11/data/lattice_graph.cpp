@@ -148,14 +148,26 @@ Returns:
       .def_static("chain", &LatticeGraph::chain, R"(
 Create a one-dimensional chain lattice.
 
+Sites are labelled 0 ... n-1 with nearest-neighbour edges.
+
+Example: chain (n=4)::
+
+    0 --- 1 --- 2 --- 3
+
+With periodic boundary condition:
+    - Wrap bond: (n-1) -- 0  e.g. 3 -- 0
+
 Args:
     n (int): Number of sites.
-    periodic (bool, optional): If True, add a periodic boundary edge
-        connecting the last site to the first. Defaults to False.
+    periodic (bool, optional): If True, add an edge between the first and
+        last site (ring topology). Requires n > 2. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
 
 Returns:
     LatticeGraph: Chain lattice with n sites.
+
+Raises:
+    ValueError: If n == 0.
 
 Examples:
     >>> chain = LatticeGraph.chain(6)
@@ -166,18 +178,167 @@ Examples:
       .def_static("square", &LatticeGraph::square, R"(
 Create a two-dimensional square lattice.
 
+Sites are indexed in row-major order: site index = y * nx + x.
+Total sites: nx * ny.
+
+Example: 4x3 square lattice::
+
+    8 --- 9 ---10 ---11
+    |     |     |     |
+    4 --- 5 --- 6 --- 7
+    |     |     |     |
+    0 --- 1 --- 2 --- 3
+
+With periodic boundary conditions (using the 4x3 example above):
+    - periodic_x wraps right to left:  3 -- 0, 7 -- 4, 11 -- 8
+    - periodic_y wraps top to bottom:  8 -- 0, 9 -- 1, 10 -- 2, 11 -- 3
+
 Args:
     nx (int): Number of sites along x.
     ny (int): Number of sites along y.
-    periodic (bool, optional): If True, apply periodic boundary conditions
-        in both directions. Defaults to False.
+    periodic_x (bool, optional): If True, apply periodic boundary conditions
+        along x. Requires nx >= 2. Defaults to False.
+    periodic_y (bool, optional): If True, apply periodic boundary conditions
+        along y. Requires ny >= 2. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
 
 Returns:
     LatticeGraph: Square lattice with nx * ny sites.
+
+Raises:
+    ValueError: If nx or ny is 0.
 )",
-                  py::arg("nx"), py::arg("ny"), py::arg("periodic") = false,
-                  py::arg("t") = 1.0)
+                  py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
+                  py::arg("periodic_y") = false, py::arg("t") = 1.0)
+
+      .def_static("triangular", &LatticeGraph::triangular, R"(
+Create a two-dimensional triangular lattice.
+
+Sites are indexed in row-major order: site index = y * nx + x.
+Total sites: nx * ny. Each site connects to its right and upper
+square-lattice neighbours plus the upper-right diagonal neighbour,
+forming a triangulation of the plane.
+
+Example: 3x3 triangular lattice::
+
+    6 --- 7 --- 8
+    |  /  |  /  |
+    3 --- 4 --- 5
+    |  /  |  /  |
+    0 --- 1 --- 2
+
+With periodic boundary conditions (using the 3x3 example above):
+    - periodic_x wraps right to left:  2 -- 0, 5 -- 3, 8 -- 6
+    - periodic_y wraps top to bottom:  6 -- 0, 7 -- 1, 8 -- 2
+    - Diagonal wraps require both periodic_x and periodic_y: 8 -- 0
+
+Args:
+    nx (int): Number of sites along x.
+    ny (int): Number of sites along y.
+    periodic_x (bool, optional): If True, apply periodic boundary conditions
+        along x. Requires nx >= 2. Defaults to False.
+    periodic_y (bool, optional): If True, apply periodic boundary conditions
+        along y. Requires ny >= 2. Defaults to False.
+    t (float, optional): Hopping weight for all edges. Defaults to 1.0.
+
+Returns:
+    LatticeGraph: Triangular lattice with nx * ny sites.
+
+Raises:
+    ValueError: If nx or ny is 0.
+)",
+                  py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
+                  py::arg("periodic_y") = false, py::arg("t") = 1.0)
+
+      .def_static("honeycomb", &LatticeGraph::honeycomb, R"(
+Create a two-dimensional honeycomb lattice.
+
+The honeycomb lattice has two sites per unit cell (A and B sublattices).
+Unit cells are arranged on a rectangular grid of size nx x ny, giving a
+total of 2 * nx * ny sites. Sites are indexed as:
+    A-sublattice: 2 * (y * nx + x)
+    B-sublattice: 2 * (y * nx + x) + 1
+
+Example: 3x4 honeycomb (brick-wall representation)::
+
+              18-19-20-21-22-23
+               |     |     |
+           12-13-14-15-16-17
+            |     |     |
+         6--7--8--9-10-11
+         |     |     |
+      0--1--2--3--4--5
+
+With periodic boundary conditions (using the 3x4 example above):
+    - periodic_x wraps right to left: 5 -- 0, 11 -- 6, 17 -- 12, 23 -- 18
+    - periodic_y wraps top to bottom: 19 -- 0, 15 -- 2, 17 -- 4
+
+Args:
+    nx (int): Number of unit cells along x.
+    ny (int): Number of unit cells along y.
+    periodic_x (bool, optional): If True, apply periodic boundary conditions
+        along x. Requires nx >= 2. Defaults to False.
+    periodic_y (bool, optional): If True, apply periodic boundary conditions
+        along y. Requires ny >= 2. Defaults to False.
+    t (float, optional): Hopping weight for all edges. Defaults to 1.0.
+
+Returns:
+    LatticeGraph: Honeycomb lattice with 2 * nx * ny sites.
+
+Raises:
+    ValueError: If nx or ny is 0.
+)",
+                  py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
+                  py::arg("periodic_y") = false, py::arg("t") = 1.0)
+
+      .def_static("kagome", &LatticeGraph::kagome, R"(
+Create a two-dimensional kagome lattice.
+
+The kagome lattice has three sites per unit cell, arranged as
+corner-sharing triangles. Unit cells are on a rectangular grid of
+size nx x ny, giving a total of 3 * nx * ny sites. Sites are indexed as:
+    site 0: 3 * (y * nx + x)
+    site 1: 3 * (y * nx + x) + 1
+    site 2: 3 * (y * nx + x) + 2
+
+Unit cell (up-triangle)
+
+        2
+       / \
+      0---1
+
+Example: 3x2 kagome
+
+        11       14       17
+       /  \     /  \     /  \
+      9---10--12---13--15---16
+     /     \  /     \  /
+    2       5        8
+   / \     / \      / \
+  0---1---3---4----6---7
+
+With periodic boundary conditions (using the 3x2 example above):
+    - periodic_x wraps right to left: 0 -- 7, 9 -- 16, 2 -- 16
+    - periodic_y wraps top to bottom: 0 -- 11, 3 -- 14, 6 -- 17, 1 -- 14, 4 -- 17
+    - Diagonal wraps (require both periodic_x and periodic_y): 7 -- 11
+
+Args:
+    nx (int): Number of unit cells along x.
+    ny (int): Number of unit cells along y.
+    periodic_x (bool, optional): If True, apply periodic boundary conditions
+        along x. Requires nx >= 2. Defaults to False.
+    periodic_y (bool, optional): If True, apply periodic boundary conditions
+        along y. Requires ny >= 2. Defaults to False.
+    t (float, optional): Hopping weight for all edges. Defaults to 1.0.
+
+Returns:
+    LatticeGraph: Kagome lattice with 3 * nx * ny sites.
+
+Raises:
+    ValueError: If nx or ny is 0.
+)",
+                  py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
+                  py::arg("periodic_y") = false, py::arg("t") = 1.0)
 
       .def("__repr__",
            [](const LatticeGraph& self) {

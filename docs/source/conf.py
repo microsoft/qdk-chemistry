@@ -150,6 +150,7 @@ primary_domain = "py"  # Set Python as the primary documentation domain
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "qiskit": ("https://quantum.cloud.ibm.com/docs/api/qiskit/", None),
 }
 
@@ -182,6 +183,7 @@ nitpick_ignore_regex = [
     (r"cpp:identifier", r"VariantMember<.*>"),
     (r"cpp:identifier", r"Vector<.*>"),
     (r"cpp:identifier", r"SupportedSettingType<.*>"),
+    (r"py:class", r"scipy.*"),
     (r"py:class", r"h5py.*"),
     (r"py:class", r"numpy.*"),
     (r"py:class", r"pathlib.*"),

@@ -162,13 +162,15 @@ LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t) {
 }
 
 LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
-                                  bool periodic, double t) {
+                                  bool periodic_x, bool periodic_y, double t) {
   if (nx == 0 || ny == 0) {
     throw std::invalid_argument("square: nx and ny must be > 0.");
   }
-  if (periodic && (nx < 2 || ny < 2)) {
-    throw std::invalid_argument(
-        "square: periodic boundary condition requires nx and ny > 1.");
+  if (periodic_x && nx < 2) {
+    throw std::invalid_argument("square: periodic_x requires nx > 1.");
+  }
+  if (periodic_y && ny < 2) {
+    throw std::invalid_argument("square: periodic_y requires ny > 1.");
   }
 
   auto Nx = static_cast<int>(nx);
@@ -187,15 +189,197 @@ LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
       if (x + 1 < Nx) {
         detail::add_edge(triplets, idx(x, y), idx(x + 1, y), t);
         // periodic boundary
-      } else if (periodic) {
+      } else if (periodic_x) {
         detail::add_edge(triplets, idx(x, y), idx(0, y), t);
       }
       // Upper neighbour
       if (y + 1 < Ny) {
         detail::add_edge(triplets, idx(x, y), idx(x, y + 1), t);
         // periodic boundary
-      } else if (periodic) {
+      } else if (periodic_y) {
         detail::add_edge(triplets, idx(x, y), idx(x, 0), t);
+      }
+    }
+  }
+
+  Eigen::SparseMatrix<double> adj(N, N);
+  adj.setFromTriplets(triplets.begin(), triplets.end());
+  adj.makeCompressed();
+  return LatticeGraph(adj, false);
+}
+
+LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
+                                      bool periodic_x, bool periodic_y,
+                                      double t) {
+  if (nx == 0 || ny == 0) {
+    throw std::invalid_argument("triangular: nx and ny must be > 0.");
+  }
+  if (periodic_x && nx < 2) {
+    throw std::invalid_argument("triangular: periodic_x requires nx > 1.");
+  }
+  if (periodic_y && ny < 2) {
+    throw std::invalid_argument("triangular: periodic_y requires ny > 1.");
+  }
+
+  auto Nx = static_cast<int>(nx);
+  auto Ny = static_cast<int>(ny);
+  int N = Nx * Ny;
+
+  auto idx = [Nx](int x, int y) { return y * Nx + x; };
+
+  std::vector<detail::Triplet> triplets;
+  triplets.reserve(6 * N);
+
+  for (int y = 0; y < Ny; ++y) {
+    for (int x = 0; x < Nx; ++x) {
+      // Right neighbour
+      if (x + 1 < Nx) {
+        detail::add_edge(triplets, idx(x, y), idx(x + 1, y), t);
+      } else if (periodic_x) {
+        detail::add_edge(triplets, idx(x, y), idx(0, y), t);
+      }
+      // Upper neighbour
+      if (y + 1 < Ny) {
+        detail::add_edge(triplets, idx(x, y), idx(x, y + 1), t);
+      } else if (periodic_y) {
+        detail::add_edge(triplets, idx(x, y), idx(x, 0), t);
+      }
+      // Diagonal neighbour (upper-right)
+      if (x + 1 < Nx && y + 1 < Ny) {
+        detail::add_edge(triplets, idx(x, y), idx(x + 1, y + 1), t);
+      } else if (x + 1 >= Nx && y + 1 < Ny && periodic_x) {
+        // x wraps, y does not
+        detail::add_edge(triplets, idx(x, y), idx(0, y + 1), t);
+      } else if (x + 1 < Nx && y + 1 >= Ny && periodic_y) {
+        // y wraps, x does not
+        detail::add_edge(triplets, idx(x, y), idx(x + 1, 0), t);
+      } else if (x + 1 >= Nx && y + 1 >= Ny && periodic_x && periodic_y) {
+        // both wrap (corner)
+        detail::add_edge(triplets, idx(x, y), idx(0, 0), t);
+      }
+    }
+  }
+
+  Eigen::SparseMatrix<double> adj(N, N);
+  adj.setFromTriplets(triplets.begin(), triplets.end());
+  adj.makeCompressed();
+  return LatticeGraph(adj, false);
+}
+
+LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
+                                     bool periodic_x, bool periodic_y,
+                                     double t) {
+  if (nx == 0 || ny == 0) {
+    throw std::invalid_argument("honeycomb: nx and ny must be > 0.");
+  }
+  if (periodic_x && nx < 2) {
+    throw std::invalid_argument("honeycomb: periodic_x requires nx > 1.");
+  }
+  if (periodic_y && ny < 2) {
+    throw std::invalid_argument("honeycomb: periodic_y requires ny > 1.");
+  }
+
+  auto Nx = static_cast<int>(nx);
+  auto Ny = static_cast<int>(ny);
+  int N = 2 * Nx * Ny;  // 2 sites per unit cell
+
+  // Site indices within unit cell (x, y):
+  //   A = 2 * (y * Nx + x),  B = 2 * (y * Nx + x) + 1
+  auto idxA = [Nx](int x, int y) { return 2 * (y * Nx + x); };
+  auto idxB = [Nx](int x, int y) { return 2 * (y * Nx + x) + 1; };
+
+  std::vector<detail::Triplet> triplets;
+  triplets.reserve(3 * N);
+
+  for (int y = 0; y < Ny; ++y) {
+    for (int x = 0; x < Nx; ++x) {
+      // Intra-cell bond: A -- B
+      detail::add_edge(triplets, idxA(x, y), idxB(x, y), t);
+
+      // Inter-cell bond 1: B(x,y) -- A(x+1, y)  (horizontal)
+      if (x + 1 < Nx) {
+        detail::add_edge(triplets, idxB(x, y), idxA(x + 1, y), t);
+      } else if (periodic_x) {
+        detail::add_edge(triplets, idxB(x, y), idxA(0, y), t);
+      }
+
+      // Inter-cell bond 2: B(x,y) -- A(x, y+1)  (vertical)
+      if (y + 1 < Ny) {
+        detail::add_edge(triplets, idxB(x, y), idxA(x, y + 1), t);
+      } else if (periodic_y) {
+        detail::add_edge(triplets, idxB(x, y), idxA(x, 0), t);
+      }
+    }
+  }
+
+  Eigen::SparseMatrix<double> adj(N, N);
+  adj.setFromTriplets(triplets.begin(), triplets.end());
+  adj.makeCompressed();
+  return LatticeGraph(adj, false);
+}
+
+LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
+                                  bool periodic_x, bool periodic_y, double t) {
+  if (nx == 0 || ny == 0) {
+    throw std::invalid_argument("kagome: nx and ny must be > 0.");
+  }
+  if (periodic_x && nx < 2) {
+    throw std::invalid_argument("kagome: periodic_x requires nx > 1.");
+  }
+  if (periodic_y && ny < 2) {
+    throw std::invalid_argument("kagome: periodic_y requires ny > 1.");
+  }
+
+  auto Nx = static_cast<int>(nx);
+  auto Ny = static_cast<int>(ny);
+  int N = 3 * Nx * Ny;  // 3 sites per unit cell
+
+  // Layout per unit cell:
+  //   s0 -- s1  (horizontal edge, bottom of up-triangle)
+  //   s0 -- s2  (left edge of up-triangle)
+  //   s1 -- s2  (right edge of up-triangle)
+  // Inter-cell bonds form the down-triangles.
+  auto idx = [Nx](int x, int y, int s) { return 3 * (y * Nx + x) + s; };
+
+  std::vector<detail::Triplet> triplets;
+  triplets.reserve(6 * N);  // 4 edges per site, stored as pairs
+
+  for (int y = 0; y < Ny; ++y) {
+    for (int x = 0; x < Nx; ++x) {
+      // Intra-cell (up-triangle) edges
+      detail::add_edge(triplets, idx(x, y, 0), idx(x, y, 1), t);
+      detail::add_edge(triplets, idx(x, y, 0), idx(x, y, 2), t);
+      detail::add_edge(triplets, idx(x, y, 1), idx(x, y, 2), t);
+
+      // Inter-cell edges (down-triangle connections)
+      // s1(x,y) -- s0(x+1, y)  (horizontal, right)
+      if (x + 1 < Nx) {
+        detail::add_edge(triplets, idx(x, y, 1), idx(x + 1, y, 0), t);
+      } else if (periodic_x) {
+        detail::add_edge(triplets, idx(x, y, 1), idx(0, y, 0), t);
+      }
+
+      // s2(x,y) -- s0(x, y+1)  (vertical, up)
+      if (y + 1 < Ny) {
+        detail::add_edge(triplets, idx(x, y, 2), idx(x, y + 1, 0), t);
+      } else if (periodic_y) {
+        detail::add_edge(triplets, idx(x, y, 2), idx(x, 0, 0), t);
+      }
+
+      // s2(x,y) -- s1(x-1, y+1)  (diagonal, upper-left)
+      if (x - 1 >= 0 && y + 1 < Ny) {
+        detail::add_edge(triplets, idx(x, y, 2), idx(x - 1, y + 1, 1), t);
+      } else if (x - 1 < 0 && y + 1 < Ny && periodic_x) {
+        // x wraps, y does not
+        int xl = (x - 1 + Nx) % Nx;
+        detail::add_edge(triplets, idx(x, y, 2), idx(xl, y + 1, 1), t);
+      } else if (x - 1 >= 0 && y + 1 >= Ny && periodic_y) {
+        // y wraps, x does not
+        detail::add_edge(triplets, idx(x, y, 2), idx(x - 1, 0, 1), t);
+      } else if (x - 1 < 0 && y + 1 >= Ny && periodic_x && periodic_y) {
+        // both wrap (corner)
+        int xl = (x - 1 + Nx) % Nx;
+        detail::add_edge(triplets, idx(x, y, 2), idx(xl, 0, 1), t);
       }
     }
   }
