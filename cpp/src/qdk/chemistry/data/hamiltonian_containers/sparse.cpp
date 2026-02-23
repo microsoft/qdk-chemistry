@@ -6,7 +6,7 @@
 #include <iomanip>
 #include <limits>
 #include <numeric>
-#include <qdk/chemistry/data/hamiltonian_containers/model_hamil.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
@@ -17,7 +17,7 @@
 
 namespace qdk::chemistry::data {
 
-ModelHamiltonianContainer::ModelHamiltonianContainer(
+SparseHamiltonianContainer::SparseHamiltonianContainer(
     Eigen::SparseMatrix<double> one_body_integrals,
     TwoBodyMap two_body_integrals, double core_energy, HamiltonianType type)
     : HamiltonianContainer(
@@ -30,7 +30,7 @@ ModelHamiltonianContainer::ModelHamiltonianContainer(
       _one_body_sparse(std::move(one_body_integrals)),
       _two_body_map(std::move(two_body_integrals)) {}
 
-ModelHamiltonianContainer::ModelHamiltonianContainer(
+SparseHamiltonianContainer::SparseHamiltonianContainer(
     Eigen::SparseMatrix<double> one_body_integrals, double core_energy,
     HamiltonianType type)
     : HamiltonianContainer(
@@ -42,7 +42,7 @@ ModelHamiltonianContainer::ModelHamiltonianContainer(
           type),
       _one_body_sparse(std::move(one_body_integrals)) {}
 
-ModelHamiltonianContainer::ModelHamiltonianContainer(
+SparseHamiltonianContainer::SparseHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals,
     const Eigen::VectorXd& two_body_integrals, double core_energy,
     HamiltonianType type)
@@ -57,7 +57,7 @@ ModelHamiltonianContainer::ModelHamiltonianContainer(
       _two_body_map(_to_map(two_body_integrals,
                             static_cast<int>(one_body_integrals.rows()))) {}
 
-ModelHamiltonianContainer::ModelHamiltonianContainer(
+SparseHamiltonianContainer::SparseHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals, double core_energy,
     HamiltonianType type)
     : HamiltonianContainer(
@@ -69,18 +69,19 @@ ModelHamiltonianContainer::ModelHamiltonianContainer(
           type),
       _one_body_sparse(_to_sparse(one_body_integrals)) {}
 
-std::unique_ptr<HamiltonianContainer> ModelHamiltonianContainer::clone() const {
-  return std::make_unique<ModelHamiltonianContainer>(
+std::unique_ptr<HamiltonianContainer> SparseHamiltonianContainer::clone()
+    const {
+  return std::make_unique<SparseHamiltonianContainer>(
       _one_body_sparse, _two_body_map, _core_energy, _type);
 }
 
-std::string ModelHamiltonianContainer::get_container_type() const {
-  return "model";
+std::string SparseHamiltonianContainer::get_container_type() const {
+  return "sparse";
 }
 
 std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
            const Eigen::VectorXd&>
-ModelHamiltonianContainer::get_two_body_integrals() const {
+SparseHamiltonianContainer::get_two_body_integrals() const {
   if (!_two_body_dense_valid) {
     _materialize_dense_two_body();
   }
@@ -88,20 +89,20 @@ ModelHamiltonianContainer::get_two_body_integrals() const {
   return {_two_body_dense_cache, _two_body_dense_cache, _two_body_dense_cache};
 }
 
-double ModelHamiltonianContainer::get_two_body_element(unsigned i, unsigned j,
-                                                       unsigned k, unsigned l,
-                                                       SpinChannel) const {
+double SparseHamiltonianContainer::get_two_body_element(unsigned i, unsigned j,
+                                                        unsigned k, unsigned l,
+                                                        SpinChannel) const {
   auto it = _two_body_map.find({i, j, k, l});
   return it != _two_body_map.end() ? it->second : 0.0;
 }
 
-bool ModelHamiltonianContainer::has_two_body_integrals() const {
+bool SparseHamiltonianContainer::has_two_body_integrals() const {
   return !_two_body_map.empty();
 }
 
-bool ModelHamiltonianContainer::is_restricted() const { return true; }
+bool SparseHamiltonianContainer::is_restricted() const { return true; }
 
-bool ModelHamiltonianContainer::is_valid() const {
+bool SparseHamiltonianContainer::is_valid() const {
   QDK_LOG_TRACE_ENTERING();
   // Check if essential data is present
   if (!has_one_body_integrals()) {
@@ -118,7 +119,7 @@ bool ModelHamiltonianContainer::is_valid() const {
   return true;
 }
 
-nlohmann::json ModelHamiltonianContainer::to_json() const {
+nlohmann::json SparseHamiltonianContainer::to_json() const {
   QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
 
@@ -158,8 +159,8 @@ nlohmann::json ModelHamiltonianContainer::to_json() const {
   return j;
 }
 
-std::unique_ptr<ModelHamiltonianContainer> ModelHamiltonianContainer::from_json(
-    const nlohmann::json& j) {
+std::unique_ptr<SparseHamiltonianContainer>
+SparseHamiltonianContainer::from_json(const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
   try {
     if (j.contains("version")) {
@@ -211,20 +212,20 @@ std::unique_ptr<ModelHamiltonianContainer> ModelHamiltonianContainer::from_json(
     }
 
     if (two_body_map.empty()) {
-      return std::make_unique<ModelHamiltonianContainer>(
+      return std::make_unique<SparseHamiltonianContainer>(
           std::move(one_body_sparse), core_energy, type);
     }
-    return std::make_unique<ModelHamiltonianContainer>(
+    return std::make_unique<SparseHamiltonianContainer>(
         std::move(one_body_sparse), std::move(two_body_map), core_energy, type);
 
   } catch (const nlohmann::json::exception& e) {
     throw std::runtime_error(
-        "Failed to parse ModelHamiltonianContainer from JSON: " +
+        "Failed to parse SparseHamiltonianContainer from JSON: " +
         std::string(e.what()));
   }
 }
 
-void ModelHamiltonianContainer::to_hdf5(H5::Group& group) const {
+void SparseHamiltonianContainer::to_hdf5(H5::Group& group) const {
   QDK_LOG_TRACE_ENTERING();
   try {
     H5::DataSpace scalar_space(H5S_SCALAR);
@@ -322,13 +323,13 @@ void ModelHamiltonianContainer::to_hdf5(H5::Group& group) const {
     }
 
   } catch (const H5::Exception& e) {
-    throw std::runtime_error("HDF5 error in ModelHamiltonianContainer: " +
+    throw std::runtime_error("HDF5 error in SparseHamiltonianContainer: " +
                              std::string(e.getCDetailMsg()));
   }
 }
 
-std::unique_ptr<ModelHamiltonianContainer> ModelHamiltonianContainer::from_hdf5(
-    H5::Group& group) {
+std::unique_ptr<SparseHamiltonianContainer>
+SparseHamiltonianContainer::from_hdf5(H5::Group& group) {
   QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version
@@ -417,42 +418,42 @@ std::unique_ptr<ModelHamiltonianContainer> ModelHamiltonianContainer::from_hdf5(
     }
 
     if (two_body_map.empty()) {
-      return std::make_unique<ModelHamiltonianContainer>(
+      return std::make_unique<SparseHamiltonianContainer>(
           std::move(one_body_sparse), core_energy, type);
     }
-    return std::make_unique<ModelHamiltonianContainer>(
+    return std::make_unique<SparseHamiltonianContainer>(
         std::move(one_body_sparse), std::move(two_body_map), core_energy, type);
 
   } catch (const H5::Exception& e) {
     throw std::runtime_error(
-        "HDF5 error in ModelHamiltonianContainer::from_hdf5: " +
+        "HDF5 error in SparseHamiltonianContainer::from_hdf5: " +
         std::string(e.getCDetailMsg()));
   }
 }
 
-void ModelHamiltonianContainer::to_fcidump_file(const std::string& filename,
-                                                size_t nalpha,
-                                                size_t nbeta) const {
+void SparseHamiltonianContainer::to_fcidump_file(const std::string& filename,
+                                                 size_t nalpha,
+                                                 size_t nbeta) const {
   QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
-      "FCIDUMP export not implemented for ModelHamiltonianContainer");
+      "FCIDUMP export not implemented for SparseHamiltonianContainer");
 }
 
 const Eigen::SparseMatrix<double>&
-ModelHamiltonianContainer::sparse_one_body_integrals() const {
+SparseHamiltonianContainer::sparse_one_body_integrals() const {
   return _one_body_sparse;
 }
 
-const ModelHamiltonianContainer::TwoBodyMap&
-ModelHamiltonianContainer::sparse_two_body_integrals() const {
+const SparseHamiltonianContainer::TwoBodyMap&
+SparseHamiltonianContainer::sparse_two_body_integrals() const {
   return _two_body_map;
 }
 
-double ModelHamiltonianContainer::one_body_element(int i, int j) const {
+double SparseHamiltonianContainer::one_body_element(int i, int j) const {
   return _one_body_sparse.coeff(i, j);
 }
 
-void ModelHamiltonianContainer::_materialize_dense_two_body() const {
+void SparseHamiltonianContainer::_materialize_dense_two_body() const {
   int n = _orbitals->get_num_molecular_orbitals();
   int n2 = n * n;
   int n3 = n2 * n;
@@ -464,7 +465,7 @@ void ModelHamiltonianContainer::_materialize_dense_two_body() const {
   _two_body_dense_valid = true;
 }
 
-std::shared_ptr<ModelOrbitals> ModelHamiltonianContainer::_make_orbitals(
+std::shared_ptr<ModelOrbitals> SparseHamiltonianContainer::_make_orbitals(
     int n) {
   std::vector<size_t> active(static_cast<size_t>(n));
   std::iota(active.begin(), active.end(), size_t{0});
@@ -473,14 +474,14 @@ std::shared_ptr<ModelOrbitals> ModelHamiltonianContainer::_make_orbitals(
       Orbitals::RestrictedCASIndices{std::move(active), {}});
 }
 
-Eigen::SparseMatrix<double> ModelHamiltonianContainer::_to_sparse(
+Eigen::SparseMatrix<double> SparseHamiltonianContainer::_to_sparse(
     const Eigen::MatrixXd& m) {
   Eigen::SparseMatrix<double> s = m.sparseView();
   s.makeCompressed();
   return s;
 }
 
-ModelHamiltonianContainer::TwoBodyMap ModelHamiltonianContainer::_to_map(
+SparseHamiltonianContainer::TwoBodyMap SparseHamiltonianContainer::_to_map(
     const Eigen::VectorXd& v, int n) {
   TwoBodyMap m;
   int n2 = n * n;

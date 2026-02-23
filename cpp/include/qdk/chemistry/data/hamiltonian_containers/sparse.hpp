@@ -19,7 +19,7 @@
 namespace qdk::chemistry::data {
 
 /**
- * @class ModelHamiltonianContainer
+ * @class SparseHamiltonianContainer
  * @brief Hamiltonian container for lattice model Hamiltonians (Hückel,
  * Hubbard, PPP, etc.) with sparse internal storage.
  *
@@ -35,7 +35,7 @@ namespace qdk::chemistry::data {
  * one_body_element, two_body_element) that are only available when working
  * directly with the concrete container type.
  */
-class ModelHamiltonianContainer : public HamiltonianContainer {
+class SparseHamiltonianContainer : public HamiltonianContainer {
  public:
   /// Sparse index type for two-body integrals (p,q,r,s).
   using TwoBodyIndex = std::tuple<int, int, int, int>;
@@ -51,10 +51,10 @@ class ModelHamiltonianContainer : public HamiltonianContainer {
    * @param core_energy Scalar energy offset (default 0.0)
    * @param type Hamiltonian type (default Hermitian)
    */
-  ModelHamiltonianContainer(Eigen::SparseMatrix<double> one_body_integrals,
-                            TwoBodyMap two_body_integrals,
-                            double core_energy = 0.0,
-                            HamiltonianType type = HamiltonianType::Hermitian);
+  SparseHamiltonianContainer(Eigen::SparseMatrix<double> one_body_integrals,
+                             TwoBodyMap two_body_integrals,
+                             double core_energy = 0.0,
+                             HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
    * @brief Construct with sparse one-body integrals only (no two-body).
@@ -63,7 +63,7 @@ class ModelHamiltonianContainer : public HamiltonianContainer {
    * @param core_energy Scalar energy offset (default 0.0)
    * @param type Hamiltonian type (default Hermitian)
    */
-  explicit ModelHamiltonianContainer(
+  explicit SparseHamiltonianContainer(
       Eigen::SparseMatrix<double> one_body_integrals, double core_energy = 0.0,
       HamiltonianType type = HamiltonianType::Hermitian);
 
@@ -75,10 +75,10 @@ class ModelHamiltonianContainer : public HamiltonianContainer {
    * @param core_energy Scalar energy offset (default 0.0)
    * @param type Hamiltonian type (default Hermitian)
    */
-  ModelHamiltonianContainer(const Eigen::MatrixXd& one_body_integrals,
-                            const Eigen::VectorXd& two_body_integrals,
-                            double core_energy = 0.0,
-                            HamiltonianType type = HamiltonianType::Hermitian);
+  SparseHamiltonianContainer(const Eigen::MatrixXd& one_body_integrals,
+                             const Eigen::VectorXd& two_body_integrals,
+                             double core_energy = 0.0,
+                             HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
    * @brief Construct from dense one-body integrals only.
@@ -87,14 +87,14 @@ class ModelHamiltonianContainer : public HamiltonianContainer {
    * @param core_energy Scalar energy offset (default 0.0)
    * @param type Hamiltonian type (default Hermitian)
    */
-  explicit ModelHamiltonianContainer(
+  explicit SparseHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals, double core_energy = 0.0,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
    * @brief Destructor
    */
-  ~ModelHamiltonianContainer() = default;
+  ~SparseHamiltonianContainer() = default;
 
   /**
    * @brief Create a deep copy of this container
@@ -172,7 +172,8 @@ class ModelHamiltonianContainer : public HamiltonianContainer {
    * @return Unique pointer to Hamiltonian loaded from group
    * @throws std::runtime_error (not yet implemented)
    */
-  static std::unique_ptr<ModelHamiltonianContainer> from_hdf5(H5::Group& group);
+  static std::unique_ptr<SparseHamiltonianContainer> from_hdf5(
+      H5::Group& group);
 
   /**
    * @brief Load Hamiltonian from JSON
@@ -180,7 +181,7 @@ class ModelHamiltonianContainer : public HamiltonianContainer {
    * @return Unique pointer to Hamiltonian loaded from JSON
    * @throws std::runtime_error (not yet implemented)
    */
-  static std::unique_ptr<ModelHamiltonianContainer> from_json(
+  static std::unique_ptr<SparseHamiltonianContainer> from_json(
       const nlohmann::json& j);
 
   /**

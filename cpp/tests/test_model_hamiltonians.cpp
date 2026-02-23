@@ -17,7 +17,7 @@ namespace model_hamiltonians = qdk::chemistry::utils::model_hamiltonians;
 namespace testing_detail {
 /** @brief Materialise a TwoBodyMap into a flat dense vector for test
  * comparison. */
-Eigen::VectorXd to_dense_h2(const ModelHamiltonianContainer::TwoBodyMap& h2,
+Eigen::VectorXd to_dense_h2(const SparseHamiltonianContainer::TwoBodyMap& h2,
                             int n) {
   int n2 = n * n, n3 = n2 * n;
   Eigen::VectorXd v = Eigen::VectorXd::Zero(n * n * n * n);

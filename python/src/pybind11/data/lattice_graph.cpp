@@ -99,7 +99,7 @@ For a symmetric graph this is twice the number of edges.
 Returns:
     int: Number of non-zero adjacency entries.
 )")
-      .def_property_readonly("is_symmetric", &LatticeGraph::symmetry, R"(
+      .def_property_readonly("is_symmetric", &LatticeGraph::is_symmetric, R"(
 Whether the adjacency matrix is symmetric.
 
 Returns:
@@ -344,7 +344,8 @@ Raises:
            [](const LatticeGraph& self) {
              return "<LatticeGraph sites=" + std::to_string(self.num_sites()) +
                     " edges=" + std::to_string(self.num_edges()) +
-                    " symmetric=" + (self.symmetry() ? "True" : "False") + ">";
+                    " symmetric=" + (self.is_symmetric() ? "True" : "False") +
+                    ">";
            })
 
       // DataClass interface

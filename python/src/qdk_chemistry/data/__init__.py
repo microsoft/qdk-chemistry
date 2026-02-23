@@ -26,7 +26,7 @@ Exposed classes are:
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
 - :class:`LatticeGraph`: Lattice graph defining the connectivity and geometry of a model Hamiltonian.
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitHamiltonian objects.
-- :class:`ModelHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
+- :class:`SparseHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
 - :class:`MP2Container`: Container for MP2 wavefunction with Hamiltonian reference and optional amplitudes.
 - :class:`Orbitals`: Molecular orbital information and properties.
@@ -79,7 +79,6 @@ from qdk_chemistry._core.data import (
     HamiltonianContainer,
     HamiltonianType,
     LatticeGraph,
-    ModelHamiltonianContainer,
     ModelOrbitals,
     MP2Container,
     Orbitals,
@@ -94,6 +93,7 @@ from qdk_chemistry._core.data import (
     SettingValue,
     Shell,
     SlaterDeterminantContainer,
+    SparseHamiltonianContainer,
     SpinChannel,
     StabilityResult,
     Structure,
@@ -145,7 +145,6 @@ __all__ = [
     "LatticeGraph",
     "MP2Container",
     "MeasurementData",
-    "ModelHamiltonianContainer",
     "ModelOrbitals",
     "OrbitalType",
     "Orbitals",
@@ -166,6 +165,7 @@ __all__ = [
     "SettingsAreLockedError",
     "Shell",
     "SlaterDeterminantContainer",
+    "SparseHamiltonianContainer",
     "SpinChannel",
     "StabilityResult",
     "Structure",

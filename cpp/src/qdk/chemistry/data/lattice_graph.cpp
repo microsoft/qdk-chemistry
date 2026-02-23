@@ -110,7 +110,7 @@ Eigen::MatrixXd LatticeGraph::adjacency_matrix() const {
   return Eigen::MatrixXd(adjacency_);
 }
 
-bool LatticeGraph::symmetry() const { return _is_symmetric; }
+bool LatticeGraph::is_symmetric() const { return _is_symmetric; }
 
 double LatticeGraph::weight(std::uint64_t i, std::uint64_t j) const {
   return adjacency_.coeff(static_cast<Eigen::Index>(i),

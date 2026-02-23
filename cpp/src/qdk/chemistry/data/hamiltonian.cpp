@@ -9,7 +9,7 @@
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/model_hamil.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
@@ -365,8 +365,8 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_json(
   if (container_type == "cholesky") {
     return CholeskyHamiltonianContainer::from_json(j);
   }
-  if (container_type == "model") {
-    return ModelHamiltonianContainer::from_json(j);
+  if (container_type == "sparse") {
+    return SparseHamiltonianContainer::from_json(j);
   }
   throw std::runtime_error("Unknown container type: " + container_type);
 }
@@ -393,8 +393,8 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_hdf5(
     if (container_type == "cholesky") {
       return CholeskyHamiltonianContainer::from_hdf5(group);
     }
-    if (container_type == "model") {
-      return ModelHamiltonianContainer::from_hdf5(group);
+    if (container_type == "sparse") {
+      return SparseHamiltonianContainer::from_hdf5(group);
     }
     throw std::runtime_error("Unknown container type: " + container_type);
 

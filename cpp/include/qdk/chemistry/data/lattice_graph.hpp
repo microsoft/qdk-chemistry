@@ -83,7 +83,7 @@ class LatticeGraph : public DataClass {
   /**
    * @brief Return whether the adjacency matrix is symmetric.
    */
-  bool symmetry() const;
+  bool is_symmetric() const;
 
   /**
    * @brief Return the edge weight between sites i and j.

@@ -73,18 +73,18 @@ class TestModelHamiltonians:
     def test_ppp_with_ohno_potential(self):
         n = 4
         epsilon_r = 0.9
-        U_val = 0.4
-        R_val = 1.2
+        u_val = 0.4
+        r_val = 1.2
         lattice = LatticeGraph.chain(n)
-        V = ohno_potential(lattice, U=U_val, R=R_val, epsilon_r=epsilon_r)
+        v = ohno_potential(lattice, U=u_val, R=r_val, epsilon_r=epsilon_r)
 
-        assert V.shape == (n, n)
+        assert v.shape == (n, n)
 
         epsilon_vec = np.zeros(n)
         t_mat = np.ones((n, n))
-        U_vec = np.full(n, U_val)
+        u_vec = np.full(n, u_val)
         z_vec = np.ones(n)
-        hamiltonian = create_ppp_hamiltonian(lattice, epsilon=epsilon_vec, t=t_mat, U=U_vec, V=V, z=z_vec)
+        hamiltonian = create_ppp_hamiltonian(lattice, epsilon=epsilon_vec, t=t_mat, U=u_vec, V=v, z=z_vec)
 
         assert isinstance(hamiltonian, Hamiltonian)
         assert hamiltonian.has_one_body_integrals()
@@ -93,18 +93,18 @@ class TestModelHamiltonians:
     def test_ppp_with_mataga_nishimoto_potential(self):
         n = 4
         epsilon_r = 0.9
-        U_val = 0.4
-        R_val = 1.2
+        u_val = 0.4
+        r_val = 1.2
         lattice = LatticeGraph.chain(n)
-        V = mataga_nishimoto_potential(lattice, U=U_val, R=R_val, epsilon_r=epsilon_r)
+        v = mataga_nishimoto_potential(lattice, U=u_val, R=r_val, epsilon_r=epsilon_r)
 
-        assert V.shape == (n, n)
+        assert v.shape == (n, n)
 
         epsilon_vec = np.zeros(n)
         t_mat = np.ones((n, n))
-        U_vec = np.full(n, U_val)
+        u_vec = np.full(n, u_val)
         z_vec = np.ones(n)
-        hamiltonian = create_ppp_hamiltonian(lattice, epsilon=epsilon_vec, t=t_mat, U=U_vec, V=V, z=z_vec)
+        hamiltonian = create_ppp_hamiltonian(lattice, epsilon=epsilon_vec, t=t_mat, U=u_vec, V=v, z=z_vec)
 
         assert isinstance(hamiltonian, Hamiltonian)
         assert hamiltonian.has_one_body_integrals()

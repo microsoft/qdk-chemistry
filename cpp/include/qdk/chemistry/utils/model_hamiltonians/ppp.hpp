@@ -11,14 +11,14 @@
 #include <vector>
 
 #include "qdk/chemistry/constants.hpp"
-#include "qdk/chemistry/data/hamiltonian_containers/model_hamil.hpp"
+#include "qdk/chemistry/data/hamiltonian_containers/sparse.hpp"
 #include "qdk/chemistry/data/lattice_graph.hpp"
 
 namespace qdk::chemistry::utils::model_hamiltonians {
 
 using qdk::chemistry::data::Hamiltonian;
 using qdk::chemistry::data::LatticeGraph;
-using qdk::chemistry::data::ModelHamiltonianContainer;
+using qdk::chemistry::data::SparseHamiltonianContainer;
 
 namespace detail {
 /**
@@ -108,7 +108,7 @@ inline Eigen::SparseMatrix<double> from_huckel(const LatticeGraph& lattice,
     throw std::invalid_argument(
         "T matrix dimensions must match the number of lattice sites.");
   }
-  if (lattice.symmetry() == false) {
+  if (lattice.is_symmetric() == false) {
     throw std::invalid_argument(
         "Lattice graph must be symmetric for a valid Hamiltonian.");
   }
@@ -168,7 +168,7 @@ inline Eigen::SparseMatrix<double> from_huckel(const LatticeGraph& lattice,
  */
 template <typename EpsT, typename TT, typename UT>
 inline std::tuple<Eigen::SparseMatrix<double>,
-                  ModelHamiltonianContainer::TwoBodyMap>
+                  SparseHamiltonianContainer::TwoBodyMap>
 from_hubbard(const LatticeGraph& lattice, EpsT&& epsilon_in, TT&& t_in,
              UT&& U_in) {
   // Check template types
@@ -194,7 +194,7 @@ from_hubbard(const LatticeGraph& lattice, EpsT&& epsilon_in, TT&& t_in,
   auto h1 = from_huckel(lattice, epsilon, t);
 
   // Build the two-body map for on-site repulsion: (p,q,r,s) = (i,i,i,i) -> U_i
-  ModelHamiltonianContainer::TwoBodyMap h2;
+  SparseHamiltonianContainer::TwoBodyMap h2;
   for (int i = 0; i < n; i++) {
     double U_i = U(i);
     if (U_i != 0.0) {
@@ -227,7 +227,7 @@ from_hubbard(const LatticeGraph& lattice, EpsT&& epsilon_in, TT&& t_in,
  */
 template <typename EpsT, typename TT, typename UT, typename VT, typename ZT>
 inline std::tuple<Eigen::SparseMatrix<double>,
-                  ModelHamiltonianContainer::TwoBodyMap, double>
+                  SparseHamiltonianContainer::TwoBodyMap, double>
 from_ppp(const LatticeGraph& lattice, EpsT&& epsilon_in, TT&& t_in, UT&& U_in,
          VT&& V_in, ZT&& z_in) {
   // Check template types
@@ -306,7 +306,7 @@ inline Hamiltonian create_huckel_hamiltonian(const LatticeGraph& lattice,
   auto h1 = detail::from_huckel(lattice, std::forward<EpsT>(epsilon_in),
                                 std::forward<TT>(t_in));
   return Hamiltonian(
-      std::make_unique<ModelHamiltonianContainer>(std::move(h1)));
+      std::make_unique<SparseHamiltonianContainer>(std::move(h1)));
 }
 
 /**
@@ -328,7 +328,7 @@ inline Hamiltonian create_hubbard_hamiltonian(const LatticeGraph& lattice,
   auto [h1, h2] =
       detail::from_hubbard(lattice, std::forward<EpsT>(epsilon_in),
                            std::forward<TT>(t_in), std::forward<UT>(U_in));
-  return Hamiltonian(std::make_unique<ModelHamiltonianContainer>(
+  return Hamiltonian(std::make_unique<SparseHamiltonianContainer>(
       std::move(h1), std::move(h2)));
 }
 
@@ -355,7 +355,7 @@ inline Hamiltonian create_ppp_hamiltonian(const LatticeGraph& lattice,
   auto [h1, h2, core_energy] = detail::from_ppp(
       lattice, std::forward<EpsT>(epsilon_in), std::forward<TT>(t_in),
       std::forward<UT>(U_in), std::forward<VT>(V_in), std::forward<ZT>(z_in));
-  return Hamiltonian(std::make_unique<ModelHamiltonianContainer>(
+  return Hamiltonian(std::make_unique<SparseHamiltonianContainer>(
       std::move(h1), std::move(h2), core_energy));
 }
 

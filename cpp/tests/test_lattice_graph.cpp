@@ -30,7 +30,7 @@ TEST_F(LatticeGraphTest, ChainConstructor) {
   auto chain = LatticeGraph::chain(4);
   EXPECT_EQ(chain.num_sites(), 4);
   EXPECT_EQ(chain.num_edges(), 3);
-  EXPECT_TRUE(chain.symmetry());
+  EXPECT_TRUE(chain.is_symmetric());
   EXPECT_TRUE(chain.adjacency_matrix().isApprox(expected.adjacency_matrix()));
 
   // Periodic (ring): wrap edge
@@ -42,7 +42,7 @@ TEST_F(LatticeGraphTest, ChainConstructor) {
     auto ring = LatticeGraph::chain(4, true);
     EXPECT_EQ(ring.num_sites(), 4);
     EXPECT_EQ(ring.num_edges(), 4);  // 3 + 1
-    EXPECT_TRUE(ring.symmetry());
+    EXPECT_TRUE(ring.is_symmetric());
     EXPECT_TRUE(
         ring.adjacency_matrix().isApprox(expected_ring.adjacency_matrix()));
   }
@@ -86,7 +86,7 @@ TEST_F(LatticeGraphTest, SquareConstructor) {
   auto sq = LatticeGraph::square(3, 4);
   EXPECT_EQ(sq.num_sites(), 12);
   EXPECT_EQ(sq.num_edges(), 17);
-  EXPECT_TRUE(sq.symmetry());
+  EXPECT_TRUE(sq.is_symmetric());
   EXPECT_TRUE(sq.adjacency_matrix().isApprox(expected.adjacency_matrix()));
 
   // periodic_y only: up wraps (no right wraps)
@@ -100,7 +100,7 @@ TEST_F(LatticeGraphTest, SquareConstructor) {
     auto sq_py = LatticeGraph::square(3, 4, false, true);
     EXPECT_EQ(sq_py.num_sites(), 12);
     EXPECT_EQ(sq_py.num_edges(), 20);  // 17 + 3
-    EXPECT_TRUE(sq_py.symmetry());
+    EXPECT_TRUE(sq_py.is_symmetric());
     EXPECT_TRUE(
         sq_py.adjacency_matrix().isApprox(expected_py.adjacency_matrix()));
   }
@@ -117,7 +117,7 @@ TEST_F(LatticeGraphTest, SquareConstructor) {
     auto sq_px = LatticeGraph::square(3, 4, true, false);
     EXPECT_EQ(sq_px.num_sites(), 12);
     EXPECT_EQ(sq_px.num_edges(), 21);  // 17 + 4
-    EXPECT_TRUE(sq_px.symmetry());
+    EXPECT_TRUE(sq_px.is_symmetric());
     EXPECT_TRUE(
         sq_px.adjacency_matrix().isApprox(expected_px.adjacency_matrix()));
   }
@@ -137,7 +137,7 @@ TEST_F(LatticeGraphTest, SquareConstructor) {
     auto sq_pxy = LatticeGraph::square(3, 4, true, true);
     EXPECT_EQ(sq_pxy.num_sites(), 12);
     EXPECT_EQ(sq_pxy.num_edges(), 24);  // 17 + 4 + 3
-    EXPECT_TRUE(sq_pxy.symmetry());
+    EXPECT_TRUE(sq_pxy.is_symmetric());
     EXPECT_TRUE(
         sq_pxy.adjacency_matrix().isApprox(expected_pxy.adjacency_matrix()));
   }
@@ -188,7 +188,7 @@ TEST_F(LatticeGraphTest, TriangularConstructor) {
   auto tri = LatticeGraph::triangular(3, 4);
   EXPECT_EQ(tri.num_sites(), 12);
   EXPECT_EQ(tri.num_edges(), 23);
-  EXPECT_TRUE(tri.symmetry());
+  EXPECT_TRUE(tri.is_symmetric());
   EXPECT_TRUE(tri.adjacency_matrix().isApprox(expected.adjacency_matrix()));
 
   // periodic_y only: up wraps + diagonal y-wraps (no right wraps, no corner)
@@ -204,7 +204,7 @@ TEST_F(LatticeGraphTest, TriangularConstructor) {
     auto tri_py = LatticeGraph::triangular(3, 4, false, true);
     EXPECT_EQ(tri_py.num_sites(), 12);
     EXPECT_EQ(tri_py.num_edges(), 28);  // 23 + 5
-    EXPECT_TRUE(tri_py.symmetry());
+    EXPECT_TRUE(tri_py.is_symmetric());
     EXPECT_TRUE(
         tri_py.adjacency_matrix().isApprox(expected_py.adjacency_matrix()));
   }
@@ -224,7 +224,7 @@ TEST_F(LatticeGraphTest, TriangularConstructor) {
     auto tri_px = LatticeGraph::triangular(3, 4, true, false);
     EXPECT_EQ(tri_px.num_sites(), 12);
     EXPECT_EQ(tri_px.num_edges(), 30);  // 23 + 7
-    EXPECT_TRUE(tri_px.symmetry());
+    EXPECT_TRUE(tri_px.is_symmetric());
     EXPECT_TRUE(
         tri_px.adjacency_matrix().isApprox(expected_px.adjacency_matrix()));
   }
@@ -250,7 +250,7 @@ TEST_F(LatticeGraphTest, TriangularConstructor) {
     auto tri_pxy = LatticeGraph::triangular(3, 4, true, true);
     EXPECT_EQ(tri_pxy.num_sites(), 12);
     EXPECT_EQ(tri_pxy.num_edges(), 36);  // 23 + 8 + 5
-    EXPECT_TRUE(tri_pxy.symmetry());
+    EXPECT_TRUE(tri_pxy.is_symmetric());
     EXPECT_TRUE(
         tri_pxy.adjacency_matrix().isApprox(expected_pxy.adjacency_matrix()));
   }
@@ -309,7 +309,7 @@ TEST_F(LatticeGraphTest, HoneycombConstructor) {
   auto hc = LatticeGraph::honeycomb(3, 4);
   EXPECT_EQ(hc.num_sites(), 24);
   EXPECT_EQ(hc.num_edges(), 29);
-  EXPECT_TRUE(hc.symmetry());
+  EXPECT_TRUE(hc.is_symmetric());
   EXPECT_TRUE(hc.adjacency_matrix().isApprox(expected.adjacency_matrix()));
 
   // periodic_y only: vertical wraps
@@ -323,7 +323,7 @@ TEST_F(LatticeGraphTest, HoneycombConstructor) {
     auto hc_py = LatticeGraph::honeycomb(3, 4, false, true);
     EXPECT_EQ(hc_py.num_sites(), 24);
     EXPECT_EQ(hc_py.num_edges(), 32);  // 29 + 3
-    EXPECT_TRUE(hc_py.symmetry());
+    EXPECT_TRUE(hc_py.is_symmetric());
     EXPECT_TRUE(
         hc_py.adjacency_matrix().isApprox(expected_py.adjacency_matrix()));
   }
@@ -340,7 +340,7 @@ TEST_F(LatticeGraphTest, HoneycombConstructor) {
     auto hc_px = LatticeGraph::honeycomb(3, 4, true, false);
     EXPECT_EQ(hc_px.num_sites(), 24);
     EXPECT_EQ(hc_px.num_edges(), 33);  // 29 + 4
-    EXPECT_TRUE(hc_px.symmetry());
+    EXPECT_TRUE(hc_px.is_symmetric());
     EXPECT_TRUE(
         hc_px.adjacency_matrix().isApprox(expected_px.adjacency_matrix()));
   }
@@ -360,7 +360,7 @@ TEST_F(LatticeGraphTest, HoneycombConstructor) {
     auto hc_pxy = LatticeGraph::honeycomb(3, 4, true, true);
     EXPECT_EQ(hc_pxy.num_sites(), 24);
     EXPECT_EQ(hc_pxy.num_edges(), 36);  // 3 * nx * ny on a torus
-    EXPECT_TRUE(hc_pxy.symmetry());
+    EXPECT_TRUE(hc_pxy.is_symmetric());
     EXPECT_TRUE(
         hc_pxy.adjacency_matrix().isApprox(expected_pxy.adjacency_matrix()));
   }
@@ -414,7 +414,7 @@ TEST_F(LatticeGraphTest, KagomeConstructor) {
   auto kg = LatticeGraph::kagome(3, 2);
   EXPECT_EQ(kg.num_sites(), 18);
   EXPECT_EQ(kg.num_edges(), 27);
-  EXPECT_TRUE(kg.symmetry());
+  EXPECT_TRUE(kg.is_symmetric());
   EXPECT_TRUE(kg.adjacency_matrix().isApprox(expected.adjacency_matrix()));
 
   // periodic_y only: vertical wraps + diagonal y-wraps
@@ -432,7 +432,7 @@ TEST_F(LatticeGraphTest, KagomeConstructor) {
     auto kg_py = LatticeGraph::kagome(3, 2, false, true);
     EXPECT_EQ(kg_py.num_sites(), 18);
     EXPECT_EQ(kg_py.num_edges(), 32);  // 27 + 5
-    EXPECT_TRUE(kg_py.symmetry());
+    EXPECT_TRUE(kg_py.is_symmetric());
     EXPECT_TRUE(
         kg_py.adjacency_matrix().isApprox(expected_py.adjacency_matrix()));
   }
@@ -450,7 +450,7 @@ TEST_F(LatticeGraphTest, KagomeConstructor) {
     auto kg_px = LatticeGraph::kagome(3, 2, true, false);
     EXPECT_EQ(kg_px.num_sites(), 18);
     EXPECT_EQ(kg_px.num_edges(), 30);  // 27 + 3
-    EXPECT_TRUE(kg_px.symmetry());
+    EXPECT_TRUE(kg_px.is_symmetric());
     EXPECT_TRUE(
         kg_px.adjacency_matrix().isApprox(expected_px.adjacency_matrix()));
   }
@@ -477,7 +477,7 @@ TEST_F(LatticeGraphTest, KagomeConstructor) {
     auto kg_pxy = LatticeGraph::kagome(3, 2, true, true);
     EXPECT_EQ(kg_pxy.num_sites(), 18);
     EXPECT_EQ(kg_pxy.num_edges(), 36);  // 27 + 9
-    EXPECT_TRUE(kg_pxy.symmetry());
+    EXPECT_TRUE(kg_pxy.is_symmetric());
     EXPECT_TRUE(
         kg_pxy.adjacency_matrix().isApprox(expected_pxy.adjacency_matrix()));
   }
