@@ -1041,12 +1041,12 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
           return std::make_unique<CasWavefunctionContainer>(
               coefficients, determinants, orbitals, one_rdm_spin_traced,
               one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-              two_rdm_aaaa, two_rdm_bbbb, type);
+              two_rdm_aaaa, two_rdm_bbbb, entropies, type);
         } else if (container_type == "sci") {
           return std::make_unique<SciWavefunctionContainer>(
               coefficients, determinants, orbitals, one_rdm_spin_traced,
               one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-              two_rdm_aaaa, two_rdm_bbbb, type);
+              two_rdm_aaaa, two_rdm_bbbb, entropies, type);
         } else {
           throw std::runtime_error(
               "RDMs are only supported for CAS and SCI containers in "
