@@ -27,11 +27,33 @@ class TrotterSettings(Settings):
 
         Attributes:
             order: The order of the Trotter decomposition (currently only first order is supported).
+            target_accuracy: Target accuracy for automatic step computation (0.0 means disabled).
+            num_divisions: Explicit number of divisions within a Trotter step (0 means automatic).
+            error_bound: Strategy for computing the Trotter error bound ("commutator" or "naive").
             weight_threshold: The absolute threshold for filtering small coefficients.
 
         """
         super().__init__()
         self._set_default("order", "int", 1, "The order of the Trotter decomposition.")
+        self._set_default(
+            "target_accuracy",
+            "double",
+            0.0,
+            "Target accuracy for automatic step computation (0.0 means disabled).",
+        )
+        self._set_default(
+            "num_divisions",
+            "int",
+            0,
+            "Explicit number of divisions within a Trotter step (0 means automatic).",
+        )
+        self._set_default(
+            "error_bound",
+            "string",
+            "commutator",
+            "Strategy for computing the Trotter error bound ('commutator' or 'naive').",
+            ["commutator", "naive"],
+        )
         self._set_default(
             "weight_threshold", "float", 1e-12, "The absolute threshold for filtering small coefficients."
         )
@@ -44,8 +66,8 @@ class Trotter(TimeEvolutionBuilder):
         self,
         order: int = 1,
         *,
-        target_accuracy: float | None = None,
-        num_divisions: int | None = None,
+        target_accuracy: float = 0.0,
+        num_divisions: int = 0,
         error_bound: str = "commutator",
         weight_threshold: float = 1e-12,
     ):
@@ -67,12 +89,13 @@ class Trotter(TimeEvolutionBuilder):
         Args:
             order: The order of the Trotter decomposition (currently only
                 first order is supported). Defaults to 1.
-            target_accuracy: If given, automatically compute the number of
-                divisions needed to achieve this accuracy.  Must be
-                positive.  Defaults to ``None`` (disabled).
+            target_accuracy: Target accuracy for automatic step computation.
+                Must be positive to enable automatic computation.
+                Use 0.0 (default) to disable.
             num_divisions: Explicit number of divisions within a Trotter
                 step.  When both *num_divisions* and *target_accuracy*
-                are given the larger value is used.  Defaults to ``None``.
+                are given the larger value is used.  Use 0 (default) for
+                automatic determination.
             error_bound: Strategy for computing the Trotter error bound
                 when *target_accuracy* is set.  Either ``"commutator"``
                 (default, tighter) or ``"naive"``.
@@ -81,18 +104,12 @@ class Trotter(TimeEvolutionBuilder):
 
         """
         super().__init__()
-        if target_accuracy is not None and target_accuracy <= 0:
-            raise ValueError(f"target_accuracy must be positive, got {target_accuracy}.")
-        if num_divisions is not None and num_divisions < 1:
-            raise ValueError(f"num_divisions must be >= 1, got {num_divisions}.")
-        if error_bound not in ("commutator", "naive"):
-            raise ValueError(f"error_bound must be 'commutator' or 'naive', got {error_bound!r}.")
         self._settings = TrotterSettings()
         self._settings.set("order", order)
+        self._settings.set("target_accuracy", target_accuracy)
+        self._settings.set("num_divisions", num_divisions)
+        self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
-        self._target_accuracy = target_accuracy
-        self._num_divisions = num_divisions
-        self._error_bound = error_bound
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
         """Construct the time evolution unitary using Trotter decomposition.
@@ -148,18 +165,21 @@ class Trotter(TimeEvolutionBuilder):
         larger value wins.  When neither is provided, the default is 1.
 
         """
-        manual = self._num_divisions if self._num_divisions is not None else 1
+        num_divisions = self._settings.get("num_divisions")
+        manual = num_divisions if num_divisions > 0 else 1
 
-        if self._target_accuracy is None:
+        target_accuracy = self._settings.get("target_accuracy")
+        if target_accuracy <= 0.0:
             return manual
 
         order = self._settings.get("order")
         weight_threshold = self._settings.get("weight_threshold")
-        if self._error_bound == "commutator":
+        error_bound = self._settings.get("error_bound")
+        if error_bound == "commutator":
             auto = trotter_steps_commutator(
                 hamiltonian=qubit_hamiltonian,
                 time=time,
-                target_accuracy=self._target_accuracy,
+                target_accuracy=target_accuracy,
                 order=order,
                 weight_threshold=weight_threshold,
             )
@@ -167,7 +187,7 @@ class Trotter(TimeEvolutionBuilder):
             auto = trotter_steps_naive(
                 hamiltonian=qubit_hamiltonian,
                 time=time,
-                target_accuracy=self._target_accuracy,
+                target_accuracy=target_accuracy,
                 order=order,
                 weight_threshold=weight_threshold,
             )

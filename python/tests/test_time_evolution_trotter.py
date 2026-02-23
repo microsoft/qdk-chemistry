@@ -224,7 +224,7 @@ class TestTrotterAccuracyAware:
         assert container.step_reps == 10
 
     def test_no_target_accuracy_backward_compatible(self):
-        """Test that the builder is backward compatible when target_accuracy is None."""
+        """Test that the builder is backward compatible when target_accuracy is disabled (0.0)."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
         builder = Trotter(num_divisions=3)
         unitary = builder.run(hamiltonian, time=0.5)
@@ -255,14 +255,16 @@ class TestTrotterAccuracyAware:
             rtol=float_comparison_relative_tolerance,
         )
 
-    def test_invalid_target_accuracy_raises(self):
-        """Test that non-positive target_accuracy raises ValueError."""
-        with pytest.raises(ValueError, match="positive"):
-            Trotter(target_accuracy=0.0)
-        with pytest.raises(ValueError, match="positive"):
-            Trotter(target_accuracy=-0.1)
+    def test_zero_target_accuracy_means_disabled(self):
+        """Test that target_accuracy=0.0 (default) disables auto step computation."""
+        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
+        builder = Trotter(target_accuracy=0.0, num_divisions=3)
+        unitary = builder.run(hamiltonian, time=1.0)
+        container = unitary.get_container()
+        # target_accuracy=0.0 means disabled, so num_divisions=3 is used directly
+        assert container.step_reps == 3
 
     def test_invalid_error_bound_raises(self):
-        """Test that an invalid error_bound raises ValueError."""
-        with pytest.raises(ValueError, match="error_bound"):
+        """Test that an invalid error_bound raises an exception via Settings constraint."""
+        with pytest.raises(ValueError, match="allowed options"):
             Trotter(error_bound="invalid")
