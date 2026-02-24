@@ -10,31 +10,37 @@ from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Wavefunction
 
 
-def prepare_2_dets_trial_state(
-    wf: Wavefunction, hamiltonian: Hamiltonian
+def prepare_top_dets_trial_state(
+    wf: Wavefunction, hamiltonian: Hamiltonian, num_dets: int
 ) -> tuple[Wavefunction, float]:
-    """Prepare a trial state for QPE using the top 2 determinants from the given wavefunction.
+    """Prepare a trial state for QPE using the top determinants from the given wavefunction.
 
     Args:
-        wf: Original wavefunction used to extract top 2 determinants.
+        wf: Original wavefunction used to extract the top determinants.
         hamiltonian: Hamiltonian used to compute the projected multi-configuration state.
+        num_dets: Number of top determinants to use.
 
     Returns:
-        wavefunction: Wavefunction object built from the top 2 determinants.
+        wavefunction: Wavefunction object built from the top determinants.
         fidelity: Fidelity with respect to the original wavefunction (overlap squared).
 
     """
-    dets = wf.get_top_determinants(max_determinants=2)
-    pmc_calculator = create("projected_multi_configuration_calculator")
-    _, wf_2dets = pmc_calculator.run(hamiltonian, list(dets.keys()))
+    dets = wf.get_top_determinants(max_determinants=num_dets)
+    if not dets:
+        raise ValueError(
+            "Cannot prepare trial state: No determinants found in the wavefunction."
+        )
+
+    pmc_calculator = create("projected_multi_configuration_calculator", "macis_pmc")
+    _, wf_trial = pmc_calculator.run(hamiltonian, list(dets.keys()))
 
     # Fidelity with original reference wf
     det_keys = list(dets.keys())
     coeffs_wf = np.array([dets[det] for det in det_keys])
-    coeffs_new = np.array([wf_2dets.get_coefficient(det) for det in det_keys])
+    coeffs_new = np.array([wf_trial.get_coefficient(det) for det in det_keys])
     fidelity = np.abs(np.vdot(coeffs_new, coeffs_wf)) ** 2
 
-    return wf_2dets, fidelity
+    return wf_trial, fidelity
 
 
 def compute_evolution_time(
