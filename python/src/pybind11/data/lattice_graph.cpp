@@ -35,48 +35,65 @@ Examples:
     >>> # Custom lattice from adjacency matrix
     >>> import numpy as np
     >>> adj = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]], dtype=float)
-    >>> lattice = LatticeGraph(adj)
+    >>> lattice = LatticeGraph.from_dense_matrix(adj)
 )")
-      // Constructors
-      .def(py::init<const Eigen::MatrixXd&, bool>(),
-           R"(
-Construct a lattice graph from a dense adjacency matrix.
-
-Args:
-    adjacency_matrix (numpy.ndarray): Dense adjacency matrix [n x n]. Non-zero
-        entries indicate edges with that weight.
-    symmetrize (bool, optional): If True, symmetrise the adjacency matrix.
-        Defaults to False.
-)",
-           py::arg("adjacency_matrix"), py::arg("symmetrize") = false)
-
-      .def(py::init<const Eigen::SparseMatrix<double>&, bool>(),
-           R"(
-Construct a lattice graph from a sparse adjacency matrix.
-
-Args:
-    sparse_adjacency_matrix (scipy.sparse matrix): Sparse adjacency matrix [n x n].
-    symmetrize (bool, optional): If True, symmetrise the adjacency matrix.
-        Defaults to False.
-)",
-           py::arg("sparse_adjacency_matrix"), py::arg("symmetrize") = false)
-
+      // Constructor: edge-weight map
       .def(py::init<
                const std::map<std::pair<std::uint64_t, std::uint64_t>, double>&,
-               bool, std::uint64_t>(),
+               std::uint64_t>(),
            R"(
 Construct a lattice graph from a dictionary of edge weights.
 
 Args:
     edge_weights (dict[tuple[int, int], float]): Dictionary mapping (i, j) pairs
         to edge weights.
-    symmetrize (bool, optional): If True, symmetrise the adjacency matrix.
-        Defaults to False.
     num_sites (int, optional): Number of sites. If 0, inferred from edge indices.
         Defaults to 0.
 )",
-           py::arg("edge_weights"), py::arg("symmetrize") = false,
-           py::arg("num_sites") = 0)
+           py::arg("edge_weights"), py::arg("num_sites") = 0)
+
+      // Static factories for matrix input
+      .def_static("from_dense_matrix", &LatticeGraph::from_dense_matrix,
+                  R"(
+Create a lattice graph from a dense adjacency matrix.
+
+Args:
+    adjacency_matrix (numpy.ndarray): Dense adjacency matrix [n x n]. Non-zero
+        entries indicate edges with that weight.
+
+Returns:
+    LatticeGraph: A new lattice graph.
+)",
+                  py::arg("adjacency_matrix"))
+
+      .def_static("from_sparse_matrix", &LatticeGraph::from_sparse_matrix,
+                  R"(
+Create a lattice graph from a sparse adjacency matrix.
+
+Args:
+    sparse_adjacency_matrix (scipy.sparse matrix): Sparse adjacency matrix [n x n].
+
+Returns:
+    LatticeGraph: A new lattice graph.
+)",
+                  py::arg("sparse_adjacency_matrix"))
+
+      .def_static("make_bidirectional", &LatticeGraph::make_bidirectional,
+                  R"(
+Return a new lattice graph with reverse edges added.
+
+For each directed edge (i,j) with weight w, ensures (j,i) also
+exists with the same weight. Computes A_out = A + A^T, so this
+should be called on graphs where edges are specified in one
+direction only.
+
+Args:
+    graph (LatticeGraph): The (possibly directed) lattice graph.
+
+Returns:
+    LatticeGraph: A new lattice graph with bidirectional edges.
+)",
+                  py::arg("graph"))
 
       // Properties / accessors
       .def_property_readonly("num_sites", &LatticeGraph::num_sites, R"(

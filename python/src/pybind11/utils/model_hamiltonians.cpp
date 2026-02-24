@@ -7,7 +7,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <qdk/chemistry/utils/model_hamiltonians/ppp.hpp>
+#include <qdk/chemistry/utils/model_hamiltonians.hpp>
 
 namespace py = pybind11;
 

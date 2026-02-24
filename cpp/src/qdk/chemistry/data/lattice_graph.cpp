@@ -24,30 +24,10 @@ static void add_edge(std::vector<Triplet>& triplets, int i, int j, double t) {
 }
 }  // namespace detail
 
-LatticeGraph::LatticeGraph(const Eigen::MatrixXd& adjacency_matrix,
-                           bool symmetrize)
-    : _num_sites(static_cast<std::uint64_t>(adjacency_matrix.rows())),
-      _is_symmetric(symmetrize) {
-  if (adjacency_matrix.rows() != adjacency_matrix.cols()) {
-    throw std::invalid_argument("Adjacency matrix must be square.");
-  }
-
-  // Symmetrize
-  Eigen::MatrixXd mat =
-      symmetrize ? (adjacency_matrix + adjacency_matrix.transpose()) / 2.0
-                 : adjacency_matrix;
-  adjacency_ = mat.sparseView();
-  adjacency_.makeCompressed();
-  if (!_is_symmetric) {
-    _is_symmetric = _check_symmetry(adjacency_);
-  }
-}
-
 LatticeGraph::LatticeGraph(
     const std::map<std::pair<std::uint64_t, std::uint64_t>, double>&
         edge_weights,
-    bool symmetrize, std::uint64_t num_sites)
-    : _is_symmetric(symmetrize) {
+    std::uint64_t num_sites) {
   // get num_sites if not provided
   if (num_sites == 0) {
     for (const auto& [edge, weight] : edge_weights) {
@@ -60,13 +40,10 @@ LatticeGraph::LatticeGraph(
 
   // build triplet list
   std::vector<detail::Triplet> triplets;
-  triplets.reserve(symmetrize ? edge_weights.size() * 2 : edge_weights.size());
+  triplets.reserve(edge_weights.size());
   for (const auto& [edge, weight] : edge_weights) {
     const auto& [i, j] = edge;
     triplets.emplace_back(static_cast<int>(i), static_cast<int>(j), weight);
-    if (symmetrize && i != j) {
-      triplets.emplace_back(static_cast<int>(j), static_cast<int>(i), weight);
-    }
   }
 
   // build sparse adjacency matrix
@@ -74,29 +51,40 @@ LatticeGraph::LatticeGraph(
   adjacency_.resize(n, n);
   adjacency_.setFromTriplets(triplets.begin(), triplets.end());
   adjacency_.makeCompressed();
-  if (!_is_symmetric) {
-    _is_symmetric = _check_symmetry(adjacency_);
-  }
+  _is_symmetric = _check_symmetry(adjacency_);
 }
 
-LatticeGraph::LatticeGraph(const Eigen::SparseMatrix<double>& sparse,
-                           bool symmetrize)
-    : _num_sites(static_cast<std::uint64_t>(sparse.rows())),
-      _is_symmetric(symmetrize) {
+LatticeGraph::LatticeGraph(Eigen::SparseMatrix<double> adjacency)
+    : _num_sites(static_cast<std::uint64_t>(adjacency.rows())),
+      adjacency_(std::move(adjacency)),
+      _is_symmetric(_check_symmetry(adjacency_)) {}
+
+LatticeGraph LatticeGraph::from_dense_matrix(
+    const Eigen::MatrixXd& adjacency_matrix) {
+  if (adjacency_matrix.rows() != adjacency_matrix.cols()) {
+    throw std::invalid_argument("Adjacency matrix must be square.");
+  }
+  Eigen::SparseMatrix<double> sparse = adjacency_matrix.sparseView();
+  sparse.makeCompressed();
+  return LatticeGraph(std::move(sparse));
+}
+
+LatticeGraph LatticeGraph::from_sparse_matrix(
+    const Eigen::SparseMatrix<double>& sparse) {
   if (sparse.rows() != sparse.cols()) {
     throw std::invalid_argument("Adjacency matrix must be square.");
   }
-  // symmetrize
-  if (symmetrize) {
-    adjacency_ =
-        (sparse + Eigen::SparseMatrix<double>(sparse.transpose())) * 0.5;
-  } else {
-    adjacency_ = sparse;
-  }
-  adjacency_.makeCompressed();
-  if (!_is_symmetric) {
-    _is_symmetric = _check_symmetry(adjacency_);
-  }
+  Eigen::SparseMatrix<double> copy = sparse;
+  copy.makeCompressed();
+  return LatticeGraph(std::move(copy));
+}
+
+LatticeGraph LatticeGraph::make_bidirectional(const LatticeGraph& graph) {
+  Eigen::SparseMatrix<double> sym =
+      (graph.adjacency_ +
+       Eigen::SparseMatrix<double>(graph.adjacency_.transpose()));
+  sym.makeCompressed();
+  return LatticeGraph(std::move(sym));
 }
 
 std::uint64_t LatticeGraph::num_sites() const { return _num_sites; }
@@ -158,7 +146,7 @@ LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t) {
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(adj, false);
+  return LatticeGraph(std::move(adj));
 }
 
 LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
@@ -205,7 +193,7 @@ LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(adj, false);
+  return LatticeGraph(std::move(adj));
 }
 
 LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
@@ -263,7 +251,7 @@ LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(adj, false);
+  return LatticeGraph(std::move(adj));
 }
 
 LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
@@ -315,7 +303,7 @@ LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(adj, false);
+  return LatticeGraph(std::move(adj));
 }
 
 LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
@@ -387,11 +375,10 @@ LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(adj, false);
+  return LatticeGraph(std::move(adj));
 }
 
-bool LatticeGraph::_check_symmetry(
-    const Eigen::SparseMatrix<double>& mat) const {
+bool LatticeGraph::_check_symmetry(const Eigen::SparseMatrix<double>& mat) {
   if (mat.rows() != mat.cols()) {
     return false;
   }
@@ -578,7 +565,7 @@ LatticeGraph LatticeGraph::from_json(const nlohmann::json& j) {
                                      static_cast<Eigen::Index>(n));
   sparse.setFromTriplets(triplets.begin(), triplets.end());
   sparse.makeCompressed();
-  return LatticeGraph(sparse, false);
+  return LatticeGraph(std::move(sparse));
 }
 
 LatticeGraph LatticeGraph::from_hdf5_file(const std::string& filename) {
@@ -637,7 +624,7 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
                                      static_cast<Eigen::Index>(n));
   sparse.setFromTriplets(triplets.begin(), triplets.end());
   sparse.makeCompressed();
-  return LatticeGraph(sparse, false);
+  return LatticeGraph(std::move(sparse));
 }
 
 }  // namespace qdk::chemistry::data

@@ -25,7 +25,8 @@ TEST_F(LatticeGraphTest, ChainConstructor) {
       {{1, 2}, 1.0},
       {{2, 3}, 1.0},
   };
-  LatticeGraph expected(expected_edges, true, 4);
+  auto expected =
+      LatticeGraph::make_bidirectional(LatticeGraph(expected_edges, 4));
 
   auto chain = LatticeGraph::chain(4);
   EXPECT_EQ(chain.num_sites(), 4);
@@ -37,7 +38,8 @@ TEST_F(LatticeGraphTest, ChainConstructor) {
   {
     std::map<Edge, double> ring_edges = expected_edges;
     ring_edges[{0, 3}] = 1.0;  // wrap
-    LatticeGraph expected_ring(ring_edges, true, 4);
+    auto expected_ring =
+        LatticeGraph::make_bidirectional(LatticeGraph(ring_edges, 4));
 
     auto ring = LatticeGraph::chain(4, true);
     EXPECT_EQ(ring.num_sites(), 4);
@@ -81,7 +83,8 @@ TEST_F(LatticeGraphTest, SquareConstructor) {
       {{7, 10}, 1.0},
       {{8, 11}, 1.0},
   };
-  LatticeGraph expected(expected_edges, true, 12);
+  auto expected =
+      LatticeGraph::make_bidirectional(LatticeGraph(expected_edges, 12));
 
   auto sq = LatticeGraph::square(3, 4);
   EXPECT_EQ(sq.num_sites(), 12);
@@ -95,7 +98,8 @@ TEST_F(LatticeGraphTest, SquareConstructor) {
     py_edges[{0, 9}] = 1.0;   // up wrap
     py_edges[{1, 10}] = 1.0;  // up wrap
     py_edges[{2, 11}] = 1.0;  // up wrap
-    LatticeGraph expected_py(py_edges, true, 12);
+    auto expected_py =
+        LatticeGraph::make_bidirectional(LatticeGraph(py_edges, 12));
 
     auto sq_py = LatticeGraph::square(3, 4, false, true);
     EXPECT_EQ(sq_py.num_sites(), 12);
@@ -112,7 +116,8 @@ TEST_F(LatticeGraphTest, SquareConstructor) {
     px_edges[{3, 5}] = 1.0;   // right wrap
     px_edges[{6, 8}] = 1.0;   // right wrap
     px_edges[{9, 11}] = 1.0;  // right wrap
-    LatticeGraph expected_px(px_edges, true, 12);
+    auto expected_px =
+        LatticeGraph::make_bidirectional(LatticeGraph(px_edges, 12));
 
     auto sq_px = LatticeGraph::square(3, 4, true, false);
     EXPECT_EQ(sq_px.num_sites(), 12);
@@ -132,7 +137,8 @@ TEST_F(LatticeGraphTest, SquareConstructor) {
     pxy_edges[{0, 9}] = 1.0;   // up wrap
     pxy_edges[{1, 10}] = 1.0;  // up wrap
     pxy_edges[{2, 11}] = 1.0;  // up wrap
-    LatticeGraph expected_pxy(pxy_edges, true, 12);
+    auto expected_pxy =
+        LatticeGraph::make_bidirectional(LatticeGraph(pxy_edges, 12));
 
     auto sq_pxy = LatticeGraph::square(3, 4, true, true);
     EXPECT_EQ(sq_pxy.num_sites(), 12);
@@ -183,7 +189,8 @@ TEST_F(LatticeGraphTest, TriangularConstructor) {
       {{6, 10}, 1.0},
       {{7, 11}, 1.0},
   };
-  LatticeGraph expected(expected_edges, true, 12);
+  auto expected =
+      LatticeGraph::make_bidirectional(LatticeGraph(expected_edges, 12));
 
   auto tri = LatticeGraph::triangular(3, 4);
   EXPECT_EQ(tri.num_sites(), 12);
@@ -199,7 +206,8 @@ TEST_F(LatticeGraphTest, TriangularConstructor) {
     py_edges[{2, 11}] = 1.0;  // up wrap
     py_edges[{1, 9}] = 1.0;   // diagonal y-wrap
     py_edges[{2, 10}] = 1.0;  // diagonal y-wrap
-    LatticeGraph expected_py(py_edges, true, 12);
+    auto expected_py =
+        LatticeGraph::make_bidirectional(LatticeGraph(py_edges, 12));
 
     auto tri_py = LatticeGraph::triangular(3, 4, false, true);
     EXPECT_EQ(tri_py.num_sites(), 12);
@@ -219,7 +227,8 @@ TEST_F(LatticeGraphTest, TriangularConstructor) {
     px_edges[{2, 3}] = 1.0;   // diagonal x-wrap
     px_edges[{5, 6}] = 1.0;   // diagonal x-wrap
     px_edges[{8, 9}] = 1.0;   // diagonal x-wrap
-    LatticeGraph expected_px(px_edges, true, 12);
+    auto expected_px =
+        LatticeGraph::make_bidirectional(LatticeGraph(px_edges, 12));
 
     auto tri_px = LatticeGraph::triangular(3, 4, true, false);
     EXPECT_EQ(tri_px.num_sites(), 12);
@@ -245,7 +254,8 @@ TEST_F(LatticeGraphTest, TriangularConstructor) {
     pxy_edges[{1, 9}] = 1.0;   // diagonal y-wrap
     pxy_edges[{2, 10}] = 1.0;  // diagonal y-wrap
     pxy_edges[{11, 0}] = 1.0;  // diagonal corner wrap
-    LatticeGraph expected_pxy(pxy_edges, true, 12);
+    auto expected_pxy =
+        LatticeGraph::make_bidirectional(LatticeGraph(pxy_edges, 12));
 
     auto tri_pxy = LatticeGraph::triangular(3, 4, true, true);
     EXPECT_EQ(tri_pxy.num_sites(), 12);
@@ -304,7 +314,8 @@ TEST_F(LatticeGraphTest, HoneycombConstructor) {
       {{15, 20}, 1.0},
       {{17, 22}, 1.0},
   };
-  LatticeGraph expected(expected_edges, true, 24);
+  auto expected =
+      LatticeGraph::make_bidirectional(LatticeGraph(expected_edges, 24));
 
   auto hc = LatticeGraph::honeycomb(3, 4);
   EXPECT_EQ(hc.num_sites(), 24);
@@ -318,7 +329,8 @@ TEST_F(LatticeGraphTest, HoneycombConstructor) {
     py_edges[{0, 19}] = 1.0;  // vertical wrap
     py_edges[{2, 21}] = 1.0;  // vertical wrap
     py_edges[{4, 23}] = 1.0;  // vertical wrap
-    LatticeGraph expected_py(py_edges, true, 24);
+    auto expected_py =
+        LatticeGraph::make_bidirectional(LatticeGraph(py_edges, 24));
 
     auto hc_py = LatticeGraph::honeycomb(3, 4, false, true);
     EXPECT_EQ(hc_py.num_sites(), 24);
@@ -335,7 +347,8 @@ TEST_F(LatticeGraphTest, HoneycombConstructor) {
     px_edges[{6, 11}] = 1.0;   // horizontal wrap
     px_edges[{12, 17}] = 1.0;  // horizontal wrap
     px_edges[{18, 23}] = 1.0;  // horizontal wrap
-    LatticeGraph expected_px(px_edges, true, 24);
+    auto expected_px =
+        LatticeGraph::make_bidirectional(LatticeGraph(px_edges, 24));
 
     auto hc_px = LatticeGraph::honeycomb(3, 4, true, false);
     EXPECT_EQ(hc_px.num_sites(), 24);
@@ -355,7 +368,8 @@ TEST_F(LatticeGraphTest, HoneycombConstructor) {
     pxy_edges[{0, 19}] = 1.0;   // vertical wrap
     pxy_edges[{2, 21}] = 1.0;   // vertical wrap
     pxy_edges[{4, 23}] = 1.0;   // vertical wrap
-    LatticeGraph expected_pxy(pxy_edges, true, 24);
+    auto expected_pxy =
+        LatticeGraph::make_bidirectional(LatticeGraph(pxy_edges, 24));
 
     auto hc_pxy = LatticeGraph::honeycomb(3, 4, true, true);
     EXPECT_EQ(hc_pxy.num_sites(), 24);
@@ -409,7 +423,8 @@ TEST_F(LatticeGraphTest, KagomeConstructor) {
       {{15, 17}, 1.0},
       {{16, 17}, 1.0},
   };
-  LatticeGraph expected(expected_edges, true, 18);
+  auto expected =
+      LatticeGraph::make_bidirectional(LatticeGraph(expected_edges, 18));
 
   auto kg = LatticeGraph::kagome(3, 2);
   EXPECT_EQ(kg.num_sites(), 18);
@@ -427,7 +442,8 @@ TEST_F(LatticeGraphTest, KagomeConstructor) {
     // diagonal y-wraps:
     py_edges[{1, 14}] = 1.0;  // diagonal y-wrap
     py_edges[{4, 17}] = 1.0;  // diagonal y-wrap
-    LatticeGraph expected_py(py_edges, true, 18);
+    auto expected_py =
+        LatticeGraph::make_bidirectional(LatticeGraph(py_edges, 18));
 
     auto kg_py = LatticeGraph::kagome(3, 2, false, true);
     EXPECT_EQ(kg_py.num_sites(), 18);
@@ -445,7 +461,8 @@ TEST_F(LatticeGraphTest, KagomeConstructor) {
     px_edges[{9, 16}] = 1.0;  // horizontal wrap
     // diagonal x-wraps:
     px_edges[{2, 16}] = 1.0;  // diagonal x-wrap
-    LatticeGraph expected_px(px_edges, true, 18);
+    auto expected_px =
+        LatticeGraph::make_bidirectional(LatticeGraph(px_edges, 18));
 
     auto kg_px = LatticeGraph::kagome(3, 2, true, false);
     EXPECT_EQ(kg_px.num_sites(), 18);
@@ -472,7 +489,8 @@ TEST_F(LatticeGraphTest, KagomeConstructor) {
     pxy_edges[{4, 17}] = 1.0;
     // diagonal corner wrap:
     pxy_edges[{7, 11}] = 1.0;
-    LatticeGraph expected_pxy(pxy_edges, true, 18);
+    auto expected_pxy =
+        LatticeGraph::make_bidirectional(LatticeGraph(pxy_edges, 18));
 
     auto kg_pxy = LatticeGraph::kagome(3, 2, true, true);
     EXPECT_EQ(kg_pxy.num_sites(), 18);

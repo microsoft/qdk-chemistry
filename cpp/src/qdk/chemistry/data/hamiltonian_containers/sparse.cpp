@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <iomanip>
 #include <limits>
@@ -16,6 +18,42 @@
 #include "../json_serialization.hpp"
 
 namespace qdk::chemistry::data {
+
+namespace detail {
+/**
+ * @brief Pack two 32-bit unsigned indices into a single double via bitwise
+ *        reinterpretation.
+ *
+ * @note The returned `double` is **not** a meaningful floating-point value;
+ *       it must only be decoded with unpack_indices.
+ *
+ * @param a First index (e.g. row or orbital index p).
+ * @param b Second index (e.g. column or orbital index q).
+ * @return A `double` whose bit pattern encodes the pair (a, b).
+ */
+inline double pack_indices(uint32_t a, uint32_t b) {
+  static_assert(sizeof(double) == 2 * sizeof(uint32_t));
+  alignas(double) uint32_t packed[2] = {a, b};
+  double result;
+  std::memcpy(&result, packed, sizeof(double));
+  return result;
+}
+
+/**
+ * @brief Unpack a double produced by pack_indices back into two 32-bit
+ *        unsigned indices.
+ *
+ * @param packed_val A `double` whose bit pattern was produced by
+ *                   pack_indices.
+ * @return A pair `{a, b}` of the originally packed indices.
+ */
+inline std::pair<uint32_t, uint32_t> unpack_indices(double packed_val) {
+  static_assert(sizeof(double) == 2 * sizeof(uint32_t));
+  alignas(double) uint32_t packed[2];
+  std::memcpy(packed, &packed_val, sizeof(double));
+  return {packed[0], packed[1]};
+}
+}  // namespace detail
 
 SparseHamiltonianContainer::SparseHamiltonianContainer(
     Eigen::SparseMatrix<double> one_body_integrals,
@@ -261,20 +299,20 @@ void SparseHamiltonianContainer::to_hdf5(H5::Group& group) const {
         "is_restricted", H5::PredType::NATIVE_HBOOL, scalar_space);
     restricted_attr.write(H5::PredType::NATIVE_HBOOL, &restricted_flag);
 
-    // One-body integrals as sparse dataset: N x 3 (row, col, value)
+    // One-body integrals as sparse dataset: N x 2 (packed row|col, value)
     {
       auto nnz = static_cast<hsize_t>(_one_body_sparse.nonZeros());
-      hsize_t dims[2] = {nnz, 3};
+      hsize_t dims[2] = {nnz, 2};
       H5::DataSpace dataspace(2, dims);
 
-      std::vector<double> buffer(nnz * 3);
+      std::vector<double> buffer(nnz * 2);
       hsize_t idx = 0;
       for (int k = 0; k < _one_body_sparse.outerSize(); ++k) {
         for (Eigen::SparseMatrix<double>::InnerIterator it(_one_body_sparse, k);
              it; ++it) {
-          buffer[idx * 3 + 0] = static_cast<double>(it.row());
-          buffer[idx * 3 + 1] = static_cast<double>(it.col());
-          buffer[idx * 3 + 2] = it.value();
+          buffer[idx * 2 + 0] = detail::pack_indices(
+              static_cast<uint32_t>(it.row()), static_cast<uint32_t>(it.col()));
+          buffer[idx * 2 + 1] = it.value();
           ++idx;
         }
       }
@@ -292,22 +330,22 @@ void SparseHamiltonianContainer::to_hdf5(H5::Group& group) const {
       norb_attr.write(H5::PredType::NATIVE_INT, &n);
     }
 
-    // Two-body integrals as sparse triplet dataset: N x 5 (p, q, r, s, val)
+    // Two-body integrals as sparse dataset: N x 3 (packed p|q, packed r|s, val)
     if (has_two_body_integrals()) {
       auto n_entries = static_cast<hsize_t>(_two_body_map.size());
-      hsize_t dims[2] = {n_entries, 5};
+      hsize_t dims[2] = {n_entries, 3};
       H5::DataSpace dataspace(2, dims);
 
-      // Pack into row-major buffer: [p, q, r, s, value] per row
-      std::vector<double> buffer(n_entries * 5);
+      // Pack into row-major buffer: [packed(p,q), packed(r,s), value] per row
+      std::vector<double> buffer(n_entries * 3);
       hsize_t row = 0;
       for (const auto& [idx, val] : _two_body_map) {
         const auto& [p, q, r, s] = idx;
-        buffer[row * 5 + 0] = static_cast<double>(p);
-        buffer[row * 5 + 1] = static_cast<double>(q);
-        buffer[row * 5 + 2] = static_cast<double>(r);
-        buffer[row * 5 + 3] = static_cast<double>(s);
-        buffer[row * 5 + 4] = val;
+        buffer[row * 3 + 0] = detail::pack_indices(static_cast<uint32_t>(p),
+                                                   static_cast<uint32_t>(q));
+        buffer[row * 3 + 1] = detail::pack_indices(static_cast<uint32_t>(r),
+                                                   static_cast<uint32_t>(s));
+        buffer[row * 3 + 2] = val;
         ++row;
       }
 
@@ -377,17 +415,31 @@ SparseHamiltonianContainer::from_hdf5(H5::Group& group) {
     hsize_t h1_dims[2];
     h1_space.getSimpleExtentDims(h1_dims);
     auto nnz = h1_dims[0];
-
-    std::vector<double> h1_buffer(nnz * 3);
-    h1_dataset.read(h1_buffer.data(), H5::PredType::NATIVE_DOUBLE);
+    auto ncols = h1_dims[1];
 
     std::vector<Eigen::Triplet<double>> triplets;
     triplets.reserve(nnz);
-    for (hsize_t i = 0; i < nnz; ++i) {
-      int row = static_cast<int>(h1_buffer[i * 3 + 0]);
-      int col = static_cast<int>(h1_buffer[i * 3 + 1]);
-      double val = h1_buffer[i * 3 + 2];
-      triplets.emplace_back(row, col, val);
+
+    if (ncols == 2) {
+      // Packed format: [packed(row,col), value]
+      std::vector<double> h1_buffer(nnz * 2);
+      h1_dataset.read(h1_buffer.data(), H5::PredType::NATIVE_DOUBLE);
+      for (hsize_t i = 0; i < nnz; ++i) {
+        auto [row, col] = detail::unpack_indices(h1_buffer[i * 2 + 0]);
+        double val = h1_buffer[i * 2 + 1];
+        triplets.emplace_back(static_cast<int>(row), static_cast<int>(col),
+                              val);
+      }
+    } else {
+      // Legacy format: [row, col, value] as doubles
+      std::vector<double> h1_buffer(nnz * 3);
+      h1_dataset.read(h1_buffer.data(), H5::PredType::NATIVE_DOUBLE);
+      for (hsize_t i = 0; i < nnz; ++i) {
+        int row = static_cast<int>(h1_buffer[i * 3 + 0]);
+        int col = static_cast<int>(h1_buffer[i * 3 + 1]);
+        double val = h1_buffer[i * 3 + 2];
+        triplets.emplace_back(row, col, val);
+      }
     }
     one_body_sparse.resize(n_orb, n_orb);
     one_body_sparse.setFromTriplets(triplets.begin(), triplets.end());
@@ -401,17 +453,31 @@ SparseHamiltonianContainer::from_hdf5(H5::Group& group) {
       hsize_t dims[2];
       dataspace.getSimpleExtentDims(dims);
       auto n_entries = dims[0];
+      auto ncols = dims[1];
 
-      std::vector<double> buffer(n_entries * 5);
-      dataset.read(buffer.data(), H5::PredType::NATIVE_DOUBLE);
-
-      for (hsize_t row = 0; row < n_entries; ++row) {
-        int p = static_cast<int>(buffer[row * 5 + 0]);
-        int q = static_cast<int>(buffer[row * 5 + 1]);
-        int r = static_cast<int>(buffer[row * 5 + 2]);
-        int s = static_cast<int>(buffer[row * 5 + 3]);
-        double val = buffer[row * 5 + 4];
-        two_body_map[{p, q, r, s}] = val;
+      if (ncols == 3) {
+        // Packed format: [packed(p,q), packed(r,s), value]
+        std::vector<double> buffer(n_entries * 3);
+        dataset.read(buffer.data(), H5::PredType::NATIVE_DOUBLE);
+        for (hsize_t row = 0; row < n_entries; ++row) {
+          auto [p, q] = detail::unpack_indices(buffer[row * 3 + 0]);
+          auto [r, s] = detail::unpack_indices(buffer[row * 3 + 1]);
+          double val = buffer[row * 3 + 2];
+          two_body_map[{static_cast<int>(p), static_cast<int>(q),
+                        static_cast<int>(r), static_cast<int>(s)}] = val;
+        }
+      } else {
+        // Legacy format: [p, q, r, s, value] as doubles
+        std::vector<double> buffer(n_entries * 5);
+        dataset.read(buffer.data(), H5::PredType::NATIVE_DOUBLE);
+        for (hsize_t row = 0; row < n_entries; ++row) {
+          int p = static_cast<int>(buffer[row * 5 + 0]);
+          int q = static_cast<int>(buffer[row * 5 + 1]);
+          int r = static_cast<int>(buffer[row * 5 + 2]);
+          int s = static_cast<int>(buffer[row * 5 + 3]);
+          double val = buffer[row * 5 + 4];
+          two_body_map[{p, q, r, s}] = val;
+        }
       }
     } catch (const H5::Exception&) {
       // No two-body dataset — (e.g. Hückel model)
@@ -435,8 +501,67 @@ void SparseHamiltonianContainer::to_fcidump_file(const std::string& filename,
                                                  size_t nalpha,
                                                  size_t nbeta) const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
-      "FCIDUMP export not implemented for SparseHamiltonianContainer");
+
+  if (is_unrestricted()) {
+    throw std::runtime_error(
+        "FCIDUMP format is not supported for unrestricted Hamiltonians.");
+  }
+
+  std::ofstream file(filename);
+  if (!file.is_open()) {
+    throw std::runtime_error("Cannot open file for writing: " + filename);
+  }
+
+  const size_t num_orbs =
+      static_cast<size_t>(_orbitals->get_num_molecular_orbitals());
+  const size_t nelec = nalpha + nbeta;
+  const double print_thresh = std::numeric_limits<double>::epsilon();
+
+  // Build ORBSYM string (C1 symmetry: all orbitals in irrep 1)
+  std::string orb_string;
+  for (size_t i = 0; i < num_orbs; ++i) {
+    if (i > 0) orb_string += ",";
+    orb_string += "1";
+  }
+
+  // Write the FCIDUMP header
+  file << "&FCI ";
+  file << "NORB=" << num_orbs << ", ";
+  file << "NELEC=" << nelec << ", ";
+  file << "MS2=" << (nalpha - nbeta) << ",\n";
+  file << "ORBSYM=" << orb_string << ",\n";
+  file << "ISYM=1,\n";
+  file << "&END\n";
+
+  auto formatted_line = [&](size_t i, size_t j, size_t k, size_t l,
+                            double val) {
+    file << std::setw(28) << std::scientific << std::setprecision(16)
+         << std::right << val << " ";
+    file << std::setw(4) << i << " ";
+    file << std::setw(4) << j << " ";
+    file << std::setw(4) << k << " ";
+    file << std::setw(4) << l << "\n";
+  };
+
+  // Write two-body integrals from sparse map (1-based indices)
+  for (const auto& [idx, val] : _two_body_map) {
+    if (std::abs(val) < print_thresh) continue;
+    const auto& [p, q, r, s] = idx;
+    formatted_line(p + 1, q + 1, r + 1, s + 1, val);
+  }
+
+  // Write one-body integrals from sparse matrix (lower triangle, 1-based)
+  for (int k = 0; k < _one_body_sparse.outerSize(); ++k) {
+    for (Eigen::SparseMatrix<double>::InnerIterator it(_one_body_sparse, k); it;
+         ++it) {
+      if (it.row() < it.col()) continue;  // skip upper triangle
+      if (std::abs(it.value()) < print_thresh) continue;
+      formatted_line(it.row() + 1, it.col() + 1, 0, 0, it.value());
+    }
+  }
+
+  // Write core energy
+  formatted_line(0, 0, 0, 0, _core_energy);
 }
 
 const Eigen::SparseMatrix<double>&

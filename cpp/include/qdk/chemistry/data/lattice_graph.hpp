@@ -29,39 +29,50 @@ namespace qdk::chemistry::data {
 class LatticeGraph : public DataClass {
  public:
   /**
-   * @brief Construct a lattice graph from a dense adjacency matrix.
-   *
-   * @param adjacency_matrix Square dense matrix of edge weights.
-   * @param symmetrize If true, symmetrise via A = (A + A^T) / 2 before storing.
-   * @throws std::invalid_argument If the matrix is not square.
-   */
-  LatticeGraph(const Eigen::MatrixXd& adjacency_matrix,
-               bool symmetrize = false);
-
-  /**
    * @brief Construct a lattice graph from an edge-weight map.
    *
    * Each key is a pair (i, j) of site indices and each value is the
-   * corresponding edge weight.
+   * corresponding edge weight. Edges are stored exactly as given; use
+   * make_bidirectional() to add reverse edges from one-directional input.
    *
    * @param edge_weights Map of (source, target) -> weight.
-   * @param symmetrize  If true, add the reverse edge for every entry.
    * @param num_sites   Total number of sites. If 0, inferred from the
    *                    largest index in edge_weights.
    */
   LatticeGraph(const std::map<std::pair<std::uint64_t, std::uint64_t>, double>&
                    edge_weights,
-               bool symmetrize = false, std::uint64_t num_sites = 0);
+               std::uint64_t num_sites = 0);
 
   /**
-   * @brief Construct a lattice graph from a sparse adjacency matrix.
+   * @brief Create a lattice graph from a dense adjacency matrix.
    *
-   * @param sparse Sparse square matrix of edge weights.
-   * @param symmetrize If true, symmetrise via A = (A + A^T) / 2 before storing.
+   * @param adjacency_matrix Square dense matrix of edge weights.
+   * @return LatticeGraph with the given adjacency.
    * @throws std::invalid_argument If the matrix is not square.
    */
-  explicit LatticeGraph(const Eigen::SparseMatrix<double>& sparse,
-                        bool symmetrize = false);
+  static LatticeGraph from_dense_matrix(
+      const Eigen::MatrixXd& adjacency_matrix);
+
+  /**
+   * @brief Create a lattice graph from a sparse adjacency matrix.
+   *
+   * @param sparse Sparse square matrix of edge weights.
+   * @return LatticeGraph with the given adjacency.
+   * @throws std::invalid_argument If the matrix is not square.
+   */
+  static LatticeGraph from_sparse_matrix(
+      const Eigen::SparseMatrix<double>& sparse);
+
+  /**
+   * @brief Return a new lattice graph with reverse edges added.
+   *
+   * For each directed edge (i,j) with weight w, ensures (j,i) also exists
+   * with the same weight. Computes A_out = A + A^T.
+   *
+   * @param graph The (possibly directed) lattice graph.
+   * @return A new LatticeGraph with bidirectional edges.
+   */
+  static LatticeGraph make_bidirectional(const LatticeGraph& graph);
 
   ~LatticeGraph() = default;
 
@@ -377,9 +388,19 @@ class LatticeGraph : public DataClass {
   static LatticeGraph from_hdf5(H5::Group& group);
 
  private:
+  /**
+   * @brief Private constructor from a sparse adjacency matrix.
+   *
+   * Used internally by factory methods, deserialization, and
+   * make_bidirectional().
+   *
+   * @param adjacency Sparse square adjacency matrix (moved in).
+   */
+  explicit LatticeGraph(Eigen::SparseMatrix<double> adjacency);
+
   /** @brief Check if a sparse matrix is symmetric within a numerical tolerance.
    */
-  bool _check_symmetry(const Eigen::SparseMatrix<double>& mat) const;
+  static bool _check_symmetry(const Eigen::SparseMatrix<double>& mat);
 
   /// Number of sites (vertices) in the lattice
   std::uint64_t _num_sites;

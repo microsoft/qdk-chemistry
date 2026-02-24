@@ -86,8 +86,8 @@ constexpr double COULOMB_CONSTANT =
  * or empty.
  */
 template <typename EpsT, typename TT>
-inline Eigen::SparseMatrix<double> from_huckel(const LatticeGraph& lattice,
-                                               EpsT&& epsilon_in, TT&& t_in) {
+inline Eigen::SparseMatrix<double> _build_huckel_integrals(
+    const LatticeGraph& lattice, EpsT&& epsilon_in, TT&& t_in) {
   // Check template types
   static_assert(detail::is_site_param_v<EpsT>,
                 "epsilon must be double or Eigen::VectorXd");
@@ -169,8 +169,8 @@ inline Eigen::SparseMatrix<double> from_huckel(const LatticeGraph& lattice,
 template <typename EpsT, typename TT, typename UT>
 inline std::tuple<Eigen::SparseMatrix<double>,
                   SparseHamiltonianContainer::TwoBodyMap>
-from_hubbard(const LatticeGraph& lattice, EpsT&& epsilon_in, TT&& t_in,
-             UT&& U_in) {
+_build_hubbard_integrals(const LatticeGraph& lattice, EpsT&& epsilon_in,
+                         TT&& t_in, UT&& U_in) {
   // Check template types
   static_assert(detail::is_site_param_v<EpsT>,
                 "epsilon must be double or Eigen::VectorXd");
@@ -191,7 +191,7 @@ from_hubbard(const LatticeGraph& lattice, EpsT&& epsilon_in, TT&& t_in,
   }
 
   // Build the one-body part using the Hückel constructor
-  auto h1 = from_huckel(lattice, epsilon, t);
+  auto h1 = _build_huckel_integrals(lattice, epsilon, t);
 
   // Build the two-body map for on-site repulsion: (p,q,r,s) = (i,i,i,i) -> U_i
   SparseHamiltonianContainer::TwoBodyMap h2;
@@ -228,8 +228,8 @@ from_hubbard(const LatticeGraph& lattice, EpsT&& epsilon_in, TT&& t_in,
 template <typename EpsT, typename TT, typename UT, typename VT, typename ZT>
 inline std::tuple<Eigen::SparseMatrix<double>,
                   SparseHamiltonianContainer::TwoBodyMap, double>
-from_ppp(const LatticeGraph& lattice, EpsT&& epsilon_in, TT&& t_in, UT&& U_in,
-         VT&& V_in, ZT&& z_in) {
+_build_ppp_integrals(const LatticeGraph& lattice, EpsT&& epsilon_in, TT&& t_in,
+                     UT&& U_in, VT&& V_in, ZT&& z_in) {
   // Check template types
   static_assert(detail::is_site_param_v<EpsT>,
                 "epsilon must be double or Eigen::VectorXd");
@@ -259,8 +259,8 @@ from_ppp(const LatticeGraph& lattice, EpsT&& epsilon_in, TT&& t_in, UT&& U_in,
         "z vector size must match the number of lattice sites.");
   }
 
-  // Build the Hubbard part using the from_hubbard constructor
-  auto [h1_sparse, h2] = from_hubbard(lattice, epsilon, t, U);
+  // Build the Hubbard part using the Hubbard integral builder
+  auto [h1_sparse, h2] = _build_hubbard_integrals(lattice, epsilon, t, U);
 
   // Convert to dense for efficient diagonal modification
   // (avoids costly insertions into compressed sparse)
@@ -303,8 +303,8 @@ from_ppp(const LatticeGraph& lattice, EpsT&& epsilon_in, TT&& t_in, UT&& U_in,
 template <typename EpsT, typename TT>
 inline Hamiltonian create_huckel_hamiltonian(const LatticeGraph& lattice,
                                              EpsT&& epsilon_in, TT&& t_in) {
-  auto h1 = detail::from_huckel(lattice, std::forward<EpsT>(epsilon_in),
-                                std::forward<TT>(t_in));
+  auto h1 = detail::_build_huckel_integrals(
+      lattice, std::forward<EpsT>(epsilon_in), std::forward<TT>(t_in));
   return Hamiltonian(
       std::make_unique<SparseHamiltonianContainer>(std::move(h1)));
 }
@@ -325,9 +325,9 @@ template <typename EpsT, typename TT, typename UT>
 inline Hamiltonian create_hubbard_hamiltonian(const LatticeGraph& lattice,
                                               EpsT&& epsilon_in, TT&& t_in,
                                               UT&& U_in) {
-  auto [h1, h2] =
-      detail::from_hubbard(lattice, std::forward<EpsT>(epsilon_in),
-                           std::forward<TT>(t_in), std::forward<UT>(U_in));
+  auto [h1, h2] = detail::_build_hubbard_integrals(
+      lattice, std::forward<EpsT>(epsilon_in), std::forward<TT>(t_in),
+      std::forward<UT>(U_in));
   return Hamiltonian(std::make_unique<SparseHamiltonianContainer>(
       std::move(h1), std::move(h2)));
 }
@@ -352,7 +352,7 @@ template <typename EpsT, typename TT, typename UT, typename VT, typename ZT>
 inline Hamiltonian create_ppp_hamiltonian(const LatticeGraph& lattice,
                                           EpsT&& epsilon_in, TT&& t_in,
                                           UT&& U_in, VT&& V_in, ZT&& z_in) {
-  auto [h1, h2, core_energy] = detail::from_ppp(
+  auto [h1, h2, core_energy] = detail::_build_ppp_integrals(
       lattice, std::forward<EpsT>(epsilon_in), std::forward<TT>(t_in),
       std::forward<UT>(U_in), std::forward<VT>(V_in), std::forward<ZT>(z_in));
   return Hamiltonian(std::make_unique<SparseHamiltonianContainer>(
