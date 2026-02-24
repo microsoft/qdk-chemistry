@@ -6,54 +6,41 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
-
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import QubitHamiltonian, SciWavefunctionContainer, Wavefunction
+from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Wavefunction
 
 
-def prepare_2_dets_trial_state(
-    wf: Wavefunction, rotation_angle: float = np.pi / 12
+def prepare_top_dets_trial_state(
+    wf: Wavefunction, hamiltonian: Hamiltonian, num_dets: int
 ) -> tuple[Wavefunction, float]:
-    """Scan rotation angles for 2-determinant wavefunction.
-
-        psi(theta) = cos(theta)*|D1> + sin(theta)*|D2|
+    """Prepare a trial state for QPE using the top determinants from the given wavefunction.
 
     Args:
-        wf: Original wavefunction (used to extract determinants)
-        rotation_angle: Rotation angle (in radians)
+        wf: Original wavefunction used to extract the top determinants.
+        hamiltonian: Hamiltonian used to compute the projected multi-configuration state.
+        num_dets: Number of top determinants to use.
 
     Returns:
-        wavefunction: Wavefunction object for the given rotation angle
-        fidelity: Fidelity with respect to the exact wavefunction
+        wavefunction: Wavefunction object built from the top determinants.
+        fidelity: Fidelity with respect to the original wavefunction (overlap squared).
 
     """
-    dets = wf.get_top_determinants(max_determinants=2)
-    orbitals = wf.get_orbitals()
+    dets = wf.get_top_determinants(max_determinants=num_dets)
+    if not dets:
+        raise ValueError(
+            "Cannot prepare trial state: No determinants found in the wavefunction."
+        )
 
-    c1_new = np.cos(round(rotation_angle, 4))
-    c2_new = np.sin(round(rotation_angle, 4))
-
-    # Only include terms with non-zero coefficients
-    coeffs_new = []
-    dets_new = []
-
-    for coeff, det in zip([c1_new, c2_new], dets):
-        if not np.isclose(coeff, 0.0):
-            coeffs_new.append(coeff)
-            dets_new.append(det)
-
-    # Convert to numpy arrays and normalize
-    coeffs_new = np.array(coeffs_new, dtype=float)
-    coeffs_new /= np.linalg.norm(coeffs_new)
-
-    # Construct trial wavefunction
-    rotated_wf = Wavefunction(SciWavefunctionContainer(coeffs_new, dets_new, orbitals))
+    pmc_calculator = create("projected_multi_configuration_calculator", "macis_pmc")
+    _, wf_trial = pmc_calculator.run(hamiltonian, list(dets.keys()))
 
     # Fidelity with original reference wf
-    coeffs_wf = np.array(list(dets.values()))
+    det_keys = list(dets.keys())
+    coeffs_wf = np.array([dets[det] for det in det_keys])
+    coeffs_new = np.array([wf_trial.get_coefficient(det) for det in det_keys])
     fidelity = np.abs(np.vdot(coeffs_new, coeffs_wf)) ** 2
 
-    return rotated_wf, fidelity
+    return wf_trial, fidelity
 
 
 def compute_evolution_time(
