@@ -32,8 +32,7 @@ auto structure = std::make_shared<Structure>(
 
 // Run a SCF to get orbitals
 auto scf_solver = ScfSolverFactory::create();
-scf_solver->settings().set("basis_set", "sto-3g");
-auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);
+auto [E_scf, wfn] = scf_solver->run(structure, 0, 1, "sto-3g");
 auto orbitals = wfn->get_orbitals();
 
 // Construct the Hamiltonian from orbitals

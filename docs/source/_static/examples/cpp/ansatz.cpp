@@ -17,8 +17,7 @@ int main() {
 
   // SCF
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("basis_set", "sto-3g");
-  auto [E_scf, wfn_scf] = scf_solver->run(structure, 0, 1);
+  auto [E_scf, wfn_scf] = scf_solver->run(structure, 0, 1, "sto-3g");
 
   // Create Hamiltonian from SCF Orbitals
   auto ham_constructor = HamiltonianConstructorFactory::create();

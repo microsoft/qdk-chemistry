@@ -18,9 +18,18 @@ Upon import, this module automatically registers the PySCF CC calculator with QD
 CC calculator registry under the name "pyscf_coupled_cluster".
 
 Examples:
-    >>> from qdk_chemistry.plugins.pyscf.coupled_cluster import PyscfCoupledClusterCalculator
-    >>> cc_calculator = PyscfCoupledClusterCalculator()
-    >>> energy, wavefunction = cc_calculator.run(ansatz)
+    Basic usage::
+
+        >>> from qdk_chemistry.plugins.pyscf.coupled_cluster import PyscfCoupledClusterCalculator
+        >>> cc_calculator = PyscfCoupledClusterCalculator()
+        >>> energy, wavefunction, _ = cc_calculator.run(ansatz)
+
+    Computing the bra wavefunction (lambda/gamma amplitudes)::
+
+        >>> cc_calculator = PyscfCoupledClusterCalculator()
+        >>> cc_calculator.settings().set("compute_bra", True)
+        >>> cc_calculator.settings().set("store_amplitudes", True)
+        >>> energy, ket_wavefunction, bra_wavefunction = cc_calculator.run(ansatz)
 
 This module requires both QDK/Chemistry and PySCF to be installed.
 
@@ -63,6 +72,9 @@ class PyscfCoupledClusterSettings(Settings):
         frozen (int or list): If integer is given, the inner-most orbitals are frozen from CC amplitudes.
             Given the orbital indices (0-based) in a list, both occupied and virtual orbitals can be frozen in the
             CC calculation.
+        store_amplitudes (bool): Whether to store amplitudes in the CC container. Default is False.
+        compute_bra (bool): Whether to compute the bra wavefunction (lambda/gamma amplitudes).
+            Default is False. When True, a second wavefunction with the lambda amplitudes is returned.
 
     Examples:
         >>> settings = PyscfCoupledClusterSettings()
@@ -83,6 +95,7 @@ class PyscfCoupledClusterSettings(Settings):
         self._set_default("async_io", "bool", True)
         self._set_default("incore_complete", "bool", True)
         self._set_default("store_amplitudes", "bool", False)
+        self._set_default("compute_bra", "bool", False)
 
 
 class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
@@ -117,13 +130,18 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
 
         Args:
             ansatz: The QDK/Chemistry :class:`Ansatz` object representing the system to calculate.
-            store_amplitudes: Whether to store amplitudes or not in the CC container (default is False).
 
         Returns:
-            A tuple containing the total energy and wavefunction, containing CC amplitudes.
+            A tuple containing:
+                - total_energy: The total CCSD energy (HF + correlation).
+                - ket_wavefunction: Wavefunction containing T amplitudes (ket state).
+                - bra_wavefunction (optional): If compute_bra is True, a second Wavefunction
+                  containing the lambda (gamma) amplitudes representing the bra state.
+                  When compute_bra is False, only (total_energy, ket_wavefunction, None) is returned.
 
         Raises:
             RuntimeError: If the CCSD calculation does not converge.
+            RuntimeError: If the lambda equation solver does not converge (when compute_bra=True).
 
         """
         Logger.trace_entering()
@@ -134,6 +152,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
         pyscf_cc = cc.CCSD(pyscf_scf)
 
         store_amplitudes = self._settings.get("store_amplitudes")
+        compute_bra = self._settings.get("compute_bra")
 
         # Handle Settings
         if self._settings.get_or_default("verbose", -1) != -1:
@@ -229,4 +248,73 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
         # Total energy = SCF energy + correlation energy
         total_energy = initial_energy + pyscf_cc.e_corr
 
-        return total_energy, updated_wavefunction
+        # Compute bra wavefunction (lambda/gamma amplitudes) if requested
+        if compute_bra:
+            pyscf_cc.solve_lambda()
+            if not pyscf_cc.converged_lambda:
+                raise RuntimeError("Lambda equation solver did not converge")
+
+            if is_unrestricted:
+                # Unrestricted case: l1 = (l1_aa, l1_bb), l2 = (l2_aaaa, l2_aabb, l2_bbbb)
+                l1_aa, l1_bb = pyscf_cc.l1
+                l2_aaaa, l2_aabb, l2_bbbb = pyscf_cc.l2
+
+                if store_amplitudes:
+                    # Reshape amplitudes for storage
+                    l1_aa = np.reshape(l1_aa, (l1_aa.size, 1))
+                    l1_bb = np.reshape(l1_bb, (l1_bb.size, 1))
+                    l2_aaaa = np.reshape(l2_aaaa, (l2_aaaa.size, 1))
+                    l2_aabb = np.reshape(l2_aabb, (l2_aabb.size, 1))
+                    l2_bbbb = np.reshape(l2_bbbb, (l2_bbbb.size, 1))
+
+                    # Create CoupledClusterContainer for bra with lambda amplitudes
+                    bra_container = CoupledClusterContainer(
+                        orbitals,
+                        original_wavefunction,
+                        l1_aa,  # Alpha L1 (gamma) amplitudes
+                        l1_bb,  # Beta L1 (gamma) amplitudes
+                        l2_aabb,  # Alpha-beta L2 (gamma) amplitudes
+                        l2_aaaa,  # Alpha-alpha L2 (gamma) amplitudes
+                        l2_bbbb,  # Beta-beta L2 (gamma) amplitudes
+                    )
+                else:
+                    # Create CoupledClusterContainer without storing amplitudes
+                    bra_container = CoupledClusterContainer(
+                        orbitals,
+                        original_wavefunction,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+            else:
+                # Restricted case: l1 and l2 are single arrays
+                l1 = pyscf_cc.l1
+                l2 = pyscf_cc.l2
+
+                if store_amplitudes:
+                    # Reshape amplitudes for storage
+                    l1 = np.reshape(l1, (l1.size, 1))
+                    l2 = np.reshape(l2, (l2.size, 1))
+
+                    # Create CoupledClusterContainer for bra with lambda amplitudes
+                    bra_container = CoupledClusterContainer(
+                        orbitals,
+                        original_wavefunction,
+                        l1,  # L1 (gamma) amplitudes
+                        l2,  # L2 (gamma) amplitudes
+                    )
+                else:
+                    # Create CoupledClusterContainer without storing amplitudes
+                    bra_container = CoupledClusterContainer(
+                        orbitals,
+                        original_wavefunction,
+                        None,
+                        None,
+                    )
+
+            bra_wavefunction = Wavefunction(bra_container)
+            return total_energy, updated_wavefunction, bra_wavefunction
+
+        return total_energy, updated_wavefunction, None

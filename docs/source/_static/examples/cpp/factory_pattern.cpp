@@ -20,8 +20,7 @@ auto scf_solver = ScfSolverFactory::create();
 auto localizer = LocalizerFactory::create("qdk_pipek_mezey");
 
 // Configure the SCF solver and run
-scf_solver->settings().set("basis_set", "cc-pvdz");
-auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);
+auto [E_scf, wfn] = scf_solver->run(structure, 0, 1, "cc-pvdz");
 // end-cell-scf-localizer
 // -----------------------------------------------------------------------------
 

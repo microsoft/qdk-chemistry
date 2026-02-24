@@ -14,18 +14,15 @@ RDKit must be installed to run this sample.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from collections.abc import Sequence
 import argparse
+from collections.abc import Sequence
 
 from qdk_chemistry.algorithms import create
+from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
-
+from qdk_chemistry.utils import Logger
 from rdkit import Chem
 from rdkit.Chem import AllChem, Mol
-
-from qdk_chemistry.constants import ANGSTROM_TO_BOHR
-
-from qdk_chemistry.utils import Logger
 
 
 def create_structure_from_rdkit(molecule: Mol) -> Structure:

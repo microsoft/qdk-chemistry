@@ -26,6 +26,47 @@
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
+// Helper struct to hold common MP2 test setup results
+struct O2TestSetup {
+  std::shared_ptr<Structure> structure;
+  std::shared_ptr<Wavefunction> hf_wavefunction;
+  std::shared_ptr<Orbitals> hf_orbitals;
+  std::shared_ptr<Hamiltonian> hf_hamiltonian;
+  double hf_energy;
+};
+
+// Helper function to create O2 structure and run HF calculation
+// bond_length: O-O bond length in Bohr (default 2.3)
+// multiplicity: 1 for singlet (restricted), 3 for triplet (unrestricted)
+// basis_set: basis set name (default "cc-pvdz")
+inline O2TestSetup create_o2_hf_setup(int multiplicity = 1,
+                                      const std::string& basis_set = "cc-pvdz",
+                                      double bond_length = 2.3) {
+  O2TestSetup setup;
+
+  // O2 structure with specified bond length
+  std::vector<Eigen::Vector3d> coordinates = {
+      Eigen::Vector3d(0.0, 0.0, 0.0), Eigen::Vector3d(bond_length, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"O", "O"};
+  setup.structure = std::make_shared<Structure>(coordinates, symbols);
+
+  // HF calculation
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("method", "hf");
+  auto [hf_energy, hf_wavefunction] =
+      scf_factory->run(setup.structure, 0, multiplicity, basis_set);
+
+  setup.hf_energy = hf_energy;
+  setup.hf_wavefunction = hf_wavefunction;
+  setup.hf_orbitals = hf_wavefunction->get_orbitals();
+
+  // Create Hamiltonian
+  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  setup.hf_hamiltonian = ham_factory->run(setup.hf_orbitals);
+
+  return setup;
+}
+
 class MP2Test : public ::testing::Test {
  protected:
   void SetUp() override {}
@@ -37,30 +78,19 @@ TEST_F(MP2Test, UMP2Energies_CCPVDZ) {
   // Test the UMP2 energies against reference for cc-pvdz
   double ref = -0.35094710125187589;
 
-  // o2 structure with 2.3 Bohr bond length
-  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
-                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
-  std::vector<std::string> symbols = {"O", "O"};
-  Structure o2_structure(coordinates, symbols);
-
-  auto scf_factory = ScfSolverFactory::create("qdk");
-  scf_factory->settings().set("method", "hf");
-  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
-  auto [hf_energy, hf_wavefunction] =
-      scf_factory->run(o2_structure_ptr, 0, 3, "cc-pvdz");
-  auto hf_orbitals = hf_wavefunction->get_orbitals();
-  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
-  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+  // Triplet O2 (unrestricted)
+  auto setup = create_o2_hf_setup(3);
   auto [n_alpha_active, n_beta_active] =
-      hf_wavefunction->get_active_num_electrons();
+      setup.hf_wavefunction->get_active_num_electrons();
 
   // Create ansatz from Hamiltonian and wavefunction
-  auto ansatz = std::make_shared<Ansatz>(*hf_hamiltonian, *hf_wavefunction);
+  auto ansatz =
+      std::make_shared<Ansatz>(*setup.hf_hamiltonian, *setup.hf_wavefunction);
 
   auto mp2_calculator =
       DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
 
-  auto [mp2_total_energy, final_wavefunction] = mp2_calculator->run(ansatz);
+  auto [mp2_total_energy, final_wavefunction, _] = mp2_calculator->run(ansatz);
 
   double reference = ansatz->calculate_energy();
   double mp2_corr_energy = mp2_total_energy - reference;
@@ -76,25 +106,10 @@ TEST_F(MP2Test, RMP2Energies_CCPVDZ) {
   // cc-pvdz
   float pyscf_rmp2_corr_cc_pvdz = -0.38428662586339435;
 
-  // O2 structure with 2.3 Bohr bond length
-  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
-                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
-  std::vector<std::string> symbols = {"O", "O"};
-  Structure o2_structure(coordinates, symbols);
-
-  // Restricted HF calculation (singlet O2, multiplicity = 1)
-  auto scf_factory = ScfSolverFactory::create("qdk");
-  scf_factory->settings().set("method", "hf");
-  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
-  auto [hf_energy, hf_wavefunction] =
-      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
-  auto hf_orbitals = hf_wavefunction->get_orbitals();
-
-  // Create Hamiltonian
-  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
-  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+  // Singlet O2 (restricted)
+  auto setup = create_o2_hf_setup(1);
   auto [n_alpha_active, n_beta_active] =
-      hf_wavefunction->get_active_num_electrons();
+      setup.hf_wavefunction->get_active_num_electrons();
 
   // Verify closed shell
   EXPECT_EQ(n_alpha_active, n_beta_active)
@@ -102,14 +117,15 @@ TEST_F(MP2Test, RMP2Energies_CCPVDZ) {
          "calculation";
 
   // Create ansatz from Hamiltonian and wavefunction
-  auto ansatz = std::make_shared<Ansatz>(*hf_hamiltonian, *hf_wavefunction);
+  auto ansatz =
+      std::make_shared<Ansatz>(*setup.hf_hamiltonian, *setup.hf_wavefunction);
 
   // Use MP2 calculator
   auto mp2_calculator =
       DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
 
   // MP2 returns total energy, subtract reference to get correlation energy
-  auto [mp2_total_energy, final_wavefunction] = mp2_calculator->run(ansatz);
+  auto [mp2_total_energy, final_wavefunction, _] = mp2_calculator->run(ansatz);
   double hf_reference_energy = ansatz->calculate_energy();
   double mp2_corr_energy = mp2_total_energy - hf_reference_energy;
 
@@ -123,27 +139,12 @@ TEST_F(MP2Test, RMP2Energies_CCPVDZ) {
 
 TEST_F(MP2Test, MP2Container) {
   // Test that MP2Container properly computes amplitudes
-  // O2 structure with 2.3 Bohr bond length
-  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
-                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
-  std::vector<std::string> symbols = {"O", "O"};
-  Structure o2_structure(coordinates, symbols);
-
-  // Restricted HF calculation (singlet O2, multiplicity = 1)
-  auto scf_factory = ScfSolverFactory::create("qdk");
-  scf_factory->settings().set("method", "hf");
-  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
-  auto [hf_energy, hf_wavefunction] =
-      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
-  auto hf_orbitals = hf_wavefunction->get_orbitals();
-
-  // Create Hamiltonian
-  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
-  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+  // Singlet O2 (restricted)
+  auto setup = create_o2_hf_setup(1);
 
   // Create MP2Container
-  auto mp2_container_with_amplitudes =
-      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+  auto mp2_container_with_amplitudes = std::make_unique<MP2Container>(
+      setup.hf_hamiltonian, setup.hf_wavefunction);
 
   // Verify Hamiltonian is stored
   EXPECT_NE(mp2_container_with_amplitudes->get_hamiltonian(), nullptr)
@@ -193,26 +194,12 @@ TEST_F(MP2Test, MP2Container) {
 
 TEST_F(MP2Test, JsonSerializationSpatial) {
   // Test JSON serialization/deserialization for spatial MP2
-  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
-                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
-  std::vector<std::string> symbols = {"O", "O"};
-  Structure o2_structure(coordinates, symbols);
-
-  // Restricted HF calculation (singlet O2, multiplicity = 1)
-  auto scf_factory = ScfSolverFactory::create("qdk");
-  scf_factory->settings().set("method", "hf");
-  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
-  auto [hf_energy, hf_wavefunction] =
-      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
-  auto hf_orbitals = hf_wavefunction->get_orbitals();
-
-  // Create Hamiltonian
-  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
-  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+  // Singlet O2 (restricted)
+  auto setup = create_o2_hf_setup(1);
 
   // Create MP2Container and compute amplitudes
-  auto original =
-      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+  auto original = std::make_unique<MP2Container>(setup.hf_hamiltonian,
+                                                 setup.hf_wavefunction);
 
   // Trigger amplitude computation
   auto [t1_aa_orig, t1_bb_orig] = original->get_t1_amplitudes();
@@ -259,26 +246,12 @@ TEST_F(MP2Test, JsonSerializationSpatial) {
 
 TEST_F(MP2Test, JsonSerializationSpin) {
   // Test JSON serialization/deserialization for unrestricted MP2
-  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
-                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
-  std::vector<std::string> symbols = {"O", "O"};
-  Structure o2_structure(coordinates, symbols);
-
-  // Unrestricted HF calculation (triplet O2, multiplicity = 3)
-  auto scf_factory = ScfSolverFactory::create("qdk");
-  scf_factory->settings().set("method", "hf");
-  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
-  auto [hf_energy, hf_wavefunction] =
-      scf_factory->run(o2_structure_ptr, 0, 3, "cc-pvdz");
-  auto hf_orbitals = hf_wavefunction->get_orbitals();
-
-  // Create Hamiltonian
-  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
-  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+  // Triplet O2 (unrestricted)
+  auto setup = create_o2_hf_setup(3);
 
   // Create MP2Container and compute amplitudes
-  auto original =
-      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+  auto original = std::make_unique<MP2Container>(setup.hf_hamiltonian,
+                                                 setup.hf_wavefunction);
 
   // Trigger amplitude computation
   auto [t1_aa_orig, t1_bb_orig] = original->get_t1_amplitudes();
@@ -325,26 +298,12 @@ TEST_F(MP2Test, JsonSerializationSpin) {
 
 TEST_F(MP2Test, Hdf5SerializationSpatial) {
   // Test HDF5 serialization/deserialization for spatial MP2
-  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
-                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
-  std::vector<std::string> symbols = {"O", "O"};
-  Structure o2_structure(coordinates, symbols);
-
-  // Restricted HF calculation (singlet O2, multiplicity = 1)
-  auto scf_factory = ScfSolverFactory::create("qdk");
-  scf_factory->settings().set("method", "hf");
-  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
-  auto [hf_energy, hf_wavefunction] =
-      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
-  auto hf_orbitals = hf_wavefunction->get_orbitals();
-
-  // Create Hamiltonian
-  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
-  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+  // Singlet O2 (restricted)
+  auto setup = create_o2_hf_setup(1);
 
   // Create MP2Container and compute amplitudes
-  auto original =
-      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+  auto original = std::make_unique<MP2Container>(setup.hf_hamiltonian,
+                                                 setup.hf_wavefunction);
 
   // Trigger amplitude computation
   auto [t1_aa_orig, t1_bb_orig] = original->get_t1_amplitudes();
@@ -401,26 +360,12 @@ TEST_F(MP2Test, Hdf5SerializationSpatial) {
 
 TEST_F(MP2Test, Hdf5SerializationSpin) {
   // Test HDF5 serialization/deserialization for unrestricted MP2
-  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
-                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
-  std::vector<std::string> symbols = {"O", "O"};
-  Structure o2_structure(coordinates, symbols);
-
-  // Unrestricted HF calculation (triplet O2, multiplicity = 3)
-  auto scf_factory = ScfSolverFactory::create("qdk");
-  scf_factory->settings().set("method", "hf");
-  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
-  auto [hf_energy, hf_wavefunction] =
-      scf_factory->run(o2_structure_ptr, 0, 3, "cc-pvdz");
-  auto hf_orbitals = hf_wavefunction->get_orbitals();
-
-  // Create Hamiltonian
-  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
-  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+  // Triplet O2 (unrestricted)
+  auto setup = create_o2_hf_setup(3);
 
   // Create MP2Container and compute amplitudes
-  auto original =
-      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+  auto original = std::make_unique<MP2Container>(setup.hf_hamiltonian,
+                                                 setup.hf_wavefunction);
 
   // Trigger amplitude computation
   auto [t1_aa_orig, t1_bb_orig] = original->get_t1_amplitudes();
@@ -480,26 +425,12 @@ TEST_F(MP2Test, Hdf5SerializationSpin) {
 TEST_F(MP2Test, WavefunctionJsonSerializationSpatial) {
   // Test JSON serialization/deserialization for MP2 via
   // Wavefunction::from_json()
-  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
-                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
-  std::vector<std::string> symbols = {"O", "O"};
-  Structure o2_structure(coordinates, symbols);
-
-  // Restricted HF calculation (singlet O2, multiplicity = 1)
-  auto scf_factory = ScfSolverFactory::create("qdk");
-  scf_factory->settings().set("method", "hf");
-  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
-  auto [hf_energy, hf_wavefunction] =
-      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
-  auto hf_orbitals = hf_wavefunction->get_orbitals();
-
-  // Create Hamiltonian
-  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
-  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+  // Singlet O2 (restricted)
+  auto setup = create_o2_hf_setup(1);
 
   // Create MP2Container
-  auto mp2_container =
-      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+  auto mp2_container = std::make_unique<MP2Container>(setup.hf_hamiltonian,
+                                                      setup.hf_wavefunction);
 
   // Trigger amplitude computation before wrapping in Wavefunction
   mp2_container->get_t2_amplitudes();
@@ -528,23 +459,11 @@ TEST_F(MP2Test, WavefunctionJsonSerializationSpatial) {
 TEST_F(MP2Test, WavefunctionHdf5SerializationSpatial) {
   // Test HDF5 serialization/deserialization for MP2 via
   // Wavefunction::from_hdf5()
-  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
-                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
-  std::vector<std::string> symbols = {"O", "O"};
-  Structure o2_structure(coordinates, symbols);
+  // Singlet O2 (restricted)
+  auto setup = create_o2_hf_setup(1);
 
-  auto scf_factory = ScfSolverFactory::create("qdk");
-  scf_factory->settings().set("method", "hf");
-  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
-  auto [hf_energy, hf_wavefunction] =
-      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
-  auto hf_orbitals = hf_wavefunction->get_orbitals();
-
-  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
-  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
-
-  auto mp2_container =
-      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+  auto mp2_container = std::make_unique<MP2Container>(setup.hf_hamiltonian,
+                                                      setup.hf_wavefunction);
   mp2_container->get_t2_amplitudes();
 
   auto original_wavefunction =
@@ -566,4 +485,231 @@ TEST_F(MP2Test, WavefunctionHdf5SerializationSpatial) {
   }
 
   std::remove(filename.c_str());
+}
+
+// Test CI coefficients generation from MP2 amplitudes
+TEST_F(MP2Test, CICoefficientsGeneration) {
+  // Singlet O2 (restricted)
+  auto setup = create_o2_hf_setup(1);
+
+  // Create MP2Container
+  auto mp2_container = std::make_unique<MP2Container>(setup.hf_hamiltonian,
+                                                      setup.hf_wavefunction);
+
+  // Test that CI coefficients can be retrieved (lazy evaluation)
+  const auto& coefficients = mp2_container->get_coefficients();
+
+  // Verify number of coefficients matches expected for MP2 expansion
+  std::visit(
+      [](const auto& vec) {
+        EXPECT_EQ(vec.size(), 4909)
+            << "4909 coefficients should be generated for MP2 expansion";
+      },
+      coefficients);
+
+  // Test that determinants can be retrieved and count matches
+  const auto& determinants = mp2_container->get_active_determinants();
+  EXPECT_EQ(determinants.size(), 4909)
+      << "4909 determinants should be generated for MP2 expansion";
+
+  // The number of coefficients should match the number of determinants
+  std::visit(
+      [&determinants](const auto& vec) {
+        EXPECT_EQ(static_cast<size_t>(vec.size()), determinants.size())
+            << "Number of coefficients should match number of determinants";
+      },
+      coefficients);
+
+  // Test size() returns the number of determinants
+  EXPECT_EQ(mp2_container->size(), determinants.size())
+      << "size() should return the number of determinants";
+}
+
+// Test CI expansion consistency for MP2
+TEST_F(MP2Test, CIExpansionConsistency) {
+  // Singlet O2 (restricted)
+  auto setup = create_o2_hf_setup(1);
+
+  // Create MP2Container
+  auto mp2_container = std::make_unique<MP2Container>(setup.hf_hamiltonian,
+                                                      setup.hf_wavefunction);
+
+  const auto& coefficients = mp2_container->get_coefficients();
+  const auto& determinants = mp2_container->get_active_determinants();
+
+  // Verify each determinant can be looked up individually
+  for (size_t i = 0; i < std::min(determinants.size(), static_cast<size_t>(10));
+       ++i) {
+    auto coeff = mp2_container->get_coefficient(determinants[i]);
+    std::visit(
+        [i, &coefficients](const auto& individual_coeff) {
+          using T = std::decay_t<decltype(individual_coeff)>;
+          std::visit(
+              [i, &individual_coeff](const auto& all_coeffs) {
+                using U = std::decay_t<decltype(all_coeffs[0])>;
+                if constexpr (std::is_same_v<T, U>) {
+                  EXPECT_NEAR(std::abs(individual_coeff),
+                              std::abs(all_coeffs[i]), testing::wf_tolerance)
+                      << "Individual coefficient lookup should match vector at "
+                         "index "
+                      << i;
+                }
+              },
+              coefficients);
+        },
+        coeff);
+  }
+}
+
+// Test that reference determinant is in MP2 expansion with coefficient 1.0
+TEST_F(MP2Test, ReferenceInExpansion) {
+  // Singlet O2 (restricted)
+  auto setup = create_o2_hf_setup(1);
+
+  // Create MP2Container
+  auto mp2_container = std::make_unique<MP2Container>(setup.hf_hamiltonian,
+                                                      setup.hf_wavefunction);
+
+  const auto& determinants = mp2_container->get_active_determinants();
+
+  // The reference determinant should be the first one in the expansion
+  const auto& ref_dets = setup.hf_wavefunction->get_total_determinants();
+  ASSERT_FALSE(ref_dets.empty())
+      << "Reference wavefunction should have determinants";
+
+  // Check that the reference is in the MP2 expansion
+  bool found_reference = false;
+  for (const auto& det : determinants) {
+    for (const auto& ref : ref_dets) {
+      if (det.to_string() == ref.to_string()) {
+        found_reference = true;
+        // The reference should have coefficient 1.0 in MP2
+        auto ref_coeff = mp2_container->get_coefficient(det);
+        std::visit(
+            [](const auto& coeff) {
+              // The reference coefficient should be dominant in the MP2
+              // expansion. We check that it is greater than 0.9, rather than
+              // matching a hardcoded value.
+              EXPECT_GT(std::abs(coeff), 0.9);
+            },
+            ref_coeff);
+        break;
+      }
+    }
+    if (found_reference) break;
+  }
+  EXPECT_TRUE(found_reference)
+      << "Reference determinant should be in the MP2 expansion";
+}
+
+// Test RDM availability for MP2 container
+TEST_F(MP2Test, LazyRDMComputationFromAmplitudes) {
+  // Singlet O2 (restricted)
+  auto setup = create_o2_hf_setup(1);
+
+  // Create MP2Container
+  auto mp2_container = std::make_unique<MP2Container>(setup.hf_hamiltonian,
+                                                      setup.hf_wavefunction);
+
+  // CI coefficients should be available (lazy evaluation from amplitudes)
+  const auto& coefficients = mp2_container->get_coefficients();
+  std::visit(
+      [](const auto& vec) {
+        EXPECT_GT(vec.size(), 0) << "CI coefficients should be available";
+      },
+      coefficients);
+
+  // RDMs SHOULD be available via lazy computation from CI coefficients
+  EXPECT_TRUE(mp2_container->has_one_rdm_spin_dependent())
+      << "MP2 container should have spin-dependent 1-RDM via lazy computation";
+  EXPECT_TRUE(mp2_container->has_one_rdm_spin_traced())
+      << "MP2 container should have spin-traced 1-RDM via lazy computation";
+  EXPECT_TRUE(mp2_container->has_two_rdm_spin_dependent())
+      << "MP2 container should have spin-dependent 2-RDM via lazy computation";
+  EXPECT_TRUE(mp2_container->has_two_rdm_spin_traced())
+      << "MP2 container should have spin-traced 2-RDM via lazy computation";
+
+  // Get RDMs and verify they have reasonable values
+  auto [one_rdm_aa, one_rdm_bb] =
+      mp2_container->get_active_one_rdm_spin_dependent();
+
+  // Verify 1-RDM has non-zero values (visit each variant separately)
+  std::visit(
+      [](const auto& mat) {
+        EXPECT_GT(mat.norm(), 0.0) << "1-RDM aa should not be zero";
+      },
+      one_rdm_aa);
+  std::visit(
+      [](const auto& mat) {
+        EXPECT_GT(mat.norm(), 0.0) << "1-RDM bb should not be zero";
+      },
+      one_rdm_bb);
+
+  // Get number of electrons
+  auto [n_alpha, n_beta] = setup.hf_wavefunction->get_active_num_electrons();
+  size_t n_electrons = n_alpha + n_beta;
+
+  // Verify 1-RDM trace equals number of electrons
+  // Tr(γ) = N
+  const auto& rdm1 = std::get<Eigen::MatrixXd>(
+      mp2_container->get_active_one_rdm_spin_traced());
+  double rdm1_trace = rdm1.trace();
+  EXPECT_NEAR(rdm1_trace, static_cast<double>(n_electrons), 1e-6)
+      << "1-RDM trace should equal number of electrons. "
+      << "Trace: " << rdm1_trace << ", N_electrons: " << n_electrons;
+
+  // Verify 2-RDMs are available and have non-zero values
+  auto [two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb] =
+      mp2_container->get_active_two_rdm_spin_dependent();
+  std::visit(
+      [](const auto& rdm) {
+        bool has_nonzero = false;
+        for (size_t i = 0; i < rdm.size() && !has_nonzero; ++i) {
+          if (std::abs(rdm.data()[i]) > 1e-12) {
+            has_nonzero = true;
+          }
+        }
+        EXPECT_TRUE(has_nonzero) << "2-RDM aaaa should have non-zero values";
+      },
+      two_rdm_aaaa);
+}
+
+// Test that both amplitudes and CI coefficients are available on MP2Container
+TEST_F(MP2Test, AmplitudesAndCICoefficientsAvailable) {
+  // Singlet O2 (restricted)
+  auto setup = create_o2_hf_setup(1);
+
+  auto mp2_container = std::make_unique<MP2Container>(setup.hf_hamiltonian,
+                                                      setup.hf_wavefunction);
+
+  // Test that both T amplitudes and CI coefficients are available
+  // First, get CI coefficients (this triggers lazy evaluation)
+  const auto& coefficients = mp2_container->get_coefficients();
+  const auto& determinants = mp2_container->get_active_determinants();
+
+  // Then, get amplitudes
+  auto [t1_aa, t1_bb] = mp2_container->get_t1_amplitudes();
+  auto [t2_abab, t2_aaaa, t2_bbbb] = mp2_container->get_t2_amplitudes();
+
+  // Verify all are available
+  EXPECT_TRUE(mp2_container->has_t1_amplitudes())
+      << "T1 amplitudes should be available";
+  EXPECT_TRUE(mp2_container->has_t2_amplitudes())
+      << "T2 amplitudes should be available";
+
+  std::visit(
+      [](const auto& vec) {
+        EXPECT_GT(vec.size(), 0) << "CI coefficients should be non-empty";
+      },
+      coefficients);
+
+  EXPECT_GT(determinants.size(), 0) << "Determinants should be non-empty";
+
+  // Verify T1 is zero for MP2
+  std::visit(
+      [](const auto& vec) {
+        EXPECT_TRUE(vec.isZero(1e-10))
+            << "T1 amplitudes should be zero for MP2";
+      },
+      t1_aa);
 }
