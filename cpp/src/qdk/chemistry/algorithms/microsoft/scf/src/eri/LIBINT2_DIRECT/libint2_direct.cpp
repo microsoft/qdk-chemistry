@@ -166,7 +166,7 @@ std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(
  * @note This class requires Libint2 library for integral evaluation
  */
 class ERI {
-  bool unrestricted_;              ///< Whether to use unrestricted formalism
+  size_t spin_density_factor_;     ///< Number of spin density matrices (1 or 2)
   bool use_thread_local_buffers_;  ///< Use thread-local buffers (true) or
                                    ///< atomic ops (false)
   ::libint2::BasisSet obs_;        ///< Libint2 orbital basis set representation
@@ -185,14 +185,15 @@ class ERI {
    * during integral evaluation. All screening data is computed once during
    * construction and reused throughout the calculation.
    *
-   * @param unr Whether to use unrestricted formalism
+   * @param spin_density_factor Number of spin density matrices (1 or 2)
    * @param basis_set QDK basis set (converted to Libint2 format internally)
    *
    * @note Construction involves significant overhead due to screening setup
    * @note Shell pair and Schwarz data is computed using OpenMP parallelization
    */
-  ERI(bool unr, qdk::chemistry::scf::BasisSet& basis_set, bool use_atomics)
-      : unrestricted_(unr),
+  ERI(size_t spin_density_factor, qdk::chemistry::scf::BasisSet& basis_set,
+      bool use_atomics)
+      : spin_density_factor_(spin_density_factor),
         use_thread_local_buffers_(!use_atomics),
         obs_(libint2_util::convert_to_libint_basisset(basis_set)) {
     QDK_LOG_TRACE_ENTERING();
@@ -243,7 +244,7 @@ class ERI {
     AutoTimer t("ERI::build_JK");
     const size_t num_atomic_orbitals = obs_.nbf();
     const size_t nsh = obs_.size();
-    const size_t num_density_matrices = unrestricted_ ? 2 : 1;
+    const size_t num_density_matrices = spin_density_factor_;
     const size_t mat_size =
         num_density_matrices * num_atomic_orbitals * num_atomic_orbitals;
     const bool is_rsx = std::abs(omega) > 1e-12;
@@ -867,11 +868,13 @@ class ERI {
 
 }  // namespace libint2::direct
 
-LIBINT2_DIRECT::LIBINT2_DIRECT(bool unr, BasisSet& basis_set,
-                               ParallelConfig _mpi, bool use_atomics)
-    : ERI(unr, 0.0, basis_set, _mpi),
-      eri_impl_(libint2::direct::ERI::make_libint2_direct_eri(unr, basis_set,
-                                                              use_atomics)) {
+LIBINT2_DIRECT::LIBINT2_DIRECT(SCFOrbitalType scf_orbital_type,
+                               BasisSet& basis_set, ParallelConfig _mpi,
+                               bool use_atomics)
+    : ERI(scf_orbital_type, 0.0, basis_set, _mpi),
+      eri_impl_(libint2::direct::ERI::make_libint2_direct_eri(
+          scf_orbital_type == SCFOrbitalType::Restricted ? 1 : 2, basis_set,
+          use_atomics)) {
   QDK_LOG_TRACE_ENTERING();
   if (_mpi.world_size > 1) throw std::runtime_error("LIBINT2_DIRECT + MPI NYI");
 }

@@ -16,7 +16,7 @@ GAUXC::GAUXC(std::shared_ptr<BasisSet> basis_set, const SCFConfig& cfg)
 
   // Store the GAUXCInput and other parameters needed for registry lookup
   gauxc_input_ = cfg.xc_input;
-  unrestricted_ = cfg.unrestricted;
+  unrestricted_ = (cfg.scf_orbital_type == SCFOrbitalType::Unrestricted);
   xc_name_ = cfg.exc.xc_name;
 
   // Get or create the GAUXC implementation via the registry

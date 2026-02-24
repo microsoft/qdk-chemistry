@@ -25,15 +25,16 @@
 
 namespace qdk::chemistry::scf::incore {
 
-ERI_DF::ERI_DF(bool unr, const BasisSet& obs, const BasisSet& abs,
-               ParallelConfig mpi)
-    : DensityFittingBase(unr, obs, abs, mpi,
+ERI_DF::ERI_DF(size_t spin_density_factor, const BasisSet& obs,
+               const BasisSet& abs, ParallelConfig mpi)
+    : DensityFittingBase(spin_density_factor != 1, obs, abs, mpi,
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
                          true /*gpu*/
 #else
                          false /*gpu*/
 #endif
-      ) {
+                         ),
+      spin_density_factor_(spin_density_factor) {
   QDK_LOG_TRACE_ENTERING();
 
   // Distribute on AUX index
@@ -92,6 +93,7 @@ void ERI_DF::build_JK(const double* P, double* J, double* K, double alpha,
   const size_t naux = abs_.nbf();
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
   const size_t naux_loc = loc_i_en_ - loc_i_st_;
+  const size_t mat_size = spin_density_factor_ * num_atomic_orbitals2;
   const double one = 1.0, zero = 0.0;
 
   // Form P[tota] if unrestricted
@@ -188,8 +190,8 @@ void ERI_DF::build_JK(const double* P, double* J, double* K, double alpha,
   }
 #endif
 
-  if (K) std::fill_n(K, (unrestricted_ ? 2 : 1) * num_atomic_orbitals2, 0.0);
-  if (unrestricted_) {
+  if (K) std::fill_n(K, mat_size, 0.0);
+  if (spin_density_factor_ > 1) {
     // J[alpha] contains J_total and J[beta] is zero - this is hacky but it
     // works
     for (size_t i = 0; i < num_atomic_orbitals2; ++i) {
@@ -333,12 +335,13 @@ ERI_DF::~ERI_DF() noexcept {
 #endif
 };
 
-std::unique_ptr<ERI_DF> ERI_DF::make_incore_eri(bool unr, const BasisSet& obs,
+std::unique_ptr<ERI_DF> ERI_DF::make_incore_eri(size_t spin_density_factor,
+                                                const BasisSet& obs,
                                                 const BasisSet& abs,
                                                 ParallelConfig mpi) {
   QDK_LOG_TRACE_ENTERING();
 
-  return std::make_unique<ERI_DF>(unr, obs, abs, mpi);
+  return std::make_unique<ERI_DF>(spin_density_factor, obs, abs, mpi);
 }
 
 }  // namespace qdk::chemistry::scf::incore

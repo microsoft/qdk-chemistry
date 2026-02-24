@@ -161,6 +161,8 @@ struct CPSCFInput {
  * convergence criteria, integral methods, and optional features.
  */
 struct SCFConfig {
+  SCFOrbitalType scf_orbital_type =
+      SCFOrbitalType::Restricted;  ///< Spin symmetry used across SCF algorithms
   std::string basis = "def2-svp";  ///< Primary basis set name
   std::string aux_basis =
       "def2-universal-jfit";  ///< Auxiliary basis set for density fitting
@@ -173,8 +175,6 @@ struct SCFConfig {
   bool require_gradient = false;  ///< Calculate analytical energy gradient
   bool require_polarizability = false;  ///< Calculate polarizability tensor
   bool do_dfj = false;  ///< Use density fitting for Coulomb (J) integrals
-  bool unrestricted =
-      false;  ///< Use unrestricted (UHF/UKS) rather than restricted (RHF/RKS)
   double lindep_threshold =
       1e-6;  ///< Linear dependency threshold for basis set orthogonalization
   DensityInitializationMethod density_init_method =

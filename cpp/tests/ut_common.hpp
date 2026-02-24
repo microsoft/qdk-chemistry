@@ -254,6 +254,25 @@ inline std::shared_ptr<Structure> create_o2_structure() {
 }
 
 /**
+ * @brief Creates an OH structure
+ */
+inline std::shared_ptr<Structure> create_oh_structure() {
+  std::vector<Eigen::Vector3d> coords = {
+      {0.000000000, 0.000000000, 0.000000000},
+      {0.969700000, 0.000000000, 0.000000000}};
+
+  // Convert to Bohr
+  for (auto& coord : coords) {
+    coord *= qdk::chemistry::constants::angstrom_to_bohr;
+  }
+
+  std::vector<Element> elements = {qdk::chemistry::data::Element::O,
+                                   qdk::chemistry::data::Element::H};
+
+  return std::make_shared<Structure>(coords, elements);
+}
+
+/**
  * @brief Create a stretched N2 structure
  */
 inline std::shared_ptr<Structure> create_stretched_n2_structure() {
