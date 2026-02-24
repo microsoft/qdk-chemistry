@@ -202,7 +202,7 @@ double SCFAlgorithm::calculate_og_error_(const RowMajorMatrix& F,
   QDK_LOG_TRACE_ENTERING();
   int num_atomic_orbitals = static_cast<int>(S.cols());
   if (num_orbital_sets != 1 && num_orbital_sets != 2) {
-    throw std::invalid_argument("num_orbital_sets_ must be 1 or 2");
+    throw std::invalid_argument("num_orbital_sets must be 1 or 2");
   }
 
   RowMajorMatrix FP(num_atomic_orbitals, num_atomic_orbitals);
