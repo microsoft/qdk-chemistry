@@ -46,18 +46,19 @@ class MP2Calculator : public DynamicalCorrelationCalculator {
    * @brief Implementation of MP2 calculation
    *
    * This method performs the MP2 calculation using the provided ansatz and
-   * returns both the total energy (reference + correlation) and the MP2
+   * returns the total energy (reference + correlation), the MP2 ket
    * wavefunction stored in an MP2Container. T2 amplitudes are computed
    * lazily by the MP2Container when first requested.
    *
    * @param ansatz The Ansatz (Wavefunction and Hamiltonian) describing the
    *               quantum system
-   * @return A pair containing the total energy and the MP2 wavefunction
+   * @return A DynamicalCorrelationResult containing the total energy and
+   *         the MP2 ket wavefunction
    * @throws Error if orbitals do not have an energy attribute, i.e., if they
    * are localized. MP2 cannot handle localized orbitals.
    *
    */
-  std::pair<double, std::shared_ptr<data::Wavefunction>> _run_impl(
+  DynamicalCorrelationResult _run_impl(
       std::shared_ptr<data::Ansatz> ansatz) const override;
 
  public:

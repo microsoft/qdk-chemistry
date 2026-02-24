@@ -25,7 +25,12 @@ namespace qdk::chemistry::data {
 
 /**
  * @class CoupledClusterContainer
- * @brief Wavefunction container representing a coupled cluster wavefunction
+ * @brief Container representing a coupled cluster singles-doubles wavefunction
+ *
+ * CI coefficients are generated from the CC amplitudes on-demand (lazy
+ * evaluation) and are costly. CI coefficients and determinants are cached after
+ * first computation and are calculated by truncating the expansion at the
+ * fourth order.
  */
 class CoupledClusterContainer : public WavefunctionContainer {
  public:
@@ -71,128 +76,6 @@ class CoupledClusterContainer : public WavefunctionContainer {
       const std::optional<VectorVariant>& t2_amplitudes_abab,
       const std::optional<VectorVariant>& t2_amplitudes_aaaa,
       const std::optional<VectorVariant>& t2_amplitudes_bbbb);
-
-  /**
-   * @brief Constructs a coupled cluster wavefunction with amplitudes and
-   * spin-traced RDMs
-   *
-   * T1/T2 amplitudes and RDMs are stored if provided
-   *
-   * @param orbitals Shared pointer to orbitals
-   * @param wavefunction Shared pointer to wavefunction
-   * @param t1_amplitudes T1 amplitudes (optional)
-   * @param t2_amplitudes T2 amplitudes (optional)
-   * @param one_rdm_spin_traced Spin-traced 1-RDM for active orbitals (optional)
-   * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
-   */
-  CoupledClusterContainer(
-      std::shared_ptr<Orbitals> orbitals,
-      std::shared_ptr<Wavefunction> wavefunction,
-      const std::optional<VectorVariant>& t1_amplitudes,
-      const std::optional<VectorVariant>& t2_amplitudes,
-      const std::optional<MatrixVariant>& one_rdm_spin_traced,
-      const std::optional<VectorVariant>& two_rdm_spin_traced);
-
-  /**
-   * @brief Constructs a coupled cluster wavefunction with spin-separated
-   * amplitudes and spin-traced RDMs
-   *
-   * T1/T2 amplitudes and RDMs are stored if provided
-   *
-   * @param orbitals Shared pointer to orbitals
-   * @param wavefunction Shared pointer to wavefunction
-   * @param t1_amplitudes_aa Alpha T1 amplitudes (optional)
-   * @param t1_amplitudes_bb Beta T1 amplitudes (optional)
-   * @param t2_amplitudes_abab Alpha-beta T2 amplitudes (optional)
-   * @param t2_amplitudes_aaaa Alpha-alpha T2 amplitudes (optional)
-   * @param t2_amplitudes_bbbb Beta-beta T2 amplitudes (optional)
-   * @param one_rdm_spin_traced Spin-traced 1-RDM for active orbitals (optional)
-   * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
-   */
-  CoupledClusterContainer(
-      std::shared_ptr<Orbitals> orbitals,
-      std::shared_ptr<Wavefunction> wavefunction,
-      const std::optional<VectorVariant>& t1_amplitudes_aa,
-      const std::optional<VectorVariant>& t1_amplitudes_bb,
-      const std::optional<VectorVariant>& t2_amplitudes_abab,
-      const std::optional<VectorVariant>& t2_amplitudes_aaaa,
-      const std::optional<VectorVariant>& t2_amplitudes_bbbb,
-      const std::optional<MatrixVariant>& one_rdm_spin_traced,
-      const std::optional<VectorVariant>& two_rdm_spin_traced);
-
-  /**
-   * @brief Constructs a coupled cluster wavefunction with amplitudes and full
-   * one- and two-body RDM data
-   *
-   * T1/T2 amplitudes and RDMs are stored if provided
-   *
-   * @param orbitals Shared pointer to orbitals
-   * @param wavefunction Shared pointer to wavefunction
-   * @param t1_amplitudes T1 amplitudes (optional)
-   * @param t2_amplitudes T2 amplitudes (optional)
-   * @param one_rdm_spin_traced Spin-traced 1-RDM for active orbitals (optional)
-   * @param one_rdm_aa Alpha-alpha block of 1-RDM for active orbitals (optional)
-   * @param one_rdm_bb Beta-beta block of 1-RDM for active orbitals (optional)
-   * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
-   * @param two_rdm_aabb Alpha-beta-beta-alpha block of 2-RDM for active
-   * orbitals (optional)
-   * @param two_rdm_aaaa Alpha-alpha-alpha-alpha block of 2-RDM for active
-   * orbitals (optional)
-   * @param two_rdm_bbbb Beta-beta-beta-beta block of 2-RDM for active orbitals
-   * (optional)
-   */
-  CoupledClusterContainer(
-      std::shared_ptr<Orbitals> orbitals,
-      std::shared_ptr<Wavefunction> wavefunction,
-      const std::optional<VectorVariant>& t1_amplitudes,
-      const std::optional<VectorVariant>& t2_amplitudes,
-      const std::optional<MatrixVariant>& one_rdm_spin_traced,
-      const std::optional<MatrixVariant>& one_rdm_aa,
-      const std::optional<MatrixVariant>& one_rdm_bb,
-      const std::optional<VectorVariant>& two_rdm_spin_traced,
-      const std::optional<VectorVariant>& two_rdm_aabb,
-      const std::optional<VectorVariant>& two_rdm_aaaa,
-      const std::optional<VectorVariant>& two_rdm_bbbb);
-
-  /**
-   * @brief Constructs a coupled cluster wavefunction with spin-separated
-   * amplitudes and full one- and two-body RDM data
-   *
-   * T1/T2 amplitudes and RDMs are stored if provided
-   *
-   * @param orbitals Shared pointer to orbitals
-   * @param wavefunction Shared pointer to wavefunction
-   * @param t1_amplitudes_aa Alpha T1 amplitudes (optional)
-   * @param t1_amplitudes_bb Beta T1 amplitudes (optional)
-   * @param t2_amplitudes_abab Alpha-beta T2 amplitudes (optional)
-   * @param t2_amplitudes_aaaa Alpha-alpha T2 amplitudes (optional)
-   * @param t2_amplitudes_bbbb Beta-beta T2 amplitudes (optional)
-   * @param one_rdm_spin_traced Spin-traced 1-RDM for active orbitals (optional)
-   * @param one_rdm_aa Alpha-alpha block of 1-RDM for active orbitals (optional)
-   * @param one_rdm_bb Beta-beta block of 1-RDM for active orbitals (optional)
-   * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
-   * @param two_rdm_aabb Alpha-beta-beta-alpha block of 2-RDM for active
-   * orbitals (optional)
-   * @param two_rdm_aaaa Alpha-alpha-alpha-alpha block of 2-RDM for active
-   * orbitals (optional)
-   * @param two_rdm_bbbb Beta-beta-beta-beta block of 2-RDM for active orbitals
-   * (optional)
-   */
-  CoupledClusterContainer(
-      std::shared_ptr<Orbitals> orbitals,
-      std::shared_ptr<Wavefunction> wavefunction,
-      const std::optional<VectorVariant>& t1_amplitudes_aa,
-      const std::optional<VectorVariant>& t1_amplitudes_bb,
-      const std::optional<VectorVariant>& t2_amplitudes_abab,
-      const std::optional<VectorVariant>& t2_amplitudes_aaaa,
-      const std::optional<VectorVariant>& t2_amplitudes_bbbb,
-      const std::optional<MatrixVariant>& one_rdm_spin_traced,
-      const std::optional<MatrixVariant>& one_rdm_aa,
-      const std::optional<MatrixVariant>& one_rdm_bb,
-      const std::optional<VectorVariant>& two_rdm_spin_traced,
-      const std::optional<VectorVariant>& two_rdm_aabb,
-      const std::optional<VectorVariant>& two_rdm_aaaa,
-      const std::optional<VectorVariant>& two_rdm_bbbb);
 
   /** @brief Destructor */
   ~CoupledClusterContainer() override = default;
@@ -334,8 +217,6 @@ class CoupledClusterContainer : public WavefunctionContainer {
    */
   void clear_caches() const override;
 
-  // === Serialization ===
-
   /**
    * @brief Convert container to JSON format
    * @return JSON object containing container data
@@ -378,6 +259,100 @@ class CoupledClusterContainer : public WavefunctionContainer {
    */
   bool is_complex() const override;
 
+  /**
+   * @brief Check if spin-dependent one-particle RDMs are available
+   *
+   * Returns true only if RDMs were explicitly set. RDMs cannot be computed
+   * from ket amplitudes alone - the adjoint (bra) wavefunction with lambda
+   * amplitudes is required.
+   *
+   * @return True if spin-dependent 1-RDMs are available
+   */
+  bool has_one_rdm_spin_dependent() const override;
+
+  /**
+   * @brief Check if spin-traced one-particle RDM is available
+   *
+   * Returns true only if RDMs were explicitly set. RDMs cannot be computed
+   * from ket amplitudes alone - the adjoint (bra) wavefunction with lambda
+   * amplitudes is required.
+   *
+   * @return True if spin-traced 1-RDM is available
+   */
+  bool has_one_rdm_spin_traced() const override;
+
+  /**
+   * @brief Check if spin-dependent two-particle RDMs are available
+   *
+   * Returns true only if RDMs were explicitly set. RDMs cannot be computed
+   * from ket amplitudes alone - the adjoint (bra) wavefunction with lambda
+   * amplitudes is required.
+   *
+   * @return True if spin-dependent 2-RDMs are available
+   */
+  bool has_two_rdm_spin_dependent() const override;
+
+  /**
+   * @brief Check if spin-traced two-particle RDM is available
+   *
+   * Returns true only if RDMs were explicitly set. RDMs cannot be computed
+   * from ket amplitudes alone - the adjoint (bra) wavefunction with lambda
+   * amplitudes is required.
+   *
+   * @return True if spin-traced 2-RDM is available
+   */
+  bool has_two_rdm_spin_traced() const override;
+
+  /**
+   * @brief Get spin-dependent one-particle RDMs
+   *
+   * @note RDMs cannot be computed from the ket (T amplitudes) alone.
+   *       Coupled cluster RDM computation requires the adjoint (bra)
+   *       wavefunction with lambda amplitudes.
+   *
+   * @return Tuple of (alpha-alpha, beta-beta) one-particle RDMs
+   * @throws std::runtime_error Always throws - requires adjoint wavefunction
+   */
+  std::tuple<const MatrixVariant&, const MatrixVariant&>
+  get_active_one_rdm_spin_dependent() const override;
+
+  /**
+   * @brief Get spin-traced one-particle RDM
+   *
+   * @note RDMs cannot be computed from the ket (T amplitudes) alone.
+   *       Coupled cluster RDM computation requires the adjoint (bra)
+   *       wavefunction with lambda amplitudes.
+   *
+   * @return Spin-traced one-particle RDM
+   * @throws std::runtime_error Always throws - requires adjoint wavefunction
+   */
+  const MatrixVariant& get_active_one_rdm_spin_traced() const override;
+
+  /**
+   * @brief Get spin-dependent two-particle RDMs
+   *
+   * @note RDMs cannot be computed from the ket (T amplitudes) alone.
+   *       Coupled cluster RDM computation requires the adjoint (bra)
+   *       wavefunction with lambda amplitudes.
+   *
+   * @return Tuple of (aabb, aaaa, bbbb) two-particle RDMs
+   * @throws std::runtime_error Always throws - requires adjoint wavefunction
+   */
+  std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
+  get_active_two_rdm_spin_dependent() const override;
+
+  /**
+   * @brief Get spin-traced two-particle RDM
+   *
+   * @note RDMs cannot be computed from the ket (T amplitudes) alone.
+   *       Coupled cluster RDM computation requires the adjoint (bra)
+   *       wavefunction with lambda amplitudes.
+   *
+   * @return Spin-traced two-particle RDM
+   * @throws std::runtime_error Always throws - requires adjoint wavefunction
+   */
+  const VectorVariant& get_active_two_rdm_spin_traced() const override;
+
  private:
   // Orbital information
   std::shared_ptr<Orbitals> _orbitals;
@@ -394,7 +369,36 @@ class CoupledClusterContainer : public WavefunctionContainer {
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 
-  // Lazy-initialized determinant vector
+  // Lazy-initialized determinant vector and coefficients
   mutable std::unique_ptr<DeterminantVector> _determinant_vector_cache;
+  mutable std::unique_ptr<VectorVariant> _coefficients_cache;
+
+  /**
+   * @brief Generate CI determinants and coefficients from CC amplitudes
+   *
+   * Expands e^T = 1 + T + T²/2! + T³/3! + T⁴/4! + ...
+   * to generate CI-like determinants and coefficients up to 4th order
+   * (quadruple excitations).
+   *
+   * The expansion includes:
+   * - Order 0: Reference determinant (coefficient = 1)
+   * - Order 1: Singles from T1
+   * - Order 2: Doubles from T2 + T1²/2
+   * - Order 3: Triples from T1·T2 + T1³/6
+   * - Order 4: Quadruples from T2²/2 + T1²·T2/2 + T1⁴/24
+   */
+  void _generate_ci_expansion() const;
+
+  /**
+   * @brief Helper to create a Configuration from excitations
+   * @param ref Reference configuration
+   * @param alpha_excitations Vector of (from_orbital, to_orbital) for alpha
+   * @param beta_excitations Vector of (from_orbital, to_orbital) for beta
+   * @return New Configuration with excitations applied
+   */
+  static Configuration _apply_excitations(
+      const Configuration& ref,
+      const std::vector<std::pair<size_t, size_t>>& alpha_excitations,
+      const std::vector<std::pair<size_t, size_t>>& beta_excitations);
 };
 }  // namespace qdk::chemistry::data
