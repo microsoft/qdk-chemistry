@@ -122,9 +122,9 @@ class DIIS : public SCFAlgorithm {
    */
   const RowMajorMatrix& select_working_fock(const SCFImpl& scf_impl);
 
-  std::unique_ptr<impl::DIIS> diis_impl_;
-  RowMajorMatrix rohf_effective_fock_;
-  RowMajorMatrix rohf_total_density_;
+  std::unique_ptr<impl::DIIS> diis_impl_;  ///< Pulay DIIS core implementation
+  RowMajorMatrix rohf_effective_fock_;     ///< Cached ROHF effective Fock (AO)
+  RowMajorMatrix rohf_total_density_;  ///< Cached ROHF total density (P_a+P_b)
 };
 
 }  // namespace qdk::chemistry::scf
