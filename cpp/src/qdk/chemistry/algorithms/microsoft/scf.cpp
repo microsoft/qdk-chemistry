@@ -125,7 +125,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     scf_orbital_type = open_shell ? SCFOrbitalType::RestrictedOpenShell
                                   : SCFOrbitalType::Restricted;
     if (scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-      QDK_LOGGER().warn(
+      QDK_LOGGER().info(
           "Restricted open-shell request detected; enabling ROHF workflow.");
     }
   } else {

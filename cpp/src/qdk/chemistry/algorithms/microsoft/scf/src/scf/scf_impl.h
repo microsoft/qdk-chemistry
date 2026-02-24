@@ -161,9 +161,10 @@ class SCFImpl {
   int get_num_density_matrices() const { return num_density_matrices_; }
 
   /**
-   * @brief Get number of distinct orbital coefficient sets
+   * @brief Get number of orbital spin blocks
+   * @return 1 for restricted/ROHF, 2 for unrestricted (UHF)
    */
-  int get_num_orbital_sets() const { return num_orbital_sets_; }
+  int get_num_orbital_spin_blocks() const { return num_orbital_spin_blocks_; }
 
   /**
    * @brief Get the orthogonalization matrix
@@ -330,10 +331,11 @@ class SCFImpl {
   // Core SCF data
   size_t num_atomic_orbitals_;     ///< Number of atomic orbital atomic orbitals
   size_t num_molecular_orbitals_;  ///< Number of molecular orbitals
-  int num_density_matrices_;  ///< Number of density matrices (1=restricted,
-                              ///< 2=unrestricted)
-  int num_orbital_sets_;      ///< Number of orbital sets (1=RHF/ROHF, 2=UHF)
-  int nelec_[2];              ///< Number of [alpha, beta] electrons
+  int num_density_matrices_;     ///< Number of density matrices (1=restricted,
+                                 ///< 2=unrestricted)
+  int num_orbital_spin_blocks_;  ///< Number of orbital spin blocks
+                                 ///< (1=RHF/ROHF, 2=UHF)
+  int nelec_[2];                 ///< Number of [alpha, beta] electrons
 
   // SCF matrices
   RowMajorMatrix H_;  ///< Core Hamiltonian matrix (num_density_matrices ×

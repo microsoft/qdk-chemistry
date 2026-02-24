@@ -15,7 +15,6 @@ class SCFImpl;
 
 namespace impl {
 class DIIS;
-class ROHFHelper;
 }  // namespace impl
 
 /**
@@ -124,7 +123,8 @@ class DIIS : public SCFAlgorithm {
   const RowMajorMatrix& select_working_fock(const SCFImpl& scf_impl);
 
   std::unique_ptr<impl::DIIS> diis_impl_;
-  std::unique_ptr<impl::ROHFHelper> rohf_helper_;
+  RowMajorMatrix rohf_effective_fock_;
+  RowMajorMatrix rohf_total_density_;
 };
 
 }  // namespace qdk::chemistry::scf

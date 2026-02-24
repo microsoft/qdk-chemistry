@@ -121,187 +121,163 @@ class DIIS {
       std::numeric_limits<double>::infinity();  ///< Current DIIS error
 };
 
-class ROHFHelper {
- public:
-  /**
-   * @brief Construct helper with zeroed caches sized to the AO basis
-   *
-   * @param num_atomic_orbitals Dimension of each spin block
-   */
-  explicit ROHFHelper(int num_atomic_orbitals)
-      : effective_F_(
-            RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals)),
-        total_P_(
-            RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals)) {}
+/**
+ * @brief Rebuild the effective ROHF Fock and density matrices
+ *
+ * Implements the averaged-block construction (Guest & Saunders 1974,
+ * Plakhutin & Davidson 2014) to obtain the single-density ROHF view and
+ * caches the total density $P_\alpha + P_\beta$ alongside it.
+ *
+ * @param F Spin-blocked Fock matrix with alpha and beta blocks stacked
+ * @param C Molecular-orbital coefficients used for block transformations
+ * @param P Spin-blocked density matrix
+ * @param nelec_alpha Number of alpha electrons
+ * @param nelec_beta Number of beta electrons
+ * @param effective_fock Output effective ROHF Fock matrix (AO basis)
+ * @param total_density Output total density matrix (P_alpha + P_beta)
+ */
+void build_rohf_f_p_matrix(const RowMajorMatrix& F, const RowMajorMatrix& C,
+                           const RowMajorMatrix& P, int nelec_alpha,
+                           int nelec_beta, RowMajorMatrix& effective_fock,
+                           RowMajorMatrix& total_density) {
+  QDK_LOG_TRACE_ENTERING();
+  const int num_atomic_orbitals = static_cast<int>(C.rows());
+  const int num_molecular_orbitals = static_cast<int>(C.cols());
+  if (num_atomic_orbitals != num_molecular_orbitals) {
+    throw std::runtime_error(
+        "ROHF build requires number of atomic orbitals to equal number of "
+        "molecular orbitals!");
+  }
 
-  /**
-   * @brief Rebuild the effective ROHF Fock and density matrices
-   *
-   * Implements the averaged-block construction (Guest & Saunders 1974,
-   * Plakhutin & Davidson 2014) to obtain the single-density ROHF view and
-   * caches the total density $P_\alpha + P_\beta$ alongside it.
-   *
-   * @param F Spin-blocked Fock matrix with alpha and beta blocks stacked
-   * @param C Molecular-orbital coefficients used for block transformations
-   * @param P Spin-blocked density matrix
-   * @param nelec_alpha Number of alpha electrons
-   * @param nelec_beta Number of beta electrons
-   */
-  void build_rohf_f_p_matrix(const RowMajorMatrix& F, const RowMajorMatrix& C,
-                             const RowMajorMatrix& P, int nelec_alpha,
-                             int nelec_beta) {
-    QDK_LOG_TRACE_ENTERING();
-    const int num_atomic_orbitals = static_cast<int>(C.rows());
-    const int num_molecular_orbitals = static_cast<int>(C.cols());
-    if (num_atomic_orbitals != num_molecular_orbitals) {
-      throw std::runtime_error(
-          "ROHFHelper requires number of atomic orbitals to equal number of "
-          "molecular orbitals!");
-    }
+  total_density =
+      P.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) +
+      P.block(num_atomic_orbitals, 0, num_atomic_orbitals, num_atomic_orbitals);
 
-    total_P_ = P.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) +
-               P.block(num_atomic_orbitals, 0, num_atomic_orbitals,
-                       num_atomic_orbitals);
+  if (effective_fock.rows() != num_atomic_orbitals ||
+      effective_fock.cols() != num_atomic_orbitals) {
+    effective_fock =
+        RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals);
+  }
 
-    if (effective_F_.rows() != num_atomic_orbitals ||
-        effective_F_.cols() != num_atomic_orbitals) {
-      effective_F_ =
-          RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals);
-    }
+  if (C.isZero()) {
+    effective_fock.noalias() =
+        F.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
+    return;
+  }
 
-    if (C.isZero()) {
-      effective_F_.noalias() =
-          F.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
+  RowMajorMatrix F_up_mo =
+      RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
+  RowMajorMatrix F_dn_mo = F_up_mo;
+  RowMajorMatrix effective_F_mo = F_up_mo;
+
+  F_up_mo.noalias() = C.transpose() *
+                      F.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) *
+                      C;
+  F_dn_mo.noalias() = C.transpose() *
+                      F.block(num_atomic_orbitals, 0, num_atomic_orbitals,
+                              num_atomic_orbitals) *
+                      C;
+
+  auto average_block = [&effective_F_mo, &F_up_mo, &F_dn_mo](
+                           int row, int col, int rows, int cols) {
+    if (rows <= 0 || cols <= 0) return;
+    effective_F_mo.block(row, col, rows, cols).noalias() =
+        0.5 * (F_up_mo.block(row, col, rows, cols) +
+               F_dn_mo.block(row, col, rows, cols));
+  };
+  auto copy_block = [&effective_F_mo](const RowMajorMatrix& src, int row,
+                                      int col, int rows, int cols) {
+    if (rows <= 0 || cols <= 0) return;
+    effective_F_mo.block(row, col, rows, cols) =
+        src.block(row, col, rows, cols);
+  };
+
+  const int nd = nelec_beta;
+  const int ns = nelec_alpha - nelec_beta;
+  const int nv = num_molecular_orbitals - nelec_alpha;
+
+  average_block(0, 0, nd, nd);
+  average_block(0, nd + ns, nd, nv);
+  average_block(nd + ns, 0, nv, nd);
+  average_block(nd + ns, nd + ns, nv, nv);
+  average_block(nd, nd, ns, ns);
+  copy_block(F_dn_mo, 0, nd, nd, ns);
+  copy_block(F_dn_mo, nd, 0, ns, nd);
+  copy_block(F_up_mo, nd, nd + ns, ns, nv);
+  copy_block(F_up_mo, nd + ns, nd, nv, ns);
+
+  // Transform the effective Fock matrix back to AO basis by solving
+  // C^{-T} * F_MO * C^{-1} = F_AO
+  // We use LAPACK's getrf/getrs to solve the linear systems involving C^T and
+  // C without explicitly inverting C
+  const int matrix_dim = num_molecular_orbitals;
+  using ColMajorMatrix =
+      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
+  // LAPACK expects column-major layout, so we copy the row-major data into a
+  // column-major matrix without transposing the logical layout
+  ColMajorMatrix Ct =
+      Eigen::Map<const ColMajorMatrix>(C.data(), matrix_dim, C.rows());
+  // F_MO is symmetric, so we can use it directly as the right-hand side
+  // without transposing
+  ColMajorMatrix temp_rhs = effective_F_mo;
+  std::vector<int64_t> ipiv(matrix_dim);
+
+  auto info =
+      lapack::getrf(matrix_dim, matrix_dim, Ct.data(), matrix_dim, ipiv.data());
+  if (info != 0) {
+    throw std::runtime_error("getrf failed while factorizing C^T");
+  }
+
+  info = lapack::getrs(lapack::Op::NoTrans, matrix_dim, matrix_dim, Ct.data(),
+                       matrix_dim, ipiv.data(), temp_rhs.data(), matrix_dim);
+  if (info != 0) {
+    throw std::runtime_error("getrs failed while solving C^T X = F_mo");
+  }
+
+  temp_rhs.transposeInPlace();
+  info = lapack::getrs(lapack::Op::NoTrans, matrix_dim, matrix_dim, Ct.data(),
+                       matrix_dim, ipiv.data(), temp_rhs.data(), matrix_dim);
+  if (info != 0) {
+    throw std::runtime_error("getrs failed while solving C^T X = M^T");
+  }
+
+  effective_fock = temp_rhs.transpose();
+  if (!effective_fock.isApprox(effective_fock.transpose())) {
+    effective_fock = 0.5 * (effective_fock + effective_fock.transpose().eval());
+  }
+}
+
+/**
+ * @brief Reconstruct spin-blocked densities from the ROHF MO matrix
+ *
+ * Generates $P_\alpha$ and $P_\beta$ blocks so we can hand the updated
+ * density back to SCFImpl after diagonalization.
+ *
+ * @param P Spin-blocked density matrix to overwrite
+ * @param C Molecular-orbital coefficients from latest diagonalization
+ * @param nelec_alpha Number of alpha electrons
+ * @param nelec_beta Number of beta electrons
+ */
+void update_rohf_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
+                                int nelec_alpha, int nelec_beta) {
+  QDK_LOG_TRACE_ENTERING();
+  const int num_atomic_orbitals = static_cast<int>(C.rows());
+
+  auto build_density = [&](auto&& target, int n_occ) {
+    if (n_occ <= 0) {
+      target.setZero();
       return;
     }
+    target.noalias() = C.block(0, 0, num_atomic_orbitals, n_occ) *
+                       C.block(0, 0, num_atomic_orbitals, n_occ).transpose();
+  };
 
-    RowMajorMatrix F_up_mo =
-        RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
-    RowMajorMatrix F_dn_mo = F_up_mo;
-    RowMajorMatrix effective_F_mo = F_up_mo;
-
-    F_up_mo.noalias() =
-        C.transpose() *
-        F.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) * C;
-    F_dn_mo.noalias() = C.transpose() *
-                        F.block(num_atomic_orbitals, 0, num_atomic_orbitals,
-                                num_atomic_orbitals) *
-                        C;
-
-    auto average_block = [&effective_F_mo, &F_up_mo, &F_dn_mo](
-                             int row, int col, int rows, int cols) {
-      if (rows <= 0 || cols <= 0) return;
-      effective_F_mo.block(row, col, rows, cols).noalias() =
-          0.5 * (F_up_mo.block(row, col, rows, cols) +
-                 F_dn_mo.block(row, col, rows, cols));
-    };
-    auto copy_block = [&effective_F_mo](const RowMajorMatrix& src, int row,
-                                        int col, int rows, int cols) {
-      if (rows <= 0 || cols <= 0) return;
-      effective_F_mo.block(row, col, rows, cols) =
-          src.block(row, col, rows, cols);
-    };
-
-    const int nd = nelec_beta;
-    const int ns = nelec_alpha - nelec_beta;
-    const int nv = num_molecular_orbitals - nelec_alpha;
-
-    average_block(0, 0, nd, nd);
-    average_block(0, nd + ns, nd, nv);
-    average_block(nd + ns, 0, nv, nd);
-    average_block(nd + ns, nd + ns, nv, nv);
-    average_block(nd, nd, ns, ns);
-    copy_block(F_dn_mo, 0, nd, nd, ns);
-    copy_block(F_dn_mo, nd, 0, ns, nd);
-    copy_block(F_up_mo, nd, nd + ns, ns, nv);
-    copy_block(F_up_mo, nd + ns, nd, nv, ns);
-
-    // Transform the effective Fock matrix back to AO basis by solving
-    // C^{-T} * F_MO * C^{-1} = F_AO
-    // We use LAPACK's getrf/getrs to solve the linear systems involving C^T and
-    // C without explicitly inverting C
-    const int matrix_dim = num_molecular_orbitals;
-    using ColMajorMatrix =
-        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
-    // LAPACK expects column-major layout, so we copy the row-major data into a
-    // column-major matrix without transposing the logical layout
-    ColMajorMatrix Ct =
-        Eigen::Map<const ColMajorMatrix>(C.data(), matrix_dim, C.rows());
-    // F_MO is symmetric, so we can use it directly as the right-hand side
-    // without transposing
-    ColMajorMatrix temp_rhs = effective_F_mo;
-    std::vector<int64_t> ipiv(matrix_dim);
-
-    auto info = lapack::getrf(matrix_dim, matrix_dim, Ct.data(), matrix_dim,
-                              ipiv.data());
-    if (info != 0) {
-      throw std::runtime_error("getrf failed while factorizing C^T");
-    }
-
-    info = lapack::getrs(lapack::Op::NoTrans, matrix_dim, matrix_dim, Ct.data(),
-                         matrix_dim, ipiv.data(), temp_rhs.data(), matrix_dim);
-    if (info != 0) {
-      throw std::runtime_error("getrs failed while solving C^T X = F_mo");
-    }
-
-    temp_rhs.transposeInPlace();
-    info = lapack::getrs(lapack::Op::NoTrans, matrix_dim, matrix_dim, Ct.data(),
-                         matrix_dim, ipiv.data(), temp_rhs.data(), matrix_dim);
-    if (info != 0) {
-      throw std::runtime_error("getrs failed while solving C^T X = M^T");
-    }
-
-    effective_F_ = temp_rhs.transpose();
-    if (!effective_F_.isApprox(effective_F_.transpose())) {
-      effective_F_ = 0.5 * (effective_F_ + effective_F_.transpose().eval());
-    }
-  }
-
-  /**
-   * @brief Reconstruct spin-blocked densities from the ROHF MO matrix
-   *
-   * Generates $P_\alpha$ and $P_\beta$ blocks so we can hand the updated
-   * density back to SCFImpl after diagonalization.
-   *
-   * @param P Spin-blocked density matrix to overwrite
-   * @param C Molecular-orbital coefficients from latest diagonalization
-   * @param nelec_alpha Number of alpha electrons
-   * @param nelec_beta Number of beta electrons
-   */
-  void update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
-                             int nelec_alpha, int nelec_beta) {
-    QDK_LOG_TRACE_ENTERING();
-    const int num_atomic_orbitals = static_cast<int>(C.rows());
-
-    auto build_density = [&](auto&& target, int n_occ) {
-      if (n_occ <= 0) {
-        target.setZero();
-        return;
-      }
-      target.noalias() = C.block(0, 0, num_atomic_orbitals, n_occ) *
-                         C.block(0, 0, num_atomic_orbitals, n_occ).transpose();
-    };
-
-    auto P_alpha = P.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
-    auto P_beta = P.block(num_atomic_orbitals, 0, num_atomic_orbitals,
-                          num_atomic_orbitals);
-    build_density(P_alpha, nelec_alpha);
-    build_density(P_beta, nelec_beta);
-  }
-
-  /** @brief Access ROHF effective Fock matrix */
-  const RowMajorMatrix& effective_fock() const { return effective_F_; }
-  /** @brief Read-only access to cached total density */
-  const RowMajorMatrix& total_density() const { return total_P_; }
-  /** @brief Mutable access to cached total density */
-  RowMajorMatrix& total_density() { return total_P_; }
-
- private:
-  /** @brief Cached ROHF effective Fock matrix in AO basis */
-  RowMajorMatrix effective_F_;
-  /** @brief Cached total density (P_alpha + P_beta) */
-  RowMajorMatrix total_P_;
-};
+  auto P_alpha = P.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
+  auto P_beta =
+      P.block(num_atomic_orbitals, 0, num_atomic_orbitals, num_atomic_orbitals);
+  build_density(P_alpha, nelec_alpha);
+  build_density(P_beta, nelec_beta);
+}
 
 DIIS::DIIS(const SCFContext& ctx, const size_t subspace_size)
     : ctx_(ctx), subspace_size_(subspace_size) {
@@ -455,8 +431,12 @@ DIIS::DIIS(const SCFContext& ctx, const size_t subspace_size)
       diis_impl_(std::make_unique<impl::DIIS>(ctx, subspace_size)) {
   QDK_LOG_TRACE_ENTERING();
   if (ctx.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    rohf_helper_ = std::make_unique<impl::ROHFHelper>(
-        static_cast<int>(ctx.basis_set->num_atomic_orbitals));
+    const int num_atomic_orbitals =
+        static_cast<int>(ctx.basis_set->num_atomic_orbitals);
+    rohf_effective_fock_ =
+        RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals);
+    rohf_total_density_ =
+        RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals);
   }
 }
 
@@ -483,7 +463,7 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   const int nelec[2] = {nelec_vec[0], nelec_vec[1]};
   const int num_atomic_orbitals = scf_impl.get_num_atomic_orbitals();
   const int num_molecular_orbitals = scf_impl.get_num_molecular_orbitals();
-  const int num_orbital_sets = scf_impl.get_num_orbital_sets();
+  const int num_orbital_sets = scf_impl.get_num_orbital_spin_blocks();
 
   // Solve the Fock eigenproblem for each spin block (or once, for restricted)
   // using the extrapolated Fock matrix, then repopulate the working density.
@@ -515,10 +495,7 @@ void DIIS::update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
                                  int nelec_beta) {
   QDK_LOG_TRACE_ENTERING();
   if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    if (!rohf_helper_) {
-      throw std::logic_error("ROHF helper not initialized");
-    }
-    rohf_helper_->update_density_matrix(P, C, nelec_alpha, nelec_beta);
+    impl::update_rohf_density_matrix(P, C, nelec_alpha, nelec_beta);
     return;
   }
   SCFAlgorithm::update_density_matrix(P, C, unrestricted, nelec_alpha,
@@ -533,35 +510,32 @@ void DIIS::build_rohf_f_p_matrix(const RowMajorMatrix& F,
   if (ctx_.cfg->scf_orbital_type != SCFOrbitalType::RestrictedOpenShell) {
     throw std::logic_error("ROHF matrix build requested for non-ROHF run");
   }
-  if (!rohf_helper_) {
-    rohf_helper_ = std::make_unique<impl::ROHFHelper>(
-        static_cast<int>(ctx_.basis_set->num_atomic_orbitals));
-  }
-  rohf_helper_->build_rohf_f_p_matrix(F, C, P, nelec_alpha, nelec_beta);
+  impl::build_rohf_f_p_matrix(F, C, P, nelec_alpha, nelec_beta,
+                              rohf_effective_fock_, rohf_total_density_);
 }
 
 const RowMajorMatrix& DIIS::get_rohf_fock_matrix() const {
   QDK_LOG_TRACE_ENTERING();
-  if (!rohf_helper_) {
-    throw std::logic_error("ROHF helper not initialized");
+  if (rohf_effective_fock_.size() == 0) {
+    throw std::logic_error("ROHF cache not initialized");
   }
-  return rohf_helper_->effective_fock();
+  return rohf_effective_fock_;
 }
 
 const RowMajorMatrix& DIIS::get_rohf_density_matrix() const {
   QDK_LOG_TRACE_ENTERING();
-  if (!rohf_helper_) {
-    throw std::logic_error("ROHF helper not initialized");
+  if (rohf_total_density_.size() == 0) {
+    throw std::logic_error("ROHF cache not initialized");
   }
-  return rohf_helper_->total_density();
+  return rohf_total_density_;
 }
 
 RowMajorMatrix& DIIS::rohf_density_matrix() {
   QDK_LOG_TRACE_ENTERING();
-  if (!rohf_helper_) {
-    throw std::logic_error("ROHF helper not initialized");
+  if (rohf_total_density_.size() == 0) {
+    throw std::logic_error("ROHF cache not initialized");
   }
-  return rohf_helper_->total_density();
+  return rohf_total_density_;
 }
 
 double DIIS::current_diis_error() const {

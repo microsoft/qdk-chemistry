@@ -248,7 +248,7 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
 
   // Calculate orbital gradient error
   RowMajorMatrix error_matrix;
-  int num_orbital_sets = scf_impl.get_num_orbital_sets();
+  int num_orbital_sets = scf_impl.get_num_orbital_spin_blocks();
 
   const RowMajorMatrix* F_ptr;
   const RowMajorMatrix* P_ptr;
