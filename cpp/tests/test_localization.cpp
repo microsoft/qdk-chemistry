@@ -604,7 +604,7 @@ TEST_F(LocalizationTest, WaterVVHV) {
   auto water = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("method", "hf");
-  auto [E, wfn] = scf_solver->run(water, 0, 1, "cc-pvtz");
+  auto [E, wfn] = scf_solver->run(water, 0, 1, "def2-svp");
   auto orbitals = wfn->get_orbitals();
   const auto& [Ca_can, Cb_can] = orbitals->get_coefficients();
 
