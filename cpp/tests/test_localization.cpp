@@ -604,21 +604,20 @@ TEST_F(LocalizationTest, WaterVVHV) {
   auto water = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("method", "hf");
-  auto [E, wfn] = scf_solver->run(water, 0, 1, "def2-svp");
+  auto [E, wfn] = scf_solver->run(water, 0, 1, "cc-pvtz");
   auto orbitals = wfn->get_orbitals();
   const auto& [Ca_can, Cb_can] = orbitals->get_coefficients();
 
-  const size_t num_occupied_orbitals = wfn->get_total_num_electrons().first;
-
   // First localize occupied orbitals with Pipek-Mezey
-  std::vector<size_t> occ_indices, virt_indices;
-  for (unsigned i = 0; i < num_occupied_orbitals; ++i) {
-    occ_indices.push_back(i);
-  }
-  for (unsigned i = num_occupied_orbitals;
-       i < orbitals->get_num_molecular_orbitals(); ++i) {
-    virt_indices.push_back(i);
-  }
+  const size_t num_occupied_orbitals = wfn->get_total_num_electrons().first;
+  const size_t num_virtual_orbitals =
+      orbitals->get_num_molecular_orbitals() - num_occupied_orbitals;
+
+  std::vector<size_t> occ_indices(num_occupied_orbitals);
+  std::vector<size_t> virt_indices(num_virtual_orbitals);
+
+  std::iota(occ_indices.begin(), occ_indices.end(), 0);
+  std::iota(virt_indices.begin(), virt_indices.end(), num_occupied_orbitals);
 
   auto localized_occ_ptr = pm_localizer->run(wfn, occ_indices, occ_indices);
 
@@ -657,22 +656,22 @@ TEST_F(LocalizationTest, O2TripletVVHV) {
   const size_t num_beta = std::round(_nb);
 
   // First localize occupied orbitals with Pipek-Mezey
-  std::vector<size_t> occ_indices_alpha, virt_indices_alpha;
-  std::vector<size_t> occ_indices_beta, virt_indices_beta;
 
-  for (unsigned i = 0; i < num_alpha; ++i) {
-    occ_indices_alpha.push_back(i);
-  }
-  for (unsigned i = num_alpha; i < orbitals->get_num_molecular_orbitals();
-       ++i) {
-    virt_indices_alpha.push_back(i);
-  }
-  for (unsigned i = 0; i < num_beta; ++i) {
-    occ_indices_beta.push_back(i);
-  }
-  for (unsigned i = num_beta; i < orbitals->get_num_molecular_orbitals(); ++i) {
-    virt_indices_beta.push_back(i);
-  }
+  const size_t num_virtual_alpha =
+      orbitals->get_num_molecular_orbitals() - num_alpha;
+  const size_t num_virtual_beta =
+      orbitals->get_num_molecular_orbitals() - num_beta;
+
+  std::vector<size_t> occ_indices_alpha(num_alpha);
+  std::vector<size_t> virt_indices_alpha(num_virtual_alpha);
+  std::vector<size_t> occ_indices_beta(num_beta);
+  std::vector<size_t> virt_indices_beta(num_virtual_beta);
+
+  std::iota(occ_indices_alpha.begin(), occ_indices_alpha.end(), 0);
+  std::iota(virt_indices_alpha.begin(), virt_indices_alpha.end(), num_alpha);
+
+  std::iota(occ_indices_beta.begin(), occ_indices_beta.end(), 0);
+  std::iota(virt_indices_beta.begin(), virt_indices_beta.end(), num_beta);
 
   auto localized_occ_ptr =
       pm_localizer->run(wfn, occ_indices_alpha, occ_indices_beta);
@@ -746,6 +745,8 @@ auto scramble_basis_shells(std::shared_ptr<BasisSet> basis) {
                                     basis->get_structure());
 }
 
+// This test is needed to ensure VVHV's consistency with respect to basis set
+// reordering Should obtain the same Pipek Mezey value as the 'WaterVVHV' test
 TEST_F(LocalizationTest, ScrambledShellsWaterVVHV) {
   auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
   auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
@@ -764,17 +765,16 @@ TEST_F(LocalizationTest, ScrambledShellsWaterVVHV) {
   auto orbitals = wfn->get_orbitals();
   const auto& [Ca_can, Cb_can] = orbitals->get_coefficients();
 
-  const size_t num_occupied_orbitals = wfn->get_total_num_electrons().first;
-
   // First localize occupied orbitals with Pipek-Mezey
-  std::vector<size_t> occ_indices, virt_indices;
-  for (unsigned i = 0; i < num_occupied_orbitals; ++i) {
-    occ_indices.push_back(i);
-  }
-  for (unsigned i = num_occupied_orbitals;
-       i < orbitals->get_num_molecular_orbitals(); ++i) {
-    virt_indices.push_back(i);
-  }
+  const size_t num_occupied_orbitals = wfn->get_total_num_electrons().first;
+  const size_t num_virtual_orbitals =
+      orbitals->get_num_molecular_orbitals() - num_occupied_orbitals;
+
+  std::vector<size_t> occ_indices(num_occupied_orbitals);
+  std::vector<size_t> virt_indices(num_virtual_orbitals);
+
+  std::iota(occ_indices.begin(), occ_indices.end(), 0);
+  std::iota(virt_indices.begin(), virt_indices.end(), num_occupied_orbitals);
 
   auto localized_occ_ptr = pm_localizer->run(wfn, occ_indices, occ_indices);
 
@@ -792,6 +792,9 @@ TEST_F(LocalizationTest, ScrambledShellsWaterVVHV) {
   EXPECT_NEAR(pm_metric, 23.693199816318174, testing::localization_tolerance);
 }
 
+// This test is needed to ensure VVHV's consistency with respect to basis set
+// reordering Should obtain the same Pipek Mezey value as the 'O2TripletVVHV'
+// test
 TEST_F(LocalizationTest, ScrambledShellsO2TripletVVHV) {
   auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
   auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
@@ -817,22 +820,22 @@ TEST_F(LocalizationTest, ScrambledShellsO2TripletVVHV) {
   const size_t num_beta = std::round(_nb);
 
   // First localize occupied orbitals with Pipek-Mezey
-  std::vector<size_t> occ_indices_alpha, virt_indices_alpha;
-  std::vector<size_t> occ_indices_beta, virt_indices_beta;
 
-  for (unsigned i = 0; i < num_alpha; ++i) {
-    occ_indices_alpha.push_back(i);
-  }
-  for (unsigned i = num_alpha; i < orbitals->get_num_molecular_orbitals();
-       ++i) {
-    virt_indices_alpha.push_back(i);
-  }
-  for (unsigned i = 0; i < num_beta; ++i) {
-    occ_indices_beta.push_back(i);
-  }
-  for (unsigned i = num_beta; i < orbitals->get_num_molecular_orbitals(); ++i) {
-    virt_indices_beta.push_back(i);
-  }
+  const size_t num_virtual_alpha =
+      orbitals->get_num_molecular_orbitals() - num_alpha;
+  const size_t num_virtual_beta =
+      orbitals->get_num_molecular_orbitals() - num_beta;
+
+  std::vector<size_t> occ_indices_alpha(num_alpha);
+  std::vector<size_t> virt_indices_alpha(num_virtual_alpha);
+  std::vector<size_t> occ_indices_beta(num_beta);
+  std::vector<size_t> virt_indices_beta(num_virtual_beta);
+
+  std::iota(occ_indices_alpha.begin(), occ_indices_alpha.end(), 0);
+  std::iota(virt_indices_alpha.begin(), virt_indices_alpha.end(), num_alpha);
+
+  std::iota(occ_indices_beta.begin(), occ_indices_beta.end(), 0);
+  std::iota(virt_indices_beta.begin(), virt_indices_beta.end(), num_beta);
 
   auto localized_occ_ptr =
       pm_localizer->run(wfn, occ_indices_alpha, occ_indices_beta);
