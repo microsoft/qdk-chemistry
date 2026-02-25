@@ -136,6 +136,7 @@ def plot_orbital_entanglement(
     selected_indices: Sequence[int] | None = None,
     selection_color: str = "#222222",
     selection_linewidth: float = 2.5,
+    transparent_background: bool = False,
     ax: matplotlib.axes.Axes | None = None,
 ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
     """Plot a chord diagram of orbital entropies and mutual information.
@@ -193,6 +194,10 @@ def plot_orbital_entanglement(
         Edge colour of the selection outline.
     selection_linewidth:
         Stroke width of the selection outline.
+    transparent_background:
+        When *True*, the figure and axes backgrounds are set to
+        transparent.  Useful for embedding the diagram in documents
+        or web pages with a non-white background.
     ax:
         An existing ``Axes`` to draw into.  When *None* a new figure
         and axes are created.
@@ -322,7 +327,12 @@ def plot_orbital_entanglement(
     ax.set_ylim(-label_margin, label_margin)
     ax.axis("off")
     if created_fig:
-        fig.patch.set_facecolor("white")
+        if transparent_background:
+            fig.patch.set_alpha(0.0)
+        else:
+            fig.patch.set_facecolor("white")
+    if transparent_background:
+        ax.set_facecolor("none")
 
     # 6. Draw outer arcs and labels
     #  Strategy: keep labels at a legible font size (≥7pt), and when
@@ -532,6 +542,11 @@ def plot_orbital_entanglement(
         ax.set_title(title, fontsize=14, pad=20)
 
     if save_path is not None:
-        fig.savefig(str(save_path), dpi=dpi, bbox_inches="tight")
+        fig.savefig(
+            str(save_path),
+            dpi=dpi,
+            bbox_inches="tight",
+            transparent=transparent_background,
+        )
 
     return fig, ax
