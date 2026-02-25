@@ -7,5 +7,12 @@
 # Import C++ utilities from the compiled extension
 from qdk_chemistry._core.utils import Logger, compute_valence_space_parameters, rotate_orbitals
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
+from qdk_chemistry.utils.visualization import plot_orbital_entanglement
 
-__all__ = ["CaseInsensitiveStrEnum", "Logger", "compute_valence_space_parameters", "rotate_orbitals"]
+__all__ = [
+    "CaseInsensitiveStrEnum",
+    "Logger",
+    "compute_valence_space_parameters",
+    "plot_orbital_entanglement",
+    "rotate_orbitals",
+]
