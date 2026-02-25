@@ -1060,7 +1060,8 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
 #endif
 
   if (ctx_.cfg->mpi.world_rank == 0) {
-    if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted) {
+    if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted ||
+        ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
       F_matrix +=
           (J_matrix.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_) +
            J_matrix.block(num_atomic_orbitals_, 0, num_atomic_orbitals_,
