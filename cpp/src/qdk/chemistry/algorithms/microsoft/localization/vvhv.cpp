@@ -15,6 +15,7 @@
 #include <iostream>
 #include <lapack.hh>
 #include <memory>
+#include <numeric>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
@@ -162,8 +163,8 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    * @param error_label Label for error messages
    * @param separation_ratio Required ratio of eigenvalue[M+1]/eigenvalue[M] for
    * sufficient separation
-   * @param canonnicalize Use Eigen instead of LAPACK for eigensolver.
-   * Important when determinism is needed (i.e. in construction of proto hv's)
+   * @param canonicalize bring the orbitals into canonical form by resolving the
+   * degeneracies of the overlap
    */
   void orthonormalization(int num_atomic_orbitals, int num_orbitals,
                           const double* overlap_inp, double* C, double* C_out,
@@ -889,7 +890,7 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
   if (weighted_orthogonalization) {
     Eigen::VectorXd spreads_hv(nhv);
     this->calculate_orbital_spreads(C_hard_virtuals, spreads_hv);
-    // Weight each orbital by spread
+    // Weight each orbital by inverse spread (with small regularization)
     for (int orb = 0; orb < nhv; ++orb)
       C_hard_virtuals.col(orb) /= (spreads_hv(orb) + 1e-6);
   }
@@ -1025,7 +1026,7 @@ void VVHVLocalization::canonicalization(const double* C, double* S,
     // Use weights W_ii = i + 1 (normalized such that sum of weights is 1)
     // But any non-degenerate diagonal will work as long as [overlap,W] != 0
     Eigen::VectorXd weights = Eigen::VectorXd::Zero(num_atomic_orbitals);
-    std::iota(weights.begin(), weights.end(), 1.0);
+    weights.setLinSpaced(num_atomic_orbitals, 1, num_atomic_orbitals + 1);
     weights /= weights.norm();
 
     temp =
@@ -1040,7 +1041,7 @@ void VVHVLocalization::canonicalization(const double* C, double* S,
                num_orbitals);
   }
 
-  // // Find degenerate eigenvalue blocks of S
+  // Find degenerate eigenvalue blocks of S
   std::vector<std::vector<int>> blocks;
   {
     blocks.emplace_back();

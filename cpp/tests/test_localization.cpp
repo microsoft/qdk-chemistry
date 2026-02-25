@@ -4,7 +4,9 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <filesystem>
+#include <numeric>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
@@ -726,7 +728,7 @@ auto scramble_basis_shells(std::shared_ptr<BasisSet> basis) {
     }
   };
 
-  // sorting shells by atom type -> angular momentum -> exponent
+  // sorting shells by exponent
   auto shell_comparator_ascending = [](const Shell& a, const Shell& b) {
     // s -> p -> d -> f ...
     if (a.orbital_type != b.orbital_type) {
@@ -746,7 +748,8 @@ auto scramble_basis_shells(std::shared_ptr<BasisSet> basis) {
 }
 
 // This test is needed to ensure VVHV's consistency with respect to basis set
-// reordering Should obtain the same Pipek Mezey value as the 'WaterVVHV' test
+// reordering. It should obtain the same Pipek Mezey value as the 'WaterVVHV'
+// test
 TEST_F(LocalizationTest, ScrambledShellsWaterVVHV) {
   auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
   auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
@@ -793,8 +796,8 @@ TEST_F(LocalizationTest, ScrambledShellsWaterVVHV) {
 }
 
 // This test is needed to ensure VVHV's consistency with respect to basis set
-// reordering Should obtain the same Pipek Mezey value as the 'O2TripletVVHV'
-// test
+// reordering. It should obtain the same Pipek Mezey value as the
+// 'O2TripletVVHV' test
 TEST_F(LocalizationTest, ScrambledShellsO2TripletVVHV) {
   auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
   auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
