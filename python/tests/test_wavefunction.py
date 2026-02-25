@@ -785,11 +785,11 @@ class TestWavefunctionSerialization:
         """Test HDF5 serialization for real CAS wavefunction."""
         filename = tmp_path / "test_wavefunction_cas_real.wavefunction.h5"
 
-        # Save to HDF5 file
-        cas_wavefunction_real.to_hdf5_file(str(filename))
+        # Save to HDF5 file (using Path object directly)
+        cas_wavefunction_real.to_hdf5_file(filename)
 
-        # Load from HDF5 file
-        wf_reconstructed = Wavefunction.from_hdf5_file(str(filename))
+        # Load from HDF5 file (using Path object directly)
+        wf_reconstructed = Wavefunction.from_hdf5_file(filename)
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == cas_wavefunction_real.size()
@@ -834,11 +834,11 @@ class TestWavefunctionSerialization:
         """Test HDF5 serialization for complex CAS wavefunction."""
         filename = tmp_path / "test_wavefunction_cas_complex.wavefunction.h5"
 
-        # Save to HDF5 file
-        cas_wavefunction_complex.to_hdf5_file(str(filename))
+        # Save to HDF5 file (using Path object directly)
+        cas_wavefunction_complex.to_hdf5_file(filename)
 
-        # Load from HDF5 file
-        wf_reconstructed = Wavefunction.from_hdf5_file(str(filename))
+        # Load from HDF5 file (using Path object directly)
+        wf_reconstructed = Wavefunction.from_hdf5_file(filename)
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == cas_wavefunction_complex.size()
@@ -854,11 +854,11 @@ class TestWavefunctionSerialization:
         """Test HDF5 serialization for Slater determinant wavefunction."""
         filename = tmp_path / "test_wavefunction_sd.wavefunction.h5"
 
-        # Save to HDF5 file
-        sd_wavefunction.to_hdf5_file(str(filename))
+        # Save to HDF5 file (using Path object directly)
+        sd_wavefunction.to_hdf5_file(filename)
 
-        # Load from HDF5 file
-        wf_reconstructed = Wavefunction.from_hdf5_file(str(filename))
+        # Load from HDF5 file (using Path object directly)
+        wf_reconstructed = Wavefunction.from_hdf5_file(filename)
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == 1
@@ -874,11 +874,11 @@ class TestWavefunctionSerialization:
         """Test JSON file I/O."""
         filename = tmp_path / "test_wavefunction.wavefunction.json"
 
-        # Save to JSON file
-        cas_wavefunction_real.to_json_file(str(filename))
+        # Save to JSON file (using Path object directly)
+        cas_wavefunction_real.to_json_file(filename)
 
-        # Load from JSON file
-        wf_reconstructed = Wavefunction.from_json_file(str(filename))
+        # Load from JSON file (using Path object directly)
+        wf_reconstructed = Wavefunction.from_json_file(filename)
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == cas_wavefunction_real.size()
@@ -910,9 +910,9 @@ class TestWavefunctionSerialization:
         json_filename = tmp_path / "test_wavefunction_generic.wavefunction.json"
         hdf5_filename = tmp_path / "test_wavefunction_generic.wavefunction.h5"
 
-        # Test JSON format
-        cas_wavefunction_real.to_file(str(json_filename), "json")
-        wf_json = Wavefunction.from_file(str(json_filename), "json")
+        # Test JSON format (using Path object directly)
+        cas_wavefunction_real.to_file(json_filename, "json")
+        wf_json = Wavefunction.from_file(json_filename, "json")
         assert np.isclose(
             wf_json.norm(),
             cas_wavefunction_real.norm(),
@@ -920,9 +920,9 @@ class TestWavefunctionSerialization:
             atol=float_comparison_absolute_tolerance,
         )
 
-        # Test HDF5 format
-        cas_wavefunction_real.to_file(str(hdf5_filename), "hdf5")
-        wf_hdf5 = Wavefunction.from_file(str(hdf5_filename), "hdf5")
+        # Test HDF5 format (using Path object directly)
+        cas_wavefunction_real.to_file(hdf5_filename, "hdf5")
+        wf_hdf5 = Wavefunction.from_file(hdf5_filename, "hdf5")
         assert np.isclose(
             wf_hdf5.norm(),
             cas_wavefunction_real.norm(),
@@ -932,10 +932,10 @@ class TestWavefunctionSerialization:
 
         # Test invalid format
         with pytest.raises(ValueError, match="Unsupported file type"):
-            cas_wavefunction_real.to_file(str(tmp_path / "test.xyz"), "xyz")
+            cas_wavefunction_real.to_file(tmp_path / "test.xyz", "xyz")
 
         with pytest.raises(ValueError, match="Unsupported file type"):
-            Wavefunction.from_file(str(tmp_path / "test.xyz"), "xyz")
+            Wavefunction.from_file(tmp_path / "test.xyz", "xyz")
 
     def test_error_handling(self):
         """Test error handling for malformed data."""
@@ -1153,8 +1153,8 @@ class TestWavefunctionRdmIntegraion:
 
         # Save and reload using tmp_path
         h5_file = tmp_path / "test_wavefunction.wavefunction.h5"
-        wfn_sci.to_hdf5_file(str(h5_file))
-        wfn_loaded = Wavefunction.from_hdf5_file(str(h5_file))
+        wfn_sci.to_hdf5_file(h5_file)
+        wfn_loaded = Wavefunction.from_hdf5_file(h5_file)
 
         # Check RDMs after load
         assert wfn_loaded.has_one_rdm_spin_dependent(), "one rdm is not available"
@@ -1200,8 +1200,8 @@ class TestWavefunctionRdmIntegraion:
 
         # Save and reload using tmp_path
         h5_file = tmp_path / "test_wavefunction.wavefunction.h5"
-        wfn_cas.to_hdf5_file(str(h5_file))
-        wfn_loaded = Wavefunction.from_hdf5_file(str(h5_file))
+        wfn_cas.to_hdf5_file(h5_file)
+        wfn_loaded = Wavefunction.from_hdf5_file(h5_file)
 
         # Check RDMs after load
         assert wfn_loaded.has_one_rdm_spin_dependent(), "one rdm is not available"

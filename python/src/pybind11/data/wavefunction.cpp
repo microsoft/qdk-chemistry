@@ -21,6 +21,7 @@
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 
+#include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
 
 namespace py = pybind11;
@@ -42,6 +43,44 @@ py::object variant_to_python(
     const qdk::chemistry::data::ContainerTypes::VectorVariant& var) {
   return std::visit(
       [](const auto& value) -> py::object { return py::cast(value); }, var);
+}
+
+// Wrapper functions for file I/O methods that accept both strings and pathlib
+// Path objects
+void wavefunction_to_file_wrapper(qdk::chemistry::data::Wavefunction& self,
+                                  const py::object& filename,
+                                  const std::string& format_type) {
+  self.to_file(qdk::chemistry::python::utils::to_string_path(filename),
+               format_type);
+}
+
+std::shared_ptr<qdk::chemistry::data::Wavefunction>
+wavefunction_from_file_wrapper(const py::object& filename,
+                               const std::string& format_type) {
+  return qdk::chemistry::data::Wavefunction::from_file(
+      qdk::chemistry::python::utils::to_string_path(filename), format_type);
+}
+
+void wavefunction_to_hdf5_file_wrapper(qdk::chemistry::data::Wavefunction& self,
+                                       const py::object& filename) {
+  self.to_hdf5_file(qdk::chemistry::python::utils::to_string_path(filename));
+}
+
+std::shared_ptr<qdk::chemistry::data::Wavefunction>
+wavefunction_from_hdf5_file_wrapper(const py::object& filename) {
+  return qdk::chemistry::data::Wavefunction::from_hdf5_file(
+      qdk::chemistry::python::utils::to_string_path(filename));
+}
+
+void wavefunction_to_json_file_wrapper(qdk::chemistry::data::Wavefunction& self,
+                                       const py::object& filename) {
+  self.to_json_file(qdk::chemistry::python::utils::to_string_path(filename));
+}
+
+std::shared_ptr<qdk::chemistry::data::Wavefunction>
+wavefunction_from_json_file_wrapper(const py::object& filename) {
+  return qdk::chemistry::data::Wavefunction::from_json_file(
+      qdk::chemistry::python::utils::to_string_path(filename));
 }
 
 /// Convert a Python dict to OrbitalEntropies.
@@ -798,80 +837,84 @@ Examples:
 )",
       py::arg("json_str"));
 
-  wavefunction.def("to_json_file", &Wavefunction::to_json_file,
+  wavefunction.def("to_json_file", wavefunction_to_json_file_wrapper,
                    R"(
 Save wavefunction to JSON file.
 
 Args:
-    filename (str): Path to JSON file to create/overwrite
+    filename (str | pathlib.Path): Path to JSON file to create/overwrite
 
 Examples:
     >>> wf.to_json_file("wavefunction.json")
+    >>> wf.to_json_file(Path("wavefunction.json"))
 )",
                    py::arg("filename"));
 
-  wavefunction.def_static("from_json_file", &Wavefunction::from_json_file,
+  wavefunction.def_static("from_json_file", wavefunction_from_json_file_wrapper,
                           R"(
 Load wavefunction from JSON file.
 
 Args:
-    filename (str): Path to JSON file to read
+    filename (str | pathlib.Path): Path to JSON file to read
 
 Returns:
     Wavefunction: Wavefunction object created from JSON file
 
 Examples:
     >>> wf = qdk_chemistry.Wavefunction.from_json_file("wavefunction.json")
+    >>> wf = qdk_chemistry.Wavefunction.from_json_file(Path("wavefunction.json"))
 )",
                           py::arg("filename"));
 
-  wavefunction.def("to_hdf5_file", &Wavefunction::to_hdf5_file,
+  wavefunction.def("to_hdf5_file", wavefunction_to_hdf5_file_wrapper,
                    R"(
 Save wavefunction to HDF5 file.
 
 Args:
-    filename (str): Path to HDF5 file to create/overwrite
+    filename (str | pathlib.Path): Path to HDF5 file to create/overwrite
 
 Examples:
     >>> wf.to_hdf5_file("wavefunction.h5")
+    >>> wf.to_hdf5_file(Path("wavefunction.h5"))
 )",
                    py::arg("filename"));
 
-  wavefunction.def_static("from_hdf5_file", &Wavefunction::from_hdf5_file,
+  wavefunction.def_static("from_hdf5_file", wavefunction_from_hdf5_file_wrapper,
                           R"(
 Load wavefunction from HDF5 file.
 
 Args:
-    filename (str): Path to HDF5 file to read
+    filename (str | pathlib.Path): Path to HDF5 file to read
 
 Returns:
     Wavefunction: Wavefunction object created from HDF5 file
 
 Examples:
     >>> wf = qdk_chemistry.Wavefunction.from_hdf5_file("wavefunction.h5")
+    >>> wf = qdk_chemistry.Wavefunction.from_hdf5_file(Path("wavefunction.h5"))
 )",
                           py::arg("filename"));
 
-  wavefunction.def("to_file", &Wavefunction::to_file,
+  wavefunction.def("to_file", wavefunction_to_file_wrapper,
                    R"(
 Save wavefunction to file in specified format.
 
 Args:
-    filename (str): Path to file to create/overwrite
+    filename (str | pathlib.Path): Path to file to create/overwrite
     format (str): Format type ("json" or "hdf5")
 
 Examples:
     >>> wf.to_file("wavefunction.json", "json")
-    >>> wf.to_file("wavefunction.h5", "hdf5")
+    >>> wf.to_file(Path("wavefunction.h5"), "hdf5")
 )",
                    py::arg("filename"), py::arg("format"));
 
-  wavefunction.def_static("from_file", &Wavefunction::from_file,
+  wavefunction.def_static("from_file", wavefunction_from_file_wrapper,
                           R"(
 Load wavefunction from file in specified format.
 
 Args:
-    filename (str): Path to file to read
+    filename (str | pathlib.Path): Path to file to read
     format (str): Format type ("json" or "hdf5")
 
 Returns:
@@ -879,7 +922,7 @@ Returns:
 
 Examples:
     >>> wf = qdk_chemistry.Wavefunction.from_file("wavefunction.json", "json")
-    >>> wf = qdk_chemistry.Wavefunction.from_file("wavefunction.h5", "hdf5")
+    >>> wf = qdk_chemistry.Wavefunction.from_file(Path("wavefunction.h5"), "hdf5")
 )",
                           py::arg("filename"), py::arg("format"));
 
