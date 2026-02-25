@@ -855,7 +855,7 @@ Examples:
 Load wavefunction from JSON file.
 
 Args:
-    filename (str | Path): Path to JSON file to read
+    filename (str | pathlib.Path): Path to JSON file to read
 
 Returns:
     Wavefunction: Wavefunction object created from JSON file
@@ -871,7 +871,7 @@ Examples:
 Save wavefunction to HDF5 file.
 
 Args:
-    filename (str | Path): Path to HDF5 file to create/overwrite
+    filename (str | pathlib.Path): Path to HDF5 file to create/overwrite
 
 Examples:
     >>> wf.to_hdf5_file("wavefunction.h5")
@@ -884,7 +884,7 @@ Examples:
 Load wavefunction from HDF5 file.
 
 Args:
-    filename (str | Path): Path to HDF5 file to read
+    filename (str | pathlib.Path): Path to HDF5 file to read
 
 Returns:
     Wavefunction: Wavefunction object created from HDF5 file
@@ -900,7 +900,7 @@ Examples:
 Save wavefunction to file in specified format.
 
 Args:
-    filename (str | Path): Path to file to create/overwrite
+    filename (str | pathlib.Path): Path to file to create/overwrite
     format (str): Format type ("json" or "hdf5")
 
 Examples:
@@ -914,7 +914,7 @@ Examples:
 Load wavefunction from file in specified format.
 
 Args:
-    filename (str | Path): Path to file to read
+    filename (str | pathlib.Path): Path to file to read
     format (str): Format type ("json" or "hdf5")
 
 Returns:
