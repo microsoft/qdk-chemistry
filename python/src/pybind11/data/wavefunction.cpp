@@ -842,7 +842,7 @@ Examples:
 Save wavefunction to JSON file.
 
 Args:
-    filename (str | Path): Path to JSON file to create/overwrite
+    filename (str | pathlib.Path): Path to JSON file to create/overwrite
 
 Examples:
     >>> wf.to_json_file("wavefunction.json")
