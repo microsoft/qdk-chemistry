@@ -119,17 +119,22 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
       minimal_basis_fp_;  // Minimal basis set in LightAIMD format
 
   /**
-   * @brief Perform canonicalization on degenerate blocks of the overlap
+   * @brief Perform canonicalization on degenerate eigenvalue blocks.
    * Important when constructing a unique set of proto HVs without
-   * resorting to iterative localization
+   * resorting to iterative localization.
    * Computes degeneracy-breaking operator X = C^T * W * C with unique weights
-   * and canonicalizes degenerate blocks of the overlap by diagonalizing X
+   * and canonicalizes (rotates) eigenvectors within degenerate eigenvalue
+   * blocks by diagonalizing X.
    *
    * @param C Input orbital coefficient matrix (num_atomic_orbitals x
    * num_orbitals)
-   * @param S Input overlap matrix S (num_orbitals x num_orbitals)
-   * Output canonicalized overlap matrix
-   * @param evals Output eigenvalues of S
+   * @param S Input/output eigenvector matrix (num_orbitals x num_orbitals),
+   * typically the eigenvectors obtained from a prior diagonalization. This
+   * matrix is modified in place by rotating eigenvectors within degenerate
+   * eigenvalue blocks to obtain a canonical set.
+   * @param evals Eigenvalues associated with the columns of S; used to detect
+   * degenerate blocks. These values are updated in place to reflect the
+   * canonicalized eigenvectors where applicable.
    * @param num_atomic_orbitals Number of atomic orbitals (rows in C and
    * overlap_inp)
    * @param num_orbitals Number of orbitals (columns in C)
