@@ -41,7 +41,8 @@ try:
     # Define the package version
     QDK_CHEMISTRY_VERSION = version("qdk-chemistry")
 except PackageNotFoundError:
-    # Fallback if package not installed
+    # Package is not installed (e.g. running from source tree).
+    # Use a dev sentinel - telemetry does not require the real version.
     QDK_CHEMISTRY_VERSION = "0.0.0.dev0"
 
 if sys.version_info >= (3, 11):

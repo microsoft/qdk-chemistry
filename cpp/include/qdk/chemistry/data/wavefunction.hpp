@@ -142,7 +142,40 @@ bool is_vector_variant_complex(const ContainerTypes::VectorVariant& variant);
 std::shared_ptr<ContainerTypes::VectorVariant>
 transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
                                    int norbs);
+
+/**
+ * @brief Consolidate duplicate determinants by summing their coefficients
+ *
+ * This utility function merges duplicate determinants in a CI expansion by
+ * summing their coefficients. Determinants with coefficients below the
+ * threshold are removed.
+ *
+ * @param determinants Vector of determinants (modified in place)
+ * @param coefficients VectorVariant of coefficients (modified in place)
+ * @param threshold Coefficient magnitude threshold for pruning (default
+ *                  1e-9)
+ */
+void consolidate_determinants(std::vector<Configuration>& determinants,
+                              ContainerTypes::VectorVariant& coefficients,
+                              double threshold = 1e-9);
 }  // namespace detail
+
+/**
+ * @brief Container for orbital entropy data
+ *
+ * Groups single-orbital entropies, two-orbital entropies, and mutual
+ * information into a single struct for cleaner constructor interfaces.
+ */
+struct OrbitalEntropies {
+  std::optional<Eigen::VectorXd> single_orbital;
+  std::optional<Eigen::MatrixXd> two_orbital;
+  std::optional<Eigen::MatrixXd> mutual_information;
+
+  /** @brief Check if any entropy data is present */
+  bool has_any() const {
+    return single_orbital || two_orbital || mutual_information;
+  }
+};
 
 /**
  * @brief Abstract base class for wavefunction containers
@@ -173,10 +206,12 @@ class WavefunctionContainer {
    *
    * @param one_rdm_spin_traced Spin-traced 1-RDM for active orbitals (optional)
    * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
+   * @param entropies Orbital entropy data (optional)
    * @param type The type of wavefunction
    */
   WavefunctionContainer(const std::optional<MatrixVariant>& one_rdm_spin_traced,
                         const std::optional<VectorVariant>& two_rdm_spin_traced,
+                        const OrbitalEntropies& entropies = OrbitalEntropies{},
                         WavefunctionType type = WavefunctionType::SelfDual);
 
   /**
@@ -193,6 +228,7 @@ class WavefunctionContainer {
    * orbitals (optional)
    * @param two_rdm_bbbb Beta-beta-beta-beta block of 2-RDM for active orbitals
    * (optional)
+   * @param entropies Orbital entropy data (optional)
    * @param type The type of wavefunction
    */
   WavefunctionContainer(const std::optional<MatrixVariant>& one_rdm_spin_traced,
@@ -202,6 +238,7 @@ class WavefunctionContainer {
                         const std::optional<VectorVariant>& two_rdm_aabb,
                         const std::optional<VectorVariant>& two_rdm_aaaa,
                         const std::optional<VectorVariant>& two_rdm_bbbb,
+                        const OrbitalEntropies& entropies = OrbitalEntropies{},
                         WavefunctionType type = WavefunctionType::SelfDual);
 
   virtual ~WavefunctionContainer() = default;
@@ -281,18 +318,55 @@ class WavefunctionContainer {
   /**
    * @brief Checks if single-orbital entropies for active orbitals are available
    *
+   * Returns true if pre-computed entropies were provided at construction,
+   * or if the required RDMs are available to compute them.
+   *
    * @return True if single-orbital entropies are available, false otherwise
    */
   virtual bool has_single_orbital_entropies() const;
 
   /**
-   * @brief Calculate single orbital entropies for active orbitals only
+   * @brief Get or calculate single orbital entropies for active orbitals only
    *
-   * This function uses the method of Boguslawski & Tecmer (2015),
+   * Returns pre-computed entropies if provided at construction. Otherwise,
+   * uses the method of Boguslawski & Tecmer (2015),
    * doi:10.1002/qua.24832, :cite:`Boguslawski2015`.
    * @return Vector of orbital entropies for active orbitals (always real)
    */
   virtual Eigen::VectorXd get_single_orbital_entropies() const;
+
+  /**
+   * @brief Checks if two-orbital entropies for active orbitals are available
+   *
+   * @return True if two-orbital entropies are available, false otherwise
+   */
+  virtual bool has_two_orbital_entropies() const;
+
+  /**
+   * @brief Get the two-orbital entropies matrix for active orbitals
+   *
+   * @return Matrix of two-orbital entropies for active orbitals
+   * @throws std::runtime_error if two-orbital entropies are not available
+   */
+  virtual Eigen::MatrixXd get_two_orbital_entropies() const;
+
+  /**
+   * @brief Checks if mutual information for active orbitals is available
+   *
+   * @return True if mutual information matrix is available, false otherwise
+   */
+  virtual bool has_mutual_information() const;
+
+  /**
+   * @brief Get the mutual information matrix for active orbitals
+   *
+   * The mutual information is defined as:
+   * \f$ I_{ij} = s_{1,i} + s_{1,j} - s_{2,ij} \f$
+   *
+   * @return Matrix of mutual information values for active orbitals
+   * @throws std::runtime_error if mutual information is not available
+   */
+  virtual Eigen::MatrixXd get_mutual_information() const;
 
   /**
    * @brief Get total number of alpha and beta electrons (active + inactive)
@@ -444,6 +518,15 @@ class WavefunctionContainer {
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 
+  /**
+   * @brief Check if the system uses restricted orbitals with a closed-shell
+   * (singlet) configuration, i.e. equal alpha and beta active electrons.
+   *
+   * @return True if orbitals are restricted and the spin multiplicity is
+   * singlet
+   */
+  bool _is_restricted_closed_shell() const;
+
   // spin-traced RDMs
   mutable std::shared_ptr<MatrixVariant> _one_rdm_spin_traced = nullptr;
   mutable std::shared_ptr<VectorVariant> _two_rdm_spin_traced = nullptr;
@@ -453,6 +536,9 @@ class WavefunctionContainer {
   mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_aaaa = nullptr;
   mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_aabb = nullptr;
   mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_bbbb = nullptr;
+
+  // Orbital entropies
+  mutable OrbitalEntropies _entropies;
 
   /** @brief Clear cached RDMs */
   void _clear_rdms() const;
@@ -464,9 +550,8 @@ class WavefunctionContainer {
   void _serialize_rdms_to_hdf5(H5::Group& group) const;
 
   /**
-   * @brief Deserialize RDMs from HDF5 group for restricted case
+   * @brief Deserialize RDMs from HDF5 group
    * @param rdm_group HDF5 group containing RDM data
-   * @param orbitals Orbitals for computing derived quantities
    * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb,
    * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb, one_rdm_spin_traced,
    * two_rdm_spin_traced)
@@ -475,23 +560,7 @@ class WavefunctionContainer {
                     std::optional<VectorVariant>, std::optional<VectorVariant>,
                     std::optional<VectorVariant>, std::optional<MatrixVariant>,
                     std::optional<VectorVariant>>
-  _deserialize_rdms_from_hdf5_restricted(
-      H5::Group& rdm_group, const std::shared_ptr<Orbitals>& orbitals);
-
-  /**
-   * @brief Deserialize RDMs from HDF5 group for unrestricted case
-   * @param rdm_group HDF5 group containing RDM data
-   * @param orbitals Orbitals for computing derived quantities
-   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb,
-   * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb, one_rdm_spin_traced,
-   * two_rdm_spin_traced)
-   */
-  static std::tuple<std::optional<MatrixVariant>, std::optional<MatrixVariant>,
-                    std::optional<VectorVariant>, std::optional<VectorVariant>,
-                    std::optional<VectorVariant>, std::optional<MatrixVariant>,
-                    std::optional<VectorVariant>>
-  _deserialize_rdms_from_hdf5_unrestricted(
-      H5::Group& rdm_group, const std::shared_ptr<Orbitals>& orbitals);
+  _deserialize_rdms_from_hdf5(H5::Group& rdm_group);
 
   /**
    * @brief Serialize RDMs to JSON if they are available
@@ -500,26 +569,23 @@ class WavefunctionContainer {
   void _serialize_rdms_to_json(nlohmann::json& j) const;
 
   /**
-   * @brief Deserialize RDMs from JSON for restricted case
-   * @param j JSON object containing RDM data
-   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb,
-   * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
+   * @brief Serialize single-orbital entropies and mutual information to JSON
+   * @param j JSON object to add entropy data to
    */
-  static std::tuple<std::optional<MatrixVariant>, std::optional<MatrixVariant>,
-                    std::optional<VectorVariant>, std::optional<VectorVariant>,
-                    std::optional<VectorVariant>>
-  _deserialize_rdms_from_json_restricted(const nlohmann::json& j);
+  void _serialize_entropies_to_json(nlohmann::json& j) const;
 
   /**
-   * @brief Deserialize RDMs from JSON for unrestricted case
+   * @brief Deserialize RDMs from JSON
    * @param j JSON object containing RDM data
    * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb,
-   * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
+   * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb, one_rdm_spin_traced,
+   * two_rdm_spin_traced)
    */
   static std::tuple<std::optional<MatrixVariant>, std::optional<MatrixVariant>,
                     std::optional<VectorVariant>, std::optional<VectorVariant>,
+                    std::optional<VectorVariant>, std::optional<MatrixVariant>,
                     std::optional<VectorVariant>>
-  _deserialize_rdms_from_json_unrestricted(const nlohmann::json& j);
+  _deserialize_rdms_from_json(const nlohmann::json& j);
 };
 
 /**
@@ -790,6 +856,32 @@ class Wavefunction : public DataClass,
    * @return Vector of orbital entropies for active orbitals (always real)
    */
   virtual Eigen::VectorXd get_single_orbital_entropies() const;
+
+  /**
+   * @brief Checks if two-orbital entropies for active orbitals are available
+   * @return True if two-orbital entropies are available, false otherwise
+   */
+  virtual bool has_two_orbital_entropies() const;
+
+  /**
+   * @brief Get the two-orbital entropy matrix for active orbitals
+   * @return Matrix of two-orbital entropies for active orbitals
+   * @throws std::runtime_error if two-orbital entropies are not available
+   */
+  virtual Eigen::MatrixXd get_two_orbital_entropies() const;
+
+  /**
+   * @brief Checks if mutual information for active orbitals is available
+   * @return True if mutual information matrix is available, false otherwise
+   */
+  virtual bool has_mutual_information() const;
+
+  /**
+   * @brief Get the mutual information matrix for active orbitals
+   * @return Matrix of mutual information values for active orbitals
+   * @throws std::runtime_error if mutual information is not available
+   */
+  virtual Eigen::MatrixXd get_mutual_information() const;
 
   /**
    * @brief Check if spin-dependent one-particle RDMs are available

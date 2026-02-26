@@ -1,5 +1,13 @@
 cmake_minimum_required(VERSION 3.15)
-project(qdk_chemistry_python VERSION 1.0.2 LANGUAGES CXX)
+
+# Read version from VERSION file at repo root
+set(_VERSION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION")
+file(READ "${_VERSION_FILE}" QDK_VERSION)
+string(STRIP "${QDK_VERSION}" QDK_VERSION)
+# Re-run CMake configure when the VERSION file changes
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_VERSION_FILE}")
+
+project(qdk_chemistry_python VERSION ${QDK_VERSION} LANGUAGES CXX)
 
 # Set default build type to Release if not specified
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
