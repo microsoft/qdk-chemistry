@@ -296,6 +296,7 @@ jobs:
         python -m pip install --prefix=${{ github.workspace }}/install pennylane ipykernel
         # Register the Jupyter kernel for notebook tests
         python -m ipykernel install --user --name python3 --display-name "Python 3"
+        python -m pip install qdk --upgrade --pre
 
     - name: Install Python dependencies
       run: |
