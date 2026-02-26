@@ -1026,7 +1026,7 @@ void VVHVLocalization::canonicalization(const double* C, double* S,
     // Use weights W_ii = i + 1 (normalized such that sum of weights is 1)
     // But any non-degenerate diagonal will work as long as [overlap,W] != 0
     Eigen::VectorXd weights = Eigen::VectorXd::Zero(num_atomic_orbitals);
-    weights.setLinSpaced(num_atomic_orbitals, 1, num_atomic_orbitals + 1);
+    weights.setLinSpaced(num_atomic_orbitals, 1, num_atomic_orbitals);
     weights /= weights.norm();
 
     temp =
