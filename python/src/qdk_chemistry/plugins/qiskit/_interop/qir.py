@@ -12,8 +12,6 @@ Qiskit cannot understand.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from __future__ import annotations
-
 import pyqir
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
 
