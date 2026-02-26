@@ -1083,7 +1083,7 @@ void VVHVLocalization::canonicalization(const double* C, double* S,
         block_eigenvalues.data());  // R now contains S_block eigenvectors WRT X
 
     // Rotate block into X-canonical form (up to a sign)
-    // S_block = S_block * X
+    // S_block = S_block * R  (R contains the eigenvectors of X in this block)
     {
       Eigen::MatrixXd temp2 =
           Eigen::Map<Eigen::MatrixXd>(S_block, num_orbitals, block_size);
