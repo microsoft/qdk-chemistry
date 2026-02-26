@@ -16,10 +16,6 @@
 
 namespace qdk::chemistry::utils::model_hamiltonians {
 
-using qdk::chemistry::data::Hamiltonian;
-using qdk::chemistry::data::LatticeGraph;
-using qdk::chemistry::data::SparseHamiltonianContainer;
-
 namespace detail {
 /**
  * @brief True if T (after decay) is double or Eigen::VectorXd — valid per-site
@@ -65,8 +61,8 @@ inline Eigen::MatrixXd to_pair_param(double val, int n) {
 /**
  * @brief e^2 / (4 pi epsilon_0), used in Ohno and Mataga-Nishimoto potentials.
  */
-constexpr double COULOMB_CONSTANT =
-    constants::hartree_to_ev * constants::bohr_to_angstrom;
+constexpr double COULOMB_CONSTANT = qdk::chemistry::constants::hartree_to_ev *
+                                    qdk::chemistry::constants::bohr_to_angstrom;
 
 /**
  * @brief Construct a Hückel Hamiltonian on a lattice.
@@ -87,7 +83,8 @@ constexpr double COULOMB_CONSTANT =
  */
 template <typename EpsT, typename TT>
 inline Eigen::SparseMatrix<double> _build_huckel_integrals(
-    const LatticeGraph& lattice, EpsT&& epsilon_in, TT&& t_in) {
+    const qdk::chemistry::data::LatticeGraph& lattice, EpsT&& epsilon_in,
+    TT&& t_in) {
   // Check template types
   static_assert(detail::is_site_param_v<EpsT>,
                 "epsilon must be double or Eigen::VectorXd");
@@ -168,9 +165,9 @@ inline Eigen::SparseMatrix<double> _build_huckel_integrals(
  */
 template <typename EpsT, typename TT, typename UT>
 inline std::tuple<Eigen::SparseMatrix<double>,
-                  SparseHamiltonianContainer::TwoBodyMap>
-_build_hubbard_integrals(const LatticeGraph& lattice, EpsT&& epsilon_in,
-                         TT&& t_in, UT&& U_in) {
+                  qdk::chemistry::data::SparseHamiltonianContainer::TwoBodyMap>
+_build_hubbard_integrals(const qdk::chemistry::data::LatticeGraph& lattice,
+                         EpsT&& epsilon_in, TT&& t_in, UT&& U_in) {
   // Check template types
   static_assert(detail::is_site_param_v<EpsT>,
                 "epsilon must be double or Eigen::VectorXd");
@@ -194,7 +191,7 @@ _build_hubbard_integrals(const LatticeGraph& lattice, EpsT&& epsilon_in,
   auto h1 = _build_huckel_integrals(lattice, epsilon, t);
 
   // Build the two-body map for on-site repulsion: (p,q,r,s) = (i,i,i,i) -> U_i
-  SparseHamiltonianContainer::TwoBodyMap h2;
+  qdk::chemistry::data::SparseHamiltonianContainer::TwoBodyMap h2;
   for (int i = 0; i < n; i++) {
     double U_i = U(i);
     if (U_i != 0.0) {
@@ -227,9 +224,11 @@ _build_hubbard_integrals(const LatticeGraph& lattice, EpsT&& epsilon_in,
  */
 template <typename EpsT, typename TT, typename UT, typename VT, typename ZT>
 inline std::tuple<Eigen::SparseMatrix<double>,
-                  SparseHamiltonianContainer::TwoBodyMap, double>
-_build_ppp_integrals(const LatticeGraph& lattice, EpsT&& epsilon_in, TT&& t_in,
-                     UT&& U_in, VT&& V_in, ZT&& z_in) {
+                  qdk::chemistry::data::SparseHamiltonianContainer::TwoBodyMap,
+                  double>
+_build_ppp_integrals(const qdk::chemistry::data::LatticeGraph& lattice,
+                     EpsT&& epsilon_in, TT&& t_in, UT&& U_in, VT&& V_in,
+                     ZT&& z_in) {
   // Check template types
   static_assert(detail::is_site_param_v<EpsT>,
                 "epsilon must be double or Eigen::VectorXd");
@@ -301,12 +300,14 @@ _build_ppp_integrals(const LatticeGraph& lattice, EpsT&& epsilon_in, TT&& t_in,
  * @return Hamiltonian for the Hückel model.
  */
 template <typename EpsT, typename TT>
-inline Hamiltonian create_huckel_hamiltonian(const LatticeGraph& lattice,
-                                             EpsT&& epsilon_in, TT&& t_in) {
+inline qdk::chemistry::data::Hamiltonian create_huckel_hamiltonian(
+    const qdk::chemistry::data::LatticeGraph& lattice, EpsT&& epsilon_in,
+    TT&& t_in) {
   auto h1 = detail::_build_huckel_integrals(
       lattice, std::forward<EpsT>(epsilon_in), std::forward<TT>(t_in));
-  return Hamiltonian(
-      std::make_unique<SparseHamiltonianContainer>(std::move(h1)));
+  return qdk::chemistry::data::Hamiltonian(
+      std::make_unique<qdk::chemistry::data::SparseHamiltonianContainer>(
+          std::move(h1)));
 }
 
 /**
@@ -322,14 +323,15 @@ inline Hamiltonian create_huckel_hamiltonian(const LatticeGraph& lattice,
  * @return Hamiltonian for the Hubbard model.
  */
 template <typename EpsT, typename TT, typename UT>
-inline Hamiltonian create_hubbard_hamiltonian(const LatticeGraph& lattice,
-                                              EpsT&& epsilon_in, TT&& t_in,
-                                              UT&& U_in) {
+inline qdk::chemistry::data::Hamiltonian create_hubbard_hamiltonian(
+    const qdk::chemistry::data::LatticeGraph& lattice, EpsT&& epsilon_in,
+    TT&& t_in, UT&& U_in) {
   auto [h1, h2] = detail::_build_hubbard_integrals(
       lattice, std::forward<EpsT>(epsilon_in), std::forward<TT>(t_in),
       std::forward<UT>(U_in));
-  return Hamiltonian(std::make_unique<SparseHamiltonianContainer>(
-      std::move(h1), std::move(h2)));
+  return qdk::chemistry::data::Hamiltonian(
+      std::make_unique<qdk::chemistry::data::SparseHamiltonianContainer>(
+          std::move(h1), std::move(h2)));
 }
 
 /**
@@ -349,14 +351,15 @@ inline Hamiltonian create_hubbard_hamiltonian(const LatticeGraph& lattice,
  * @return Hamiltonian for the PPP model.
  */
 template <typename EpsT, typename TT, typename UT, typename VT, typename ZT>
-inline Hamiltonian create_ppp_hamiltonian(const LatticeGraph& lattice,
-                                          EpsT&& epsilon_in, TT&& t_in,
-                                          UT&& U_in, VT&& V_in, ZT&& z_in) {
+inline qdk::chemistry::data::Hamiltonian create_ppp_hamiltonian(
+    const qdk::chemistry::data::LatticeGraph& lattice, EpsT&& epsilon_in,
+    TT&& t_in, UT&& U_in, VT&& V_in, ZT&& z_in) {
   auto [h1, h2, core_energy] = detail::_build_ppp_integrals(
       lattice, std::forward<EpsT>(epsilon_in), std::forward<TT>(t_in),
       std::forward<UT>(U_in), std::forward<VT>(V_in), std::forward<ZT>(z_in));
-  return Hamiltonian(std::make_unique<SparseHamiltonianContainer>(
-      std::move(h1), std::move(h2), core_energy));
+  return qdk::chemistry::data::Hamiltonian(
+      std::make_unique<qdk::chemistry::data::SparseHamiltonianContainer>(
+          std::move(h1), std::move(h2), core_energy));
 }
 
 /**
@@ -383,10 +386,9 @@ inline Hamiltonian create_ppp_hamiltonian(const LatticeGraph& lattice,
  * @throws std::invalid_argument if U size or R dimensions mismatch.
  */
 template <typename UT, typename RT, typename PotentialFunc>
-inline Eigen::MatrixXd pairwise_potential(const LatticeGraph& lattice,
-                                          UT&& U_in, RT&& R_in,
-                                          PotentialFunc&& func,
-                                          bool nearest_neighbor_only = false) {
+inline Eigen::MatrixXd pairwise_potential(
+    const qdk::chemistry::data::LatticeGraph& lattice, UT&& U_in, RT&& R_in,
+    PotentialFunc&& func, bool nearest_neighbor_only = false) {
   // Check template types
   static_assert(detail::is_site_param_v<UT>,
                 "U must be double or Eigen::VectorXd");
@@ -444,9 +446,9 @@ inline Eigen::MatrixXd pairwise_potential(const LatticeGraph& lattice,
  * @return n x n symmetric MatrixXd of Ohno potential values.
  */
 template <typename UT, typename RT>
-inline Eigen::MatrixXd ohno_potential(const LatticeGraph& lattice, UT&& U,
-                                      RT&& R, double epsilon_r = 1.0,
-                                      bool nearest_neighbor_only = false) {
+inline Eigen::MatrixXd ohno_potential(
+    const qdk::chemistry::data::LatticeGraph& lattice, UT&& U, RT&& R,
+    double epsilon_r = 1.0, bool nearest_neighbor_only = false) {
   // Check template types
   static_assert(detail::is_site_param_v<UT>,
                 "U must be double or Eigen::VectorXd");
@@ -483,8 +485,8 @@ inline Eigen::MatrixXd ohno_potential(const LatticeGraph& lattice, UT&& U,
  */
 template <typename UT, typename RT>
 inline Eigen::MatrixXd mataga_nishimoto_potential(
-    const LatticeGraph& lattice, UT&& U, RT&& R, double epsilon_r = 1.0,
-    bool nearest_neighbor_only = false) {
+    const qdk::chemistry::data::LatticeGraph& lattice, UT&& U, RT&& R,
+    double epsilon_r = 1.0, bool nearest_neighbor_only = false) {
   // Check template types
   static_assert(detail::is_site_param_v<UT>,
                 "U must be double or Eigen::VectorXd");

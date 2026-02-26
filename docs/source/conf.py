@@ -176,6 +176,9 @@ nitpick_ignore_regex = [
     (r"cpp:identifier", r".*::value"),
     (r"cpp:identifier", r"fmt::format_string.*"),
     (r"cpp:identifier", r"spdlog.*"),
+    # constants:: symbols imported via `using namespace codata_XXXX` inside
+    # a #if block — Doxygen/Breathe cannot resolve them.
+    (r"cpp:identifier", r".*constants::.*"),
     # C++20 concepts - Sphinx/Breathe doesn't fully support concept references yet
     (r"cpp:identifier", r"NonBoolIntegral<.*>"),
     (r"cpp:identifier", r"NonBoolIntegralVector<.*>"),

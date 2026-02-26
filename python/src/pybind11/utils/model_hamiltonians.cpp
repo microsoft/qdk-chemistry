@@ -35,8 +35,6 @@ Eigen::MatrixXd to_pair_param(const py::object& obj, int n) {
 
 void bind_model_hamiltonians(pybind11::module& m) {
   using namespace qdk::chemistry::utils::model_hamiltonians;
-  using qdk::chemistry::data::Hamiltonian;
-  using qdk::chemistry::data::LatticeGraph;
 
   auto mh = m.def_submodule("model_hamiltonians", R"(
 Model Hamiltonian builders and intersite potential functions.
@@ -60,8 +58,8 @@ of shape ``(n, n)``. These can be freely mixed.
   // --- Hückel -----------------------------------------------------------
   mh.def(
       "create_huckel_hamiltonian",
-      [](const LatticeGraph& lattice, const py::object& epsilon,
-         const py::object& t) {
+      [](const qdk::chemistry::data::LatticeGraph& lattice,
+         const py::object& epsilon, const py::object& t) {
         auto n = static_cast<int>(lattice.num_sites());
         return create_huckel_hamiltonian(lattice, to_site_param(epsilon, n),
                                          to_pair_param(t, n));
@@ -86,8 +84,8 @@ Returns:
   // --- Hubbard ----------------------------------------------------------
   mh.def(
       "create_hubbard_hamiltonian",
-      [](const LatticeGraph& lattice, const py::object& epsilon,
-         const py::object& t, const py::object& U) {
+      [](const qdk::chemistry::data::LatticeGraph& lattice,
+         const py::object& epsilon, const py::object& t, const py::object& U) {
         auto n = static_cast<int>(lattice.num_sites());
         return create_hubbard_hamiltonian(lattice, to_site_param(epsilon, n),
                                           to_pair_param(t, n),
@@ -113,9 +111,9 @@ Returns:
   // --- PPP --------------------------------------------------------------
   mh.def(
       "create_ppp_hamiltonian",
-      [](const LatticeGraph& lattice, const py::object& epsilon,
-         const py::object& t, const py::object& U, const py::object& V,
-         const py::object& z) {
+      [](const qdk::chemistry::data::LatticeGraph& lattice,
+         const py::object& epsilon, const py::object& t, const py::object& U,
+         const py::object& V, const py::object& z) {
         auto n = static_cast<int>(lattice.num_sites());
         return create_ppp_hamiltonian(lattice, to_site_param(epsilon, n),
                                       to_pair_param(t, n), to_site_param(U, n),
@@ -148,8 +146,8 @@ Returns:
   // --- Ohno potential ---------------------------------------------------
   mh.def(
       "ohno_potential",
-      [](const LatticeGraph& lattice, const py::object& U, const py::object& R,
-         double epsilon_r, bool nearest_neighbor_only) {
+      [](const qdk::chemistry::data::LatticeGraph& lattice, const py::object& U,
+         const py::object& R, double epsilon_r, bool nearest_neighbor_only) {
         auto n = static_cast<int>(lattice.num_sites());
         return ohno_potential(lattice, to_site_param(U, n), to_pair_param(R, n),
                               epsilon_r, nearest_neighbor_only);
@@ -178,8 +176,8 @@ Returns:
   // --- Mataga-Nishimoto potential ---------------------------------------
   mh.def(
       "mataga_nishimoto_potential",
-      [](const LatticeGraph& lattice, const py::object& U, const py::object& R,
-         double epsilon_r, bool nearest_neighbor_only) {
+      [](const qdk::chemistry::data::LatticeGraph& lattice, const py::object& U,
+         const py::object& R, double epsilon_r, bool nearest_neighbor_only) {
         auto n = static_cast<int>(lattice.num_sites());
         return mataga_nishimoto_potential(lattice, to_site_param(U, n),
                                           to_pair_param(R, n), epsilon_r,
@@ -209,7 +207,8 @@ Returns:
   // --- pairwise_potential (callable version) ----------------------------
   mh.def(
       "pairwise_potential",
-      [](const LatticeGraph& lattice, const py::object& U, const py::object& R,
+      [](const qdk::chemistry::data::LatticeGraph& lattice, const py::object& U,
+         const py::object& R,
          std::function<double(int, int, double, double)> func,
          bool nearest_neighbor_only) {
         auto n = static_cast<int>(lattice.num_sites());

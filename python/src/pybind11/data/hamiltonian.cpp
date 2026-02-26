@@ -764,15 +764,6 @@ Returns:
     bool: True if the one-body matrix is square and non-empty.
 )");
 
-  sparse_container.def("get_container_type",
-                       &SparseHamiltonianContainer::get_container_type,
-                       R"(
-Get the type of the underlying container.
-
-Returns:
-    str: ``"model"``
-)");
-
   // -- Sparse-specific accessors --
   sparse_container.def("sparse_one_body_integrals",
                        &SparseHamiltonianContainer::sparse_one_body_integrals,
@@ -822,21 +813,6 @@ as sparse [p, q, r, s, value] entries.
 Returns:
     str: JSON string with all container data.
 )");
-
-  sparse_container.def_static("from_json",
-                              &SparseHamiltonianContainer::from_json,
-                              R"(
-Load a SparseHamiltonianContainer from a JSON dictionary.
-
-Supports both sparse and dense one-body formats for backward compatibility.
-
-Args:
-    j (dict): Dictionary produced by ``to_json()``.
-
-Returns:
-    SparseHamiltonianContainer: New container instance.
-)",
-                              py::arg("j"));
 
   sparse_container.def(
       "to_fcidump_file", &SparseHamiltonianContainer::to_fcidump_file, R"(

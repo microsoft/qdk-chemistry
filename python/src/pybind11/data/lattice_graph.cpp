@@ -6,6 +6,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/lattice_graph.hpp>
 
 namespace py = pybind11;
@@ -273,8 +274,9 @@ Create a two-dimensional honeycomb lattice.
 The honeycomb lattice has two sites per unit cell (A and B sublattices).
 Unit cells are arranged on a rectangular grid of size nx x ny, giving a
 total of 2 * nx * ny sites. Sites are indexed as:
-    A-sublattice: 2 * (y * nx + x)
-    B-sublattice: 2 * (y * nx + x) + 1
+
+    - A-sublattice: 2 * (y * nx + x)
+    - B-sublattice: 2 * (y * nx + x) + 1
 
 Example: 3x4 honeycomb (brick-wall representation)::
 
@@ -314,17 +316,18 @@ Create a two-dimensional kagome lattice.
 The kagome lattice has three sites per unit cell, arranged as
 corner-sharing triangles. Unit cells are on a rectangular grid of
 size nx x ny, giving a total of 3 * nx * ny sites. Sites are indexed as:
-    site 0: 3 * (y * nx + x)
-    site 1: 3 * (y * nx + x) + 1
-    site 2: 3 * (y * nx + x) + 2
 
-Unit cell (up-triangle)
+    - site 0: 3 * (y * nx + x)
+    - site 1: 3 * (y * nx + x) + 1
+    - site 2: 3 * (y * nx + x) + 2
+
+Unit cell (up-triangle)::
 
         2
        / \
       0---1
 
-Example: 3x2 kagome
+Example: 3x2 kagome::
 
         11       14       17
        /  \     /  \     /  \
@@ -372,22 +375,32 @@ Get a human-readable summary of the lattice graph.
 Returns:
     str: Multi-line summary with site/edge counts and symmetry info.
 )")
-      .def("to_json", &LatticeGraph::to_json, R"(
-Convert the lattice graph to a JSON representation.
+      .def(
+          "to_json",
+          [](const LatticeGraph& self) -> std::string {
+            return self.to_json().dump();
+          },
+          R"(
+Convert the lattice graph to a JSON string.
 
 Returns:
-    dict: JSON-compatible dictionary with adjacency matrix and metadata.
+    str: JSON string with adjacency matrix and metadata.
 )")
-      .def_static("from_json", &LatticeGraph::from_json, R"(
-Load a lattice graph from a JSON object.
+      .def_static(
+          "from_json",
+          [](const std::string& json_str) -> LatticeGraph {
+            return LatticeGraph::from_json(nlohmann::json::parse(json_str));
+          },
+          R"(
+Load a lattice graph from a JSON string.
 
 Args:
-    j (dict): Dictionary containing 'num_sites' and 'adjacency_matrix'.
+    json_str (str): JSON string containing 'num_sites' and 'adjacency_matrix'.
 
 Returns:
     LatticeGraph: New LatticeGraph instance.
 )",
-                  py::arg("j"))
+          py::arg("json_str"))
       .def("to_file", &LatticeGraph::to_file, R"(
 Save the lattice graph to a file.
 

@@ -235,8 +235,8 @@ class LatticeGraph : public DataClass {
    * The honeycomb lattice has two sites per unit cell (A and B sublattices).
    * Unit cells are arranged on a rectangular grid of size nx x ny, giving a
    * total of 2 * nx * ny sites.  Sites are indexed as:
-   *   A-sublattice: 2 * (y * nx + x)
-   *   B-sublattice: 2 * (y * nx + x) + 1
+   *   - A-sublattice: 2 * (y * nx + x)
+   *   - B-sublattice: 2 * (y * nx + x) + 1
    *
    * @code
    *   Example: 3x4 honeycomb
@@ -275,9 +275,9 @@ class LatticeGraph : public DataClass {
    * corner-sharing triangles.  Unit cells are on a rectangular grid of
    * size nx x ny, giving a total of 3 * nx * ny sites.  Sites are indexed
    * as:
-   *   site 0: 3 * (y * nx + x)
-   *   site 1: 3 * (y * nx + x) + 1
-   *   site 2: 3 * (y * nx + x) + 2
+   *   - site 0: 3 * (y * nx + x)
+   *   - site 1: 3 * (y * nx + x) + 1
+   *   - site 2: 3 * (y * nx + x) + 2
    *
    * @code
    *   Unit cell (up-triangle):
