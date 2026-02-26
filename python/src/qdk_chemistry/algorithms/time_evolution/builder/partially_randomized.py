@@ -31,6 +31,7 @@ from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
+from qdk_chemistry.utils.pauli_commutation import get_commutation_checker
 
 __all__: list[str] = ["PartiallyRandomized", "PartiallyRandomizedSettings"]
 
@@ -265,7 +266,7 @@ class PartiallyRandomized(QDrift):
             # Random part (full time)
             random_part_terms = self._sample_qdrift_terms(random_terms, time, num_random_samples, rng)
             if self._settings.get("merge_duplicate_terms"):
-                commute_fn = self._get_commutation_checker(self._settings.get("commutation_type"))
+                commute_fn = get_commutation_checker(self._settings.get("commutation_type"))
                 random_part_terms = self._merge_duplicate_terms(random_part_terms, commute_fn=commute_fn)
             all_terms.extend(random_part_terms)
 
@@ -286,7 +287,7 @@ class PartiallyRandomized(QDrift):
             # Random part
             random_part_terms = self._sample_qdrift_terms(random_terms, time, num_random_samples, rng)
             if self._settings.get("merge_duplicate_terms"):
-                commute_fn = self._get_commutation_checker(self._settings.get("commutation_type"))
+                commute_fn = get_commutation_checker(self._settings.get("commutation_type"))
                 random_part_terms = self._merge_duplicate_terms(random_part_terms, commute_fn=commute_fn)
             all_terms.extend(random_part_terms)
 
