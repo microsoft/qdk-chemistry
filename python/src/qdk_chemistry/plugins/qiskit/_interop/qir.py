@@ -385,25 +385,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
         """Handle read_result operation, which is not supported in Qiskit."""
         raise UnsupportedQIROperationError("read_result is not supported in Qiskit QuantumCircuit.")
 
-    # =========================================================================
-    # Catch unknown quantum operations
-    # =========================================================================
-
-    def _on_call_instr(self, call: pyqir.Call) -> None:
-        """Handle call instructions."""
-        super()._on_call_instr(call)
-
-
-def qir_to_qiskit(qir: pyqir.Module) -> QuantumCircuit:
-    """Convert a QIR module to a Qiskit QuantumCircuit."""
-    return QirToQiskitConverter().convert(qir)
-
-
-def qir_bitcode_to_qiskit(bitcode: bytes) -> QuantumCircuit:
-    """Convert QIR bitcode to a Qiskit QuantumCircuit."""
-    return qir_to_qiskit(pyqir.Module.from_bitcode(pyqir.Context(), bitcode))
-
 
 def qir_ir_to_qiskit(ir: str) -> QuantumCircuit:
     """Convert QIR LLVM IR text to a Qiskit QuantumCircuit."""
-    return qir_to_qiskit(pyqir.Module.from_ir(pyqir.Context(), ir))
+    return QirToQiskitConverter().convert(pyqir.Module.from_ir(pyqir.Context(), ir))
