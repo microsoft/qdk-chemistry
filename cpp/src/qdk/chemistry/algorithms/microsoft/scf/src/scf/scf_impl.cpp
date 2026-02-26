@@ -1097,4 +1097,11 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
   return {total_energy, F_matrix};
 }
 
+void SCFImpl::build_jk_matrices(const RowMajorMatrix& density_matrix,
+                                RowMajorMatrix& J, RowMajorMatrix& K) const {
+  QDK_LOG_TRACE_ENTERING();
+  auto [alpha, beta, omega] = get_hyb_coeff_();
+  eri_->build_JK(density_matrix.data(), J.data(), K.data(), alpha, beta, omega);
+}
+
 }  // namespace qdk::chemistry::scf
