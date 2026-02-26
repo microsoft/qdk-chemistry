@@ -76,7 +76,6 @@ scf_solver = create(
 # This is equivalent to:
 # scf_solver = create("scf_solver")
 # scf_solver.settings().set("max_iterations", 100)
-# scf_solver.settings().set("basis_set", "def2-tzvp")
 # scf_solver.settings().set("convergence_threshold", 1.0e-8)
 # end-cell-factory-settings
 ################################################################################

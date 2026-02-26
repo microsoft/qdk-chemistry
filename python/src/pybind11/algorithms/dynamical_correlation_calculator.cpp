@@ -16,7 +16,9 @@ using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::python;
 
-using RefDerivedReturnType = std::pair<double, std::shared_ptr<Wavefunction>>;
+using RefDerivedReturnType =
+    std::tuple<double, std::shared_ptr<Wavefunction>,
+               std::optional<std::shared_ptr<Wavefunction>>>;
 
 // Trampoline class for python inheritance
 class DynamicalCorrelationCalculatorBase
@@ -62,8 +64,8 @@ corrections from a reference wavefunction, such as Møller-Plesset perturbation
 theory (MP2) and Coupled Cluster (CC) methods.
 
 The calculator takes an Ansatz (containing both Hamiltonian and reference
-wavefunction) as input and returns both the total energy and an updated
-wavefunction that may contain correlation information.
+wavefunction) as input and returns the total energy, a ket wavefunction, and
+optionally a bra wavefunction for non-Hermitian methods.
 
 Examples:
   >>> import qdk
@@ -74,7 +76,7 @@ Examples:
   >>> calculator = qdk_chemistry.algorithms.create("dynamical_correlation_calculator", "qdk_mp2_calculator")
   >>>
   >>> # Run calculation
-  >>> total_energy, result_wavefunction = calculator.run(ansatz)
+  >>> total_energy, ket_wavefunction, bra_wavefunction = calculator.run(ansatz)
     )");
 
   ref_calc.def(py::init<>(),
@@ -102,7 +104,8 @@ Examples:
     ansatz (Ansatz): The Ansatz (Wavefunction and Hamiltonian) describing the quantum system
 
   Returns:
-    tuple[float, Wavefunction]: A tuple containing the total energy and the resulting wavefunction
+    tuple[float, Wavefunction, Optional[Wavefunction]]: A tuple containing the total energy,
+      the ket wavefunction, and optionally a bra wavefunction for non-Hermitian methods
               )");
 
   ref_calc.def("name", &DynamicalCorrelationCalculator::name,

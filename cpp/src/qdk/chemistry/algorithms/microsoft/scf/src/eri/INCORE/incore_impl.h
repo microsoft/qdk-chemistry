@@ -24,8 +24,8 @@ namespace qdk::chemistry::scf::incore {
  * @see ERIINCORE for public API documentation
  */
 class ERI {
-  /// Whether this is an unrestricted (UHF/UKS) spin calculation
-  bool unrestricted_;
+  /// Number of spin-resolved density matrices (1 for RHF, 2 otherwise)
+  size_t spin_density_factor_;
 
   /// atomic orbital normalization convention (PSI4 vs. default)
   BasisMode basis_mode_;
@@ -111,7 +111,7 @@ class ERI {
    * @brief Construct in-core conventional ERI calculator implementation
    * @see ERIINCORE for public API documentation
    */
-  ERI(bool unrestricted, const BasisSet& basis, ParallelConfig mpi,
+  ERI(size_t spin_density_factor, const BasisSet& basis, ParallelConfig mpi,
       double omega);
 
   /**
@@ -146,7 +146,8 @@ class ERI {
    * ERI implementation object. Provides a convenient interface that matches
    * the public API expectations.
    *
-   * @param unrestricted Whether this is an unrestricted calculation
+   * @param spin_density_factor Number of spin-resolved density matrices (1 or
+   * 2)
    * @param basis Orbital basis set
    * @param mpi MPI configuration
    * @param omega Range-separation parameter in bohr⁻¹
@@ -154,7 +155,7 @@ class ERI {
    *
    * @note Prefer using this factory over direct construction
    */
-  static std::unique_ptr<ERI> make_incore_eri(bool unrestricted,
+  static std::unique_ptr<ERI> make_incore_eri(size_t spin_density_factor,
                                               const BasisSet& basis,
                                               ParallelConfig mpi, double omega);
 };
@@ -173,6 +174,9 @@ class ERI_DF : public DensityFittingBase {
   /// Host memory storage for 3-center integrals (N²M doubles, may be NULL on
   /// GPU-only builds)
   std::unique_ptr<double[]> h_eri_;
+
+  /// Number of spin-resolved density matrices (1 for RHF, 2 otherwise)
+  size_t spin_density_factor_ = 1;
 
   // MPI distribution: Each rank stores integral shells in range [loc_i_st_,
   // loc_i_en_)
@@ -208,9 +212,11 @@ class ERI_DF : public DensityFittingBase {
  public:
   /**
    * @brief Construct in-core density-fitted ERI calculator implementation
+   * @param spin_density_factor Number of spin-resolved densities (1 for RHF,
+   * 2 otherwise)
    * @see ERIINCORE_DF for public API documentation
    */
-  ERI_DF(bool unr, const BasisSet& obs, const BasisSet& abs,
+  ERI_DF(size_t spin_density_factor, const BasisSet& obs, const BasisSet& abs,
          ParallelConfig _mpi);
 
   /**
@@ -245,7 +251,8 @@ class ERI_DF : public DensityFittingBase {
    * DF-ERI implementation object. Provides a convenient interface that matches
    * the public API expectations.
    *
-   * @param unrestricted Whether this is an unrestricted calculation
+   * @param spin_density_factor Number of spin-resolved densities (1 for RHF,
+   * 2 otherwise)
    * @param obs Orbital basis set (primary basis)
    * @param abs Auxiliary basis set for density fitting
    * @param mpi MPI configuration
@@ -253,7 +260,7 @@ class ERI_DF : public DensityFittingBase {
    *
    * @note Prefer using this factory over direct construction
    */
-  static std::unique_ptr<ERI_DF> make_incore_eri(bool unrestricted,
+  static std::unique_ptr<ERI_DF> make_incore_eri(size_t spin_density_factor,
                                                  const BasisSet& obs,
                                                  const BasisSet& abs,
                                                  ParallelConfig mpi);

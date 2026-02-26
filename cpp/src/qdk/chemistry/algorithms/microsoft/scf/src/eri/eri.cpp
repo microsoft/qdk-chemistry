@@ -44,22 +44,22 @@ std::shared_ptr<ERI> ERI::create(BasisSet& basis_set, const SCFConfig& cfg,
   switch (cfg.eri.method) {
 #ifdef QDK_CHEMISTRY_ENABLE_RYS
     case ERIMethod::Rys:
-      return std::make_shared<ERIRYS>(cfg.unrestricted, cfg.eri.eri_threshold,
-                                      basis_set, cfg.mpi);
+      return std::make_shared<ERIRYS>(
+          cfg.scf_orbital_type, cfg.eri.eri_threshold, basis_set, cfg.mpi);
 #endif
 #ifdef QDK_CHEMISTRY_ENABLE_HGP
     case ERIMethod::HGP:
-      return std::make_shared<ERIHGP>(cfg.unrestricted, cfg.eri.eri_threshold,
-                                      basis_set, cfg.mpi);
+      return std::make_shared<ERIHGP>(
+          cfg.scf_orbital_type, cfg.eri.eri_threshold, basis_set, cfg.mpi);
 #endif
     case ERIMethod::Incore:
-      return std::make_shared<ERIINCORE>(cfg.unrestricted, basis_set, cfg.mpi,
-                                         omega);
+      return std::make_shared<ERIINCORE>(cfg.scf_orbital_type, basis_set,
+                                         cfg.mpi, omega);
     case ERIMethod::SnK:
-      return std::make_shared<SNK>(cfg.unrestricted, basis_set, cfg.snk_input,
-                                   cfg.exc.xc_name, cfg.mpi);
+      return std::make_shared<SNK>(cfg.scf_orbital_type, basis_set,
+                                   cfg.snk_input, cfg.exc.xc_name, cfg.mpi);
     case ERIMethod::Libint2Direct:
-      return std::make_shared<LIBINT2_DIRECT>(cfg.unrestricted, basis_set,
+      return std::make_shared<LIBINT2_DIRECT>(cfg.scf_orbital_type, basis_set,
                                               cfg.mpi, cfg.eri.use_atomics);
     default:
       throw std::runtime_error("Invalid ERI Method");
@@ -77,11 +77,11 @@ std::shared_ptr<ERI> ERI::create(BasisSet& basis_set, BasisSet& aux_basis_set,
   AutoTimer t("ERI::create");
   switch (cfg.eri.method) {
     case ERIMethod::Incore:
-      return std::make_shared<ERIINCORE_DF>(cfg.unrestricted, basis_set,
+      return std::make_shared<ERIINCORE_DF>(cfg.scf_orbital_type, basis_set,
                                             aux_basis_set, cfg.mpi);
 #ifdef QDK_CHEMISTRY_ENABLE_LIBINTX
     case ERIMethod::LibintX:
-      return std::make_shared<LIBINTX_DF>(cfg.unrestricted, basis_set,
+      return std::make_shared<LIBINTX_DF>(cfg.scf_orbital_type, basis_set,
                                           aux_basis_set, cfg.mpi,
                                           cfg.libintx_config.min_tile_size);
 #endif
@@ -102,7 +102,7 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
   build_JK_impl_(P, J, K, alpha, beta, omega);
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
-  int num_density_matrices = unrestricted_ ? 2 : 1;
+  int num_density_matrices = has_spin_split_density() ? 2 : 1;
   int size = num_density_matrices * basis_set_.num_atomic_orbitals *
              basis_set_.num_atomic_orbitals;
   if (mpi_.world_size > 1) {
