@@ -19,6 +19,10 @@ python -m pip install 'qdk-chemistry[jupyter]'
 - `qpe_stretched_n2.ipynb`: Jupyter notebook demonstrating multi-reference quantum chemistry state preparation and iterative quantum phase estimation
 - `state_prep_energy.ipynb`: Jupyter notebook demonstrating quantum state preparation and energy calculation using quantum simulators.
 
+## Companion datasets and assets
+
+Additional curated datasets and benchmark materials that complement these examples are available at [microsoft/qdk-chemistry-data](https://github.com/microsoft/qdk-chemistry-data).
+
 ## Examples of interoperability with other quantum computing frameworks
 
 ### PennyLane
