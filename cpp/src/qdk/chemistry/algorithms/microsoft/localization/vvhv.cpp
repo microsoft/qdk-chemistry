@@ -16,6 +16,7 @@
 #include <lapack.hh>
 #include <memory>
 #include <numeric>
+#include <tuple>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
