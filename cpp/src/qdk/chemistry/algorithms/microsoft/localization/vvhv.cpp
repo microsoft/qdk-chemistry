@@ -220,16 +220,18 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    * representation which input orbitals C are given (num_atomic_orbitals_al x
    * num_atomic_orbitals_al)
    * @param C_al Input orbital coefficient matrix wihtin this atom+l AO
-   * block(num_atomic_orbitals_al x num_orbitals) orthonormal with respect to overlap_al
-   * @param num_atomic_orbitals Total number of atomic orbitals in the original basis
+   * block(num_atomic_orbitals_al x num_orbitals) orthonormal with respect to
+   * overlap_al
+   * @param num_atomic_orbitals Total number of atomic orbitals in the original
+   * basis
    * @param num_atomic_orbitals_al Number of atomic orbitals in the atom+l
    * current block
    * @param num_orbitals Number of orbitals orbitals to localize
    */
   void localize_proto_hv(const std::vector<int>& bf_al_ori,
-                         const double* overlap_al,
-                         Eigen::MatrixXd& C_al, int num_atomic_orbitals,
-                         int num_atomic_orbitals_al, int num_orbitals);
+                         const double* overlap_al, Eigen::MatrixXd& C_al,
+                         int num_atomic_orbitals, int num_atomic_orbitals_al,
+                         int num_orbitals);
 
   /**
    * @brief Initialize data structures and compute overlap matrices and
@@ -614,8 +616,8 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
                              num_atomic_orbitals_al_min, "", 5.0);
   }
 
-  // Localize the proto HVs by rotating them to maximize the overlap with the most
-  // localized AO basis functions
+  // Localize the proto HVs by rotating them to maximize the overlap with the
+  // most localized AO basis functions
   this->localize_proto_hv(bf_al_ori, overlap_ori_al.data(), C_psi,
                           num_atomic_orbitals_ori, num_atomic_orbitals_al_ori,
                           nhv_al);
@@ -634,19 +636,18 @@ void VVHVLocalization::localize_proto_hv(const std::vector<int>& bf_al_ori,
                                          int num_atomic_orbitals,
                                          int num_atomic_orbitals_al,
                                          int num_orbitals) {
-
   // Get the full AO-asis representation of this atom+l block
   Eigen::MatrixXd atomic_orbitals =
       Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals_al);
 
-  for(int i = 0; i < num_atomic_orbitals_al; ++i) {
+  for (int i = 0; i < num_atomic_orbitals_al; ++i) {
     atomic_orbitals(bf_al_ori[i], i) = 1;
   }
 
   // Calculate the spreads of this atom+l AOs
   Eigen::VectorXd al_spreads = Eigen::VectorXd::Zero(num_atomic_orbitals_al);
   this->calculate_orbital_spreads(atomic_orbitals, al_spreads);
-  
+
   // Sort the AOs in the block by spread
   auto most_localized_aos = std::vector<int>(num_atomic_orbitals_al);
   std::iota(most_localized_aos.begin(), most_localized_aos.end(), 0);
@@ -662,7 +663,7 @@ void VVHVLocalization::localize_proto_hv(const std::vector<int>& bf_al_ori,
     ao_localized_al(most_localized_aos[j], j) = 1;
   }
 
-   // Form T = C_al^T * overlap_al * ao_localized_al
+  // Form T = C_al^T * overlap_al * ao_localized_al
   Eigen::MatrixXd T = Eigen::MatrixXd::Zero(num_orbitals, num_orbitals);
   Eigen::MatrixXd temp =
       Eigen::MatrixXd::Zero(num_atomic_orbitals_al, num_orbitals);
@@ -675,7 +676,8 @@ void VVHVLocalization::localize_proto_hv(const std::vector<int>& bf_al_ori,
              C_al.data(), num_atomic_orbitals_al, temp.data(),
              num_atomic_orbitals_al, 0.0, T.data(), num_orbitals);
 
-  // Now to form Z, Z is just orthonormalized T in our case (since C_al is O-orthonormal)
+  // Now to form Z, Z is just orthonormalized T in our case (since C_al is
+  // O-orthonormal)
   Eigen::MatrixXd Z = Eigen::MatrixXd::Zero(num_orbitals, num_orbitals);
   Eigen::MatrixXd identity =
       Eigen::MatrixXd::Identity(num_orbitals, num_orbitals);
@@ -688,8 +690,8 @@ void VVHVLocalization::localize_proto_hv(const std::vector<int>& bf_al_ori,
       Eigen::MatrixXd::Zero(num_atomic_orbitals_al, num_orbitals);
   blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
              num_atomic_orbitals_al, num_orbitals, num_orbitals, 1.0,
-             C_al.data(), num_atomic_orbitals_al, Z.data(), num_orbitals,
-             0.0, C_loc.data(), num_atomic_orbitals_al);
+             C_al.data(), num_atomic_orbitals_al, Z.data(), num_orbitals, 0.0,
+             C_loc.data(), num_atomic_orbitals_al);
   C_al.block(0, 0, num_atomic_orbitals_al, num_orbitals) = C_loc;
 }
 
@@ -1079,11 +1081,13 @@ void VVHVLocalization::calculate_orbital_spreads(
   }
 }
 
-void VVHVLocalization::orthonormalization(
-    int num_atomic_orbitals, int num_orbitals, const double* overlap_inp,
-    double* C, double* C_out, double ortho_threshold,
-    unsigned int expected_near_zero, const std::string& error_label,
-    double separation_ratio) {
+void VVHVLocalization::orthonormalization(int num_atomic_orbitals,
+                                          int num_orbitals,
+                                          const double* overlap_inp, double* C,
+                                          double* C_out, double ortho_threshold,
+                                          unsigned int expected_near_zero,
+                                          const std::string& error_label,
+                                          double separation_ratio) {
   QDK_LOG_TRACE_ENTERING();
 
   // Compute overlap matrix S = C^T * overlap_inp * C
