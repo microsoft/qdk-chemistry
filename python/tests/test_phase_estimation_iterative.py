@@ -419,6 +419,7 @@ def test_iterative_phase_estimation_second_non_commuting_example() -> None:
     )
 
 
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available")
 def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
     """Integration test showing NoiseModel impact on iterative phase estimation accuracy."""
     # Run noiseless QPE
