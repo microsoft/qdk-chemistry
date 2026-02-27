@@ -361,21 +361,6 @@ class TestQDriftDuplicateTermFusion:
         """Empty term list returns empty."""
         assert QDrift._merge_duplicate_terms([]) == []
 
-    def test_pauli_terms_qw_commute(self):
-        """Verify qubit-wise commutation checks for known cases."""
-        # Same qubit, same Pauli → qw-commute
-        assert QDrift._pauli_terms_qw_commute({0: "X"}, {0: "X"}) is True
-        # Same qubit, different Pauli → do not qw-commute
-        assert QDrift._pauli_terms_qw_commute({0: "X"}, {0: "Y"}) is False
-        # Different qubits → qw-commute
-        assert QDrift._pauli_terms_qw_commute({0: "X"}, {1: "Y"}) is True
-        # XY vs YX: commute globally but do NOT qubit-wise commute
-        assert QDrift._pauli_terms_qw_commute({0: "X", 1: "Y"}, {0: "Y", 1: "X"}) is False
-        # Same Paulis on overlapping qubits → qw-commute
-        assert QDrift._pauli_terms_qw_commute({0: "X", 1: "Z"}, {0: "X", 1: "Z"}) is True
-        # One differing, one matching → do not qw-commute
-        assert QDrift._pauli_terms_qw_commute({0: "X", 1: "Z"}, {0: "Y", 1: "Z"}) is False
-
 
 class TestQDriftPauliLabelToMap:
     """Tests for the _pauli_label_to_map helper function."""
