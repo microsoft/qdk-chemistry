@@ -8,6 +8,8 @@
 from qdk_chemistry._core.utils import Logger, compute_valence_space_parameters, rotate_orbitals
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 
+from . import model_hamiltonians
+
 # model_hamiltonians is a sub-package (utils/model_hamiltonians.py)
 
 __all__ = [

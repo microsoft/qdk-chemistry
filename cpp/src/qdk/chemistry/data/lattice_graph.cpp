@@ -382,20 +382,7 @@ bool LatticeGraph::_check_symmetry(const Eigen::SparseMatrix<double>& mat) {
   if (mat.rows() != mat.cols()) {
     return false;
   }
-  for (int k = 0; k < mat.outerSize(); ++k) {
-    for (Eigen::SparseMatrix<double>::InnerIterator it(mat, k); it; ++it) {
-      int i = static_cast<int>(it.row());
-      int j = static_cast<int>(it.col());
-      double val = it.value();
-      if (val != 0.0) {
-        double sym_val = mat.coeff(j, i);
-        if (sym_val != val) {
-          return false;
-        }
-      }
-    }
-  }
-  return true;
+  return mat.isApprox(Eigen::SparseMatrix<double>(mat.transpose()));
 }
 
 std::string LatticeGraph::get_summary() const {

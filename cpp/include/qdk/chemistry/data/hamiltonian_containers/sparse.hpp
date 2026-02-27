@@ -104,7 +104,7 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Get the type of the underlying container
-   * @return "model"
+   * @return "sparse"
    */
   std::string get_container_type() const override;
 
