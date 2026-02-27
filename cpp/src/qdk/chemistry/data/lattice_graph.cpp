@@ -43,6 +43,12 @@ LatticeGraph::LatticeGraph(
   triplets.reserve(edge_weights.size());
   for (const auto& [edge, weight] : edge_weights) {
     const auto& [i, j] = edge;
+    if (i >= _num_sites || j >= _num_sites) {
+      throw std::invalid_argument("Edge (" + std::to_string(i) + ", " +
+                                  std::to_string(j) +
+                                  ") has index out of range for num_sites=" +
+                                  std::to_string(_num_sites) + ".");
+    }
     triplets.emplace_back(static_cast<int>(i), static_cast<int>(j), weight);
   }
 
@@ -540,12 +546,19 @@ LatticeGraph LatticeGraph::from_json(const nlohmann::json& j) {
   }
 
   auto n = j["num_sites"].get<std::uint64_t>();
+  auto n_idx = static_cast<int>(n);
 
   std::vector<detail::Triplet> triplets;
   for (const auto& entry : j["adjacency_sparse"]) {
     int row = entry[0].get<int>();
     int col = entry[1].get<int>();
     double val = entry[2].get<double>();
+    if (row < 0 || row >= n_idx || col < 0 || col >= n_idx) {
+      throw std::runtime_error(
+          "Edge (" + std::to_string(row) + ", " + std::to_string(col) +
+          ") has index out of range for num_sites=" + std::to_string(n) +
+          " in JSON data.");
+    }
     triplets.emplace_back(row, col, val);
   }
   Eigen::SparseMatrix<double> sparse(static_cast<Eigen::Index>(n),
@@ -582,12 +595,14 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
   QDK_LOG_TRACE_ENTERING();
   H5::DataSet dataset = group.openDataSet("adjacency_sparse");
 
-  // Read num_sites from group attribute
-  std::uint64_t n = 0;
-  if (group.attrExists("num_sites")) {
-    H5::Attribute sites_attr = group.openAttribute("num_sites");
-    sites_attr.read(H5::PredType::NATIVE_UINT64, &n);
+  // Read num_sites from group attribute (required)
+  if (!group.attrExists("num_sites")) {
+    throw std::runtime_error(
+        "HDF5 group missing required 'num_sites' attribute for LatticeGraph.");
   }
+  std::uint64_t n = 0;
+  H5::Attribute sites_attr = group.openAttribute("num_sites");
+  sites_attr.read(H5::PredType::NATIVE_UINT64, &n);
 
   H5::DataSpace dataspace = dataset.getSpace();
   hsize_t dims[2];
@@ -597,6 +612,8 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
   std::vector<double> buffer(nnz * 3);
   dataset.read(buffer.data(), H5::PredType::NATIVE_DOUBLE);
 
+  auto n_idx = static_cast<int>(n);
+
   using T = Eigen::Triplet<double>;
   std::vector<T> triplets;
   triplets.reserve(nnz);
@@ -604,6 +621,12 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
     int row = static_cast<int>(buffer[i * 3 + 0]);
     int col = static_cast<int>(buffer[i * 3 + 1]);
     double val = buffer[i * 3 + 2];
+    if (row < 0 || row >= n_idx || col < 0 || col >= n_idx) {
+      throw std::runtime_error(
+          "Edge (" + std::to_string(row) + ", " + std::to_string(col) +
+          ") has index out of range for num_sites=" + std::to_string(n) +
+          " in HDF5 data.");
+    }
     triplets.emplace_back(row, col, val);
   }
 

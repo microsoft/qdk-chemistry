@@ -8,13 +8,59 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/lattice_graph.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
+
+#include "path_utils.hpp"
+#include "property_binding_helpers.hpp"
 
 namespace py = pybind11;
 
-void bind_lattice_graph(pybind11::module& m) {
+// Wrapper functions for file I/O methods that accept both strings and pathlib
+// Path objects
+void lattice_graph_to_file_wrapper(
+    const qdk::chemistry::data::LatticeGraph &self, const py::object &filename,
+    const std::string &format_type) {
+  self.to_file(qdk::chemistry::python::utils::to_string_path(filename),
+               format_type);
+}
+
+qdk::chemistry::data::LatticeGraph lattice_graph_from_file_wrapper(
+    const py::object &filename, const std::string &format_type) {
+  return qdk::chemistry::data::LatticeGraph::from_file(
+      qdk::chemistry::python::utils::to_string_path(filename), format_type);
+}
+
+void lattice_graph_to_json_file_wrapper(
+    const qdk::chemistry::data::LatticeGraph &self,
+    const py::object &filename) {
+  self.to_json_file(qdk::chemistry::python::utils::to_string_path(filename));
+}
+
+qdk::chemistry::data::LatticeGraph lattice_graph_from_json_file_wrapper(
+    const py::object &filename) {
+  return qdk::chemistry::data::LatticeGraph::from_json_file(
+      qdk::chemistry::python::utils::to_string_path(filename));
+}
+
+void lattice_graph_to_hdf5_file_wrapper(
+    const qdk::chemistry::data::LatticeGraph &self,
+    const py::object &filename) {
+  self.to_hdf5_file(qdk::chemistry::python::utils::to_string_path(filename));
+}
+
+qdk::chemistry::data::LatticeGraph lattice_graph_from_hdf5_file_wrapper(
+    const py::object &filename) {
+  return qdk::chemistry::data::LatticeGraph::from_hdf5_file(
+      qdk::chemistry::python::utils::to_string_path(filename));
+}
+
+void bind_lattice_graph(pybind11::module &m) {
   using namespace qdk::chemistry::data;
 
-  py::class_<LatticeGraph>(m, "LatticeGraph", R"(
+  using qdk::chemistry::python::utils::bind_getter_as_property;
+
+  py::class_<LatticeGraph, DataClass, py::smart_holder> lattice_graph(
+      m, "LatticeGraph", R"(
 Lattice graph defining the connectivity and geometry of a model Hamiltonian.
 
 A LatticeGraph stores a (possibly weighted) adjacency matrix for a lattice of
@@ -37,12 +83,14 @@ Examples:
     >>> import numpy as np
     >>> adj = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]], dtype=float)
     >>> lattice = LatticeGraph.from_dense_matrix(adj)
-)")
-      // Constructor: edge-weight map
-      .def(py::init<
-               const std::map<std::pair<std::uint64_t, std::uint64_t>, double>&,
-               std::uint64_t>(),
-           R"(
+)");
+
+  // Constructor: edge-weight map
+  lattice_graph.def(
+      py::init<
+          const std::map<std::pair<std::uint64_t, std::uint64_t>, double> &,
+          std::uint64_t>(),
+      R"(
 Construct a lattice graph from a dictionary of edge weights.
 
 Args:
@@ -51,11 +99,12 @@ Args:
     num_sites (int, optional): Number of sites. If 0, inferred from edge indices.
         Defaults to 0.
 )",
-           py::arg("edge_weights"), py::arg("num_sites") = 0)
+      py::arg("edge_weights"), py::arg("num_sites") = 0);
 
-      // Static factories for matrix input
-      .def_static("from_dense_matrix", &LatticeGraph::from_dense_matrix,
-                  R"(
+  // Static factories for matrix input
+  lattice_graph.def_static("from_dense_matrix",
+                           &LatticeGraph::from_dense_matrix,
+                           R"(
 Create a lattice graph from a dense adjacency matrix.
 
 Args:
@@ -65,10 +114,11 @@ Args:
 Returns:
     LatticeGraph: A new lattice graph.
 )",
-                  py::arg("adjacency_matrix"))
+                           py::arg("adjacency_matrix"));
 
-      .def_static("from_sparse_matrix", &LatticeGraph::from_sparse_matrix,
-                  R"(
+  lattice_graph.def_static("from_sparse_matrix",
+                           &LatticeGraph::from_sparse_matrix,
+                           R"(
 Create a lattice graph from a sparse adjacency matrix.
 
 Args:
@@ -77,10 +127,11 @@ Args:
 Returns:
     LatticeGraph: A new lattice graph.
 )",
-                  py::arg("sparse_adjacency_matrix"))
+                           py::arg("sparse_adjacency_matrix"));
 
-      .def_static("make_bidirectional", &LatticeGraph::make_bidirectional,
-                  R"(
+  lattice_graph.def_static("make_bidirectional",
+                           &LatticeGraph::make_bidirectional,
+                           R"(
 Return a new lattice graph with reverse edges added.
 
 For each directed edge (i,j) with weight w, ensures (j,i) also
@@ -94,51 +145,54 @@ Args:
 Returns:
     LatticeGraph: A new lattice graph with bidirectional edges.
 )",
-                  py::arg("graph"))
+                           py::arg("graph"));
 
-      // Properties / accessors
-      .def_property_readonly("num_sites", &LatticeGraph::num_sites, R"(
+  // Properties / accessors
+  lattice_graph.def_property_readonly("num_sites", &LatticeGraph::num_sites, R"(
 Number of lattice sites.
 
 Returns:
     int: Number of sites in the lattice.
-)")
-      .def_property_readonly("num_edges", &LatticeGraph::num_edges, R"(
+)");
+  lattice_graph.def_property_readonly("num_edges", &LatticeGraph::num_edges, R"(
 Number of unique edges in the lattice.
 
 Returns:
     int: Number of edges.
-)")
-      .def_property_readonly("num_nonzeros", &LatticeGraph::num_nonzeros, R"(
+)");
+  lattice_graph.def_property_readonly("num_nonzeros",
+                                      &LatticeGraph::num_nonzeros, R"(
 Number of non-zero entries in the adjacency matrix.
 
 For a symmetric graph this is twice the number of edges.
 
 Returns:
     int: Number of non-zero adjacency entries.
-)")
-      .def_property_readonly("is_symmetric", &LatticeGraph::is_symmetric, R"(
+)");
+  lattice_graph.def_property_readonly("is_symmetric",
+                                      &LatticeGraph::is_symmetric, R"(
 Whether the adjacency matrix is symmetric.
 
 Returns:
     bool: True if the adjacency matrix is symmetric.
-)")
-      .def("adjacency_matrix", &LatticeGraph::adjacency_matrix, R"(
+)");
+  lattice_graph.def("adjacency_matrix", &LatticeGraph::adjacency_matrix, R"(
 Return the dense adjacency matrix.
 
 Returns:
     numpy.ndarray: Dense adjacency matrix [n x n].
-)")
-      .def("sparse_adjacency_matrix", &LatticeGraph::sparse_adjacency_matrix,
-           R"(
+)");
+  lattice_graph.def("sparse_adjacency_matrix",
+                    &LatticeGraph::sparse_adjacency_matrix,
+                    R"(
 Return the sparse adjacency matrix.
 
 Returns:
     scipy.sparse.csc_matrix: Sparse adjacency matrix [n x n].
 )",
-           py::return_value_policy::reference_internal)
+                    py::return_value_policy::reference_internal);
 
-      .def("weight", &LatticeGraph::weight, R"(
+  lattice_graph.def("weight", &LatticeGraph::weight, R"(
 Get the weight of the edge between sites i and j.
 
 Args:
@@ -148,9 +202,9 @@ Args:
 Returns:
     float: Edge weight (0 if not connected).
 )",
-           py::arg("i"), py::arg("j"))
+                    py::arg("i"), py::arg("j"));
 
-      .def("are_connected", &LatticeGraph::are_connected, R"(
+  lattice_graph.def("are_connected", &LatticeGraph::are_connected, R"(
 Check whether two sites are connected by an edge.
 
 Args:
@@ -160,10 +214,10 @@ Args:
 Returns:
     bool: True if sites i and j are connected.
 )",
-           py::arg("i"), py::arg("j"))
+                    py::arg("i"), py::arg("j"));
 
-      // Static factory methods
-      .def_static("chain", &LatticeGraph::chain, R"(
+  // Static factory methods
+  lattice_graph.def_static("chain", &LatticeGraph::chain, R"(
 Create a one-dimensional chain lattice.
 
 Sites are labelled 0 ... n-1 with nearest-neighbour edges.
@@ -191,9 +245,10 @@ Examples:
     >>> chain = LatticeGraph.chain(6)
     >>> ring = LatticeGraph.chain(6, periodic=True)
 )",
-                  py::arg("n"), py::arg("periodic") = false, py::arg("t") = 1.0)
+                           py::arg("n"), py::arg("periodic") = false,
+                           py::arg("t") = 1.0);
 
-      .def_static("square", &LatticeGraph::square, R"(
+  lattice_graph.def_static("square", &LatticeGraph::square, R"(
 Create a two-dimensional square lattice.
 
 Sites are indexed in row-major order: site index = y * nx + x.
@@ -226,10 +281,11 @@ Returns:
 Raises:
     ValueError: If nx or ny is 0.
 )",
-                  py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
-                  py::arg("periodic_y") = false, py::arg("t") = 1.0)
+                           py::arg("nx"), py::arg("ny"),
+                           py::arg("periodic_x") = false,
+                           py::arg("periodic_y") = false, py::arg("t") = 1.0);
 
-      .def_static("triangular", &LatticeGraph::triangular, R"(
+  lattice_graph.def_static("triangular", &LatticeGraph::triangular, R"(
 Create a two-dimensional triangular lattice.
 
 Sites are indexed in row-major order: site index = y * nx + x.
@@ -265,10 +321,11 @@ Returns:
 Raises:
     ValueError: If nx or ny is 0.
 )",
-                  py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
-                  py::arg("periodic_y") = false, py::arg("t") = 1.0)
+                           py::arg("nx"), py::arg("ny"),
+                           py::arg("periodic_x") = false,
+                           py::arg("periodic_y") = false, py::arg("t") = 1.0);
 
-      .def_static("honeycomb", &LatticeGraph::honeycomb, R"(
+  lattice_graph.def_static("honeycomb", &LatticeGraph::honeycomb, R"(
 Create a two-dimensional honeycomb lattice.
 
 The honeycomb lattice has two sites per unit cell (A and B sublattices).
@@ -307,10 +364,11 @@ Returns:
 Raises:
     ValueError: If nx or ny is 0.
 )",
-                  py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
-                  py::arg("periodic_y") = false, py::arg("t") = 1.0)
+                           py::arg("nx"), py::arg("ny"),
+                           py::arg("periodic_x") = false,
+                           py::arg("periodic_y") = false, py::arg("t") = 1.0);
 
-      .def_static("kagome", &LatticeGraph::kagome, R"(
+  lattice_graph.def_static("kagome", &LatticeGraph::kagome, R"(
 Create a two-dimensional kagome lattice.
 
 The kagome lattice has three sites per unit cell, arranged as
@@ -357,41 +415,50 @@ Returns:
 Raises:
     ValueError: If nx or ny is 0.
 )",
-                  py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
-                  py::arg("periodic_y") = false, py::arg("t") = 1.0)
+                           py::arg("nx"), py::arg("ny"),
+                           py::arg("periodic_x") = false,
+                           py::arg("periodic_y") = false, py::arg("t") = 1.0);
 
-      .def("__repr__",
-           [](const LatticeGraph& self) {
-             return "<LatticeGraph sites=" + std::to_string(self.num_sites()) +
-                    " edges=" + std::to_string(self.num_edges()) +
-                    " symmetric=" + (self.is_symmetric() ? "True" : "False") +
-                    ">";
-           })
+  lattice_graph.def("__repr__", [](const LatticeGraph &self) {
+    return "<LatticeGraph sites=" + std::to_string(self.num_sites()) +
+           " edges=" + std::to_string(self.num_edges()) +
+           " symmetric=" + (self.is_symmetric() ? "True" : "False") + ">";
+  });
 
-      // DataClass interface
-      .def("get_summary", &LatticeGraph::get_summary, R"(
+  lattice_graph.def(
+      "__str__", [](const LatticeGraph &self) { return self.get_summary(); });
+
+  bind_getter_as_property(lattice_graph, "get_summary",
+                          &LatticeGraph::get_summary, R"(
 Get a human-readable summary of the lattice graph.
 
 Returns:
     str: Multi-line summary with site/edge counts and symmetry info.
-)")
-      .def(
-          "to_json",
-          [](const LatticeGraph& self) -> std::string {
-            return self.to_json().dump();
-          },
-          R"(
+
+Examples:
+    >>> summary = graph.get_summary()
+    >>> print(summary)
+    >>> # Or as a property:
+    >>> print(graph.summary)
+)");
+
+  lattice_graph.def(
+      "to_json",
+      [](const LatticeGraph &self) -> std::string {
+        return self.to_json().dump();
+      },
+      R"(
 Convert the lattice graph to a JSON string.
 
 Returns:
     str: JSON string with adjacency matrix and metadata.
-)")
-      .def_static(
-          "from_json",
-          [](const std::string& json_str) -> LatticeGraph {
-            return LatticeGraph::from_json(nlohmann::json::parse(json_str));
-          },
-          R"(
+)");
+  lattice_graph.def_static(
+      "from_json",
+      [](const std::string &json_str) -> LatticeGraph {
+        return LatticeGraph::from_json(nlohmann::json::parse(json_str));
+      },
+      R"(
 Load a lattice graph from a JSON string.
 
 Args:
@@ -400,61 +467,107 @@ Args:
 Returns:
     LatticeGraph: New LatticeGraph instance.
 )",
-          py::arg("json_str"))
-      .def("to_file", &LatticeGraph::to_file, R"(
+      py::arg("json_str"));
+  lattice_graph.def("to_file", lattice_graph_to_file_wrapper, R"(
 Save the lattice graph to a file.
 
 Args:
-    filename (str): Path to the output file.
+    filename (str | pathlib.Path): Path to the output file.
     format_type (str): Format type ("json" or "hdf5").
 
 Raises:
     ValueError: If format_type is not supported.
+
+Examples:
+    >>> graph.to_file("lattice.json", "json")
+    >>> from pathlib import Path
+    >>> graph.to_file(Path("lattice.json"), "json")
 )",
-           py::arg("filename"), py::arg("format_type"))
-      .def_static("from_file", &LatticeGraph::from_file, R"(
+                    py::arg("filename"), py::arg("format_type"));
+  lattice_graph.def_static("from_file", lattice_graph_from_file_wrapper, R"(
 Load a lattice graph from a file.
 
 Args:
-    filename (str): Path to the input file.
+    filename (str | pathlib.Path): Path to the input file.
     format_type (str): Format type ("json" or "hdf5").
 
 Returns:
     LatticeGraph: New LatticeGraph instance.
+
+Examples:
+    >>> graph = LatticeGraph.from_file("lattice.json", "json")
+    >>> from pathlib import Path
+    >>> graph = LatticeGraph.from_file(Path("lattice.json"), "json")
 )",
-                  py::arg("filename"), py::arg("format_type"))
-      .def("to_json_file", &LatticeGraph::to_json_file, R"(
+                           py::arg("filename"), py::arg("format_type"));
+  lattice_graph.def("to_json_file", lattice_graph_to_json_file_wrapper, R"(
 Save the lattice graph to a JSON file.
 
 Args:
-    filename (str): Path to the output JSON file.
+    filename (str | pathlib.Path): Path to the output JSON file.
+
+Examples:
+    >>> graph.to_json_file("lattice.json")
+    >>> from pathlib import Path
+    >>> graph.to_json_file(Path("lattice.json"))
 )",
-           py::arg("filename"))
-      .def_static("from_json_file", &LatticeGraph::from_json_file, R"(
+                    py::arg("filename"));
+  lattice_graph.def_static("from_json_file",
+                           lattice_graph_from_json_file_wrapper, R"(
 Load a lattice graph from a JSON file.
 
 Args:
-    filename (str): Path to the input JSON file.
+    filename (str | pathlib.Path): Path to the input JSON file.
 
 Returns:
     LatticeGraph: New LatticeGraph instance.
+
+Examples:
+    >>> graph = LatticeGraph.from_json_file("lattice.json")
+    >>> from pathlib import Path
+    >>> graph = LatticeGraph.from_json_file(Path("lattice.json"))
 )",
-                  py::arg("filename"))
-      .def("to_hdf5_file", &LatticeGraph::to_hdf5_file, R"(
+                           py::arg("filename"));
+  lattice_graph.def("to_hdf5_file", lattice_graph_to_hdf5_file_wrapper, R"(
 Save the lattice graph to an HDF5 file.
 
 Args:
-    filename (str): Path to the output HDF5 file.
+    filename (str | pathlib.Path): Path to the output HDF5 file.
+
+Examples:
+    >>> graph.to_hdf5_file("lattice.h5")
+    >>> from pathlib import Path
+    >>> graph.to_hdf5_file(Path("lattice.h5"))
 )",
-           py::arg("filename"))
-      .def_static("from_hdf5_file", &LatticeGraph::from_hdf5_file, R"(
+                    py::arg("filename"));
+  lattice_graph.def_static("from_hdf5_file",
+                           lattice_graph_from_hdf5_file_wrapper, R"(
 Load a lattice graph from an HDF5 file.
 
 Args:
-    filename (str): Path to the input HDF5 file.
+    filename (str | pathlib.Path): Path to the input HDF5 file.
 
 Returns:
     LatticeGraph: New LatticeGraph instance.
+
+Examples:
+    >>> graph = LatticeGraph.from_hdf5_file("lattice.h5")
+    >>> from pathlib import Path
+    >>> graph = LatticeGraph.from_hdf5_file(Path("lattice.h5"))
 )",
-                  py::arg("filename"));
+                           py::arg("filename"));
+
+  // Pickling support using JSON serialization
+  lattice_graph.def(py::pickle(
+      [](const LatticeGraph &lg) -> std::string {
+        // Return JSON string for pickling
+        return lg.to_json().dump();
+      },
+      [](const std::string &json_str) -> LatticeGraph {
+        // Reconstruct from JSON string
+        return LatticeGraph::from_json(nlohmann::json::parse(json_str));
+      }));
+
+  // Data type name class attribute
+  lattice_graph.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(LatticeGraph);
 }

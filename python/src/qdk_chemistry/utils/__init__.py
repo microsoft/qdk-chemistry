@@ -10,8 +10,6 @@ from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 
 from . import model_hamiltonians
 
-# model_hamiltonians is a sub-package (utils/model_hamiltonians.py)
-
 __all__ = [
     "CaseInsensitiveStrEnum",
     "Logger",
