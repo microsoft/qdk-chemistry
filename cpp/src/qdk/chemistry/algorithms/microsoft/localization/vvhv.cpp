@@ -219,14 +219,14 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    * @param overlap_al Overlap matrix of the atom+l AO block in the
    * representation which input orbitals C are given (num_atomic_orbitals_al x
    * num_atomic_orbitals_al)
-   * @param C_al Input orbital coefficient matrix wihtin this atom+l AO
-   * block(num_atomic_orbitals_al x num_orbitals) orthonormal with respect to
+   * @param C_al Input orbital coefficient matrix within this atom+l AO
+   * block (num_atomic_orbitals_al x num_orbitals) orthonormal with respect to
    * overlap_al
    * @param num_atomic_orbitals Total number of atomic orbitals in the original
    * basis
    * @param num_atomic_orbitals_al Number of atomic orbitals in the atom+l
    * current block
-   * @param num_orbitals Number of orbitals orbitals to localize
+   * @param num_orbitals Number of orbitals to localize
    */
   void localize_proto_hv(const std::vector<int>& bf_al_ori,
                          const double* overlap_al, Eigen::MatrixXd& C_al,
