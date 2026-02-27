@@ -105,6 +105,10 @@ def _import_plugins() -> None:
         import qdk_chemistry.plugins.qiskit as qiskit_plugin  # noqa: PLC0415
 
         qiskit_plugin.load()
+    with contextlib.suppress(ImportError):
+        import qdk_chemistry.plugins.openfermion as openfermion_plugin  # noqa: PLC0415
+
+        openfermion_plugin.load()
 
 
 def _is_placeholder_stub(stub_file: Path) -> bool:
