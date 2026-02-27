@@ -120,32 +120,6 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
       minimal_basis_fp_;  // Minimal basis set in LightAIMD format
 
   /**
-   * @brief Perform canonicalization on degenerate eigenvalue blocks.
-   * Important when constructing a unique set of proto HVs without
-   * resorting to iterative localization.
-   * Computes degeneracy-breaking operator X = C^T * W * C with unique weights
-   * and canonicalizes (rotates) eigenvectors within degenerate eigenvalue
-   * blocks by diagonalizing X.
-   *
-   * @param C Input orbital coefficient matrix (num_atomic_orbitals x
-   * num_orbitals)
-   * @param S Input/output eigenvector matrix (num_orbitals x num_orbitals),
-   * typically the eigenvectors obtained from a prior diagonalization. This
-   * matrix is modified in place by rotating eigenvectors within degenerate
-   * eigenvalue blocks to obtain a canonical set.
-   * @param evals Eigenvalues associated with the columns of S; used to detect
-   * degenerate blocks. These values are updated in place to reflect the
-   * canonicalized eigenvectors where applicable.
-   * @param num_atomic_orbitals Number of atomic orbitals (rows in C and
-   * overlap_inp)
-   * @param num_orbitals Number of orbitals (columns in C)
-   * @param ortho_threshold Threshold for orthonormalization (eigenvalue cutoff)
-   */
-  void canonicalization(const double* C, double* S, Eigen::VectorXd& evals,
-                        int num_atomic_orbitals, int num_orbitals,
-                        double ortho_threshold);
-
-  /**
    * @brief Perform symmetric orthonormalization of orbital coefficients.
    *
    * Computes the overlap matrix S = C^T * overlap_inp * C, diagonalizes it,
@@ -168,16 +142,13 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    * @param error_label Label for error messages
    * @param separation_ratio Required ratio of eigenvalue[M+1]/eigenvalue[M] for
    * sufficient separation
-   * @param canonicalize bring the orbitals into canonical form by resolving the
-   * degeneracies of the overlap
    */
   void orthonormalization(int num_atomic_orbitals, int num_orbitals,
                           const double* overlap_inp, double* C, double* C_out,
                           double ortho_threshold = 1e-6,
                           unsigned int expected_near_zero = 0,
                           const std::string& error_label = "",
-                          double separation_ratio = 5.0,
-                          bool canonicalize = false);
+                          double separation_ratio = 5.0);
 
   /**
    * @brief Check the eigenvalue structure when projecting out some space.
@@ -229,37 +200,35 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    * (global row dimension for C_hv_al)
    * @param atom_index Atom index (for logging / diagnostics)
    * @param l Angular momentum quantum number (for logging / diagnostics)
-   * @param canonicalize bring the proto HVs into canonical form without
-   * performing iterative localization
    */
   void proto_hv(const Eigen::MatrixXd& overlap_ori_al,
                 const Eigen::MatrixXd& overlap_mix_al,
                 const std::vector<int>& bf_al_ori,
                 const std::vector<int>& bf_al_min, Eigen::MatrixXd& C_hv_al,
-                int num_atomic_orbitals_ori, int atom_index, int l,
-                bool canonicalize = true);
+                int num_atomic_orbitals_ori, int atom_index, int l);
 
   /**
-   * @brief Canonicalize proto hard virtuals within one atom + angular momentum
-   * block.
+   * @brief Localize orbitals within a given atom + angular momentum
+   * block using a one-shot formula without iterative localization.
    *
    * Selects the most localized AOs in the block by computing their spreads
-   * and rotates C to maximize the overlap with these AOs
+   * and rotates the input orbitals to maximize their overlap with these AOs
+   *
    * @param bf_al_ori Index list (global AO indices) for this atom+l block in
    * the original basis
-   * @param overlap_block_inp Overlap matrix of the atom+l AO block in the
+   * @param overlap_al Overlap matrix of the atom+l AO block in the
    * representation which input orbitals C are given (num_atomic_orbitals_al x
    * num_atomic_orbitals_al)
-   * @param C_block Input orbital coefficient matrix wihtin this AO
-   * block(num_atomic_orbitals_al x num_orbitals)
-   * @param num_atomic_orbitals Number of total atomic orbitals in all blocks
+   * @param C_al Input orbital coefficient matrix wihtin this atom+l AO
+   * block(num_atomic_orbitals_al x num_orbitals) orthonormal with respect to overlap_al
+   * @param num_atomic_orbitals Total number of atomic orbitals in the original basis
    * @param num_atomic_orbitals_al Number of atomic orbitals in the atom+l
    * current block
-   * @param num_orbitals Number of orbitals to canonicalize
+   * @param num_orbitals Number of orbitals orbitals to localize
    */
   void localize_proto_hv(const std::vector<int>& bf_al_ori,
-                         const double* overlap_block_inp,
-                         Eigen::MatrixXd& C_block, int num_atomic_orbitals,
+                         const double* overlap_al,
+                         Eigen::MatrixXd& C_al, int num_atomic_orbitals,
                          int num_atomic_orbitals_al, int num_orbitals);
 
   /**
@@ -567,7 +536,7 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
                                 const std::vector<int>& bf_al_min,
                                 Eigen::MatrixXd& C_hv_al,
                                 int num_atomic_orbitals_ori, int atom_index,
-                                int l, bool canonicalize) {
+                                int l) {
   QDK_LOG_TRACE_ENTERING();
   const int num_atomic_orbitals_al_ori = static_cast<int>(bf_al_ori.size());
   const int num_atomic_orbitals_al_min = static_cast<int>(bf_al_min.size());
@@ -645,13 +614,11 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
                              num_atomic_orbitals_al_min, "", 5.0);
   }
 
-  // Bring the proto HVs into canonical form by maximizing the overlap with AO
-  // basis (without performing iterative localization)
-  if (canonicalize) {
-    this->localize_proto_hv(bf_al_ori, overlap_ori_al.data(), C_psi,
-                            num_atomic_orbitals_ori, num_atomic_orbitals_al_ori,
-                            nhv_al);
-  }
+  // Localize the proto HVs by rotating them to maximize the overlap with the most
+  // localized AO basis functions
+  this->localize_proto_hv(bf_al_ori, overlap_ori_al.data(), C_psi,
+                          num_atomic_orbitals_ori, num_atomic_orbitals_al_ori,
+                          nhv_al);
 
   // Copy from C_psi to the right place in C_hv_al
   for (int i = 0; i < num_atomic_orbitals_al_ori; ++i) {
@@ -662,62 +629,68 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
 }
 
 void VVHVLocalization::localize_proto_hv(const std::vector<int>& bf_al_ori,
-                                         const double* overlap_block_inp,
-                                         Eigen::MatrixXd& C_block,
+                                         const double* overlap_al,
+                                         Eigen::MatrixXd& C_al,
                                          int num_atomic_orbitals,
                                          int num_atomic_orbitals_al,
                                          int num_orbitals) {
-  Eigen::VectorXd atomic_orbitals_spreads =
-      Eigen::VectorXd::Zero(num_atomic_orbitals);
+
+  // Get the full AO-asis representation of this atom+l block
   Eigen::MatrixXd atomic_orbitals =
-      Eigen::MatrixXd::Identity(num_atomic_orbitals, num_atomic_orbitals);
+      Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals_al);
 
-  this->calculate_orbital_spreads(atomic_orbitals, atomic_orbitals_spreads);
-
-  Eigen::VectorXd al_spreads = Eigen::VectorXd::Zero(num_atomic_orbitals_al);
-  for (int i = 0; i < num_atomic_orbitals_al; ++i) {
-    al_spreads(i) = atomic_orbitals_spreads(bf_al_ori[i]);
+  for(int i = 0; i < num_atomic_orbitals_al; ++i) {
+    atomic_orbitals(bf_al_ori[i], i) = 1;
   }
 
+  // Calculate the spreads of this atom+l AOs
+  Eigen::VectorXd al_spreads = Eigen::VectorXd::Zero(num_atomic_orbitals_al);
+  this->calculate_orbital_spreads(atomic_orbitals, al_spreads);
+  
+  // Sort the AOs in the block by spread
   auto most_localized_aos = std::vector<int>(num_atomic_orbitals_al);
   std::iota(most_localized_aos.begin(), most_localized_aos.end(), 0);
   std::sort(most_localized_aos.begin(), most_localized_aos.end(),
             [&](int i, int j) {
               return std::tie(al_spreads(i), i) < std::tie(al_spreads(j), j);
             });
-  most_localized_aos.resize(num_orbitals);
 
-  Eigen::MatrixXd localized_al =
+  // Get the num_orbitals most localized AOs in the block
+  Eigen::MatrixXd ao_localized_al =
       Eigen::MatrixXd::Zero(num_atomic_orbitals_al, num_orbitals);
   for (int j = 0; j < num_orbitals; ++j) {
-    localized_al(most_localized_aos[j], j) = 1;
+    ao_localized_al(most_localized_aos[j], j) = 1;
   }
 
+   // Form T = C_al^T * overlap_al * ao_localized_al
   Eigen::MatrixXd T = Eigen::MatrixXd::Zero(num_orbitals, num_orbitals);
   Eigen::MatrixXd temp =
       Eigen::MatrixXd::Zero(num_atomic_orbitals_al, num_orbitals);
   blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
              num_atomic_orbitals_al, num_orbitals, num_atomic_orbitals_al, 1.0,
-             overlap_block_inp, num_atomic_orbitals_al, localized_al.data(),
+             overlap_al, num_atomic_orbitals_al, ao_localized_al.data(),
              num_atomic_orbitals_al, 0.0, temp.data(), num_atomic_orbitals_al);
   blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
              num_orbitals, num_orbitals, num_atomic_orbitals_al, 1.0,
-             C_block.data(), num_atomic_orbitals_al, temp.data(),
+             C_al.data(), num_atomic_orbitals_al, temp.data(),
              num_atomic_orbitals_al, 0.0, T.data(), num_orbitals);
 
+  // Now to form Z, Z is just orthonormalized T in our case (since C_al is O-orthonormal)
   Eigen::MatrixXd Z = Eigen::MatrixXd::Zero(num_orbitals, num_orbitals);
   Eigen::MatrixXd identity =
       Eigen::MatrixXd::Identity(num_orbitals, num_orbitals);
   this->orthonormalization(num_orbitals, num_orbitals, identity.data(),
                            T.data(), Z.data(), 1e-6);
 
-  Eigen::MatrixXd C_canon =
+  // Form the localized proto HVs in this atom+l block
+  // Using the trace-maximizing rotation formula
+  Eigen::MatrixXd C_loc =
       Eigen::MatrixXd::Zero(num_atomic_orbitals_al, num_orbitals);
   blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
              num_atomic_orbitals_al, num_orbitals, num_orbitals, 1.0,
-             C_block.data(), num_atomic_orbitals_al, Z.data(), num_orbitals,
-             0.0, C_canon.data(), num_atomic_orbitals_al);
-  C_block.block(0, 0, num_atomic_orbitals_al, num_orbitals) = C_canon;
+             C_al.data(), num_atomic_orbitals_al, Z.data(), num_orbitals,
+             0.0, C_loc.data(), num_atomic_orbitals_al);
+  C_al.block(0, 0, num_atomic_orbitals_al, num_orbitals) = C_loc;
 }
 
 Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
@@ -875,7 +848,7 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
       Eigen::MatrixXd C_hv_al =
           Eigen::MatrixXd::Zero(num_atomic_orbitals_ori, nhv_al);
       this->proto_hv(overlap_ori_al, overlap_mix_al, bf_al_ori, bf_al_min,
-                     C_hv_al, num_atomic_orbitals_ori, atom_a, l, true);
+                     C_hv_al, num_atomic_orbitals_ori, atom_a, l);
       // place C_hv_al into proto_hv
       proto_hv.block(0, proto_hv_idx, num_atomic_orbitals_ori, nhv_al) =
           C_hv_al;
@@ -1106,96 +1079,11 @@ void VVHVLocalization::calculate_orbital_spreads(
   }
 }
 
-void VVHVLocalization::canonicalization(const double* C, double* S,
-                                        Eigen::VectorXd& evals,
-                                        int num_atomic_orbitals,
-                                        int num_orbitals,
-                                        double ortho_threshold) {
-  QDK_LOG_TRACE_ENTERING();
-
-  // Construct an orbital-independent operator X to lift degeneracies in
-  // S-degenerate blocks
-  Eigen::MatrixXd temp =
-      Eigen::MatrixXd::Zero(num_orbitals, num_atomic_orbitals);
-  Eigen::MatrixXd X = Eigen::MatrixXd::Zero(num_orbitals, num_orbitals);
-  {
-    // Use weights W_ii = i + 1 (normalized such that sum of weights is 1)
-    // But any non-degenerate diagonal will work as long as [overlap,W] != 0
-    Eigen::VectorXd weights = Eigen::VectorXd::Zero(num_atomic_orbitals);
-    weights.setLinSpaced(num_atomic_orbitals, 1, num_atomic_orbitals);
-    weights /= weights.norm();
-
-    temp =
-        Eigen::Map<const Eigen::MatrixXd>(C, num_atomic_orbitals, num_orbitals)
-            .transpose();
-    for (auto i = 0; i < num_atomic_orbitals; i++) {
-      temp.col(i) *= weights(i);
-    }
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-               num_orbitals, num_orbitals, num_atomic_orbitals, 1.0,
-               temp.data(), num_orbitals, C, num_atomic_orbitals, 0.0, X.data(),
-               num_orbitals);
-  }
-
-  // Find degenerate eigenvalue blocks of S
-  std::vector<std::vector<int>> blocks;
-  {
-    blocks.emplace_back();
-    blocks.back().push_back(0);
-
-    for (auto i = 1; i < num_orbitals; ++i) {
-      if (evals(i) - evals(i - 1) < ortho_threshold) {
-        blocks.back().push_back(i);
-      } else {
-        blocks.emplace_back();
-        blocks.back().push_back(i);
-      }
-    }
-  }
-
-  // Canonicalize within degenerate eigenvalue blocks of S
-  for (const auto& block : blocks) {
-    // Find end of current degenerate block (within ortho_threshold)
-    auto block_begin = block[0];
-    auto block_size = block.size();
-
-    double* S_block = S + block_begin * num_orbitals;
-    // R = S_block^T * X * S_block
-    Eigen::MatrixXd R = Eigen::MatrixXd::Zero(block_size, block_size);
-    {
-      blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-                 block_size, num_orbitals, num_orbitals, 1.0, S_block,
-                 num_orbitals, X.data(), num_orbitals, 0.0, temp.data(),
-                 block_size);
-      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-                 block_size, block_size, num_orbitals, 1.0, temp.data(),
-                 block_size, S_block, num_orbitals, 0.0, R.data(), block_size);
-    }
-
-    // Diagonalize X in this block
-    Eigen::VectorXd block_eigenvalues = Eigen::VectorXd::Zero(block_size);
-    lapack::syev(
-        lapack::Job::Vec, lapack::Uplo::Lower, block_size, R.data(), block_size,
-        block_eigenvalues.data());  // R now contains S_block eigenvectors WRT X
-
-    // Rotate block into X-canonical form (up to a sign)
-    // S_block = S_block * R  (R contains the eigenvectors of X in this block)
-    {
-      Eigen::MatrixXd temp2 =
-          Eigen::Map<Eigen::MatrixXd>(S_block, num_orbitals, block_size);
-      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-                 num_orbitals, block_size, block_size, 1.0, temp2.data(),
-                 num_orbitals, R.data(), block_size, 0.0, S_block,
-                 num_orbitals);
-    }
-  }
-}
-
 void VVHVLocalization::orthonormalization(
     int num_atomic_orbitals, int num_orbitals, const double* overlap_inp,
     double* C, double* C_out, double ortho_threshold,
     unsigned int expected_near_zero, const std::string& error_label,
-    double separation_ratio, bool canonicalize) {
+    double separation_ratio) {
   QDK_LOG_TRACE_ENTERING();
 
   // Compute overlap matrix S = C^T * overlap_inp * C
@@ -1218,11 +1106,7 @@ void VVHVLocalization::orthonormalization(
   lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_orbitals, S.data(),
                num_orbitals,
                eigenvalues.data());  // S now contains eigenvectors U
-  if (canonicalize) {
-    // Canonicalize degenerate blocks of S
-    canonicalization(C, S.data(), eigenvalues, num_atomic_orbitals,
-                     num_orbitals, ortho_threshold);
-  }
+
   if (expected_near_zero > 0) {
     // Check eigenvalue structure if selection needed
     VVHVLocalization::check_eigenvalue_structure(
