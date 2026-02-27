@@ -95,15 +95,15 @@ static void apply_restricted_open_shell_orbital_rotation(
   const int wa_size = num_open_orbitals * num_virtual_orbitals;
   const int ia_size = num_closed_orbitals * num_virtual_orbitals;
 
-  const RowMajorMatrix kappa_iw = Eigen::Map<const RowMajorMatrix>(
+  const auto kappa_iw = Eigen::Map<const RowMajorMatrix>(
       kappa_vector.data() + offset, num_closed_orbitals, num_open_orbitals);
   offset += iw_size;
 
-  const RowMajorMatrix kappa_wa = Eigen::Map<const RowMajorMatrix>(
+  const auto kappa_wa = Eigen::Map<const RowMajorMatrix>(
       kappa_vector.data() + offset, num_open_orbitals, num_virtual_orbitals);
   offset += wa_size;
 
-  const RowMajorMatrix kappa_ia = Eigen::Map<const RowMajorMatrix>(
+  const auto kappa_ia = Eigen::Map<const RowMajorMatrix>(
       kappa_vector.data() + offset, num_closed_orbitals, num_virtual_orbitals);
   offset += ia_size;
 
@@ -111,22 +111,25 @@ static void apply_restricted_open_shell_orbital_rotation(
       RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
 
   kappa_complete.block(0, num_closed_orbitals, num_closed_orbitals,
-                       num_open_orbitals) = kappa_iw / 2.0;
+                       num_open_orbitals) = kappa_iw;
   kappa_complete.block(num_closed_orbitals, 0, num_open_orbitals,
-                       num_closed_orbitals) = -kappa_iw.transpose() / 2.0;
+                       num_closed_orbitals) = -kappa_iw.transpose();
 
   const int open_start = num_closed_orbitals;
   const int virtual_start = num_closed_orbitals + num_open_orbitals;
 
   kappa_complete.block(open_start, virtual_start, num_open_orbitals,
-                       num_virtual_orbitals) = kappa_wa / 2.0;
+                       num_virtual_orbitals) = kappa_wa;
   kappa_complete.block(virtual_start, open_start, num_virtual_orbitals,
-                       num_open_orbitals) = -kappa_wa.transpose() / 2.0;
+                       num_open_orbitals) = -kappa_wa.transpose();
 
   kappa_complete.block(0, virtual_start, num_closed_orbitals,
-                       num_virtual_orbitals) = kappa_ia / 2.0;
+                       num_virtual_orbitals) = kappa_ia;
   kappa_complete.block(virtual_start, 0, num_virtual_orbitals,
-                       num_closed_orbitals) = -kappa_ia.transpose() / 2.0;
+                       num_closed_orbitals) = -kappa_ia.transpose();
+
+  // 0.5 is for consistency with the gradient definition
+  kappa_complete *= 0.5;
 
   RowMajorMatrix exp_kappa =
       RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
@@ -437,17 +440,27 @@ double GDMLineFunctor::eval(const Eigen::VectorXd& x) {
   for (int i = 0; i < num_density_matrices_; i++) {
     const int num_occupied_orbitals = num_electrons_[i];
     const double occupation_factor =
-        (scf_orbital_type_ == SCFOrbitalType::Unrestricted) ? 1.0 : 2.0;
+        (scf_orbital_type_ == SCFOrbitalType::Restricted) ? 2.0 : 1.0;
+    auto P_block =
+        cached_P_.block(num_molecular_orbitals_ * i, 0, num_molecular_orbitals_,
+                        num_molecular_orbitals_);
 
-    cached_P_.block(num_molecular_orbitals_ * i, 0, num_molecular_orbitals_,
-                    num_molecular_orbitals_) =
-        occupation_factor *
-        cached_C_.block(num_molecular_orbitals_ * i, 0, num_molecular_orbitals_,
-                        num_occupied_orbitals) *
-        cached_C_
-            .block(num_molecular_orbitals_ * i, 0, num_molecular_orbitals_,
-                   num_occupied_orbitals)
-            .transpose();
+    double* C_block_data = nullptr;
+    if (scf_orbital_type_ == SCFOrbitalType::RestrictedOpenShell) {
+      auto C_block =
+          cached_C_.block(0, 0, num_molecular_orbitals_, num_occupied_orbitals);
+      C_block_data = C_block.data();
+    } else {
+      auto C_block =
+          cached_C_.block(num_molecular_orbitals_ * i, 0,
+                          num_molecular_orbitals_, num_occupied_orbitals);
+      C_block_data = C_block.data();
+    }
+    blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::Trans,
+               num_molecular_orbitals_, num_molecular_orbitals_,
+               num_occupied_orbitals, occupation_factor, C_block_data,
+               num_molecular_orbitals_, C_block_data, num_molecular_orbitals_,
+               0.0, P_block.data(), num_molecular_orbitals_);
   }
 
   // Evaluate energy and Fock matrix using trial density matrix
@@ -612,11 +625,6 @@ class GDM {
 
   /// Generalized Fock matrix in MO basis for ROHF
   RowMajorMatrix generalized_fock_mo_;
-
-  /// Horizontal rotation matrix of occupied orbitals
-  RowMajorMatrix Uoo_;
-  /// Horizontal rotation matrix of virtual orbitals
-  RowMajorMatrix Uvv_;
 
   Eigen::VectorXd kappa_;  // vertical rotation matrix of this step
 
@@ -807,22 +815,23 @@ void GDM::generate_pseudo_canonical_orbital_(
   // Perform pseudo-canonical transformation and BFGS
   // Obtain pseudo-canonical orbitals. Foo and Fvv are symmetric matrices, but
   // the output eigenvectors are column-major
-  Uoo_ = F_MO.block(0, 0, num_occupied_orbitals, num_occupied_orbitals);
-  Uvv_ = F_MO.block(num_occupied_orbitals, num_occupied_orbitals,
-                    num_virtual_orbitals, num_virtual_orbitals);
+  RowMajorMatrix Uoo =
+      F_MO.block(0, 0, num_occupied_orbitals, num_occupied_orbitals);
+  RowMajorMatrix Uvv = F_MO.block(num_occupied_orbitals, num_occupied_orbitals,
+                                  num_virtual_orbitals, num_virtual_orbitals);
 
   // Compute eigenvalues/eigenvectors of occupied-occupied and virtual-virtual
   // blocks for pseudo-canonical orbital transformation
   lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_occupied_orbitals,
-               Uoo_.data(), num_occupied_orbitals,
+               Uoo.data(), num_occupied_orbitals,
                pseudo_canonical_eigenvalues_.data());
   lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_virtual_orbitals,
-               Uvv_.data(), num_virtual_orbitals,
+               Uvv.data(), num_virtual_orbitals,
                pseudo_canonical_eigenvalues_.data() + num_occupied_orbitals);
 
   // Transpose to convert column-major eigenvectors to row-major format
-  Uoo_.transposeInPlace();
-  Uvv_.transposeInPlace();
+  Uoo.transposeInPlace();
+  Uvv.transposeInPlace();
 
   // Transform occupied orbitals
   auto C_occ_view = C.block(num_molecular_orbitals * spin_index, 0,
@@ -831,7 +840,7 @@ void GDM::generate_pseudo_canonical_orbital_(
   blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
              num_molecular_orbitals, num_occupied_orbitals,
              num_occupied_orbitals, 1.0, C_occ.data(), num_occupied_orbitals,
-             Uoo_.data(), num_occupied_orbitals, 0.0, C_occ_view.data(),
+             Uoo.data(), num_occupied_orbitals, 0.0, C_occ_view.data(),
              num_molecular_orbitals);
 
   // Transform virtual orbitals
@@ -841,15 +850,15 @@ void GDM::generate_pseudo_canonical_orbital_(
   RowMajorMatrix C_virt = C_virt_view.eval();
   blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
              num_molecular_orbitals, num_virtual_orbitals, num_virtual_orbitals,
-             1.0, C_virt.data(), num_virtual_orbitals, Uvv_.data(),
+             1.0, C_virt.data(), num_virtual_orbitals, Uvv.data(),
              num_virtual_orbitals, 0.0, C_virt_view.data(),
              num_molecular_orbitals);
 
   // Transform the vectors in history_kappa and history_dgrad to
   // accommodate current pseudo-canonical orbitals
-  transform_history_(history_kappa_spin, Uoo_, Uvv_, history_size_,
+  transform_history_(history_kappa_spin, Uoo, Uvv, history_size_,
                      num_occupied_orbitals, num_molecular_orbitals);
-  transform_history_(history_dgrad_spin, Uoo_, Uvv_, history_size_,
+  transform_history_(history_dgrad_spin, Uoo, Uvv, history_size_,
                      num_occupied_orbitals, num_molecular_orbitals);
 
   // Transform the gradient to accommodate current pseudo-canonical orbitals
@@ -857,7 +866,7 @@ void GDM::generate_pseudo_canonical_orbital_(
       Eigen::Map<RowMajorMatrix>(current_gradient_spin.data(),
                                  num_occupied_orbitals, num_virtual_orbitals);
   RowMajorMatrix current_gradient_transformed_matrix =
-      Uoo_.transpose() * current_gradient_matrix * Uvv_;
+      Uoo.transpose() * current_gradient_matrix * Uvv;
   Eigen::VectorXd current_gradient_transformed = Eigen::Map<Eigen::VectorXd>(
       current_gradient_transformed_matrix.data(), rotation_size);
   current_gradient_spin = current_gradient_transformed;
