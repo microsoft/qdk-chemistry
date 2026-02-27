@@ -18,6 +18,7 @@ The example starts with a molecular structure and ends with an energy estimation
 The focus of this example is on high-level concepts and common coding patterns that can be extended to other applications.
 
 You can also view a related code sample in a Jupyter notebook format, along with several other examples, in the `examples folder <https://github.com/microsoft/qdk-chemistry/blob/main/examples/>`_ of the GitHub repository.
+Companion chemistry datasets and supporting assets are also available in `microsoft/qdk-chemistry-data <https://github.com/microsoft/qdk-chemistry-data>`_.
 
 Create a Structure object
 ^^^^^^^^^^^^^^^^^^^^^^^^^

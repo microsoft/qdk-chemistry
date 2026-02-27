@@ -70,6 +70,11 @@ Access to State-of-the-Art Algorithms
    glossary
    references
 
+Companion repositories
+----------------------
+
+- `microsoft/qdk-chemistry-data <https://github.com/microsoft/qdk-chemistry-data>`_: Curated datasets and supporting materials for QDK/Chemistry.
+
 Citing QDK/Chemistry
 =====================
 
