@@ -636,6 +636,7 @@ void VVHVLocalization::localize_proto_hv(const std::vector<int>& bf_al_ori,
                                          int num_atomic_orbitals,
                                          int num_atomic_orbitals_al,
                                          int num_orbitals) {
+  QDK_LOG_TRACE_ENTERING();
   // Get the full AO-basis representation of this atom+l block
   Eigen::MatrixXd atomic_orbitals =
       Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals_al);
