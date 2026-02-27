@@ -699,7 +699,7 @@ TEST_F(LocalizationTest, O2TripletVVHV) {
               testing::localization_tolerance);
 }
 
-auto scramble_basis_shells(std::shared_ptr<BasisSet> basis) {
+static auto scramble_basis_shells(std::shared_ptr<BasisSet> basis) {
   std::vector<Shell> shells = basis->get_shells();
 
   auto sort_shell_primitives = [](Shell& shell) {
