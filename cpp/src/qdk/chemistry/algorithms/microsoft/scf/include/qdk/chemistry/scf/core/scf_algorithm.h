@@ -14,7 +14,6 @@ namespace qdk::chemistry::scf {
 
 // Forward declaration
 class SCFImpl;
-
 /**
  * @brief Base class for SCF iteration algorithms
  *
@@ -35,7 +34,7 @@ class SCFAlgorithm {
   /**
    * @brief Default destructor
    */
-  virtual ~SCFAlgorithm() noexcept = default;
+  virtual ~SCFAlgorithm() noexcept;
 
   /**
    * @brief Perform one iteration of the SCF algorithm
@@ -73,7 +72,7 @@ class SCFAlgorithm {
 
   /**
    * @brief Solve the eigenvalue problem for the Fock matrix and update
-   * eigenvalues, molecular coefficients, and density matrix
+   * eigenvalues and molecular coefficients
    *
    * Solves the generalized eigenvalue problem F*C = S*C*E using the
    * orthogonalization matrix to transform to an orthogonal basis.
@@ -91,13 +90,28 @@ class SCFAlgorithm {
    * @param[in] num_molecular_orbitals Number of molecular orbitals
    * @param[in] idx_spin Density matrix index (0 for alpha or restricted, 1 for
    * beta)
-   * @param[in] unrestricted Whether calculation is unrestricted
    */
   virtual void solve_fock_eigenproblem(
       const RowMajorMatrix& F, const RowMajorMatrix& S, const RowMajorMatrix& X,
       RowMajorMatrix& C, RowMajorMatrix& eigenvalues, RowMajorMatrix& P,
       const int num_occupied_orbitals[2], int num_atomic_orbitals,
-      int num_molecular_orbitals, int idx_spin, bool unrestricted);
+      int num_molecular_orbitals, int idx_spin);
+
+  /**
+   * @brief Update the density matrix for restricted or unrestricted
+   * calculations. For ASAHF and ROHF calculations, this method will be
+   * overridden to implement the specific density matrix construction for those
+   * methods.
+   *
+   * @param[in,out] P Reference to the density matrix to be updated
+   * @param[in] C Reference to the molecular orbital coefficients
+   * @param[in] unrestricted Flag indicating if the calculation is unrestricted
+   * @param[in] nelec_alpha Number of alpha electrons
+   * @param[in] nelec_beta Number of beta electrons
+   */
+  virtual void update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
+                                     bool unrestricted, int nelec_alpha,
+                                     int nelec_beta);
 
   /**
    * @brief Calculate orbital gradient (OG) error for convergence checking
@@ -113,14 +127,15 @@ class SCFAlgorithm {
    * @param[in] S Overlap matrix (num_atomic_orbitals × num_atomic_orbitals)
    * @param[out] error_matrix Output matrix to store calculated error (will be
    * resized)
-   * @param[in] unrestricted Whether the calculation is unrestricted
+   * @param[in] num_orbital_sets Number of spin blocks supplied (1 for RHF /
+   * ROHF, 2 for UHF)
    * @return Infinity norm of the error matrix
    */
   static double calculate_og_error_(const RowMajorMatrix& F,
                                     const RowMajorMatrix& P,
                                     const RowMajorMatrix& S,
                                     RowMajorMatrix& error_matrix,
-                                    bool unrestricted);
+                                    int num_orbital_sets);
 
  protected:
   const SCFContext& ctx_;  ///< Reference to SCF context
