@@ -58,6 +58,7 @@ The following extras are available:
 | `jupyter` | Jupyter notebook support | ipykernel, pandas, pyscf |
 | `plugins` | Third-party quantum chemistry backends | PySCF |
 | `qiskit-extras` | Optional Qiskit ecosystem packages | qiskit-aer, qiskit-nature |
+| `openfermion-extras` | OpenFermion qubit mappings and Cirq circuit interop | openfermion, cirq-core |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
 | `all` | All of the above | All optional dependencies |
 
@@ -73,6 +74,12 @@ To install with all optional Qiskit ecosystem packages:
 
 ```bash
 python -m pip install 'qdk-chemistry[qiskit-extras]'
+```
+
+To install with OpenFermion support (qubit mappings and Cirq circuit conversion):
+
+```bash
+python -m pip install 'qdk-chemistry[openfermion-extras]'
 ```
 
 To install everything:

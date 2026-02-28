@@ -13,8 +13,8 @@ using different mapping strategies ("jordan-wigner", "bravyi-kitaev",
 import numpy as np
 import openfermion as of
 
-from qdk_chemistry.algorithms.qubit_mapper import QubitMapper
-from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Settings
+from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
+from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
 from qdk_chemistry.plugins.openfermion.conversion import (
     hamiltonian_to_fermion_operator,
     hamiltonian_to_interaction_operator,
@@ -33,33 +33,20 @@ _VALID_ENCODINGS = [
 ]
 
 
-class OpenFermionQubitMapperSettings(Settings):
+class OpenFermionQubitMapperSettings(QubitMapperSettings):
     """Settings configuration for an OpenFermionQubitMapper.
 
-    OpenFermionQubitMapper-specific settings:
-        encoding (string, default="jordan-wigner"): Qubit mapping strategy to use.
+    Inherits ``encoding`` from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.
 
-            Valid options: ``"jordan-wigner"``, ``"bravyi-kitaev"``,
-            ``"symmetry-conserving-bravyi-kitaev"``, ``"bravyi-kitaev-fast"``,
-            ``"bravyi-kitaev-tree"``
-
-        n_active_electrons (integer, default=0): Number of active electrons. Required for
-            the ``"symmetry-conserving-bravyi-kitaev"`` encoding. If set to 0, the mapper
-            will attempt to infer it from the Hamiltonian's orbital data.
+    Additional settings:
+        n_active_electrons (integer, default=0): Required for ``symmetry-conserving-bravyi-kitaev`` (0 = auto-detect).
 
     """
 
     def __init__(self):
         """Initialize OpenFermionQubitMapperSettings."""
         Logger.trace_entering()
-        super().__init__()
-        self._set_default(
-            "encoding",
-            "string",
-            "jordan-wigner",
-            "Qubit mapping strategy to use",
-            _VALID_ENCODINGS,
-        )
+        super().__init__(valid_encodings=_VALID_ENCODINGS)
         self._set_default(
             "n_active_electrons",
             "int",

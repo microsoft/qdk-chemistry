@@ -4,10 +4,9 @@ This module provides functions to convert between Cirq circuits and QDK/Chemistr
 ``Circuit`` objects (which wrap OpenQASM 3 strings). Conversion is performed by
 generating OpenQASM 2.0 from Cirq and upgrading the syntax to OpenQASM 3.
 
-Functions:
-    cirq_circuit_to_qasm3: Convert a Cirq ``Circuit`` to an OpenQASM 3 string.
-    cirq_circuit_to_qdk_circuit: Convert a Cirq ``Circuit`` to a QDK ``Circuit``.
-    qdk_circuit_to_cirq_circuit: Convert a QDK ``Circuit`` to a Cirq ``Circuit`` (via QASM 2 round-trip).
+- ``cirq_circuit_to_qasm3``: Convert a Cirq ``Circuit`` to an OpenQASM 3 string.
+- ``cirq_circuit_to_qdk_circuit``: Convert a Cirq ``Circuit`` to a QDK ``Circuit``.
+- ``qdk_circuit_to_cirq_circuit``: Convert a QDK ``Circuit`` to a Cirq ``Circuit`` (via QASM 2 round-trip).
 """
 
 # --------------------------------------------------------------------------------------------
@@ -145,8 +144,7 @@ def cirq_circuit_to_qdk_circuit(
 
     Args:
         circuit: The Cirq circuit to convert.
-        encoding: Optional encoding label (e.g., ``"jordan-wigner"``) to attach
-            to the resulting ``Circuit``.
+        encoding: Optional encoding label (e.g., ``"jordan-wigner"``) to attach to the resulting ``Circuit``.
 
     Returns:
         Circuit: A QDK/Chemistry ``Circuit`` wrapping the OpenQASM 3 string.

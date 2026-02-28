@@ -33,6 +33,14 @@ Currently available plugin packages:
   cluster calculators, orbital localization, active space selection (AVAS), and
   stability analysis.
 
+* :mod:`qdk_chemistry.plugins.qiskit`: Qiskit integration providing qubit mapping,
+  circuit execution, energy estimation, and state preparation.
+
+* :mod:`qdk_chemistry.plugins.openfermion`: OpenFermion integration providing qubit
+  mapping via five fermion-to-qubit encodings (Jordan-Wigner, Bravyi-Kitaev,
+  symmetry-conserving Bravyi-Kitaev, Bravyi-Kitaev fast, and Bravyi-Kitaev tree),
+  bidirectional Hamiltonian/operator conversion, and Cirq circuit interoperability.
+
 Using Plugins
 -------------
 Plugins are used by importing the plugin module (which auto-registers implementations)
@@ -48,6 +56,12 @@ Examples:
     >>> scf_solver.settings()["max_iterations"] = 50
     >>> energy, orbitals = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
 
+    >>> # Import the OpenFermion plugin to register its implementations
+    >>> import qdk_chemistry.plugins.openfermion  # noqa: F401
+    >>> # Create an OpenFermion qubit mapper through the registry
+    >>> mapper = create("qubit_mapper", "openfermion", encoding="jordan-wigner")
+    >>> qubit_hamiltonian = mapper.run(hamiltonian)
+
 Notes:
     Plugin modules may have additional dependencies beyond core QDK/Chemistry.
     For example, the PySCF plugin requires the `pyscf` package to be installed
@@ -56,6 +70,8 @@ Notes:
 See Also:
     :mod:`qdk_chemistry.algorithms`: Algorithm base classes and registry system
     :mod:`qdk_chemistry.plugins.pyscf`: PySCF integration plugin
+    :mod:`qdk_chemistry.plugins.qiskit`: Qiskit integration plugin
+    :mod:`qdk_chemistry.plugins.openfermion`: OpenFermion integration plugin
 
 """
 # --------------------------------------------------------------------------------------------

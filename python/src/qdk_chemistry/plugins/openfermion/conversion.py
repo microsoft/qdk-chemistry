@@ -1,10 +1,10 @@
 """Conversion utilities for QDK Chemistry to OpenFermion interoperability.
 
 This module provides functions to convert between QDK/Chemistry data structures
-and OpenFermion operator representations, including:
+and OpenFermion operator representations:
 
-- Hamiltonian → InteractionOperator / FermionOperator
-- QubitOperator ↔ QubitHamiltonian
+- Hamiltonian to InteractionOperator / FermionOperator
+- QubitOperator to/from QubitHamiltonian
 """
 
 # --------------------------------------------------------------------------------------------
@@ -199,8 +199,7 @@ def qubit_operator_to_qubit_hamiltonian(
 
     Args:
         qubit_op: The OpenFermion QubitOperator to convert.
-        encoding: Optional encoding label (e.g., ``"jordan-wigner"``) to attach
-            to the resulting QubitHamiltonian.
+        encoding: Optional encoding label (e.g., ``"jordan-wigner"``) to attach to the resulting QubitHamiltonian.
 
     Returns:
         QubitHamiltonian: A QDK/Chemistry QubitHamiltonian.

@@ -18,34 +18,24 @@ from qiskit_nature.second_q.mappers import (
     ParityMapper,
 )
 
-from qdk_chemistry.algorithms.qubit_mapper import QubitMapper
-from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Settings
+from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
+from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
 from qdk_chemistry.utils import Logger
 
 __all__ = ["QiskitQubitMapper", "QiskitQubitMapperSettings"]
 
 
-class QiskitQubitMapperSettings(Settings):
+class QiskitQubitMapperSettings(QubitMapperSettings):
     """Settings configuration for a QiskitQubitMapper.
 
-    QiskitQubitMapper-specific settings:
-        encoding (string, default="jordan-wigner"): Qubit mapping strategy to use.
-
-            Valid options: "jordan-wigner", "bravyi-kitaev", "parity"
+    Inherits ``encoding`` from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.
 
     """
 
     def __init__(self):
         """Initialize QiskitQubitMapperSettings."""
         Logger.trace_entering()
-        super().__init__()
-        self._set_default(
-            "encoding",
-            "string",
-            "jordan-wigner",
-            "Qubit mapping strategy to use",
-            ["jordan-wigner", "bravyi-kitaev", "parity"],
-        )
+        super().__init__(valid_encodings=["jordan-wigner", "bravyi-kitaev", "parity"])
 
 
 class QiskitQubitMapper(QubitMapper):

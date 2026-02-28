@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper
-from qdk_chemistry.data import PauliTermAccumulator, Settings
+from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper, QubitMapperSettings
+from qdk_chemistry.data import PauliTermAccumulator
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.utils import Logger
 
@@ -180,32 +180,21 @@ def _bk_compute_z_indices_for_y_component(j: int, n: int) -> frozenset[int]:
     return parity - flip  # Set difference, not symmetric difference
 
 
-class QdkQubitMapperSettings(Settings):
+class QdkQubitMapperSettings(QubitMapperSettings):
     """Settings configuration for a QdkQubitMapper.
 
-    QdkQubitMapper-specific settings:
-        encoding (string, default="jordan-wigner"): Fermion-to-qubit encoding type.
-            Valid options: "jordan-wigner", "bravyi-kitaev"
+    Inherits ``encoding`` from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.
 
+    Additional settings:
         threshold (double, default=1e-12): Threshold for pruning small Pauli coefficients.
-
         integral_threshold (double, default=1e-12): Threshold for filtering small integrals.
-            Integrals with absolute value below this threshold are treated as zero.
-            This significantly improves performance when integrals contain floating-point noise.
 
     """
 
     def __init__(self) -> None:
         """Initialize QdkQubitMapperSettings."""
         Logger.trace_entering()
-        super().__init__()
-        self._set_default(
-            "encoding",
-            "string",
-            "jordan-wigner",
-            "Fermion-to-qubit encoding type",
-            ["jordan-wigner", "bravyi-kitaev"],
-        )
+        super().__init__(valid_encodings=["jordan-wigner", "bravyi-kitaev"])
         self._set_default(
             "threshold",
             "double",

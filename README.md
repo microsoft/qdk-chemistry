@@ -13,6 +13,7 @@ QDK/Chemistry provides a comprehensive suite of tools for:
 - Basis set management
 - Configuration and settings management
 - High-performance quantum algorithms
+- Integration with external frameworks (OpenFermion, Qiskit, PySCF) through a plugin system
 
 ## Documentation
 
