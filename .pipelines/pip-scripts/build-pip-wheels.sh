@@ -131,8 +131,9 @@ cd python
 
 # Build wheel with all necessary CMake flags
 if [ "$MAC_BUILD" == "OFF" ]; then
-    export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
-    export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
+    # We need to include the -g flag so that we can publish our symbols internally
+    export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden -g"
+    export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden -g"
     export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
     python3 -m build --wheel \
         -C build-dir="build/{wheel_tag}" \
@@ -170,10 +171,18 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     rm "$WHEEL_FILE"
     (cd "$TEMP_DIR" && python3 -m zipfile -c "$FULL_WHEEL_PATH" .)
     rm -rf "$TEMP_DIR"
+    export tostripfile="build/cp*/_core.*.so"
+    export debugdir="debug_symbols"
+    export debugfile="_core.so.debug"
+    mkdir -p "${debugdir}"
+
+    objcopy --only-keep-debug "${tostripfile}" "${debugdir}/${debugfile}"
+    strip --strip-debug --strip-unneeded "${tostripfile}"
+    objcopy --add-gnu-debuglink="${debugdir}/${debugfile}" "${tostripfile}"
 
 elif [ "$MAC_BUILD" == "ON" ]; then
-    export CMAKE_C_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin"
-    export CMAKE_CXX_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin"
+    export CMAKE_C_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin -g"
+    export CMAKE_CXX_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin -g"
     python3 -m build --wheel \
         -C build-dir="build/{wheel_tag}" \
         -C cmake.define.QDK_UARCH=native \
@@ -192,5 +201,16 @@ elif [ "$MAC_BUILD" == "ON" ]; then
     delocate-listdeps --all repaired_wheelhouse/qdk_chemistry*.whl
 
     echo "Checking shared dependencies..."
-    otool -L build/cp*/_core.*.so
+    otool -L build/cp*/_core.*.so]
+    
+    export tostripfile="build/cp*/_core.*.so"
+    export debugdir="debug_symbols"
+    export debugfile="_core.so"
+    mkdir -p "${debugdir}"
+
+    # Create external debug symbols
+    dsymutil "${tostripfile}" -o "${debugdir}/${debugfile}.dSYM"
+
+    # Strip binary (pick level as needed)
+    strip -S -x "${tostripfile}"
 fi

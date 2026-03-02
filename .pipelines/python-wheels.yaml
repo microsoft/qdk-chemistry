@@ -213,6 +213,13 @@ extends:
               python3 -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
             displayName: Upload wheel with twine
             condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
+          
+          - task: PublishSymbols@2
+            displayName: Publish debug symbols
+            inputs:
+              SymbolsFolder: '$(System.DefaultWorkingDirectory)/debug_symbols/*'
+              IndexSources: True
+              SymbolServerType: 'TeamServices'
 
     - stage: Approval
       displayName: Approval
