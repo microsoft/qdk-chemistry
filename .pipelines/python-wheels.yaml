@@ -213,14 +213,15 @@ extends:
               python3 -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
             displayName: Upload wheel with twine
             condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
-          
-          - ${{ if eq(target.os, 'linux') }}:
+
+          # Publishing debug symbols is not supported for macOS
+          - ${{ if and( eq(target.os, 'linux'), eq(target.arch, 'x86_64') ) }}:
             - task: PublishSymbols@2
               displayName: Publish debug symbols
               inputs:
-                SymbolsFolder: '$(System.DefaultWorkingDirectory)/python/debug_symbols'
+                SymbolsFolder: $(System.DefaultWorkingDirectory)/python/debug_symbols
                 IndexSources: true
-                SymbolServerType: 'TeamServices'
+                SymbolServerType: TeamServices
                 SearchPattern: '**/*.debug'
                 publishLinuxSymbols: true
 
