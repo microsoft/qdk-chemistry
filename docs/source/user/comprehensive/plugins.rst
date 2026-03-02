@@ -163,7 +163,7 @@ Alternatively, you can install them directly:
 
 .. code-block:: bash
 
-   pip install openfermion cirq-core
+   pip install openfermion cirq-core ply
 
 **Checking what is loaded:**
 

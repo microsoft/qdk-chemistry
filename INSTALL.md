@@ -76,7 +76,7 @@ To install with all optional Qiskit ecosystem packages:
 python -m pip install 'qdk-chemistry[qiskit-extras]'
 ```
 
-To install with OpenFermion support (qubit mappings and Cirq circuit conversion):
+To install with OpenFermion support:
 
 ```bash
 python -m pip install 'qdk-chemistry[openfermion-extras]'

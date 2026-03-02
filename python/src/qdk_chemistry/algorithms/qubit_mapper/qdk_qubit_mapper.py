@@ -183,7 +183,7 @@ def _bk_compute_z_indices_for_y_component(j: int, n: int) -> frozenset[int]:
 class QdkQubitMapperSettings(QubitMapperSettings):
     """Settings configuration for a QdkQubitMapper.
 
-    Inherits ``encoding`` from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.
+    Inherits base settings from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.
 
     Additional settings:
         threshold (double, default=1e-12): Threshold for pruning small Pauli coefficients.
