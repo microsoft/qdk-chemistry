@@ -170,7 +170,6 @@ class TestTrotter:
         # Compare: the error should scale as O(t^2) for first-order Trotter
         assert np.allclose(u_trot, u_exact, atol=t**2)
 
-
     # Second-order Trotter tests.
     def test_single_step_construction_second_order(self):
         """Test construction of time evolution unitary with a single Trotter step."""

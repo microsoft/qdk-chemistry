@@ -77,7 +77,7 @@ def trotter_steps_naive(
     """
     if target_accuracy <= 0:
         raise ValueError(f"target_accuracy must be positive, got {target_accuracy}.")
-    if order != 1 and order != 2:
+    if order not in {1, 2}:
         raise NotImplementedError(
             f"Trotter step estimation for order {order} is not yet implemented. "
             "Only orders 1 or 2 are currently supported."
@@ -130,7 +130,7 @@ def trotter_steps_commutator(
     """
     if target_accuracy <= 0:
         raise ValueError(f"target_accuracy must be positive, got {target_accuracy}.")
-    if order != 1 and order != 2:
+    if order not in {1, 2}:
         raise NotImplementedError(
             f"Trotter step estimation for order {order} is not yet implemented. "
             "Only orders 1 or 2 are currently supported."
