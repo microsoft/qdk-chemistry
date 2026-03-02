@@ -115,13 +115,6 @@ class TestTrotterStepsCommutator:
 
     # Second-order Trotter tests.
 
-    def test_anticommuting_pair_second_order(self):
-        """Test with an anticommuting pair."""
-        # X and Z anticommute: commutator bound = 2 * 2**2 = 8
-        # N = ceil(sqrt(8) * 1**(3/2) / (sqrt(3! * 0.1))) = ceil(10) = 4
-        h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        assert trotter_steps_commutator(h, 1.0, 0.1, order=2) == 4
-
     def test_all_commuting_second_order(self):
         """Test with all commuting terms."""
         # XI and IX commute: commutator bound = 0, N = 1

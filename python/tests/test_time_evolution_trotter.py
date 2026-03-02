@@ -15,6 +15,7 @@ from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
+from qdk_chemistry.utils.pauli_commutation import commutator_bound_first_order, commutator_bound_second_order
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -168,7 +169,11 @@ class TestTrotter:
         assert container.step_terms[0].angle == t  # angle for X term
         assert container.step_terms[1].angle == t  # angle for Z term
         # Compare: the error should scale as O(t^2) for first-order Trotter
-        assert np.allclose(u_trot, u_exact, atol=t**2)
+        commutator_error_bound = t**2 / 2 * commutator_bound_first_order(hamiltonian)
+        naive_error_bound = t**2 * sum(abs(coeff) for _, coeff in hamiltonian.get_real_coefficients()) ** 2
+        error_actual = np.linalg.norm(u_trot - u_exact, ord=2)
+        assert error_actual <= commutator_error_bound
+        assert error_actual <= naive_error_bound
 
     # Second-order Trotter tests.
     def test_single_step_construction_second_order(self):
@@ -279,8 +284,12 @@ class TestTrotter:
         assert container.step_terms[0].angle == t / 2  # angle for X term
         assert container.step_terms[1].angle == t  # angle for Z term
         assert container.step_terms[2].angle == t / 2  # angle for X term
-        # Compare: the error should scale as O(t^2) for second-order Trotter
-        assert np.allclose(u_trot, u_exact, atol=t**3)
+        # Compare: the error should scale as O(t^3) for second-order Trotter
+        commutator_error_bound = t**3 / 12 * commutator_bound_second_order(hamiltonian)
+        naive_error_bound = t**3 * sum(abs(coeff) for _, coeff in hamiltonian.get_real_coefficients()) ** 3
+        error_actual = np.linalg.norm(u_trot - u_exact, ord=2)
+        assert error_actual <= commutator_error_bound
+        assert error_actual <= naive_error_bound
 
 
 class TestTrotterAccuracyAware:
@@ -391,7 +400,7 @@ class TestTrotterAccuracyAware:
         builder = Trotter(target_accuracy=0.01, order=2)
         unitary = builder.run(hamiltonian, time=1.0)
         container = unitary.get_container()
-        assert container.step_reps == 12
+        assert container.step_reps == 9
 
     def test_target_accuracy_naive_bound_second_order(self):
         """Test that target_accuracy with naive bound computes correct step count."""
