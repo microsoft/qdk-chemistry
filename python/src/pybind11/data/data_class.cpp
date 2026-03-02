@@ -243,7 +243,12 @@ Examples:
 )")
 
       // JSON serialization
-      .def("to_json", &DataClass::to_json, R"(
+      .def(
+          "to_json",
+          [](const DataClass &self) -> std::string {
+            return self.to_json().dump();
+          },
+          R"(
 Serialize object to JSON string.
 
 Returns:

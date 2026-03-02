@@ -150,6 +150,7 @@ primary_domain = "py"  # Set Python as the primary documentation domain
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "qiskit": ("https://quantum.cloud.ibm.com/docs/api/qiskit/", None),
 }
 
@@ -175,6 +176,9 @@ nitpick_ignore_regex = [
     (r"cpp:identifier", r".*::value"),
     (r"cpp:identifier", r"fmt::format_string.*"),
     (r"cpp:identifier", r"spdlog.*"),
+    # constants:: symbols imported via `using namespace codata_XXXX` inside
+    # a #if block — Doxygen/Breathe cannot resolve them.
+    (r"cpp:identifier", r".*constants::.*"),
     # C++20 concepts - Sphinx/Breathe doesn't fully support concept references yet
     (r"cpp:identifier", r"NonBoolIntegral<.*>"),
     (r"cpp:identifier", r"NonBoolIntegralVector<.*>"),
@@ -182,6 +186,7 @@ nitpick_ignore_regex = [
     (r"cpp:identifier", r"VariantMember<.*>"),
     (r"cpp:identifier", r"Vector<.*>"),
     (r"cpp:identifier", r"SupportedSettingType<.*>"),
+    (r"py:class", r"scipy.*"),
     (r"py:class", r"h5py.*"),
     (r"py:class", r"numpy.*"),
     (r"py:class", r"pathlib.*"),
