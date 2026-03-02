@@ -163,6 +163,20 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         patchelf --set-rpath '$ORIGIN/../../qdk_chemistry.libs' "$so_file" || true
     done
 
+    export debugdir="debug_symbols"
+    mkdir -p "${debugdir}"
+
+    CORE_SO="$(find "$TEMP_DIR" -type f -name '_core*.so' | head -n 1)"
+    if [ -z "$CORE_SO" ]; then
+        echo "ERROR: Could not find _core*.so in repaired wheel contents."
+        exit 1
+    fi
+
+    debugfile="$(basename "$CORE_SO").debug"
+    objcopy --only-keep-debug "$CORE_SO" "${debugdir}/${debugfile}"
+    strip --strip-debug --strip-unneeded "$CORE_SO"
+    objcopy --add-gnu-debuglink="${debugdir}/${debugfile}" "$CORE_SO"
+
     find "$TEMP_DIR" -path '*/qdk_chemistry.libs/*' -name '*.so*' -type f | while read so_file; do
         echo "Fixing RPATH for bundled library: $so_file"
         patchelf --set-rpath '$ORIGIN' "$so_file" || true
@@ -171,14 +185,6 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     rm "$WHEEL_FILE"
     (cd "$TEMP_DIR" && python3 -m zipfile -c "$FULL_WHEEL_PATH" .)
     rm -rf "$TEMP_DIR"
-    export tostripfile="build/cp*/_core.*.so"
-    export debugdir="debug_symbols"
-    export debugfile="_core.so.debug"
-    mkdir -p "${debugdir}"
-
-    objcopy --only-keep-debug "${tostripfile}" "${debugdir}/${debugfile}"
-    strip --strip-debug --strip-unneeded "${tostripfile}"
-    objcopy --add-gnu-debuglink="${debugdir}/${debugfile}" "${tostripfile}"
 
 elif [ "$MAC_BUILD" == "ON" ]; then
     export CMAKE_C_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin -g"
@@ -201,7 +207,7 @@ elif [ "$MAC_BUILD" == "ON" ]; then
     delocate-listdeps --all repaired_wheelhouse/qdk_chemistry*.whl
 
     echo "Checking shared dependencies..."
-    otool -L build/cp*/_core.*.so]
+    otool -L build/cp*/_core.*.so
     
     export tostripfile="build/cp*/_core.*.so"
     export debugdir="debug_symbols"
