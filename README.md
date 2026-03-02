@@ -21,6 +21,7 @@ QDK/Chemistry provides a comprehensive suite of tools for:
 - **C++ API**: Headers in `cpp/include/` contain comprehensive Doxygen documentation
 - **Python API**: All methods include detailed docstrings with Parameters, Returns, Raises, and Examples sections
 - **Examples**: See the `examples/` directory and [documentation](https://microsoft.github.io/qdk-chemistry/index.html) for usage examples
+- **Reference data and companion materials**: Curated simulation datasets, molecular benchmarks, and related assets are available at [microsoft/qdk-chemistry-data](https://github.com/microsoft/qdk-chemistry-data)
 
 ## Project Structure
 
