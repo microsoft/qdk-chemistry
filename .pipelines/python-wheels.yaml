@@ -215,11 +215,14 @@ extends:
             condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
           
           - task: PublishSymbols@2
+            condition: eq($(target.os), 'linux')
             displayName: Publish debug symbols
             inputs:
               SymbolsFolder: '$(System.DefaultWorkingDirectory)/debug_symbols/*'
               IndexSources: True
               SymbolServerType: 'TeamServices'
+              SearchPattern: '**/*.debug'
+              publishLinuxSymbols: true
 
     - stage: Approval
       displayName: Approval

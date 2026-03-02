@@ -172,10 +172,13 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         exit 1
     fi
 
+    # We need to do this in order publish our C++ debug symbols internally.
     debugfile="$(basename "$CORE_SO").debug"
     objcopy --only-keep-debug "$CORE_SO" "${debugdir}/${debugfile}"
     strip --strip-debug --strip-unneeded "$CORE_SO"
     objcopy --add-gnu-debuglink="${debugdir}/${debugfile}" "$CORE_SO"
+    echo "Extracted debug symbols to ${debugdir}/${debugfile}"
+    ls ${debugdir}
 
     find "$TEMP_DIR" -path '*/qdk_chemistry.libs/*' -name '*.so*' -type f | while read so_file; do
         echo "Fixing RPATH for bundled library: $so_file"
@@ -208,15 +211,4 @@ elif [ "$MAC_BUILD" == "ON" ]; then
 
     echo "Checking shared dependencies..."
     otool -L build/cp*/_core.*.so
-    
-    export tostripfile="build/cp*/_core.*.so"
-    export debugdir="debug_symbols"
-    export debugfile="_core.so"
-    mkdir -p "${debugdir}"
-
-    # Create external debug symbols
-    dsymutil "${tostripfile}" -o "${debugdir}/${debugfile}.dSYM"
-
-    # Strip binary (pick level as needed)
-    strip -S -x "${tostripfile}"
 fi
