@@ -92,7 +92,8 @@ qiskit-extras = [
 ]
 openfermion-extras = [
   "openfermion>=1.0.0",
-  "cirq-core"
+  "cirq-core",
+  "ply"
 ]
 
 [project.urls]
