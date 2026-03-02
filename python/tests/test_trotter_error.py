@@ -113,7 +113,7 @@ class TestTrotterStepsCommutator:
         with pytest.raises(NotImplementedError, match="order 3"):
             trotter_steps_commutator(h, 1.0, 0.1, order=3)
 
-    """Second-order Trotter tests."""
+    # Second-order Trotter tests.
 
     def test_anticommuting_pair_second_order(self):
         """Test with an anticommuting pair."""

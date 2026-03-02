@@ -239,19 +239,24 @@ class Trotter(TimeEvolutionBuilder):
                 angle = coeff * time
                 terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
         elif order == 2:
+            coeffs = list(qubit_hamiltonian.get_real_coefficients(tolerance=atol))
+            # If there are no coefficients (e.g., empty Hamiltonian or all filtered by atol),
+            # there is nothing to decompose; return the empty list of terms.
+            if not coeffs:
+                return terms
             # \prod_{i=1}^{L-1} e^{-iH_i t/(2n)}
-            for label, coeff in qubit_hamiltonian.get_real_coefficients(tolerance=atol)[:-1]:
+            for label, coeff in coeffs[:-1]:
                 mapping = self._pauli_label_to_map(label)
                 angle = coeff * time / 2
                 terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
             # e^{-iH_L t/n}
-            label, coeff = qubit_hamiltonian.get_real_coefficients(tolerance=atol)[-1]
+            label, coeff = coeffs[-1]
             mapping = self._pauli_label_to_map(label)
             angle = coeff * time
             terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
 
             # \prod_{i=L-1}^1 e^{-iH_i t/(2n)}
-            for label, coeff in reversed(qubit_hamiltonian.get_real_coefficients(tolerance=atol)[:-1]):
+            for label, coeff in reversed(coeffs[:-1]):
                 mapping = self._pauli_label_to_map(label)
                 angle = coeff * time / 2
                 terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))

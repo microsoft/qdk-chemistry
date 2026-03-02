@@ -170,8 +170,8 @@ class TestTrotter:
         # Compare: the error should scale as O(t^2) for first-order Trotter
         assert np.allclose(u_trot, u_exact, atol=t**2)
 
-    """Second-order Trotter tests."""
 
+    # Second-order Trotter tests.
     def test_single_step_construction_second_order(self):
         """Test construction of time evolution unitary with a single Trotter step."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
@@ -382,7 +382,7 @@ class TestTrotterAccuracyAware:
         with pytest.raises(ValueError, match="allowed options"):
             Trotter(error_bound="invalid")
 
-    """Second-order Trotter tests."""
+    # Second-order Trotter tests.
 
     def test_target_accuracy_commutator_bound_second_order(self):
         """Test that target_accuracy with commutator bound computes correct step count."""
