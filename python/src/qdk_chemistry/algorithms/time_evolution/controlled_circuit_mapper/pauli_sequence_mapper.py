@@ -129,13 +129,14 @@ class PauliSequenceMapper(ControlledEvolutionCircuitMapper):
             flattened_pauli_terms.extend(pauli_terms)
             flattened_angles.extend(angles)
 
-        if self._settings.get("power") < 1:
+        power = self._settings.get("power")
+        if power < 1:
             raise ValueError("PauliSequenceMapper requires 'power' to be an integer greater than or equal to 1.")
 
         controlled_evo_params = {
             "pauliExponents": flattened_pauli_terms,
             "pauliCoefficients": flattened_angles,
-            "repetitions": self._settings.get("power"),
+            "repetitions": power,
         }
 
         qsc = qsharp.circuit(
