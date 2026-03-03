@@ -637,7 +637,7 @@ TEST_F(LocalizationTest, WaterVVHV) {
   EXPECT_NEAR(pm_metric, 23.693199816318174, testing::localization_tolerance);
 }
 
-TEST_F(LocalizationTest, WaterVVHV_2) {
+TEST_F(LocalizationTest, WaterVVHV_ccpvtz) {
   auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
   auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
   EXPECT_NO_THROW({ auto settings = vvhv_localizer->settings(); });
@@ -841,7 +841,7 @@ TEST_F(LocalizationTest, ScrambledShellsWaterVVHV) {
 // atomic basis set, regardless of the structure of its overlap matrix
 // The test verifies that the same Pipek Mezey value is attained when the
 // cc-pvtz basis is scrambled
-TEST_F(LocalizationTest, ScrambledShellsWaterVVHV_2) {
+TEST_F(LocalizationTest, ScrambledShellsWaterVVHV_ccpvtz) {
   auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
   auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
   EXPECT_NO_THROW({ auto settings = vvhv_localizer->settings(); });
