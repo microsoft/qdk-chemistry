@@ -215,8 +215,8 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    * Selects the most localized AOs in the block by computing their spreads
    * and rotates the input orbitals to maximize their overlap with these AOs
    *
-   * @param bf_al_ori Index list (global AO indices) for this atom+l block in
-   * the original basis
+   * @param al_bf_indices List containing the AO indices (in the full AO basis) 
+   * of basis functions in this atom+l block
    * @param overlap_al Overlap matrix of the atom+l AO block in the
    * representation which input orbitals C are given (num_atomic_orbitals_al x
    * num_atomic_orbitals_al)
@@ -229,7 +229,7 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    * current block
    * @param num_orbitals Number of orbitals to localize
    */
-  void localize_proto_hv(const std::vector<int>& bf_al_ori,
+  void localize_proto_hv(const std::vector<int>& al_bf_indices,
                          const double* overlap_al, Eigen::MatrixXd& C_al,
                          int num_atomic_orbitals, int num_atomic_orbitals_al,
                          int num_orbitals);
@@ -631,7 +631,7 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
   }
 }
 
-void VVHVLocalization::localize_proto_hv(const std::vector<int>& bf_al_ori,
+void VVHVLocalization::localize_proto_hv(const std::vector<int>& al_bf_indices,
                                          const double* overlap_al,
                                          Eigen::MatrixXd& C_al,
                                          int num_atomic_orbitals,
@@ -643,7 +643,7 @@ void VVHVLocalization::localize_proto_hv(const std::vector<int>& bf_al_ori,
       Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals_al);
 
   for (int i = 0; i < num_atomic_orbitals_al; ++i) {
-    atomic_orbitals(bf_al_ori[i], i) = 1;
+    atomic_orbitals(al_bf_indices[i], i) = 1;
   }
 
   // Calculate the spreads of this atom+l AOs
