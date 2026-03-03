@@ -215,7 +215,7 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    * Selects the most localized AOs in the block by computing their spreads
    * and rotates the input orbitals to maximize their overlap with these AOs
    *
-   * @param al_bf_indices List containing the AO indices (in the full AO basis) 
+   * @param al_bf_indices List containing the AO indices (in the full AO basis)
    * of basis functions in this atom+l block
    * @param overlap_al Overlap matrix of the atom+l AO block in the
    * representation which input orbitals C are given (num_atomic_orbitals_al x
