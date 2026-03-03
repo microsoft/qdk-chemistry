@@ -840,7 +840,7 @@ TEST_F(LocalizationTest, ScrambledShellsWaterVVHV) {
 // reordering. Localizing the proto HVs should yield this consistency for any
 // atomic basis set, regardless of the structure of its overlap matrix
 // The test verifies that the same Pipek Mezey value is attained when the
-// cc-pvtz basis is scrambeld
+// cc-pvtz basis is scrambled
 TEST_F(LocalizationTest, ScrambledShellsWaterVVHV_2) {
   auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
   auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
