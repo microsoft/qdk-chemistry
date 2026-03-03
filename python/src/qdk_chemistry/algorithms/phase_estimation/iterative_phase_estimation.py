@@ -259,8 +259,8 @@ class IterativePhaseEstimation(PhaseEstimation):
         """
         from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3  # noqa: PLC0415
 
-        state_prep_qc = state_preparation.get_qiskit_circuit()
-        ctrl_evol_qc = controlled_evolution.get_qiskit_circuit()
+        state_prep_qc = state_preparation._qiskit_circuit  # noqa: SLF001
+        ctrl_evol_qc = controlled_evolution._qiskit_circuit  # noqa: SLF001
         # Parse the state preparation circuit from QASM
         ancilla = QuantumRegister(1, "ancilla")
         system_target = QuantumRegister(num_system_qubits, "system")

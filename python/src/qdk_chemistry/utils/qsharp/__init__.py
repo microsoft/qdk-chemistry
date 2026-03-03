@@ -20,10 +20,12 @@ _QS_FILES = [
 
 def get_qsharp_utils():
     """Returns the Q# namespace for chemistry operations."""
-    if not hasattr(qdk.code, "QDKChemistry.Utils"):
+    try:
+        return qdk.code.QDKChemistry.Utils
+    except AttributeError:
         code = "\n".join(f.read_text() for f in _QS_FILES)
         qsharp.eval(code)
-    return qdk.code.QDKChemistry.Utils
+        return qdk.code.QDKChemistry.Utils
 
 
 QSHARP_UTILS = get_qsharp_utils()

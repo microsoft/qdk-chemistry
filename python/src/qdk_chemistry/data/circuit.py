@@ -71,6 +71,7 @@ class Circuit(DataClass):
         self.qsharp = qsharp
         self._qsharp_op = qsharp_op
         self.encoding = encoding
+        self._qiskit_circuit = None
 
         # Check for conflicting representations
 
@@ -167,11 +168,14 @@ class Circuit(DataClass):
             raise RuntimeError("Qiskit is not available. Cannot convert circuit to Qiskit format.") from err
 
         if self.qir:
+            self._qiskit_circuit = qir_ir_to_qiskit(str(self.qir))
             if self.qasm:
                 Logger.warn("Both QIR and QASM representations are available. Convert from QIR.")
-            return qir_ir_to_qiskit(str(self.qir))
+            return self._qiskit_circuit
+
         if self.qasm:
-            return qasm3.loads(self.qasm)
+            self._qiskit_circuit = qasm3.loads(self.qasm)
+            return self._qiskit_circuit
 
         # Error message why conversion failed
         raise RuntimeError("The quantum circuit cannot be converted to Qiskit format.")
