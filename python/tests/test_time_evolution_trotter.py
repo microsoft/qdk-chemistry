@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
+
 import numpy as np
 import pytest
 import scipy
@@ -15,7 +17,11 @@ from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
-from qdk_chemistry.utils.pauli_commutation import commutator_bound_first_order, commutator_bound_second_order
+from qdk_chemistry.utils.pauli_commutation import (
+    commutator_bound_first_order,
+    commutator_bound_higher_order,
+    commutator_bound_second_order,
+)
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -132,7 +138,7 @@ class TestTrotter:
         builder = Trotter(order=3)
         hamiltonian = QubitHamiltonian(pauli_strings=["X"], coefficients=[1.0])
 
-        with pytest.raises(NotImplementedError, match="Only orders 1 or 2 are currently supported."):
+        with pytest.raises(NotImplementedError, match="Higher odd-order Trotter methods are not supported."):
             builder.run(hamiltonian, time=1.0)
 
     def test_trotter_x_z_example(self):
@@ -291,6 +297,172 @@ class TestTrotter:
         assert error_actual <= commutator_error_bound
         assert error_actual <= naive_error_bound
 
+    # Higher-order Trotter tests.
+    def test_single_step_construction_higher_order(self):
+        """Test construction of time evolution unitary with a single Trotter step."""
+        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        builder = Trotter(num_divisions=1, order=4)
+        unitary = builder.run(hamiltonian, time=0.2)
+
+        assert isinstance(unitary, TimeEvolutionUnitary)
+        container = unitary.get_container()
+
+        assert isinstance(container, PauliProductFormulaContainer)
+        assert container.num_qubits == 1
+        assert container.step_reps == 1
+        assert len(container.step_terms) == 11
+
+    def test_multiple_trotter_steps_higher_order(self):
+        """Test construction of time evolution unitary with multiple Trotter steps."""
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XI", "ZZ"],
+            coefficients=[1.0, 1.0],
+        )
+
+        builder = Trotter(num_divisions=4, order=4)
+        unitary = builder.run(hamiltonian, time=0.2)
+
+        container = unitary.get_container()
+
+        assert container.step_reps == 4
+        assert len(container.step_terms) == 11
+
+        dt = 0.2 / container.step_reps
+        u_k = 1 / (4 - 4 ** (1 / 3))
+
+        # See Childs et. al. 2021
+        assert np.isclose(
+            container.step_terms[0].angle,
+            u_k / 2 * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            container.step_terms[1].angle,
+            u_k * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            container.step_terms[2].angle,
+            u_k * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            container.step_terms[3].angle,
+            u_k * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+        assert np.isclose(
+            container.step_terms[4].angle,
+            (1 - 3 * u_k) / 2 * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            container.step_terms[5].angle,
+            (1 - 4 * u_k) * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            container.step_terms[6].angle,
+            (1 - 3 * u_k) / 2 * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            container.step_terms[7].angle,
+            u_k * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+        assert np.isclose(
+            container.step_terms[8].angle,
+            u_k * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            container.step_terms[9].angle,
+            u_k * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            container.step_terms[10].angle,
+            u_k / 2 * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+    def test_filters_small_coefficients_higher_order(self):
+        """Test that terms with small coefficients are filtered out."""
+        builder = Trotter(order=4)
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["X", "Z"],
+            coefficients=[1e-15, 1.0],
+        )
+
+        terms = builder._decompose_trotter_step(hamiltonian, time=1.0, atol=1e-12)
+
+        assert len(terms) == 1
+        assert terms[0].pauli_term == {0: "Z"}
+
+    def test_trotter_x_z_example_higher_order(self):
+        """Correctness check for fourth-order Trotter decomposition."""
+        # Hamiltonian H = X + Z
+        hamiltonian_coefficient = 0.5
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["X", "Z"], coefficients=[hamiltonian_coefficient, hamiltonian_coefficient]
+        )
+
+        builder = Trotter(num_divisions=1, order=4)
+        t = 0.1
+        unitary = builder.run(hamiltonian, time=t)
+        container = unitary.get_container()
+
+        def _pauli_matrix(label: str) -> np.ndarray:
+            """Helper to get Pauli matrix from label."""
+            if label == "X":
+                return np.array([[0, 1], [1, 0]], dtype=complex)
+            if label == "Z":
+                return np.array([[1, 0], [0, -1]], dtype=complex)
+            raise ValueError(f"Unsupported Pauli label: {label}")
+
+        # Build Trotter unitary matrix
+        u_trot = np.eye(2, dtype=complex)
+        for term in container.step_terms:
+            pauli_label = next(iter(term.pauli_term.values()))
+            pauli_matrix = _pauli_matrix(pauli_label)
+            u_trot = scipy.linalg.expm(-1j * term.angle * pauli_matrix) @ u_trot
+
+        # Exact unitary
+        hamiltonian_matrix = np.zeros((2, 2), dtype=complex)
+        for pauli_string, coeff in zip(hamiltonian.pauli_strings, hamiltonian.coefficients, strict=False):
+            hamiltonian_matrix += coeff * _pauli_matrix(pauli_string)
+        u_exact = scipy.linalg.expm(-1j * t * hamiltonian_matrix)
+
+        angles_abs = [abs(term.angle / (hamiltonian_coefficient * t)) for term in container.step_terms]
+        largest_error_coefficient = math.prod(sorted(angles_abs, reverse=True)[: 4 + 1]) + 1 / math.factorial(4 + 1)
+
+        commutator_error_bound = t**5 * commutator_bound_higher_order(hamiltonian, order=4) * largest_error_coefficient
+
+        naive_error_bound = (
+            t**5
+            * 2**5
+            * sum(abs(coeff) for _, coeff in hamiltonian.get_real_coefficients()) ** 5
+            * largest_error_coefficient
+        )
+        error_actual = np.linalg.norm(u_trot - u_exact, ord=2)
+        assert error_actual <= commutator_error_bound
+        assert error_actual <= naive_error_bound
+        assert commutator_error_bound < naive_error_bound
+
 
 class TestTrotterAccuracyAware:
     """Tests for accuracy-aware Trotter parameterization."""
@@ -409,7 +581,7 @@ class TestTrotterAccuracyAware:
         unitary = builder.run(hamiltonian, time=1.0)
         container = unitary.get_container()
         # one_norm = 2, N = ceil(2^1/2 / 0.01) = 29
-        assert container.step_reps == 29
+        assert container.step_reps == 17
 
     def test_commutator_tighter_than_naive_second_order(self):
         """Test that commutator bound gives fewer steps than naive bound."""

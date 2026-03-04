@@ -25,6 +25,9 @@ References:
 
 from __future__ import annotations
 
+import itertools
+import math
+from functools import reduce
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -207,55 +210,69 @@ def pauli_product_label(label_a: str, label_b: str) -> str:
     )
 
 
-def does_nested_commutator_vanish(
-    label_x: str,
-    label_y: str,
-    label_z: str,
-) -> bool:
-    r"""Determine whether :math:`[P_x,\,[P_y,\,P_z]]` vanishes.
+def does_nested_commutator_vanish(*labels: str) -> bool:
+    r"""Determine whether an *n*-nested commutator of Pauli strings vanishes.
 
-    The nested commutator of three Pauli strings is zero when *either*
-    of the following holds:
+    For labels :math:`(P_1, P_2, \ldots, P_n)` this checks whether
 
-    1. The inner commutator :math:`[P_y, P_z]` vanishes
-       (i.e. :math:`P_y` and :math:`P_z` commute), **or**
-    2. The outer commutator :math:`[P_x, P_y P_z]` vanishes
-       (i.e. :math:`P_x` commutes with the Pauli label of
-       :math:`P_y P_z`).
+    .. math::
 
-    Note that the Pauli label of :math:`[P_y, P_z]` is proportional
-    to :math:`P_y P_z` (up to a scalar), so commutation of :math:`P_x`
-    with :math:`P_y P_z` is equivalent to commutation with the full
-    commutator operator.
+        [P_1,\,[P_2,\,[\cdots [P_{n-1},\,P_n]\cdots]]] = 0.
+
+    The nested commutator vanishes when *either* of the following holds:
+
+    1. The inner nested commutator
+       :math:`[P_2, [\cdots [P_{n-1}, P_n] \cdots]]` vanishes, **or**
+    2. :math:`P_1` commutes with the Pauli label of the product
+       :math:`P_2 P_3 \cdots P_n`.
+
+    Condition 2 works because a non-vanishing nested commutator of Pauli
+    strings is always proportional to the sequential product of those
+    strings (up to a scalar phase), so commutation with the product label
+    is equivalent to commutation with the full commutator operator.
 
     Args:
-        label_x: Pauli string label for :math:`P_x`.
-        label_y: Pauli string label for :math:`P_y`.
-        label_z: Pauli string label for :math:`P_z`.
+        *labels: Two or more Pauli string labels of equal length.
 
     Returns:
-        ``True`` if :math:`[P_x, [P_y, P_z]] = 0`, ``False`` otherwise.
+        ``True`` if the nested commutator is zero, ``False`` otherwise.
 
     Raises:
-        ValueError: If the labels have different lengths.
+        ValueError: If fewer than two labels are given or if the labels
+            have different lengths.
 
     Examples:
+        >>> does_nested_commutator_vanish("XI", "IX")
+        True
+        >>> does_nested_commutator_vanish("XI", "YI")
+        False
         >>> does_nested_commutator_vanish("XI", "IX", "II")
         True
-        >>> does_nested_commutator_vanish("XI", "YI", "ZI")
-        False
+        >>> does_nested_commutator_vanish("XI", "YI", "ZI")  # [XI, 2i·XI] = 0
+        True
         >>> does_nested_commutator_vanish("IX", "XI", "YI")
         True
+        >>> does_nested_commutator_vanish("ZI", "IX", "ZI", "XY")
+        False
 
     """
-    # Inner commutator [P_y, P_z] vanishes => whole thing vanishes
-    if do_pauli_labels_commute(label_y, label_z):
-        return True
-    # Compute Pauli label of P_y P_z (∝ [P_y, P_z])
-    inner_label = pauli_product_label(label_y, label_z)
+    if len(labels) < 2:
+        raise ValueError("At least two Pauli labels are required for a commutator.")
 
-    # Outer commutator [P_x, inner] vanishes?
-    return do_pauli_labels_commute(label_x, inner_label)
+    # Base case: [P_a, P_b] vanishes iff the two strings commute.
+    if len(labels) == 2:
+        return do_pauli_labels_commute(labels[0], labels[1])
+
+    # Recursive case: [P_1, [P_2, ..., P_n]]
+    # 1. Inner nested commutator vanishes => whole expression vanishes.
+    if does_nested_commutator_vanish(*labels[1:]):
+        return True
+
+    # 2. Compute the Pauli product label P_2 P_3 … P_n (proportional to
+    #    the inner commutator when it is non-zero) and check whether P_1
+    #    commutes with it.
+    inner_product = reduce(pauli_product_label, labels[1:])
+    return do_pauli_labels_commute(labels[0], inner_product)
 
 
 def commutator_bound_first_order(
@@ -316,8 +333,8 @@ def commutator_bound_second_order(
     .. math::
 
         \lVert U(t) - S_2(t) \rVert \le
-            \frac{t^3}{3!} \sum_{j < k < l}
-            \lVert \lvert [\alpha_j P_i,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert ] \rVert
+            \frac{t^3}{12} \left(\sum_{k > j,l > j} \lVert [\alpha_l P_l,\, [\alpha_k P_k,\, \alpha_j P_j] \rVert +
+            \frac{1}{2} \sum_{k > j} \lVert [\alpha_j P_j,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert \right)
 
     For Pauli strings the spectral norm of the commutator is
 
@@ -325,9 +342,9 @@ def commutator_bound_second_order(
     * :math:`2 |\alpha_j| |\alpha_k|`  if they anticommute.
 
     This function returns
-    :math:`\sum_{j < k < l}
-            \lVert \lvert [\alpha_j P_i,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert ] \rVert`,
-    so the user can multiply by :math:`t^{3} / (3! * N)` to get the per-step
+    :math:`\sum_{k > j,l > j} \lVert [\alpha_l P_l,\, [\alpha_k P_k,\, \alpha_j P_j] \rVert +
+            \frac{1}{2} \sum_{k > j} \lVert [\alpha_j P_j,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert`,
+    so the user can multiply by :math:`t^{3} / (12 * N**2)` to get the per-step
     error.
 
     Args:
@@ -356,3 +373,55 @@ def commutator_bound_second_order(
             if not does_nested_commutator_vanish(pauli_labels[i], pauli_labels[i], pauli_labels[j]):
                 total_term2 += 2.0**2 * abs(coefficients[i]) ** 2 * abs(coefficients[j])
     return total_term1 + 0.5 * total_term2
+
+
+def commutator_bound_higher_order(
+    hamiltonian: QubitHamiltonian,
+    order: int,
+    weight_threshold: float = 1e-12,
+) -> float:
+    r"""Compute the higher-order Trotter commutator bound.
+
+    For a Hamiltonian :math:`H = \sum_j \alpha_j P_j` the p-order
+    (Lie-Trotter) product formula has error bounded by
+
+    .. math::
+
+        \lVert U(t) - S_p(t) \rVert \le \frac{t^{p+1}}{C_{\text{max}}} \left(
+            \sum_{j_1,\ldots,j_{p+1}} \lVert [\alpha_{j_1} P_{j_1},\, [\ldots [\alpha_{j_p} P_{j_p},
+            \alpha_{j_{p+1}}P_{j_{p+1}}]\ldots]\rVert \right)
+
+    where the spectral norm of a :math:`(p+1)`-nested commutator of Pauli
+    strings is either 0 (if the nested commutator vanishes) or
+    :math:`2^p`.
+
+    The constant :math:`C_{\text{max}}` is the largest coefficient
+    in the Taylor expansion of the Trotter error, (exp(H_1+...+H_L) - S_order),
+    to t^(order+1) when all coefficients are 1 and t = 1.
+
+    The number of loop indices equals *order + 1* (the depth of nesting).
+    Since *order* is a runtime parameter, the nested iteration is
+    implemented with :func:`itertools.product`.
+
+    Args:
+        hamiltonian: The qubit Hamiltonian whose terms to analyse.
+        order: The Trotter order :math:`p`.  Must be at least 1.
+        weight_threshold: Absolute threshold below which coefficients
+            are discarded.
+
+    Returns:
+        The sum of commutator norms over all index tuples.
+
+    """
+    real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
+    pauli_labels = [label for label, _ in real_terms]
+    coefficients = [coeff for _, coeff in real_terms]
+    abs_coeffs = [abs(c) for c in coefficients]
+
+    n = len(pauli_labels)
+    total = 0.0
+    for idx_tuple in itertools.product(range(n), repeat=order + 1):
+        labels = [pauli_labels[i] for i in idx_tuple]
+        if not does_nested_commutator_vanish(*labels):
+            total += (2.0**order) * math.prod(abs_coeffs[i] for i in idx_tuple)
+    return total
