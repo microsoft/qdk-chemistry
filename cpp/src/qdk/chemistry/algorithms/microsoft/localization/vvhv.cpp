@@ -678,23 +678,46 @@ void VVHVLocalization::localize_proto_hv(const std::vector<int>& al_bf_indices,
              C_al.data(), num_atomic_orbitals_al, temp.data(),
              num_atomic_orbitals_al, 0.0, T.data(), num_orbitals);
 
-  // Now to form Z, Z is just orthonormalized T in our case (since C_al is
-  // O-orthonormal)
-  Eigen::MatrixXd Z = Eigen::MatrixXd::Zero(num_orbitals, num_orbitals);
-  Eigen::MatrixXd identity =
-      Eigen::MatrixXd::Identity(num_orbitals, num_orbitals);
-  this->orthonormalization(num_orbitals, num_orbitals, identity.data(),
-                           T.data(), Z.data(), 1e-6);
+  // Compute the smallest singular value of T
+  Eigen::MatrixXd T_copy = T;  // gesvd overwrites input
+  std::vector<double> singular_values(num_orbitals);
+  Eigen::MatrixXd U(num_orbitals, num_orbitals);
+  Eigen::MatrixXd VT(num_orbitals, num_orbitals);
+  lapack::gesvd(lapack::Job::AllVec, lapack::Job::AllVec, num_orbitals,
+                num_orbitals, T_copy.data(), num_orbitals,
+                singular_values.data(), U.data(), num_orbitals, VT.data(),
+                num_orbitals);
+  double smallest_sv =
+      *std::min_element(singular_values.begin(), singular_values.end());
+  QDK_LOGGER().debug("Smallest singular value of T: {}", smallest_sv);
 
-  // Form the localized proto HVs in this atom+l block
-  // Using the trace-maximizing rotation formula
-  Eigen::MatrixXd C_loc =
-      Eigen::MatrixXd::Zero(num_atomic_orbitals_al, num_orbitals);
-  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-             num_atomic_orbitals_al, num_orbitals, num_orbitals, 1.0,
-             C_al.data(), num_atomic_orbitals_al, Z.data(), num_orbitals, 0.0,
-             C_loc.data(), num_atomic_orbitals_al);
-  C_al.block(0, 0, num_atomic_orbitals_al, num_orbitals) = C_loc;
+  if (smallest_sv < 1e-6) {
+    QDK_LOGGER().warn(
+        "Smallest singular value of T is very small ({}), which may indicate "
+        "linear dependence or near-dependence in the proto HV construction. "
+        "This may lead to numerical instability in localization. Consider "
+        "increasing the orthogonalization threshold or checking the input "
+        "orbitals and basis set.",
+        smallest_sv);
+  } else {
+    // Now to form Z, Z is just orthonormalized T in our case (since C_al is
+    // O-orthonormal)
+    Eigen::MatrixXd Z = Eigen::MatrixXd::Zero(num_orbitals, num_orbitals);
+    Eigen::MatrixXd identity =
+        Eigen::MatrixXd::Identity(num_orbitals, num_orbitals);
+    this->orthonormalization(num_orbitals, num_orbitals, identity.data(),
+                             T.data(), Z.data(), 1e-6);
+
+    // Form the localized proto HVs in this atom+l block
+    // Using the trace-maximizing rotation formula
+    Eigen::MatrixXd C_loc =
+        Eigen::MatrixXd::Zero(num_atomic_orbitals_al, num_orbitals);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_atomic_orbitals_al, num_orbitals, num_orbitals, 1.0,
+               C_al.data(), num_atomic_orbitals_al, Z.data(), num_orbitals, 0.0,
+               C_loc.data(), num_atomic_orbitals_al);
+    C_al.block(0, 0, num_atomic_orbitals_al, num_orbitals) = C_loc;
+  }
 }
 
 Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
