@@ -34,6 +34,4 @@ def openfermion_load():
 
     mapper_for_log = OpenFermionQubitMapper()
     register(lambda: OpenFermionQubitMapper())
-    Logger.debug(
-        f"OpenFermion plugin loaded: [{mapper_for_log.type_name()}: {mapper_for_log.name()}]."
-    )
+    Logger.debug(f"OpenFermion plugin loaded: [{mapper_for_log.type_name()}: {mapper_for_log.name()}].")
