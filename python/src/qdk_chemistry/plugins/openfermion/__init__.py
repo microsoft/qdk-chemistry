@@ -32,7 +32,8 @@ def openfermion_load():
     from qdk_chemistry.algorithms import register  # noqa: PLC0415
     from qdk_chemistry.plugins.openfermion.qubit_mapper import OpenFermionQubitMapper  # noqa: PLC0415
 
+    mapper_for_log = OpenFermionQubitMapper()
     register(lambda: OpenFermionQubitMapper())
     Logger.debug(
-        f"OpenFermion plugin loaded: [{OpenFermionQubitMapper().type_name()}: {OpenFermionQubitMapper().name()}]."
+        f"OpenFermion plugin loaded: [{mapper_for_log.type_name()}: {mapper_for_log.name()}]."
     )

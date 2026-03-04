@@ -133,7 +133,7 @@ class QubitHamiltonian(DataClass):
 
         """
         if not isinstance(other, QubitHamiltonian):
-            return NotImplemented
+            return False
 
         def _sum_terms(qh: QubitHamiltonian) -> dict[str, complex]:
             d: dict[str, complex] = {}

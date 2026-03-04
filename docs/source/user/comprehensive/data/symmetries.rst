@@ -29,7 +29,7 @@ sz
    Spin projection quantum number, :math:`S_z = (n_\alpha - n_\beta) / 2`.
 
 spin_multiplicity
-   Spin multiplicity, :math:`2S + 1 = n_\alpha - n_\beta + 1`.
+   Spin multiplicity, :math:`2S + 1 = |n_\alpha - n_\beta| + 1`.
 
 Creating a Symmetries object
 ----------------------------
