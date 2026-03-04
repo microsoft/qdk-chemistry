@@ -197,10 +197,12 @@ class IterativePhaseEstimation(PhaseEstimation):
                 state_preparation, ctrl_evol_circuit, phase_correction, num_system_qubits
             )
 
-        if state_preparation.get_qiskit_circuit() and ctrl_evol_circuit.get_qiskit_circuit():
+        try:
             return self._create_circuit_from_qiskit(
                 state_preparation, ctrl_evol_circuit, phase_correction, num_system_qubits
             )
+        except ImportError:  # Fall through to the clearer RuntimeError if Qiskit or conversion is unavailable.
+            pass
 
         raise RuntimeError(
             "Failed to create iteration circuit: Q# operations or Qiskit dependencies are not available."

@@ -38,9 +38,9 @@ from dataclasses import dataclass
 import numpy as np
 from qdk import qsharp
 
+import qdk_chemistry.plugins.qiskit
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
 from qdk_chemistry.data import Circuit, Wavefunction
-from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -96,10 +96,6 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         Logger.trace_entering()
         super().__init__()
         self._settings = SparseIsometryGF2XStatePreparationSettings()
-        if self._settings.get("dense_preparation_method") == "qiskit" and not QDK_CHEMISTRY_HAS_QISKIT:
-            raise ImportError(
-                "Qiskit is not available. Please install Qiskit to use the 'qiskit' dense preparation method."
-            )
 
     def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
         """Prepare a quantum circuit that encodes the given wavefunction using sparse isometry over GF(2^x).
@@ -112,6 +108,14 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
         """
         Logger.trace_entering()
+
+        if (
+            self._settings.get("dense_preparation_method") == "qiskit"
+            and not qdk_chemistry.plugins.qiskit.QDK_CHEMISTRY_HAS_QISKIT
+        ):
+            raise ImportError(
+                "Qiskit is not available. Please install Qiskit to use the 'qiskit' dense preparation method."
+            )
 
         # Active Space Consistency Check
         alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()

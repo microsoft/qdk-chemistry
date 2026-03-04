@@ -90,7 +90,7 @@ class Circuit(DataClass):
             If only QIR is available, it attempts to convert it to QASM using Qiskit.
 
         """
-        if self.qasm is not None:
+        if self.qasm:
             if self.qir:
                 Logger.warn("Both QASM and QIR representations are available. Return QASM.")
             return self.qasm

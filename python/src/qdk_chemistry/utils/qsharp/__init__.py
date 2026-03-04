@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import functools
 from pathlib import Path
 
 import qdk
@@ -18,8 +19,9 @@ _QS_FILES = [
 ]
 
 
+@functools.lru_cache(maxsize=1)
 def get_qsharp_utils():
-    """Returns the Q# namespace for chemistry operations."""
+    """Returns the Q# namespace for chemistry operations (lazy-loaded)."""
     try:
         return qdk.code.QDKChemistry.Utils
     except AttributeError:

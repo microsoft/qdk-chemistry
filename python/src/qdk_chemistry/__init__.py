@@ -44,7 +44,7 @@ _DOCS_MODE = os.getenv("QDK_CHEMISTRY_DOCS", "0") == "1"
 # Initialize Q# interpreter
 qdk_config = get_qdk_profile_config()
 _QDK_INTERPRETER_PROFILE = qdk_config.get_target_profile()
-if _QDK_INTERPRETER_PROFILE == "unrestricted":
+if _QDK_INTERPRETER_PROFILE == "unrestricted":  # Default by Q# if not set
     qdk_init(target_profile=TargetProfile.Base)
     new_config = get_qdk_profile_config()
     _QDK_INTERPRETER_PROFILE = new_config.get_target_profile()

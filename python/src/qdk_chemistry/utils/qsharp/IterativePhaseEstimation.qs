@@ -39,6 +39,6 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
             repControlledEvolution(control, system);
         }
         ResetAll(system);
-        return [MResetZ(control)]
+        return [MResetZ(control)];
     }
 }

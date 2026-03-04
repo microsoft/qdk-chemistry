@@ -11,7 +11,7 @@ from qdk import TargetProfile, init
 from qsharp._qsharp import get_config
 
 
-def test_defualt_qdk_interpreter_init():
+def test_default_qdk_interpreter_init():
     sys.modules.pop("qdk_chemistry", None)
     from qdk_chemistry import _QDK_INTERPRETER_PROFILE  # noqa: PLC0415
 
