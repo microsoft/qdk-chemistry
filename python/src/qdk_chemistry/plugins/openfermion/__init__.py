@@ -10,23 +10,19 @@ from qdk_chemistry.utils import Logger
 
 _loaded = False
 QDK_CHEMISTRY_HAS_OPENFERMION = False
-QDK_CHEMISTRY_HAS_CIRQ = False
 
 
 def load():
     """Load the OpenFermion related plugins into QDK/Chemistry."""
     Logger.trace_entering()
     global _loaded  # noqa: PLW0603
-    global QDK_CHEMISTRY_HAS_OPENFERMION, QDK_CHEMISTRY_HAS_CIRQ  # noqa: PLW0603
+    global QDK_CHEMISTRY_HAS_OPENFERMION  # noqa: PLW0603
     if _loaded:
         return
     _loaded = True
     if importlib.util.find_spec("openfermion") is not None:
         QDK_CHEMISTRY_HAS_OPENFERMION = True
         openfermion_load()
-    if importlib.util.find_spec("cirq") is not None:
-        QDK_CHEMISTRY_HAS_CIRQ = True
-        Logger.debug("Cirq detected: OpenFermion Cirq interop utilities available.")
 
 
 def openfermion_load():
