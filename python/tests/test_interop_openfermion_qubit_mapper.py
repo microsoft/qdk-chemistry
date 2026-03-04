@@ -16,7 +16,7 @@ import pytest
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
 )
-from .test_helpers import create_nontrivial_test_hamiltonian
+from .test_helpers import create_nontrivial_test_hamiltonian, create_test_ansatz, create_test_wavefunction
 
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
 
@@ -24,6 +24,7 @@ if OPENFERMION_AVAILABLE:
     import openfermion as of
 
     from qdk_chemistry.algorithms import QubitMapper, available, create
+    from qdk_chemistry.data import Symmetries
     from qdk_chemistry.plugins.openfermion.conversion import (
         hamiltonian_to_fermion_operator,
         hamiltonian_to_interaction_operator,
@@ -149,9 +150,9 @@ def test_openfermion_scbk_encoding():
         "qubit_mapper",
         "openfermion",
         encoding="symmetry-conserving-bravyi-kitaev",
-        n_active_electrons=2,
     )
-    qh = mapper.run(hamiltonian)
+    symmetries = Symmetries(n_alpha=1, n_beta=1)
+    qh = mapper.run(hamiltonian, symmetries)
 
     # Reference: apply SCBK directly
     fop = hamiltonian_to_fermion_operator(hamiltonian)
@@ -167,6 +168,74 @@ def test_openfermion_scbk_encoding():
     ref_qh = qubit_operator_to_qubit_hamiltonian(ref_qop, encoding="symmetry-conserving-bravyi-kitaev")
 
     _assert_pauli_ops_equal(qh, ref_qh)
+
+
+def test_openfermion_scbk_requires_symmetries():
+    """SCBK encoding raises ValueError when symmetries are not provided."""
+    hamiltonian = create_nontrivial_test_hamiltonian()
+
+    mapper = create(
+        "qubit_mapper",
+        "openfermion",
+        encoding="symmetry-conserving-bravyi-kitaev",
+    )
+    with pytest.raises(ValueError, match="Symmetries"):
+        mapper.run(hamiltonian)
+
+
+def test_openfermion_scbk_from_wavefunction():
+    """SCBK encoding works with Symmetries constructed from a Wavefunction."""
+    hamiltonian = create_nontrivial_test_hamiltonian()
+
+    wfn = create_test_wavefunction(num_orbitals=2)
+    symmetries = Symmetries.from_wavefunction(wfn)
+
+    mapper = create(
+        "qubit_mapper",
+        "openfermion",
+        encoding="symmetry-conserving-bravyi-kitaev",
+    )
+    qh = mapper.run(hamiltonian, symmetries)
+
+    # Should produce a valid QubitHamiltonian with reduced qubit count
+    assert qh.num_qubits == 2  # 4 spin-orbitals - 2 from SCBK
+
+
+def test_openfermion_scbk_from_ansatz():
+    """SCBK encoding works with Symmetries constructed from an Ansatz."""
+    hamiltonian = create_nontrivial_test_hamiltonian()
+
+    ansatz = create_test_ansatz(num_orbitals=2)
+    symmetries = Symmetries.from_ansatz(ansatz)
+
+    mapper = create(
+        "qubit_mapper",
+        "openfermion",
+        encoding="symmetry-conserving-bravyi-kitaev",
+    )
+    qh = mapper.run(hamiltonian, symmetries)
+
+    # Should produce a valid QubitHamiltonian with reduced qubit count
+    assert qh.num_qubits == 2  # 4 spin-orbitals - 2 from SCBK
+
+
+def test_openfermion_scbk_symmetries_ignored_for_jw():
+    """Symmetries parameter is accepted but ignored for non-SCBK encodings."""
+    hamiltonian = create_nontrivial_test_hamiltonian()
+    symmetries = Symmetries(n_alpha=1, n_beta=1)
+
+    # Should work without error - symmetries is simply ignored
+    qh_with = create("qubit_mapper", "openfermion", encoding="jordan-wigner").run(hamiltonian, symmetries)
+    qh_without = create("qubit_mapper", "openfermion", encoding="jordan-wigner").run(hamiltonian)
+
+    _assert_pauli_ops_equal(qh_with, qh_without)
+
+
+def test_openfermion_scbk_no_n_active_electrons_setting():
+    """The n_active_electrons setting no longer exists on OpenFermionQubitMapperSettings."""
+    mapper = create("qubit_mapper", "openfermion")
+    with pytest.raises(Exception, match="n_active_electrons"):
+        mapper.settings().get("n_active_electrons")
 
 
 def test_openfermion_invalid_encoding():

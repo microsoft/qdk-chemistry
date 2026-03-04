@@ -43,6 +43,7 @@ Exposed classes are:
 - :class:`SlaterDeterminantContainer`: Single Slater determinant wavefunction representation.
 - :class:`StabilityResult`: Result of stability analysis for electronic structure calculations.
 - :class:`Structure`: Molecular structure and geometry information.
+- :class:`Symmetries`: Conserved quantum numbers (particle count, spin) for symmetry-exploiting algorithms.
 - :class:`TimeEvolutionUnitary`: Time evolution unitary.
 - :class:`TimeEvolutionUnitaryContainer`: Abstract base class for different time evolution unitary representation.
 - :class:`Wavefunction`: Electronic wavefunction data and coefficients.
@@ -110,6 +111,7 @@ from qdk_chemistry.data.estimator_data import EnergyExpectationResult, Measureme
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.base import TimeEvolutionUnitaryContainer
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import PauliProductFormulaContainer
@@ -169,6 +171,7 @@ __all__ = [
     "SpinChannel",
     "StabilityResult",
     "Structure",
+    "Symmetries",
     "TimeEvolutionUnitary",
     "TimeEvolutionUnitaryContainer",
     "Wavefunction",

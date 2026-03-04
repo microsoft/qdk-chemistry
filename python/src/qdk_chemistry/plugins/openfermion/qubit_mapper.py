@@ -10,17 +10,23 @@ using different mapping strategies ("jordan-wigner", "bravyi-kitaev",
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import numpy as np
 import openfermion as of
 
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
-from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
 from qdk_chemistry.plugins.openfermion.conversion import (
     hamiltonian_to_fermion_operator,
     hamiltonian_to_interaction_operator,
     qubit_operator_to_qubit_hamiltonian,
 )
 from qdk_chemistry.utils import Logger
+
+if TYPE_CHECKING:
+    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Symmetries
 
 __all__ = ["OpenFermionQubitMapper", "OpenFermionQubitMapperSettings"]
 
@@ -37,22 +43,12 @@ class OpenFermionQubitMapperSettings(QubitMapperSettings):
     """Settings configuration for an OpenFermionQubitMapper.
 
     Inherits ``encoding`` from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.
-
-    Additional settings:
-        n_active_electrons (integer, default=0): Required for ``symmetry-conserving-bravyi-kitaev`` (0 = auto-detect).
-
     """
 
     def __init__(self):
         """Initialize OpenFermionQubitMapperSettings."""
         Logger.trace_entering()
         super().__init__(valid_encodings=_VALID_ENCODINGS)
-        self._set_default(
-            "n_active_electrons",
-            "int",
-            0,
-            "Number of active electrons (required for symmetry-conserving-bravyi-kitaev, 0 = auto-detect)",
-        )
 
 
 class OpenFermionQubitMapper(QubitMapper):
@@ -72,11 +68,12 @@ class OpenFermionQubitMapper(QubitMapper):
         self._settings = OpenFermionQubitMapperSettings()
         self._settings.set("encoding", encoding)
 
-    def _run_impl(self, hamiltonian: Hamiltonian) -> QubitHamiltonian:
+    def _run_impl(self, hamiltonian: Hamiltonian, symmetries: Symmetries | None = None) -> QubitHamiltonian:
         """Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.
 
         Args:
-            hamiltonian (Hamiltonian): The fermionic Hamiltonian.
+            hamiltonian: The fermionic Hamiltonian.
+            symmetries: Conserved quantum numbers (particle count, spin). Required for SCBK encoding.
 
         Returns:
             QubitHamiltonian: An instance of the QubitHamiltonian.
@@ -94,7 +91,7 @@ class OpenFermionQubitMapper(QubitMapper):
         if encoding == "bravyi-kitaev-fast":
             qubit_op = self._map_bksf(hamiltonian)
         elif encoding == "symmetry-conserving-bravyi-kitaev":
-            qubit_op = self._map_scbk(hamiltonian)
+            qubit_op = self._map_scbk(hamiltonian, symmetries)
         else:
             qubit_op = self._map_standard(hamiltonian, encoding)
 
@@ -109,7 +106,7 @@ class OpenFermionQubitMapper(QubitMapper):
 
         return qubit_operator_to_qubit_hamiltonian(qubit_op, encoding=encoding)
 
-    def _map_standard(self, hamiltonian: Hamiltonian, encoding: str) -> "of.QubitOperator":
+    def _map_standard(self, hamiltonian: Hamiltonian, encoding: str) -> of.QubitOperator:
         """Apply a standard fermion-to-qubit transform (JW, BK, or BK-tree).
 
         Uses blocked spin-orbital ordering (α₀, α₁, …, β₀, β₁, …) so that
@@ -134,43 +131,36 @@ class OpenFermionQubitMapper(QubitMapper):
         transform = transform_map[encoding]
         return transform(fermion_op)
 
-    def _map_scbk(self, hamiltonian: Hamiltonian) -> "of.QubitOperator":
+    def _map_scbk(self, hamiltonian: Hamiltonian, symmetries: Symmetries | None) -> of.QubitOperator:
         """Apply symmetry-conserving Bravyi-Kitaev transformation.
 
         This transform reduces the qubit count by 2 by exploiting particle number
-        and spin symmetry. It requires the number of active electrons.
+        and spin symmetry. The number of active electrons is read from the
+        ``symmetries`` parameter.
 
         Args:
             hamiltonian: The fermionic Hamiltonian.
+            symmetries: Conserved quantum numbers providing the active electron count.
 
         Returns:
             openfermion.QubitOperator: The mapped qubit operator.
 
         Raises:
-            ValueError: If the number of active electrons cannot be determined.
+            ValueError: If ``symmetries`` is not provided.
 
         """
-        fermion_op = hamiltonian_to_fermion_operator(hamiltonian)
+        if symmetries is None:
+            raise ValueError(
+                "The symmetry-conserving Bravyi-Kitaev encoding requires a Symmetries "
+                "object specifying the number of active electrons.\n"
+                "Example:\n"
+                "  from qdk_chemistry.data import Symmetries\n"
+                "  symmetries = Symmetries(n_alpha=1, n_beta=1)\n"
+                "  qubit_hamiltonian = mapper.run(hamiltonian, symmetries)"
+            )
 
-        n_active_electrons = self._settings.get("n_active_electrons")
-        if n_active_electrons <= 0:
-            # Try to infer from orbital data
-            try:
-                orbitals = hamiltonian.get_orbitals()
-                alpha_inactive, _ = orbitals.get_inactive_space_indices()
-                alpha_active, _ = orbitals.get_active_space_indices()
-                # Number of active electrons = total electrons - inactive electrons * 2
-                # For restricted: each inactive orbital contributes 2 electrons
-                n_active_electrons = 2 * len(alpha_inactive)
-                Logger.debug(
-                    f"Auto-detected n_active_electrons={n_active_electrons} from orbital data "
-                    f"(inactive orbitals: {len(alpha_inactive)})"
-                )
-            except (AttributeError, RuntimeError, TypeError):
-                raise ValueError(
-                    "Cannot determine the number of active electrons for symmetry-conserving "
-                    "Bravyi-Kitaev. Please set the 'n_active_electrons' setting explicitly."
-                ) from None
+        fermion_op = hamiltonian_to_fermion_operator(hamiltonian)
+        n_active_electrons = symmetries.n_particles
 
         # Number of spin-orbitals
         h1_alpha, _ = hamiltonian.get_one_body_integrals()
@@ -184,7 +174,7 @@ class OpenFermionQubitMapper(QubitMapper):
             n_active_electrons,
         )
 
-    def _map_bksf(self, hamiltonian: Hamiltonian) -> "of.QubitOperator":
+    def _map_bksf(self, hamiltonian: Hamiltonian) -> of.QubitOperator:
         """Apply Bravyi-Kitaev superfast (BKSF) transformation.
 
         The BKSF transform operates directly on the ``InteractionOperator`` rather
@@ -206,7 +196,7 @@ class OpenFermionQubitMapper(QubitMapper):
         return "openfermion"
 
 
-def _build_blocked_fermion_operator(hamiltonian: Hamiltonian) -> "of.FermionOperator":
+def _build_blocked_fermion_operator(hamiltonian: Hamiltonian) -> of.FermionOperator:
     """Build a FermionOperator using blocked spin-orbital ordering.
 
     Blocked ordering: [α₀, α₁, …, αₙ₋₁, β₀, β₁, …, βₙ₋₁]

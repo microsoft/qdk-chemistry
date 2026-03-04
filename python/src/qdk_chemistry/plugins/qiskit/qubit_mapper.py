@@ -3,13 +3,14 @@
 This module provides a QiskitQubitMapper class to convert Hamiltonians to QubitHamiltonians
 using different mapping strategies ("jordan-wigner", "bravyi-kitaev", and "parity").
 """
-
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import ClassVar
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, ClassVar
 
 from qiskit_nature.second_q.hamiltonians import ElectronicEnergy
 from qiskit_nature.second_q.mappers import (
@@ -21,6 +22,9 @@ from qiskit_nature.second_q.mappers import (
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
 from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
 from qdk_chemistry.utils import Logger
+
+if TYPE_CHECKING:
+    from qdk_chemistry.data import Symmetries
 
 __all__ = ["QiskitQubitMapper", "QiskitQubitMapperSettings"]
 
@@ -60,11 +64,12 @@ class QiskitQubitMapper(QubitMapper):
         self._settings = QiskitQubitMapperSettings()
         self._settings.set("encoding", encoding)
 
-    def _run_impl(self, hamiltonian: Hamiltonian) -> QubitHamiltonian:
+    def _run_impl(self, hamiltonian: Hamiltonian, _symmetries: Symmetries | None = None) -> QubitHamiltonian:
         """Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.
 
         Args:
-            hamiltonian (Hamiltonian): The fermionic Hamiltonian.
+            hamiltonian: The fermionic Hamiltonian.
+            _symmetries: Optional conserved quantum numbers. Not used by this implementation.
 
         Returns:
             QubitHamiltonian: An instance of the QubitHamiltonian.

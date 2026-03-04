@@ -45,7 +45,7 @@ Parity :cite:`Seeley2012`
 .. _encoding-scbk:
 
 Symmetry-conserving Bravyi-Kitaev :cite:`Bravyi2017tapering`
-   Exploits particle-number and spin-parity symmetries to reduce the qubit count by 2. Requires the number of active electrons.
+   Exploits particle-number and spin-parity symmetries to reduce the qubit count by 2. Requires a :class:`~qdk_chemistry.data.Symmetries` object.
 
 .. _encoding-bk-fast:
 
@@ -220,9 +220,22 @@ Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi
    * - ``encoding``
      - string
      - Fermion-to-qubit encoding (``jordan-wigner``, ``bravyi-kitaev``, ``symmetry-conserving-bravyi-kitaev``, ``bravyi-kitaev-fast``, ``bravyi-kitaev-tree``)
-   * - ``n_active_electrons``
-     - integer
-     - Number of active electrons. Required for ``symmetry-conserving-bravyi-kitaev``. Set to 0 for auto-detection from orbital data. Default: ``0``
+
+.. note::
+
+   The ``symmetry-conserving-bravyi-kitaev`` encoding requires a
+   :class:`~qdk_chemistry.data.Symmetries` object passed as the second argument
+   to ``run()``.  This object specifies the number of active alpha and beta
+   electrons so that the transform can exploit particle-number and spin-parity
+   symmetries to reduce the qubit count by 2.
+   See :doc:`Symmetries <../data/symmetries>` for full details and factory methods.
+
+   .. tab:: Python API
+
+      .. literalinclude:: ../../../_static/examples/python/qubit_mapper.py
+         :language: python
+         :start-after: # start-cell-scbk-mapper
+         :end-before: # end-cell-scbk-mapper
 
 
 Related classes
@@ -230,6 +243,7 @@ Related classes
 
 - :doc:`Hamiltonian <../data/hamiltonian>`: Input Hamiltonian for mapping
 - :class:`~qdk_chemistry.data.QubitHamiltonian`: Output qubit operator representation
+- :doc:`Symmetries <../data/symmetries>`: Conserved quantum numbers for symmetry-exploiting encodings
 
 Further reading
 ---------------

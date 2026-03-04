@@ -14,7 +14,7 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Settings
 
 if TYPE_CHECKING:  # Only needed for type annotations; avoid importing into module namespace
-    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
+    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Symmetries
 
 __all__: list[str] = []
 
@@ -58,11 +58,12 @@ class QubitMapper(Algorithm):
         return "qubit_mapper"
 
     @abstractmethod
-    def _run_impl(self, hamiltonian: Hamiltonian) -> QubitHamiltonian:
+    def _run_impl(self, hamiltonian: Hamiltonian, symmetries: Symmetries | None = None) -> QubitHamiltonian:
         """Construct a QubitHamiltonian from a Hamiltonian using the mapping specified.
 
         Args:
-            hamiltonian (Hamiltonian): The fermionic Hamiltonian.
+            hamiltonian: The fermionic Hamiltonian.
+            symmetries: Optional conserved quantum numbers. Required by symmetry-exploiting encodings.
 
         Returns:
            QubitHamiltonian: An instance of the QubitHamiltonian.
