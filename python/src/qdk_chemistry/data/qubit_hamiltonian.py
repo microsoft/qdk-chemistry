@@ -111,6 +111,42 @@ class QubitHamiltonian(DataClass):
         """
         return SparsePauliOp(self.pauli_strings, self.coefficients)
 
+    def equiv(self, other: "QubitHamiltonian", atol: float = 1e-12) -> bool:
+        """Check mathematical equivalence with another QubitHamiltonian.
+
+        Two QubitHamiltonians are equivalent if they contain the same Pauli
+        terms with the same coefficients (within tolerance), regardless of
+        term ordering.  Duplicate Pauli strings are summed before comparison.
+
+        Args:
+            other: The QubitHamiltonian to compare against.
+            atol: Absolute tolerance for coefficient comparison. Defaults to 1e-12.
+
+        Returns:
+            ``True`` if the two QubitHamiltonians are mathematically equivalent.
+
+        Examples:
+            >>> qh1 = QubitHamiltonian(["XI", "ZZ"], np.array([0.5, 0.3]))
+            >>> qh2 = QubitHamiltonian(["ZZ", "XI"], np.array([0.3, 0.5]))
+            >>> qh1.equiv(qh2)
+            True
+
+        """
+        if not isinstance(other, QubitHamiltonian):
+            return NotImplemented
+
+        def _sum_terms(qh: QubitHamiltonian) -> dict[str, complex]:
+            d: dict[str, complex] = {}
+            for ps, c in zip(qh.pauli_strings, qh.coefficients, strict=True):
+                d[ps] = d.get(ps, 0) + c
+            return d
+
+        self_dict = _sum_terms(self)
+        other_dict = _sum_terms(other)
+
+        all_keys = set(self_dict) | set(other_dict)
+        return all(abs(self_dict.get(k, 0) - other_dict.get(k, 0)) <= atol for k in all_keys)
+
     def is_hermitian(self, tolerance: float = 1e-12) -> bool:
         """Check whether all coefficients are real within ``tolerance``.
 

@@ -91,5 +91,8 @@ Logger.info(f"  Ground-state energy: {energy: .15f} Hartree")
 ########################################################################################
 qdk_qubit_ham_rt = qubit_operator_to_qubit_hamiltonian(qop, encoding="jordan-wigner")
 
-Logger.info("=== OpenFermion → QDK ===")
-Logger.info(f"  Pauli terms: {len(qdk_qubit_ham_rt.pauli_strings)}")
+Logger.info("=== OpenFermion → QDK (round-trip check) ===")
+assert qdk_qubit_ham_rt.equiv(qdk_qubit_ham), "Round-trip mismatch!"
+Logger.info(
+    f"  Round-trip check passed ({len(qdk_qubit_ham_rt.pauli_strings)} Pauli terms)"
+)

@@ -40,8 +40,8 @@ pytestmark = pytest.mark.skipif(not OPENFERMION_AVAILABLE, reason="OpenFermion n
 
 def _assert_pauli_ops_equal(actual: QubitHamiltonian, expected: QubitHamiltonian) -> None:
     """Assert two QubitHamiltonians have identical Pauli terms and coefficients."""
-    assert actual.pauli_ops.equiv(expected.pauli_ops, atol=float_comparison_absolute_tolerance), (
-        f"Pauli operators differ.\n  actual:   {actual.pauli_ops.sort()}\n  expected: {expected.pauli_ops.sort()}"
+    assert actual.equiv(expected, atol=float_comparison_absolute_tolerance), (
+        f"Pauli operators differ.\n  actual:   {actual.pauli_strings}\n  expected: {expected.pauli_strings}"
     )
 
 
