@@ -26,7 +26,7 @@ def load():
 
 
 def openfermion_load():
-    """Load the OpenFermion qubit mapper plugin into QDK/Chemistry."""
+    """Load the OpenFermion plugins into QDK/Chemistry."""
     Logger.trace_entering()
 
     from qdk_chemistry.algorithms import register  # noqa: PLC0415

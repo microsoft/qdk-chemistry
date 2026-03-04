@@ -132,7 +132,7 @@ def create_nontrivial_test_hamiltonian(num_orbitals: int = 2):
                     for a, b, c, d in perms:
                         h2[a, b, c, d] = val
 
-    two_body = h2.ravel(order="F")
+    two_body = h2.ravel()
     fock = np.eye(0)
     orbitals = create_test_orbitals(n)
     return Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 0.5, fock))

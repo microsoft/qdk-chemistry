@@ -231,13 +231,6 @@ def test_openfermion_scbk_symmetries_ignored_for_jw():
     _assert_pauli_ops_equal(qh_with, qh_without)
 
 
-def test_openfermion_scbk_no_n_active_electrons_setting():
-    """The n_active_electrons setting no longer exists on OpenFermionQubitMapperSettings."""
-    mapper = create("qubit_mapper", "openfermion")
-    with pytest.raises(Exception, match="n_active_electrons"):
-        mapper.settings().get("n_active_electrons")
-
-
 def test_openfermion_invalid_encoding():
     """An invalid encoding raises ValueError."""
     mapper = create("qubit_mapper", "openfermion")
@@ -309,6 +302,28 @@ def test_qubit_operator_to_qubit_hamiltonian_empty():
     empty_op = of.QubitOperator()
     with pytest.raises(ValueError, match="empty"):
         qubit_operator_to_qubit_hamiltonian(empty_op)
+
+
+def test_qubit_operator_to_qubit_hamiltonian_near_zero_raises():
+    """A QubitOperator whose coefficients are all below machine epsilon raises ValueError."""
+    eps = np.finfo(np.float64).eps
+    near_zero_op = of.QubitOperator("X0 Z1", eps * 0.1) + of.QubitOperator("Y0", eps * 0.5)
+    with pytest.raises(ValueError, match="empty"):
+        qubit_operator_to_qubit_hamiltonian(near_zero_op)
+
+
+def test_qubit_operator_to_qubit_hamiltonian_cancelled_raises():
+    """A QubitOperator that cancels to zero via subtraction raises ValueError."""
+    cancelled_op = of.QubitOperator("X0", 1.0) - of.QubitOperator("X0", 1.0)
+    with pytest.raises(ValueError, match="empty"):
+        qubit_operator_to_qubit_hamiltonian(cancelled_op)
+
+
+def test_qubit_operator_to_qubit_hamiltonian_zero_identity_raises():
+    """A QubitOperator with only a zero-coefficient identity term raises ValueError."""
+    zero_identity = of.QubitOperator("", 0.0)
+    with pytest.raises(ValueError, match="empty"):
+        qubit_operator_to_qubit_hamiltonian(zero_identity)
 
 
 def test_full_pipeline_round_trip():

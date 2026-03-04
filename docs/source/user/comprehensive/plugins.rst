@@ -143,27 +143,26 @@ These boolean variables are set at module load time and reflect the actual avail
 
 OpenFermion plugin details
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
-The OpenFermion plugin integrates QDK/Chemistry with `OpenFermion <https://quantumai.google/openfermion>`_ and, optionally, `Cirq <https://quantumai.google/cirq>`_.
-Like the Qiskit plugin, it uses **opportunistic loading**: the plugin loads when OpenFermion is installed, and optionally loads Cirq for circuit interoperability.
+The OpenFermion plugin integrates QDK/Chemistry with `OpenFermion <https://quantumai.google/openfermion>`_.
+Like the Qiskit plugin, it uses **opportunistic loading**: the plugin loads when OpenFermion is installed.
 
 **Loading behavior:**
 
-- **OpenFermion (core)**: Loaded when the plugin is initialized and OpenFermion is installed.
-- **Cirq**: Loaded if ``cirq-core`` is installed.
+- **OpenFermion**: Loaded when the plugin is initialized and OpenFermion is installed.
 
 **Installing OpenFermion packages:**
 
-To install OpenFermion and its optional Cirq dependency, use the ``openfermion-extras`` extra when installing QDK/Chemistry:
+To install OpenFermion, use the ``openfermion-extras`` extra when installing QDK/Chemistry:
 
 .. code-block:: bash
 
    pip install 'qdk-chemistry[openfermion-extras]'
 
-Alternatively, you can install them directly:
+Alternatively, you can install it directly:
 
 .. code-block:: bash
 
-   pip install openfermion cirq-core ply
+   pip install openfermion
 
 **Checking what is loaded:**
 
@@ -173,19 +172,17 @@ To determine which OpenFermion components are available in your environment, you
 
    from qdk_chemistry.plugins.openfermion import (
        QDK_CHEMISTRY_HAS_OPENFERMION,
-       QDK_CHEMISTRY_HAS_CIRQ,
    )
 
    print(f"OpenFermion available: {QDK_CHEMISTRY_HAS_OPENFERMION}")
-   print(f"Cirq available: {QDK_CHEMISTRY_HAS_CIRQ}")
 
 These boolean variables are set at module load time and reflect the actual availability of each package in your Python environment.
 
 .. warning::
 
-   If OpenFermion is not installed, the ``"openfermion"`` qubit mapper will not be available
-   in the factory. Use the :ref:`listing-implementations` pattern to see which implementations
-   are currently available.
+   If you attempt to use an algorithm that requires OpenFermion but the package is not installed,
+   the algorithm will not be available in the factory. Use the :ref:`listing-implementations` pattern
+   to see which implementations are currently available.
 
 .. _community-plugins:
 

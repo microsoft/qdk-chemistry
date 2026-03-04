@@ -91,9 +91,7 @@ qiskit-extras = [
   "qiskit-nature"
 ]
 openfermion-extras = [
-  "openfermion>=1.0.0",
-  "cirq-core",
-  "ply"
+  "openfermion>=1.0.0"
 ]
 
 [project.urls]

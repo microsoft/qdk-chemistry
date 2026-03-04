@@ -36,10 +36,8 @@ Currently available plugin packages:
 * :mod:`qdk_chemistry.plugins.qiskit`: Qiskit integration providing qubit mapping,
   circuit execution, energy estimation, and state preparation.
 
-* :mod:`qdk_chemistry.plugins.openfermion`: OpenFermion integration providing qubit
-  mapping via five fermion-to-qubit encodings (Jordan-Wigner, Bravyi-Kitaev,
-  symmetry-conserving Bravyi-Kitaev, Bravyi-Kitaev fast, and Bravyi-Kitaev tree),
-  bidirectional Hamiltonian/operator conversion, and Cirq circuit interoperability.
+* :mod:`qdk_chemistry.plugins.openfermion`: OpenFermion integration providing qubit mapping,
+  operator conversion, and quantum circuit interoperability.
 
 Using Plugins
 -------------

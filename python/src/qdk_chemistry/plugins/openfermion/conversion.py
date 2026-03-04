@@ -216,14 +216,11 @@ def qubit_operator_to_qubit_hamiltonian(
     Logger.trace_entering()
 
     # After compression, a zero operator may have no terms or only a zero identity
-    non_zero_terms = {k: v for k, v in qubit_op.terms.items() if abs(v) > 1e-15}
+    epsilon = np.finfo(np.float64).eps
+    non_zero_terms = {k: v for k, v in qubit_op.terms.items() if abs(v) > epsilon}
     if not non_zero_terms:
-        # Return an empty QubitHamiltonian with zero identity
-        return data.QubitHamiltonian(
-            pauli_strings=[],
-            coefficients=np.array([], dtype=complex),
-            encoding=encoding,
-        )
+        msg = "QubitOperator is empty (no non-zero terms)."
+        raise ValueError(msg)
 
     # Determine the number of qubits from the highest qubit index
     n_qubits = 0

@@ -58,7 +58,7 @@ The following extras are available:
 | `jupyter` | Jupyter notebook support | ipykernel, pandas, pyscf |
 | `plugins` | Third-party quantum chemistry backends | PySCF |
 | `qiskit-extras` | Optional Qiskit ecosystem packages | qiskit-aer, qiskit-nature |
-| `openfermion-extras` | OpenFermion qubit mappings and Cirq circuit interop | openfermion, cirq-core |
+| `openfermion-extras` | Optional OpenFermion ecosystem packages | openfermion |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
 | `all` | All of the above | All optional dependencies |
 
