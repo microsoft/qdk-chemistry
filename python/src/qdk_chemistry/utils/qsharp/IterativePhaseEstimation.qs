@@ -4,11 +4,7 @@
 
 namespace QDKChemistry.Utils.IterativePhaseEstimation {
 
-    import Std.Math.ArcCos;
-    import Std.Math.PI;
-    import Std.Convert.IntAsDouble;
     import Std.Arrays.Subarray;
-    import Std.Arrays.Mapped;
 
     /// Prepare iterative Quantum Phase Estimation (IQPE) circuit.
     /// # Parameters

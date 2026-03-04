@@ -4,11 +4,7 @@
 
 namespace QDKChemistry.Utils.ControlledPauliExp {
 
-    import Std.Math.ArcCos;
-    import Std.Math.PI;
-    import Std.Convert.IntAsDouble;
     import Std.Arrays.Subarray;
-    import Std.Arrays.Mapped;
 
     /// Performs Controlled Time Evolution for a set of Pauli exponentials.
     /// # Parameters

@@ -251,7 +251,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             coeffs: The coefficients corresponding to each determinant.
 
         Returns:
-            A tuple containing the GF2X elimination result and the reduced binary matrix.
+            A tuple containing the GF2X elimination result and the statevector.
 
         """
         Logger.trace_entering()

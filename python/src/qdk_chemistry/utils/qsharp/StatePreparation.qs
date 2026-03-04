@@ -4,9 +4,6 @@
 
 namespace QDKChemistry.Utils.StatePreparation {
 
-    import Std.Math.ArcCos;
-    import Std.Math.PI;
-    import Std.Convert.IntAsDouble;
     import Std.Arrays.Subarray;
     import Std.StatePreparation.PreparePureStateD;
 
