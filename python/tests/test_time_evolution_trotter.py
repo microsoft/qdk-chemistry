@@ -138,7 +138,7 @@ class TestTrotter:
         builder = Trotter(order=3)
         hamiltonian = QubitHamiltonian(pauli_strings=["X"], coefficients=[1.0])
 
-        with pytest.raises(NotImplementedError, match="Higher odd-order Trotter methods are not supported."):
+        with pytest.raises(NotImplementedError, match="Non-positive and higher odd orders are not supported."):
             builder.run(hamiltonian, time=1.0)
 
     def test_trotter_x_z_example(self):
@@ -312,7 +312,7 @@ class TestTrotter:
         assert container.step_reps == 1
         assert len(container.step_terms) == 11
 
-    def test_multiple_trotter_steps_higher_order(self):
+    def test_multiple_trotter_steps_fourth_order(self):
         """Test construction of time evolution unitary with multiple Trotter steps."""
         hamiltonian = QubitHamiltonian(
             pauli_strings=["XI", "ZZ"],
@@ -399,6 +399,86 @@ class TestTrotter:
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
         )
+
+    def test_multiple_trotter_steps_sixth_order(self):
+        """Test construction of time evolution unitary with multiple Trotter steps."""
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XI", "ZZ"],
+            coefficients=[1.0, 1.0],
+        )
+
+        builder = Trotter(num_divisions=4, order=6)
+        unitary = builder.run(hamiltonian, time=0.2)
+
+        container = unitary.get_container()
+
+        assert container.step_reps == 4
+        assert len(container.step_terms) == 51
+
+        dt = 0.2 / container.step_reps
+
+        angles = [
+            0.07731617143363592,
+            0.15463234286727184,
+            0.15463234286727184,
+            0.15463234286727184,
+            -0.04541560043427140,
+            -0.24546354373581464,
+            -0.04541560043427140,
+            0.15463234286727184,
+            0.15463234286727184,
+            0.15463234286727184,
+            0.15463234286727184,
+            0.15463234286727184,
+            0.15463234286727184,
+            0.15463234286727184,
+            -0.04541560043427140,
+            -0.24546354373581464,
+            -0.04541560043427140,
+            0.15463234286727184,
+            0.15463234286727184,
+            0.15463234286727184,
+            -0.024703128403719937,
+            -0.20403859967471172,
+            -0.20403859967471172,
+            -0.20403859967471172,
+            0.059926244045521965,
+            0.32389108776575565,
+            0.059926244045521965,
+            -0.20403859967471172,
+            -0.20403859967471172,
+            -0.20403859967471172,
+            -0.024703128403719937,
+            0.15463234286727184,
+            0.15463234286727184,
+            0.15463234286727184,
+            -0.04541560043427140,
+            -0.24546354373581464,
+            -0.04541560043427140,
+            0.15463234286727184,
+            0.15463234286727184,
+            0.15463234286727184,
+            0.15463234286727184,
+            0.15463234286727184,
+            0.15463234286727184,
+            0.15463234286727184,
+            -0.04541560043427140,
+            -0.24546354373581464,
+            -0.04541560043427140,
+            0.15463234286727184,
+            0.15463234286727184,
+            0.15463234286727184,
+            0.07731617143363592,
+        ]
+
+        # See Childs et. al. 2021
+        for term, expected_angle in zip(container.step_terms, angles, strict=False):
+            assert np.isclose(
+                term.angle,
+                expected_angle * dt,
+                atol=float_comparison_absolute_tolerance,
+                rtol=float_comparison_relative_tolerance,
+            )
 
     def test_filters_small_coefficients_higher_order(self):
         """Test that terms with small coefficients are filtered out."""
@@ -566,13 +646,13 @@ class TestTrotterAccuracyAware:
 
     def test_target_accuracy_commutator_bound_second_order(self):
         """Test that target_accuracy with commutator bound computes correct step count."""
-        # H = X + Z, X and Z anticommute -> commutator bound = 4
-        # N = ceil(sqrt(4) * t^(3/2) / (sqrt(3! * eps))) = 17
+        # H = X + Z, X and Z anticommute -> commutator bound = 6
+        # For t = 1 and eps = 0.01, N = ceil(sqrt(6 / 12) / sqrt(eps)) = 8.
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
         builder = Trotter(target_accuracy=0.01, order=2)
         unitary = builder.run(hamiltonian, time=1.0)
         container = unitary.get_container()
-        assert container.step_reps == 9
+        assert container.step_reps == 8
 
     def test_target_accuracy_naive_bound_second_order(self):
         """Test that target_accuracy with naive bound computes correct step count."""
@@ -580,7 +660,7 @@ class TestTrotterAccuracyAware:
         builder = Trotter(target_accuracy=0.01, error_bound="naive", order=2)
         unitary = builder.run(hamiltonian, time=1.0)
         container = unitary.get_container()
-        # one_norm = 2, N = ceil(2^1/2 / 0.01) = 29
+        # one_norm = 2, naive second-order bound for eps=0.01 and t=1.0 gives N = 17
         assert container.step_reps == 17
 
     def test_commutator_tighter_than_naive_second_order(self):

@@ -164,7 +164,7 @@ class TestTrotterStepsCommutator:
         assert trotter_steps_commutator(h, 1.0, 100.0, order=2) == 1
 
     def test_time_scaling_second_order(self):
-        """Test that step count scales with t^3."""
+        """Test that step count scales with t^(3/2)."""
         h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
         n1 = trotter_steps_commutator(h, 1.0, 0.1, order=2)
         n2 = trotter_steps_commutator(h, 2.0, 0.1, order=2)

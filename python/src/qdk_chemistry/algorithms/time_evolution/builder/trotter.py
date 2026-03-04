@@ -145,7 +145,7 @@ class Trotter(TimeEvolutionBuilder):
         order = self._settings.get("order")
         if order in {1, 2} or (order > 2 and order % 2 == 0):
             return self._trotter(qubit_hamiltonian, time)
-        raise NotImplementedError("Higher odd-order Trotter methods are not supported.")
+        raise NotImplementedError("Non-positive and higher odd orders are not supported.")
 
     def _trotter(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
         r"""Construct the time evolution unitary using Trotter decomposition.
@@ -308,10 +308,9 @@ class Trotter(TimeEvolutionBuilder):
 
             # Construct order 2k formula bottom up dynamic-programming style
             if order > 2 and order % 2 == 0:
-                k = int(order / 2)
-                u_k = 1 / (4 - 4 ** (1 / (2 * k - 1)))
                 step_terms = terms.copy()
-                for _ in range(1, k):
+                for k in range(2, int(order / 2) + 1):
+                    u_k = 1 / (4 - 4 ** (1 / (2 * k - 1)))
                     new_terms = []
 
                     # S_{2k-2}(u_k t)^2 = S_{2k-2}(u_k t) S_{2k-2}(u_k t)

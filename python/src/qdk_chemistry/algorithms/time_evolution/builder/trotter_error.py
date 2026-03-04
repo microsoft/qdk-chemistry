@@ -67,7 +67,7 @@ def trotter_steps_naive(
     coefficients, :math:`p` is the order of the Trotter-Suzuki product formula,
     and :math:`C_{\text{max}}` is the largest coefficient in the Taylor expansion of
     the Trotter error, (exp(H_1+...+H_L) - S_order), to t^(order+1)
-    when all coefficients are 1 and t = 1. The
+    when all coefficients are 1 and t = 1.
 
     Args:
         hamiltonian: The qubit Hamiltonian to simulate.
@@ -93,7 +93,7 @@ def trotter_steps_naive(
     if order not in {1, 2} and not (order > 2 and order % 2 == 0):
         raise NotImplementedError(
             f"Trotter step estimation for order {order} is not yet implemented. "
-            "Higher odd-order Trotter methods are not supported."
+            "Non-positive and higher odd orders are not supported."
         )
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
     one_norm = sum(abs(coeff) for _, coeff in real_terms)
@@ -122,8 +122,8 @@ def trotter_steps_commutator(
     hamiltonian: QubitHamiltonian,
     time: float,
     target_accuracy: float,
-    order: int,
     *,
+    order: int = 1,
     largest_error_coefficient: float = 1.0,
     weight_threshold: float = 1e-12,
 ) -> int:
@@ -177,7 +177,7 @@ def trotter_steps_commutator(
     if order not in {1, 2} and not (order > 2 and order % 2 == 0):
         raise NotImplementedError(
             f"Trotter step estimation for order {order} is not yet implemented. "
-            "Higher odd-order Trotter methods are not supported."
+            "Non-positive and higher odd orders are not supported."
         )
     if order == 1:
         comm_bound = commutator_bound_first_order(hamiltonian, weight_threshold=weight_threshold)

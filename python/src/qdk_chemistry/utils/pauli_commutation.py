@@ -361,6 +361,7 @@ def commutator_bound_second_order(
 
     total_term1 = 0.0
     n = len(pauli_labels)
+    print("n", n)
     for i in range(n):
         for j in range(i + 1, n):
             for k in range(i + 1, n):
@@ -372,6 +373,7 @@ def commutator_bound_second_order(
         for j in range(i + 1, n):
             if not does_nested_commutator_vanish(pauli_labels[i], pauli_labels[i], pauli_labels[j]):
                 total_term2 += 2.0**2 * abs(coefficients[i]) ** 2 * abs(coefficients[j])
+
     return total_term1 + 0.5 * total_term2
 
 
