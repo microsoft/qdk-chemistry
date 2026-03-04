@@ -48,12 +48,10 @@ if _QDK_INTERPRETER_PROFILE == "unrestricted":  # Default by Q# if not set
     qdk_init(target_profile=TargetProfile.Base)
     new_config = get_qdk_profile_config()
     _QDK_INTERPRETER_PROFILE = new_config.get_target_profile()
-    Logger.warn(
-        f"QDK interpreter profile was re-initialized to '{_QDK_INTERPRETER_PROFILE}'. "
-        "If you imported Q# code before this module loaded, please re-import it. "
-        "To avoid this re-initialization, please set your target profile before importing qdk_chemistry:\n"
-        "    from qdk import init, TargetProfile\n"
-        "    init(target_profile=TargetProfile.Base)"
+    Logger.info(
+        f"QDK interpreter profile initialized to '{_QDK_INTERPRETER_PROFILE}'. "
+        "If you imported Q# code before this module was loaded, please re-import it, "
+        "or set your target profile before importing qdk_chemistry."
     )
 
 
