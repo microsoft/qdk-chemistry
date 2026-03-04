@@ -12,15 +12,19 @@ symmetry-conserving Bravyi-Kitaev qubit mapping.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+from qdk_chemistry.data.base import DataClass
 
 if TYPE_CHECKING:
+    import h5py
+
     from qdk_chemistry.data import Ansatz, Wavefunction
 
 __all__ = ["Symmetries"]
 
 
-class Symmetries:
+class Symmetries(DataClass):
     """Immutable container for the conserved quantum numbers of an electronic state.
 
     Stores the number of alpha and beta electrons in the active space. Derived
@@ -43,7 +47,11 @@ class Symmetries:
 
     """
 
-    __slots__ = ("_n_alpha", "_n_beta")
+    # Class attribute for filename validation
+    _data_type_name = "symmetries"
+
+    # Serialization version for this class
+    _serialization_version = "0.1.0"
 
     def __init__(self, n_alpha: int, n_beta: int) -> None:
         """Initialize Symmetries with active-space electron counts."""
@@ -53,6 +61,8 @@ class Symmetries:
             raise ValueError(f"n_beta must be non-negative, got {n_beta}")
         self._n_alpha = int(n_alpha)
         self._n_beta = int(n_beta)
+        # Make instance immutable after construction (handled by base class)
+        super().__init__()
 
     # -- Factory methods -------------------------------------------------------
 
@@ -111,8 +121,8 @@ class Symmetries:
 
     @property
     def spin_multiplicity(self) -> int:
-        r"""Spin multiplicity :math:`2S + 1 = n_\alpha - n_\beta + 1`."""
-        return self._n_alpha - self._n_beta + 1
+        r"""Spin multiplicity :math:`2S + 1 = |n_\alpha - n_\beta| + 1`."""
+        return abs(self._n_alpha - self._n_beta) + 1
 
     # -- Dunder methods --------------------------------------------------------
 
@@ -129,3 +139,85 @@ class Symmetries:
     def __hash__(self) -> int:
         """Return a hash."""
         return hash((self._n_alpha, self._n_beta))
+
+    # -- DataClass interface ---------------------------------------------------
+
+    def get_summary(self) -> str:
+        """Get a human-readable summary of the symmetries.
+
+        Returns:
+            str: Summary string describing the symmetries.
+
+        """
+        return (
+            f"Symmetries\n"
+            f"  Alpha electrons: {self._n_alpha}\n"
+            f"  Beta electrons: {self._n_beta}\n"
+            f"  Total particles: {self.n_particles}\n"
+            f"  Sz: {self.sz}\n"
+            f"  Spin multiplicity: {self.spin_multiplicity}"
+        )
+
+    def to_json(self) -> dict[str, Any]:
+        """Convert the symmetries to a dictionary for JSON serialization.
+
+        Returns:
+            dict[str, Any]: Dictionary representation of the symmetries.
+
+        """
+        data = {
+            "n_alpha": self._n_alpha,
+            "n_beta": self._n_beta,
+        }
+        return self._add_json_version(data)
+
+    def to_hdf5(self, group: h5py.Group) -> None:
+        """Save the symmetries to an HDF5 group.
+
+        Args:
+            group (h5py.Group): HDF5 group or file to write the symmetries to.
+
+        """
+        self._add_hdf5_version(group)
+        group.attrs["n_alpha"] = self._n_alpha
+        group.attrs["n_beta"] = self._n_beta
+
+    @classmethod
+    def from_json(cls, json_data: dict[str, Any]) -> Symmetries:
+        """Create a Symmetries from a JSON dictionary.
+
+        Args:
+            json_data (dict[str, Any]): Dictionary containing the serialized data.
+
+        Returns:
+            Symmetries: New instance reconstructed from JSON data.
+
+        Raises:
+            RuntimeError: If version field is missing or incompatible.
+
+        """
+        cls._validate_json_version(cls._serialization_version, json_data)
+        return cls(
+            n_alpha=json_data["n_alpha"],
+            n_beta=json_data["n_beta"],
+        )
+
+    @classmethod
+    def from_hdf5(cls, group: h5py.Group) -> Symmetries:
+        """Load a Symmetries from an HDF5 group.
+
+        Args:
+            group (h5py.Group): HDF5 group or file containing the data.
+
+        Returns:
+            Symmetries: New instance reconstructed from HDF5 data.
+
+        Raises:
+            RuntimeError: If version attribute is missing or incompatible.
+
+        """
+        cls._validate_hdf5_version(cls._serialization_version, group)
+        return cls(
+            n_alpha=int(group.attrs["n_alpha"]),
+            n_beta=int(group.attrs["n_beta"]),
+        )

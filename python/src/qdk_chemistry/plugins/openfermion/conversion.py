@@ -90,24 +90,25 @@ def _spatial_to_spinorb_two_body(
     # which is <pq|sr> in physicist notation = (ps|rq) in chemist notation
     h2_so = np.zeros((n_spinorb, n_spinorb, n_spinorb, n_spinorb), dtype=float)
 
-    for p in range(norb):
-        for q in range(norb):
-            for r in range(norb):
-                for s in range(norb):
-                    # Chemist (pq|rs) → InteractionOperator h[p,q,r,s] = (ps|rq) in chemist
-                    # Or equivalently, we can use spinorb_from_spatial which does the standard mapping
+    # The loop body assigns h2_so[2p,2q,2r,2s] = h2_aaaa[p,s,r,q], i.e. a
+    # transpose (0,3,2,1) of the source block placed into even-index slots.
+    # The same pattern applies to every spin block.
 
-                    # alpha-alpha: spin-orbitals 2p, 2q, 2r, 2s
-                    h2_so[2 * p, 2 * q, 2 * r, 2 * s] = h2_aaaa[p, s, r, q]
+    # Slice objects for even (alpha) and odd (beta) spin-orbital indices
+    e = slice(0, n_spinorb, 2)  # even: 0,2,4,...
+    o = slice(1, n_spinorb, 2)  # odd:  1,3,5,...
 
-                    # beta-beta: spin-orbitals 2p+1, 2q+1, 2r+1, 2s+1
-                    h2_so[2 * p + 1, 2 * q + 1, 2 * r + 1, 2 * s + 1] = h2_bbbb[p, s, r, q]
+    # alpha-alpha block
+    h2_so[e, e, e, e] = h2_aaaa.transpose(0, 3, 2, 1)
 
-                    # alpha-beta: a†_(2p) a†_(2q+1) a_(2r+1) a_(2s)
-                    h2_so[2 * p, 2 * q + 1, 2 * r + 1, 2 * s] = h2_aabb[p, s, r, q]
+    # beta-beta block
+    h2_so[o, o, o, o] = h2_bbbb.transpose(0, 3, 2, 1)
 
-                    # beta-alpha: a†_(2p+1) a†_(2q) a_(2r) a_(2s+1)
-                    h2_so[2 * p + 1, 2 * q, 2 * r, 2 * s + 1] = h2_aabb[q, r, s, p]
+    # alpha-beta block: h2_so[2p, 2q+1, 2r+1, 2s] = h2_aabb[p,s,r,q]
+    h2_so[e, o, o, e] = h2_aabb.transpose(0, 3, 2, 1)
+
+    # beta-alpha block: h2_so[2p+1, 2q, 2r, 2s+1] = h2_aabb[q,r,s,p]
+    h2_so[o, e, e, o] = h2_aabb.transpose(3, 0, 1, 2)
 
     return h2_so
 
@@ -224,7 +225,7 @@ def qubit_operator_to_qubit_hamiltonian(
 
     # Determine the number of qubits from the highest qubit index
     n_qubits = 0
-    for term in qubit_op.terms:
+    for term in non_zero_terms:
         if term:  # Non-identity term
             max_idx = max(idx for idx, _ in term)
             n_qubits = max(n_qubits, max_idx + 1)
@@ -232,7 +233,7 @@ def qubit_operator_to_qubit_hamiltonian(
     pauli_strings = []
     coefficients = []
 
-    for term, coeff in qubit_op.terms.items():
+    for term, coeff in non_zero_terms.items():
         # Build dense Pauli string in Qiskit/QDK little-endian convention
         # QDK uses little-endian: qubit 0 is the rightmost character
         pauli_list = ["I"] * n_qubits
