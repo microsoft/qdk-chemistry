@@ -198,9 +198,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             )
 
         try:
-            return self._create_circuit_from_qiskit(
-                state_preparation, ctrl_evol_circuit, phase_correction, num_system_qubits
-            )
+            return self._create_circuit_from_qiskit(state_preparation, ctrl_evol_circuit, phase_correction)
         except ImportError:  # Fall through to the clearer RuntimeError if Qiskit or conversion is unavailable.
             pass
 
@@ -245,7 +243,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         return Circuit(qsharp=iqpe_iter_qsc, qir=iqpe_iter_qir)
 
     def _create_circuit_from_qiskit(
-        self, state_preparation: Circuit, controlled_evolution: Circuit, phase_correction: float, num_system_qubits: int
+        self, state_preparation: Circuit, controlled_evolution: Circuit, phase_correction: float
     ) -> Circuit:
         """Create a Circuit object from Qiskit QuantumCircuit objects.
 
@@ -253,7 +251,6 @@ class IterativePhaseEstimation(PhaseEstimation):
             state_preparation: Circuit object containing a Qiskit QuantumCircuit for state preparation.
             controlled_evolution: Circuit object containing a Qiskit QuantumCircuit for the controlled time evolution.
             phase_correction: Feedback phase angle to apply before controlled evolution.
-            num_system_qubits: Number of system qubits.
 
         Returns:
             A Circuit object representing the IQPE iteration.
@@ -265,7 +262,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         ctrl_evol_qc = controlled_evolution.get_qiskit_circuit()
         # Parse the state preparation circuit from QASM
         ancilla = QuantumRegister(1, "ancilla")
-        system_target = QuantumRegister(num_system_qubits, "system")
+        system_target = QuantumRegister(state_prep_qc.num_qubits, "system")
         classical = ClassicalRegister(1, "c")
         circuit = QuantumCircuit(ancilla, system_target, classical)
         circuit.append(state_prep_qc.to_gate(), system_target)

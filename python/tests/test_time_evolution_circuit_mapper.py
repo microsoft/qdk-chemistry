@@ -104,6 +104,21 @@ class TestPauliSequenceMapper:
 
         assert set(control_qubits) == {2}
 
+    def test_target_indices_validation(self, controlled_unitary):
+        """Test that invalid target indices raise ValueError."""
+        mapper = PauliSequenceMapper()
+
+        # Overlapping target and control indices
+        with pytest.raises(ValueError, match="must not overlap"):
+            mapper.run(controlled_unitary, target_indices=[1, 2])
+
+        # Target and control indices do not cover all qubits
+        with pytest.raises(ValueError, match="must cover all qubits"):
+            mapper.run(controlled_unitary, target_indices=[0])
+
+        with pytest.raises(ValueError, match="must cover all qubits"):
+            mapper.run(controlled_unitary, target_indices=[3, 4])
+
     def test_invalid_container_type_raises(self):
         """Test that an invalid container type raises a ValueError."""
 

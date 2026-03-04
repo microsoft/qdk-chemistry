@@ -27,3 +27,9 @@ def test_qdk_interpreter_init_with_target_profile():
     from qdk_chemistry import _QDK_INTERPRETER_PROFILE  # noqa: PLC0415
 
     assert user_profile == _QDK_INTERPRETER_PROFILE
+
+    init(target_profile=TargetProfile.Base)
+
+    from qdk_chemistry.utils.qsharp import QSHARP_UTILS  # noqa: PLC0415
+
+    assert getattr(QSHARP_UTILS, "StatePreparation", None) is not None

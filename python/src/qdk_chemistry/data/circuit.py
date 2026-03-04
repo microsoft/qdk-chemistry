@@ -98,7 +98,7 @@ class Circuit(DataClass):
             try:
                 from qiskit import qasm3  # noqa: PLC0415
             except ImportError as err:
-                raise RuntimeError("Qiskit is not available. Cannot convert circuit to Qiskit format.") from err
+                raise RuntimeError("Qiskit is not available. Cannot convert circuit to QASM format.") from err
 
             return qasm3.dumps(qir_ir_to_qiskit(str(self.qir)))
 

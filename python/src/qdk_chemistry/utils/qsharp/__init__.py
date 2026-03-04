@@ -1,10 +1,9 @@
 """QDK/Chemistry Q# Utilities Module."""
+
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-
-import functools
 from pathlib import Path
 
 import qdk
@@ -19,7 +18,6 @@ _QS_FILES = [
 ]
 
 
-@functools.lru_cache(maxsize=1)
 def get_qsharp_utils():
     """Returns the Q# namespace for chemistry operations (lazy-loaded)."""
     try:
@@ -30,4 +28,18 @@ def get_qsharp_utils():
         return qdk.code.QDKChemistry.Utils
 
 
-QSHARP_UTILS = get_qsharp_utils()
+class _QSharpUtilsProxy:
+    """Lightweight proxy that lazily resolves the Q# utilities namespace."""
+
+    def __getattr__(self, name: str):
+        """Load Q# code (if necessary) and resolve *name* on the utilities namespace.
+
+        Args:
+            name: The name of the attribute being accessed on the Q# utilities namespace.
+
+        """
+        utils = get_qsharp_utils()
+        return getattr(utils, name)
+
+
+QSHARP_UTILS = _QSharpUtilsProxy()

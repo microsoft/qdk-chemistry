@@ -113,6 +113,13 @@ class PauliSequenceMapper(ControlledEvolutionCircuitMapper):
 
         if target_indices is None:
             target_indices = [i for i in range(total_qubits) if i not in controlled_evolution.control_indices]
+        else:
+            target_indices_set = set(target_indices)
+            control_indices_set = set(controlled_evolution.control_indices)
+            if target_indices_set & control_indices_set:
+                raise ValueError("target_indices and control_indices must not overlap.")
+            if target_indices_set | control_indices_set != set(range(total_qubits)):
+                raise ValueError("target_indices and control_indices must cover all qubits.")
 
         pauli_terms: list[list[qsharp.Pauli]] = []
         angles: list[float] = []
