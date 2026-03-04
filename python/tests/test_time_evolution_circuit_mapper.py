@@ -82,14 +82,27 @@ class TestPauliSequenceMapper:
         qsc_json = json.loads(circuit.get_qsharp_circuit().json())
         num_qubits = len(qsc_json["qubits"])  # 2 system qubits + 1 control qubit
         assert num_qubits == 3
-        operations = qsc_json["componentGrid"][0]["components"][0]["children"][0]["components"][0]["children"]
-        # Check that "X0" on qubit 0 and "Z1" on qubit 1 are present in the circuit
-        # Check control qubit is qubit 2
-        for op in operations:
-            for component in op["components"]:
-                if component["gate"] == "X" and "controls" in component:
-                    control_qubit = component["controls"][0]["qubit"]
-                    assert control_qubit == 2  # Control qubit is qubit 2
+
+        def _find_control_qubits(node):
+            """Recursively collect control-qubit indices for X gates."""
+            control_qubits = []
+            if isinstance(node, dict):
+                if node.get("gate") == "X" and "controls" in node:
+                    for ctrl in node["controls"]:
+                        qubit_idx = ctrl.get("qubit")
+                        if qubit_idx is not None:
+                            control_qubits.append(qubit_idx)
+                for value in node.values():
+                    control_qubits.extend(_find_control_qubits(value))
+            elif isinstance(node, list):
+                for item in node:
+                    control_qubits.extend(_find_control_qubits(item))
+            return control_qubits
+
+        # Check that there is at least one X gate controlled by qubit 2
+        control_qubits = _find_control_qubits(qsc_json.get("componentGrid", []))
+
+        assert set(control_qubits) == {2}
 
     def test_invalid_container_type_raises(self):
         """Test that an invalid container type raises a ValueError."""
