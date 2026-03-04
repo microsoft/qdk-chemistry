@@ -49,8 +49,8 @@ def trotter_steps_naive(
     hamiltonian: QubitHamiltonian,
     time: float,
     target_accuracy: float,
-    order: int,
     *,
+    order: int = 1,
     largest_error_coefficient: float = 1.0,
     weight_threshold: float = 1e-12,
 ) -> int:
@@ -143,7 +143,7 @@ def trotter_steps_commutator(
         \alpha_2 = \sum_{k > j,l > j} \lVert [\alpha_l P_l,\, [\alpha_k P_k,\, \alpha_j P_j] \rVert +
             \frac{1}{2} \sum_{k > j} \lVert [\alpha_j P_j,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert
 
-        N_p = \left\lceil \frac{t^{1+1/p}\alpha_p^{1/p}}{C_{\text{max}}^{1/p}\epsilon^{1/p}} \right\rceil
+        N_p = \left\lceil \frac{C_{\text{max}}^{1/p} t^{1+1/p}\alpha_p^{1/p}}{\epsilon^{1/p}} \right\rceil
 
         \alpha_p = \sum_{j_1,\ldots,j_{p+1}} \lVert [\alpha_{j_1} P_{j_1},\, [\ldots [\alpha_{j_p} P_{j_p},
         \alpha_{j_{p+1}}P_{j_{p+1}}]\ldots]\rVert
@@ -184,9 +184,7 @@ def trotter_steps_commutator(
         return max(1, math.ceil(comm_bound * 1 / 2.0 * time**2 / (target_accuracy)))
     if order == 2:
         comm_bound = commutator_bound_second_order(hamiltonian, weight_threshold=weight_threshold)
-        print(
-            "steps:", comm_bound ** (1 / 2) * (1 / 12.0) ** (1 / 2) * time ** (1 + 1 / 2) / (target_accuracy) ** (1 / 2)
-        )
+
         return max(
             1,
             math.ceil(

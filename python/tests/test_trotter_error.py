@@ -133,7 +133,7 @@ class TestTrotterStepsCommutator:
         n2 = trotter_steps_commutator(h, 2.0, 0.1, order=1)
         # n2 should be approximately 4 * n1 (t^2 scaling)
         assert n2 == math.ceil(4 * (2.0 / 0.2))  # 40
-        assert (n1 * math.ceil(2**2)) // n2 == 1  # Allow for ceiling effects
+        assert abs(n2 - 4 * n1) <= 1  # Allow for ceiling effects
 
     def test_zero_accuracy_raises(self):
         """Test that zero accuracy raises ValueError."""

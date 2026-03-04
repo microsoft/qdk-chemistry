@@ -217,20 +217,22 @@ class Trotter(TimeEvolutionBuilder):
         # Obtain Trotter formula with all coefficients equal to 1 and t = 1
         terms = self._decompose_trotter_step(unit_hamiltonian, time=1.0, atol=weight_threshold)
         abs_angles = [abs(term.angle) for term in terms]
-        if len(abs_angles) < order + 1:
-            raise ValueError(f"Number of terms in Trotter formula of order {order} is wrong.")
         # The largest_error_coefficient is the max coefficient in the Taylor expansion of the Trotter error,
         # (exp(H_1+...+H_L) - S_order), to t^(order+1) when all coefficients are 1 and t = 1.
-        # Used to bound the constant factor in the error bound formulae
-        # The product of maximal angles corresponds to the multiplication of (order+1) terms of t^1 order
-        # in the Taylor expansion of S_order, which is the largest coefficient contributing at t^(order+1) order
-        # The 1/(order+1)! term corresponds to the division by (order+1)! in the Taylor expansion of exp(H_1+...+H_L),
-        # which is the largest coefficient contributing at t^(order+1) order
-        # The sum of both contributions bounds the largest coefficient in the Taylor expansion of the Trotter error,
-        # (exp(H_1+...+H_L) - S_order), to t^(order+1)
-        largest_error_coefficient = math.prod(sorted(abs_angles, reverse=True)[: order + 1]) + 1 / math.factorial(
-            order + 1
-        )
+        # Used to bound the constant factor in the error bound formulae.
+        # We base this on the maximum absolute angle and allow repetition so that the bound
+        # remains well-defined even when the product formula has fewer than (order + 1) terms,
+        # e.g., for single-term or fully commuting Hamiltonians.
+        if not abs_angles:
+            # No terms in the Hamiltonian ⇒ zero Trotter error.
+            largest_error_coefficient = 0.0
+        else:
+            max_angle = max(abs_angles)
+            # The product term corresponds to a worst-case contribution from (order + 1)
+            # factors of order t^1, and the 1/(order+1)! term comes from the Taylor expansion
+            # of exp(H_1+...+H_L). Their sum bounds the largest coefficient in the Taylor
+            # expansion of the Trotter error, (exp(H_1+...+H_L) - S_order), at order t^(order+1).
+            largest_error_coefficient = max_angle ** (order + 1) + 1 / math.factorial(order + 1)
 
         error_bound = self._settings.get("error_bound")
         if error_bound == "commutator":
@@ -261,7 +263,7 @@ class Trotter(TimeEvolutionBuilder):
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be decomposed.
             time: The evolution time for the single step.
-            order: The order of the Trotter decomposition.
+
             atol: Absolute tolerance for filtering small coefficients.
 
         Returns:
