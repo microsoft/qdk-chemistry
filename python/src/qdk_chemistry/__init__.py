@@ -28,6 +28,7 @@ import warnings
 
 from qdk import TargetProfile
 from qdk import init as qdk_init
+from qsharp._qsharp import get_config as get_qdk_profile_config
 
 # Import some tools for convenience
 import qdk_chemistry.constants
@@ -40,8 +41,13 @@ if TELEMETRY_ENABLED:
 
 _DOCS_MODE = os.getenv("QDK_CHEMISTRY_DOCS", "0") == "1"
 
-# Initialize Q#
-qdk_init(target_profile=TargetProfile.Base)
+# Initialize Q# interpreter
+qdk_config = get_qdk_profile_config()
+_QDK_INTERPRETER_PROFILE = qdk_config.get_target_profile()
+if _QDK_INTERPRETER_PROFILE == "unrestricted":
+    qdk_init(target_profile=TargetProfile.Base)
+    new_config = get_qdk_profile_config()
+    _QDK_INTERPRETER_PROFILE = new_config.get_target_profile()
 
 
 def _setup_resources() -> None:
