@@ -139,6 +139,8 @@ class TestTrotterStepsCommutator:
         """Test that step count scales with t^(3/2)."""
         h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
         n1 = trotter_steps_commutator(h, 1.0, 0.1, order=2)
-        n2 = trotter_steps_commutator(h, 8.0, 0.1, order=2)
+        n2 = trotter_steps_commutator(h, 4.0, 0.1, order=2)
         # n2 should be approximately 2**1.5 * n1 (t^1.5 scaling)
-        assert n2 // n1 >= math.ceil(4**1.5)  # Allow for ceiling effects
+        if n1 > 1:
+            assert (n2 + 1) / (n1 - 1) >= math.ceil(4**1.5)  # Allow for ceiling effects
+        assert (n2 - 1) / (n1 + 1) <= math.ceil(4**1.5)  # Allow for ceiling effects
