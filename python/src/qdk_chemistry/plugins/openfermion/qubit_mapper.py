@@ -43,6 +43,13 @@ class OpenFermionQubitMapperSettings(QubitMapperSettings):
     """Settings configuration for an OpenFermionQubitMapper.
 
     Inherits ``encoding`` from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.
+
+    Available encodings:
+        - ``"jordan-wigner"`` (default)
+        - ``"bravyi-kitaev"``
+        - ``"symmetry-conserving-bravyi-kitaev"`` (requires :class:`~qdk_chemistry.data.Symmetries`)
+        - ``"bravyi-kitaev-tree"``
+
     """
 
     def __init__(self):
@@ -52,7 +59,15 @@ class OpenFermionQubitMapperSettings(QubitMapperSettings):
 
 
 class OpenFermionQubitMapper(QubitMapper):
-    """Class to map an electronic structure Hamiltonian to a QubitHamiltonian using an OpenFermion mapper."""
+    """Map an electronic structure Hamiltonian to a QubitHamiltonian using OpenFermion.
+
+    Available encodings:
+        - ``"jordan-wigner"`` (default)
+        - ``"bravyi-kitaev"``
+        - ``"symmetry-conserving-bravyi-kitaev"`` (requires :class:`~qdk_chemistry.data.Symmetries`)
+        - ``"bravyi-kitaev-tree"``
+
+    """
 
     def __init__(self, encoding: str = "jordan-wigner"):
         """Initialize OpenFermionQubitMapper with a specific mapping strategy.

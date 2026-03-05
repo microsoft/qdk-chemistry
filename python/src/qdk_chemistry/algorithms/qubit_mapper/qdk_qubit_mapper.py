@@ -186,6 +186,10 @@ class QdkQubitMapperSettings(QubitMapperSettings):
 
     Inherits base settings from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.
 
+    Available encodings:
+        - ``"jordan-wigner"`` (default)
+        - ``"bravyi-kitaev"``
+
     Additional settings:
         threshold (double, default=1e-12): Threshold for pruning small Pauli coefficients.
         integral_threshold (double, default=1e-12): Threshold for filtering small integrals.
@@ -214,8 +218,11 @@ class QdkQubitMapper(QubitMapper):
     """QDK native qubit mapper using PauliTermAccumulator.
 
     This mapper transforms a fermionic Hamiltonian to a qubit Hamiltonian using
-    configurable fermion-to-qubit encodings. Supports Jordan-Wigner and Bravyi-Kitaev
-    encodings.
+    configurable fermion-to-qubit encodings.
+
+    Available encodings:
+        - ``"jordan-wigner"`` (default)
+        - ``"bravyi-kitaev"``
 
     The mapper uses canonical blocked spin-orbital ordering internally:
     qubits 0..N-1 for alpha spin, qubits N..2N-1 for beta spin (where N is the

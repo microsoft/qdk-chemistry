@@ -35,6 +35,11 @@ class QiskitQubitMapperSettings(QubitMapperSettings):
 
     Inherits ``encoding`` from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.
 
+    Available encodings:
+        - ``"jordan-wigner"`` (default)
+        - ``"bravyi-kitaev"``
+        - ``"parity"``
+
     """
 
     def __init__(self):
@@ -44,7 +49,14 @@ class QiskitQubitMapperSettings(QubitMapperSettings):
 
 
 class QiskitQubitMapper(QubitMapper):
-    """Class to map an electronic structure Hamiltonian to a QubitHamiltonian using a Qiskit mapper."""
+    """Map an electronic structure Hamiltonian to a QubitHamiltonian using Qiskit.
+
+    Available encodings:
+        - ``"jordan-wigner"`` (default)
+        - ``"bravyi-kitaev"``
+        - ``"parity"``
+
+    """
 
     QubitMappers: ClassVar = {
         "bravyi-kitaev": BravyiKitaevMapper,
