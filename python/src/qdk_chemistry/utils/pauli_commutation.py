@@ -272,6 +272,11 @@ def does_nested_commutator_vanish(*labels: str) -> bool:
     if len(labels) < 2:
         raise ValueError("At least two Pauli labels are required for a commutator.")
 
+    # Ensure all labels have the same length, as required by the docstring.
+    ref_len = len(labels[0])
+    for lbl in labels[1:]:
+        if len(lbl) != ref_len:
+            raise ValueError("All Pauli labels must have the same length.")
     # Base case: [P_a, P_b] vanishes iff the two strings commute.
     if len(labels) == 2:
         return do_pauli_labels_commute(labels[0], labels[1])

@@ -259,13 +259,6 @@ class TestTrotter:
         unitary = builder.run(hamiltonian, time=t)
         container = unitary.get_container()
 
-        def _pauli_matrix(label: str) -> np.ndarray:
-            """Helper to get Pauli matrix from label."""
-            if label == "X":
-                return np.array([[0, 1], [1, 0]], dtype=complex)
-            if label == "Z":
-                return np.array([[1, 0], [0, -1]], dtype=complex)
-            raise ValueError(f"Unsupported Pauli label: {label}")
 
         # Build Trotter unitary matrix
         u_trot = np.eye(2, dtype=complex)
