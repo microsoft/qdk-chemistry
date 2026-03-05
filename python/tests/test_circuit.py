@@ -132,6 +132,10 @@ class TestGetQiskitConversion:
         from qiskit import QuantumCircuit  # noqa: PLC0415
 
         circuit = Circuit(qasm=simple_qasm)
+
+        with pytest.raises(AttributeError, match="has no attribute"):
+            _ = circuit._qiskit_circuit
+
         circuit.get_qiskit_circuit()
         assert isinstance(circuit.__dict__.get("_qiskit_circuit"), QuantumCircuit)
         assert isinstance(circuit._qiskit_circuit, QuantumCircuit)

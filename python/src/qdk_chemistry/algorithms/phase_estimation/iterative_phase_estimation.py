@@ -181,8 +181,6 @@ class IterativePhaseEstimation(PhaseEstimation):
         _validate_iteration_inputs(iteration, total_iterations)
         # Build the base circuit with registers
         num_system_qubits = qubit_hamiltonian.num_qubits
-        # Import the Q# code from the IterativePhaseEstimation.qs file
-
         time_evolution_unitary = self._create_time_evolution(
             qubit_hamiltonian, self.settings().get("evolution_time"), evolution_builder
         )
@@ -256,8 +254,8 @@ class IterativePhaseEstimation(PhaseEstimation):
         """
         from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3  # noqa: PLC0415
 
-        state_prep_qc = state_preparation._qiskit_circuit  # noqa: SLF001
-        ctrl_evol_qc = controlled_evolution._qiskit_circuit  # noqa: SLF001
+        state_prep_qc = state_preparation.get_qiskit_circuit()
+        ctrl_evol_qc = controlled_evolution.get_qiskit_circuit()
         # Parse the state preparation circuit from QASM
         ancilla = QuantumRegister(1, "ancilla")
         system_target = QuantumRegister(state_prep_qc.num_qubits, "system")
