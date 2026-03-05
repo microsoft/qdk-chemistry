@@ -48,14 +48,9 @@ class DynamicModeDecompositionSettings(PhaseEstimationSettings):
 
         """
         super().__init__()
-        self._set_default(
-            "shots_per_observable",
-            "int",
-            3,
-            r"The number of shots to execute per observable (overlap <\psi|exp(-iH n dt)|\psi>).",
-        )
         self._set_default("vector_dim", "int", -1, "the row number of Hankel matrix X")
         self._set_default("initial_rank_k", "int", -1, "the initial column number of Hankel matrix X")
+        self._set_default("evolution_time", "float", 0.0, "Time dt in the evolution unitary U = exp(-i H dt)")
         self._set_default("shots_per_observable", "int", 40, "the number of shots to test one observable")
         self._set_default("max_rank_k", "int", 200, "Column number limit of Hankel matrix X")
 
@@ -76,7 +71,7 @@ class DynamicModeDecomposition(PhaseEstimation):
         Args:
             vector_dim: The row number of the Hankel matrix X. Must be a positive integer.
             initial_rank_k: The initial column number of the Hankel matrix X. Must be a positive integer.
-            evolution_time: Time parameter dt used in the time-evolution unitary ``U = exp(-i H dt)``.
+            evolution_time: Time parameter dt used in the time-evolution unitary U = exp(-i H dt)``.
             Must be a non-negative number.
             shots_per_observable: The number of shots to execute per observable measurement. Defaults to 40.
             Must be a positive integer.
@@ -99,12 +94,14 @@ class DynamicModeDecomposition(PhaseEstimation):
         self._iteration_circuits: list[Circuit] | None = None
 
         # check validity of inputs
-        if vector_dim < 1 or initial_rank_k < 1:
-            raise ValueError("vector_dim and initial_rank_k must be a positive integer.")
+        if vector_dim < 1:
+            raise ValueError("vector_dim must be a positive integer.")
+        if initial_rank_k < 2:
+            raise ValueError("initial_rank_k must be larger than 1.")
         if initial_rank_k > max_rank_k:
             raise ValueError("initial_rank_k must be no more than max_rank_k.")
-        if evolution_time < 0.0:
-            raise ValueError("evolution_time must be a positive double number.")
+        if evolution_time <= 0.0:
+            raise ValueError("evolution_time must be a positive float.")
         if shots_per_observable < 1:  # currently we use classical Hadamard test for measuring observable
             raise ValueError("shots_per_observable must be a positive integer.")
 
@@ -197,7 +194,7 @@ class DynamicModeDecomposition(PhaseEstimation):
 
             log_eigs = np.log(eigenvalues)
 
-            print(log_eigs)
+            Logger.debug(f"log_eigs: {log_eigs}")
 
             # Pick the mode with smallest |real| and negative imaginary part.
             negative_imag_mask = log_eigs.imag < 0.0
@@ -251,10 +248,11 @@ class DynamicModeDecomposition(PhaseEstimation):
         circuit_mapper: ControlledEvolutionCircuitMapper,
         observable_power: int,
     ) -> list[Circuit]:
-        r"""Construct n-th single ODMD iteration circuit for gauging Re and Im of (<\psi|exp(-iH n dt)|\psi>). Since we only approximate ground state energy and don't find the state, we don't measure the imaginary part for now.
+        r"""Construct n-th single ODMD iteration circuit for gauging Re and Im of (<\psi|exp(-iH n dt)|\psi>).
 
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
+            num_system_qubits: number of qubits representing the quantum state
             ctrl_time_evol_unitary: The controlled one time step evolution unitary operator U = exp(-iH dt).
             circuit_mapper: The controlled evolution circuit mapper to use.
             observable_power: Current observable power.
