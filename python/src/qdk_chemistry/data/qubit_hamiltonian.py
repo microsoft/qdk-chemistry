@@ -10,15 +10,21 @@ and quantum circuit construction or measurement workflows.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from functools import cached_property
-from typing import Any
+from __future__ import annotations
 
-import h5py
+from functools import cached_property
+from typing import TYPE_CHECKING, Any
+
 import numpy as np
 from qiskit.quantum_info import SparsePauliOp
 
-from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.base import DataClass
+
+if TYPE_CHECKING:
+    import h5py
+
+    from qdk_chemistry.data import Wavefunction
+from qdk_chemistry.data.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 
 __all__ = ["filter_and_group_pauli_ops_from_wavefunction"]
@@ -32,6 +38,9 @@ class QubitHamiltonian(DataClass):
         coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
         encoding (str | None): The fermion-to-qubit encoding used to create this Hamiltonian
             (e.g., "jordan-wigner", "bravyi-kitaev", "parity"). If None, encoding is not specified.
+        fermion_mode_order (FermionModeOrder | None): The fermion mode ordering convention used
+            when mapping fermionic modes to qubits (``"blocked"`` or ``"interleaved"``). If None,
+            the ordering is unspecified or not applicable.
 
     """
 
@@ -46,15 +55,15 @@ class QubitHamiltonian(DataClass):
         pauli_strings: list[str],
         coefficients: np.ndarray,
         encoding: str | None = None,
+        fermion_mode_order: FermionModeOrder | str | None = None,
     ) -> None:
         """Initialize a QubitHamiltonian.
 
         Args:
             pauli_strings (list[str]): List of Pauli strings representing the ``QubitHamiltonian``.
             coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
-            encoding (str | None): The fermion-to-qubit encoding used to create this Hamiltonian.
-                Valid values include "jordan-wigner", "bravyi-kitaev", "parity", or None.
-                Defaults to None.
+            encoding (str | None): Fermion-to-qubit encoding (e.g., ``"jordan-wigner"``). Default ``None``.
+            fermion_mode_order (FermionModeOrder | str | None): Mode ordering (``"blocked"``/``"interleaved"``).
 
         Raises:
             ValueError: If the number of Pauli strings and coefficients don't match,
@@ -68,6 +77,9 @@ class QubitHamiltonian(DataClass):
         self.pauli_strings = pauli_strings
         self.coefficients = coefficients
         self.encoding = encoding
+        self.fermion_mode_order: FermionModeOrder | None = (
+            FermionModeOrder(fermion_mode_order) if fermion_mode_order is not None else None
+        )
 
         try:
             _ = self.pauli_ops  # Trigger cached property to validate Pauli strings
@@ -111,7 +123,7 @@ class QubitHamiltonian(DataClass):
         """
         return SparsePauliOp(self.pauli_strings, self.coefficients)
 
-    def equiv(self, other: "QubitHamiltonian", atol: float = 1e-12) -> bool:
+    def equiv(self, other: QubitHamiltonian, atol: float = 1e-12) -> bool:
         """Check mathematical equivalence with another QubitHamiltonian.
 
         Two QubitHamiltonians are equivalent if they contain the same Pauli
@@ -192,7 +204,7 @@ class QubitHamiltonian(DataClass):
             terms.sort(key=lambda t: abs(t[1]), reverse=True)
         return terms
 
-    def reorder_qubits(self, permutation: list[int]) -> "QubitHamiltonian":
+    def reorder_qubits(self, permutation: list[int]) -> QubitHamiltonian:
         """Reorder qubits in all Pauli strings according to a permutation.
 
         Applies a qubit index permutation to all Pauli strings. The permutation
@@ -239,9 +251,10 @@ class QubitHamiltonian(DataClass):
         return QubitHamiltonian(
             pauli_strings=reordered_strings,
             coefficients=self.coefficients.copy(),
+            encoding=self.encoding,
         )
 
-    def to_interleaved(self, n_spatial: int) -> "QubitHamiltonian":
+    def to_interleaved(self, n_spatial: int) -> QubitHamiltonian:
         """Convert from blocked to interleaved spin-orbital ordering.
 
         Converts a qubit Hamiltonian from blocked ordering (alpha orbitals first,
@@ -284,9 +297,15 @@ class QubitHamiltonian(DataClass):
             else:
                 permutation.append(2 * (i - n_spatial) + 1)
 
-        return self.reorder_qubits(permutation)
+        result = self.reorder_qubits(permutation)
+        return QubitHamiltonian(
+            pauli_strings=result.pauli_strings,
+            coefficients=result.coefficients,
+            encoding=self.encoding,
+            fermion_mode_order=FermionModeOrder.INTERLEAVED,
+        )
 
-    def group_commuting(self, qubit_wise: bool = True) -> list["QubitHamiltonian"]:
+    def group_commuting(self, qubit_wise: bool = True) -> list[QubitHamiltonian]:
         """Group the qubit Hamiltonian into commuting subsets.
 
         Args:
@@ -303,6 +322,7 @@ class QubitHamiltonian(DataClass):
                 pauli_strings=group.paulis.to_labels(),
                 coefficients=group.coeffs,
                 encoding=self.encoding,
+                fermion_mode_order=self.fermion_mode_order,
             )
             for group in sparse_pauli_ops
         ]
@@ -320,6 +340,8 @@ class QubitHamiltonian(DataClass):
         )
         if self.encoding is not None:
             summary += f"  Encoding: {self.encoding}\n"
+        if self.fermion_mode_order is not None:
+            summary += f"  Fermion mode order: {self.fermion_mode_order}\n"
         return summary
 
     def to_json(self) -> dict[str, Any]:
@@ -341,6 +363,8 @@ class QubitHamiltonian(DataClass):
         }
         if self.encoding is not None:
             data["encoding"] = self.encoding
+        if self.fermion_mode_order is not None:
+            data["fermion_mode_order"] = str(self.fermion_mode_order)
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -355,9 +379,11 @@ class QubitHamiltonian(DataClass):
         group.create_dataset("coefficients", data=self.coefficients)
         if self.encoding is not None:
             group.attrs["encoding"] = self.encoding
+        if self.fermion_mode_order is not None:
+            group.attrs["fermion_mode_order"] = str(self.fermion_mode_order)
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> "QubitHamiltonian":
+    def from_json(cls, json_data: dict[str, Any]) -> QubitHamiltonian:
         """Create a QubitHamiltonian from a JSON dictionary.
 
         Args:
@@ -382,10 +408,11 @@ class QubitHamiltonian(DataClass):
             pauli_strings=json_data["pauli_strings"],
             coefficients=coefficients,
             encoding=json_data.get("encoding"),
+            fermion_mode_order=json_data.get("fermion_mode_order"),
         )
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> "QubitHamiltonian":
+    def from_hdf5(cls, group: h5py.Group) -> QubitHamiltonian:
         """Load a QubitHamiltonian from an HDF5 group.
 
         Args:
@@ -405,7 +432,15 @@ class QubitHamiltonian(DataClass):
         # Decode encoding if it's stored as bytes (HDF5 behavior can vary)
         if encoding is not None and isinstance(encoding, bytes):
             encoding = encoding.decode("utf-8")
-        return cls(pauli_strings=pauli_strings, coefficients=coefficients, encoding=encoding)
+        fermion_mode_order = group.attrs.get("fermion_mode_order")
+        if fermion_mode_order is not None and isinstance(fermion_mode_order, bytes):
+            fermion_mode_order = fermion_mode_order.decode("utf-8")
+        return cls(
+            pauli_strings=pauli_strings,
+            coefficients=coefficients,
+            encoding=encoding,
+            fermion_mode_order=fermion_mode_order,
+        )
 
 
 def _filter_and_group_pauli_ops_from_statevector(
@@ -501,7 +536,12 @@ def _filter_and_group_pauli_ops_from_statevector(
         reduced_pauli.append(best_pauli)
         reduced_coeffs.append(coeff_sum)
 
-    reduced_hamiltonian = QubitHamiltonian(reduced_pauli, np.array(reduced_coeffs), encoding=hamiltonian.encoding)
+    reduced_hamiltonian = QubitHamiltonian(
+        reduced_pauli,
+        np.array(reduced_coeffs),
+        encoding=hamiltonian.encoding,
+        fermion_mode_order=hamiltonian.fermion_mode_order,
+    )
 
     grouped_hamiltonians = (
         reduced_hamiltonian.group_commuting(qubit_wise=abelian_grouping) if abelian_grouping else [reduced_hamiltonian]

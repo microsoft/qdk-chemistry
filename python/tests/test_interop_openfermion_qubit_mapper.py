@@ -25,6 +25,7 @@ if OPENFERMION_AVAILABLE:
 
     from qdk_chemistry.algorithms import QubitMapper, available, create
     from qdk_chemistry.data import Symmetries
+    from qdk_chemistry.data.fermion_mode_order import FermionModeOrder
     from qdk_chemistry.plugins.openfermion.conversion import (
         hamiltonian_to_fermion_operator,
         hamiltonian_to_interaction_operator,
@@ -115,31 +116,8 @@ def test_openfermion_bk_tree_encoding():
 
 
 # -------------------------------------------------------------------------------------
-# Non-standard encodings (BKSF, SCBK) — OpenFermion-specific, no QDK native equivalent
+# Non-standard encodings (SCBK)
 # -------------------------------------------------------------------------------------
-
-
-def test_openfermion_bksf_encoding():
-    """BKSF encoding produces a QubitHamiltonian with correct Pauli terms."""
-    hamiltonian = create_nontrivial_test_hamiltonian()
-
-    mapper = create("qubit_mapper", "openfermion", encoding="bravyi-kitaev-fast")
-    qh = mapper.run(hamiltonian)
-
-    # Reference: apply BKSF directly to the InteractionOperator
-    iop = hamiltonian_to_interaction_operator(hamiltonian)
-    ref_qop = of.transforms.bravyi_kitaev_fast(iop)
-    ref_qop.compress()
-
-    # Remove core energy from reference (same convention as plugin)
-    core_energy = hamiltonian.get_core_energy()
-    if abs(core_energy) > 1e-15:
-        ref_qop -= core_energy * of.QubitOperator(())
-        ref_qop.compress()
-
-    ref_qh = qubit_operator_to_qubit_hamiltonian(ref_qop, encoding="bravyi-kitaev-fast")
-
-    _assert_pauli_ops_equal(qh, ref_qh)
 
 
 def test_openfermion_scbk_encoding():
@@ -341,3 +319,27 @@ def test_full_pipeline_round_trip():
         of.linalg.get_sparse_operator(qop).toarray(),
         atol=float_comparison_absolute_tolerance,
     )
+
+
+# -------------------------------------------------------------------------------------
+# Fermion mode order metadata
+# -------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("encoding", ["jordan-wigner", "bravyi-kitaev", "bravyi-kitaev-tree"])
+def test_openfermion_standard_sets_blocked_order(encoding):
+    """Standard OpenFermion encodings set fermion_mode_order to BLOCKED."""
+    hamiltonian = create_nontrivial_test_hamiltonian()
+    qh = create("qubit_mapper", "openfermion", encoding=encoding).run(hamiltonian)
+    assert qh.fermion_mode_order == FermionModeOrder.BLOCKED
+
+
+def test_openfermion_scbk_sets_blocked_order():
+    """SCBK encoding sets fermion_mode_order to BLOCKED."""
+    hamiltonian = create_nontrivial_test_hamiltonian()
+    symmetries = Symmetries(n_alpha=1, n_beta=1)
+    qh = create("qubit_mapper", "openfermion", encoding="symmetry-conserving-bravyi-kitaev").run(
+        hamiltonian,
+        symmetries,
+    )
+    assert qh.fermion_mode_order == FermionModeOrder.BLOCKED

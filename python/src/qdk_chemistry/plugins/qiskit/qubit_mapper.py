@@ -21,6 +21,7 @@ from qiskit_nature.second_q.mappers import (
 
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
 from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
+from qdk_chemistry.data.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
@@ -96,6 +97,7 @@ class QiskitQubitMapper(QubitMapper):
             pauli_strings=qubit_op.paulis.to_labels(),
             coefficients=qubit_op.coeffs,
             encoding=encoding,
+            fermion_mode_order=FermionModeOrder.BLOCKED,
         )
 
     def name(self) -> str:

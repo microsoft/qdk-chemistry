@@ -2,7 +2,7 @@
 
 This module provides an OpenFermionQubitMapper class to convert Hamiltonians to QubitHamiltonians
 using different mapping strategies ("jordan-wigner", "bravyi-kitaev",
-"symmetry-conserving-bravyi-kitaev", "bravyi-kitaev-fast", and "bravyi-kitaev-tree").
+"symmetry-conserving-bravyi-kitaev", and "bravyi-kitaev-tree").
 """
 
 # --------------------------------------------------------------------------------------------
@@ -18,6 +18,7 @@ import numpy as np
 import openfermion as of
 
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
+from qdk_chemistry.data.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.plugins.openfermion.conversion import (
     hamiltonian_to_fermion_operator,
     hamiltonian_to_interaction_operator,
@@ -34,7 +35,6 @@ _VALID_ENCODINGS = [
     "jordan-wigner",
     "bravyi-kitaev",
     "symmetry-conserving-bravyi-kitaev",
-    "bravyi-kitaev-fast",
     "bravyi-kitaev-tree",
 ]
 
@@ -58,9 +58,7 @@ class OpenFermionQubitMapper(QubitMapper):
         """Initialize OpenFermionQubitMapper with a specific mapping strategy.
 
         Args:
-            encoding (str): Qubit mapping strategy to use ("jordan-wigner", "bravyi-kitaev",
-                "symmetry-conserving-bravyi-kitaev", "bravyi-kitaev-fast", or
-                "bravyi-kitaev-tree"). Default: "jordan-wigner".
+            encoding (str): Qubit mapping (``"jordan-wigner"``, ``"bravyi-kitaev"``, ``"scbk"``, ``"bk-tree"``).
 
         """
         Logger.trace_entering()
@@ -88,12 +86,12 @@ class OpenFermionQubitMapper(QubitMapper):
 
         Logger.debug(f"Mapping Hamiltonian with OpenFermion encoding: {encoding}")
 
-        if encoding == "bravyi-kitaev-fast":
-            qubit_op = self._map_bksf(hamiltonian)
-        elif encoding == "symmetry-conserving-bravyi-kitaev":
+        if encoding == "symmetry-conserving-bravyi-kitaev":
             qubit_op = self._map_scbk(hamiltonian, symmetries)
+            fermion_mode_order = FermionModeOrder.BLOCKED
         else:
             qubit_op = self._map_standard(hamiltonian, encoding)
+            fermion_mode_order = FermionModeOrder.BLOCKED
 
         qubit_op.compress()
 
@@ -104,7 +102,11 @@ class OpenFermionQubitMapper(QubitMapper):
             qubit_op -= core_energy * of.QubitOperator(())
             qubit_op.compress()
 
-        return qubit_operator_to_qubit_hamiltonian(qubit_op, encoding=encoding)
+        return qubit_operator_to_qubit_hamiltonian(
+            qubit_op,
+            encoding=encoding,
+            fermion_mode_order=fermion_mode_order,
+        )
 
     def _map_standard(self, hamiltonian: Hamiltonian, encoding: str) -> of.QubitOperator:
         """Apply a standard fermion-to-qubit transform (JW, BK, or BK-tree).
@@ -173,22 +175,6 @@ class OpenFermionQubitMapper(QubitMapper):
             n_spinorbitals,
             n_active_electrons,
         )
-
-    def _map_bksf(self, hamiltonian: Hamiltonian) -> of.QubitOperator:
-        """Apply Bravyi-Kitaev superfast (BKSF) transformation.
-
-        The BKSF transform operates directly on the ``InteractionOperator`` rather
-        than on a ``FermionOperator``, and maps edges of an interaction graph to qubits.
-
-        Args:
-            hamiltonian: The fermionic Hamiltonian.
-
-        Returns:
-            openfermion.QubitOperator: The mapped qubit operator.
-
-        """
-        iop = hamiltonian_to_interaction_operator(hamiltonian)
-        return of.transforms.bravyi_kitaev_fast(iop)
 
     def name(self) -> str:
         """Return the algorithm name ``openfermion``."""

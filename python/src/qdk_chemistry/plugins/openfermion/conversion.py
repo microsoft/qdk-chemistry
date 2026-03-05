@@ -190,6 +190,7 @@ def hamiltonian_to_fermion_operator(
 def qubit_operator_to_qubit_hamiltonian(
     qubit_op: "of.QubitOperator",
     encoding: str | None = None,
+    fermion_mode_order: "data.FermionModeOrder | str | None" = None,
 ) -> data.QubitHamiltonian:
     """Convert an OpenFermion QubitOperator to a QDK/Chemistry QubitHamiltonian.
 
@@ -199,6 +200,7 @@ def qubit_operator_to_qubit_hamiltonian(
     Args:
         qubit_op: The OpenFermion QubitOperator to convert.
         encoding: Optional encoding label (e.g., ``"jordan-wigner"``) to attach to the resulting QubitHamiltonian.
+        fermion_mode_order: Fermion mode ordering (``"blocked"`` or ``"interleaved"``) for the ``QubitHamiltonian``.
 
     Returns:
         QubitHamiltonian: A QDK/Chemistry QubitHamiltonian.
@@ -246,6 +248,7 @@ def qubit_operator_to_qubit_hamiltonian(
         pauli_strings=pauli_strings,
         coefficients=np.array(coefficients, dtype=complex),
         encoding=encoding,
+        fermion_mode_order=fermion_mode_order,
     )
 
 

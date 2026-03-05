@@ -47,11 +47,6 @@ Parity :cite:`Seeley2012`
 Symmetry-conserving Bravyi-Kitaev :cite:`Bravyi2017tapering`
    Exploits particle-number and spin-parity symmetries to reduce the qubit count by 2. Requires a :class:`~qdk_chemistry.data.Symmetries` object.
 
-.. _encoding-bk-fast:
-
-Bravyi-Kitaev fast (superfast) :cite:`Setia2018`
-   Maps edges of the molecular interaction graph to qubits, operating directly on the interaction operator.
-
 .. _encoding-bk-tree:
 
 Bravyi-Kitaev tree :cite:`Havlicek2017`
@@ -206,7 +201,7 @@ OpenFermion
 
 Qubit mapping implementation integrated through the OpenFermion plugin.
 
-Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Symmetry-conserving Bravyi-Kitaev <encoding-scbk>`, :ref:`Bravyi-Kitaev fast <encoding-bk-fast>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`
+Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Symmetry-conserving Bravyi-Kitaev <encoding-scbk>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`
 
 .. rubric:: Settings
 
@@ -219,7 +214,7 @@ Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi
      - Description
    * - ``encoding``
      - string
-     - Fermion-to-qubit encoding (``jordan-wigner``, ``bravyi-kitaev``, ``symmetry-conserving-bravyi-kitaev``, ``bravyi-kitaev-fast``, ``bravyi-kitaev-tree``)
+     - Fermion-to-qubit encoding (``jordan-wigner``, ``bravyi-kitaev``, ``symmetry-conserving-bravyi-kitaev``, ``bravyi-kitaev-tree``)
 
 .. note::
 
