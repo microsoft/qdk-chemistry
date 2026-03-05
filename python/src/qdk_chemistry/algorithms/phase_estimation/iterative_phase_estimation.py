@@ -197,10 +197,8 @@ class IterativePhaseEstimation(PhaseEstimation):
                 state_preparation, ctrl_evol_circuit, phase_correction, num_system_qubits
             )
 
-        try:
+        if state_preparation.get_qiskit_circuit() and ctrl_evol_circuit.get_qiskit_circuit():
             return self._create_circuit_from_qiskit(state_preparation, ctrl_evol_circuit, phase_correction)
-        except ImportError:  # Fall through to the clearer RuntimeError if Qiskit or conversion is unavailable.
-            pass
 
         raise RuntimeError(
             "Failed to create iteration circuit: Q# operations or Qiskit dependencies are not available."
@@ -258,8 +256,8 @@ class IterativePhaseEstimation(PhaseEstimation):
         """
         from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3  # noqa: PLC0415
 
-        state_prep_qc = state_preparation.get_qiskit_circuit()
-        ctrl_evol_qc = controlled_evolution.get_qiskit_circuit()
+        state_prep_qc = state_preparation._qiskit_circuit  # noqa: SLF001
+        ctrl_evol_qc = controlled_evolution._qiskit_circuit  # noqa: SLF001
         # Parse the state preparation circuit from QASM
         ancilla = QuantumRegister(1, "ancilla")
         system_target = QuantumRegister(state_prep_qc.num_qubits, "system")

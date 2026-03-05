@@ -157,6 +157,11 @@ class Circuit(DataClass):
 
         """
         Logger.trace_entering()
+
+        cached = self.__dict__.get("_qiskit_circuit", None)
+        if cached is not None:
+            return cached
+
         try:
             from qiskit import qasm3  # noqa: PLC0415
 
@@ -167,13 +172,15 @@ class Circuit(DataClass):
         if self.qir:
             if self.qasm:
                 Logger.warn("Both QIR and QASM representations are available. Convert from QIR.")
-            return qir_ir_to_qiskit(str(self.qir))
+            result = qir_ir_to_qiskit(str(self.qir))
+        elif self.qasm:
+            result = qasm3.loads(self.qasm)
+        else:
+            raise RuntimeError("The quantum circuit cannot be converted to Qiskit format.")
 
-        if self.qasm:
-            return qasm3.loads(self.qasm)
-
-        # Error message why conversion failed
-        raise RuntimeError("The quantum circuit cannot be converted to Qiskit format.")
+        # Cache via object.__setattr__ to bypass the immutability guard
+        object.__setattr__(self, "_qiskit_circuit", result)
+        return result
 
     # DataClass interface implementation
     def get_summary(self) -> str:

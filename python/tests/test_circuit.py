@@ -127,6 +127,15 @@ class TestGetQiskitConversion:
         assert len(qiskit_circuit.qubits) == 2
         assert len(qiskit_circuit.data) == 2  # H and CX gates
 
+    def test_cache_qiskit_circuit(self, simple_qasm):
+        """Test that the Qiskit circuit is cached after the first conversion."""
+        from qiskit import QuantumCircuit  # noqa: PLC0415
+
+        circuit = Circuit(qasm=simple_qasm)
+        circuit.get_qiskit_circuit()
+        assert isinstance(circuit.__dict__.get("_qiskit_circuit"), QuantumCircuit)
+        assert isinstance(circuit._qiskit_circuit, QuantumCircuit)
+
 
 class TestCircuitSerialization:
     """Test cases for Circuit serialization and deserialization."""
