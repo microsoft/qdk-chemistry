@@ -144,30 +144,6 @@ class Trotter(TimeEvolutionBuilder):
         raise NotImplementedError("Non-positive and higher odd orders are not supported.")
 
     def _trotter(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
-        r"""Construct the time evolution unitary using Trotter decomposition.
-
-        The First Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`
-        by decomposing the Hamiltonian H into a sum of terms and using the product formula:
-        :math:`e^{-iHt} \approx \left[\prod_i e^{-iH_i t/n}\right]^n`, where n is the number of divisions.
-
-        The Second Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`
-        by decomposing the Hamiltonian H into a sum of terms and using the product formula:
-        :math:`e^{-iHt} \approx \left[\prod_{i=1}^{L-1} e^{-iH_i t/(2n)} e^{-iH_L t/n}
-        \prod_{i=L-1}^{1} e^{-iH_i t/(2n)}\right]^n`,
-        where n is the number of divisions.
-
-        Higher-order Trotter methods are constructed recursively using the second-order formula as a building block:
-        :math:`S_{2k}(t) = S_{2k-2}(u_k t)^2 S_{2k-2}((1-4u_k) t) S_{2k-2}(u_k t)^2`,
-        where :math:`u_k = 1/(4 - 4^{1/(2k-1)})`.
-
-        Args:
-            qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
-            time: The total evolution time.
-
-        Returns:
-            TimeEvolutionUnitary: The time evolution unitary built by the Trotter decomposition.
-
-        """
         weight_threshold = self._settings.get("weight_threshold")
 
         num_divisions = self._resolve_num_divisions(qubit_hamiltonian, time)
