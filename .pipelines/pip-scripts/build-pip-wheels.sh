@@ -120,11 +120,16 @@ python3 --version
 
 # Update pip and install build tools
 python3 -m pip install --upgrade pip
+
+PIP_STRING="fonttools>=4.61.0" "urllib3>=2.6.0 "
+
+# This is necessary for 1ES Geneva telemetry during the Linux builds.
+if [ ${MAC_BUILD} == "OFF" ]; then
+    PIP_STRING+="opentelemetry-api==1.23.0 opentelemetry-sdk==1.23.0 opentelemetry-exporter-otlp-proto-grpc==1.23.0"
+fi
+
 python3 -m pip install auditwheel build \
-    "fonttools>=4.61.0" "urllib3>=2.6.0" \
-    opentelemetry-api==1.23.0 \
-    opentelemetry-sdk==1.23.0 \
-    opentelemetry-exporter-otlp-proto-grpc==1.23.0
+    ${PIP_STRING}
 
 # Prepare README for PyPI
 bash .pipelines/pip-scripts/prepare-readme.sh
