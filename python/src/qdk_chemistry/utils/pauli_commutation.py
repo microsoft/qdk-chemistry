@@ -207,6 +207,18 @@ def get_commutation_checker(
 
 
 def does_nested_commutator_vanish(*labels: str) -> bool:
+    """Check whether a nested commutator of Pauli labels vanishes.
+
+    Args:
+        labels: A sequence of Pauli labels representing the nested commutator.
+
+    Returns:
+        ``True`` if the nested commutator vanishes, ``False`` otherwise.
+
+    Raises:
+        ValueError: If fewer than two Pauli labels are provided.
+
+    """
     if len(labels) < 2:
         raise ValueError("At least two Pauli labels are required for a commutator.")
 
@@ -233,6 +245,16 @@ def commutator_bound_first_order(
     hamiltonian: QubitHamiltonian,
     weight_threshold: float = 1e-12,
 ) -> float:
+    r"""Compute the commutator bound term :math:`\alpha_1` for the first-order Trotter error.
+
+    Args:
+        hamiltonian: The qubit Hamiltonian for which to compute the bound.
+        weight_threshold: Absolute threshold for filtering small Hamiltonian coefficients.
+
+    Returns:
+        The commutator bound term :math:`\alpha_1`.
+
+    """
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
     pauli_labels = [label for label, _ in real_terms]
     coefficients = [coeff for _, coeff in real_terms]
@@ -250,6 +272,16 @@ def commutator_bound_second_order(
     hamiltonian: QubitHamiltonian,
     weight_threshold: float = 1e-12,
 ) -> float:
+    r"""Compute the commutator bound term :math:`\alpha_2` for the second-order Trotter error.
+
+    Args:
+        hamiltonian: The qubit Hamiltonian for which to compute the bound.
+        weight_threshold: Absolute threshold for filtering small Hamiltonian coefficients.
+
+    Returns:
+        The commutator bound term :math:`\alpha_2`.
+
+    """
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
     pauli_labels = [label for label, _ in real_terms]
     coefficients = [coeff for _, coeff in real_terms]
@@ -276,6 +308,17 @@ def commutator_bound_higher_order(
     order: int,
     weight_threshold: float = 1e-12,
 ) -> float:
+    r"""Compute the commutator bound term :math:`\alpha_k` for higher-order Trotter errors.
+
+    Args:
+        hamiltonian: The qubit Hamiltonian for which to compute the bound.
+        order: The order of the Trotter decomposition.
+        weight_threshold: Absolute threshold for filtering small Hamiltonian coefficients.
+
+    Returns:
+        The commutator bound term :math:`\alpha_k`.
+
+    """
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
     pauli_labels = [label for label, _ in real_terms]
     coefficients = [coeff for _, coeff in real_terms]
