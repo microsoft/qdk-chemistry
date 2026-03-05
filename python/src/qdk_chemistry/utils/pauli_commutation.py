@@ -352,8 +352,8 @@ def commutator_bound_second_order(
     .. math::
 
         \lVert U(t) - S_2(t) \rVert \le
-        \frac{t^3}{12} \left(\sum_{k > j,l > j} \lVert [\alpha_l P_l,\, [\alpha_k P_k,\, \alpha_j P_j] \rVert +
-        \frac{1}{2} \sum_{k > j} \lVert [\alpha_j P_j,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert \right)
+        \frac{t^3}{12} \bigg(\sum_{k > j,l > j} \lVert [\alpha_l P_l,\, [\alpha_k P_k,\, \alpha_j P_j] \rVert +
+        \frac{1}{2} \sum_{k > j} \lVert [\alpha_j P_j,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert \bigg)
 
     For Pauli strings the spectral norm of the commutator is
 
@@ -361,9 +361,13 @@ def commutator_bound_second_order(
     * :math:`2 |\alpha_j| |\alpha_k|`  if they anticommute.
 
     This function returns
-    :math:`\sum_{k > j,l > j} \lVert [\alpha_l P_l,\, [\alpha_k P_k,\, \alpha_j P_j] \rVert
-    + \frac{1}{2} \sum_{k > j} \lVert [\alpha_j P_j,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert`,
-    so the user can multiply by :math:`t^{3} / (12 * N**2)` to get the per-step
+
+    .. math::
+
+        \sum_{k > j,l > j} \lVert [\alpha_l P_l,\, [\alpha_k P_k,\, \alpha_j P_j] \rVert
+        + \frac{1}{2} \sum_{k > j} \lVert [\alpha_j P_j,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert
+
+    so the user can multiply by :math:`t^{3} / (12 N^{2})` to get the per-step
     error.
 
     Args:
@@ -407,17 +411,13 @@ def commutator_bound_higher_order(
 
     .. math::
 
-        \lVert U(t) - S_p(t) \rVert \le t^{p+1}C_{\text{max}} \left(
+        \lVert U(t) - S_p(t) \rVert \le O\!\left( t^{p+1} \bigg(
         \sum_{j_1,\ldots,j_{p+1}} \lVert [\alpha_{j_1} P_{j_1},\, [\ldots [\alpha_{j_p} P_{j_p},
-        \alpha_{j_{p+1}}P_{j_{p+1}}]\ldots]\rVert \right)
+        \alpha_{j_{p+1}}P_{j_{p+1}}]\ldots]\rVert \bigg) \right)
 
     where the spectral norm of a :math:`(p+1)`-nested commutator of Pauli
     strings is either 0 (if the nested commutator vanishes) or
     :math:`2^p`.
-
-    The constant :math:`C_{\text{max}}` is the largest coefficient
-    in the Taylor expansion of the Trotter error, :math:`(exp(H_1+...+H_L) - S_order)`,
-    to :math:`t^(order+1)` when all coefficients are 1 and :math:`t = 1`.
 
     The number of loop indices equals *order + 1* (the depth of nesting).
     Since *order* is a runtime parameter, the nested iteration is

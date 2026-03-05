@@ -59,14 +59,11 @@ def trotter_steps_naive(
 
     .. math::
 
-        N = \left\lceil \frac{2(\sum_j |\alpha_j|)^{1 + 1/p} \, t^{1+1/p} \, C_{\text{max}}^{1/p}}
+        N = \left\lceil \frac{2(\sum_j |\alpha_j|)^{1 + 1/p} \, t^{1+1/p}}
         {\epsilon^{1/p}} \right\rceil
 
     where :math:`\sum_j |\alpha_j|` is the 1-norm of the Hamiltonian
-    coefficients, :math:`p` is the order of the Trotter-Suzuki product formula,
-    and :math:`C_{\text{max}}` is the largest coefficient in the Taylor expansion of
-    the Trotter error, :math:`(exp(H_1+...+H_L) - S_order)`, to :math:`t^(order+1)`
-    when all coefficients are 1 and :math:`t = 1`.
+    coefficients, :math:`p` is the order of the Trotter-Suzuki product formula.
 
     Args:
         hamiltonian: The qubit Hamiltonian to simulate.
@@ -136,7 +133,7 @@ def trotter_steps_commutator(
         \alpha_2 = \sum_{k > j,l > j} \lVert [\alpha_l P_l,\, [\alpha_k P_k,\, \alpha_j P_j] \rVert +
             \frac{1}{2} \sum_{k > j} \lVert [\alpha_j P_j,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert
 
-        N_p = \left\lceil \frac{C_{\text{max}}^{1/p} t^{1+1/p}\alpha_p^{1/p}}{\epsilon^{1/p}} \right\rceil
+        N_p = \left\lceil \frac{t^{1+1/p}\alpha_p^{1/p}}{\epsilon^{1/p}} \right\rceil
 
         \alpha_p = \sum_{j_1,\ldots,j_{p+1}} \lVert [\alpha_{j_1} P_{j_1},\, [\ldots [\alpha_{j_p} P_{j_p},
         \alpha_{j_{p+1}}P_{j_{p+1}}]\ldots]\rVert
