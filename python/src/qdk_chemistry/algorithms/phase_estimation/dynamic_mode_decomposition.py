@@ -136,7 +136,7 @@ class DynamicModeDecomposition(PhaseEstimation):
         observable_array = np.zeros(vector_dim + max_rank_k, dtype=complex)
 
         # Generate controlled U = exp(-iH dt) by evolution_builder, it will be connected by circuit_mapper
-        ctrl_time_evol_unitary = self.create_ctrl_one_time_evol(qubit_hamiltonian, evolution_builder)
+        ctrl_time_evol_unitary = self.create_ctrl_one_time_evol(qubit_hamiltonian, evolution_builder, [0])
 
         # Calculate initial vector_dim + initial_rank_k - 1 observables
         for i in range(initial_number_measurement - 1):
@@ -217,7 +217,7 @@ class DynamicModeDecomposition(PhaseEstimation):
         )
 
     def create_ctrl_one_time_evol(
-        self, qubit_hamiltonian: QubitHamiltonian, evolution_builder: TimeEvolutionBuilder, control_indices: list = [0]
+        self, qubit_hamiltonian: QubitHamiltonian, evolution_builder: TimeEvolutionBuilder, control_indices: list[int] | None = None
     ) -> ControlledTimeEvolutionUnitary:
         """Create the controlled one time step evolution unitary operator U = exp(-iH dt).
 
@@ -264,7 +264,7 @@ class DynamicModeDecomposition(PhaseEstimation):
         # Build the base circuit with registers
         ancilla = QuantumRegister(1, "ancilla")
         system_target = QuantumRegister(num_system_qubits, "system")
-        classical = ClassicalRegister(1, f"c{observable_power}")  # ??
+        classical = ClassicalRegister(1, f"c{observable_power}")
         circuit = QuantumCircuit(ancilla, system_target, classical)
 
         # Apply state preparation
@@ -280,12 +280,12 @@ class DynamicModeDecomposition(PhaseEstimation):
             controlled_evolution=ctrl_time_evol_unitary, power=observable_power, circuit_mapper=circuit_mapper
         )
         cu_circuit = qasm3.loads(ctrl_time_evol_circuit.qasm)
-        mapping = [control, *target_qubits]  # ??
+        mapping = [control, *target_qubits]
         circuit.compose(cu_circuit, qubits=mapping, inplace=True)
 
         circuit_imag = copy.deepcopy(circuit)
 
-        # Final Hadamard and measurement for real part
+        # Final Hadamard and measurement for real part and imag part
         circuit.h(control)
         circuit.measure(control, classical[0])
 
