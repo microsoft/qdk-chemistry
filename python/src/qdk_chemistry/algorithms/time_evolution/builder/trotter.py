@@ -139,12 +139,12 @@ class Trotter(TimeEvolutionBuilder):
 
         """
         if self._settings.get("order") == 1:
-            return self._first_or_second_order_trotter(qubit_hamiltonian, time)
+            return self._trotter(qubit_hamiltonian, time)
         if self._settings.get("order") == 2:
-            return self._first_or_second_order_trotter(qubit_hamiltonian, time)
+            return self._trotter(qubit_hamiltonian, time)
         raise NotImplementedError("Only orders 1 or 2 are currently supported.")
 
-    def _first_or_second_order_trotter(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
+    def _trotter(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
         r"""Construct the time evolution unitary using first-order Trotter decomposition.
 
         The First Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`

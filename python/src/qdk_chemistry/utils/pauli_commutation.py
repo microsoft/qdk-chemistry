@@ -27,6 +27,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from qdk_chemistry.data import PauliTermAccumulator
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -34,6 +36,7 @@ if TYPE_CHECKING:
 
 __all__: list[str] = [
     "commutator_bound_first_order",
+    "commutator_bound_second_order",
     "do_pauli_labels_commute",
     "do_pauli_labels_qw_commute",
     "do_pauli_maps_commute",
@@ -41,6 +44,19 @@ __all__: list[str] = [
     "does_nested_commutator_vanish",
     "get_commutation_checker",
 ]
+
+
+def _label_to_sparse_word(label: str) -> list[tuple[int, int]]:
+    """Convert a Pauli string label to a ``SparsePauliWord``."""
+    return [(i, 1 if c == "X" else 2 if c == "Y" else 3) for i, c in enumerate(label) if c != "I"]
+
+
+def _sparse_word_to_label(word: list[tuple[int, int]], n_qubits: int) -> str:
+    """Convert a ``SparsePauliWord`` back to a Pauli string label."""
+    chars = ["I"] * n_qubits
+    for q, p in word:
+        chars[q] = "X" if p == 1 else "Y" if p == 2 else "Z"
+    return "".join(chars)
 
 
 def do_pauli_labels_commute(label_a: str, label_b: str) -> bool:
@@ -207,55 +223,72 @@ def pauli_product_label(label_a: str, label_b: str) -> str:
     )
 
 
-def does_nested_commutator_vanish(
-    label_x: str,
-    label_y: str,
-    label_z: str,
-) -> bool:
-    r"""Determine whether :math:`[P_x,\,[P_y,\,P_z]]` vanishes.
+def does_nested_commutator_vanish(*labels: str) -> bool:
+    r"""Determine whether an *n*-nested commutator of Pauli strings vanishes.
 
-    The nested commutator of three Pauli strings is zero when *either*
-    of the following holds:
+    For labels :math:`(P_1, P_2, \ldots, P_n)` this checks whether
 
-    1. The inner commutator :math:`[P_y, P_z]` vanishes
-       (i.e. :math:`P_y` and :math:`P_z` commute), **or**
-    2. The outer commutator :math:`[P_x, P_y P_z]` vanishes
-       (i.e. :math:`P_x` commutes with the Pauli label of
-       :math:`P_y P_z`).
+    .. math::
 
-    Note that the Pauli label of :math:`[P_y, P_z]` is proportional
-    to :math:`P_y P_z` (up to a scalar), so commutation of :math:`P_x`
-    with :math:`P_y P_z` is equivalent to commutation with the full
-    commutator operator.
+        [P_1,\,[P_2,\,[\cdots [P_{n-1},\,P_n]\cdots]]] = 0.
+
+    The nested commutator vanishes when *either* of the following holds:
+
+    1. The inner nested commutator
+       :math:`[P_2, [\cdots [P_{n-1}, P_n] \cdots]]` vanishes, **or**
+    2. :math:`P_1` commutes with the Pauli label of the product
+       :math:`P_2 P_3 \cdots P_n`.
+
+    Condition 2 works because a non-vanishing nested commutator of Pauli
+    strings is always proportional to the sequential product of those
+    strings (up to a scalar phase), so commutation with the product label
+    is equivalent to commutation with the full commutator operator.
 
     Args:
-        label_x: Pauli string label for :math:`P_x`.
-        label_y: Pauli string label for :math:`P_y`.
-        label_z: Pauli string label for :math:`P_z`.
+        *labels: Two or more Pauli string labels of equal length.
 
     Returns:
-        ``True`` if :math:`[P_x, [P_y, P_z]] = 0`, ``False`` otherwise.
+        ``True`` if the nested commutator is zero, ``False`` otherwise.
 
     Raises:
-        ValueError: If the labels have different lengths.
+        ValueError: If fewer than two labels are given or if the labels
+            have different lengths.
 
     Examples:
+        >>> does_nested_commutator_vanish("XI", "IX")
+        True
+        >>> does_nested_commutator_vanish("XI", "YI")
+        False
         >>> does_nested_commutator_vanish("XI", "IX", "II")
         True
-        >>> does_nested_commutator_vanish("XI", "YI", "ZI")
-        False
+        >>> does_nested_commutator_vanish("XI", "YI", "ZI")  # [XI, 2i·XI] = 0
+        True
         >>> does_nested_commutator_vanish("IX", "XI", "YI")
         True
+        >>> does_nested_commutator_vanish("ZI", "IX", "ZI", "XY")
+        False
 
     """
-    # Inner commutator [P_y, P_z] vanishes => whole thing vanishes
-    if do_pauli_labels_commute(label_y, label_z):
-        return True
-    # Compute Pauli label of P_y P_z (∝ [P_y, P_z])
-    inner_label = pauli_product_label(label_y, label_z)
+    if len(labels) < 2:
+        raise ValueError("At least two Pauli labels are required for a commutator.")
 
-    # Outer commutator [P_x, inner] vanishes?
-    return do_pauli_labels_commute(label_x, inner_label)
+    # Base case: [P_a, P_b] vanishes iff the two strings commute.
+    if len(labels) == 2:
+        return do_pauli_labels_commute(labels[0], labels[1])
+
+    # Recursive case: [P_1, [P_2, ..., P_n]]
+    # 1. Inner nested commutator vanishes => whole expression vanishes.
+    if does_nested_commutator_vanish(*labels[1:]):
+        return True
+
+    # 2. Compute the product P_2 P_3 … P_n via sparse-word multiplication
+    #    (proportional to the inner commutator when it is non-zero) and
+    #    check whether P_1 commutes with it.
+    word = _label_to_sparse_word(labels[1])
+    for lbl in labels[2:]:
+        _, word = PauliTermAccumulator.multiply_uncached(word, _label_to_sparse_word(lbl))
+    inner_product = _sparse_word_to_label(word, len(labels[0]))
+    return do_pauli_labels_commute(labels[0], inner_product)
 
 
 def commutator_bound_first_order(
@@ -270,8 +303,8 @@ def commutator_bound_first_order(
     .. math::
 
         \lVert U(t) - S_1(t) \rVert \le
-            \frac{t^2}{2} \sum_{j < k}
-            \lVert [\alpha_j P_j,\, \alpha_k P_k] \rVert
+        \frac{t^2}{2} \sum_{j < k}
+        \lVert [\alpha_j P_j,\, \alpha_k P_k] \rVert
 
     For Pauli strings the spectral norm of the commutator is
 
@@ -316,8 +349,8 @@ def commutator_bound_second_order(
     .. math::
 
         \lVert U(t) - S_2(t) \rVert \le
-            \frac{t^3}{3!} \sum_{j < k < l}
-            \lVert \lvert [\alpha_j P_i,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert ] \rVert
+        \frac{t^3}{12} \left(\sum_{k > j,l > j} \lVert [\alpha_l P_l,\, [\alpha_k P_k,\, \alpha_j P_j] \rVert +
+        \frac{1}{2} \sum_{k > j} \lVert [\alpha_j P_j,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert \right)
 
     For Pauli strings the spectral norm of the commutator is
 
@@ -325,9 +358,9 @@ def commutator_bound_second_order(
     * :math:`2 |\alpha_j| |\alpha_k|`  if they anticommute.
 
     This function returns
-    :math:`\sum_{j < k < l}
-            \lVert \lvert [\alpha_j P_i,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert ] \rVert`,
-    so the user can multiply by :math:`t^{3} / (3! * N)` to get the per-step
+    :math:`\sum_{k > j,l > j} \lVert [\alpha_l P_l,\, [\alpha_k P_k,\, \alpha_j P_j] \rVert
+    + \frac{1}{2} \sum_{k > j} \lVert [\alpha_j P_j,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert`,
+    so the user can multiply by :math:`t^{3} / (12 * N**2)` to get the per-step
     error.
 
     Args:
@@ -352,7 +385,8 @@ def commutator_bound_second_order(
 
     total_term2 = 0.0
     for i in range(n):
-        for j in range(n):
+        for j in range(i + 1, n):
             if not does_nested_commutator_vanish(pauli_labels[i], pauli_labels[i], pauli_labels[j]):
                 total_term2 += 2.0**2 * abs(coefficients[i]) ** 2 * abs(coefficients[j])
+
     return total_term1 + 0.5 * total_term2

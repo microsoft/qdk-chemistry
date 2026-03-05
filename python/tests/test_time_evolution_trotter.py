@@ -394,13 +394,12 @@ class TestTrotterAccuracyAware:
 
     def test_target_accuracy_commutator_bound_second_order(self):
         """Test that target_accuracy with commutator bound computes correct step count."""
-        # H = X + Z, X and Z anticommute -> commutator bound = 4
-        # N = ceil(sqrt(4) * t^(3/2) / (sqrt(3! * eps))) = 17
+        # H = X + Z, X and Z anticommute -> commutator bound = 6
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
         builder = Trotter(target_accuracy=0.01, order=2)
         unitary = builder.run(hamiltonian, time=1.0)
         container = unitary.get_container()
-        assert container.step_reps == 9
+        assert container.step_reps == 8
 
     def test_target_accuracy_naive_bound_second_order(self):
         """Test that target_accuracy with naive bound computes correct step count."""
