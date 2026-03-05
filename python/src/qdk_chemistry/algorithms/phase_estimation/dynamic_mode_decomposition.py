@@ -15,6 +15,8 @@ Reference:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+import copy
+
 import numpy as np
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
 
@@ -39,7 +41,7 @@ class DynamicModeDecompositionSettings(PhaseEstimationSettings):
     """Settings for the Dynamic Mode Decomposition algorithm."""
 
     def __init__(self):
-        """Initialize the settings for ODMD
+        """Initialize the settings for ODMD.
 
         Args:
             shots_per_observable: The number of shots to execute per measuring a bit in the iterative phase estimation.
@@ -50,7 +52,7 @@ class DynamicModeDecompositionSettings(PhaseEstimationSettings):
             "shots_per_observable",
             "int",
             3,
-            "The number of shots to execute per observable (overlap <\psi|exp(-iH n dt)|\psi>).",
+            r"The number of shots to execute per observable (overlap <\psi|exp(-iH n dt)|\psi>).",
         )
         self._set_default("vector_dim", "int", -1, "the row number of Hankel matrix X")
         self._set_default("initial_rank_k", "int", -1, "the initial column number of Hankel matrix X")
@@ -134,26 +136,22 @@ class DynamicModeDecomposition(PhaseEstimation):
         initial_rank_k = self._settings.get("initial_rank_k")
         max_rank_k = self._settings.get("max_rank_k")
         initial_number_measurement = vector_dim + initial_rank_k
-        observable_array = np.zeros(vector_dim + max_rank_k)
-        shots = self._settings.get("shots_per_observable")
+        observable_array = np.zeros(vector_dim + max_rank_k, dtype=complex)
 
         # Generate controlled U = exp(-iH dt) by evolution_builder, it will be connected by circuit_mapper
         ctrl_time_evol_unitary = self.create_ctrl_one_time_evol(qubit_hamiltonian, evolution_builder)
 
         # Calculate initial vector_dim + initial_rank_k - 1 observables
         for i in range(initial_number_measurement - 1):
-            circuit_real = self.create_iteration_circuit(
-                state_preparation, qubit_hamiltonian.num_qubits, ctrl_time_evol_unitary, circuit_mapper, i + 1
+            observable_array[i] = self._measure_observables(
+                state_preparation=state_preparation,
+                num_system_qubits=qubit_hamiltonian.num_qubits,
+                ctrl_time_evol_unitary=ctrl_time_evol_unitary,
+                circuit_mapper=circuit_mapper,
+                observable_power=i + 1,
+                circuit_executor=circuit_executor,
+                noise=noise,
             )
-
-            executor_data = circuit_executor.run(circuit_real, shots=shots, noise=noise)
-            bitstring_result = executor_data.bitstring_counts  # a dictionary
-            Logger.info(
-                f"measured real part of {i + 1} observable, {bitstring_result.get('0', 0)} zeros, {bitstring_result.get('1', 0)} ones"
-            )
-            observable_real = (bitstring_result.get("0", 0) - bitstring_result.get("1", 0)) / shots
-            Logger.info(f"measured real part of {i + 1} observable, value {observable_real}")
-            observable_array[i] = observable_real
 
         last_phase_fraction = 1.0
         phase_fraction = 0.0
@@ -161,10 +159,10 @@ class DynamicModeDecomposition(PhaseEstimation):
         rank_k = initial_rank_k - 1
 
         # Compose Hankel matrices
-        hankel_x = np.zeros((vector_dim, rank_k))
+        hankel_x = np.zeros((vector_dim, rank_k), dtype=complex)
         for v in range(rank_k):
             hankel_x[:, v] = observable_array[v : v + vector_dim]
-        hankel_x_prime = np.zeros((vector_dim, rank_k))
+        hankel_x_prime = np.zeros((vector_dim, rank_k), dtype=complex)
         hankel_x_prime[:, 0 : rank_k - 1] = hankel_x[:, 1:rank_k]
         hankel_x_prime[:, rank_k - 1] = observable_array[rank_k : rank_k + vector_dim]
 
@@ -178,22 +176,15 @@ class DynamicModeDecomposition(PhaseEstimation):
             # Quantum part: obtain the observables (overlaps) by Hadamard tests
             rank_k += 1
             observe_index += 1
-            circuit_real = self.create_iteration_circuit(
-                state_preparation,
-                qubit_hamiltonian.num_qubits,
-                ctrl_time_evol_unitary,
-                circuit_mapper,
-                observe_index + 1,
+            observable_array[observe_index] = self._measure_observables(
+                state_preparation=state_preparation,
+                num_system_qubits=qubit_hamiltonian.num_qubits,
+                ctrl_time_evol_unitary=ctrl_time_evol_unitary,
+                circuit_mapper=circuit_mapper,
+                observable_power=observe_index + 1,
+                circuit_executor=circuit_executor,
+                noise=noise,
             )
-
-            executor_data = circuit_executor.run(circuit_real, shots=shots, noise=noise)
-            bitstring_result = executor_data.bitstring_counts  # a dictionary
-            Logger.info(
-                f"measured real part of {observe_index + 1} observable, {bitstring_result.get('0', 0)} zeros, {bitstring_result.get('1', 0)} ones"
-            )
-            observable_real = (bitstring_result.get("0", 0) - bitstring_result.get("1", 0)) / shots
-            Logger.info(f"measured real part of {observe_index + 1} observable, value {observable_real}")
-            observable_array[observe_index] = observable_real
 
             # Classical part: update Hankel matrices, pseudo-inverse to get DMD matrix A
             hankel_x = np.column_stack((hankel_x, hankel_x_prime[:, rank_k - 2]))
@@ -231,7 +222,7 @@ class DynamicModeDecomposition(PhaseEstimation):
     def create_ctrl_one_time_evol(
         self, qubit_hamiltonian: QubitHamiltonian, evolution_builder: TimeEvolutionBuilder, control_indices: list = [0]
     ) -> ControlledTimeEvolutionUnitary:
-        """Create the controlled one time step evolution unitary operator U = exp(-iH dt)
+        """Create the controlled one time step evolution unitary operator U = exp(-iH dt).
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
@@ -247,12 +238,10 @@ class DynamicModeDecomposition(PhaseEstimation):
             evolution_builder=evolution_builder,
         )
 
-        ctrl_one_time_step_evol_unitary = ControlledTimeEvolutionUnitary(
+        return ControlledTimeEvolutionUnitary(
             time_evolution_unitary=time_evol_unitary,
             control_indices=control_indices,
         )
-
-        return ctrl_one_time_step_evol_unitary
 
     def create_iteration_circuit(
         self,
@@ -260,15 +249,15 @@ class DynamicModeDecomposition(PhaseEstimation):
         num_system_qubits: int,
         ctrl_time_evol_unitary: ControlledTimeEvolutionUnitary,
         circuit_mapper: ControlledEvolutionCircuitMapper,
-        observable_index: int,
-    ) -> Circuit:
-        r"""Construct n-th single ODMD iteration circuit for gauging Re(<\psi|exp(-iH n dt)|\psi>). Since we only approximate ground state energy and don't find the state, we don't measure the imaginary part for now.
+        observable_power: int,
+    ) -> list[Circuit]:
+        r"""Construct n-th single ODMD iteration circuit for gauging Re and Im of (<\psi|exp(-iH n dt)|\psi>). Since we only approximate ground state energy and don't find the state, we don't measure the imaginary part for now.
 
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
             ctrl_time_evol_unitary: The controlled one time step evolution unitary operator U = exp(-iH dt).
             circuit_mapper: The controlled evolution circuit mapper to use.
-            observable_index: Current observable index (0-based).
+            observable_power: Current observable power.
 
         Returns:
             A quantum circuit gauging <\psi|exp(-iH n dt)|\psi>.
@@ -277,7 +266,7 @@ class DynamicModeDecomposition(PhaseEstimation):
         # Build the base circuit with registers
         ancilla = QuantumRegister(1, "ancilla")
         system_target = QuantumRegister(num_system_qubits, "system")
-        classical = ClassicalRegister(1, f"c{observable_index}")  # ??
+        classical = ClassicalRegister(1, f"c{observable_power}")  # ??
         circuit = QuantumCircuit(ancilla, system_target, classical)
 
         # Apply state preparation
@@ -290,21 +279,27 @@ class DynamicModeDecomposition(PhaseEstimation):
 
         # Apply control U^n = exp(-iH n dt)
         ctrl_time_evol_circuit = self._create_ctrl_time_evol_circuit(
-            controlled_evolution=ctrl_time_evol_unitary, power=observable_index, circuit_mapper=circuit_mapper
+            controlled_evolution=ctrl_time_evol_unitary, power=observable_power, circuit_mapper=circuit_mapper
         )
         cu_circuit = qasm3.loads(ctrl_time_evol_circuit.qasm)
         mapping = [control, *target_qubits]  # ??
         circuit.compose(cu_circuit, qubits=mapping, inplace=True)
 
+        circuit_imag = copy.deepcopy(circuit)
+
         # Final Hadamard and measurement for real part
         circuit.h(control)
         circuit.measure(control, classical[0])
 
+        circuit_imag.sdg(control)
+        circuit_imag.h(control)
+        circuit_imag.measure(control, classical[0])
+
         Logger.info(
-            f"Completed ODMD observable {observable_index + 1}, producing circuit with {circuit.num_qubits} "
+            f"Completed ODMD observable {observable_power}, producing circuit with {circuit.num_qubits} "
             f"qubits and {circuit.num_clbits} classical bits."
         )
-        return Circuit(qasm=qasm3.dumps(circuit))
+        return [Circuit(qasm=qasm3.dumps(circuit)), Circuit(qasm=qasm3.dumps(circuit_imag))]
 
     def _append_state_preparation(
         self, circuit: QuantumCircuit, state_preparation: Circuit, system_target: QuantumRegister
@@ -328,6 +323,61 @@ class DynamicModeDecomposition(PhaseEstimation):
             circuit.compose(state_prep_circuit.to_gate(), qubits=system_target, inplace=True)
         except AssertionError:
             circuit.compose(state_prep_circuit, qubits=system_target, inplace=True)
+
+    def _measure_observables(
+        self,
+        state_preparation: Circuit,
+        num_system_qubits: int,
+        ctrl_time_evol_unitary: ControlledTimeEvolutionUnitary,
+        circuit_mapper: ControlledEvolutionCircuitMapper,
+        observable_power: int,
+        circuit_executor: CircuitExecutor,
+        noise: QuantumErrorProfile | None = None,
+    ) -> complex:
+        """Measure a single ODMD observable using Hadamard tests.
+
+        Args:
+            state_preparation: Trial-state preparation circuit.
+            num_system_qubits: Number of system qubits for the circuit.
+            ctrl_time_evol_unitary: Controlled time-evolution unitary.
+            circuit_mapper: Circuit mapper for controlled evolution.
+            observable_power: Observable time-step power.
+            circuit_executor: Executor to run the circuits.
+            noise: Optional noise model.
+
+        Returns:
+            The complex-valued observable.
+
+        """
+        circuit_real, circuit_imag = self.create_iteration_circuit(
+            state_preparation=state_preparation,
+            num_system_qubits=num_system_qubits,
+            ctrl_time_evol_unitary=ctrl_time_evol_unitary,
+            circuit_mapper=circuit_mapper,
+            observable_power=observable_power,
+        )
+
+        shots = self._settings.get("shots_per_observable")
+
+        executor_data = circuit_executor.run(circuit_real, shots=shots, noise=noise)
+        bitstring_result = executor_data.bitstring_counts
+        Logger.info(
+            f"measured real part of observable power {observable_power}, "
+            f"{bitstring_result.get('0', 0)} zeros, {bitstring_result.get('1', 0)} ones"
+        )
+        observable_real = (bitstring_result.get("0", 0) - bitstring_result.get("1", 0)) / shots
+
+        executor_data = circuit_executor.run(circuit_imag, shots=shots, noise=noise)
+        bitstring_result = executor_data.bitstring_counts
+        Logger.info(
+            f"measured imag part of observable power {observable_power}, "
+            f"{bitstring_result.get('0', 0)} zeros, {bitstring_result.get('1', 0)} ones"
+        )
+        observable_imag = (bitstring_result.get("0", 0) - bitstring_result.get("1", 0)) / shots
+
+        observable_value = observable_real + 1j * observable_imag
+        Logger.info(f"measured observable power {observable_power}, value {observable_value}")
+        return observable_value
 
     def name(self) -> str:
         """Return the name of the phase estimation algorithm."""
