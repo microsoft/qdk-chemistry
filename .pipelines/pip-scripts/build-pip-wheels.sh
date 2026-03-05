@@ -122,7 +122,7 @@ python3 --version
 python3 -m pip install --upgrade pip
 python3 -m pip install auditwheel build \
     "fonttools>=4.61.0" "urllib3>=2.6.0" \
-    opentelemetry-api==1.23.0 \ # Necessary for 1ES telemetry
+    opentelemetry-api==1.23.0 \
     opentelemetry-sdk==1.23.0 \
     opentelemetry-exporter-otlp-proto-grpc==1.23.0
 
