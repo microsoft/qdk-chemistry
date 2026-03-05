@@ -198,8 +198,8 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     rm -rf "$TEMP_DIR"
 
 elif [ "$MAC_BUILD" == "ON" ]; then
-    export CMAKE_C_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin -g"
-    export CMAKE_CXX_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin -g"
+    export CMAKE_C_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin"
+    export CMAKE_CXX_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin"
     python3 -m build --wheel \
         -C build-dir="build/{wheel_tag}" \
         -C cmake.define.QDK_UARCH=native \
