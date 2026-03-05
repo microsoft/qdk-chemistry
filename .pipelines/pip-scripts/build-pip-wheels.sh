@@ -120,8 +120,11 @@ python3 --version
 
 # Update pip and install build tools
 python3 -m pip install --upgrade pip
-python3 -m pip install auditwheel build
-python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
+python3 -m pip install auditwheel build \
+    "fonttools>=4.61.0" "urllib3>=2.6.0" \
+    opentelemetry-api==1.23.0 \ # Necessary for 1ES telemetry
+    opentelemetry-sdk==1.23.0 \
+    opentelemetry-exporter-otlp-proto-grpc==1.23.0
 
 # Prepare README for PyPI
 bash .pipelines/pip-scripts/prepare-readme.sh
