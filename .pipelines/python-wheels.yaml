@@ -37,7 +37,7 @@ parameters:
     march: armv8-a
     imageName: 1es-pt-azurelinux3-arm
   - name: macos_arm64
-    os: macos
+    os: macOS
     arch: aarch64
     march: armv8-a
     imageName: ACES_VM_SharedPool_Tahoe
@@ -83,7 +83,7 @@ extends:
       jobs:
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
-          ${{ if eq(target.os, 'macos') }}:
+          ${{ if eq(target.os, 'macOS') }}:
             pool:
               name: AcesShared
               demands:
@@ -175,7 +175,7 @@ extends:
                 pythonVersion: $(pythonVersion)
 
           # Build - macOS ARM64
-          - ${{ if eq(target.os, 'macos') }}:
+          - ${{ if eq(target.os, 'macOS') }}:
             - template: .pipelines/templates/build-pip-wheels.yml@self
               parameters:
                 march: $(buildMarch)
@@ -186,7 +186,7 @@ extends:
                 macBuild: ON
 
           # Test - macOS ARM64
-          - ${{ if eq(target.os, 'macos') }}:
+          - ${{ if eq(target.os, 'macOS') }}:
             - template: .pipelines/templates/test-pip-wheels.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
