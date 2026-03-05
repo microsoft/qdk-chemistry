@@ -63,7 +63,7 @@ class QubitMapper(Algorithm):
 
         Args:
             hamiltonian: The fermionic Hamiltonian.
-            symmetries: Optional conserved quantum numbers. Required by symmetry-exploiting encodings.
+            symmetries: Optional symmetry information. Required by symmetry-exploiting algorithms.
 
         Returns:
            QubitHamiltonian: An instance of the QubitHamiltonian.

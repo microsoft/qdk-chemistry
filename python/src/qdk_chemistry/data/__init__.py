@@ -43,7 +43,7 @@ Exposed classes are:
 - :class:`SlaterDeterminantContainer`: Single Slater determinant wavefunction representation.
 - :class:`StabilityResult`: Result of stability analysis for electronic structure calculations.
 - :class:`Structure`: Molecular structure and geometry information.
-- :class:`Symmetries`: Conserved quantum numbers (particle count, spin) for symmetry-exploiting algorithms.
+- :class:`Symmetries`: Physical symmetries of an electronic state for symmetry-exploiting algorithms.
 - :class:`TimeEvolutionUnitary`: Time evolution unitary.
 - :class:`TimeEvolutionUnitaryContainer`: Abstract base class for different time evolution unitary representation.
 - :class:`Wavefunction`: Electronic wavefunction data and coefficients.

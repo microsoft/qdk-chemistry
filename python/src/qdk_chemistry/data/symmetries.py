@@ -1,8 +1,7 @@
-"""Symmetries data class for encoding quantum number constraints.
+"""Symmetries data class for encoding physical symmetries of an electronic state.
 
-Encapsulates the physical symmetries of an electronic state (particle number, spin)
-for use by algorithms that exploit conserved quantum numbers, such as the
-symmetry-conserving Bravyi-Kitaev qubit mapping.
+The :class:`Symmetries` class is a general container for symmetry information
+that quantum algorithms can exploit to reduce circuit depth or qubit count.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -25,11 +24,10 @@ __all__ = ["Symmetries"]
 
 
 class Symmetries(DataClass):
-    """Immutable container for the conserved quantum numbers of an electronic state.
+    r"""Immutable container for the physical symmetries of an electronic state.
 
-    Stores the number of alpha and beta electrons in the active space. Derived
-    quantities such as total particle number, :math:`S_z` projection, and spin
-    multiplicity are available as properties.
+    ``Symmetries`` serves as the central object for communicating symmetry
+    information to algorithms that can exploit it.
 
     Args:
         n_alpha: Number of alpha (spin-up) electrons in the active space.

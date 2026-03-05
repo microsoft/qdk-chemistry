@@ -38,7 +38,7 @@ Quick reference
      - Pauli operator representation
      - :doc:`QubitMapper <../algorithms/qubit_mapper>`
    * - :doc:`Symmetries <symmetries>`
-     - Conserved quantum numbers (electron counts, spin)
+     - Physical symmetries
      - Factory methods, User input
    * - :doc:`PauliOperator <pauli_operator>`
      - Pauli operator expressions with arithmetic

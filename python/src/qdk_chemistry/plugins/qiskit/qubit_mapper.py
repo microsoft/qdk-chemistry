@@ -70,7 +70,7 @@ class QiskitQubitMapper(QubitMapper):
 
         Args:
             hamiltonian: The fermionic Hamiltonian.
-            _symmetries: Optional conserved quantum numbers. Not used by this implementation.
+            _symmetries: Optional symmetry information. Not used by this implementation.
 
         Returns:
             QubitHamiltonian: An instance of the QubitHamiltonian.

@@ -1,17 +1,20 @@
 Symmetries
 ==========
 
-The :class:`~qdk_chemistry.data.Symmetries` class in QDK/Chemistry represents the conserved quantum numbers of an electronic state, including particle number and spin.
+The :class:`~qdk_chemistry.data.Symmetries` class in QDK/Chemistry is a general container for symmetry information that quantum algorithms can exploit to reduce resource requirements.
 As a core :doc:`data class <../design/index>`, it follows QDK/Chemistry's immutable data pattern.
 
 Overview
 --------
 
-Certain quantum algorithms can reduce resource requirements when the symmetries of the target quantum state are known in advance.
-The :class:`~qdk_chemistry.data.Symmetries` class encapsulates these conserved quantities so that they can be passed to any algorithm that exploits them, such as the :ref:`symmetry-conserving Bravyi-Kitaev <encoding-scbk>` qubit mapping.
+Many quantum algorithms can reduce circuit depth, qubit count, or classical post-processing cost when the symmetries of the target quantum state are known in advance.
+The :class:`~qdk_chemistry.data.Symmetries` class encapsulates this symmetry information so that it can be passed to any algorithm that exploits it, such as the :ref:`symmetry-conserving Bravyi-Kitaev <encoding-scbk>` qubit mapping.
 
-The class stores the number of alpha (spin-up) and beta (spin-down) electrons in the active space.
-From these two values, several derived quantities are available as read-only properties.
+
+Conserved quantum numbers
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+From the alpha and beta electron counts, several derived quantities are available as read-only properties.
 
 Properties
 ~~~~~~~~~~

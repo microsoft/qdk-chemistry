@@ -265,7 +265,7 @@ class QdkQubitMapper(QubitMapper):
 
         Args:
             hamiltonian: The fermionic Hamiltonian with one-body and two-body integrals.
-            _symmetries: Optional conserved quantum numbers. Not used by this implementation.
+            _symmetries: Optional symmetry information. Not used by this implementation.
 
         Returns:
             QubitHamiltonian: The qubit Hamiltonian with Pauli strings and coefficients.

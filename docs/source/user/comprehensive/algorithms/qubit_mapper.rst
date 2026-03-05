@@ -238,7 +238,7 @@ Related classes
 
 - :doc:`Hamiltonian <../data/hamiltonian>`: Input Hamiltonian for mapping
 - :class:`~qdk_chemistry.data.QubitHamiltonian`: Output qubit operator representation
-- :doc:`Symmetries <../data/symmetries>`: Conserved quantum numbers for symmetry-exploiting encodings
+- :doc:`Symmetries <../data/symmetries>`: Physical symmetries (e.g., conserved quantum numbers) for symmetry-exploiting algorithms
 
 Further reading
 ---------------

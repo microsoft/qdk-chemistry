@@ -71,7 +71,7 @@ class OpenFermionQubitMapper(QubitMapper):
 
         Args:
             hamiltonian: The fermionic Hamiltonian.
-            symmetries: Conserved quantum numbers (particle count, spin). Required for SCBK encoding.
+            symmetries: Symmetry information. Required for SCBK encoding.
 
         Returns:
             QubitHamiltonian: An instance of the QubitHamiltonian.
@@ -142,7 +142,7 @@ class OpenFermionQubitMapper(QubitMapper):
 
         Args:
             hamiltonian: The fermionic Hamiltonian.
-            symmetries: Conserved quantum numbers providing the active electron count.
+            symmetries: Symmetry information providing the active electron count.
 
         Returns:
             openfermion.QubitOperator: The mapped qubit operator.
