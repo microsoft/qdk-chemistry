@@ -98,7 +98,7 @@ def trotter_steps_naive(
         return max(
             1,
             math.ceil(
-                ((2**2 * one_norm**3) ** (1 / 2) * (1 / 12.0 ** (1 / 2)) * time ** (1 + 1 / 2))
+                ((2**2 * one_norm**3) ** (1 / 2) * (1 / 12.0 ** (1 / 2)) * abs(time) ** (1 + 1 / 2))
                 / target_accuracy ** (1 / 2)
             ),
         )
@@ -106,7 +106,7 @@ def trotter_steps_naive(
         1,
         math.ceil(
             (2**order * one_norm ** (order + 1)) ** (1 / order)
-            * time ** (1 + 1 / order)
+            * abs(time) ** (1 + 1 / order)
             / (target_accuracy ** (1 / order))
         ),
     )
@@ -177,7 +177,7 @@ def trotter_steps_commutator(
         return max(
             1,
             math.ceil(
-                comm_bound ** (1 / 2) * (1 / 12.0) ** (1 / 2) * time ** (1 + 1 / 2) / (target_accuracy) ** (1 / 2)
+                comm_bound ** (1 / 2) * (1 / 12.0) ** (1 / 2) * abs(time) ** (1 + 1 / 2) / (target_accuracy) ** (1 / 2)
             ),
         )
 
@@ -185,6 +185,6 @@ def trotter_steps_commutator(
     return max(
         1,
         math.ceil(
-            (comm_bound / (order + 1)) ** (1 / order) * time ** (1 + 1 / order) / (target_accuracy) ** (1 / order)
+            (comm_bound / (order + 1)) ** (1 / order) * abs(time) ** (1 + 1 / order) / (target_accuracy) ** (1 / order)
         ),
     )
