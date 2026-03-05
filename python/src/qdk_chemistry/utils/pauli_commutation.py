@@ -27,8 +27,9 @@ from __future__ import annotations
 
 import itertools
 import math
-from functools import reduce
 from typing import TYPE_CHECKING
+
+from qdk_chemistry.data import PauliTermAccumulator
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -46,6 +47,19 @@ __all__: list[str] = [
     "does_nested_commutator_vanish",
     "get_commutation_checker",
 ]
+
+
+def _label_to_sparse_word(label: str) -> list[tuple[int, int]]:
+    """Convert a Pauli string label to a ``SparsePauliWord``."""
+    return [(i, 1 if c == "X" else 2 if c == "Y" else 3) for i, c in enumerate(label) if c != "I"]
+
+
+def _sparse_word_to_label(word: list[tuple[int, int]], n_qubits: int) -> str:
+    """Convert a ``SparsePauliWord`` back to a Pauli string label."""
+    chars = ["I"] * n_qubits
+    for q, p in word:
+        chars[q] = "X" if p == 1 else "Y" if p == 2 else "Z"
+    return "".join(chars)
 
 
 def do_pauli_labels_commute(label_a: str, label_b: str) -> bool:
@@ -270,10 +284,13 @@ def does_nested_commutator_vanish(*labels: str) -> bool:
     if does_nested_commutator_vanish(*labels[1:]):
         return True
 
-    # 2. Compute the Pauli product label P_2 P_3 … P_n (proportional to
-    #    the inner commutator when it is non-zero) and check whether P_1
-    #    commutes with it.
-    inner_product = reduce(pauli_product_label, labels[1:])
+    # 2. Compute the product P_2 P_3 … P_n via sparse-word multiplication
+    #    (proportional to the inner commutator when it is non-zero) and
+    #    check whether P_1 commutes with it.
+    word = _label_to_sparse_word(labels[1])
+    for lbl in labels[2:]:
+        _, word = PauliTermAccumulator.multiply_uncached(word, _label_to_sparse_word(lbl))
+    inner_product = _sparse_word_to_label(word, len(labels[0]))
     return do_pauli_labels_commute(labels[0], inner_product)
 
 
