@@ -7,8 +7,6 @@
 
 from __future__ import annotations
 
-import tempfile
-
 import h5py
 import pytest
 
@@ -237,11 +235,10 @@ class TestSymmetriesJsonSerialization:
 class TestSymmetriesHdf5Serialization:
     """Tests for HDF5 serialization round-trip."""
 
-    def test_hdf5_roundtrip(self):
+    def test_hdf5_roundtrip(self, tmp_path):
         """HDF5 serialization round-trip preserves all fields."""
         original = Symmetries(n_alpha=5, n_beta=3)
-        with tempfile.NamedTemporaryFile(suffix=".symmetries.h5", delete=False) as tmp:
-            filename = tmp.name
+        filename = str(tmp_path / "test.symmetries.h5")
         with h5py.File(filename, "w") as f:
             original.to_hdf5(f)
         with h5py.File(filename, "r") as f:

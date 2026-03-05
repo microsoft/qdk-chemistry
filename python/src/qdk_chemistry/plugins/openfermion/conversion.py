@@ -47,12 +47,10 @@ def _spatial_to_spinorb_one_body(
     n_spinorb = 2 * norb
     h1_so = np.zeros((n_spinorb, n_spinorb), dtype=float)
 
-    for p in range(norb):
-        for q in range(norb):
-            # Alpha-alpha block (even indices)
-            h1_so[2 * p, 2 * q] = h1_alpha[p, q]
-            # Beta-beta block (odd indices)
-            h1_so[2 * p + 1, 2 * q + 1] = h1_beta[p, q]
+    # Alpha-alpha block (even rows, even cols)
+    h1_so[0::2, 0::2] = h1_alpha
+    # Beta-beta block (odd rows, odd cols)
+    h1_so[1::2, 1::2] = h1_beta
 
     return h1_so
 
