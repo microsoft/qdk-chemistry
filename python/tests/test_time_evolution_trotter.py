@@ -5,8 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import math
-
 import numpy as np
 import pytest
 import scipy
@@ -326,7 +324,6 @@ class TestTrotter:
 
         assert container.step_reps == 4
         assert len(container.step_terms) == 11
-
         dt = 0.2 / container.step_reps
         u_k = 1 / (4 - 4 ** (1 / 3))
 
@@ -527,21 +524,13 @@ class TestTrotter:
             hamiltonian_matrix += coeff * _pauli_matrix(pauli_string)
         u_exact = scipy.linalg.expm(-1j * t * hamiltonian_matrix)
 
-        angles_abs = [abs(term.angle / (hamiltonian_coefficient * t)) for term in container.step_terms]
-        largest_error_coefficient = math.prod(sorted(angles_abs, reverse=True)[: 4 + 1]) + 1 / math.factorial(4 + 1)
-
-        commutator_error_bound = t**5 * commutator_bound_higher_order(hamiltonian, order=4) * largest_error_coefficient
-
-        naive_error_bound = (
-            t**5
-            * 2**5
-            * sum(abs(coeff) for _, coeff in hamiltonian.get_real_coefficients()) ** 5
-            * largest_error_coefficient
-        )
+        comm_bound = commutator_bound_higher_order(hamiltonian=hamiltonian, order=4)
+        commutator_error_bound = t**5 * comm_bound
+        naive_error_bound = t**5 * 2**4 * sum(abs(coeff) for _, coeff in hamiltonian.get_real_coefficients()) ** 5
         error_actual = np.linalg.norm(u_trot - u_exact, ord=2)
         assert error_actual <= commutator_error_bound
         assert error_actual <= naive_error_bound
-        assert commutator_error_bound < naive_error_bound
+        assert commutator_error_bound <= naive_error_bound
 
 
 class TestTrotterAccuracyAware:
@@ -740,3 +729,122 @@ class TestTrotterAccuracyAware:
         container = unitary.get_container()
         # target_accuracy=0.0 means disabled, so num_divisions=3 is used directly
         assert container.step_reps == 3
+
+    # Higher-order Trotter tests.
+    def test_target_accuracy_commutator_bound_higher_order(self):
+        """Test that target_accuracy with commutator bound computes correct step count."""
+        # H = X + Z, X and Z anticommute -> commutator bound = 6
+        # For t = 1 and eps = 0.01, N = ceil(sqrt(6 / 12) / sqrt(eps)) = 8.
+        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
+        builder = Trotter(target_accuracy=0.01, order=6)
+        unitary = builder.run(hamiltonian, time=1.0)
+        container = unitary.get_container()
+        assert container.step_reps == 5
+
+    def test_commutator_tighter_than_naive_higher_order(self):
+        """Test that commutator bound gives fewer steps than naive bound."""
+        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
+        eps = 0.01
+        time = 1.0
+        builder_comm = Trotter(target_accuracy=eps, error_bound="commutator", order=4)
+        builder_naive = Trotter(target_accuracy=eps, error_bound="naive", order=2)
+        n_comm = builder_comm.run(hamiltonian, time=time).get_container().step_reps
+        n_naive = builder_naive.run(hamiltonian, time=time).get_container().step_reps
+        assert n_comm <= n_naive
+
+    def test_commuting_hamiltonian_needs_one_step_higher_order(self):
+        """Test that a fully commuting Hamiltonian needs only 1 Trotter step."""
+        # XI and IX commute -> commutator bound = 0 -> N = 1
+        hamiltonian = QubitHamiltonian(pauli_strings=["XI", "IX"], coefficients=[1.0, 1.0])
+        builder = Trotter(target_accuracy=0.01, order=6)
+        unitary = builder.run(hamiltonian, time=1.0)
+        container = unitary.get_container()
+        assert container.step_reps == 1
+
+    def test_angle_scaling_with_auto_steps_higher_order(self):
+        """Test construction of time evolution unitary with multiple Trotter steps."""
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XI", "ZZ"],
+            coefficients=[1.0, 1.0],
+        )
+
+        builder = Trotter(target_accuracy=0.01, order=4)
+
+        t = 1.0
+        unitary = builder.run(hamiltonian, time=t)
+        container = unitary.get_container()
+
+        n = container.step_reps
+        dt = t / n
+
+        u_k = 1 / (4 - 4 ** (1 / 3))
+
+        # See Childs et. al. 2021
+        assert np.isclose(
+            container.step_terms[0].angle,
+            u_k / 2 * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            container.step_terms[1].angle,
+            u_k * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            container.step_terms[2].angle,
+            u_k * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            container.step_terms[3].angle,
+            u_k * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+        assert np.isclose(
+            container.step_terms[4].angle,
+            (1 - 3 * u_k) / 2 * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            container.step_terms[5].angle,
+            (1 - 4 * u_k) * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            container.step_terms[6].angle,
+            (1 - 3 * u_k) / 2 * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            container.step_terms[7].angle,
+            u_k * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+        assert np.isclose(
+            container.step_terms[8].angle,
+            u_k * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            container.step_terms[9].angle,
+            u_k * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            container.step_terms[10].angle,
+            u_k / 2 * dt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )

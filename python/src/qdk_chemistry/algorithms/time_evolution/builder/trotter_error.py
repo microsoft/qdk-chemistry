@@ -51,7 +51,6 @@ def trotter_steps_naive(
     target_accuracy: float,
     *,
     order: int = 1,
-    largest_error_coefficient: float = 1.0,
     weight_threshold: float = 1e-12,
 ) -> int:
     r"""Compute the number of Trotter steps using the naive bound.
@@ -73,10 +72,6 @@ def trotter_steps_naive(
         hamiltonian: The qubit Hamiltonian to simulate.
         time: The total evolution time *t*.
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
-        largest_error_coefficient: The largest coefficient in the Taylor expansion of the Trotter error,
-        :math:`(exp(H_1+...+H_L) - S_order)`, to :math:`t^(order+1)` when all coefficients are 1 and :math:`t = 1`.
-        Used to bound the constant factor in the error bound formulae. Used for order > 2, for which tight bound
-        formulae are not available.
         order: The order of the Trotter-Suzuki product formula.
         weight_threshold: Absolute threshold below which coefficients are discarded.
 
@@ -111,7 +106,6 @@ def trotter_steps_naive(
         1,
         math.ceil(
             (2**order * one_norm ** (order + 1)) ** (1 / order)
-            * largest_error_coefficient ** (1 / order)
             * time ** (1 + 1 / order)
             / (target_accuracy ** (1 / order))
         ),
@@ -124,7 +118,6 @@ def trotter_steps_commutator(
     target_accuracy: float,
     *,
     order: int = 1,
-    largest_error_coefficient: float = 1.0,
     weight_threshold: float = 1e-12,
 ) -> int:
     r"""Compute the number of Trotter steps using the commutator bound.
@@ -157,10 +150,6 @@ def trotter_steps_commutator(
         hamiltonian: The qubit Hamiltonian to simulate.
         time: The total evolution time *t*.
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
-        largest_error_coefficient: The largest coefficient in the Taylor expansion of the Trotter error,
-        :math:`(exp(H_1+...+H_L) - S_order)`, to :math:`t^(order+1)` when all coefficients are 1 and :math:`t = 1`.
-        Used to bound the constant factor in the error bound formulae. Used for order > 2, for which tight bound
-        formulae are not available.
         order: The order of the Trotter-Suzuki product formula.
         weight_threshold: Absolute threshold below which coefficients are discarded.
 
@@ -196,9 +185,6 @@ def trotter_steps_commutator(
     return max(
         1,
         math.ceil(
-            comm_bound ** (1 / order)
-            * largest_error_coefficient ** (1 / order)
-            * time ** (1 + 1 / order)
-            / (target_accuracy) ** (1 / order)
+            (comm_bound / (order + 1)) ** (1 / order) * time ** (1 + 1 / order) / (target_accuracy) ** (1 / order)
         ),
     )
