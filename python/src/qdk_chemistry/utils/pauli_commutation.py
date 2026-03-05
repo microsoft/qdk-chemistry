@@ -37,6 +37,8 @@ if TYPE_CHECKING:
 
 __all__: list[str] = [
     "commutator_bound_first_order",
+    "commutator_bound_higher_order",
+    "commutator_bound_second_order",
     "do_pauli_labels_commute",
     "do_pauli_labels_qw_commute",
     "do_pauli_maps_commute",
@@ -361,7 +363,6 @@ def commutator_bound_second_order(
 
     total_term1 = 0.0
     n = len(pauli_labels)
-    print("n", n)
     for i in range(n):
         for j in range(i + 1, n):
             for k in range(i + 1, n):
@@ -389,7 +390,7 @@ def commutator_bound_higher_order(
 
     .. math::
 
-        \lVert U(t) - S_p(t) \rVert \le \frac{t^{p+1}}{C_{\text{max}}} \left(
+        \lVert U(t) - S_p(t) \rVert \le t^{p+1}C_{\text{max}} \left(
             \sum_{j_1,\ldots,j_{p+1}} \lVert [\alpha_{j_1} P_{j_1},\, [\ldots [\alpha_{j_p} P_{j_p},
             \alpha_{j_{p+1}}P_{j_{p+1}}]\ldots]\rVert \right)
 
@@ -398,8 +399,8 @@ def commutator_bound_higher_order(
     :math:`2^p`.
 
     The constant :math:`C_{\text{max}}` is the largest coefficient
-    in the Taylor expansion of the Trotter error, (exp(H_1+...+H_L) - S_order),
-    to t^(order+1) when all coefficients are 1 and t = 1.
+    in the Taylor expansion of the Trotter error, :math:`(exp(H_1+...+H_L) - S_order)`,
+    to :math:`t^(order+1)` when all coefficients are 1 and :math:`t = 1`.
 
     The number of loop indices equals *order + 1* (the depth of nesting).
     Since *order* is a runtime parameter, the nested iteration is

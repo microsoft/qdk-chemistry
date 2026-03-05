@@ -66,16 +66,16 @@ def trotter_steps_naive(
     where :math:`\sum_j |\alpha_j|` is the 1-norm of the Hamiltonian
     coefficients, :math:`p` is the order of the Trotter-Suzuki product formula,
     and :math:`C_{\text{max}}` is the largest coefficient in the Taylor expansion of
-    the Trotter error, (exp(H_1+...+H_L) - S_order), to t^(order+1)
-    when all coefficients are 1 and t = 1.
+    the Trotter error, :math:`(exp(H_1+...+H_L) - S_order)`, to :math:`t^(order+1)`
+    when all coefficients are 1 and :math:`t = 1`.
 
     Args:
         hamiltonian: The qubit Hamiltonian to simulate.
         time: The total evolution time *t*.
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
         largest_error_coefficient: The largest coefficient in the Taylor expansion of the Trotter error,
-        (exp(H_1+...+H_L) - S_order), to t^(order+1) when all coefficients are 1 and t = 1. Used to bound
-        the constant factor in the error bound formulae. Used for order > 2, for which tight bound
+        :math:`(exp(H_1+...+H_L) - S_order)`, to :math:`t^(order+1)` when all coefficients are 1 and :math:`t = 1`.
+        Used to bound the constant factor in the error bound formulae. Used for order > 2, for which tight bound
         formulae are not available.
         order: The order of the Trotter-Suzuki product formula.
         weight_threshold: Absolute threshold below which coefficients are discarded.
@@ -158,8 +158,8 @@ def trotter_steps_commutator(
         time: The total evolution time *t*.
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
         largest_error_coefficient: The largest coefficient in the Taylor expansion of the Trotter error,
-        (exp(H_1+...+H_L) - S_order), to t^(order+1) when all coefficients are 1 and t = 1. Used to bound
-        the constant factor in the error bound formulae. Used for order > 2, for which tight bound
+        :math:`(exp(H_1+...+H_L) - S_order)`, to :math:`t^(order+1)` when all coefficients are 1 and :math:`t = 1`.
+        Used to bound the constant factor in the error bound formulae. Used for order > 2, for which tight bound
         formulae are not available.
         order: The order of the Trotter-Suzuki product formula.
         weight_threshold: Absolute threshold below which coefficients are discarded.

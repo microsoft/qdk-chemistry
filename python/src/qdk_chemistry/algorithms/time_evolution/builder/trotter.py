@@ -156,7 +156,7 @@ class Trotter(TimeEvolutionBuilder):
 
         The Second Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`
         by decomposing the Hamiltonian H into a sum of terms and using the product formula:
-        :math:`e^{-iHt} \approx \left[\prod_{i=1}^{L-1} e^{-iH_i t/(2n) e^{-iH_L t/n}
+        :math:`e^{-iHt} \approx \left[\prod_{i=1}^{L-1} e^{-iH_i t/(2n)} e^{-iH_L t/n}
         \prod_{i=L-1}^{1} e^{-iH_i t/(2n)}\right]^n`,
         where n is the number of divisions.
 
@@ -345,16 +345,17 @@ class Trotter(TimeEvolutionBuilder):
                 terms = step_terms
 
             # Merge adjacent terms with the same pauli_term by summing angles.
-            i = 0
-            while i < len(terms) - 1:
-                if terms[i].pauli_term == terms[i + 1].pauli_term:
-                    terms[i] = ExponentiatedPauliTerm(
-                        pauli_term=terms[i].pauli_term,
-                        angle=terms[i].angle + terms[i + 1].angle,
+            merged_terms: list[ExponentiatedPauliTerm] = []
+            for term in terms:
+                if merged_terms and merged_terms[-1].pauli_term == term.pauli_term:
+                    last = merged_terms[-1]
+                    merged_terms[-1] = ExponentiatedPauliTerm(
+                        pauli_term=last.pauli_term,
+                        angle=last.angle + term.angle,
                     )
-                    del terms[i + 1]
                 else:
-                    i += 1
+                    merged_terms.append(term)
+            terms = merged_terms
         return terms
 
     def name(self) -> str:
