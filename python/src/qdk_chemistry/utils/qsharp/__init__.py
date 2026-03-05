@@ -15,6 +15,7 @@ _QS_FILES = [
     Path(__file__).parent / "StatePreparation.qs",
     Path(__file__).parent / "IterativePhaseEstimation.qs",
     Path(__file__).parent / "ControlledPauliExp.qs",
+    Path(__file__).parent / "MeasurementBasisRotation.qs",
 ]
 
 

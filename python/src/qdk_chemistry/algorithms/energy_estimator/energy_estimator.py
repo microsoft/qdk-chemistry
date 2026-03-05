@@ -7,14 +7,14 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import numpy as np
-from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
-from qiskit.quantum_info import Pauli, PauliList
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit, EnergyExpectationResult, QubitHamiltonian
+from qdk_chemistry.data.qubit_hamiltonian import _pauli_string_to_masks
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
@@ -25,47 +25,57 @@ def _parity(integer: int) -> int:
     return integer.bit_count() % 2
 
 
-def _paulis_to_indices(paulis: PauliList) -> list[int]:
-    """Converts a list of Pauli operators into a list of integer indices.
+def _paulis_to_nonid_masks(pauli_strings: list[str]) -> list[int]:
+    """Converts a list of Pauli operators into a list of non-identity bitmasks.
+
+    Reuses ``_pauli_string_to_masks`` from ``qubit_hamiltonian`` to produce
+    integer masks where each set bit corresponds to a non-identity Pauli.
 
     Example:
-        PauliList(["IZ", "ZX", "YZ", "ZY"]) -> [1, 3, 3, 3]
+        ["IZ", "ZX", "YZ", "ZY"] -> [1, 3, 3, 3]
 
     Args:
-        paulis: ``PauliList`` representing Pauli operators.
+        pauli_strings: List of Pauli label strings.
 
     Returns:
-        A list of integer indices corresponding to the non-identity components of the Pauli operators.
+        A list of integer bitmasks (``x_mask | z_mask``) for each operator.
 
     """
-    nonid = paulis.z | paulis.x
-    packed_vals = np.packbits(nonid, axis=1, bitorder="little").astype(object)
-    power_uint8 = 1 << (8 * np.arange(packed_vals.shape[1], dtype=object))
-    inds = packed_vals @ power_uint8
-    return inds.tolist()
+    n = len(pauli_strings[0])
+    return [x | z for x, z, _ in (_pauli_string_to_masks(ps, n) for ps in pauli_strings)]
 
 
 def _compute_expval_and_variance_from_bitstrings(
-    bitstring_counts: dict[str, int], paulis: PauliList
+    bitstring_counts: dict[str, int], pauli_strings: list[str]
 ) -> tuple[np.ndarray, np.ndarray]:
     """Computes the expectation values and variances for a given set of Pauli operators.
 
     Args:
         bitstring_counts: A dictionary of measurement outcomes.
-        paulis: ``PauliList`` representing Pauli operators for computing expectation values.
+        pauli_strings: List of Pauli label strings for computing expectation values.
 
     Returns:
         A tuple containing expectation values and variances.
 
     """
     Logger.trace_entering()
-    # Determine measurement basis and Pauli contains only measured terms (drop I terms)
-    basis = _determine_measurement_basis(paulis)
-    measured_indices = np.where(basis.z | basis.x)[0]
-    measured_paulis = PauliList.from_symplectic(paulis.z[:, measured_indices], paulis.x[:, measured_indices])
+    # Determine measurement basis and restrict Paulis to measured qubits (drop I terms)
+    basis = _determine_measurement_basis(pauli_strings)
+    n_qubits = len(basis)
 
-    diag_inds = _paulis_to_indices(measured_paulis)
-    expvals = np.zeros(len(measured_paulis), dtype=float)
+    # For each Pauli string, extract only the measured-qubit bits and compress
+    # them into a contiguous index via bit extraction.
+    measured_indices = sorted(n_qubits - 1 - j for j, ch in enumerate(basis) if ch != "I")
+    nonid_masks = _paulis_to_nonid_masks(pauli_strings)
+    diag_inds = []
+    for nonid in nonid_masks:
+        val = 0
+        for bit_pos, q in enumerate(measured_indices):
+            if nonid & (1 << q):
+                val |= 1 << bit_pos
+        diag_inds.append(val)
+
+    expvals = np.zeros(len(pauli_strings), dtype=float)
     nshots = sum(bitstring_counts.values())
     if nshots == 0:
         raise ValueError("Bitstring counts are empty.")
@@ -83,52 +93,77 @@ def _compute_expval_and_variance_from_bitstrings(
     return expvals, variances
 
 
-def _determine_measurement_basis(paulis: PauliList) -> Pauli:
-    """Determine the measurement basis for a group of Pauli operators.
+def _determine_measurement_basis(pauli_strings: list[str]) -> str:
+    """Determine the measurement basis for a group of qubit-wise commuting Pauli operators.
 
-    Example: PauliList(["IZ", "YZ"]) -> Pauli("YZ")
-
-    Args:
-        paulis: A list of ``PauliList`` representing Pauli operators.
-
-    Returns:
-        A ``Pauli`` representing the measurement basis.
-
-    """
-    qubit_wise_grouped_paulis = paulis.group_commuting(qubit_wise=True)
-    if len(qubit_wise_grouped_paulis) != 1:
-        raise ValueError(
-            "Paulis are not qubit-wise commuting. Please group them first to generate a valid measurement basis."
-        )
-    paulis = qubit_wise_grouped_paulis[0]
-
-    return Pauli((np.logical_or.reduce(paulis.z), np.logical_or.reduce(paulis.x)))
-
-
-def _build_measurement_circuit(basis: Pauli) -> QuantumCircuit:
-    """Generate a circuit with measurement operations for a given Pauli operator.
+    Example: ["IZ", "YZ"] -> "YZ"
 
     Args:
-        basis: ``Pauli`` operator defining the measurement basis.
+        pauli_strings: List of Pauli label strings that must be qubit-wise commuting.
 
     Returns:
-        A ``QuantumCircuit`` representing the measurement circuit for the given Pauli operator.
+        A Pauli label string representing the combined measurement basis.
 
     """
-    # Locate active qubits by binary symplectic representation of the Pauli basis
-    # I: x=0, z=0, X: x=1, z=0, Z: x=0, z=1, Y: x=1, z=1
-    active = np.arange(basis.num_qubits)[basis.z | basis.x]
-    qreg = QuantumRegister(basis.num_qubits, "q")
-    creg = ClassicalRegister(len(active), "c")
-    qc = QuantumCircuit(qreg, creg)
+    n_qubits = len(pauli_strings[0])
+    basis = ["I"] * n_qubits
+    for ps in pauli_strings:
+        for j, ch in enumerate(ps):
+            if ch != "I":
+                if basis[j] == "I":
+                    basis[j] = ch
+                elif basis[j] != ch:
+                    raise ValueError(
+                        "Paulis are not qubit-wise commuting. "
+                        "Please group them first to generate a valid measurement basis."
+                    )
+    return "".join(basis)
 
-    for cidx, qidx in enumerate(active):
-        if basis.x[qidx]:
-            if basis.z[qidx]:
-                qc.sdg(qreg[qidx])  # If x=1 and z=1, Y basis
-            qc.h(qreg[qidx])  # If x=1 and z=0, X basis
-        qc.measure(qreg[qidx], creg[cidx])
-    return qc
+
+def _append_measurement_to_qasm3(base_qasm: str, basis: str) -> str:
+    """Append measurement basis rotation and measurement to a QASM3 circuit string.
+
+    For each non-identity position in *basis*, the appropriate single-qubit
+    rotation is emitted followed by a measurement instruction:
+
+    * ``X`` basis: ``h`` then ``measure``
+    * ``Y`` basis: ``sdg`` then ``h`` then ``measure``
+    * ``Z`` basis: ``measure`` directly
+
+    Args:
+        base_qasm: Base circuit in QASM3 format (without measurements).
+        basis: Pauli label string (e.g. ``"YZI"``) using the standard label
+            convention where ``basis[0]`` = highest qubit (MSB).
+
+    Returns:
+        Complete QASM3 circuit string with measurement appended.
+
+    """
+    n_qubits = len(basis)
+
+    # Resolve qubit register name from the QASM3 header
+    match = re.search(r"qubit\[(\d+)\]\s+(\w+)\s*;", base_qasm)
+    q_name = match.group(2) if match else "q"
+
+    # Map label positions to physical qubit indices: basis[j] -> qubit (n-1-j)
+    active = sorted(
+        ((n_qubits - 1 - j, ch) for j, ch in enumerate(basis) if ch != "I"),
+        key=lambda t: t[0],
+    )
+    n_meas = len(active)
+    if n_meas == 0:
+        return base_qasm
+
+    lines = [f"bit[{n_meas}] c;"]
+    for cidx, (qidx, pauli) in enumerate(active):
+        if pauli == "Y":
+            lines.append(f"sdg {q_name}[{qidx}];")
+            lines.append(f"h {q_name}[{qidx}];")
+        elif pauli == "X":
+            lines.append(f"h {q_name}[{qidx}];")
+        lines.append(f"c[{cidx}] = measure {q_name}[{qidx}];")
+
+    return base_qasm.rstrip() + "\n" + "\n".join(lines) + "\n"
 
 
 class EnergyEstimator(Algorithm):
@@ -186,19 +221,22 @@ class EnergyEstimator(Algorithm):
         """
         Logger.trace_entering()
         meas_circuits = []
-        base_circuit = circuit.get_qiskit_circuit()
+        base_qasm = circuit.get_qasm()
 
-        if base_circuit.num_qubits != grouped_hamiltonians[0].num_qubits:
-            raise ValueError(
-                f"Number of qubits in the base circuit ({base_circuit.num_qubits}) does not match "
-                f"the number of qubits in the Hamiltonian ({grouped_hamiltonians[0].num_qubits})."
-            )
+        # Validate qubit count from the QASM3 header
+        qreg_match = re.search(r"qubit\[(\d+)\]", base_qasm)
+        if qreg_match:
+            circuit_num_qubits = int(qreg_match.group(1))
+            if circuit_num_qubits != grouped_hamiltonians[0].num_qubits:
+                raise ValueError(
+                    f"Number of qubits in the base circuit ({circuit_num_qubits}) does not match "
+                    f"the number of qubits in the Hamiltonian ({grouped_hamiltonians[0].num_qubits})."
+                )
 
         for hamiltonian in grouped_hamiltonians:
-            basis = _determine_measurement_basis(hamiltonian.pauli_ops.paulis)
-            meas_ops = _build_measurement_circuit(basis)
-            full_circ = base_circuit.compose(meas_ops, inplace=False)
-            meas_circuits.append(Circuit(qasm=qasm3.dumps(full_circ)))
+            basis = _determine_measurement_basis(hamiltonian.pauli_strings)
+            full_qasm = _append_measurement_to_qasm3(base_qasm, basis)
+            meas_circuits.append(Circuit(qasm=full_qasm))
 
         return meas_circuits
 
@@ -230,8 +268,8 @@ class EnergyEstimator(Algorithm):
         for counts, group in zip(bitstring_counts_list, hamiltonians, strict=True):
             if counts is None:
                 continue
-            paulis = group.pauli_ops.paulis
-            coeffs = group.pauli_ops.coeffs
+            paulis = group.pauli_strings
+            coeffs = group.coefficients
 
             expvals, variances = _compute_expval_and_variance_from_bitstrings(counts, paulis)
             expvals_list.append(expvals)
