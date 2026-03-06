@@ -139,10 +139,12 @@ class Trotter(TimeEvolutionBuilder):
 
         """
         if self._settings.get("order") == 1:
-            return self._first_order_trotter(qubit_hamiltonian, time)
-        raise NotImplementedError("Only first-order Trotter decomposition is currently supported.")
+            return self._trotter(qubit_hamiltonian, time)
+        if self._settings.get("order") == 2:
+            return self._trotter(qubit_hamiltonian, time)
+        raise NotImplementedError("Only orders 1 or 2 are currently supported.")
 
-    def _first_order_trotter(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
+    def _trotter(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
         r"""Construct the time evolution unitary using first-order Trotter decomposition.
 
         The First Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`
@@ -214,6 +216,9 @@ class Trotter(TimeEvolutionBuilder):
     ) -> list[ExponentiatedPauliTerm]:
         """Decompose a single Trotter step into exponentiated Pauli terms.
 
+        The order of the Trotter decomposition is taken from the settings associated
+        with this builder.
+
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be decomposed.
             time: The evolution time for the single step.
@@ -228,10 +233,35 @@ class Trotter(TimeEvolutionBuilder):
         if not qubit_hamiltonian.is_hermitian(tolerance=atol):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
-        for label, coeff in qubit_hamiltonian.get_real_coefficients(tolerance=atol):
+        order = self._settings.get("order")
+
+        if order == 1:
+            for label, coeff in qubit_hamiltonian.get_real_coefficients(tolerance=atol):
+                mapping = self._pauli_label_to_map(label)
+                angle = coeff * time
+                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+        elif order == 2:
+            coeffs = list(qubit_hamiltonian.get_real_coefficients(tolerance=atol))
+            # If there are no coefficients (e.g., empty Hamiltonian or all filtered by atol),
+            # there is nothing to decompose; return the empty list of terms.
+            if not coeffs:
+                return terms
+            # \prod_{i=1}^{L-1} e^{-iH_i t/(2n)}
+            for label, coeff in coeffs[:-1]:
+                mapping = self._pauli_label_to_map(label)
+                angle = coeff * time / 2
+                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+            # e^{-iH_L t/n}
+            label, coeff = coeffs[-1]
             mapping = self._pauli_label_to_map(label)
             angle = coeff * time
             terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+
+            # \prod_{i=L-1}^1 e^{-iH_i t/(2n)}
+            for label, coeff in reversed(coeffs[:-1]):
+                mapping = self._pauli_label_to_map(label)
+                angle = coeff * time / 2
+                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
 
         return terms
 
