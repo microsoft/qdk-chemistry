@@ -103,7 +103,7 @@ class OpenFermionQubitMapper(QubitMapper):
 
         if encoding == "symmetry-conserving-bravyi-kitaev":
             qubit_op = self._map_scbk(hamiltonian, symmetries)
-            fermion_mode_order = FermionModeOrder.BLOCKED
+            fermion_mode_order = FermionModeOrder.INTERLEAVED
         else:
             qubit_op = self._map_standard(hamiltonian, encoding)
             fermion_mode_order = FermionModeOrder.BLOCKED
