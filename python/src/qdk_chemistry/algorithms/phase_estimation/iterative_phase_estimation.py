@@ -14,8 +14,6 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk import qsharp
-
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
@@ -219,24 +217,16 @@ class IterativePhaseEstimation(PhaseEstimation):
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_evol_op = controlled_evolution._qsharp_op  # noqa: SLF001
-        iqpe_iter_qsc = qsharp.circuit(
+        qsharp_factory = [
             QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
             state_prep_op,
             ctrl_evol_op,
             phase_correction,
             0,
             [1 + i for i in range(num_system_qubits)],  # target qubits
-        )
-        iqpe_iter_qir = qsharp.compile(
-            QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
-            state_prep_op,
-            ctrl_evol_op,
-            phase_correction,
-            0,
-            [1 + i for i in range(num_system_qubits)],  # target qubits
-        )
+        ]
 
-        return Circuit(qsharp=iqpe_iter_qsc, qir=iqpe_iter_qir)
+        return Circuit(qsharp_factory=qsharp_factory)
 
     def _create_circuit_from_qiskit(
         self, state_preparation: Circuit, controlled_evolution: Circuit, phase_correction: float
