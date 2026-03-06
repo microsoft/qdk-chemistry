@@ -53,6 +53,7 @@ class DynamicModeDecompositionSettings(PhaseEstimationSettings):
         self._set_default("evolution_time", "float", 0.0, "Time dt in the evolution unitary U = exp(-i H dt)")
         self._set_default("shots_per_observable", "int", 40, "the number of shots to test one observable")
         self._set_default("max_rank_k", "int", 200, "Column number limit of Hankel matrix X")
+        self._set_default("measure_imag", "bool", False, "flag for testing imaginary part of observables")
 
 
 class DynamicModeDecomposition(PhaseEstimation):
@@ -65,6 +66,7 @@ class DynamicModeDecomposition(PhaseEstimation):
         evolution_time: float,
         shots_per_observable: int = 40,
         max_rank_k: int = 200,
+        measure_imag: bool = False
     ):
         """Initialize DynamicModeDecomposition with the given settings.
 
@@ -77,6 +79,7 @@ class DynamicModeDecomposition(PhaseEstimation):
             Must be a positive integer.
             max_rank_k: The maximum column number limit of Hankel matrix X. Defaults to 200.
             Must be greater than or equal to initial_rank_k.
+            measure_imag: The flag for testing imaginary part of observables. Default is False.
 
         Raises:
             ValueError: If vector_dim or initial_rank_k are not positive integers, if initial_rank_k exceeds
@@ -91,6 +94,7 @@ class DynamicModeDecomposition(PhaseEstimation):
         self._settings.set("evolution_time", evolution_time)
         self._settings.set("shots_per_observable", shots_per_observable)
         self._settings.set("max_rank_k", max_rank_k)
+        self._settings.set("measure_imag", measure_imag)
         self._iteration_circuits: list[Circuit] | None = None
 
         # check validity of inputs
@@ -132,6 +136,7 @@ class DynamicModeDecomposition(PhaseEstimation):
         vector_dim = self._settings.get("vector_dim")
         initial_rank_k = self._settings.get("initial_rank_k")
         max_rank_k = self._settings.get("max_rank_k")
+        measure_imag = self._settings.get("measure_imag")
         initial_number_measurement = vector_dim + initial_rank_k
         observable_array = np.zeros(vector_dim + max_rank_k, dtype=complex)
 
@@ -156,10 +161,15 @@ class DynamicModeDecomposition(PhaseEstimation):
         rank_k = initial_rank_k - 1
 
         # Compose Hankel matrices
-        hankel_x = np.zeros((vector_dim, rank_k), dtype=complex)
+        if measure_imag:
+            hankel_x = np.zeros((vector_dim, rank_k), dtype=complex)
+            hankel_x_prime = np.zeros((vector_dim, rank_k), dtype=complex)
+        else:
+            hankel_x = np.zeros((vector_dim, rank_k))
+            hankel_x_prime = np.zeros((vector_dim, rank_k))
+
         for v in range(rank_k):
             hankel_x[:, v] = observable_array[v : v + vector_dim]
-        hankel_x_prime = np.zeros((vector_dim, rank_k), dtype=complex)
         hankel_x_prime[:, 0 : rank_k - 1] = hankel_x[:, 1:rank_k]
         hankel_x_prime[:, rank_k - 1] = observable_array[rank_k : rank_k + vector_dim]
 
@@ -194,7 +204,7 @@ class DynamicModeDecomposition(PhaseEstimation):
 
             log_eigs = np.log(eigenvalues)
 
-            Logger.debug(f"log_eigs: {log_eigs}")
+            Logger.info(f"log_eigs: {log_eigs}")
 
             # Pick the mode with smallest |real| and negative imaginary part.
             negative_imag_mask = log_eigs.imag < 0.0
@@ -365,15 +375,18 @@ class DynamicModeDecomposition(PhaseEstimation):
         )
         observable_real = (bitstring_result.get("0", 0) - bitstring_result.get("1", 0)) / shots
 
-        executor_data = circuit_executor.run(circuit_imag, shots=shots, noise=noise)
-        bitstring_result = executor_data.bitstring_counts
-        Logger.info(
-            f"measured imag part of observable power {observable_power}, "
-            f"{bitstring_result.get('0', 0)} zeros, {bitstring_result.get('1', 0)} ones"
-        )
-        observable_imag = (bitstring_result.get("0", 0) - bitstring_result.get("1", 0)) / shots
-
-        observable_value = observable_real + 1j * observable_imag
+        if self._settings.get("measure_imag"):
+            executor_data = circuit_executor.run(circuit_imag, shots=shots, noise=noise)
+            bitstring_result = executor_data.bitstring_counts
+            Logger.info(
+                f"measured imag part of observable power {observable_power}, "
+                f"{bitstring_result.get('0', 0)} zeros, {bitstring_result.get('1', 0)} ones"
+            )
+            observable_imag = (bitstring_result.get("0", 0) - bitstring_result.get("1", 0)) / shots
+            observable_value = observable_real + 1j * observable_imag
+        else:
+            observable_value = observable_real
+        
         Logger.info(f"measured observable power {observable_power}, value {observable_value}")
         return observable_value
 
