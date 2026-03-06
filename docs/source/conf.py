@@ -194,6 +194,8 @@ nitpick_ignore_regex = [
     (r"py:class", r"numpy.*"),
     (r"py:class", r"pathlib.*"),
     (r"py:class", r"pyscf.*"),
+    (r"py:class", r"pyqir.*"),
+    (r"py:class", r"^Module$"),
     (r"py:class", r"qiskit.*"),
     (r"py:class", r"qiskit_aer.*"),
     (r"py:class", r"openfermion.*"),
