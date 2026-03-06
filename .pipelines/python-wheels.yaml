@@ -220,7 +220,7 @@ extends:
               displayName: Publish debug symbols
               inputs:
                 SymbolsFolder: $(System.DefaultWorkingDirectory)/python/debug_symbols
-                IndexSources: true
+                IndexSources: false # Not applicable for non-Windows builds
                 SymbolServerType: TeamServices
                 SearchPattern: '**/*.debug'
                 publishLinuxSymbols: true
