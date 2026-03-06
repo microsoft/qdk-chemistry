@@ -15,13 +15,14 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper
-from qdk_chemistry.data import PauliTermAccumulator, Settings
+from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper, QubitMapperSettings
+from qdk_chemistry.data import PauliTermAccumulator
+from qdk_chemistry.data.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import Hamiltonian
+    from qdk_chemistry.data import Hamiltonian, Symmetries
 
 # Type alias for sparse Pauli word: list of (qubit_index, op_type)
 # op_type: 1=X, 2=Y, 3=Z (identity is implicit/omitted)
@@ -180,32 +181,25 @@ def _bk_compute_z_indices_for_y_component(j: int, n: int) -> frozenset[int]:
     return parity - flip  # Set difference, not symmetric difference
 
 
-class QdkQubitMapperSettings(Settings):
+class QdkQubitMapperSettings(QubitMapperSettings):
     """Settings configuration for a QdkQubitMapper.
 
-    QdkQubitMapper-specific settings:
-        encoding (string, default="jordan-wigner"): Fermion-to-qubit encoding type.
-            Valid options: "jordan-wigner", "bravyi-kitaev"
+    Inherits base settings from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.
 
+    Available encodings:
+        - ``"jordan-wigner"`` (default)
+        - ``"bravyi-kitaev"``
+
+    Additional settings:
         threshold (double, default=1e-12): Threshold for pruning small Pauli coefficients.
-
         integral_threshold (double, default=1e-12): Threshold for filtering small integrals.
-            Integrals with absolute value below this threshold are treated as zero.
-            This significantly improves performance when integrals contain floating-point noise.
 
     """
 
     def __init__(self) -> None:
         """Initialize QdkQubitMapperSettings."""
         Logger.trace_entering()
-        super().__init__()
-        self._set_default(
-            "encoding",
-            "string",
-            "jordan-wigner",
-            "Fermion-to-qubit encoding type",
-            ["jordan-wigner", "bravyi-kitaev"],
-        )
+        super().__init__(valid_encodings=["jordan-wigner", "bravyi-kitaev"])
         self._set_default(
             "threshold",
             "double",
@@ -224,13 +218,16 @@ class QdkQubitMapper(QubitMapper):
     """QDK native qubit mapper using PauliTermAccumulator.
 
     This mapper transforms a fermionic Hamiltonian to a qubit Hamiltonian using
-    configurable fermion-to-qubit encodings. Supports Jordan-Wigner and Bravyi-Kitaev
-    encodings.
+    configurable fermion-to-qubit encodings.
+
+    Available encodings:
+        - ``"jordan-wigner"`` (default)
+        - ``"bravyi-kitaev"``
 
     The mapper uses canonical blocked spin-orbital ordering internally:
     qubits 0..N-1 for alpha spin, qubits N..2N-1 for beta spin (where N is the
-    number of spatial orbitals). Use ``QubitHamiltonian.reorder_qubits()`` or
-    ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings.
+    number of spatial orbitals). Use ``QubitHamiltonian.to_interleaved()``
+    for alternative qubit orderings.
 
     Attributes:
         encoding (str): The fermion-to-qubit encoding type. Default: "jordan-wigner".
@@ -270,11 +267,12 @@ class QdkQubitMapper(QubitMapper):
         """Return the algorithm name."""
         return "qdk"
 
-    def _run_impl(self, hamiltonian: Hamiltonian) -> QubitHamiltonian:
+    def _run_impl(self, hamiltonian: Hamiltonian, _symmetries: Symmetries | None = None) -> QubitHamiltonian:
         """Transform a fermionic Hamiltonian to a qubit Hamiltonian.
 
         Args:
             hamiltonian: The fermionic Hamiltonian with one-body and two-body integrals.
+            _symmetries: Optional symmetry information. Not used by this implementation.
 
         Returns:
             QubitHamiltonian: The qubit Hamiltonian with Pauli strings and coefficients.
@@ -597,4 +595,5 @@ class QdkQubitMapper(QubitMapper):
             pauli_strings=pauli_strings,
             coefficients=np.array(coefficients, dtype=complex),
             encoding=encoding,
+            fermion_mode_order=FermionModeOrder.BLOCKED,
         )

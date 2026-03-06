@@ -3,13 +3,14 @@
 This module provides a QiskitQubitMapper class to convert Hamiltonians to QubitHamiltonians
 using different mapping strategies ("jordan-wigner", "bravyi-kitaev", and "parity").
 """
-
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import ClassVar
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, ClassVar
 
 from qiskit_nature.second_q.hamiltonians import ElectronicEnergy
 from qiskit_nature.second_q.mappers import (
@@ -18,38 +19,44 @@ from qiskit_nature.second_q.mappers import (
     ParityMapper,
 )
 
-from qdk_chemistry.algorithms.qubit_mapper import QubitMapper
-from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Settings
+from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
+from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
+from qdk_chemistry.data.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
+
+if TYPE_CHECKING:
+    from qdk_chemistry.data import Symmetries
 
 __all__ = ["QiskitQubitMapper", "QiskitQubitMapperSettings"]
 
 
-class QiskitQubitMapperSettings(Settings):
+class QiskitQubitMapperSettings(QubitMapperSettings):
     """Settings configuration for a QiskitQubitMapper.
 
-    QiskitQubitMapper-specific settings:
-        encoding (string, default="jordan-wigner"): Qubit mapping strategy to use.
+    Inherits ``encoding`` from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.
 
-            Valid options: "jordan-wigner", "bravyi-kitaev", "parity"
+    Available encodings:
+        - ``"jordan-wigner"`` (default)
+        - ``"bravyi-kitaev"``
+        - ``"parity"``
 
     """
 
     def __init__(self):
         """Initialize QiskitQubitMapperSettings."""
         Logger.trace_entering()
-        super().__init__()
-        self._set_default(
-            "encoding",
-            "string",
-            "jordan-wigner",
-            "Qubit mapping strategy to use",
-            ["jordan-wigner", "bravyi-kitaev", "parity"],
-        )
+        super().__init__(valid_encodings=["jordan-wigner", "bravyi-kitaev", "parity"])
 
 
 class QiskitQubitMapper(QubitMapper):
-    """Class to map an electronic structure Hamiltonian to a QubitHamiltonian using a Qiskit mapper."""
+    """Map an electronic structure Hamiltonian to a QubitHamiltonian using Qiskit.
+
+    Available encodings:
+        - ``"jordan-wigner"`` (default)
+        - ``"bravyi-kitaev"``
+        - ``"parity"``
+
+    """
 
     QubitMappers: ClassVar = {
         "bravyi-kitaev": BravyiKitaevMapper,
@@ -70,11 +77,12 @@ class QiskitQubitMapper(QubitMapper):
         self._settings = QiskitQubitMapperSettings()
         self._settings.set("encoding", encoding)
 
-    def _run_impl(self, hamiltonian: Hamiltonian) -> QubitHamiltonian:
+    def _run_impl(self, hamiltonian: Hamiltonian, _symmetries: Symmetries | None = None) -> QubitHamiltonian:
         """Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.
 
         Args:
-            hamiltonian (Hamiltonian): The fermionic Hamiltonian.
+            hamiltonian: The fermionic Hamiltonian.
+            _symmetries: Optional symmetry information. Not used by this implementation.
 
         Returns:
             QubitHamiltonian: An instance of the QubitHamiltonian.
@@ -101,6 +109,7 @@ class QiskitQubitMapper(QubitMapper):
             pauli_strings=qubit_op.paulis.to_labels(),
             coefficients=qubit_op.coeffs,
             encoding=encoding,
+            fermion_mode_order=FermionModeOrder.BLOCKED,
         )
 
     def name(self) -> str:

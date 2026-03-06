@@ -78,7 +78,8 @@ Included third-party plugins
 In addition to the native implementations packaged within QDK/Chemistry, plugins are included for the following packages:
 
 - `PySCF <https://pyscf.org/>`_ — Python-based quantum chemistry
-- `Qiskit <https://www.ibm.com/quantum/qiskit>`_ — Quantum computing
+- `Qiskit <https://www.ibm.com/quantum/qiskit>`_ — Quantum algorithm primitives
+- `OpenFermion <https://quantumai.google/openfermion>`_ — Quantum algorithm primitives
 
 These plugins are enabled automatically when the corresponding package is installed.
 
@@ -135,6 +136,51 @@ These boolean variables are set at module load time and reflect the actual avail
 .. warning::
 
    If you attempt to use an algorithm that requires an optional Qiskit package that is not installed,
+   the algorithm will not be available in the factory. Use the :ref:`listing-implementations` pattern
+   to see which implementations are currently available.
+
+.. _openfermion-plugin-details:
+
+OpenFermion plugin details
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+The OpenFermion plugin integrates QDK/Chemistry with `OpenFermion <https://quantumai.google/openfermion>`_.
+Like the Qiskit plugin, it uses **opportunistic loading**: the plugin loads when OpenFermion is installed.
+
+**Loading behavior:**
+
+- **OpenFermion**: Loaded when the plugin is initialized and OpenFermion is installed.
+
+**Installing OpenFermion packages:**
+
+To install OpenFermion, use the ``openfermion-extras`` extra when installing QDK/Chemistry:
+
+.. code-block:: bash
+
+   pip install 'qdk-chemistry[openfermion-extras]'
+
+Alternatively, you can install it directly:
+
+.. code-block:: bash
+
+   pip install openfermion
+
+**Checking what is loaded:**
+
+To determine which OpenFermion components are available in your environment, you can check the following module-level variables:
+
+.. code-block:: python
+
+   from qdk_chemistry.plugins.openfermion import (
+       QDK_CHEMISTRY_HAS_OPENFERMION,
+   )
+
+   print(f"OpenFermion available: {QDK_CHEMISTRY_HAS_OPENFERMION}")
+
+These boolean variables are set at module load time and reflect the actual availability of each package in your Python environment.
+
+.. warning::
+
+   If you attempt to use an algorithm that requires OpenFermion but the package is not installed,
    the algorithm will not be available in the factory. Use the :ref:`listing-implementations` pattern
    to see which implementations are currently available.
 
