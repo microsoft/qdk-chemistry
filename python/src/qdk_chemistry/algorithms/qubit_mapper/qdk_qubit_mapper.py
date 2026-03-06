@@ -226,8 +226,8 @@ class QdkQubitMapper(QubitMapper):
 
     The mapper uses canonical blocked spin-orbital ordering internally:
     qubits 0..N-1 for alpha spin, qubits N..2N-1 for beta spin (where N is the
-    number of spatial orbitals). Use ``QubitHamiltonian.reorder_qubits()`` or
-    ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings.
+    number of spatial orbitals). Use ``QubitHamiltonian.to_interleaved()``
+    for alternative qubit orderings.
 
     Attributes:
         encoding (str): The fermion-to-qubit encoding type. Default: "jordan-wigner".

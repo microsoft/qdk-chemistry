@@ -204,56 +204,6 @@ class QubitHamiltonian(DataClass):
             terms.sort(key=lambda t: abs(t[1]), reverse=True)
         return terms
 
-    def reorder_qubits(self, permutation: list[int]) -> QubitHamiltonian:
-        """Reorder qubits in all Pauli strings according to a permutation.
-
-        Applies a qubit index permutation to all Pauli strings. The permutation
-        specifies where each qubit should be mapped: permutation[old_index] = new_index.
-
-        Args:
-            permutation (list[int]): A permutation mapping old qubit indices to new indices.
-                Must be a valid permutation of [0, 1, ..., num_qubits-1].
-
-        Returns:
-            QubitHamiltonian: A new QubitHamiltonian with reordered Pauli strings.
-
-        Raises:
-            ValueError: If the permutation is invalid (wrong length or not a valid permutation).
-
-        Examples:
-            >>> qh = QubitHamiltonian(["XIZI", "IYII"], np.array([0.5, 0.3]))
-            >>> # Swap qubits 0 and 1: permutation[0]=1, permutation[1]=0, ...
-            >>> reordered = qh.reorder_qubits([1, 0, 2, 3])
-            >>> print(reordered.pauli_strings)
-            ['IXZI', 'YIII']
-
-        """
-        Logger.trace_entering()
-        n_qubits = self.num_qubits
-
-        # Validate permutation
-        if len(permutation) != n_qubits:
-            raise ValueError(f"Permutation length ({len(permutation)}) must match number of qubits ({n_qubits}).")
-        if sorted(permutation) != list(range(n_qubits)):
-            raise ValueError(f"Invalid permutation: must be a permutation of [0, 1, ..., {n_qubits - 1}].")
-
-        # Apply permutation to each Pauli string
-        # Pauli strings are in little-endian order: string[i] corresponds to qubit i
-        reordered_strings = []
-        for pauli_str in self.pauli_strings:
-            # Create new string with reordered characters
-            new_chars = ["I"] * n_qubits
-            for old_idx, char in enumerate(pauli_str):
-                new_idx = permutation[old_idx]
-                new_chars[new_idx] = char
-            reordered_strings.append("".join(new_chars))
-
-        return QubitHamiltonian(
-            pauli_strings=reordered_strings,
-            coefficients=self.coefficients.copy(),
-            encoding=self.encoding,
-        )
-
     def to_interleaved(self, n_spatial: int) -> QubitHamiltonian:
         """Convert from blocked to interleaved spin-orbital ordering.
 
@@ -288,19 +238,25 @@ class QubitHamiltonian(DataClass):
         # Build permutation: blocked -> interleaved
         # Blocked ordering:      a0, a1, ..., a(n-1), b0, b1, ..., b(n-1)
         # Interleaved ordering:  a0, b0, a1, b1, ..., a(n-1), b(n-1)
-        # For blocked index i, alpha spin (i < n_spatial) maps to 2*i,
-        # and beta spin (i >= n_spatial) maps to 2*(i - n_spatial) + 1
-        permutation = []
-        for i in range(n_qubits):
-            if i < n_spatial:
-                permutation.append(2 * i)
-            else:
-                permutation.append(2 * (i - n_spatial) + 1)
+        # Pauli strings are little-endian (rightmost char = qubit 0), so
+        # string position j corresponds to qubit (n_qubits - 1 - j).
+        # Qubit mapping: alpha (q < n_spatial) -> 2*q, beta -> 2*(q - n_spatial) + 1
+        permutation = [0] * n_qubits
+        for pos in range(n_qubits):
+            q_old = n_qubits - 1 - pos
+            q_new = 2 * q_old if q_old < n_spatial else 2 * (q_old - n_spatial) + 1
+            permutation[pos] = n_qubits - 1 - q_new
 
-        result = self.reorder_qubits(permutation)
+        reordered_strings = []
+        for pauli_str in self.pauli_strings:
+            new_chars = ["I"] * n_qubits
+            for old_pos, char in enumerate(pauli_str):
+                new_chars[permutation[old_pos]] = char
+            reordered_strings.append("".join(new_chars))
+
         return QubitHamiltonian(
-            pauli_strings=result.pauli_strings,
-            coefficients=result.coefficients,
+            pauli_strings=reordered_strings,
+            coefficients=self.coefficients.copy(),
             encoding=self.encoding,
             fermion_mode_order=FermionModeOrder.INTERLEAVED,
         )

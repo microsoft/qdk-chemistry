@@ -145,37 +145,6 @@ class TestQubitHamiltonian:
             rtol=float_comparison_relative_tolerance,
         )
 
-    def test_reorder_qubits_identity(self):
-        """Test that identity permutation returns equivalent Hamiltonian."""
-        qh = QubitHamiltonian(["XIZI", "IYII"], np.array([0.5, 0.3], dtype=complex))
-        reordered = qh.reorder_qubits([0, 1, 2, 3])
-        assert reordered.pauli_strings == qh.pauli_strings
-        assert np.allclose(reordered.coefficients, qh.coefficients)
-
-    def test_reorder_qubits_swap(self):
-        """Test swapping two adjacent qubits."""
-        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
-        reordered = qh.reorder_qubits([1, 0, 2, 3])
-        assert reordered.pauli_strings == ["IXZI"]
-
-    def test_reorder_qubits_reverse(self):
-        """Test reversing all qubit indices."""
-        qh = QubitHamiltonian(["XYZI"], np.array([1.0], dtype=complex))
-        reordered = qh.reorder_qubits([3, 2, 1, 0])
-        assert reordered.pauli_strings == ["IZYX"]
-
-    def test_reorder_qubits_invalid_length(self):
-        """Test that invalid permutation length raises error."""
-        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
-        with pytest.raises(ValueError, match="Permutation length"):
-            qh.reorder_qubits([0, 1, 2])
-
-    def test_reorder_qubits_invalid_values(self):
-        """Test that invalid permutation values raise error."""
-        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
-        with pytest.raises(ValueError, match="Invalid permutation"):
-            qh.reorder_qubits([0, 1, 1, 3])
-
     def test_to_interleaved_4_qubits(self):
         """Test blocked to interleaved conversion for 4 qubits."""
         # Blocked: [α₀, α₁, β₀, β₁] -> Interleaved: [α₀, β₀, α₁, β₁]

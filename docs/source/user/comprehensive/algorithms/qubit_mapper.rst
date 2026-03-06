@@ -138,7 +138,7 @@ This implementation provides high-performance fermion-to-qubit transformations w
 Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`
 
 The native mapper uses blocked spin-orbital ordering internally (alpha orbitals first, then beta orbitals).
-Use ``QubitHamiltonian.reorder_qubits()`` or ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if needed.
+Use ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if needed.
 
 .. rubric:: Settings
 
