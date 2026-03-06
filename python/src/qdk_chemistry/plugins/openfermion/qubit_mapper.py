@@ -73,7 +73,7 @@ class OpenFermionQubitMapper(QubitMapper):
         """Initialize OpenFermionQubitMapper with a specific mapping strategy.
 
         Args:
-            encoding (str): Qubit mapping (``"jordan-wigner"``, ``"bravyi-kitaev"``, ``"scbk"``, ``"bk-tree"``).
+            encoding (str): Qubit mapping (``"jordan-wigner"``, ``"bravyi-kitaev"``, ``"symmetry-conserving-bravyi-kitaev"``, ``"bravyi-kitaev-tree"``).
 
         """
         Logger.trace_entering()
