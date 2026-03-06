@@ -334,12 +334,12 @@ def test_openfermion_standard_sets_blocked_order(encoding):
     assert qh.fermion_mode_order == FermionModeOrder.BLOCKED
 
 
-def test_openfermion_scbk_sets_blocked_order():
-    """SCBK encoding sets fermion_mode_order to BLOCKED."""
+def test_openfermion_scbk_sets_interleaved_order():
+    """SCBK encoding sets fermion_mode_order to INTERLEAVED."""
     hamiltonian = create_nontrivial_test_hamiltonian()
     symmetries = Symmetries(n_alpha=1, n_beta=1)
     qh = create("qubit_mapper", "openfermion", encoding="symmetry-conserving-bravyi-kitaev").run(
         hamiltonian,
         symmetries,
     )
-    assert qh.fermion_mode_order == FermionModeOrder.BLOCKED
+    assert qh.fermion_mode_order == FermionModeOrder.INTERLEAVED
