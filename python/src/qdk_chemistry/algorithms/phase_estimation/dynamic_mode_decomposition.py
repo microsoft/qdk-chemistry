@@ -66,7 +66,7 @@ class DynamicModeDecomposition(PhaseEstimation):
         evolution_time: float,
         shots_per_observable: int = 40,
         max_rank_k: int = 200,
-        measure_imag: bool = False
+        measure_imag: bool = False,
     ):
         """Initialize DynamicModeDecomposition with the given settings.
 
@@ -206,15 +206,9 @@ class DynamicModeDecomposition(PhaseEstimation):
 
             Logger.info(f"log_eigs: {log_eigs}")
 
-            # Pick the mode with smallest |real| and negative imaginary part.
-            negative_imag_mask = log_eigs.imag < 0.0
-            if np.any(negative_imag_mask):
-                candidate_log_eigs = log_eigs[negative_imag_mask]
-            else:
-                candidate_log_eigs = log_eigs
-
-            min_real_idx = np.argmin(np.abs(candidate_log_eigs.real))
-            phase = candidate_log_eigs[min_real_idx].imag
+            # Pick the mode with smallest |real| part.
+            min_real_idx = np.argmin(np.abs(log_eigs.real))
+            phase = -log_eigs[min_real_idx].imag
             phase_fraction = phase / (2.0 * np.pi)
 
             Logger.info(f"iteration {rank_k - initial_rank_k + 1}, phase_fraction {phase_fraction}")
@@ -227,14 +221,17 @@ class DynamicModeDecomposition(PhaseEstimation):
         )
 
     def create_ctrl_one_time_evol(
-        self, qubit_hamiltonian: QubitHamiltonian, evolution_builder: TimeEvolutionBuilder, control_indices: list[int] | None = None
+        self,
+        qubit_hamiltonian: QubitHamiltonian,
+        evolution_builder: TimeEvolutionBuilder,
+        control_indices: list[int] | None = None,
     ) -> ControlledTimeEvolutionUnitary:
         """Create the controlled one time step evolution unitary operator U = exp(-iH dt).
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
             evolution_builder: The time evolution builder to use.
-            control_indices:
+            control_indices: The list of control qubit indices
 
         """
         evolution_time = self._settings.get("evolution_time")
@@ -386,7 +383,7 @@ class DynamicModeDecomposition(PhaseEstimation):
             observable_value = observable_real + 1j * observable_imag
         else:
             observable_value = observable_real
-        
+
         Logger.info(f"measured observable power {observable_power}, value {observable_value}")
         return observable_value
 
