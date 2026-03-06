@@ -21,9 +21,9 @@ class TestTrotterStepsNaive:
 
     def test_basic(self):
         """Test basic naive bound computation."""
-        # one_norm = 2, N = ceil((2 * 2^2 * 1^2) / 0.1) = ceil(40) = 80
+        # one_norm = 2, N = ceil((2^2 * 1^2) / 0.1) = ceil(40) = 40
         h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        assert trotter_steps_naive(h, 1.0, 0.1, order=1) == 80
+        assert trotter_steps_naive(h, 1.0, 0.1, order=1) == 40
 
     def test_minimum_one(self):
         """Test that result is at least 1."""
@@ -33,15 +33,15 @@ class TestTrotterStepsNaive:
 
     def test_small_accuracy(self):
         """Test with very small accuracy."""
-        # one_norm = 1, N = ceil((2 * 1^2 * 1^2) / 0.001) = ceil(2000) = 2000
+        # one_norm = 1, N = ceil((1^2 * 1^2) / 0.001) = ceil(1000) = 1000
         h = QubitHamiltonian(pauli_strings=["X"], coefficients=[1.0])
-        assert trotter_steps_naive(h, 1.0, 0.001, order=1) == 2000
+        assert trotter_steps_naive(h, 1.0, 0.001, order=1) == 1000
 
     def test_large_time(self):
         """Test with large evolution time."""
-        # one_norm = 1, N = ceil((2 * 1^2 * 10^2) / 1.0) = ceil(200) = 200
+        # one_norm = 1, N = ceil((1^2 * 10^2) / 1.0) = ceil(100) = 100
         h = QubitHamiltonian(pauli_strings=["X"], coefficients=[1.0])
-        assert trotter_steps_naive(h, 10.0, 1.0, order=1) == 200
+        assert trotter_steps_naive(h, 10.0, 1.0, order=1) == 100
 
     def test_zero_accuracy_raises(self):
         """Test that zero accuracy raises ValueError."""
@@ -59,18 +59,18 @@ class TestTrotterStepsNaive:
     def test_basic_second_order(self):
         """Test basic second-order naive bound computation."""
         h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        assert trotter_steps_naive(h, 1.0, 0.1, order=2) == 18
+        assert trotter_steps_naive(h, 1.0, 0.1, order=2) == 6
 
     def test_small_accuracy_second_order(self):
         """Test with very small accuracy."""
         h = QubitHamiltonian(pauli_strings=["X"], coefficients=[1.0])
-        assert trotter_steps_naive(h, 1.0, 0.0001, order=2) == 200
+        assert trotter_steps_naive(h, 1.0, 0.0001, order=2) == 58
 
     def test_large_time_second_order(self):
         """Test with large evolution time."""
-        # one_norm = 1, N = ceil((2 * 1^1.5 * 10^1.5) / (1.0^0.5)) = 64
+        # one_norm = 1, N = ceil((2 * 1^1.5 * 10^1.5) / (12 * 1.0^0.5)) = 19
         h = QubitHamiltonian(pauli_strings=["X"], coefficients=[1.0])
-        assert trotter_steps_naive(h, 10.0, 1.0, order=2) == 64
+        assert trotter_steps_naive(h, 10.0, 1.0, order=2) == 19
 
     # Higher-order Trotter tests.
 
