@@ -299,14 +299,31 @@ def commutator_bound_second_order(
     hamiltonian: QubitHamiltonian,
     weight_threshold: float = 1e-12,
 ) -> float:
-    r"""Compute the commutator bound term multiplying :math:`t^{3} / (12N)` in Proposition 10 in Childs et. al (2021).
+    r"""Compute the second-order Trotter commutator bound.
+
+    For a Hamiltonian :math:`H = \sum_j \alpha_j P_j` the second-order
+    (Lie-Trotter) product formula has error bounded by
+
+    .. math::
+
+        \lVert U(t) - S_2(t) \rVert \le
+            \frac{t^3}{12} \alpha_2
+    Where :math:`\alpha_2` involves a sum of nested commutator norms (see Childs *et al.* (2021) for details).
+    For Pauli strings the spectral norm of the commutator is
+
+    * 0  if :math:`P_j` and :math:`P_k` commute, or
+    * :math:`2 |\alpha_j| |\alpha_k|`  if they anticommute.
+
+    This function returns
+    :math:`\alpha_2`, so the user can multiply by :math:`t^{3} / 12` to get the per-step
+    error.
 
     Args:
-        hamiltonian: The qubit Hamiltonian for which to compute the bound.
-        weight_threshold: Absolute threshold for filtering small Hamiltonian coefficients.
+        hamiltonian: The qubit Hamiltonian whose terms to analyse.
+        weight_threshold: Absolute threshold below which coefficients are discarded.
 
     Returns:
-        The commutator bound term multiplying :math:`t^{3} / (12N)`.
+        The sum of commutator norms over all unique pairs.
 
     """
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
