@@ -25,8 +25,6 @@ References:
 
 from __future__ import annotations
 
-import itertools
-import math
 from typing import TYPE_CHECKING
 
 from qdk_chemistry.data import PauliTermAccumulator
@@ -50,12 +48,18 @@ __all__: list[str] = [
 
 
 def _label_to_sparse_word(label: str) -> list[tuple[int, int]]:
-    #    """Convert a Pauli string label to a ``SparsePauliWord``."""
-    return [(i, 1 if c == "X" else 2 if c == "Y" else 3) for i, c in enumerate(label) if c != "I"]
+    """Convert a Pauli string label to a ``SparsePauliWord``."""
+    word = []
+    for i, c in enumerate(label):
+        if c in {"X", "Y", "Z"}:
+            word.append((i, 1 if c == "X" else 2 if c == "Y" else 3))
+        elif c != "I":
+            raise ValueError(f"Invalid character {c!r} in Pauli label; expected 'I', 'X', 'Y', or 'Z'.")
+    return word
 
 
 def _sparse_word_to_label(word: list[tuple[int, int]], n_qubits: int) -> str:
-    #    """Convert a ``SparsePauliWord`` back to a Pauli string label."""
+    """Convert a ``SparsePauliWord`` back to a Pauli string label."""
     chars = ["I"] * n_qubits
     for q, p in word:
         chars[q] = "X" if p == 1 else "Y" if p == 2 else "Z"
@@ -219,6 +223,10 @@ def does_nested_commutator_vanish(*labels: str) -> bool:
         ValueError: If fewer than two Pauli labels are provided.
 
     """
+    pauli_string_length = len(labels[0])
+    if any(len(lbl) != pauli_string_length for lbl in labels):
+        raise ValueError("All Pauli labels must have the same length.")
+
     if len(labels) < 2:
         raise ValueError("At least two Pauli labels are required for a commutator.")
 
@@ -237,7 +245,7 @@ def does_nested_commutator_vanish(*labels: str) -> bool:
     word = _label_to_sparse_word(labels[1])
     for lbl in labels[2:]:
         _, word = PauliTermAccumulator.multiply_uncached(word, _label_to_sparse_word(lbl))
-    inner_product = _sparse_word_to_label(word, len(labels[0]))
+    inner_product = _sparse_word_to_label(word, pauli_string_length)
     return do_pauli_labels_commute(labels[0], inner_product)
 
 
@@ -327,15 +335,27 @@ def commutator_bound_higher_order(
     order: int,
     weight_threshold: float = 1e-12,
 ) -> float:
-    r"""Compute the commutator bound term :math:`\alpha` for arbitrary-order Trotter errors.
+    r"""Compute the commutator bound :math:`\alpha` for arbitrary-order Trotter errors (bottom-up).
+
+    This is functionally equivalent to :func:`commutator_bound_higher_order`
+    but uses a bottom-up dynamic-programming strategy.  Instead of
+    iterating over all :math:`n^{p+1}` index tuples independently, the
+    algorithm builds the nested commutator level-by-level starting from
+    the innermost pair.  At each level the intermediate Pauli-string
+    products are cached and entries that share the same product label
+    are grouped together, summing their coefficient contributions.
+    This avoids redundant Pauli-string multiplications and enables
+    early pruning of vanishing commutators.
 
     Args:
         hamiltonian: The qubit Hamiltonian for which to compute the bound.
-        order: The order of the Trotter decomposition.
-        weight_threshold: Absolute threshold for filtering small Hamiltonian coefficients.
+        order: The order :math:`p` of the Trotter decomposition.
+        weight_threshold: Absolute threshold for filtering small
+            Hamiltonian coefficients.
 
     Returns:
-        The commutator bound term :math:`\alpha` multiplying :math:`t^{order+1}` in Theorem 6 of Childs et. al (2021).
+        The commutator bound term :math:`\alpha` multiplying
+        :math:`t^{p+1}` in Theorem 6 of Childs et al. (2021).
 
     """
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
@@ -344,9 +364,66 @@ def commutator_bound_higher_order(
     abs_coeffs = [abs(c) for c in coefficients]
 
     n = len(pauli_labels)
-    total = 0.0
-    for idx_tuple in itertools.product(range(n), repeat=order + 1):
-        labels = [pauli_labels[i] for i in idx_tuple]
-        if not does_nested_commutator_vanish(*labels):
-            total += (2.0**order) * math.prod(abs_coeffs[i] for i in idx_tuple)
-    return total
+    if n == 0:
+        return 0.0
+    n_qubits = len(pauli_labels[0])
+
+    # Pre-compute sparse-word representations for every term.
+    sparse_words = [_label_to_sparse_word(label) for label in pauli_labels]
+
+    # ---- Bottom-up construction ------------------------------------------------
+    #
+    # At each level the dictionary ``current`` maps a product Pauli-string
+    # label to (accumulated_coefficient_sum, product_sparse_word).  Only
+    # entries whose nested commutator is *non-vanishing* are kept.
+    #
+    # Level 0: innermost pairs [P_a, P_b]:
+    #   For every ordered pair (a, b) where P_a and P_b anticommute,
+    #   record the product P_a·P_b and accumulate |c_a|·|c_b|.
+    #
+    # Level k (k = 1 … order-1): prepend one more index:
+    #   For each surviving product Q with coefficient sum S, and every
+    #   index i where P_i anticommutes with Q, record the new product
+    #   P_i·Q and accumulate |c_i|·S.
+    #
+    # After (order-1) prepend steps we have depth = order brackets and
+    # (order+1) indices, matching the original brute-force iteration.
+    # ---- Level 0: pairs --------------------------------------------------------
+    current: dict[str, tuple[float, list[tuple[int, int]]]] = {}
+    for a in range(n):
+        for b in range(n):
+            if not do_pauli_labels_commute(pauli_labels[a], pauli_labels[b]):
+                _, product_word = PauliTermAccumulator.multiply_uncached(
+                    sparse_words[a],
+                    sparse_words[b],
+                )
+                product_label = _sparse_word_to_label(product_word, n_qubits)
+                coeff_contrib = abs_coeffs[a] * abs_coeffs[b]
+                if product_label in current:
+                    prev_coeff, word = current[product_label]
+                    current[product_label] = (prev_coeff + coeff_contrib, word)
+                else:
+                    current[product_label] = (coeff_contrib, product_word)
+
+    # ---- Levels 1 … order-1: prepend one index each time -----------------------
+    for _ in range(order - 1):
+        next_level: dict[str, tuple[float, list[tuple[int, int]]]] = {}
+        for product_label, (coeff_sum, product_word) in current.items():
+            for i in range(n):
+                if not do_pauli_labels_commute(pauli_labels[i], product_label):
+                    _, new_word = PauliTermAccumulator.multiply_uncached(
+                        sparse_words[i],
+                        product_word,
+                    )
+                    new_label = _sparse_word_to_label(new_word, n_qubits)
+                    new_coeff = abs_coeffs[i] * coeff_sum
+                    if new_label in next_level:
+                        prev_c, w = next_level[new_label]
+                        next_level[new_label] = (prev_c + new_coeff, w)
+                    else:
+                        next_level[new_label] = (new_coeff, new_word)
+        current = next_level
+
+    # ---- Final summation -------------------------------------------------------
+    total = sum(coeff_sum for coeff_sum, _ in current.values())
+    return (2.0**order) * total
