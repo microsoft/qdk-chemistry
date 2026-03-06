@@ -15,7 +15,7 @@ encoding:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from enum import StrEnum
+from qdk_chemistry.utils.enum import StrEnum
 
 
 class FermionModeOrder(StrEnum):
