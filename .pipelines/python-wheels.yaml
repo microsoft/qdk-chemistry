@@ -218,6 +218,7 @@ extends:
           - ${{ if and( eq(target.os, 'linux'), eq(target.arch, 'x86_64') ) }}:
             - task: PublishSymbols@2
               displayName: Publish debug symbols
+              condition: and(succeeded(), ${{ parameters.publishEsrp }})
               inputs:
                 SymbolsFolder: $(System.DefaultWorkingDirectory)/python/debug_symbols
                 IndexSources: false # Not applicable for non-Windows builds
