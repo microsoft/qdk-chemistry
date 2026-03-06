@@ -37,7 +37,7 @@ dependencies = [
   "pylatexenc==2.10",
   "ruamel-yaml>=0.18.10",
   "pydantic-settings>=2.9.1",
-  "qdk[jupyter]>=1.26.0",
+  "qdk[jupyter]>=1.25.0",
   "pybind11-stubgen>=2.5.1",
   "h5py>=3.0.0"
 ]

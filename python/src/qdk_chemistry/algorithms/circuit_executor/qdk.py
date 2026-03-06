@@ -15,6 +15,7 @@ Supported QDK backends include:
 from collections import Counter
 from typing import Literal
 
+from qdk.openqasm import compile as compile_qir
 from qsharp._simulation import run_qir
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
@@ -72,7 +73,7 @@ class QdkFullStateSimulator(CircuitExecutor):
 
         """
         Logger.trace_entering()
-        qir = circuit.get_qir()
+        qir = compile_qir(circuit.qasm)
         Logger.debug("QIR compiled")
         noise_config = noise.to_qdk_noise_config() if noise is not None else None
         raw_results = run_qir(

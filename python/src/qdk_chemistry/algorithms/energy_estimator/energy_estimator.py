@@ -186,7 +186,7 @@ class EnergyEstimator(Algorithm):
         """
         Logger.trace_entering()
         meas_circuits = []
-        base_circuit = circuit.get_qiskit_circuit()
+        base_circuit = qasm3.loads(circuit.get_qasm())
 
         if base_circuit.num_qubits != grouped_hamiltonians[0].num_qubits:
             raise ValueError(
