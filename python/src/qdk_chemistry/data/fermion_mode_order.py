@@ -17,17 +17,12 @@ encoding:
 
 from enum import StrEnum
 
-__all__ = ["FermionModeOrder"]
-
 
 class FermionModeOrder(StrEnum):
-    """Fermion mode ordering convention used when mapping fermions to qubits.
-
-    Attributes:
-        BLOCKED: All alpha modes first, then all beta: ``[α₀, α₁, …, β₀, β₁, …]``.
-        INTERLEAVED: Alternating alpha and beta: ``[α₀, β₀, α₁, β₁, …]``.
-
-    """
+    """Fermion mode ordering convention used when mapping fermions to qubits."""
 
     BLOCKED = "blocked"
+    """All alpha modes first, then all beta -- ``[α₀, α₁, …, β₀, β₁, …]``."""
+
     INTERLEAVED = "interleaved"
+    """Alternating alpha and beta -- ``[α₀, β₀, α₁, β₁, …]``."""
