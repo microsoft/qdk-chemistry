@@ -175,17 +175,8 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         patchelf --set-rpath '$ORIGIN/../../qdk_chemistry.libs' "$so_file" || true
     done
 
-    export debugdir="debug_symbols"
-    mkdir -p "${debugdir}"
-
-    CORE_SO="$(find "$TEMP_DIR" -type f -name '_core*.so' | head -n 1)"
-    if [ -z "$CORE_SO" ]; then
-        echo "ERROR: Could not find _core*.so in repaired wheel contents."
-        exit 1
-    fi
-
     # We need to do this in order to publish our C++ debug symbols internally.
-if [ "$MARCH" == "x86-64-v3" ]; then
+    if [ "$MARCH" == "x86-64-v3" ]; then
         export debugdir="debug_symbols"
         mkdir -p "${debugdir}"
         CORE_SO="$(find "$TEMP_DIR" -type f -name '_core*.so' | head -n 1)"
@@ -193,13 +184,12 @@ if [ "$MARCH" == "x86-64-v3" ]; then
             echo "ERROR: Could not find _core*.so in repaired wheel contents."
             exit 1
         fi
-        # We need to do this in order publish our C++ debug symbols internally.
         debugfile="$(basename "$CORE_SO").debug"
         objcopy --only-keep-debug "$CORE_SO" "${debugdir}/${debugfile}"
         strip --strip-debug --strip-unneeded "$CORE_SO"
         objcopy --add-gnu-debuglink="${debugdir}/${debugfile}" "$CORE_SO"
         echo "Extracted debug symbols to ${debugdir}/${debugfile}"
-        ls $"{debugdir}"
+        ls "${debugdir}"
     fi
 
     find "$TEMP_DIR" -path '*/qdk_chemistry.libs/*' -name '*.so*' -type f | while read so_file; do
