@@ -174,7 +174,7 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
         cls._validate_json_version(cls._serialization_version, json_data)
         step_terms = [
             ExponentiatedPauliTerm(
-                pauli_term=term_data["pauli_term"],
+                pauli_term={int(k): v for k, v in term_data["pauli_term"].items()},
                 angle=term_data["angle"],
             )
             for term_data in json_data["step_terms"]
