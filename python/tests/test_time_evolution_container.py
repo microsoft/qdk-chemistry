@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
+
 import h5py
 import numpy as np
 import pytest
@@ -99,8 +101,6 @@ class TestPauliProductFormulaContainer:
 
     def test_from_json_pauli_term_keys_are_int(self, container):
         """Regression: JSON keys are strings, but pauli_term keys must be int after deserialization."""
-        import json
-
         json_data = container.to_json()
         # Simulate a real JSON roundtrip where all dict keys become strings
         json_string = json.dumps(json_data)
