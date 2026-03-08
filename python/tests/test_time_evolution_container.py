@@ -97,6 +97,21 @@ class TestPauliProductFormulaContainer:
                 t1.angle, t2.angle, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
             )
 
+    def test_from_json_pauli_term_keys_are_int(self, container):
+        """Regression: JSON keys are strings, but pauli_term keys must be int after deserialization."""
+        import json
+
+        json_data = container.to_json()
+        # Simulate a real JSON roundtrip where all dict keys become strings
+        json_string = json.dumps(json_data)
+        parsed = json.loads(json_string)
+
+        restored = PauliProductFormulaContainer.from_json(parsed)
+
+        for term in restored.step_terms:
+            for key in term.pauli_term:
+                assert isinstance(key, int), f"pauli_term key {key!r} should be int, got {type(key).__name__}"
+
     def test_to_hdf5_roundtrip(self, container, tmp_path):
         """Test HDF5 serialization and deserialization roundtrip."""
         file_path = tmp_path / "ppf_container.h5"
