@@ -50,8 +50,8 @@ class Circuit(DataClass):
         Args:
             qasm: The quantum circuit in QASM format. Defaults to None.
             qir: The QIR representation of the quantum circuit. Defaults to None.
-            qsharp: The quantum circuit as a Q# program. Defaults to None.
-            qsharp_factory: The factory data for the Q# program. Defaults to None.
+            qsharp: The Q# circuit object. Defaults to None.
+            qsharp_factory: The factory data for creating a Q# program. Defaults to None.
             qsharp_op: The Q# operation associated with the circuit. Defaults to None.
             encoding: The fermion-to-qubit encoding assumed by this circuit.
                 Valid values include "jordan-wigner", "bravyi-kitaev", "parity", or None.
@@ -62,7 +62,7 @@ class Circuit(DataClass):
             If multiple representations are available, conversion methods attempt to follow this priority order:
             - get_qasm(): Returns qasm string if available, otherwise converts from qir via Qiskit if possible.
             - get_qir(): Returns qir if available, otherwise converts from qasm
-            - get_qsharp_circuit(): Returns qsharp if available, otherwise converts from qasm
+            - get_qsharp_circuit(): Returns Q# circuit if available, otherwise converts from qasm
             - get_qiskit_circuit(): Converts from qir if available, otherwise converts from qasm
 
         """
@@ -82,7 +82,12 @@ class Circuit(DataClass):
         super().__init__()
 
     def _has_qir(self) -> bool:
-        """Check if the Circuit has a QIR representation."""
+        """Check if the Circuit has a QIR representation.
+
+        Returns:
+            True if either qir or qsharp_factory is set, indicating that a QIR representation is available.
+
+        """
         return self.qir is not None or self.qsharp_factory is not None
 
     def get_qasm(self) -> str:
@@ -122,6 +127,7 @@ class Circuit(DataClass):
 
         Notes:
             If both QIR and QASM representations are available, this method returns the QIR representation.
+            If Q# factory data is available, it compiles it to QIR using the Q# compiler.
             If only QASM is available, it attempts to convert it to QIR using the Q# OpenQASM compiler.
 
         """
@@ -137,10 +143,10 @@ class Circuit(DataClass):
         raise RuntimeError("The QIR representation of the quantum circuit is not set.")
 
     def get_qsharp_circuit(self, prune_classical_qubits: bool = False) -> qsharp._native.Circuit:
-        """Parse a Circuit object into a qsharp Circuit object.
+        """Parse a Circuit object into a Q# circuit object.
 
         Returns:
-            qsharp._native.Circuit: A qsharp Circuit object.
+            qsharp._native.Circuit: A Q# circuit object.
             prune_classical_qubits: If True, classical qubits are removed from the circuit.
                 Only applicable when converting from qsharp_factory.
 
@@ -152,6 +158,7 @@ class Circuit(DataClass):
 
         Notes:
             If both Q# and QASM representations are available, this method returns the Q# circuit.
+            If Q# factory data is available, it compiles it to a Q# circuit using the Q# compiler.
             If only QASM is available, it attempts to convert it to Q#.
 
         """
@@ -164,7 +171,7 @@ class Circuit(DataClass):
         if self.qasm:
             return qsharp.openqasm.circuit(self.qasm)
 
-        raise RuntimeError("The quantum circuit is not set in a qsharp format.")
+        raise RuntimeError("The quantum circuit is not set in a Q# format.")
 
     def get_qiskit_circuit(self):
         """Convert the Circuit to a Qiskit QuantumCircuit.
