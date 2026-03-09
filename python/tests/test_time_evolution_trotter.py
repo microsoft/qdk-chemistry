@@ -469,7 +469,8 @@ class TestTrotter:
         ]
 
         # See Childs et. al. 2021
-        for term, expected_angle in zip(container.step_terms, angles, strict=False):
+        assert len(angles) == len(container.step_terms)
+        for term, expected_angle in zip(container.step_terms, angles):
             assert np.isclose(
                 term.angle,
                 expected_angle * dt,
