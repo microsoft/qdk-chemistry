@@ -2,6 +2,7 @@ target_sources(chemistry PRIVATE
     ansatz.cpp
     basis_set.cpp
     configuration.cpp
+    lattice_graph.cpp
     configuration_set.cpp
     element_data.cpp
     hdf5_serialization.cpp
@@ -10,6 +11,7 @@ target_sources(chemistry PRIVATE
     hamiltonian_containers/canonical_four_center.cpp
     hamiltonian_containers/density_fitted.cpp
     hamiltonian_containers/cholesky.cpp
+    hamiltonian_containers/sparse.cpp
     orbitals.cpp
     pauli_operator.cpp
     settings.cpp

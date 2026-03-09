@@ -19,10 +19,12 @@
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/density_fitted.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <sstream>
 #include <string>
 
 #include "../src/qdk/chemistry/algorithms/microsoft/mp2.hpp"
@@ -68,6 +70,17 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
 
     // For Cholesky vector (2x2 AO basis, 3 cholesky vectors)
     L_ao = Eigen::MatrixXd::Random(4, 3);
+
+    // For sparse Hamiltonian
+    sparse_one_body = Eigen::SparseMatrix<double>(2, 2);
+    sparse_one_body.insert(0, 0) = 1.0;
+    sparse_one_body.insert(0, 1) = 0.5;
+    sparse_one_body.insert(1, 0) = 0.5;
+    sparse_one_body.insert(1, 1) = 1.0;
+    sparse_one_body.makeCompressed();
+
+    two_body_map[{0, 0, 0, 0}] = 2.0;
+    two_body_map[{1, 1, 1, 1}] = 3.0;
 
     container_type = GetParam();
 
@@ -121,6 +134,10 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
       return std::make_shared<Hamiltonian>(
           std::make_unique<CholeskyHamiltonianContainer>(
               one_body, two_body, orbitals, core_energy, inactive_fock, L_ao));
+    } else if (type == "sparse") {
+      return std::make_shared<Hamiltonian>(
+          std::make_unique<SparseHamiltonianContainer>(
+              sparse_one_body, two_body_map, core_energy));
     }
     throw std::runtime_error("Unknown container type: " + type);
   }
@@ -152,6 +169,10 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
               sample_two_body_aabb, sample_two_body_bbbb, orbitals_unrestricted,
               core_energy, sample_inactive_fock_alpha,
               sample_inactive_fock_beta, L_ao));
+    } else if (type == "sparse") {
+      // SparseHamiltonianContainer does not take separate alpha/beta integrals
+      // or inactive fock matrices
+      return nullptr;
     }
     throw std::runtime_error("Unknown container type: " + type);
   }
@@ -160,6 +181,8 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
   Eigen::VectorXd two_body;
   Eigen::MatrixXd three_center;
   Eigen::MatrixXd L_ao;
+  Eigen::SparseMatrix<double> sparse_one_body;
+  SparseHamiltonianContainer::TwoBodyMap two_body_map;
   std::shared_ptr<Orbitals> orbitals;
   std::shared_ptr<Orbitals> orbitals_with_inactive;
   std::shared_ptr<Orbitals> orbitals_unrestricted;
@@ -221,17 +244,19 @@ TEST_P(HamiltonianTest, Constructor) {
   EXPECT_FALSE(hamiltonian_restricted->is_unrestricted());
   EXPECT_TRUE(hamiltonian_restricted->is_hermitian());
 
-  EXPECT_TRUE(hamiltonian_unrestricted->has_one_body_integrals());
-  EXPECT_TRUE(hamiltonian_unrestricted->has_two_body_integrals());
-  EXPECT_TRUE(hamiltonian_unrestricted->has_orbitals());
-  EXPECT_EQ(
-      hamiltonian_unrestricted->get_orbitals()->get_num_molecular_orbitals(),
-      2);
-  EXPECT_EQ(hamiltonian_unrestricted->get_core_energy(), 1.5);
-  EXPECT_EQ(hamiltonian_unrestricted->get_container_type(), container_type);
-  EXPECT_FALSE(hamiltonian_unrestricted->is_restricted());
-  EXPECT_TRUE(hamiltonian_unrestricted->is_unrestricted());
-  EXPECT_TRUE(hamiltonian_unrestricted->is_hermitian());
+  if (hamiltonian_unrestricted) {
+    EXPECT_TRUE(hamiltonian_unrestricted->has_one_body_integrals());
+    EXPECT_TRUE(hamiltonian_unrestricted->has_two_body_integrals());
+    EXPECT_TRUE(hamiltonian_unrestricted->has_orbitals());
+    EXPECT_EQ(
+        hamiltonian_unrestricted->get_orbitals()->get_num_molecular_orbitals(),
+        2);
+    EXPECT_EQ(hamiltonian_unrestricted->get_core_energy(), 1.5);
+    EXPECT_EQ(hamiltonian_unrestricted->get_container_type(), container_type);
+    EXPECT_FALSE(hamiltonian_unrestricted->is_restricted());
+    EXPECT_TRUE(hamiltonian_unrestricted->is_unrestricted());
+    EXPECT_TRUE(hamiltonian_unrestricted->is_hermitian());
+  }
 }
 
 TEST_P(HamiltonianTest, ConstructorWithInactiveFock) {
@@ -259,6 +284,8 @@ TEST_P(HamiltonianTest, ConstructorWithInactiveFock) {
         std::make_unique<CholeskyHamiltonianContainer>(
             one_body, two_body, orbitals_with_inactive, core_energy,
             inactive_fock_non_empty, L_ao));
+  } else if (test_p == "sparse") {
+    GTEST_SKIP() << "Sparse container does not support active space";
   }
 
   EXPECT_TRUE(h_active_space->has_one_body_integrals());
@@ -270,7 +297,7 @@ TEST_P(HamiltonianTest, ConstructorWithInactiveFock) {
 }
 
 TEST_P(HamiltonianTest, MoveConstructor) {
-  Hamiltonian h2(std::move(*hamiltonian_unrestricted));
+  Hamiltonian h2(std::move(*hamiltonian_restricted));
 
   EXPECT_TRUE(h2.has_one_body_integrals());
   EXPECT_TRUE(h2.has_two_body_integrals());
@@ -297,6 +324,11 @@ TEST_P(HamiltonianTest, CopyConstructorAndAssignment) {
     h1 = std::make_shared<Hamiltonian>(
         std::make_unique<CholeskyHamiltonianContainer>(
             one_body, two_body, orbitals, core_energy, inactive_fock, L_ao));
+  } else if (test_p == "sparse") {
+    // SparseHamiltonianContainer does not take orbitals/inactive_fock
+    h1 = std::make_shared<Hamiltonian>(
+        std::make_unique<SparseHamiltonianContainer>(one_body, two_body,
+                                                     core_energy));
   }
 
   Hamiltonian h2(*h1);
@@ -309,6 +341,7 @@ TEST_P(HamiltonianTest, CopyConstructorAndAssignment) {
   EXPECT_EQ(h2.get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h2.get_core_energy(), 1.5);
   EXPECT_TRUE(h2.is_restricted());
+  EXPECT_EQ(h2.get_container_type(), container_type);
 
   // Verify one body integral copy
   auto [h1_one_alpha, h1_one_beta] = h1->get_one_body_integrals();
@@ -349,6 +382,13 @@ TEST_P(HamiltonianTest, CopyConstructorAndAssignment) {
   EXPECT_TRUE(h4->has_orbitals());
   EXPECT_EQ(h4->get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h4->get_core_energy(), 1.5);
+
+  if (container_type == "sparse") {
+    // Sparse container does not support unrestricted, so skip the rest of this
+    // test
+    GTEST_SKIP()
+        << "Sparse container does not support unrestricted Hamiltonian";
+  }
 
   // unrestricted Hamiltonian
   Hamiltonian h5(*hamiltonian_unrestricted);
@@ -523,6 +563,45 @@ TEST_P(HamiltonianTest, TwoBodyElementAccess) {
 
     EXPECT_DOUBLE_EQ(h_large.get_two_body_element(1, 2, 1, 2), 49.0);
     EXPECT_DOUBLE_EQ(h_large.get_two_body_element(1, 0, 1, 0), 64.0);
+  } else if (test_p == "density_fitted") {
+    SparseHamiltonianContainer::TwoBodyMap two_body_map;
+    two_body_map[{0, 0, 0, 0}] = 1.0;
+    two_body_map[{0, 0, 0, 1}] = 2.0;
+    two_body_map[{1, 1, 1, 1}] = 4.0;
+    two_body_map[{0, 1, 1, 0}] = 5.0;
+
+    Eigen::SparseMatrix<double> sp_one_body(2, 2);
+    sp_one_body.insert(0, 0) = 1.0;
+    sp_one_body.insert(1, 1) = 1.0;
+    sp_one_body.makeCompressed();
+
+    Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(
+        sp_one_body, two_body_map, 0.0));
+
+    EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0), 1.0);
+    EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 1), 2.0);
+    EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 1, 1, 1), 4.0);
+    EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 1, 1, 0), 5.0);
+    // Non-stored entries return 0
+    EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 0, 0, 0), 0.0);
+    EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 1, 0, 1), 0.0);
+
+    auto container = std::make_unique<SparseHamiltonianContainer>(
+        sparse_one_body, two_body_map, core_energy);
+    const auto& ref = *container;
+
+    EXPECT_DOUBLE_EQ(ref.one_body_element(0, 0), 1.0);
+    EXPECT_DOUBLE_EQ(ref.one_body_element(0, 1), 0.5);
+    EXPECT_DOUBLE_EQ(ref.one_body_element(1, 0), 0.5);
+    EXPECT_DOUBLE_EQ(ref.one_body_element(1, 1), 1.0);
+
+    const auto& h2_map = ref.sparse_two_body_integrals();
+    EXPECT_EQ(h2_map.size(), 2u);
+    EXPECT_DOUBLE_EQ(h2_map.at({0, 0, 0, 0}), 2.0);
+    EXPECT_DOUBLE_EQ(h2_map.at({1, 1, 1, 1}), 3.0);
+
+    const auto& h1_sp = ref.sparse_one_body_integrals();
+    EXPECT_EQ(h1_sp.nonZeros(), 4);
   }
 }
 
@@ -533,7 +612,7 @@ TEST_P(HamiltonianTest, JSONSerialization) {
   EXPECT_EQ(j["container"]["core_energy"], 1.5);
   EXPECT_TRUE(j["container"]["has_one_body_integrals"]);
   EXPECT_TRUE(j["container"]["has_two_body_integrals"]);
-  EXPECT_TRUE(j["container"]["has_orbitals"]);
+  if (container_type != "sparse") EXPECT_TRUE(j["container"]["has_orbitals"]);
 
   // Test round-trip conversion
   auto h2 = Hamiltonian::from_json(j);
@@ -542,23 +621,22 @@ TEST_P(HamiltonianTest, JSONSerialization) {
   EXPECT_EQ(h2->get_core_energy(), 1.5);
   EXPECT_TRUE(h2->has_one_body_integrals());
   EXPECT_TRUE(h2->has_two_body_integrals());
-  EXPECT_TRUE(h2->has_orbitals());
+  if (container_type != "sparse") EXPECT_TRUE(h2->has_orbitals());
 
   // Check one body
   auto [h_one_alpha, h_one_beta] =
       hamiltonian_restricted->get_one_body_integrals();
   auto [h2_one_alpha, h2_one_beta] = h2->get_one_body_integrals();
-  EXPECT_TRUE(h_one_alpha.isApprox(h2_one_alpha));
-  EXPECT_TRUE(h_one_alpha.isApprox(h2_one_alpha));
-  EXPECT_TRUE(h_one_beta.isApprox(h2_one_beta));
+  EXPECT_TRUE(h_one_alpha.isApprox(h2_one_alpha, testing::json_tolerance));
+  EXPECT_TRUE(h_one_beta.isApprox(h2_one_beta, testing::json_tolerance));
 
   // Check two body
   auto [h_two_aaaa, h_two_aabb, h_two_bbbb] =
       hamiltonian_restricted->get_two_body_integrals();
   auto [h2_two_aaaa, h2_two_aabb, h2_two_bbbb] = h2->get_two_body_integrals();
-  EXPECT_TRUE(h_two_aaaa.isApprox(h2_two_aaaa));
-  EXPECT_TRUE(h_two_aabb.isApprox(h2_two_aabb));
-  EXPECT_TRUE(h_two_bbbb.isApprox(h2_two_bbbb));
+  EXPECT_TRUE(h_two_aaaa.isApprox(h2_two_aaaa, testing::json_tolerance));
+  EXPECT_TRUE(h_two_aabb.isApprox(h2_two_aabb, testing::json_tolerance));
+  EXPECT_TRUE(h_two_bbbb.isApprox(h2_two_bbbb, testing::json_tolerance));
 
   // Check they are still restricted
   EXPECT_TRUE(h2->is_restricted());
@@ -580,6 +658,7 @@ TEST_P(HamiltonianTest, JSONFileIO) {
   EXPECT_TRUE(h2->has_one_body_integrals());
   EXPECT_TRUE(h2->has_two_body_integrals());
   EXPECT_TRUE(h2->has_orbitals());
+  EXPECT_TRUE(h2->get_container_type() == container_type);
 
   // Check that matrices are approximately equal
   auto [h_one_alpha, h_one_beta] =
@@ -615,20 +694,22 @@ TEST_P(HamiltonianTest, HDF5FileIO) {
   EXPECT_TRUE(h2->has_one_body_integrals());
   EXPECT_TRUE(h2->has_two_body_integrals());
   EXPECT_TRUE(h2->has_orbitals());
+  EXPECT_TRUE(h2->is_restricted());
+  EXPECT_TRUE(h2->get_container_type() == container_type);
 
   // Check that matrices are approximately equal
   auto [h_one_alpha, h_one_beta] =
       hamiltonian_restricted->get_one_body_integrals();
   auto [h2_one_alpha, h2_one_beta] = h2->get_one_body_integrals();
-  EXPECT_TRUE(h_one_alpha.isApprox(h2_one_alpha));
-  EXPECT_TRUE(h_one_beta.isApprox(h2_one_beta));
+  EXPECT_TRUE(h_one_alpha.isApprox(h2_one_alpha, testing::hdf5_tolerance));
+  EXPECT_TRUE(h_one_beta.isApprox(h2_one_beta, testing::hdf5_tolerance));
 
   auto [h_two_aaaa, h_two_aabb, h_two_bbbb] =
       hamiltonian_restricted->get_two_body_integrals();
   auto [h2_two_aaaa, h2_two_aabb, h2_two_bbbb] = h2->get_two_body_integrals();
-  EXPECT_TRUE(h_two_aaaa.isApprox(h2_two_aaaa));
-  EXPECT_TRUE(h_two_aabb.isApprox(h2_two_aabb));
-  EXPECT_TRUE(h_two_bbbb.isApprox(h2_two_bbbb));
+  EXPECT_TRUE(h_two_aaaa.isApprox(h2_two_aaaa, testing::hdf5_tolerance));
+  EXPECT_TRUE(h_two_aabb.isApprox(h2_two_aabb, testing::hdf5_tolerance));
+  EXPECT_TRUE(h_two_bbbb.isApprox(h2_two_bbbb, testing::hdf5_tolerance));
 }
 
 TEST_P(HamiltonianTest, GenericFileIO) {
@@ -813,6 +894,11 @@ TEST_P(HamiltonianTest, ValidationEdgeCases) {
 TEST_P(HamiltonianTest, UnrestrictedConstructor) {
   // Verify the unrestricted Hamiltonian was created successfully using
   // pre-built hamiltonian_unrestricted
+  if (container_type == "sparse") {
+    // Sparse container does not support unrestricted, so skip this test
+    GTEST_SKIP()
+        << "Sparse container does not support unrestricted Hamiltonian";
+  }
   EXPECT_TRUE(hamiltonian_unrestricted->has_one_body_integrals());
   EXPECT_TRUE(hamiltonian_unrestricted->has_two_body_integrals());
   EXPECT_TRUE(hamiltonian_unrestricted->has_orbitals());
@@ -824,6 +910,12 @@ TEST_P(HamiltonianTest, UnrestrictedConstructor) {
 
 TEST_P(HamiltonianTest, UnrestrictedAccessorMethods) {
   std::string test_p = GetParam();
+
+  if (container_type == "sparse") {
+    // Sparse container does not support unrestricted, so skip this test
+    GTEST_SKIP()
+        << "Sparse container does not support unrestricted Hamiltonian";
+  }
 
   // Test alpha/beta one-body integral access using pre-built
   // hamiltonian_unrestricted
@@ -844,6 +936,11 @@ TEST_P(HamiltonianTest, UnrestrictedAccessorMethods) {
 }
 
 TEST_P(HamiltonianTest, RestrictedVsUnrestrictedDetection) {
+  if (container_type == "sparse") {
+    // Sparse container does not support unrestricted, so skip this test
+    GTEST_SKIP()
+        << "Sparse container does not support unrestricted Hamiltonian";
+  }
   // Test restricted detection using pre-built hamiltonian_restricted
   EXPECT_TRUE(hamiltonian_restricted->is_restricted());
   EXPECT_FALSE(hamiltonian_restricted->is_unrestricted());
@@ -938,6 +1035,12 @@ TEST_P(HamiltonianTest, UnrestrictedSpinChannelAccess) {
 }
 
 TEST_P(HamiltonianTest, UnrestrictedJSONSerialization) {
+  if (container_type == "sparse") {
+    // Sparse container does not support unrestricted, so skip this test
+    GTEST_SKIP()
+        << "Sparse container does not support unrestricted Hamiltonian";
+  }
+
   // Test JSON serialization round-trip using pre-built hamiltonian_unrestricted
   nlohmann::json j = hamiltonian_unrestricted->to_json();
   auto h_loaded = Hamiltonian::from_json(j);
@@ -969,6 +1072,11 @@ TEST_P(HamiltonianTest, UnrestrictedJSONSerialization) {
 }
 
 TEST_P(HamiltonianTest, UnrestrictedHDF5Serialization) {
+  if (container_type == "sparse") {
+    // Sparse container does not support unrestricted, so skip this test
+    GTEST_SKIP()
+        << "Sparse container does not support unrestricted Hamiltonian";
+  }
   // Test HDF5 serialization round-trip using pre-built hamiltonian_unrestricted
   std::string filename = "test_unrestricted.hamiltonian.h5";
   hamiltonian_unrestricted->to_hdf5_file(filename);
@@ -1016,26 +1124,47 @@ TEST_P(HamiltonianTest, FCIDUMPSerialization) {
   std::string fcidump_content = buffer.str();
 
   // Check that the file matches the reference
-  const std::string reference_fcidump_contents =
-      "&FCI NORB=2, NELEC=2, MS2=0,\n"
-      "ORBSYM=1,1,\n"
-      "ISYM=1,\n"
-      "&END\n"
-      "      2.0000000000000000e+00    1    1    1    1\n"
-      "      2.0000000000000000e+00    1    1    1    2\n"
-      "      2.0000000000000000e+00    1    1    2    2\n"
-      "      2.0000000000000000e+00    1    2    1    2\n"
-      "      2.0000000000000000e+00    1    2    2    2\n"
-      "      2.0000000000000000e+00    2    2    2    2\n"
-      "      1.0000000000000000e+00    1    1    0    0\n"
-      "      5.0000000000000000e-01    2    1    0    0\n"
-      "      1.0000000000000000e+00    2    2    0    0\n"
-      "      1.5000000000000000e+00    0    0    0    0";
+  if (container_type != "sparse") {
+    const std::string reference_fcidump_contents =
+        "&FCI NORB=2, NELEC=2, MS2=0,\n"
+        "ORBSYM=1,1,\n"
+        "ISYM=1,\n"
+        "&END\n"
+        "      2.0000000000000000e+00    1    1    1    1\n"
+        "      2.0000000000000000e+00    1    1    1    2\n"
+        "      2.0000000000000000e+00    1    1    2    2\n"
+        "      2.0000000000000000e+00    1    2    1    2\n"
+        "      2.0000000000000000e+00    1    2    2    2\n"
+        "      2.0000000000000000e+00    2    2    2    2\n"
+        "      1.0000000000000000e+00    1    1    0    0\n"
+        "      5.0000000000000000e-01    2    1    0    0\n"
+        "      1.0000000000000000e+00    2    2    0    0\n"
+        "      1.5000000000000000e+00    0    0    0    0";
 
-  EXPECT_TRUE(fcidump_content == reference_fcidump_contents);
+    EXPECT_TRUE(fcidump_content == reference_fcidump_contents);
+  } else {
+    const std::string reference_fcidump_contents =
+        "&FCI NORB=2, NELEC=2, MS2=0,\n"
+        "ORBSYM=1,1,\n"
+        "ISYM=1,\n"
+        "&END\n"
+        "      2.0000000000000000e+00    1    1    1    1\n"
+        "      3.0000000000000000e+00    2    2    2    2\n"
+        "      1.0000000000000000e+00    1    1    0    0\n"
+        "      5.0000000000000000e-01    2    1    0    0\n"
+        "      1.0000000000000000e+00    2    2    0    0\n"
+        "      1.5000000000000000e+00    0    0    0    0\n";
+
+    EXPECT_TRUE(fcidump_content == reference_fcidump_contents);
+  }
 }
 
 TEST_P(HamiltonianTest, FCIDUMPSerializationUnrestrictedThrowsError) {
+  if (container_type == "sparse") {
+    // Sparse container does not support unrestricted, so skip this test
+    GTEST_SKIP()
+        << "Sparse container does not support unrestricted Hamiltonian";
+  }
   // Verify hamiltonian_unrestricted is actually unrestricted
   EXPECT_TRUE(hamiltonian_unrestricted->is_unrestricted());
   EXPECT_FALSE(hamiltonian_unrestricted->is_restricted());
@@ -1068,6 +1197,10 @@ TEST_P(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {
         std::make_unique<CholeskyHamiltonianContainer>(
             one_body, two_body, orbitals_with_inactive, core_energy,
             inactive_fock_non_empty, L_ao));
+  } else if (test_p == "sparse") {
+    GTEST_SKIP() << "Sparse container does not support active space";
+  } else {
+    FAIL() << "Unknown container type: " << test_p;
   }
 
   // Should successfully write FCIDUMP using active space dimensions
@@ -1789,7 +1922,7 @@ TEST_F(HamiltonianIntegrationTest, IntegralSymmetriesEnergiesO2Singlet) {
       std::make_shared<Ansatz>(*rhf_hamiltonian, *rhf_wavefunction);
   auto mp2_calculator =
       DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
-  auto [rmp2_energy, rhf_mp2_wavefunction] = mp2_calculator->run(rhf_ansatz);
+  auto [rmp2_energy, rhf_mp2_wavefunction, _] = mp2_calculator->run(rhf_ansatz);
 
   // Create unrestricted orbitals from restricted ones
   // Get restricted coefficients and energies
@@ -1828,7 +1961,7 @@ TEST_F(HamiltonianIntegrationTest, IntegralSymmetriesEnergiesO2Singlet) {
 
   auto uhf_ansatz =
       std::make_shared<Ansatz>(*uhf_hamiltonian, *uhf_wavefunction);
-  auto [ump2_total_energy, uhf_mp2_wavefunction] =
+  auto [ump2_total_energy, uhf_mp2_wavefunction, _uhf_mp2_wavefunction_bra] =
       mp2_calculator->run(uhf_ansatz);
   double ump2_correlation = ump2_total_energy - rhf_energy;
   double ump2_energy = rhf_energy + ump2_correlation;
@@ -2228,6 +2361,7 @@ TEST(HamiltonianContainerTypeTest, ContainerTypePreservedThroughSerialization) {
   EXPECT_EQ(h_df_hdf5->get_container_type(), "density_fitted");
   std::filesystem::remove("test_df.hamiltonian.h5");
 }
+
 class CholeskyTest : public ::testing::Test {
  protected:
   void SetUp() override {}
@@ -2596,12 +2730,78 @@ TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
   }
 }
 
+class SparseTest : public ::HamiltonianTest {
+ protected:
+  void SetUp() override {}
+  void TearDown() override {}
+};
+
+TEST_F(SparseTest, SparseContainerConstructionOneBodyOnly) {
+  Hamiltonian h(
+      std::make_unique<SparseHamiltonianContainer>(sparse_one_body, 0.0));
+
+  EXPECT_TRUE(h.has_one_body_integrals());
+  EXPECT_FALSE(h.has_two_body_integrals());
+  EXPECT_TRUE(h.is_restricted());
+  EXPECT_DOUBLE_EQ(h.get_core_energy(), 0.0);
+  EXPECT_EQ(h.get_container_type(), "sparse");
+}
+
+TEST_F(SparseTest, SparseContainerConstructionFromDense) {
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(one_body, two_body,
+                                                             core_energy));
+
+  EXPECT_TRUE(h.has_one_body_integrals());
+  EXPECT_TRUE(h.has_two_body_integrals());
+  EXPECT_TRUE(h.is_restricted());
+  EXPECT_DOUBLE_EQ(h.get_core_energy(), core_energy);
+  EXPECT_EQ(h.get_container_type(), "sparse");
+  EXPECT_EQ(h.get_orbitals()->get_num_molecular_orbitals(), 2);
+}
+
+TEST_F(SparseTest, SparseContainerConstructionFromDenseOneBodyOnly) {
+  Hamiltonian h(
+      std::make_unique<SparseHamiltonianContainer>(one_body, core_energy));
+
+  EXPECT_TRUE(h.has_one_body_integrals());
+  EXPECT_FALSE(h.has_two_body_integrals());
+  EXPECT_TRUE(h.is_restricted());
+  EXPECT_DOUBLE_EQ(h.get_core_energy(), core_energy);
+  EXPECT_EQ(h.get_container_type(), "sparse");
+}
+
+TEST_F(SparseTest, SparseContainerJSONSerializationOneBodyOnly) {
+  Hamiltonian h(
+      std::make_unique<SparseHamiltonianContainer>(one_body, core_energy));
+
+  nlohmann::json j = h.to_json();
+  EXPECT_EQ(j["container"]["container_type"], "sparse");
+  EXPECT_FALSE(j["container"]["has_two_body_integrals"].get<bool>());
+
+  auto h_loaded = Hamiltonian::from_json(j);
+  EXPECT_EQ(h_loaded->get_container_type(), "sparse");
+  EXPECT_FALSE(h_loaded->has_two_body_integrals());
+  EXPECT_TRUE(h_loaded->has_one_body_integrals());
+}
+
+TEST_F(SparseTest, SparseContainerIsValid) {
+  // Valid container with two-body
+  auto c1 = std::make_unique<SparseHamiltonianContainer>(one_body, two_body,
+                                                         core_energy);
+  EXPECT_TRUE(c1->is_valid());
+
+  // One-body only is also valid
+  auto c2 = std::make_unique<SparseHamiltonianContainer>(one_body, core_energy);
+  EXPECT_TRUE(c2->is_valid());
+}
+
 // ============================================================================
 // Instantiate parameterized tests for all container types
 // ============================================================================
 INSTANTIATE_TEST_SUITE_P(
     AllContainerTypes, HamiltonianTest,
-    ::testing::Values("canonical_four_center", "density_fitted", "cholesky"),
+    ::testing::Values("canonical_four_center", "density_fitted", "cholesky",
+                      "sparse"),
     [](const ::testing::TestParamInfo<std::string>& info) {
       std::string name = info.param;
       std::replace(name.begin(), name.end(), '_', ' ');

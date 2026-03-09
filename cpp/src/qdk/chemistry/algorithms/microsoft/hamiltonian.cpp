@@ -158,7 +158,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   scf_config->require_gradient = false;
   scf_config->basis = internal_basis_set->name;
   scf_config->cartesian = !internal_basis_set->pure;
-  scf_config->unrestricted = false;
+  scf_config->scf_orbital_type = qcs::SCFOrbitalType::Restricted;
 
   // Set ERI method based on settings
   std::string method_name = _settings->get<std::string>("eri_method");
@@ -234,7 +234,11 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
                          orbitals->is_restricted();
   }
 
-  scf_config->unrestricted = !is_restricted_calc;
+  // SCFOrbitalType::RestrictedOpenShell is not supported for Hamiltonian
+  // construction, so we only use Restricted in restricted case
+  scf_config->scf_orbital_type = is_restricted_calc
+                                     ? qcs::SCFOrbitalType::Restricted
+                                     : qcs::SCFOrbitalType::Unrestricted;
 
   // Compute integrals (same size for alpha and beta)
   const size_t nactive = nactive_alpha;

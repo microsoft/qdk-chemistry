@@ -1,5 +1,16 @@
 cmake_minimum_required(VERSION 3.15)
-project(qdk VERSION 1.0.2 LANGUAGES CXX C)
+
+# Read version from VERSION file at repo root
+set(_VERSION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION")
+file(READ "${_VERSION_FILE}" QDK_VERSION)
+string(STRIP "${QDK_VERSION}" QDK_VERSION)
+# Re-run CMake configure when the VERSION file changes
+# Only set at the top-level to avoid duplicate output errors when included via add_subdirectory
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_VERSION_FILE}")
+endif()
+
+project(qdk VERSION ${QDK_VERSION} LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 

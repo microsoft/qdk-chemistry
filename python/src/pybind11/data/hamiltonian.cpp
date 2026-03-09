@@ -13,6 +13,7 @@
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/density_fitted.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
@@ -832,6 +833,210 @@ Args:
     nbeta (int): Number of beta electrons
 )",
                      py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
+  // SparseHamiltonianContainer — sparse lattice-model container
+  // ============================================================================
+  py::class_<SparseHamiltonianContainer, HamiltonianContainer, py::smart_holder>
+      sparse_container(data, "SparseHamiltonianContainer", R"(
+Hamiltonian container for lattice model Hamiltonians (Hückel, Hubbard, PPP, etc.)
+with sparse internal storage.
+
+Stores one-body integrals as a sparse matrix and two-body integrals as a
+sparse dictionary of (p, q, r, s) index tuples.
+
+Internally uses ``ModelOrbitals`` so that the full ``HamiltonianContainer``
+interface (``get_one_body_integrals``, ``get_orbitals``, etc.) works.
+
+Examples:
+    >>> import numpy as np
+    >>> from qdk_chemistry.data import SparseHamiltonianContainer, Hamiltonian
+    >>> h1 = np.diag([-0.5, -0.5, -0.5])
+    >>> container = SparseHamiltonianContainer(h1)
+    >>> hamiltonian = Hamiltonian(container)
+    >>> hamiltonian.has_one_body_integrals()
+    True
+)");
+
+  // -- Sparse + two-body constructor --
+  sparse_container.def(py::init<Eigen::SparseMatrix<double>,
+                                SparseHamiltonianContainer::TwoBodyMap, double,
+                                HamiltonianType>(),
+                       R"(
+Construct from sparse one-body integrals and a sparse two-body map.
+
+Args:
+    one_body_integrals (scipy.sparse matrix): Sparse one-body integral matrix [n x n].
+    two_body_integrals (dict[tuple[int,int,int,int], float]): Sparse two-body
+        integral map from (p, q, r, s) index tuples to values.
+    core_energy (float, optional): Scalar energy offset. Defaults to 0.0.
+    type (HamiltonianType, optional): Hamiltonian type. Defaults to Hermitian.
+)",
+                       py::arg("one_body_integrals"),
+                       py::arg("two_body_integrals"),
+                       py::arg("core_energy") = 0.0,
+                       py::arg("type") = HamiltonianType::Hermitian);
+
+  // -- Sparse one-body only --
+  sparse_container.def(
+      py::init<Eigen::SparseMatrix<double>, double, HamiltonianType>(),
+      R"(
+Construct from sparse one-body integrals only.
+
+Args:
+    one_body_integrals (scipy.sparse matrix): Sparse one-body integral matrix [n x n].
+    core_energy (float, optional): Scalar energy offset. Defaults to 0.0.
+    type (HamiltonianType, optional): Hamiltonian type. Defaults to Hermitian.
+)",
+      py::arg("one_body_integrals"), py::arg("core_energy") = 0.0,
+      py::arg("type") = HamiltonianType::Hermitian);
+
+  // -- Dense + two-body constructor --
+  sparse_container.def(py::init<const Eigen::MatrixXd&, const Eigen::VectorXd&,
+                                double, HamiltonianType>(),
+                       R"(
+Construct from dense one-body and two-body integrals.
+
+Args:
+    one_body_integrals (numpy.ndarray): Dense one-body integral matrix [n x n].
+    two_body_integrals (numpy.ndarray): Dense two-body integrals [n^4].
+    core_energy (float, optional): Scalar energy offset. Defaults to 0.0.
+    type (HamiltonianType, optional): Hamiltonian type. Defaults to Hermitian.
+)",
+                       py::arg("one_body_integrals"),
+                       py::arg("two_body_integrals"),
+                       py::arg("core_energy") = 0.0,
+                       py::arg("type") = HamiltonianType::Hermitian);
+
+  // -- Dense one-body only --
+  sparse_container.def(
+      py::init<const Eigen::MatrixXd&, double, HamiltonianType>(),
+      R"(
+Construct from dense one-body integrals only (no two-body).
+
+Args:
+    one_body_integrals (numpy.ndarray): Dense one-body integral matrix [n x n].
+    core_energy (float, optional): Scalar energy offset. Defaults to 0.0.
+    type (HamiltonianType, optional): Hamiltonian type. Defaults to Hermitian.
+)",
+      py::arg("one_body_integrals"), py::arg("core_energy") = 0.0,
+      py::arg("type") = HamiltonianType::Hermitian);
+
+  // -- Base-class overrides --
+  bind_getter_as_property(sparse_container, "get_two_body_integrals",
+                          &SparseHamiltonianContainer::get_two_body_integrals,
+                          R"(
+Get two-electron integrals as dense vectors for all spin channels.
+
+Materialises the sparse map into a dense n^4 vector on first access (cached).
+Model Hamiltonians are restricted so all three channels are identical.
+
+Returns:
+    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: (aaaa, aabb, bbbb) integrals.
+
+Raises:
+    RuntimeError: If no two-body integrals are stored.
+)",
+                          py::return_value_policy::reference_internal);
+
+  sparse_container.def("get_two_body_element",
+                       &SparseHamiltonianContainer::get_two_body_element,
+                       R"(
+Get a specific two-electron integral element.
+
+Args:
+    i, j, k, l (int): Orbital indices.
+    channel (SpinChannel, optional): Spin channel (ignored; model Hamiltonians
+        are restricted). Defaults to aaaa.
+
+Returns:
+    float: Two-electron integral (ij|kl), or 0 if not stored.
+)",
+                       py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
+                       py::arg("channel") = SpinChannel::aaaa);
+
+  sparse_container.def("has_two_body_integrals",
+                       &SparseHamiltonianContainer::has_two_body_integrals,
+                       R"(
+Check if two-body integrals are available.
+
+Returns:
+    bool: True if the two-body map is non-empty.
+)");
+
+  sparse_container.def("is_restricted",
+                       &SparseHamiltonianContainer::is_restricted, R"(
+Model Hamiltonians are always restricted.
+
+Returns:
+    bool: Always True.
+)");
+
+  sparse_container.def("is_valid", &SparseHamiltonianContainer::is_valid, R"(
+Check if the container data is consistent.
+
+Returns:
+    bool: True if the one-body matrix is square and non-empty.
+)");
+
+  // -- Sparse-specific accessors --
+  sparse_container.def("sparse_one_body_integrals",
+                       &SparseHamiltonianContainer::sparse_one_body_integrals,
+                       R"(
+Direct access to the sparse one-body integral matrix.
+
+Returns:
+    scipy.sparse.csc_matrix: Sparse one-body integrals [n x n].
+)",
+                       py::return_value_policy::reference_internal);
+
+  sparse_container.def("sparse_two_body_integrals",
+                       &SparseHamiltonianContainer::sparse_two_body_integrals,
+                       R"(
+Direct access to the sparse two-body integral map.
+
+Returns:
+    dict[tuple[int,int,int,int], float]: Sparse two-body integral map.
+)",
+                       py::return_value_policy::reference_internal);
+
+  sparse_container.def("one_body_element",
+                       &SparseHamiltonianContainer::one_body_element, R"(
+Access a single one-body integral element.
+
+Args:
+    i (int): Row index.
+    j (int): Column index.
+
+Returns:
+    float: Value of one-body integral (i, j).
+)",
+                       py::arg("i"), py::arg("j"));
+
+  // -- Serialization --
+  sparse_container.def(
+      "to_json",
+      [](const SparseHamiltonianContainer& self) -> std::string {
+        return self.to_json().dump();
+      },
+      R"(
+Convert the container to a JSON string.
+
+Serialises one-body integrals as sparse COO triplets and two-body integrals
+as sparse [p, q, r, s, value] entries.
+
+Returns:
+    str: JSON string with all container data.
+)");
+
+  sparse_container.def(
+      "to_fcidump_file", &SparseHamiltonianContainer::to_fcidump_file, R"(
+Save the Hamiltonian to an FCIDUMP file.
+
+Args:
+    filename (str): Path to the output file.
+    nalpha (int): Number of alpha electrons.
+    nbeta (int): Number of beta electrons.
+)",
+      py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
   // ============================================================================
   // Hamiltonian - Interface class

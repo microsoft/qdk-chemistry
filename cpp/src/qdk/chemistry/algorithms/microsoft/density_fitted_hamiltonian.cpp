@@ -375,7 +375,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
   scf_config->basis = basis_set->get_name();
   scf_config->aux_basis = aux_basis_set->get_name();
   scf_config->eri.method = qcs::ERIMethod::Incore;
-  scf_config->unrestricted = orbitals->is_unrestricted();
+  scf_config->scf_orbital_type = qcs::SCFOrbitalType::Restricted;
   scf_config->mpi = qcs::mpi_default_input();
 
   // Create Integral Instance

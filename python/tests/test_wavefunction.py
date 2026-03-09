@@ -550,6 +550,86 @@ class TestWavefunctionEdgeCases:
         with pytest.raises(RuntimeError):
             wf.get_single_orbital_entropies()
 
+    def test_lazy_mutual_information_from_s1_and_s2(self, basic_orbitals):
+        """Test that mutual information is lazily derived from s1 and s2 entropies."""
+        norb = 2
+        det = Configuration("20")
+        dets = [det]
+        coeffs = np.array([1.0])
+
+        # Provide synthetic s1 and s2 entropies
+        s1 = np.array([0.3, 0.5])
+        s2 = np.array([[0.0, 0.6], [0.6, 0.0]])
+
+        # Expected mutual information: I_ij = s1_i + s1_j - s2_ij
+        expected_mi = np.zeros((norb, norb))
+        for i in range(norb):
+            for j in range(i + 1, norb):
+                expected_mi[i, j] = s1[i] + s1[j] - s2[i, j]
+                expected_mi[j, i] = expected_mi[i, j]
+
+        container = CasWavefunctionContainer(
+            coeffs,
+            dets,
+            basic_orbitals,
+            entropies={"single_orbital": s1, "two_orbital": s2},
+        )
+        wf = Wavefunction(container)
+
+        # s1 and s2 were provided directly
+        assert wf.has_single_orbital_entropies()
+        assert wf.has_two_orbital_entropies()
+        # mutual information should be derivable (lazy)
+        assert wf.has_mutual_information()
+
+        mi = wf.get_mutual_information()
+        assert np.allclose(
+            mi,
+            expected_mi,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
+    def test_lazy_two_orbital_entropy_from_s1_and_mutual_info(self, basic_orbitals):
+        """Test that s2 entropies are lazily derived from s1 and mutual information."""
+        norb = 2
+        det = Configuration("20")
+        dets = [det]
+        coeffs = np.array([1.0])
+
+        # Provide synthetic s1 and mutual information
+        s1 = np.array([0.3, 0.5])
+        mi = np.array([[0.0, 0.2], [0.2, 0.0]])
+
+        # Expected s2: s2_ij = s1_i + s1_j - I_ij
+        expected_s2 = np.zeros((norb, norb))
+        for i in range(norb):
+            for j in range(i + 1, norb):
+                expected_s2[i, j] = s1[i] + s1[j] - mi[i, j]
+                expected_s2[j, i] = expected_s2[i, j]
+
+        container = CasWavefunctionContainer(
+            coeffs,
+            dets,
+            basic_orbitals,
+            entropies={"single_orbital": s1, "mutual_information": mi},
+        )
+        wf = Wavefunction(container)
+
+        # s1 and mutual information were provided directly
+        assert wf.has_single_orbital_entropies()
+        assert wf.has_mutual_information()
+        # s2 should be derivable (lazy)
+        assert wf.has_two_orbital_entropies()
+
+        s2 = wf.get_two_orbital_entropies()
+        assert np.allclose(
+            s2,
+            expected_s2,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
 
 class TestWavefunctionSerialization:
     """Test wavefunction serialization and deserialization."""
@@ -563,13 +643,21 @@ class TestWavefunctionSerialization:
 
     @pytest.fixture
     def cas_wavefunction_real(self, basic_orbitals):
-        """Create a real CAS wavefunction for testing."""
+        """Create a real CAS wavefunction for testing, with s1 entropies and mutual information."""
         det1 = Configuration("20")
         det2 = Configuration("ud")
         dets = [det1, det2]
         coeffs = np.array([0.8, 0.6])
 
-        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals)
+        s1 = np.array([0.3, 0.5])
+        mi = np.array([[0.0, 0.2], [0.2, 0.0]])
+
+        container = CasWavefunctionContainer(
+            coeffs,
+            dets,
+            basic_orbitals,
+            entropies={"single_orbital": s1, "mutual_information": mi},
+        )
         return Wavefunction(container)
 
     @pytest.fixture
@@ -623,6 +711,30 @@ class TestWavefunctionSerialization:
         for orig_det, recon_det in zip(orig_dets, recon_dets, strict=True):
             assert orig_det.to_string() == recon_det.to_string()
 
+        # Verify entropies survive roundtrip
+        assert wf_reconstructed.has_single_orbital_entropies()
+        assert wf_reconstructed.has_mutual_information()
+        assert np.allclose(
+            wf_reconstructed.get_single_orbital_entropies(),
+            cas_wavefunction_real.get_single_orbital_entropies(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            wf_reconstructed.get_mutual_information(),
+            cas_wavefunction_real.get_mutual_information(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        # Lazy s2 should be derivable from roundtripped s1 + MI
+        assert wf_reconstructed.has_two_orbital_entropies()
+        assert np.allclose(
+            wf_reconstructed.get_two_orbital_entropies(),
+            cas_wavefunction_real.get_two_orbital_entropies(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
     def test_json_serialization_cas_complex(self, cas_wavefunction_complex):
         """Test JSON serialization for complex CAS wavefunction."""
         json_str = cas_wavefunction_complex.to_json()
@@ -673,11 +785,11 @@ class TestWavefunctionSerialization:
         """Test HDF5 serialization for real CAS wavefunction."""
         filename = tmp_path / "test_wavefunction_cas_real.wavefunction.h5"
 
-        # Save to HDF5 file
-        cas_wavefunction_real.to_hdf5_file(str(filename))
+        # Save to HDF5 file (using Path object directly)
+        cas_wavefunction_real.to_hdf5_file(filename)
 
-        # Load from HDF5 file
-        wf_reconstructed = Wavefunction.from_hdf5_file(str(filename))
+        # Load from HDF5 file (using Path object directly)
+        wf_reconstructed = Wavefunction.from_hdf5_file(filename)
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == cas_wavefunction_real.size()
@@ -694,15 +806,39 @@ class TestWavefunctionSerialization:
         recon_dets = wf_reconstructed.get_active_determinants()
         assert len(recon_dets) == len(orig_dets)
 
+        # Verify entropies survive HDF5 roundtrip
+        assert wf_reconstructed.has_single_orbital_entropies()
+        assert wf_reconstructed.has_mutual_information()
+        assert np.allclose(
+            wf_reconstructed.get_single_orbital_entropies(),
+            cas_wavefunction_real.get_single_orbital_entropies(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            wf_reconstructed.get_mutual_information(),
+            cas_wavefunction_real.get_mutual_information(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        # Lazy s2 should be derivable from roundtripped s1 + MI
+        assert wf_reconstructed.has_two_orbital_entropies()
+        assert np.allclose(
+            wf_reconstructed.get_two_orbital_entropies(),
+            cas_wavefunction_real.get_two_orbital_entropies(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
     def test_hdf5_serialization_cas_complex(self, cas_wavefunction_complex, tmp_path):
         """Test HDF5 serialization for complex CAS wavefunction."""
         filename = tmp_path / "test_wavefunction_cas_complex.wavefunction.h5"
 
-        # Save to HDF5 file
-        cas_wavefunction_complex.to_hdf5_file(str(filename))
+        # Save to HDF5 file (using Path object directly)
+        cas_wavefunction_complex.to_hdf5_file(filename)
 
-        # Load from HDF5 file
-        wf_reconstructed = Wavefunction.from_hdf5_file(str(filename))
+        # Load from HDF5 file (using Path object directly)
+        wf_reconstructed = Wavefunction.from_hdf5_file(filename)
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == cas_wavefunction_complex.size()
@@ -718,11 +854,11 @@ class TestWavefunctionSerialization:
         """Test HDF5 serialization for Slater determinant wavefunction."""
         filename = tmp_path / "test_wavefunction_sd.wavefunction.h5"
 
-        # Save to HDF5 file
-        sd_wavefunction.to_hdf5_file(str(filename))
+        # Save to HDF5 file (using Path object directly)
+        sd_wavefunction.to_hdf5_file(filename)
 
-        # Load from HDF5 file
-        wf_reconstructed = Wavefunction.from_hdf5_file(str(filename))
+        # Load from HDF5 file (using Path object directly)
+        wf_reconstructed = Wavefunction.from_hdf5_file(filename)
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == 1
@@ -738,11 +874,11 @@ class TestWavefunctionSerialization:
         """Test JSON file I/O."""
         filename = tmp_path / "test_wavefunction.wavefunction.json"
 
-        # Save to JSON file
-        cas_wavefunction_real.to_json_file(str(filename))
+        # Save to JSON file (using Path object directly)
+        cas_wavefunction_real.to_json_file(filename)
 
-        # Load from JSON file
-        wf_reconstructed = Wavefunction.from_json_file(str(filename))
+        # Load from JSON file (using Path object directly)
+        wf_reconstructed = Wavefunction.from_json_file(filename)
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == cas_wavefunction_real.size()
@@ -753,14 +889,30 @@ class TestWavefunctionSerialization:
             atol=float_comparison_absolute_tolerance,
         )
 
+        # Verify entropies survive JSON file roundtrip
+        assert wf_reconstructed.has_single_orbital_entropies()
+        assert wf_reconstructed.has_mutual_information()
+        assert np.allclose(
+            wf_reconstructed.get_single_orbital_entropies(),
+            cas_wavefunction_real.get_single_orbital_entropies(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            wf_reconstructed.get_mutual_information(),
+            cas_wavefunction_real.get_mutual_information(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
     def test_generic_file_io(self, cas_wavefunction_real, tmp_path):
         """Test generic file I/O with different formats."""
         json_filename = tmp_path / "test_wavefunction_generic.wavefunction.json"
         hdf5_filename = tmp_path / "test_wavefunction_generic.wavefunction.h5"
 
-        # Test JSON format
-        cas_wavefunction_real.to_file(str(json_filename), "json")
-        wf_json = Wavefunction.from_file(str(json_filename), "json")
+        # Test JSON format (using Path object directly)
+        cas_wavefunction_real.to_file(json_filename, "json")
+        wf_json = Wavefunction.from_file(json_filename, "json")
         assert np.isclose(
             wf_json.norm(),
             cas_wavefunction_real.norm(),
@@ -768,9 +920,9 @@ class TestWavefunctionSerialization:
             atol=float_comparison_absolute_tolerance,
         )
 
-        # Test HDF5 format
-        cas_wavefunction_real.to_file(str(hdf5_filename), "hdf5")
-        wf_hdf5 = Wavefunction.from_file(str(hdf5_filename), "hdf5")
+        # Test HDF5 format (using Path object directly)
+        cas_wavefunction_real.to_file(hdf5_filename, "hdf5")
+        wf_hdf5 = Wavefunction.from_file(hdf5_filename, "hdf5")
         assert np.isclose(
             wf_hdf5.norm(),
             cas_wavefunction_real.norm(),
@@ -780,10 +932,10 @@ class TestWavefunctionSerialization:
 
         # Test invalid format
         with pytest.raises(ValueError, match="Unsupported file type"):
-            cas_wavefunction_real.to_file(str(tmp_path / "test.xyz"), "xyz")
+            cas_wavefunction_real.to_file(tmp_path / "test.xyz", "xyz")
 
         with pytest.raises(ValueError, match="Unsupported file type"):
-            Wavefunction.from_file(str(tmp_path / "test.xyz"), "xyz")
+            Wavefunction.from_file(tmp_path / "test.xyz", "xyz")
 
     def test_error_handling(self):
         """Test error handling for malformed data."""
@@ -1001,8 +1153,8 @@ class TestWavefunctionRdmIntegraion:
 
         # Save and reload using tmp_path
         h5_file = tmp_path / "test_wavefunction.wavefunction.h5"
-        wfn_sci.to_hdf5_file(str(h5_file))
-        wfn_loaded = Wavefunction.from_hdf5_file(str(h5_file))
+        wfn_sci.to_hdf5_file(h5_file)
+        wfn_loaded = Wavefunction.from_hdf5_file(h5_file)
 
         # Check RDMs after load
         assert wfn_loaded.has_one_rdm_spin_dependent(), "one rdm is not available"
@@ -1048,8 +1200,8 @@ class TestWavefunctionRdmIntegraion:
 
         # Save and reload using tmp_path
         h5_file = tmp_path / "test_wavefunction.wavefunction.h5"
-        wfn_cas.to_hdf5_file(str(h5_file))
-        wfn_loaded = Wavefunction.from_hdf5_file(str(h5_file))
+        wfn_cas.to_hdf5_file(h5_file)
+        wfn_loaded = Wavefunction.from_hdf5_file(h5_file)
 
         # Check RDMs after load
         assert wfn_loaded.has_one_rdm_spin_dependent(), "one rdm is not available"

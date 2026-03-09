@@ -5,7 +5,19 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-__version__ = "1.0.2"
+from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
+from importlib.metadata import version as _get_version
+from pathlib import Path
+
+try:
+    __version__ = _get_version("qdk-chemistry")
+except _PackageNotFoundError:
+    # Fallback for development/uninstalled use - read from VERSION file
+    try:
+        __version__ = (Path(__file__).parent.parent.parent.parent / "VERSION").read_text().strip()
+    except (OSError, UnicodeDecodeError):
+        # VERSION file not reachable or unreadable (e.g. vendored copy without repo root)
+        __version__ = "0.0.0.dev0"
 
 import contextlib
 import os
@@ -13,7 +25,6 @@ import shutil
 import subprocess
 import sys
 import warnings
-from pathlib import Path
 
 # Import some tools for convenience
 import qdk_chemistry.constants

@@ -18,7 +18,18 @@ from pathlib import Path
 project = "qdk-chemistry"
 copyright = "Microsoft Corporation. All rights reserved. Licensed under the MIT License"
 author = "QDK/Chemistry Team"
-release = "1.0.2"
+
+# Repo root (docs/source/conf.py -> docs/source -> docs -> repo root)
+_repo_root = Path(__file__).resolve().parent.parent.parent
+
+# Read version from VERSION file
+_version_file = _repo_root / "VERSION"
+if not _version_file.exists():
+    raise FileNotFoundError(
+        f"VERSION file not found at {_version_file}. "
+        "Ensure you have a complete checkout of the repository."
+    )
+release = _version_file.read_text().strip()
 
 # -----------------------------------------------------------------------------
 # Perform initial setup and tests
@@ -27,10 +38,11 @@ release = "1.0.2"
 # Signal to qdk_chemistry that we're in a docs build so runtime hooks stay idle
 os.environ.setdefault("QDK_CHEMISTRY_DOCS", "1")
 
-# Add path to the Python package
-sys.path.insert(
-    0, str(Path(__file__).parent.parent.joinpath("python", "src").absolute())
-)
+# Add the Python source tree so Sphinx can find qdk_chemistry when the
+# package has not been pip-installed (e.g. local docs builds).
+# NOTE: The path must stay *after* any pip-installed copy so that the
+# compiled C++ extension (_core) from the installed package is preferred.
+sys.path.append(str(_repo_root / "python" / "src"))
 
 # Check if Graphviz 'dot' executable is available
 if shutil.which("dot") is None:
@@ -138,6 +150,7 @@ primary_domain = "py"  # Set Python as the primary documentation domain
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "qiskit": ("https://quantum.cloud.ibm.com/docs/api/qiskit/", None),
 }
 
@@ -163,6 +176,9 @@ nitpick_ignore_regex = [
     (r"cpp:identifier", r".*::value"),
     (r"cpp:identifier", r"fmt::format_string.*"),
     (r"cpp:identifier", r"spdlog.*"),
+    # constants:: symbols imported via `using namespace codata_XXXX` inside
+    # a #if block — Doxygen/Breathe cannot resolve them.
+    (r"cpp:identifier", r".*constants::.*"),
     # C++20 concepts - Sphinx/Breathe doesn't fully support concept references yet
     (r"cpp:identifier", r"NonBoolIntegral<.*>"),
     (r"cpp:identifier", r"NonBoolIntegralVector<.*>"),
@@ -170,6 +186,7 @@ nitpick_ignore_regex = [
     (r"cpp:identifier", r"VariantMember<.*>"),
     (r"cpp:identifier", r"Vector<.*>"),
     (r"cpp:identifier", r"SupportedSettingType<.*>"),
+    (r"py:class", r"scipy.*"),
     (r"py:class", r"h5py.*"),
     (r"py:class", r"numpy.*"),
     (r"py:class", r"pathlib.*"),
