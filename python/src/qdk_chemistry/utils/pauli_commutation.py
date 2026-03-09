@@ -303,14 +303,14 @@ def commutator_bound_second_order(
     hamiltonian: QubitHamiltonian,
     weight_threshold: float = 1e-12,
 ) -> float:
-    r"""Compute the commutator bound term multiplying :math:`t^{3} / (12N)` in Proposition 10 in Childs et. al (2021).
+    r"""Compute the commutator bound term multiplying :math:`t^{3} / 12` in Proposition 10 in Childs et. al (2021).
 
     Args:
         hamiltonian: The qubit Hamiltonian for which to compute the bound.
         weight_threshold: Absolute threshold for filtering small Hamiltonian coefficients.
 
     Returns:
-        The commutator bound term multiplying :math:`t^{3} / (12N)`.
+        The commutator bound term multiplying :math:`t^{3} / 12`.
 
     """
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
