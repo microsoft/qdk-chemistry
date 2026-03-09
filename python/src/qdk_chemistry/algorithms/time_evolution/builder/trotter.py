@@ -152,8 +152,8 @@ class Trotter(TimeEvolutionBuilder):
 
         The Second Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`
         by decomposing the Hamiltonian H into a sum of terms and using the product formula:
-        :math:`e^{-iHt} \approx \left[\prod_i e^{-iH_{i=1}^{L-1} t/2n}e^{-iH_L t/n}\prod_i
-        e^{-iH_{i=L-1}^{1} t/2n}\right]^n`, where n is the number of divisions.
+        :math:`e^{-iHt} \approx \left[\prod_{i=1}^{L-1} e^{-iH_i t/2n}e^{-iH_L t/n}\prod_{i=L-1}^{1}
+        e^{-iH_i t/2n}\right]^n`, where n is the number of divisions.
 
         Higher order Trotter methods are constructed using the recursive Suzuki method, which builds order 2k formulas
         as: :math:`S_{2k}(t) = S_{2k-2}(u_k t)^2 S_{2k-2}((1-4u_k) t) S_{2k-2}(u_k t)^2`,

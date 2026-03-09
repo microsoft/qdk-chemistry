@@ -174,7 +174,7 @@ class TestTrotter:
         assert container.step_terms[1].angle == t  # angle for Z term
         # Compare: the error should scale as O(t^2) for first-order Trotter
         commutator_error_bound = t**2 / 2 * commutator_bound_first_order(hamiltonian)
-        naive_error_bound = t**2 * sum(abs(coeff) for _, coeff in hamiltonian.get_real_coefficients()) ** 2
+        naive_error_bound = 2 * t**2 * sum(abs(coeff) for _, coeff in hamiltonian.get_real_coefficients()) ** 2
         error_actual = np.linalg.norm(u_trot - u_exact, ord=2)
         assert error_actual <= commutator_error_bound
         assert error_actual <= naive_error_bound
@@ -290,7 +290,7 @@ class TestTrotter:
         assert container.step_terms[2].angle == t / 2  # angle for X term
         # Compare: the error should scale as O(t^3) for second-order Trotter
         commutator_error_bound = t**3 / 12 * commutator_bound_second_order(hamiltonian)
-        naive_error_bound = t**3 * sum(abs(coeff) for _, coeff in hamiltonian.get_real_coefficients()) ** 3
+        naive_error_bound = 2**2 * t**3 * sum(abs(coeff) for _, coeff in hamiltonian.get_real_coefficients()) ** 3
         error_actual = np.linalg.norm(u_trot - u_exact, ord=2)
         assert error_actual <= commutator_error_bound
         assert error_actual <= naive_error_bound

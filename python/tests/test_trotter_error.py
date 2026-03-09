@@ -75,13 +75,13 @@ class TestTrotterStepsNaive:
     # Higher-order Trotter tests.
 
     def test_order_3_raises(self):
-        """Test that order > 2 raises NotImplementedError."""
+        """Test that odd order > 2 raises NotImplementedError."""
         h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
         with pytest.raises(NotImplementedError, match="order 3"):
             trotter_steps_naive(h, 1.0, 0.1, order=3)
 
     def test_basic_higher_order(self):
-        """Test basic second-order naive bound computation."""
+        """Test basic higher-order naive bound computation."""
         h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
         assert trotter_steps_naive(h, 1.0, 0.1, order=6) == 7
 
