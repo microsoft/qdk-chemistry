@@ -50,12 +50,18 @@ __all__: list[str] = [
 
 
 def _label_to_sparse_word(label: str) -> list[tuple[int, int]]:
-    #    """Convert a Pauli string label to a ``SparsePauliWord``."""
-    return [(i, 1 if c == "X" else 2 if c == "Y" else 3) for i, c in enumerate(label) if c != "I"]
+    #    Convert a Pauli string label to a ``SparsePauliWord``.
+    word = []
+    for i, c in enumerate(label):
+        if c in {"X", "Y", "Z"}:
+            word.append((i, 1 if c == "X" else 2 if c == "Y" else 3))
+        elif c != "I":
+            raise ValueError(f"Invalid character {c!r} in Pauli label; expected 'I', 'X', 'Y', or 'Z'.")
+    return word
 
 
 def _sparse_word_to_label(word: list[tuple[int, int]], n_qubits: int) -> str:
-    #    """Convert a ``SparsePauliWord`` back to a Pauli string label."""
+    #    Convert a ``SparsePauliWord`` back to a Pauli string label.
     chars = ["I"] * n_qubits
     for q, p in word:
         chars[q] = "X" if p == 1 else "Y" if p == 2 else "Z"
@@ -219,6 +225,10 @@ def does_nested_commutator_vanish(*labels: str) -> bool:
         ValueError: If fewer than two Pauli labels are provided.
 
     """
+    pauli_string_length = len(labels[0])
+    if any(len(lbl) != pauli_string_length for lbl in labels):
+        raise ValueError("All Pauli labels must have the same length.")
+
     if len(labels) < 2:
         raise ValueError("At least two Pauli labels are required for a commutator.")
 
@@ -237,7 +247,7 @@ def does_nested_commutator_vanish(*labels: str) -> bool:
     word = _label_to_sparse_word(labels[1])
     for lbl in labels[2:]:
         _, word = PauliTermAccumulator.multiply_uncached(word, _label_to_sparse_word(lbl))
-    inner_product = _sparse_word_to_label(word, len(labels[0]))
+    inner_product = _sparse_word_to_label(word, pauli_string_length)
     return do_pauli_labels_commute(labels[0], inner_product)
 
 

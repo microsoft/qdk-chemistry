@@ -553,8 +553,8 @@ class TestTrotterAccuracyAware:
         builder = Trotter(target_accuracy=0.01, error_bound="naive")
         unitary = builder.run(hamiltonian, time=1.0)
         container = unitary.get_container()
-        # one_norm = 2, N = ceil(4 / 0.01) = 400
-        assert container.step_reps == 400
+        # one_norm = 2, N = ceil(2 * 4 / 0.01) = 800
+        assert container.step_reps == 800
 
     def test_commutator_tighter_than_naive(self):
         """Test that commutator bound gives fewer steps than naive bound."""
@@ -649,8 +649,8 @@ class TestTrotterAccuracyAware:
         builder = Trotter(target_accuracy=0.01, error_bound="naive", order=2)
         unitary = builder.run(hamiltonian, time=1.0)
         container = unitary.get_container()
-        # one_norm = 2, naive second-order bound for eps=0.01 and t=1.0 gives N = 17
-        assert container.step_reps == 17
+        # one_norm = 2, naive second-order bound for eps=0.01 and t=1.0 gives N = 57
+        assert container.step_reps == 57
 
     def test_commutator_tighter_than_naive_second_order(self):
         """Test that commutator bound gives fewer steps than naive bound."""
@@ -733,13 +733,11 @@ class TestTrotterAccuracyAware:
     # Higher-order Trotter tests.
     def test_target_accuracy_commutator_bound_higher_order(self):
         """Test that target_accuracy with commutator bound computes correct step count."""
-        # H = X + Z, X and Z anticommute -> commutator bound = 6
-        # For t = 1 and eps = 0.01, N = ceil(sqrt(6 / 12) / sqrt(eps)) = 8.
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
         builder = Trotter(target_accuracy=0.01, order=6)
         unitary = builder.run(hamiltonian, time=1.0)
         container = unitary.get_container()
-        assert container.step_reps == 5
+        assert container.step_reps == 7
 
     def test_commutator_tighter_than_naive_higher_order(self):
         """Test that commutator bound gives fewer steps than naive bound."""
@@ -747,7 +745,7 @@ class TestTrotterAccuracyAware:
         eps = 0.01
         time = 1.0
         builder_comm = Trotter(target_accuracy=eps, error_bound="commutator", order=4)
-        builder_naive = Trotter(target_accuracy=eps, error_bound="naive", order=2)
+        builder_naive = Trotter(target_accuracy=eps, error_bound="naive", order=4)
         n_comm = builder_comm.run(hamiltonian, time=time).get_container().step_reps
         n_naive = builder_naive.run(hamiltonian, time=time).get_container().step_reps
         assert n_comm <= n_naive

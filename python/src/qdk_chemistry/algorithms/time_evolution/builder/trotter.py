@@ -144,7 +144,7 @@ class Trotter(TimeEvolutionBuilder):
         raise NotImplementedError("Non-positive and higher odd orders are not supported.")
 
     def _trotter(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
-        r"""Construct the time evolution unitary using first-order Trotter decomposition.
+        r"""Construct the time evolution unitary using the Trotter decomposition.
 
         The First Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`
         by decomposing the Hamiltonian H into a sum of terms and using the product formula:

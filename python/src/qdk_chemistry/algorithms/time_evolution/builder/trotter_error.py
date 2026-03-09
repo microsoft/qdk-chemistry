@@ -90,14 +90,11 @@ def trotter_steps_naive(
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
     one_norm = sum(abs(coeff) for _, coeff in real_terms)
     if order == 1:
-        return max(1, math.ceil(((2 * one_norm**2) * (1 / 2.0) * time**2) / target_accuracy))
+        return max(1, math.ceil(((2 * one_norm**2) * time**2) / target_accuracy))
     if order == 2:
         return max(
             1,
-            math.ceil(
-                ((2**2 * one_norm**3) ** (1 / 2) * (1 / 12.0 ** (1 / 2)) * abs(time) ** (1 + 1 / 2))
-                / target_accuracy ** (1 / 2)
-            ),
+            math.ceil(((2**2 * one_norm**3) ** (1 / 2) * abs(time) ** (1 + 1 / 2)) / target_accuracy ** (1 / 2)),
         )
     return max(
         1,
@@ -181,7 +178,5 @@ def trotter_steps_commutator(
     comm_bound = commutator_bound_higher_order(hamiltonian, order=order, weight_threshold=weight_threshold)
     return max(
         1,
-        math.ceil(
-            (comm_bound / (order + 1)) ** (1 / order) * abs(time) ** (1 + 1 / order) / (target_accuracy) ** (1 / order)
-        ),
+        math.ceil(comm_bound ** (1 / order) * abs(time) ** (1 + 1 / order) / (target_accuracy) ** (1 / order)),
     )
