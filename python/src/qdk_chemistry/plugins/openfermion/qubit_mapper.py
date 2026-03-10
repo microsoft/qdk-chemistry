@@ -18,7 +18,7 @@ import numpy as np
 import openfermion as of
 
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
-from qdk_chemistry.data.fermion_mode_order import FermionModeOrder
+from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.plugins.openfermion.conversion import (
     hamiltonian_to_fermion_operator,
     hamiltonian_to_interaction_operator,

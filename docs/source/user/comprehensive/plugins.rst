@@ -176,7 +176,7 @@ To determine which OpenFermion components are available in your environment, you
 
    print(f"OpenFermion available: {QDK_CHEMISTRY_HAS_OPENFERMION}")
 
-These boolean variables are set at module load time and reflect the actual availability of each package in your Python environment.
+This boolean variable is set at module load time and reflects the actual availability of each package in your Python environment.
 
 .. warning::
 

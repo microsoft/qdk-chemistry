@@ -9,6 +9,7 @@ import importlib.util
 from qdk_chemistry.utils import Logger
 
 _loaded = False
+# Set to True by load(), which is called from the parent plugins __init__.
 QDK_CHEMISTRY_HAS_OPENFERMION = False
 
 

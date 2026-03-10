@@ -17,7 +17,7 @@ import numpy as np
 
 from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper, QubitMapperSettings
 from qdk_chemistry.data import PauliTermAccumulator
-from qdk_chemistry.data.fermion_mode_order import FermionModeOrder
+from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.utils import Logger
 

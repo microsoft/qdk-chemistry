@@ -11,7 +11,7 @@ import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Circuit, EncodingMismatchError, QubitHamiltonian, validate_encoding_compatibility
-from qdk_chemistry.data.fermion_mode_order import FermionModeOrder
+from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE
 
 from .test_helpers import create_test_hamiltonian

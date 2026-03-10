@@ -25,7 +25,7 @@ if OPENFERMION_AVAILABLE:
 
     from qdk_chemistry.algorithms import QubitMapper, available, create
     from qdk_chemistry.data import Symmetries
-    from qdk_chemistry.data.fermion_mode_order import FermionModeOrder
+    from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
     from qdk_chemistry.plugins.openfermion.conversion import (
         hamiltonian_to_fermion_operator,
         hamiltonian_to_interaction_operator,

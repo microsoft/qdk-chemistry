@@ -11,7 +11,7 @@ import re
 import numpy as np
 import pytest
 
-from qdk_chemistry.data.fermion_mode_order import FermionModeOrder
+from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.qubit_hamiltonian import (
     QubitHamiltonian,
     _filter_and_group_pauli_ops_from_statevector,

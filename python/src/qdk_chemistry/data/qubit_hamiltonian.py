@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     import h5py
 
     from qdk_chemistry.data import Wavefunction
-from qdk_chemistry.data.fermion_mode_order import FermionModeOrder
+from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 
 __all__ = ["filter_and_group_pauli_ops_from_wavefunction"]

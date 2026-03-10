@@ -21,7 +21,7 @@ from qiskit_nature.second_q.mappers import (
 
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
 from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
-from qdk_chemistry.data.fermion_mode_order import FermionModeOrder
+from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
