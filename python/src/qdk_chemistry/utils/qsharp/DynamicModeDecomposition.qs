@@ -10,7 +10,6 @@ namespace QDKChemistry.Utils.DynamicModeDecomposition {
     /// # Parameters
     /// - `statePrep`: A function to prepare the initial quantum state.
     /// - `repControlledEvolution`: A function to perform repeated controlled evolution.
-    /// - `measure_imag`: The flag to designate if the operation is for measuring the imaginary part of the observable.
     /// - `control`: The index of the control qubit.
     /// - `systems`: An array of indices representing the system qubits.
     /// # Returns
@@ -18,7 +17,6 @@ namespace QDKChemistry.Utils.DynamicModeDecomposition {
     operation MakeODMDCircuit(
         statePrep : Qubit[] => Unit,
         repControlledEvolution : (Qubit, Qubit[]) => Unit,
-        measure_imag : Bool,
         control : Int,
         systems : Int[],
     ) : Result[] {
@@ -32,9 +30,6 @@ namespace QDKChemistry.Utils.DynamicModeDecomposition {
             H(control);
         } apply {
             repControlledEvolution(control, system);
-            if measure_imag {
-                Adjoint S(control);
-            }
         }
         ResetAll(system);
         return [MResetZ(control)];
