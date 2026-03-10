@@ -4,6 +4,8 @@
 
 #include "hamiltonian.hpp"
 
+#include "hamiltonian_util.hpp"
+
 // STL Headers
 #include <filesystem>
 #include <set>
@@ -26,61 +28,6 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
-
-namespace detail {
-/**
- * @brief Validate active orbital indices
- * @param indices The indices to validate
- * @param spin_label Label for error messages (e.g., "Alpha", "Beta")
- * @param num_molecular_orbitals Total number of molecular orbitals
- * @return true if the indices are contiguous, false otherwise
- */
-bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
-                                        const std::string& spin_label,
-                                        size_t num_molecular_orbitals) {
-  QDK_LOG_TRACE_ENTERING();
-  if (indices.empty()) return true;
-
-  // Cannot contain more than the total number of MOs
-  if (indices.size() > num_molecular_orbitals) {
-    throw std::runtime_error("Number of requested " + spin_label +
-                             " active orbitals exceeds total number of MOs");
-  }
-
-  // Make sure that the indices are within bounds
-  for (const auto& idx : indices) {
-    if (static_cast<size_t>(idx) >= num_molecular_orbitals) {
-      throw std::runtime_error(
-          spin_label +
-          " active orbital index out of bounds: " + std::to_string(idx));
-    }
-  }
-
-  // Make sure that the indices are unique
-  std::set<size_t> unique_indices(indices.begin(), indices.end());
-  if (unique_indices.size() != indices.size()) {
-    throw std::runtime_error(spin_label +
-                             " active orbital indices must be unique");
-  }
-
-  // Make sure that the indices are sorted
-  std::vector<size_t> sorted_indices(indices.begin(), indices.end());
-  std::sort(sorted_indices.begin(), sorted_indices.end());
-  if (indices != sorted_indices) {
-    throw std::runtime_error(spin_label +
-                             " active orbital indices must be sorted");
-  }
-
-  // Check if indices are contiguous
-  for (size_t i = 0; i < indices.size() - 1; ++i) {
-    if (indices[i + 1] - indices[i] != 1) {
-      return false;
-    }
-  }
-
-  return true;
-}
-}  // namespace detail
 
 std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     std::shared_ptr<data::Orbitals> orbitals,
