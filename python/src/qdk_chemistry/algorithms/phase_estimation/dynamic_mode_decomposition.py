@@ -18,7 +18,7 @@ Reference:
 import copy
 
 import numpy as np
-from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
+from qdk import qsharp
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
@@ -31,6 +31,7 @@ from qdk_chemistry.data import (
     QubitHamiltonian,
 )
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import PhaseEstimation, PhaseEstimationSettings
 
@@ -268,6 +269,45 @@ class DynamicModeDecomposition(PhaseEstimation):
             A quantum circuit gauging <\psi|exp(-iH n dt)|\psi>.
 
         """
+
+        # Apply control U^n = exp(-iH n dt)
+        ctrl_evol_circuit = self._create_ctrl_time_evol_circuit(
+            controlled_evolution=ctrl_time_evol_unitary, power=observable_power, circuit_mapper=circuit_mapper
+        )
+
+        if state_preparation._qsharp_op and ctrl_evol_circuit._qsharp_op:  # noqa: SLF001
+            return self._create_circuit_from_qsharp_op(
+                state_preparation, num_system_qubits, ctrl_evol_circuit, observable_power
+            )
+
+        if state_preparation.get_qiskit_circuit() and ctrl_evol_circuit.get_qiskit_circuit():
+            return self._create_circuit_from_qiskit(state_preparation, num_system_qubits, ctrl_evol_circuit, observable_power)
+
+        raise RuntimeError(
+            "Failed to create iteration circuit: Q# operations or Qiskit dependencies are not available."
+        )
+
+    def _create_circuit_from_qiskit(self,
+        state_preparation: Circuit,
+        num_system_qubits: int,
+        ctrl_evol_circuit: Circuit,
+        observable_power: int,
+    ) -> list[Circuit]:
+        r"""Construct n-th single ODMD iteration circuit for gauging Re and Im of (<\psi|exp(-iH n dt)|\psi>).
+
+        Args:
+            state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
+            num_system_qubits: number of qubits representing the quantum state
+            ctrl_evol_circuit: The controlled one time step evolution unitary operator U = exp(-iH dt).
+            circuit_mapper: The controlled evolution circuit mapper to use.
+            observable_power: Current observable power.
+
+        Returns:
+            A quantum circuit gauging <\psi|exp(-iH n dt)|\psi>.
+
+        """
+        from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
+
         # Build the base circuit with registers
         ancilla = QuantumRegister(1, "ancilla")
         system_target = QuantumRegister(num_system_qubits, "system")
@@ -275,7 +315,8 @@ class DynamicModeDecomposition(PhaseEstimation):
         circuit = QuantumCircuit(ancilla, system_target, classical)
 
         # Apply state preparation
-        self._append_state_preparation(circuit, state_preparation, system_target)
+        state_prep_qc = state_preparation.get_qiskit_circuit()
+        circuit.append(state_prep_qc.to_gate(), system_target)
 
         # Prepare the ancilla qubit
         control = ancilla[0]
@@ -283,12 +324,8 @@ class DynamicModeDecomposition(PhaseEstimation):
         circuit.h(control)
 
         # Apply control U^n = exp(-iH n dt)
-        ctrl_time_evol_circuit = self._create_ctrl_time_evol_circuit(
-            controlled_evolution=ctrl_time_evol_unitary, power=observable_power, circuit_mapper=circuit_mapper
-        )
-        cu_circuit = qasm3.loads(ctrl_time_evol_circuit.qasm)
-        mapping = [control, *target_qubits]
-        circuit.compose(cu_circuit, qubits=mapping, inplace=True)
+        ctrl_evol_qc = ctrl_evol_circuit.get_qiskit_circuit()
+        circuit.append(ctrl_evol_qc.to_gate(), [control, *target_qubits])
 
         circuit_imag = copy.deepcopy(circuit)
 
@@ -301,33 +338,56 @@ class DynamicModeDecomposition(PhaseEstimation):
         circuit_imag.measure(control, classical[0])
 
         Logger.info(
-            f"Completed ODMD observable {observable_power}, producing circuit with {circuit.num_qubits} "
-            f"qubits and {circuit.num_clbits} classical bits."
+            f"Completed qiskit circuit for ODMD observable {observable_power}."
         )
         return [Circuit(qasm=qasm3.dumps(circuit)), Circuit(qasm=qasm3.dumps(circuit_imag))]
 
-    def _append_state_preparation(
-        self, circuit: QuantumCircuit, state_preparation: Circuit, system_target: QuantumRegister
-    ) -> None:
-        """Apply the state preparation circuit to the system qubits.
+    def _create_circuit_from_qsharp_op(self,
+        state_preparation: Circuit,
+        num_system_qubits: int,
+        ctrl_evol_circuit: Circuit,
+        observable_power: int,
+    ) -> list[Circuit]:
+        state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
+        ctrl_evol_op = ctrl_evol_circuit._qsharp_op  # noqa: SLF001
+        odmd_iter_qsc = qsharp.circuit(
+            QSHARP_UTILS.DynamicModeDecomposition.MakeODMDCircuit,
+            state_prep_op,
+            ctrl_evol_op,
+            False,
+            0,
+            [1 + i for i in range(num_system_qubits)],  # target qubits
+        )
+        odmd_iter_qir = qsharp.compile(
+            QSHARP_UTILS.DynamicModeDecomposition.MakeODMDCircuit,
+            state_prep_op,
+            ctrl_evol_op,
+            False,
+            0,
+            [1 + i for i in range(num_system_qubits)],  # target qubits
+        )
 
-        Args:
-            circuit: The quantum circuit to modify.
-            state_preparation: The state preparation circuit.
-            system_target: The system qubit register.
+        odmd_imag_iter_qsc = qsharp.circuit(
+            QSHARP_UTILS.DynamicModeDecomposition.MakeODMDCircuit,
+            state_prep_op,
+            ctrl_evol_op,
+            True,
+            0,
+            [1 + i for i in range(num_system_qubits)],  # target qubits
+        )
+        odmd_imag_iter_qir = qsharp.compile(
+            QSHARP_UTILS.DynamicModeDecomposition.MakeODMDCircuit,
+            state_prep_op,
+            ctrl_evol_op,
+            True,
+            0,
+            [1 + i for i in range(num_system_qubits)],  # target qubits
+        )
 
-        """
-        state_prep_circuit = qasm3.loads(state_preparation.qasm)
-        if state_prep_circuit.num_qubits != len(system_target):
-            raise ValueError(
-                "state_preparation must prepare the same number of system qubits as the target register "
-                f"(expected {len(system_target)}, received {state_prep_circuit.num_qubits}).",
-            )
-        state_prep_circuit.name = "state_preparation"
-        try:
-            circuit.compose(state_prep_circuit.to_gate(), qubits=system_target, inplace=True)
-        except AssertionError:
-            circuit.compose(state_prep_circuit, qubits=system_target, inplace=True)
+        Logger.info(
+            f"Completed qsharp circuit for ODMD observable {observable_power}"
+        )
+        return [Circuit(qsharp=odmd_iter_qsc, qir=odmd_iter_qir), Circuit(qsharp=odmd_imag_iter_qsc, qir=odmd_imag_iter_qir)]
 
     def _measure_observables(
         self,
