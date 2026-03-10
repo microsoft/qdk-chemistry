@@ -101,6 +101,9 @@ else
     echo "Skipping qiskit-extras (not supported on Python 3.14+)"
 fi
 
+# Disable telemetry during testing
+export QSHARP_PYTHON_TELEMETRY=false
+
 # Run pytest suite
 echo '=== Running pytest suite ==='
 python3 -m pytest -v ./tests
