@@ -20,6 +20,13 @@ The focus of this example is on high-level concepts and common coding patterns t
 You can also view a related code sample in a Jupyter notebook format, along with several other examples, in the `examples folder <https://github.com/microsoft/qdk-chemistry/blob/main/examples/>`_ of the GitHub repository.
 Companion chemistry datasets and supporting assets are also available in `microsoft/qdk-chemistry-data <https://github.com/microsoft/qdk-chemistry-data>`_.
 
+.. note::
+
+   If you installed ``qdk-chemistry`` from PyPI, use the ``stable/major.minor`` branch
+   (e.g., ``stable/1.0``) when cloning the repository for examples.
+   The ``main`` branch is the active development branch and may be incompatible with
+   the released pip package. See the `examples README <https://github.com/microsoft/qdk-chemistry/blob/main/examples/README.md>`_ for details.
+
 Create a Structure object
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 

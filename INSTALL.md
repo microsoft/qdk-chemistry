@@ -11,6 +11,9 @@ git clone https://github.com/microsoft/qdk-chemistry.git
 cd qdk-chemistry
 ```
 
+**Note**: Some examples require additional dependencies beyond the base package.
+See the [examples README](examples/README.md) for per-example installation requirements.
+
 ## Pip Wheel Installation
 
 **Note**: Before using pip to install QDK/Chemistry, ensure that Python 3.10+ and pip are installed on your system. On Ubuntu/Debian, you may need to install `python3-pip` and `python3-venv` first. See the [System Dependencies](#system-dependencies) section for more details.
