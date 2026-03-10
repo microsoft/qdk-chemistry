@@ -135,8 +135,11 @@ class Circuit(DataClass):
             if self.qasm:
                 Logger.warn("Both QIR and QASM representations are available. Return QIR.")
             return self.qir
-        if self.qsharp_factory:
-            return qsharp.compile(*self.qsharp_factory)
+        if self.qsharp_factory and self.qir is None:
+            compiled_qir = qsharp.compile(*self.qsharp_factory)
+            # Cache the compiled qir if qir is not already set
+            object.__setattr__(self, "qir", compiled_qir)
+            return compiled_qir
         if self.qasm:
             return qsharp.openqasm.compile(self.qasm)
 
@@ -147,8 +150,8 @@ class Circuit(DataClass):
 
         Returns:
             qsharp._native.Circuit: A Q# circuit object.
-            prune_classical_qubits: If True, classical qubits are removed from the circuit.
-                Only applicable when converting from qsharp_factory.
+            prune_classical_qubits: If True, classical qubits are removed from the circuit. Only applicable
+            when converting from qsharp_factory.
 
         Returns:
             qsharp._native.Circuit: A Q# Circuit object.
@@ -166,8 +169,11 @@ class Circuit(DataClass):
             if self.qasm:
                 Logger.warn("Both Q# and QASM representations are available. Return Q# circuit.")
             return self.qsharp
-        if self.qsharp_factory:
-            return qsharp.circuit(*self.qsharp_factory, prune_classical_qubits=prune_classical_qubits)
+        if self.qsharp_factory and self.qsharp is None:
+            compiled_qsharp = qsharp.circuit(*self.qsharp_factory, prune_classical_qubits=prune_classical_qubits)
+            # Cache the compiled Q# circuit if Q# is not already set
+            object.__setattr__(self, "qsharp", compiled_qsharp)
+            return compiled_qsharp
         if self.qasm:
             return qsharp.openqasm.circuit(self.qasm)
 
