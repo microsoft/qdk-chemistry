@@ -120,8 +120,15 @@ python3 --version
 
 # Update pip and install build tools
 python3 -m pip install --upgrade pip
-python3 -m pip install auditwheel build
-python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
+
+PIP_STRING="fonttools>=4.61.0 urllib3>=2.6.0"
+
+# This is necessary for 1ES Geneva telemetry during the Linux builds.
+if [ "${MAC_BUILD}" == "OFF" ]; then
+    PIP_STRING+=" opentelemetry-api==1.23.0 opentelemetry-sdk==1.23.0 opentelemetry-exporter-otlp-proto-grpc==1.23.0"
+fi
+
+python3 -m pip install auditwheel build ${PIP_STRING}
 
 # Prepare README for PyPI
 bash .pipelines/pip-scripts/prepare-readme.sh
@@ -131,8 +138,14 @@ cd python
 
 # Build wheel with all necessary CMake flags
 if [ "$MAC_BUILD" == "OFF" ]; then
-    export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
-    export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
+    # We need to include the -g flag so that we can publish our symbols internally
+    if [ "$MARCH" == "x86-64-v3" ]; then
+        export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden -g"
+        export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden -g"
+    else
+        export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
+        export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
+    fi
     export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
     python3 -m build --wheel \
         -C build-dir="build/{wheel_tag}" \
@@ -161,6 +174,23 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         echo "Fixing RPATH for main package: $so_file"
         patchelf --set-rpath '$ORIGIN/../../qdk_chemistry.libs' "$so_file" || true
     done
+
+    # We need to do this in order to publish our C++ debug symbols internally.
+    if [ "$MARCH" == "x86-64-v3" ]; then
+        export debugdir="debug_symbols"
+        mkdir -p "${debugdir}"
+        CORE_SO="$(find "$TEMP_DIR" -type f -name '_core*.so' | head -n 1)"
+        if [ -z "$CORE_SO" ]; then
+            echo "ERROR: Could not find _core*.so in repaired wheel contents."
+            exit 1
+        fi
+        debugfile="$(basename "$CORE_SO").debug"
+        objcopy --only-keep-debug "$CORE_SO" "${debugdir}/${debugfile}"
+        strip --strip-debug --strip-unneeded "$CORE_SO"
+        objcopy --add-gnu-debuglink="${debugdir}/${debugfile}" "$CORE_SO"
+        echo "Extracted debug symbols to ${debugdir}/${debugfile}"
+        ls "${debugdir}"
+    fi
 
     find "$TEMP_DIR" -path '*/qdk_chemistry.libs/*' -name '*.so*' -type f | while read so_file; do
         echo "Fixing RPATH for bundled library: $so_file"
