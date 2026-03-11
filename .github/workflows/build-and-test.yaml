@@ -293,7 +293,7 @@ jobs:
         fi
         python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
         # Install optional dependencies for tests
-        python -m pip install --prefix=${{ github.workspace }}/install pennylane ipykernel
+        python -m pip install --prefix=${{ github.workspace }}/install pennylane gast ipykernel
         # Register the Jupyter kernel for notebook tests
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 

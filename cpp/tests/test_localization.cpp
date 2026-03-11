@@ -637,6 +637,47 @@ TEST_F(LocalizationTest, WaterVVHV) {
   EXPECT_NEAR(pm_metric, 23.693199816318174, testing::localization_tolerance);
 }
 
+TEST_F(LocalizationTest, WaterVVHV_ccpvtz) {
+  auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
+  auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
+  EXPECT_NO_THROW({ auto settings = vvhv_localizer->settings(); });
+
+  // Set the minimal basis to lowercase as required by VVHV
+  vvhv_localizer->settings().set("minimal_basis", "sto-3g");
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "hf");
+  auto [E, wfn] = scf_solver->run(water, 0, 1, "cc-pvtz");
+  auto orbitals = wfn->get_orbitals();
+  const auto& [Ca_can, Cb_can] = orbitals->get_coefficients();
+
+  // First localize occupied orbitals with Pipek-Mezey
+  const size_t num_occupied_orbitals = wfn->get_total_num_electrons().first;
+  const size_t num_virtual_orbitals =
+      orbitals->get_num_molecular_orbitals() - num_occupied_orbitals;
+
+  std::vector<size_t> occ_indices(num_occupied_orbitals);
+  std::vector<size_t> virt_indices(num_virtual_orbitals);
+
+  std::iota(occ_indices.begin(), occ_indices.end(), 0);
+  std::iota(virt_indices.begin(), virt_indices.end(), num_occupied_orbitals);
+
+  auto localized_occ_ptr = pm_localizer->run(wfn, occ_indices, occ_indices);
+
+  // Then pass all orbitals (localized occupied + canonical virtual) to VVHV
+  auto localized_wfn_ptr =
+      vvhv_localizer->run(localized_occ_ptr, virt_indices, virt_indices);
+  auto& localized_orbitals = *localized_wfn_ptr->get_orbitals();
+
+  // Simple checks
+  const auto& [Ca_loc, Cb_loc] = localized_orbitals.get_coefficients();
+  EXPECT_EQ(Ca_loc.rows(), Ca_can.rows());
+  EXPECT_EQ(Cb_loc.rows(), Cb_can.rows());
+
+  auto pm_metric = testing::pipek_mezey_metric(localized_orbitals, Ca_loc);
+  EXPECT_NEAR(pm_metric, 74.487168441505631, testing::localization_tolerance);
+}
+
 TEST_F(LocalizationTest, O2TripletVVHV) {
   auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
   auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
@@ -793,6 +834,56 @@ TEST_F(LocalizationTest, ScrambledShellsWaterVVHV) {
 
   auto pm_metric = testing::pipek_mezey_metric(localized_orbitals, Ca_loc);
   EXPECT_NEAR(pm_metric, 23.693199816318174, testing::localization_tolerance);
+}
+
+// This test is needed to ensure VVHV's consistency with respect to basis set
+// reordering. Localizing the proto HVs should yield this consistency for any
+// atomic basis set, regardless of the structure of its overlap matrix
+// The test verifies that the same Pipek Mezey value is attained when the
+// cc-pvtz basis is scrambled
+TEST_F(LocalizationTest, ScrambledShellsWaterVVHV_ccpvtz) {
+  auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
+  auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
+  EXPECT_NO_THROW({ auto settings = vvhv_localizer->settings(); });
+
+  // Set the minimal basis to lowercase as required by VVHV
+  vvhv_localizer->settings().set("minimal_basis", "sto-3g");
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "hf");
+
+  auto cc_pvtz = BasisSet::from_basis_name("cc-pvtz", water);
+  auto cc_pvtz_scrambled = scramble_basis_shells(cc_pvtz);
+
+  auto [E, wfn] = scf_solver->run(water, 0, 1, cc_pvtz_scrambled);
+  auto orbitals = wfn->get_orbitals();
+  const auto& [Ca_can, Cb_can] = orbitals->get_coefficients();
+
+  // First localize occupied orbitals with Pipek-Mezey
+  const size_t num_occupied_orbitals = wfn->get_total_num_electrons().first;
+  const size_t num_virtual_orbitals =
+      orbitals->get_num_molecular_orbitals() - num_occupied_orbitals;
+
+  std::vector<size_t> occ_indices(num_occupied_orbitals);
+  std::vector<size_t> virt_indices(num_virtual_orbitals);
+
+  std::iota(occ_indices.begin(), occ_indices.end(), 0);
+  std::iota(virt_indices.begin(), virt_indices.end(), num_occupied_orbitals);
+
+  auto localized_occ_ptr = pm_localizer->run(wfn, occ_indices, occ_indices);
+
+  // Then pass all orbitals (localized occupied + canonical virtual) to VVHV
+  auto localized_wfn_ptr =
+      vvhv_localizer->run(localized_occ_ptr, virt_indices, virt_indices);
+  auto& localized_orbitals = *localized_wfn_ptr->get_orbitals();
+
+  // Simple checks
+  const auto& [Ca_loc, Cb_loc] = localized_orbitals.get_coefficients();
+  EXPECT_EQ(Ca_loc.rows(), Ca_can.rows());
+  EXPECT_EQ(Cb_loc.rows(), Cb_can.rows());
+
+  auto pm_metric = testing::pipek_mezey_metric(localized_orbitals, Ca_loc);
+  EXPECT_NEAR(pm_metric, 74.487168441505631, testing::localization_tolerance);
 }
 
 // This test is needed to ensure VVHV's consistency with respect to basis set
