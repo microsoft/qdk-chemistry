@@ -25,8 +25,6 @@ References:
 
 from __future__ import annotations
 
-import itertools
-import math
 from typing import TYPE_CHECKING
 
 from qdk_chemistry.data import PauliTermAccumulator
