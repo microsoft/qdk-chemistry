@@ -134,7 +134,10 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
         """
         data: dict[str, Any] = {
             "container_type": self.type,
-            "step_terms": [{"pauli_term": term.pauli_term, "angle": term.angle} for term in self.step_terms],
+            "step_terms": [
+                {"pauli_term": {str(k): v for k, v in term.pauli_term.items()}, "angle": term.angle}
+                for term in self.step_terms
+            ],
             "step_reps": self.step_reps,
             "num_qubits": self.num_qubits,
         }
@@ -176,24 +179,20 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
         for i, term_data in enumerate(json_data["step_terms"]):
             pauli_term: dict[int, str] = {}
             for k, v in term_data["pauli_term"].items():
+                if not isinstance(k, str):
+                    raise TypeError(f"step_terms[{i}].pauli_term: expected str key, got {type(k).__name__} ({k!r})")
                 try:
-                    # Only accept int (excluding bool) or a string that parses losslessly as an int.
-                    if isinstance(k, bool):
-                        raise TypeError("boolean is not a valid qubit index type")
-                    if isinstance(k, int):
-                        qubit_index = k
-                    elif isinstance(k, str):
-                        qubit_index = int(k)
-                        # Ensure that parsing did not change the representation (e.g., reject "01", "1.0").
-                        if str(qubit_index) != k:
-                            raise ValueError(f"string {k!r} is not a canonical integer qubit index")
-                    else:
-                        raise TypeError(f"unsupported key type {type(k)!r} for qubit index")
-                    pauli_term[qubit_index] = v
-                except (ValueError, TypeError) as exc:
+                    qubit_index = int(k)
+                except ValueError as exc:
                     raise ValueError(
                         f"step_terms[{i}].pauli_term: key {k!r} is not a valid integer qubit index"
                     ) from exc
+                if str(qubit_index) != k:
+                    raise ValueError(
+                        f"step_terms[{i}].pauli_term: key {k!r} is not a canonical integer "
+                        f"(expected {str(qubit_index)!r})"
+                    )
+                pauli_term[qubit_index] = v
             step_terms.append(ExponentiatedPauliTerm(pauli_term=pauli_term, angle=term_data["angle"]))
         step_reps = json_data["step_reps"]
         num_qubits = json_data["num_qubits"]
