@@ -126,7 +126,7 @@ class TestTrotterStepsCommutator:
         h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
         eps = 0.01
         time = 1.0
-        n_naive = trotter_steps_naive(h, time, eps)
+        n_naive = trotter_steps_naive(h, time, eps, order=2)
         n_comm = trotter_steps_commutator(h, time, eps, order=2)
         assert n_comm <= n_naive
 
