@@ -182,9 +182,7 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
                     raise ValueError(
                         f"step_terms[{i}].pauli_term: key {k!r} is not a valid integer qubit index"
                     ) from exc
-            step_terms.append(
-                ExponentiatedPauliTerm(pauli_term=pauli_term, angle=term_data["angle"])
-            )
+            step_terms.append(ExponentiatedPauliTerm(pauli_term=pauli_term, angle=term_data["angle"]))
         step_reps = json_data["step_reps"]
         num_qubits = json_data["num_qubits"]
         return cls(
