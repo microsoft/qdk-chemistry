@@ -19,7 +19,7 @@ namespace qdk::chemistry::algorithms::microsoft {
  */
 class DensityFittedHamiltonianSettings : public qdk::chemistry::data::Settings {
  public:
-  DensityFittedHamiltonianSettings() {}
+  DensityFittedHamiltonianSettings() { set_default("scf_type", "auto"); }
   ~DensityFittedHamiltonianSettings() override = default;
 };
 

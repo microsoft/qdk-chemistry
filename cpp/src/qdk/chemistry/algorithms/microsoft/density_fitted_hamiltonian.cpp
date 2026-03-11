@@ -41,46 +41,44 @@ namespace qcs = qdk::chemistry::scf;
 
 namespace detail_df {
 
-void transform_dferi_ao_to_mo(
-    size_t num_atomic_orbitals, size_t nactive, size_t naux,
-    std::unique_ptr<double[]>& df_eri, std::unique_ptr<double[]>& df_metric,
-    const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
-                        Eigen::RowMajor>& C_active_row_maj,
-    Eigen::MatrixXd& df_mo_eri_cm) {
+void fold_metric_to_three_center(size_t num_atomic_orbitals, size_t naux,
+                                 std::unique_ptr<double[]>& df_eri,
+                                 std::unique_ptr<double[]>& df_metric) {
   size_t nao = num_atomic_orbitals;
-  size_t nmo = nactive;
+
   size_t nao2 = nao * nao;
 
   // 1. Cholesky factorization of metric:  df_metric = L L^{T}
-  lapack::potrf(lapack::Uplo::Upper, naux, df_metric.get(), naux);
+  lapack::potrf(lapack::Uplo::Lower, naux, df_metric.get(), naux);
 
   // 2. Solve L B = eri_df  => B = L^{-1} eri_df = (metric)^(-1/2) eri_df
   // save result in df_eri.
-  blas::trsm(blas::Layout::RowMajor, blas::Side::Left, blas::Uplo::Lower,
-             blas::Op::NoTrans, blas::Diag::NonUnit, naux, nao2, 1.0,
+  blas::trsm(blas::Layout::ColMajor, blas::Side::Right, blas::Uplo::Lower,
+             blas::Op::Trans, blas::Diag::NonUnit, nao2, naux, 1.0,
              df_metric.get(), naux, df_eri.get(), nao2);
 
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-      df_eri_mo_rm(df_mo_eri_cm.rows(), df_mo_eri_cm.cols());
+  // Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+  //     df_eri_mo_rm(df_mo_eri_cm.rows(), df_mo_eri_cm.cols());
 
-  std::vector<double> tmp(naux * nao * nmo);
+  // std::vector<double> tmp(naux * nao * nmo);
 
-  // TMP(Q,i,q) = C(p,i) * B_ao(Q,p,q)
-  for (size_t Q = 0; Q < naux; ++Q) {
-    auto TMP = tmp.data() + Q * nao * nmo;
-    auto B_pt = df_eri.get() + Q * nao2;
-    blas::gemm(blas::Layout::RowMajor, blas::Op::Trans, blas::Op::NoTrans, nmo,
-               nao, nao, 1.0, C_active_row_maj.data(), nmo, B_pt, nao, 0.0, TMP,
-               nao);
-  }
+  // // TMP(Q,i,q) = C(p,i) * B_ao(Q,p,q)
+  // for (size_t Q = 0; Q < naux; ++Q) {
+  //   auto TMP = tmp.data() + Q * nao * nmo;
+  //   auto B_pt = df_eri.get() + Q * nao2;
+  //   blas::gemm(blas::Layout::RowMajor, blas::Op::Trans, blas::Op::NoTrans,
+  //   nmo,
+  //              nao, nao, 1.0, C_active_row_maj.data(), nmo, B_pt, nao, 0.0,
+  //              TMP, nao);
+  // }
 
-  // B(Q,i,j) = C(q,j) * TMP(Q,i,q)
-  // B(Qi,j) = TMP(Qi,q) * C(q,j)
-  blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-             naux * nmo, nmo, nao, 1.0, tmp.data(), nao,
-             C_active_row_maj.data(), nmo, 0.0, df_eri_mo_rm.data(), nmo);
+  // // B(Q,i,j) = C(q,j) * TMP(Q,i,q)
+  // // B(Qi,j) = TMP(Qi,q) * C(q,j)
+  // blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+  //            naux * nmo, nmo, nao, 1.0, tmp.data(), nao,
+  //            C_active_row_maj.data(), nmo, 0.0, df_eri_mo_rm.data(), nmo);
 
-  df_mo_eri_cm = df_eri_mo_rm;
+  // df_mo_eri_cm = df_eri_mo_rm;
 }
 }  // namespace detail_df
 
@@ -253,28 +251,33 @@ DensityFittedHamiltonianConstructor::_run_impl(
   auto h_metric =
       qcs::libint2_util::metric_df(internal_basis_set->mode, aux_basis_libint2);
 
-  bool is_restricted_calc = orbitals->is_restricted();
+  // Determine SCF type from settings
+  std::string scf_type = _settings->get<std::string>("scf_type");
 
-  if (is_restricted_calc) {
+  bool is_restricted_calc;
+  if (scf_type == "restricted") {
+    is_restricted_calc = true;
+  } else if (scf_type == "unrestricted") {
+    is_restricted_calc = false;
+  } else {  // "auto"
+    is_restricted_calc = (active_indices_alpha == active_indices_beta) &&
+                         orbitals->is_restricted();
+  }
+
+  dfmoeri_aa.resize(num_auxiliary_orbitals, df_orb_pair_size);
+  detail_df::fold_metric_to_three_center(
+      num_atomic_orbitals, num_auxiliary_orbitals, h_eri, h_metric);
+  Eigen::Map<Eigen::MatrixXd> B_ao(h_eri.get(),
+                                   num_atomic_orbitals * num_atomic_orbitals,
+                                   num_auxiliary_orbitals);
+  dfmoeri_aa =
+      detail_three_center::transform_three_center_ao_to_mo(B_ao, Ca_active);
+
+  if (!is_restricted_calc) {
     // Only allocate and compute (αα|αα) integrals - the others are identical
-    dfmoeri_aa.resize(num_auxiliary_orbitals, df_orb_pair_size);
-    detail_df::transform_dferi_ao_to_mo(num_atomic_orbitals, nactive,
-                                        num_auxiliary_orbitals, h_eri, h_metric,
-                                        Ca_active_rm, dfmoeri_aa);
-  } else {
-    // Unrestricted case - allocate and compute all three types of integrals
-    dfmoeri_aa.resize(num_auxiliary_orbitals, df_orb_pair_size);
     dfmoeri_bb.resize(num_auxiliary_orbitals, df_orb_pair_size);
-
-    // (X|αα) integrals
-    detail_df::transform_dferi_ao_to_mo(num_atomic_orbitals, nactive,
-                                        num_auxiliary_orbitals, h_eri, h_metric,
-                                        Ca_active_rm, dfmoeri_aa);
-
-    // (X|ββ) integrals
-    detail_df::transform_dferi_ao_to_mo(num_atomic_orbitals, nactive,
-                                        num_auxiliary_orbitals, h_eri, h_metric,
-                                        Cb_active_rm, dfmoeri_bb);
+    dfmoeri_bb =
+        detail_three_center::transform_three_center_ao_to_mo(B_ao, Cb_active);
   }
 
   // Get inactive space indices for both alpha and beta
@@ -318,18 +321,20 @@ DensityFittedHamiltonianConstructor::_run_impl(
     }
   }
 
-  // Create dummy SCFConfig
-  auto scf_config = std::make_unique<qcs::SCFConfig>();
-  scf_config->do_dfj = true;
-  scf_config->basis = basis_set->get_name();
-  scf_config->aux_basis = aux_basis_set->get_name();
-  scf_config->eri.method = qcs::ERIMethod::Incore;
-  scf_config->scf_orbital_type = qcs::SCFOrbitalType::Restricted;
-  scf_config->mpi = qcs::mpi_default_input();
+  // Active space Hamiltonian need to update core energy to include core
+  // electronic contribution
+  // // Create dummy SCFConfig
+  // auto scf_config = std::make_unique<qcs::SCFConfig>();
+  // scf_config->do_dfj = true;
+  // scf_config->basis = basis_set->get_name();
+  // scf_config->aux_basis = aux_basis_set->get_name();
+  // scf_config->eri.method = qcs::ERIMethod::Incore;
+  // scf_config->scf_orbital_type = qcs::SCFOrbitalType::Restricted;
+  // scf_config->mpi = qcs::mpi_default_input();
 
-  // Create Integral Instance
-  auto eri = qcs::ERIMultiplexer::create(
-      *internal_basis_set, *internal_aux_basis_set, *scf_config, 0.0);
+  // // Create Integral Instance
+  // auto eri = qcs::ERIMultiplexer::create(
+  //     *internal_basis_set, *internal_aux_basis_set, *scf_config, 0.0);
 
   if (is_restricted_calc) {
     // Restricted case
@@ -358,10 +363,12 @@ DensityFittedHamiltonianConstructor::_run_impl(
     }
 
     // Compute the two electron part of the inactive fock matrix
-    Eigen::MatrixXd J_inactive_ao(num_atomic_orbitals, num_atomic_orbitals),
-        K_inactive_ao(num_atomic_orbitals, num_atomic_orbitals);
-    eri->build_JK(D_inactive.data(), J_inactive_ao.data(), K_inactive_ao.data(),
-                  1.0, 0.0, 0.0);
+    Eigen::MatrixXd J_inactive_ao, K_inactive_ao;
+    // Use Cholesky vectors to build J and K
+    J_inactive_ao =
+        detail_three_center::build_J_from_three_center(B_ao, D_inactive);
+    K_inactive_ao = detail_three_center::build_K_from_three_center(
+        B_ao, Ca, inactive_indices);
     Eigen::MatrixXd G_inactive_ao = 2 * J_inactive_ao - K_inactive_ao;
 
     // Compute the inactive Fock matrix
@@ -443,15 +450,16 @@ DensityFittedHamiltonianConstructor::_run_impl(
     }
 
     // Compute J and K matrices for alpha and beta densities
-    Eigen::MatrixXd J_alpha_ao(num_atomic_orbitals, num_atomic_orbitals),
-        K_alpha_ao(num_atomic_orbitals, num_atomic_orbitals);
-    Eigen::MatrixXd J_beta_ao(num_atomic_orbitals, num_atomic_orbitals),
-        K_beta_ao(num_atomic_orbitals, num_atomic_orbitals);
-
-    eri->build_JK(D_inactive_alpha.data(), J_alpha_ao.data(), K_alpha_ao.data(),
-                  1.0, 0.0, 0.0);
-    eri->build_JK(D_inactive_beta.data(), J_beta_ao.data(), K_beta_ao.data(),
-                  1.0, 0.0, 0.0);
+    Eigen::MatrixXd J_alpha_ao, K_alpha_ao, J_beta_ao, K_beta_ao;
+    // Use Cholesky vectors to build J and K
+    J_alpha_ao =
+        detail_three_center::build_J_from_three_center(B_ao, D_inactive_alpha);
+    K_alpha_ao = detail_three_center::build_K_from_three_center(
+        B_ao, Ca, inactive_indices_alpha);
+    J_beta_ao =
+        detail_three_center::build_J_from_three_center(B_ao, D_inactive_beta);
+    K_beta_ao = detail_three_center::build_K_from_three_center(
+        B_ao, Cb, inactive_indices_beta);
 
     Eigen::MatrixXd F_inactive_alpha_ao =
         H_full + J_alpha_ao + J_beta_ao - K_alpha_ao;
