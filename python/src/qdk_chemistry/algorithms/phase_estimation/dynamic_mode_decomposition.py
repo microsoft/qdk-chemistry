@@ -46,11 +46,11 @@ class DynamicModeDecompositionSettings(PhaseEstimationSettings):
 
         """
         super().__init__()
-        self._set_default("vector_dim", "int", -1, "the row number of Hankel matrix X")
-        self._set_default("initial_rank_k", "int", -1, "the initial column number of Hankel matrix X")
+        self._set_default("hankel_rows", "int", -1, "the row number of Hankel matrix X")
+        self._set_default("initial_hankel_columns", "int", -1, "the initial column number of Hankel matrix X")
         self._set_default("evolution_time", "float", 0.0, "Time dt in the evolution unitary U = exp(-i H dt)")
         self._set_default("shots_per_observable", "int", 40, "the number of shots to test one observable")
-        self._set_default("max_rank_k", "int", 200, "Column number limit of Hankel matrix X")
+        self._set_default("max_hankel_columns", "int", 200, "Column number limit of Hankel matrix X")
 
 
 class DynamicModeDecomposition(PhaseEstimation):
@@ -58,48 +58,51 @@ class DynamicModeDecomposition(PhaseEstimation):
 
     def __init__(
         self,
-        vector_dim: int,
-        initial_rank_k: int,
-        evolution_time: float,
+        hankel_rows: int,
+        initial_hankel_columns: int,
+        time_step: float,
         shots_per_observable: int = 40,
-        max_rank_k: int = 200,
+        max_hankel_columns: int = 200,
     ):
         """Initialize DynamicModeDecomposition with the given settings.
 
         Args:
-            vector_dim: The row number of the Hankel matrix X. Must be a positive integer.
-            initial_rank_k: The initial column number of the Hankel matrix X. Must be a positive integer.
-            evolution_time: Time parameter dt used in the time-evolution unitary U = exp(-i H dt)``.
+            hankel_rows: The row count of the Hankel matrix X. Must be a positive integer.
+            initial_hankel_columns: The initial column count of the Hankel matrix X. Must be greater than 1.
+            time_step: Time parameter dt used in the time-evolution unitary U = exp(-i H dt)``.
             Must be a non-negative number.
             shots_per_observable: The number of shots to execute per observable measurement. Defaults to 40.
             Must be a positive integer.
-            max_rank_k: The maximum column number limit of Hankel matrix X. Defaults to 200.
-            Must be greater than or equal to initial_rank_k.
+            max_hankel_columns: The maximum column count limit of Hankel matrix X. Defaults to 200.
+            Must be greater than or equal to initial_hankel_columns.
 
         Raises:
-            ValueError: If vector_dim or initial_rank_k are not positive integers, if initial_rank_k exceeds
-            max_rank_k, if evolution_time is negative, or if shots_per_observable is not positive.
+            ValueError: If hankel_rows or initial_hankel_columns are not positive integers,
+            if initial_hankel_columns exceeds max_hankel_columns, if time_step is negative,
+            or if shots_per_observable is not positive.
 
         """
         Logger.trace_entering()
-        super().__init__(evolution_time=evolution_time)
+        super().__init__(evolution_time=time_step)
         self._settings = DynamicModeDecompositionSettings()
-        self._settings.set("vector_dim", vector_dim)
-        self._settings.set("initial_rank_k", initial_rank_k)
-        self._settings.set("evolution_time", evolution_time)
+        self._settings.set("hankel_rows", hankel_rows)
+        self._settings.set("initial_hankel_columns", initial_hankel_columns)
+        self._settings.set("evolution_time", time_step)
         self._settings.set("shots_per_observable", shots_per_observable)
-        self._settings.set("max_rank_k", max_rank_k)
+        self._settings.set("max_hankel_columns", max_hankel_columns)
         self._iteration_circuits: list[Circuit] | None = None
+        self._last_converged: bool | None = None
+        self._phase_fraction_history: list[float] = []
 
         # check validity of inputs
-        if vector_dim < 1:
-            raise ValueError("vector_dim must be a positive integer.")
-        if initial_rank_k < 2:
-            raise ValueError("initial_rank_k must be larger than 1.")
-        if initial_rank_k > max_rank_k:
-            raise ValueError("initial_rank_k must be no more than max_rank_k.")
-        if evolution_time <= 0.0:
-            raise ValueError("evolution_time must be a positive float.")
+        if hankel_rows < 1:
+            raise ValueError("hankel_rows must be a positive integer.")
+        if initial_hankel_columns < 2:
+            raise ValueError("initial_hankel_columns must be larger than 1.")
+        if initial_hankel_columns > max_hankel_columns:
+            raise ValueError("initial_hankel_columns must be no more than max_hankel_columns.")
+        if time_step <= 0.0:
+            raise ValueError("time_step must be a positive float.")
         if shots_per_observable < 1:  # currently we use classical Hadamard test for measuring observable
             raise ValueError("shots_per_observable must be a positive integer.")
 
@@ -127,17 +130,17 @@ class DynamicModeDecomposition(PhaseEstimation):
             QpeResult: The result of the phase estimation.
 
         """
-        vector_dim = self._settings.get("vector_dim")
-        initial_rank_k = self._settings.get("initial_rank_k")
-        max_rank_k = self._settings.get("max_rank_k")
-        initial_number_measurement = vector_dim + initial_rank_k
-        observable_array = np.zeros(vector_dim + max_rank_k)
+        hankel_rows = self._settings.get("hankel_rows")
+        initial_hankel_columns = self._settings.get("initial_hankel_columns")
+        max_hankel_columns = self._settings.get("max_hankel_columns")
+        initial_number_measurement = hankel_rows + initial_hankel_columns
+        observable_array = np.zeros(hankel_rows + max_hankel_columns)
 
         # Generate controlled U = exp(-iH dt) by evolution_builder, it will be connected by circuit_mapper
-        ctrl_time_evol_unitary = self.create_ctrl_one_time_evol(qubit_hamiltonian, evolution_builder, [0])
+        ctrl_time_evol_unitary = self.create_ctrl_evol_unitary(qubit_hamiltonian, evolution_builder, [0])
         shots = self._settings.get("shots_per_observable")
 
-        # Calculate initial vector_dim + initial_rank_k - 1 observables
+        # Calculate initial hankel_rows + initial_hankel_columns - 1 observables
         for i in range(initial_number_measurement - 1):
             observable_power = i + 1
             ctrl_evol_circuit = self._create_ctrl_time_evol_circuit(
@@ -155,26 +158,29 @@ class DynamicModeDecomposition(PhaseEstimation):
                 noise=noise,
             )
 
-        last_phase_fraction = 1.0
         phase_fraction = 0.0
         observe_index = initial_number_measurement - 2
-        rank_k = initial_rank_k - 1
+        rank_k = initial_hankel_columns - 1
+
+        convergence_tolerance = 1e-7
+        converged = False
+        stop_reason = "max_hankel_columns_reached"
+        odmd_iterations = 0
+        self._phase_fraction_history = []
 
         # Compose Hankel matrices
-        hankel_x = np.zeros((vector_dim, rank_k))
-        hankel_x_prime = np.zeros((vector_dim, rank_k))
+        hankel_x = np.zeros((hankel_rows, rank_k))
+        hankel_x_prime = np.zeros((hankel_rows, rank_k))
 
         for v in range(rank_k):
-            hankel_x[:, v] = observable_array[v : v + vector_dim]
+            hankel_x[:, v] = observable_array[v : v + hankel_rows]
         hankel_x_prime[:, 0 : rank_k - 1] = hankel_x[:, 1:rank_k]
-        hankel_x_prime[:, rank_k - 1] = observable_array[rank_k : rank_k + vector_dim]
+        hankel_x_prime[:, rank_k - 1] = observable_array[rank_k : rank_k + hankel_rows]
 
-        while abs(phase_fraction - last_phase_fraction) > 1e-6:
-            if rank_k == max_rank_k:
-                Logger.warn(f"reached the limit of rank_k {max_rank_k}! ODMD iteration will stop here!")
+        while True:
+            if rank_k == max_hankel_columns:
+                Logger.warn(f"reached the limit of rank_k {max_hankel_columns}! ODMD iteration will stop here!")
                 break
-
-            last_phase_fraction = phase_fraction
 
             # Quantum part: obtain the observables (overlaps) by Hadamard tests
             rank_k += 1
@@ -197,7 +203,7 @@ class DynamicModeDecomposition(PhaseEstimation):
 
             # Classical part: update Hankel matrices, pseudo-inverse to get DMD matrix A
             hankel_x = np.column_stack((hankel_x, hankel_x_prime[:, rank_k - 2]))
-            hankel_x_prime = np.column_stack((hankel_x_prime, observable_array[rank_k : rank_k + vector_dim]))
+            hankel_x_prime = np.column_stack((hankel_x_prime, observable_array[rank_k : rank_k + hankel_rows]))
 
             dmd_a = hankel_x_prime @ np.linalg.pinv(hankel_x)
 
@@ -212,17 +218,72 @@ class DynamicModeDecomposition(PhaseEstimation):
             min_real_idx = np.argmin(np.abs(log_eigs.real))
             phase = -log_eigs[min_real_idx].imag
             phase_fraction = phase / (2.0 * np.pi)
+            odmd_iterations += 1
+            converged = self._record_phase_fraction_and_check_convergence(
+                phase_fraction=phase_fraction,
+                convergence_tolerance=convergence_tolerance,
+            )
 
-            Logger.info(f"iteration {rank_k - initial_rank_k + 1}, phase_fraction {phase_fraction}")
+            Logger.info(f"iteration {rank_k - initial_hankel_columns + 1}, phase_fraction {phase_fraction}")
+            if converged:
+                stop_reason = "converged"
+                break
+
+        self._last_converged = converged
+
+        result_metadata = {
+            "converged": converged,
+            "stop_reason": stop_reason,
+            "iterations": odmd_iterations,
+            "final_hankel_columns": rank_k,
+            "max_hankel_columns": max_hankel_columns,
+            "phase_fraction_convergence_tolerance": convergence_tolerance,
+            "phase_fraction_history": list(self._phase_fraction_history),
+        }
 
         # Create and return the result
         return QpeResult.from_phase_fraction(
             method=self.name(),
             phase_fraction=phase_fraction,
             evolution_time=self.settings().get("evolution_time"),
+            metadata=result_metadata,
         )
 
-    def create_ctrl_one_time_evol(
+    def _record_phase_fraction_and_check_convergence(
+        self,
+        phase_fraction: float,
+        convergence_tolerance: float,
+    ) -> bool:
+        """Record phase history and evaluate convergence for the current ODMD run.
+
+        Args:
+            phase_fraction: Newly estimated phase fraction for this iteration.
+            convergence_tolerance: Convergence threshold on absolute phase difference.
+
+        Returns:
+            bool: ``True`` when converged under the current criterion, else ``False``.
+
+        """
+        current_phase_fraction = float(phase_fraction)
+        self._phase_fraction_history.append(current_phase_fraction)
+
+        if len(self._phase_fraction_history) < 2:
+            return False
+
+        previous_phase_fraction = self._phase_fraction_history[-2]
+        return abs(abs(current_phase_fraction) - abs(previous_phase_fraction)) <= convergence_tolerance
+
+    def is_converged(self) -> bool | None:
+        """Return convergence state from the most recent ODMD run.
+
+        Returns:
+            bool | None: ``True`` if the latest run converged, ``False`` if it stopped
+            before convergence, or ``None`` if no run has been executed yet.
+
+        """
+        return self._last_converged
+
+    def create_ctrl_evol_unitary(
         self,
         qubit_hamiltonian: QubitHamiltonian,
         evolution_builder: TimeEvolutionBuilder,
