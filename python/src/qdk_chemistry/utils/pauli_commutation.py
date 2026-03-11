@@ -25,6 +25,8 @@ References:
 
 from __future__ import annotations
 
+import itertools
+import math
 from typing import TYPE_CHECKING
 
 from qdk_chemistry.data import PauliTermAccumulator
@@ -47,16 +49,24 @@ __all__: list[str] = [
 
 
 def _label_to_sparse_word(label: str) -> list[tuple[int, int]]:
-    """Convert a Pauli string label to a ``SparsePauliWord``."""
-    return [(i, 1 if c == "X" else 2 if c == "Y" else 3) for i, c in enumerate(label) if c != "I"]
+    #    Convert a Pauli string label to a ``SparsePauliWord``.
+    word = []
+    # q_n...q_0
+    for i, c in enumerate(reversed(label)):
+        if c in {"X", "Y", "Z"}:
+            word.append((i, 1 if c == "X" else 2 if c == "Y" else 3))
+        elif c != "I":
+            raise ValueError(f"Invalid character {c!r} in Pauli label; expected 'I', 'X', 'Y', or 'Z'.")
+    return word
 
 
 def _sparse_word_to_label(word: list[tuple[int, int]], n_qubits: int) -> str:
-    """Convert a ``SparsePauliWord`` back to a Pauli string label."""
+    #    Convert a ``SparsePauliWord`` back to a Pauli string label.
     chars = ["I"] * n_qubits
     for q, p in word:
         chars[q] = "X" if p == 1 else "Y" if p == 2 else "Z"
-    return "".join(chars)
+    # q_n...q_0
+    return "".join(reversed(chars))
 
 
 def do_pauli_labels_commute(label_a: str, label_b: str) -> bool:
@@ -203,80 +213,26 @@ def get_commutation_checker(
     raise ValueError(f"Unknown commutation_type {commutation_type!r}; expected 'general' or 'qubit_wise'.")
 
 
-def pauli_product_label(label_a: str, label_b: str) -> str:
-    r"""Compute the Pauli label of the product :math:`P_a P_b` (up to phase).
-
-    For each qubit position the single-qubit product rule is:
-
-    * :math:`I \cdot Q = Q`
-    * :math:`Q \cdot I = Q`
-    * :math:`Q \cdot Q = I`
-    * Otherwise the result is the third Pauli axis
-      (e.g. :math:`X Y \to Z`, :math:`Y Z \to X`, :math:`Z X \to Y`).
-
-    The global phase (:math:`\pm 1` or :math:`\pm i`) is discarded because
-    it does not affect commutativity checks.
-    """
-    return "".join(
-        b if a == "I" else a if b == "I" else "I" if a == b else ({"X", "Y", "Z"} - {a, b}).pop()
-        for a, b in zip(label_a, label_b, strict=True)
-    )
-
-
 def does_nested_commutator_vanish(*labels: str) -> bool:
-    r"""Determine whether an *n*-nested commutator of Pauli strings vanishes.
-
-    For labels :math:`(P_1, P_2, \ldots, P_n)` this checks whether
-
-    .. math::
-
-        [P_1,\,[P_2,\,[\cdots [P_{n-1},\,P_n]\cdots]]] = 0.
-
-    The nested commutator vanishes when *either* of the following holds:
-
-    1. The inner nested commutator
-       :math:`[P_2, [\cdots [P_{n-1}, P_n] \cdots]]` vanishes, **or**
-    2. :math:`P_1` commutes with the Pauli label of the product
-       :math:`P_2 P_3 \cdots P_n`.
-
-    Condition 2 works because a non-vanishing nested commutator of Pauli
-    strings is always proportional to the sequential product of those
-    strings (up to a scalar phase), so commutation with the product label
-    is equivalent to commutation with the full commutator operator.
+    """Check whether a nested commutator of Pauli labels vanishes.
 
     Args:
-        *labels: Two or more Pauli string labels of equal length.
+        labels: A sequence of Pauli labels representing the nested commutator.
 
     Returns:
-        ``True`` if the nested commutator is zero, ``False`` otherwise.
+        ``True`` if the nested commutator vanishes, ``False`` otherwise.
 
     Raises:
-        ValueError: If fewer than two labels are given or if the labels
-            have different lengths.
-
-    Examples:
-        >>> does_nested_commutator_vanish("XI", "IX")
-        True
-        >>> does_nested_commutator_vanish("XI", "YI")
-        False
-        >>> does_nested_commutator_vanish("XI", "IX", "II")
-        True
-        >>> does_nested_commutator_vanish("XI", "YI", "ZI")  # [XI, 2i·XI] = 0
-        True
-        >>> does_nested_commutator_vanish("IX", "XI", "YI")
-        True
-        >>> does_nested_commutator_vanish("ZI", "IX", "ZI", "XY")
-        False
+        ValueError: If fewer than two Pauli labels are provided.
 
     """
     if len(labels) < 2:
         raise ValueError("At least two Pauli labels are required for a commutator.")
 
-    # Ensure all labels have the same length, as required by the docstring.
-    ref_len = len(labels[0])
-    for lbl in labels[1:]:
-        if len(lbl) != ref_len:
-            raise ValueError("All Pauli labels must have the same length.")
+    pauli_string_length = len(labels[0])
+    if any(len(lbl) != pauli_string_length for lbl in labels):
+        raise ValueError("All Pauli labels must have the same length.")
+
     # Base case: [P_a, P_b] vanishes iff the two strings commute.
     if len(labels) == 2:
         return do_pauli_labels_commute(labels[0], labels[1])
@@ -292,7 +248,7 @@ def does_nested_commutator_vanish(*labels: str) -> bool:
     word = _label_to_sparse_word(labels[1])
     for lbl in labels[2:]:
         _, word = PauliTermAccumulator.multiply_uncached(word, _label_to_sparse_word(lbl))
-    inner_product = _sparse_word_to_label(word, len(labels[0]))
+    inner_product = _sparse_word_to_label(word, pauli_string_length)
     return do_pauli_labels_commute(labels[0], inner_product)
 
 
@@ -308,8 +264,8 @@ def commutator_bound_first_order(
     .. math::
 
         \lVert U(t) - S_1(t) \rVert \le
-        \frac{t^2}{2} \sum_{j < k}
-        \lVert [\alpha_j P_j,\, \alpha_k P_k] \rVert
+            \frac{t^2}{2} \sum_{j < k}
+            \lVert [\alpha_j P_j,\, \alpha_k P_k] \rVert
 
     For Pauli strings the spectral norm of the commutator is
 
@@ -346,34 +302,14 @@ def commutator_bound_second_order(
     hamiltonian: QubitHamiltonian,
     weight_threshold: float = 1e-12,
 ) -> float:
-    r"""Compute the second-order Trotter commutator bound.
-
-    For a Hamiltonian :math:`H = \sum_j \alpha_j P_j` the second-order
-    (Lie-Trotter) product formula has error bounded by
-
-    .. math::
-
-        \lVert U(t) - S_2(t) \rVert \le
-        \frac{t^3}{12} \left(\sum_{k > j,l > j} \lVert [\alpha_l P_l,\, [\alpha_k P_k,\, \alpha_j P_j] \rVert +
-        \frac{1}{2} \sum_{k > j} \lVert [\alpha_j P_j,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert \right)
-
-    For Pauli strings the spectral norm of the commutator is
-
-    * 0  if :math:`P_j` and :math:`P_k` commute, or
-    * :math:`2 |\alpha_j| |\alpha_k|`  if they anticommute.
-
-    This function returns
-    :math:`\sum_{k > j,l > j} \lVert [\alpha_l P_l,\, [\alpha_k P_k,\, \alpha_j P_j] \rVert
-    + \frac{1}{2} \sum_{k > j} \lVert [\alpha_j P_j,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert`,
-    so the user can multiply by :math:`t^{3} / (12 * N**2)` to get the per-step
-    error.
+    r"""Compute the commutator bound term multiplying :math:`t^{3} / 12` in Proposition 10 in Childs et. al (2021).
 
     Args:
-        hamiltonian: The qubit Hamiltonian whose terms to analyse.
-        weight_threshold: Absolute threshold below which coefficients are discarded.
+        hamiltonian: The qubit Hamiltonian for which to compute the bound.
+        weight_threshold: Absolute threshold for filtering small Hamiltonian coefficients.
 
     Returns:
-        The sum of commutator norms over all triples without redundancies.
+        The commutator bound term multiplying :math:`t^{3} / 12`.
 
     """
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
