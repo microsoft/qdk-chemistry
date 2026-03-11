@@ -262,7 +262,8 @@ class Trotter(TimeEvolutionBuilder):
                 mapping = self._pauli_label_to_map(label)
                 angle = coeff * time / 2
                 terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
-
+        else:
+            raise NotImplementedError("Only orders 1 or 2 are currently supported.")
         return terms
 
     def name(self) -> str:

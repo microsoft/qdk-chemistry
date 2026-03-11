@@ -103,12 +103,15 @@ def trotter_steps_commutator(
 
     .. math::
 
-        N_1 = \left\lceil \frac{t^2}{2\epsilon}
-            \sum_{j<k} \lVert [\alpha_j P_j,\, \alpha_k P_k] \rVert
-        \right\rceil
+        N_1 = \left\lceil \frac{\alpha_1 t^2}{2\epsilon}\right\rceil
 
-        N_2 = \frac{t^3}{3!} \sum_{j < k < l}
-            \lVert \lvert [\alpha_j P_l,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert ] \rVert
+        \alpha_1 =
+            \sum_{j<k} \lVert [\alpha_j P_j,\, \alpha_k P_k] \rVert
+
+        N_2 = \left\lceil \frac{t^{3/2}\alpha_2^{1/2}}{(12\epsilon)^{1/2}} \right\rceil
+
+        \alpha_2 = \sum_{k > j,l > j} \lVert [\alpha_l P_l,\, [\alpha_k P_k,\, \alpha_j P_j] \rVert +
+            \frac{1}{2} \sum_{k > j} \lVert [\alpha_j P_j,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert
 
     For Pauli strings the commutator norm is :math:`2|\alpha_j||\alpha_k|`
     when the pair anticommutes and 0 when it commutes.  This bound is never
