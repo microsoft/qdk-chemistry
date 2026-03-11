@@ -177,7 +177,19 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
             pauli_term: dict[int, str] = {}
             for k, v in term_data["pauli_term"].items():
                 try:
-                    pauli_term[int(k)] = v
+                    # Only accept int (excluding bool) or a string that parses losslessly as an int.
+                    if isinstance(k, bool):
+                        raise TypeError("boolean is not a valid qubit index type")
+                    if isinstance(k, int):
+                        qubit_index = k
+                    elif isinstance(k, str):
+                        qubit_index = int(k)
+                        # Ensure that parsing did not change the representation (e.g., reject "01", "1.0").
+                        if str(qubit_index) != k:
+                            raise ValueError(f"string {k!r} is not a canonical integer qubit index")
+                    else:
+                        raise TypeError(f"unsupported key type {type(k)!r} for qubit index")
+                    pauli_term[qubit_index] = v
                 except (ValueError, TypeError) as exc:
                     raise ValueError(
                         f"step_terms[{i}].pauli_term: key {k!r} is not a valid integer qubit index"
