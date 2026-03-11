@@ -78,9 +78,6 @@ docs/source/api/api_autogen
 docs/source/api/breathe_api_autogen/
 docs/source/api/doxygen/
 
-# Addons folder
-addons/
-
 # PyBuilder
 .pybuilder/
 target/
