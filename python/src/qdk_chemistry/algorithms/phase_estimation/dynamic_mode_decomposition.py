@@ -49,6 +49,7 @@ class DynamicModeDecompositionSettings(PhaseEstimationSettings):
         self._set_default("hankel_rows", "int", -1, "the row number of Hankel matrix X")
         self._set_default("initial_hankel_columns", "int", -1, "the initial column number of Hankel matrix X")
         self._set_default("evolution_time", "float", 0.0, "Time dt in the evolution unitary U = exp(-i H dt)")
+        self._set_default("eigen_converge_tol", "float", 1e-5, "Convergence tolerance for Hamiltonian eigenvalue")
         self._set_default("shots_per_observable", "int", 40, "the number of shots to test one observable")
         self._set_default("max_hankel_columns", "int", 200, "Column number limit of Hankel matrix X")
 
@@ -61,6 +62,7 @@ class DynamicModeDecomposition(PhaseEstimation):
         hankel_rows: int,
         initial_hankel_columns: int,
         time_step: float,
+        eigen_converge_tol: float = 1e-3,
         shots_per_observable: int = 40,
         max_hankel_columns: int = 200,
     ):
@@ -71,6 +73,8 @@ class DynamicModeDecomposition(PhaseEstimation):
             initial_hankel_columns: The initial column count of the Hankel matrix X. Must be greater than 1.
             time_step: Time parameter dt used in the time-evolution unitary U = exp(-i H dt)``.
             Must be a non-negative number.
+            eigen_converge_tol: Convergence tolerance for Hamiltonian eigenvalue.
+            Must be a positive float.
             shots_per_observable: The number of shots to execute per observable measurement. Defaults to 40.
             Must be a positive integer.
             max_hankel_columns: The maximum column count limit of Hankel matrix X. Defaults to 200.
@@ -79,7 +83,7 @@ class DynamicModeDecomposition(PhaseEstimation):
         Raises:
             ValueError: If hankel_rows or initial_hankel_columns are not positive integers,
             if initial_hankel_columns exceeds max_hankel_columns, if time_step is negative,
-            or if shots_per_observable is not positive.
+            if eigen_converge_tol is not positive, or if shots_per_observable is not positive.
 
         """
         Logger.trace_entering()
@@ -88,6 +92,7 @@ class DynamicModeDecomposition(PhaseEstimation):
         self._settings.set("hankel_rows", hankel_rows)
         self._settings.set("initial_hankel_columns", initial_hankel_columns)
         self._settings.set("evolution_time", time_step)
+        self._settings.set("eigen_converge_tol", eigen_converge_tol)
         self._settings.set("shots_per_observable", shots_per_observable)
         self._settings.set("max_hankel_columns", max_hankel_columns)
         self._iteration_circuits: list[Circuit] | None = None
@@ -103,6 +108,8 @@ class DynamicModeDecomposition(PhaseEstimation):
             raise ValueError("initial_hankel_columns must be no more than max_hankel_columns.")
         if time_step <= 0.0:
             raise ValueError("time_step must be a positive float.")
+        if eigen_converge_tol <= 0.0:
+            raise ValueError("eigen_converge_tol must be a positive float.")
         if shots_per_observable < 1:  # currently we use classical Hadamard test for measuring observable
             raise ValueError("shots_per_observable must be a positive integer.")
 
@@ -162,7 +169,9 @@ class DynamicModeDecomposition(PhaseEstimation):
         observe_index = initial_number_measurement - 2
         rank_k = initial_hankel_columns - 1
 
-        convergence_tolerance = 1e-7
+        evolution_time = self._settings.get("evolution_time")
+        eigen_converge_tol = self._settings.get("eigen_converge_tol")
+        convergence_tolerance = eigen_converge_tol * evolution_time / (2.0 * np.pi)
         converged = False
         stop_reason = "max_hankel_columns_reached"
         odmd_iterations = 0
@@ -237,6 +246,7 @@ class DynamicModeDecomposition(PhaseEstimation):
             "iterations": odmd_iterations,
             "final_hankel_columns": rank_k,
             "max_hankel_columns": max_hankel_columns,
+            "eigen_converge_tol": eigen_converge_tol,
             "phase_fraction_convergence_tolerance": convergence_tolerance,
             "phase_fraction_history": list(self._phase_fraction_history),
         }

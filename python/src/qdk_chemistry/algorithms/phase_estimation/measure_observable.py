@@ -17,6 +17,7 @@ or other workflows that need overlap measurements.
 # --------------------------------------------------------------------------------------------
 
 from qdk import qsharp
+from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import Circuit, QuantumErrorProfile
@@ -42,8 +43,6 @@ def _create_circuit_from_qiskit(
         Circuit encoded as QASM for backend execution.
 
     """
-    from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
-
     # Build the base circuit with registers.
     ancilla = QuantumRegister(1, "ancilla")
     system_target = QuantumRegister(num_system_qubits, "system")
