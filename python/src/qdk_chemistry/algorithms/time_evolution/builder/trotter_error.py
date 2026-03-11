@@ -141,7 +141,6 @@ def trotter_steps_commutator(
         return max(1, math.ceil(comm_bound * time**2 / (2.0 * target_accuracy)))
     if order == 2:
         comm_bound = commutator_bound_second_order(hamiltonian, weight_threshold=weight_threshold)
-        print("val", comm_bound**0.5 * abs(time) ** 1.5 / (12.0 * target_accuracy) ** 0.5)
         return max(1, math.ceil(comm_bound**0.5 * abs(time) ** 1.5 / (12.0 * target_accuracy) ** 0.5))
     raise NotImplementedError(
         f"Trotter step estimation for order {order} is not yet implemented. Only orders 1 or 2 are currently supported."
