@@ -4,6 +4,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+import cmath
 
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
@@ -57,6 +58,12 @@ class TrotterSettings(Settings):
         self._set_default(
             "weight_threshold", "float", 1e-12, "The absolute threshold for filtering small coefficients."
         )
+        self._set_default(
+            "optimize_term_ordering",
+            "bool",
+            False,
+            "Whether to group commuting terms and execute them in parallel.",
+        )
 
 
 class Trotter(TimeEvolutionBuilder):
@@ -70,6 +77,7 @@ class Trotter(TimeEvolutionBuilder):
         num_divisions: int = 0,
         error_bound: str = "commutator",
         weight_threshold: float = 1e-12,
+        optimize_term_ordering: bool = False,
     ):
         r"""Initialize Trotter builder with specified Trotter decomposition settings.
 
@@ -117,6 +125,7 @@ class Trotter(TimeEvolutionBuilder):
                 (default, tighter) or ``"naive"``.
             weight_threshold: Absolute threshold for filtering small
                 Hamiltonian coefficients. Defaults to 1e-12.
+            optimize_term_ordering: Whether to group commuting terms and execute them in parallel. Defaults to False.
 
         """
         super().__init__()
@@ -126,6 +135,7 @@ class Trotter(TimeEvolutionBuilder):
         self._settings.set("num_divisions", num_divisions)
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
+        self._settings.set("optimize_term_ordering", optimize_term_ordering)
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
         """Construct the time evolution unitary using Trotter decomposition.
@@ -173,7 +183,11 @@ class Trotter(TimeEvolutionBuilder):
 
         delta = time / num_divisions
 
-        terms = self._decompose_trotter_step(qubit_hamiltonian, time=delta, atol=weight_threshold)
+        optimize_term_ordering = self._settings.get("optimize_term_ordering")
+
+        terms = self._decompose_trotter_step(
+            qubit_hamiltonian, time=delta, atol=weight_threshold, optimize_term_ordering=optimize_term_ordering
+        )
 
         num_qubits = qubit_hamiltonian.num_qubits
 
@@ -223,7 +237,12 @@ class Trotter(TimeEvolutionBuilder):
         return max(manual, auto)
 
     def _decompose_trotter_step(
-        self, qubit_hamiltonian: QubitHamiltonian, time: float, *, atol: float = 1e-12
+        self,
+        qubit_hamiltonian: QubitHamiltonian,
+        time: float,
+        *,
+        atol: float = 1e-12,
+        optimize_term_ordering: bool = False,
     ) -> list[ExponentiatedPauliTerm]:
         """Decompose a single Trotter step into exponentiated Pauli terms.
 
@@ -232,6 +251,8 @@ class Trotter(TimeEvolutionBuilder):
             time: The evolution time for the single step.
 
             atol: Absolute tolerance for filtering small coefficients.
+            optimize_term_ordering: Whether to group commuting terms together
+            and further subgroup into parallelizable layers.
 
         Returns:
             A list of ``ExponentiatedPauliTerm`` representing the decomposed terms.
@@ -242,36 +263,55 @@ class Trotter(TimeEvolutionBuilder):
         if not qubit_hamiltonian.is_hermitian(tolerance=atol):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
+        coeffs = list(qubit_hamiltonian.get_real_coefficients(tolerance=atol))
+        # If there are no coefficients (e.g., empty Hamiltonian or all filtered by atol),
+        # there is nothing to decompose; return the empty list of terms.
+        if not coeffs:
+            return terms
+
         order = self._settings.get("order")
+        grouped_hamiltonians = self._group_terms(qubit_hamiltonian, optimize_term_ordering=optimize_term_ordering)
 
         if order == 1:
-            for label, coeff in qubit_hamiltonian.get_real_coefficients(tolerance=atol):
-                mapping = self._pauli_label_to_map(label)
-                angle = coeff * time
-                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+            for group in grouped_hamiltonians:
+                for subgroup in group:
+                    terms.extend(
+                        self._exponentiate_commuting(
+                            subgroup,
+                            num_qubits=qubit_hamiltonian.num_qubits,
+                            time=time,
+                            atol=atol,
+                        )
+                    )
+
         # order = 2 or order = 2k with k>1
         else:
-            coeffs = list(qubit_hamiltonian.get_real_coefficients(tolerance=atol))
-            # If there are no coefficients (e.g., empty Hamiltonian or all filtered by atol),
-            # there is nothing to decompose; return the empty list of terms.
-            if not coeffs:
-                return terms
-            # \prod_{i=1}^{L-1} e^{-iH_i t/(2n)}
-            for label, coeff in coeffs[:-1]:
-                mapping = self._pauli_label_to_map(label)
-                angle = coeff * time / 2
-                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
-            # e^{-iH_L t/n}
-            label, coeff = coeffs[-1]
-            mapping = self._pauli_label_to_map(label)
-            angle = coeff * time
-            terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+            # \prod e^{-iH_i t/(2n)} for all Hamiltonian terms groups except the last one
+            # which is executed in the middle as e^{-iH_i t/n}
+            terms_without_last_group = []
+            for group in grouped_hamiltonians[:-1]:
+                for subgroup in group:
+                    terms_without_last_group.extend(
+                        self._exponentiate_commuting(
+                            subgroup,
+                            num_qubits=qubit_hamiltonian.num_qubits,
+                            time=time / 2,
+                            atol=atol,
+                        )
+                    )
 
-            # \prod_{i=L-1}^1 e^{-iH_i t/(2n)}
-            for label, coeff in reversed(coeffs[:-1]):
-                mapping = self._pauli_label_to_map(label)
-                angle = coeff * time / 2
-                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+            terms.extend(terms_without_last_group)
+            # e^{-iH_i t/n} for all terms in the last group
+            for subgroup in grouped_hamiltonians[-1]:
+                terms.extend(
+                    self._exponentiate_commuting(
+                        subgroup,
+                        num_qubits=qubit_hamiltonian.num_qubits,
+                        time=time,
+                        atol=atol,
+                    )
+                )
+            terms.extend(terms_without_last_group[::-1])  # reverse all but the last group and append
 
             # Construct order 2k formula bottom up dynamic-programming style
             if order > 2 and order % 2 == 0:
@@ -323,6 +363,239 @@ class Trotter(TimeEvolutionBuilder):
                 else:
                     merged_terms.append(term)
             terms = merged_terms
+
+        return terms
+
+    def _group_terms(
+        self,
+        qubit_hamiltonian: QubitHamiltonian,
+        *,
+        optimize_term_ordering: bool = True,
+    ) -> list[list[QubitHamiltonian]]:
+        """Group Hamiltonian terms into commuting and concurrent sets.
+
+        When *optimize_term_ordering* is ``True``:
+        1. Partition using :meth:`QubitHamiltonian.group_commuting`.
+        2. Within each group, merge terms with identical Pauli strings
+           by summing their coefficients.
+        3. Within each group, split terms into parallelizable layers
+           (terms whose Pauli supports are disjoint).
+        4. Move the group with the most multi-qubit terms to the end.
+
+        When ``False``, each Pauli string is returned as its own
+        single-term group with no reordering.
+
+        Args:
+            qubit_hamiltonian: The qubit Hamiltonian to group.
+            optimize_term_ordering: Whether to group commuting terms together.
+
+        Returns:
+            A list of groups, where each group is a list of
+            ``QubitHamiltonian`` sub-groups (parallelizable layers).
+
+        """
+        if not optimize_term_ordering:
+            return [
+                [
+                    QubitHamiltonian(
+                        pauli_strings=[label],
+                        coefficients=[coeff],
+                        encoding=qubit_hamiltonian.encoding,
+                    )
+                ]
+                for label, coeff in zip(qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients, strict=False)
+            ]
+
+        # Sort terms so that Pauli strings acting on more qubits appear first.
+        num_non_identity = [sum(c != "I" for c in ps) for ps in qubit_hamiltonian.pauli_strings]
+        sorted_indices = sorted(range(len(num_non_identity)), key=lambda i: num_non_identity[i], reverse=True)
+        qubit_hamiltonian = QubitHamiltonian(
+            pauli_strings=[qubit_hamiltonian.pauli_strings[i] for i in sorted_indices],
+            coefficients=[qubit_hamiltonian.coefficients[i] for i in sorted_indices],
+            encoding=qubit_hamiltonian.encoding,
+        )
+
+        sub_hamiltonians = qubit_hamiltonian.group_commuting(qubit_wise=False)
+
+        result: list[list[QubitHamiltonian]] = []
+        for sub_h in sub_hamiltonians:
+            # Merge terms with identical Pauli strings.
+            merged: dict[str, complex] = {}
+            for label, coeff in zip(sub_h.pauli_strings, sub_h.coefficients, strict=False):
+                merged[label] = merged.get(label, 0.0) + coeff
+            labels = list(merged.keys())
+            coeffs = list(merged.values())
+
+            # Split into parallelizable layers (disjoint qubit supports).
+            # Each layer becomes its own sub-group so that every sub-group
+            # passed to encoding_clifford_of contains only independent generators.
+            pauli_maps = [self._pauli_label_to_map(label) for label in labels]
+            layers_indices: list[list[int]] = []
+            layers_occupied: list[set[int]] = []
+            for i, pm in enumerate(pauli_maps):
+                qubits = set(pm.keys())
+                placed = False
+                for layer_i, layer_occ in enumerate(layers_occupied):
+                    if qubits.isdisjoint(layer_occ):
+                        layers_indices[layer_i].append(i)
+                        placed = True
+                        break
+                if not placed:
+                    layers_indices.append([i])
+                    layers_occupied.append(set(qubits))
+
+            outer_group: list[QubitHamiltonian] = []
+            for layer in layers_indices:
+                outer_group.append(
+                    QubitHamiltonian(
+                        pauli_strings=[labels[i] for i in layer],
+                        coefficients=[coeffs[i] for i in layer],
+                        encoding=sub_h.encoding,
+                    )
+                )
+            result.append(outer_group)
+
+        # Move the group with the most multi-qubit terms to the end.
+        def _multi_qubit_count(group: list[QubitHamiltonian]) -> int:
+            return sum(1 for sub_h in group for label in sub_h.pauli_strings if sum(c != "I" for c in label) > 1)
+
+        max_idx = max(range(len(result)), key=lambda i: _multi_qubit_count(result[i]))
+        result.append(result.pop(max_idx))
+
+        return result
+
+    def _exponentiate_commuting(
+        self,
+        group: QubitHamiltonian,
+        num_qubits: int,
+        time: float,
+        *,
+        atol: float = 1e-12,
+    ) -> list[ExponentiatedPauliTerm]:
+        r"""Exponentiate commuting Pauli groups via Clifford diagonalization.
+
+        For each commuting group produced by :meth:`_group_terms`, computes
+        the encoding Clifford *C* that simultaneously diagonalizes every
+        Pauli string in that group (:math:`C\,P_j\,C^\dagger = D_j`, where
+        :math:`D_j` is a product of *Z* and *I* operators only), then
+        constructs the sandwich decomposition:
+
+        .. math::
+
+            \prod_j e^{-i\,\theta_j\,P_j}
+            \;=\;
+            C^\dagger
+            \!\left(\prod_j e^{-i\,\theta_j\,D_j}\right)
+            C
+
+        Applied to a quantum state :math:`|\psi\rangle`:
+
+        1. Apply *C*  (rotate into the diagonal basis).
+        2. Apply :math:`\prod_j e^{-i\,\theta_j\,D_j}` (diagonal rotations).
+        3. Apply :math:`C^\dagger` (undo the basis change).
+
+        The returned list encodes the full sequence as
+        :class:`ExponentiatedPauliTerm` entries: for every commuting group
+        the Clifford *C* (decomposed into Pauli rotations), then the
+        diagonal :math:`e^{-i\theta_j D_j}` terms, then :math:`C^\dagger`
+        (the reversed rotations with negated angles).
+
+        Args:
+            group: The group of commuting Hamiltonian terms to exponentiate.
+            num_qubits: The number of qubits in the system.
+            time: The evolution time used to compute rotation angles
+                (:math:`\theta_j = c_j \cdot t`).
+            atol: Absolute tolerance for filtering small coefficients.
+
+        Returns:
+            A flat list of :class:`ExponentiatedPauliTerm` representing, for
+            each commuting group, the sequence
+            :math:`C \;\prod_j e^{-i\theta_j D_j}\; C^\dagger`.
+
+        """
+        from paulimer import DensePauli, SparsePauli, encoding_clifford_of  # noqa: PLC0415
+
+        terms: list[ExponentiatedPauliTerm] = []
+
+        # Single-term groups don't need Clifford diagonalization.
+        if len(group.pauli_strings) == 1:
+            for label, coeff in group.get_real_coefficients(tolerance=atol):
+                mapping = self._pauli_label_to_map(label)
+                angle = coeff * time
+                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+            return terms
+
+        sparse_paulis = [SparsePauli(ps) for ps in group.pauli_strings]
+        clifford = encoding_clifford_of(sparse_paulis, num_qubits)
+
+        if clifford.is_identity:
+            # All terms are already diagonal (Z/I only); no basis change needed.
+            for label, coeff in group.get_real_coefficients(tolerance=atol):
+                mapping = self._pauli_label_to_map(label)
+                angle = coeff * time
+                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+            return terms
+
+        # Decompose the Clifford C into Pauli rotations.
+        clifford_terms = self._clifford_to_terms(clifford, num_qubits, atol)
+
+        # C: rotate into the diagonal basis.
+        terms.extend(clifford_terms)
+
+        # Build the diagonal exponentiated terms.
+        # C diagonalizes each P_j: D_j = C P_j C†  (Z/I only).
+        for label, coeff in group.get_real_coefficients(tolerance=atol):
+            diag_pauli = clifford.image_of(DensePauli(label))
+            mapping = self._pauli_label_to_map(diag_pauli.characters)
+            angle = coeff * time * diag_pauli.phase.real
+            terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+
+        # C†: undo the basis change (reversed order, negated angles).
+        for ct in reversed(clifford_terms):
+            terms.append(ExponentiatedPauliTerm(pauli_term=ct.pauli_term, angle=-ct.angle))
+
+        return terms
+
+    @staticmethod
+    def _clifford_to_terms(clifford, num_qubits, atol) -> list[ExponentiatedPauliTerm]:
+        r"""Convert an encoding Clifford into Pauli strings with phases.
+
+        Extracts the 2n generator images of the Clifford via
+        :meth:`~paulimer.CliffordUnitary.image_z` and
+        :meth:`~paulimer.CliffordUnitary.image_x`, returning each as
+        an :class:`ExponentiatedPauliTerm` with angle derived from the
+        image phase.
+
+        Args:
+            clifford: The encoding Clifford object returned by
+                :func:`~paulimer.encoding_clifford_of`.
+            num_qubits: Number of qubits.
+            atol: Absolute tolerance for filtering small angles (e.g., from numerical imprecision).
+
+        Returns:
+            A list of :class:`ExponentiatedPauliTerm` entries.
+
+        """
+        if clifford.is_identity:
+            return []
+
+        terms: list[ExponentiatedPauliTerm] = []
+        for q in range(num_qubits):
+            for image in (clifford.image_z(q), clifford.image_x(q)):
+                chars = image.characters
+                # Skip pure-identity images.
+                if all(c == "I" for c in chars):
+                    continue
+                # phase is +1, -1, +i, or -i.
+                # Map to an angle: phase = exp(i * phi) => angle = phi / 2
+                phi = cmath.phase(image.phase)  # 0, pi, pi/2, -pi/2
+                angle = phi / 2
+                # Skip no-op rotations (phase == +1 => angle == 0).
+                if abs(angle) < atol:
+                    continue
+                mapping = Trotter._pauli_label_to_map(chars)
+                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+
         return terms
 
     def name(self) -> str:

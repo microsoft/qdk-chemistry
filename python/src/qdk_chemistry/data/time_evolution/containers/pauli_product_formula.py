@@ -125,6 +125,37 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
             num_qubits=self._num_qubits,
         )
 
+    def combine(self, other_container: "PauliProductFormulaContainer", atol=1e-12) -> "PauliProductFormulaContainer":
+        """Combine two Trotter evolutions, merging commuting terms.
+
+        Args:
+            self_container: The first ``PauliProductFormulaContainer``.
+            other_container: The second ``PauliProductFormulaContainer`` appended
+                after *self_container*.
+            atol: Absolute tolerance for filtering small coefficients.
+
+        Returns:
+            A single ``PauliProductFormulaContainer`` representing the combined
+            evolution.
+
+        """
+        self_terms = list(self.step_terms) * self.step_reps
+        other_terms = list(other_container.step_terms) * other_container.step_reps
+        num_qubits = max(self.num_qubits, other_container.num_qubits)
+
+        combined = self_terms + other_terms
+        merged: list[ExponentiatedPauliTerm] = []
+        for term in combined:
+            if merged and merged[-1].pauli_term == term.pauli_term:
+                new_angle = merged[-1].angle + term.angle
+                if abs(new_angle) > atol:
+                    merged[-1] = ExponentiatedPauliTerm(pauli_term=term.pauli_term, angle=new_angle)
+                else:
+                    merged.pop()
+            else:
+                merged.append(term)
+        return PauliProductFormulaContainer(step_terms=merged, step_reps=1, num_qubits=num_qubits)
+
     def to_json(self) -> dict[str, Any]:
         """Convert the PauliProductFormulaContainer to a dictionary for JSON serialization.
 

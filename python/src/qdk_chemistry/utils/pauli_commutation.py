@@ -50,16 +50,24 @@ __all__: list[str] = [
 
 
 def _label_to_sparse_word(label: str) -> list[tuple[int, int]]:
-    #    """Convert a Pauli string label to a ``SparsePauliWord``."""
-    return [(i, 1 if c == "X" else 2 if c == "Y" else 3) for i, c in enumerate(label) if c != "I"]
+    #    Convert a Pauli string label to a ``SparsePauliWord``.
+    word = []
+    # q_n...q_0
+    for i, c in enumerate(reversed(label)):
+        if c in {"X", "Y", "Z"}:
+            word.append((i, 1 if c == "X" else 2 if c == "Y" else 3))
+        elif c != "I":
+            raise ValueError(f"Invalid character {c!r} in Pauli label; expected 'I', 'X', 'Y', or 'Z'.")
+    return word
 
 
 def _sparse_word_to_label(word: list[tuple[int, int]], n_qubits: int) -> str:
-    #    """Convert a ``SparsePauliWord`` back to a Pauli string label."""
+    #    Convert a ``SparsePauliWord`` back to a Pauli string label.
     chars = ["I"] * n_qubits
     for q, p in word:
         chars[q] = "X" if p == 1 else "Y" if p == 2 else "Z"
-    return "".join(chars)
+    # q_n...q_0
+    return "".join(reversed(chars))
 
 
 def do_pauli_labels_commute(label_a: str, label_b: str) -> bool:
@@ -222,6 +230,10 @@ def does_nested_commutator_vanish(*labels: str) -> bool:
     if len(labels) < 2:
         raise ValueError("At least two Pauli labels are required for a commutator.")
 
+    pauli_string_length = len(labels[0])
+    if any(len(lbl) != pauli_string_length for lbl in labels):
+        raise ValueError("All Pauli labels must have the same length.")
+
     # Base case: [P_a, P_b] vanishes iff the two strings commute.
     if len(labels) == 2:
         return do_pauli_labels_commute(labels[0], labels[1])
@@ -237,7 +249,7 @@ def does_nested_commutator_vanish(*labels: str) -> bool:
     word = _label_to_sparse_word(labels[1])
     for lbl in labels[2:]:
         _, word = PauliTermAccumulator.multiply_uncached(word, _label_to_sparse_word(lbl))
-    inner_product = _sparse_word_to_label(word, len(labels[0]))
+    inner_product = _sparse_word_to_label(word, pauli_string_length)
     return do_pauli_labels_commute(labels[0], inner_product)
 
 
@@ -291,14 +303,14 @@ def commutator_bound_second_order(
     hamiltonian: QubitHamiltonian,
     weight_threshold: float = 1e-12,
 ) -> float:
-    r"""Compute the commutator bound term multiplying :math:`t^{3} / (12N)` in Proposition 10 in Childs et. al (2021).
+    r"""Compute the commutator bound term multiplying :math:`t^{3} / 12` in Proposition 10 in Childs et. al (2021).
 
     Args:
         hamiltonian: The qubit Hamiltonian for which to compute the bound.
         weight_threshold: Absolute threshold for filtering small Hamiltonian coefficients.
 
     Returns:
-        The commutator bound term multiplying :math:`t^{3} / (12N)`.
+        The commutator bound term multiplying :math:`t^{3} / 12`.
 
     """
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)

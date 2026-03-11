@@ -39,7 +39,8 @@ dependencies = [
   "pydantic-settings>=2.9.1",
   "qdk[jupyter]>=1.26.0",
   "pybind11-stubgen>=2.5.1",
-  "h5py>=3.0.0"
+  "h5py>=3.0.0",
+  "paulimer"
 ]
 description = "Quantum Development Kit - Chemistry Library"
 license = { file = "LICENSE.txt" }
