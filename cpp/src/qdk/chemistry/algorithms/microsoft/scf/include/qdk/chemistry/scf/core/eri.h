@@ -116,6 +116,28 @@ class ERI {
   virtual void quarter_trans(size_t nt, const double* C, double* out);
 
   /**
+   * @brief Perform half transformation of ERI tensor
+   *
+   * Transforms two indices of the 4-center ERI tensor from AO to MO basis:
+   * (μν|λσ) → (pq|λσ) where p and q are molecular orbital indices.
+   *
+   * Output layout: out[p + q*ni + λ*(ni*nj) + σ*(ni*nj*NAO)] col-major
+   *
+   * The default implementation calls quarter_trans followed by a Q2
+   * contraction. Backends (e.g. direct) may override half_trans_impl to
+   * fuse both contractions into the shell-quartet loop, avoiding the
+   * ni*NAO^3 intermediate that quarter_trans materializes.
+   *
+   * @param ni Number of MO vectors for first index
+   * @param Ci First transformation coefficients (row-major, NAO × ni)
+   * @param nj Number of MO vectors for second index
+   * @param Cj Second transformation coefficients (row-major, NAO × nj)
+   * @param out Output half-transformed tensor (ni * nj * NAO * NAO)
+   */
+  virtual void half_trans(size_t ni, const double* Ci, size_t nj,
+                          const double* Cj, double* out);
+
+  /**
    * @brief Create traditional (non-DF) ERI engine
    *
    * Factory method that selects the appropriate ERI implementation
@@ -164,6 +186,17 @@ class ERI {
    * @see ERI::quarter_trans for API documentation
    */
   virtual void quarter_trans_impl(size_t nt, const double* C, double* out) = 0;
+
+  /**
+   * @brief Implementation of the half transformation
+   *
+   * Default implementation uses quarter_trans_impl + BLAS Q2 contraction.
+   * Derived classes may override to fuse both contractions.
+   *
+   * @see ERI::half_trans for API documentation
+   */
+  virtual void half_trans_impl(size_t ni, const double* Ci, size_t nj,
+                               const double* Cj, double* out);
 
   bool has_spin_split_density() const {
     return scf_orbital_type_ != SCFOrbitalType::Restricted;

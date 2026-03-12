@@ -21,6 +21,7 @@
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
+#include "util/timer.h"
 #include "utils.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -85,6 +86,7 @@ bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
 std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     std::shared_ptr<data::Orbitals> orbitals) const {
   QDK_LOG_TRACE_ENTERING();
+  scf::AutoTimer __hamiltonian_total_timer("hamiltonian::total");
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
 
@@ -167,16 +169,20 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   }
 
   // Create Integral Instance
+  scf::Timer::start_timing("hamiltonian::eri_creation");
   auto eri = qcs::ERIMultiplexer::create(*internal_basis_set, *scf_config, 0.0);
   auto int1e = std::make_unique<qcs::OneBodyIntegral>(
       internal_basis_set.get(), mol.get(), scf_config->mpi);
+  scf::Timer::stop_timing("hamiltonian::eri_creation");
 
   // Compute Core Hamiltonian in AO basis
+  scf::Timer::start_timing("hamiltonian::1e_integrals");
   Eigen::MatrixXd T_full(num_atomic_orbitals, num_atomic_orbitals),
       V_full(num_atomic_orbitals, num_atomic_orbitals);
   int1e->kinetic_integral(T_full.data());
   int1e->nuclear_integral(V_full.data());
   Eigen::MatrixXd H_full = T_full + V_full;
+  scf::Timer::stop_timing("hamiltonian::1e_integrals");
 
   // Build active coefficient matrices for alpha and beta (can have different
   // sizes)
@@ -243,6 +249,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   const size_t moeri_size = nactive * nactive * nactive * nactive;
 
+  scf::Timer::start_timing("hamiltonian::moeri_compute");
   if (is_restricted_calc) {
     // Only allocate and compute (αα|αα) integrals - the others are identical
     moeri_aaaa.resize(moeri_size);
@@ -255,12 +262,14 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     moeri_bbbb.resize(moeri_size);
 
     // (αα|αα) integrals
+    scf::Timer::start_timing("hamiltonian::moeri_compute_aaaa");
     moeri_c.compute(num_atomic_orbitals, nactive,
                     Ca_active_rm.data(),  // 1st quarter: alpha
                     Ca_active_rm.data(),  // 2nd quarter: alpha
                     Ca_active_rm.data(),  // 3rd quarter: alpha
                     Ca_active_rm.data(),  // 4th quarter: alpha
                     moeri_aaaa.data());
+    scf::Timer::stop_timing("hamiltonian::moeri_compute_aaaa");
 
     // (αα|ββ) integrals
     // Here, the C's are accessed like beta, beta, alpha, alpha, but results in
@@ -281,6 +290,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
                     Cb_active_rm.data(),  // 4th quarter: beta
                     moeri_bbbb.data());
   }
+  scf::Timer::stop_timing("hamiltonian::moeri_compute");
 
   // Get inactive space indices for both alpha and beta
   auto [inactive_indices_alpha, inactive_indices_beta] =

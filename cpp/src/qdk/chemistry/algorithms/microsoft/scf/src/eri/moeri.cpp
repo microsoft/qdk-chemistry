@@ -151,4 +151,52 @@ void MOERI::compute(size_t nb, size_t nt, const double* Ci, const double* Cj,
 
 #endif  // QDK_CHEMISTRY_ENABLE_GPU
 }
+
+void MOERI::compute(size_t nb, size_t ni, const double* Ci, size_t nj,
+                    const double* Cj, size_t nk, const double* Ck, size_t nl,
+                    const double* Cl, double* out) {
+  QDK_LOG_TRACE_ENTERING();
+  const size_t nmax = std::max({ni, nj, nk, nl});
+  if (nmax > nb)
+    throw std::runtime_error(
+        "MOERI does not support num_molecular_orbitals > num_atomic_orbitals");
+
+  const size_t nij = ni * nj;
+  const size_t nijk = nij * nk;
+  const size_t nb2 = nb * nb;
+
+  // Workspace: tmp1 holds results after Q3 (nijk*nb)
+  //            tmp2 holds results after half_trans Q1+Q2 (nij*nb²)
+  std::vector<double> tmp1(nijk * nb), tmp2(nij * nb2);
+
+  // CPU path only — GPU generalization deferred
+  Eigen::Map<const RowMajorMatrix> Ci_rm(Ci, nb, ni);
+  Eigen::Map<const RowMajorMatrix> Cj_rm(Cj, nb, nj);
+  Eigen::Map<const RowMajorMatrix> Ck_rm(Ck, nb, nk);
+  Eigen::Map<const RowMajorMatrix> Cl_rm(Cl, nb, nl);
+
+  // Half transform (Q1+Q2): (pq|lk) = Ci(m,p) * Cj(n,q) * (mn|lk)
+  // tmp2 layout: (ni, nj, nb, nb) col-major
+  eri_->half_trans(ni, Ci_rm.data(), nj, Cj_rm.data(), tmp2.data());
+
+  // Column-major copies for BLAS
+  Eigen::MatrixXd Ck_cm = Ck_rm;
+  Eigen::MatrixXd Cl_cm = Cl_rm;
+
+  // 3rd Quarter: (pq|rk) = TMP2(p,q,l,k) * Ck(l,r)
+  // For each k: TMP1_k(pq,r) = TMP2_k(pq,l) * Ck(l,r)
+  for (size_t k = 0; k < nb; ++k) {
+    auto TMP2_k = tmp2.data() + k * nij * nb;
+    auto TMP1_k = tmp1.data() + k * nijk;
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               nij, nk, nb, 1.0, TMP2_k, nij, Ck_cm.data(), nb, 0.0, TMP1_k,
+               nij);
+  }
+
+  // 4th Quarter: (pq|rs) = TMP1(p,q,r,k) * Cl(k,s)
+  // OUT(pqr,s) = TMP1(pqr,k) * Cl(k,s)
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, nijk,
+             nl, nb, 1.0, tmp1.data(), nijk, Cl_cm.data(), nb, 0.0, out, nijk);
+}
+
 }  // namespace qdk::chemistry::scf

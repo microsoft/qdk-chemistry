@@ -104,6 +104,16 @@ class ERIMultiplexer : public ERI {
   void quarter_trans(size_t nt, const double* C, double* out) override;
 
   /**
+   * @brief Perform half transformation of two-electron integrals
+   *
+   * Routes half transformation to the configured implementation.
+   *
+   * @see ERI::half_trans for API documentation
+   */
+  void half_trans(size_t ni, const double* Ci, size_t nj, const double* Cj,
+                  double* out) override;
+
+  /**
    * @brief Factory method to create shared_ptr to ERIMultiplexer
    *
    * @tparam Args Constructor argument types (deduced)
@@ -133,5 +143,13 @@ class ERIMultiplexer : public ERI {
    * The actual work is delegated to qt_impl_.
    */
   void quarter_trans_impl(size_t nt, const double* C, double* out) override {};
+
+  /**
+   * @brief Stub implementation for half_trans_impl
+   *
+   * Empty override since routing is handled in the public half_trans method.
+   */
+  void half_trans_impl(size_t ni, const double* Ci, size_t nj, const double* Cj,
+                       double* out) override {};
 };
 }  // namespace qdk::chemistry::scf

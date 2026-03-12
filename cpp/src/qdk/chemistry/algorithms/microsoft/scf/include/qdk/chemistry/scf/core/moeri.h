@@ -68,6 +68,39 @@ class MOERI {
   void compute(size_t nao, size_t nt, const double* Ci, const double* Cj,
                const double* Ck, const double* Cl, double* out);
 
+  /**
+   *  @brief Compute MO ERIs with different-sized transformation matrices per
+   *  index.
+   *
+   *  Generalized 4-quarter AO→MO integral transform where each coefficient
+   *  matrix may have a different number of MO vectors:
+   *
+   *  (pn|lk) = Ci(p,m) * (mn|lk), Ci is (nao × ni), p ∈ [0, ni)
+   *  (pq|lk) = Cj(q,n) * (pn|lk), Cj is (nao × nj), q ∈ [0, nj)
+   *  (pq|rk) = Ck(r,l) * (pq|lk), Ck is (nao × nk), r ∈ [0, nk)
+   *  (pq|rs) = Cl(s,k) * (pq|rk), Cl is (nao × nl), s ∈ [0, nl)
+   *
+   *  Output is column major: out[p + q*ni + r*ni*nj + s*ni*nj*nk]
+   *
+   *  @param[in]  nao  Number of atomic orbitals
+   *  @param[in]  ni   Number of MO vectors for first index
+   *  @param[in]  Ci   First quarter transformation coefficients (row major,
+   *                   nao × ni)
+   *  @param[in]  nj   Number of MO vectors for second index
+   *  @param[in]  Cj   Second quarter transformation coefficients (row major,
+   *                   nao × nj)
+   *  @param[in]  nk   Number of MO vectors for third index
+   *  @param[in]  Ck   Third quarter transformation coefficients (row major,
+   *                   nao × nk)
+   *  @param[in]  nl   Number of MO vectors for fourth index
+   *  @param[in]  Cl   Fourth quarter transformation coefficients (row major,
+   *                   nao × nl)
+   *  @param[out] out  Output MO ERIs (ni × nj × nk × nl, column major)
+   */
+  void compute(size_t nao, size_t ni, const double* Ci, size_t nj,
+               const double* Cj, size_t nk, const double* Ck, size_t nl,
+               const double* Cl, double* out);
+
  private:
   std::shared_ptr<ERI> eri_;  ///< ERI instance
 #ifdef QDK_CHEMISTRY_ENABLE_GPU

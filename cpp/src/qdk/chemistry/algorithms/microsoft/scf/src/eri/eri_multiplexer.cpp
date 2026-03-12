@@ -76,6 +76,13 @@ void ERIMultiplexer::quarter_trans(size_t nt, const double* C, double* out) {
   qt_impl_->quarter_trans(nt, C, out);
 }
 
+void ERIMultiplexer::half_trans(size_t ni, const double* Ci, size_t nj,
+                                const double* Cj, double* out) {
+  QDK_LOG_TRACE_ENTERING();
+
+  qt_impl_->half_trans(ni, Ci, nj, Cj, out);
+}
+
 void ERIMultiplexer::get_gradients(const double* P, double* dJ, double* dK,
                                    double alpha, double beta, double omega) {
   QDK_LOG_TRACE_ENTERING();

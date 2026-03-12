@@ -72,4 +72,49 @@ void mp2_natural_orbitals(NumOrbital norb,
                           size_t LDV, double* ON, double* NO_C, size_t LDC,
                           double shift = 0.0);
 
+/**
+ *  @brief Form MP2 T2 Amplitudes from compact (ia|jb) integrals
+ *
+ *  Uses precomputed orbital energies and the (occ,virt,occ,virt) block of
+ *  the two-electron integrals directly, avoiding the need for the full
+ *  Hamiltonian.
+ *
+ *  @param[in] nocc     Number of occupied orbitals
+ *  @param[in] nvirt    Number of virtual orbitals
+ *  @param[in] V_iajb   Compact 2e integrals (nocc × nvirt × nocc × nvirt),
+ *                       column major: V_iajb[i + a*nocc + j*nocc*nvirt +
+ *                       b*nocc*nvirt*nocc]
+ *  @param[in] eps_occ  Occupied orbital energies (size nocc)
+ *  @param[in] eps_virt Virtual orbital energies (size nvirt)
+ *  @param[out] T2      MP2 T2 amplitudes (nocc × nocc × nvirt × nvirt)
+ *  @param[in] shift    Energy shift for the MP2 denominator (default 0.0)
+ */
+void mp2_t2_ov(NumCanonicalOccupied nocc, NumCanonicalVirtual nvirt,
+               const double* V_iajb, const double* eps_occ,
+               const double* eps_virt, double* T2, double shift = 0.0);
+
+/**
+ *  @brief Form MP2 Natural Orbitals from compact (ia|jb) integrals
+ *
+ *  Computes the MP2 1-RDM and diagonalizes it to obtain natural orbitals.
+ *  Takes precomputed orbital energies and the (occ,virt,occ,virt) block
+ *  of two-electron integrals, bypassing full Hamiltonian construction.
+ *
+ *  @param[in]  norb      Number of orbitals (nocc + nvirt)
+ *  @param[in]  nocc      Number of occupied orbitals
+ *  @param[in]  nvirt     Number of virtual orbitals
+ *  @param[in]  eps_occ   Occupied orbital energies (size nocc)
+ *  @param[in]  eps_virt  Virtual orbital energies (size nvirt)
+ *  @param[in]  V_iajb    Compact 2e integrals (nocc × nvirt × nocc × nvirt)
+ *  @param[out] ON        Natural orbital occupation numbers (size norb)
+ *  @param[out] NO_C      Natural orbital rotation matrix (norb × norb)
+ *  @param[in]  LDC       Leading dimension of NO_C
+ *  @param[in]  shift     Energy shift for the MP2 denominator (default 0.0)
+ */
+void mp2_natural_orbitals_ov(NumOrbital norb, NumCanonicalOccupied nocc,
+                             NumCanonicalVirtual nvirt, const double* eps_occ,
+                             const double* eps_virt, const double* V_iajb,
+                             double* ON, double* NO_C, size_t LDC,
+                             double shift = 0.0);
+
 }  // namespace macis

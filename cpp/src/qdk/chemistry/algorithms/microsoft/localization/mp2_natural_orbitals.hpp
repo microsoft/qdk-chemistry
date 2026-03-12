@@ -5,8 +5,21 @@
 #pragma once
 
 #include <qdk/chemistry/algorithms/localization.hpp>
+#include <qdk/chemistry/data/settings.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
+
+/**
+ * @class MP2NaturalOrbitalLocalizerSettings
+ * @brief Settings for the MP2 natural orbital localizer
+ */
+class MP2NaturalOrbitalLocalizerSettings
+    : public qdk::chemistry::data::Settings {
+ public:
+  MP2NaturalOrbitalLocalizerSettings() {
+    set_default("eri_method", std::string("incore"));
+  }
+};
 
 /**
  * @class MP2NaturalOrbitalLocalizer
@@ -42,7 +55,9 @@ class MP2NaturalOrbitalLocalizer : public Localizer {
   /**
    * @brief Default constructor
    */
-  MP2NaturalOrbitalLocalizer() = default;
+  MP2NaturalOrbitalLocalizer() {
+    _settings = std::make_unique<MP2NaturalOrbitalLocalizerSettings>();
+  };
 
   /**
    * @brief Virtual destructor

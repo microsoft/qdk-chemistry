@@ -8,7 +8,11 @@
 #include <mpi.h>
 #endif
 
+#include <Eigen/Core>
+#include <blas.hh>
+#include <cstring>
 #include <memory>
+#include <vector>
 #ifdef ENABLE_NVTX3
 #include <nvtx3/nvtx3.hpp>
 #endif
@@ -122,5 +126,77 @@ void ERI::quarter_trans(size_t nt, const double* C, double* out) {
   QDK_LOG_TRACE_ENTERING();
 
   quarter_trans_impl(nt, C, out);
+}
+
+void ERI::half_trans(size_t ni, const double* Ci, size_t nj, const double* Cj,
+                     double* out) {
+  QDK_LOG_TRACE_ENTERING();
+
+  half_trans_impl(ni, Ci, nj, Cj, out);
+}
+
+void ERI::half_trans_impl(size_t ni, const double* Ci, size_t nj,
+                          const double* Cj, double* out) {
+  QDK_LOG_TRACE_ENTERING();
+
+  // Batched Q1 + immediate Q2 to keep memory bounded.
+  // Each batch transforms bp orbitals via quarter_trans_impl, then
+  // contracts the second index via BLAS before the next batch.
+  const size_t nb = basis_set_.num_atomic_orbitals;
+  const size_t nb2 = nb * nb;
+  const size_t nb3 = nb2 * nb;
+  const size_t nij = ni * nj;
+
+  // Budget: quarter_trans internally allocates nthreads copies of the output
+  // for thread-local accumulation, so actual memory is bp*nb³*(1+nthreads).
+  // Target ~1 GB for the Q1 buffer itself to stay safe on 16 GB systems.
+  constexpr size_t max_bytes = 1ULL * 1024 * 1024 * 1024;
+  const size_t max_batch =
+      std::max<size_t>(1, max_bytes / (nb3 * sizeof(double)));
+
+  // Cj row-major (nb × nj) → col-major for BLAS
+  Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+                                 Eigen::RowMajor>>
+      Cj_rm(Cj, nb, nj);
+  Eigen::MatrixXd Cj_cm = Cj_rm;
+
+  const size_t n_batches = (ni + max_batch - 1) / max_batch;
+  QDK_LOGGER().debug(
+      "half_trans: nb={}, ni={}, nj={}, batch_size={}, n_batches={}, "
+      "Q1_buf={:.2f} GB, out={:.2f} GB",
+      nb, ni, nj, max_batch, n_batches,
+      double(max_batch * nb3 * sizeof(double)) / (1024.0 * 1024 * 1024),
+      double(nij * nb2 * sizeof(double)) / (1024.0 * 1024 * 1024));
+
+  std::memset(out, 0, nij * nb2 * sizeof(double));
+
+  for (size_t p0 = 0, batch_idx = 0; p0 < ni; p0 += max_batch, ++batch_idx) {
+    const size_t bp = std::min(max_batch, ni - p0);
+
+    QDK_LOGGER().debug("half_trans: batch {}/{}, orbitals [{}, {})",
+                       batch_idx + 1, n_batches, p0, p0 + bp);
+
+    // Extract columns p0..p0+bp from Ci (row-major nb×ni) into contiguous
+    // row-major buffer (nb×bp)
+    std::vector<double> Ci_batch(nb * bp);
+    for (size_t mu = 0; mu < nb; ++mu)
+      for (size_t p = 0; p < bp; ++p)
+        Ci_batch[mu * bp + p] = Ci[mu * ni + p0 + p];
+
+    // Q1 for this batch: quarter_trans produces (bp, nb, nb, nb) col-major
+    std::vector<double> tmp(bp * nb3);
+    quarter_trans_impl(bp, Ci_batch.data(), tmp.data());
+
+    // Q2: for each (ν,μ) pair, gemm contracts λ→q
+    //   out_{νμ}(p_full, q) += tmp_{νμ}(p_local, λ) × Cj(λ, q)
+    // Output stride: p sits within the full ni dimension
+    for (size_t vm = 0; vm < nb2; ++vm) {
+      const double* TMP_vm = tmp.data() + vm * nb * bp;
+      double* OUT_vm = out + vm * nij + p0;
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+                 bp, nj, nb, 1.0, TMP_vm, bp, Cj_cm.data(), nb, 0.0, OUT_vm,
+                 ni);
+    }
+  }
 }
 }  // namespace qdk::chemistry::scf
