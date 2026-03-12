@@ -8,6 +8,7 @@
 #include <Eigen/Dense>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <stdexcept>
@@ -17,26 +18,25 @@
 namespace qdk::chemistry::data {
 
 /**
- * @class CanonicalFourCenterHamiltonianContainer
- * @brief Contains a molecular Hamiltonian using canonical four center
- * integrals (ij|kl).
+ * @class DensityFittedHamiltonianContainer
+ * @brief Contains a molecular Hamiltonian using three center
+ * integrals.
  *
- * This class stores molecular Hamiltonian data for quantum chemistry
- * calculations. In addition to those contained in HamiltonianContainer, it
+ * In addition to those contained in HamiltonianContainer, this subclass also
  * contains:
- * - Two-electron integrals (electron-electron repulsion) in MO representation
- * in chemist's notation (ij|kl).
+ * - Three-center two-electron integrals (electron-electron repulsion) in MO
+ * representation.
  *
  */
-class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
+class DensityFittedHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
-   * @brief Constructor for active space Hamiltonian with four center integrals
-   * (ij|kl)
+   * @brief Constructor for active space Hamiltonian with three center integrals
+   * (ij|Q)
    *
    * @param one_body_integrals One-electron integrals in MO basis [norb x norb]
-   * @param two_body_integrals Two-electron integrals in MO basis [norb x norb x
-   * norb x norb]
+   * @param three_center_integrals Three-center two-electron integrals in MO
+   * basis [(norb x norb) x naux]
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital
    * energy)
@@ -46,25 +46,27 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
-  CanonicalFourCenterHamiltonianContainer(
+  DensityFittedHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals,
-      const Eigen::VectorXd& two_body_integrals,
+      const Eigen::MatrixXd& three_center_integrals,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
       const Eigen::MatrixXd& inactive_fock_matrix,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
-   * @brief Constructor for active space Hamiltonian with four center integrals
+   * @brief Constructor for active space Hamiltonian with three center integrals
    * using separate spin components
    *
    * @param one_body_integrals_alpha One-electron integrals for alpha spin in MO
    * basis
    * @param one_body_integrals_beta One-electron integrals for beta spin in MO
    * basis
-   * @param two_body_integrals_aaaa Two-electron alpha-alpha-alpha-alpha
-   * integrals
-   * @param two_body_integrals_aabb Two-electron alpha-alpha-beta-beta integrals
-   * @param two_body_integrals_bbbb Two-electron beta-beta-beta-beta integrals
+   * @param three_center_integrals_aa Three-center two-electron alpha-alpha
+   * integrals (ij|Q), where the orbital pair index ij are stored in row-major
+   * order
+   * @param three_center_integrals_bb Three-center two-electron beta-beta
+   * integrals (ij|Q), where the orbital pair index ij are stored in row-major
+   * order
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital
    * energy)
@@ -76,12 +78,11 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
-  CanonicalFourCenterHamiltonianContainer(
+  DensityFittedHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals_alpha,
       const Eigen::MatrixXd& one_body_integrals_beta,
-      const Eigen::VectorXd& two_body_integrals_aaaa,
-      const Eigen::VectorXd& two_body_integrals_aabb,
-      const Eigen::VectorXd& two_body_integrals_bbbb,
+      const Eigen::MatrixXd& three_center_integrals_aa,
+      const Eigen::MatrixXd& three_center_integrals_bb,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
       const Eigen::MatrixXd& inactive_fock_matrix_alpha,
       const Eigen::MatrixXd& inactive_fock_matrix_beta,
@@ -90,51 +91,62 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Destructor
    */
-  ~CanonicalFourCenterHamiltonianContainer() = default;
+  ~DensityFittedHamiltonianContainer() override = default;
 
   /**
    * @brief Create a deep copy of this container
    * @return Unique pointer to a cloned container
    */
-  std::unique_ptr<HamiltonianContainer> clone() const override;
+  std::unique_ptr<HamiltonianContainer> clone() const override final;
 
   /**
    * @brief Get the type of the underlying container
    * @return String identifying the container type (e.g.,
    * "canonical_four_center", "density_fitted")
    */
-  std::string get_container_type() const override;
+  std::string get_container_type() const override final;
 
   /**
-   * @brief Get two-electron integrals in MO basis for all spin channels
-   * @return Tuple of references to (aaaa, aabb, bbbb) two-electron integrals
-   * vectors
+   * @brief Get four-center two-electron integrals in MO basis for all spin
+   * channels
+   * @return Tuple of references to (aaaa, aabb, bbbb) four-center two-electron
+   * integrals vectors
    * @throws std::runtime_error if integrals are not set
    */
   std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
              const Eigen::VectorXd&>
-  get_two_body_integrals() const override final;
+  get_two_body_integrals() const override;
 
   /**
-   * @brief Get specific two-electron integral element
+   * @brief Get three-center integrals in MO basis for all spin channels
+   * @return Pair of references to (aa, bb) three-center two-electron
+   * integrals matrices, where each matrix is of dimension [(norb x norb) x
+   * naux], with the (norb x norb) part stored in row-major order
+   * @throws std::runtime_error if integrals are not set
+   */
+  std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
+  get_three_center_integrals() const;
+
+  /**
+   * @brief Get specific four-center two-electron integral element
    * @param i First orbital index
    * @param j Second orbital index
    * @param k Third orbital index
    * @param l Fourth orbital index
    * @param channel Spin channel to query (aaaa, aabb, or bbbb), defaults to
    * aaaa
-   * @return Two-electron integral (ij|kl)
+   * @return Four-center two-electron integral (ij|kl)
    * @throws std::out_of_range if indices are invalid
    */
   double get_two_body_element(
       unsigned i, unsigned j, unsigned k, unsigned l,
-      SpinChannel channel = SpinChannel::aaaa) const override final;
+      SpinChannel channel = SpinChannel::aaaa) const override;
 
   /**
    * @brief Check if two-body integrals are available
    * @return True if two-body integrals are set
    */
-  bool has_two_body_integrals() const override final;
+  bool has_two_body_integrals() const override;
 
   /**
    * @brief Check if the Hamiltonian is restricted
@@ -146,31 +158,31 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
    * @brief Convert Hamiltonian to JSON
    * @return JSON object containing Hamiltonian data
    */
-  nlohmann::json to_json() const override;
+  nlohmann::json to_json() const override final;
 
   /**
    * @brief Serialize Hamiltonian data to HDF5 group
    * @param group HDF5 group to write data to
    * @throws std::runtime_error if I/O error occurs
    */
-  void to_hdf5(H5::Group& group) const override;
+  void to_hdf5(H5::Group& group) const override final;
 
   /**
    * @brief Deserialize Hamiltonian data from HDF5 group
    * @param group HDF5 group to read data from
-   * @return Unique pointer to Hamiltonian loaded from group
+   * @return Unique pointer to const Hamiltonian loaded from group
    * @throws std::runtime_error if I/O error occurs
    */
-  static std::unique_ptr<CanonicalFourCenterHamiltonianContainer> from_hdf5(
+  static std::unique_ptr<DensityFittedHamiltonianContainer> from_hdf5(
       H5::Group& group);
 
   /**
    * @brief Load Hamiltonian from JSON
    * @param j JSON object containing Hamiltonian data
-   * @return Shared pointer to Hamiltonian loaded from JSON
+   * @return Unique pointer to const Hamiltonian loaded from JSON
    * @throws std::runtime_error if JSON is malformed
    */
-  static std::unique_ptr<CanonicalFourCenterHamiltonianContainer> from_json(
+  static std::unique_ptr<DensityFittedHamiltonianContainer> from_json(
       const nlohmann::json& j);
 
   /**
@@ -179,25 +191,41 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
    */
   bool is_valid() const override final;
 
- protected:
-  /// Two-electron integrals in MO basis, stored as flattened arrays [norb^4]
-  /// Access pattern: V[i*norb^3 + j*norb^2 + k*norb + l] = (ij|kl)
-  const std::tuple<std::shared_ptr<Eigen::VectorXd>,
-                   std::shared_ptr<Eigen::VectorXd>,
-                   std::shared_ptr<Eigen::VectorXd>>
-      _two_body_integrals;
+ private:
+  /**
+   * Three-center integrals in MO basis, where each channel is stored as a
+   * matrix of dimension [(norb x norb) x naux] where norb x norb is stored in
+   * row major order
+   */
+  const std::pair<std::shared_ptr<Eigen::MatrixXd>,
+                  std::shared_ptr<Eigen::MatrixXd>>
+      _three_center_integrals;
 
-  /// Validation helpers
+  /**
+   * Lazily computed four-center integrals cache (built on first access).
+   * Stores (aaaa, aabb, bbbb) as flattened arrays [norb^4].
+   * Uses shared_ptr so restricted case can share the same data for all
+   * channels.
+   */
+  mutable std::optional<std::tuple<std::shared_ptr<Eigen::VectorXd>,
+                                   std::shared_ptr<Eigen::VectorXd>,
+                                   std::shared_ptr<Eigen::VectorXd>>>
+      _cached_four_center_integrals;
+
+  /** Build four-center integrals from three-center integrals and cache them */
+  void _build_four_center_cache() const;
+
+  /** Validation helper for integral dimensions */
   void validate_integral_dimensions() const override final;
 
-  size_t get_two_body_index(size_t i, size_t j, size_t k, size_t l) const;
+  double _get_two_body_element(const Eigen::MatrixXd& A, unsigned ij,
+                               const Eigen::MatrixXd& B, unsigned kl) const;
 
-  static std::tuple<std::shared_ptr<Eigen::VectorXd>,
-                    std::shared_ptr<Eigen::VectorXd>,
-                    std::shared_ptr<Eigen::VectorXd>>
-  make_restricted_two_body_integrals(const Eigen::VectorXd& integrals);
+  static std::pair<std::shared_ptr<Eigen::MatrixXd>,
+                   std::shared_ptr<Eigen::MatrixXd>>
+  make_restricted_three_center_integrals(const Eigen::MatrixXd& integrals);
 
-  /// Serialization version
+  /** Serialization version */
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 };
 
