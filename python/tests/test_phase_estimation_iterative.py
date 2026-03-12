@@ -442,7 +442,7 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
     )
 
     # Create noise model with depolarizing error
-    error_rate = 0.03
+    error_rate = 0.05
     error_profile = QuantumErrorProfile(
         name="qpe_noise_test",
         description="Depolarizing noise for QPE integration test",
