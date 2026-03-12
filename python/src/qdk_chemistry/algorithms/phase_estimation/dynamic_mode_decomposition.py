@@ -50,7 +50,7 @@ class DynamicModeDecompositionSettings(PhaseEstimationSettings):
         self._set_default("initial_hankel_columns", "int", -1, "the initial column number of Hankel matrix X")
         self._set_default("evolution_time", "float", 0.0, "Time dt in the evolution unitary U = exp(-i H dt)")
         self._set_default("eigen_converge_tol", "float", 1e-5, "Convergence tolerance for Hamiltonian eigenvalue")
-        self._set_default("shots_per_observable", "int", 40, "the number of shots to test one observable")
+        self._set_default("shots_per_observable", "int", 100, "the number of shots to test one observable")
         self._set_default("max_hankel_columns", "int", 200, "Column number limit of Hankel matrix X")
 
 
@@ -63,7 +63,7 @@ class DynamicModeDecomposition(PhaseEstimation):
         initial_hankel_columns: int,
         time_step: float,
         eigen_converge_tol: float = 1e-3,
-        shots_per_observable: int = 40,
+        shots_per_observable: int = 100,
         max_hankel_columns: int = 200,
     ):
         """Initialize DynamicModeDecomposition with the given settings.
@@ -71,19 +71,12 @@ class DynamicModeDecomposition(PhaseEstimation):
         Args:
             hankel_rows: The row count of the Hankel matrix X. Must be a positive integer.
             initial_hankel_columns: The initial column count of the Hankel matrix X. Must be greater than 1.
-            time_step: Time parameter dt used in the time-evolution unitary U = exp(-i H dt)``.
-            Must be a non-negative number.
-            eigen_converge_tol: Convergence tolerance for Hamiltonian eigenvalue.
-            Must be a positive float.
-            shots_per_observable: The number of shots to execute per observable measurement. Defaults to 40.
-            Must be a positive integer.
-            max_hankel_columns: The maximum column count limit of Hankel matrix X. Defaults to 200.
-            Must be greater than or equal to initial_hankel_columns.
-
-        Raises:
-            ValueError: If hankel_rows or initial_hankel_columns are not positive integers,
-            if initial_hankel_columns exceeds max_hankel_columns, if time_step is negative,
-            if eigen_converge_tol is not positive, or if shots_per_observable is not positive.
+            time_step: Time parameter dt used in the time-evolution unitary U = exp(-i H dt)``. It must be non-negative.
+            eigen_converge_tol: Convergence tolerance for Hamiltonian eigenvalue. It must be a positive float.
+            shots_per_observable: The number of shots to execute per observable measurement. Defaults to 100. It must be
+                a positive integer.
+            max_hankel_columns: The maximum column count limit of Hankel matrix X. Defaults to 200. It must be greater
+                than or equal to initial_hankel_columns.
 
         """
         Logger.trace_entering()

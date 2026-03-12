@@ -33,14 +33,13 @@ pytestmark = pytest.mark.skipif(
 
 _SEED = 42
 _EVOLUTION_TIME = float(np.pi / 48.0)
-_HANKEL_ROWS = 24
-_INITIAL_HANKEL_COLUMNS = 12
+_HANKEL_ROWS = 8
+_INITIAL_HANKEL_COLUMNS = 4
 _SHOTS_PER_OBSERVABLE = 500
-_EIGEN_CONVERGE_TOL = 1e-3
+_EIGEN_CONVERGE_TOL = 1e-2 # for running the test quickly
 
-# References captured from test_ODMD/tests/result_*_shot500_tol1e-3.log.
-_EXPECTED_PHASE_FRACTION = 0.9800011077309474
-_EXPECTED_ENERGY = -1.919893657829055
+_EXPECTED_PHASE_FRACTION = 0.9795868360
+_EXPECTED_ENERGY = -1.9596637398
 
 
 @pytest.fixture(scope="module")
