@@ -16,6 +16,7 @@ import qsharp
 
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 
 def strip_ws(s: str) -> str:
@@ -105,6 +106,20 @@ class TestGetQsharpCircuit:
         assert len(qdk_circuit_info["qubits"]) == 3
         qir = circuit.get_qir()
         assert isinstance(qir, qsharp._qsharp.QirInputData)
+
+    def test_get_circuit_from_factory(self):
+        """Test that get_qir and get_qsharp_circuit can generate and cache QIR and Q# circuit from Q# factory data."""
+        state_prep_params = {"rowMap": [1, 0], "stateVector": [0.6, 0.0, 0.0, 0.8], "expansionOps": []}
+        qsharp_factory = [QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, state_prep_params, 2]
+        circuit = Circuit(qsharp_factory=qsharp_factory)
+        assert circuit.qir is None
+        assert circuit.qsharp is None
+        qir = circuit.get_qir()
+        qsc = circuit.get_qsharp_circuit()
+        assert isinstance(qir, qsharp._qsharp.QirInputData)
+        assert isinstance(circuit.qir, qsharp._qsharp.QirInputData)
+        assert isinstance(qsc, qsharp._native.Circuit)
+        assert isinstance(circuit.qsharp, qsharp._native.Circuit)
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")

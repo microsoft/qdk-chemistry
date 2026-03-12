@@ -146,20 +146,13 @@ class PauliSequenceMapper(ControlledEvolutionCircuitMapper):
             "repetitions": power,
         }
 
-        qsc = qsharp.circuit(
+        qsharp_factory = [
             QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
             controlled_evo_params,
             controlled_evolution.control_indices[0],
             target_indices,
-        )
-
-        qir = qsharp.compile(
-            QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
-            controlled_evo_params,
-            controlled_evolution.control_indices[0],
-            target_indices,
-        )
+        ]
 
         controlled_evolution_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(controlled_evo_params)
 
-        return Circuit(qsharp=qsc, qir=qir, qsharp_op=controlled_evolution_op)
+        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_evolution_op)

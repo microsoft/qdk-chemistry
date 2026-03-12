@@ -36,7 +36,6 @@ Algorithm Details:
 from dataclasses import dataclass
 
 import numpy as np
-from qdk import qsharp
 
 import qdk_chemistry.plugins.qiskit
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
@@ -53,9 +52,6 @@ class SparseIsometryGF2XStatePreparationSettings(StatePreparationSettings):
     def __init__(self):
         """Initialize the StatePreparationSettings."""
         super().__init__()
-        self._set_default(
-            "prune_classical_qubits", "bool", False, "Whether to prune classical qubits and return the circuit."
-        )
         self._set_default(
             "dense_preparation_method", "string", "qdk", "The dense state preparation method to use.", ["qdk", "qiskit"]
         )
@@ -171,21 +167,14 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             "expansionOps": expansion_ops,
         }
 
-        qsharp_circuit = qsharp.circuit(
+        qsharp_factory = [
             QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
             state_prep_params,
             n_qubits,
-            prune_classical_qubits=self._settings.get("prune_classical_qubits"),
-        )
-
-        qir = qsharp.compile(
-            QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
-            state_prep_params,
-            n_qubits,
-        )
+        ]
 
         state_prep_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
-        return Circuit(qsharp=qsharp_circuit, qir=qir, qsharp_op=state_prep_op, encoding="jordan-wigner")
+        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=state_prep_op, encoding="jordan-wigner")
 
     def _qiskit_dense_preparation(
         self, gf2x_operation_results: "GF2XEliminationResult", statevector_data: np.ndarray, num_qubits: int
@@ -418,22 +407,11 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         n_qubits = len(bitstring_array)
         params = {"bitStrings": bitstring_array[::-1]}  # Reverse for Q# convention
 
-        qsharp_circuit = qsharp.circuit(
-            QSHARP_UTILS.StatePreparation.MakeSingleReferenceStateCircuit,
-            params,
-            n_qubits,
-            prune_classical_qubits=self._settings.get("prune_classical_qubits"),
-        )
-        qir = qsharp.compile(
-            QSHARP_UTILS.StatePreparation.MakeSingleReferenceStateCircuit,
-            params,
-            n_qubits,
-        )
+        qsharp_factory = [QSHARP_UTILS.StatePreparation.MakeSingleReferenceStateCircuit, params, n_qubits]
         qsharp_op = QSHARP_UTILS.StatePreparation.MakePrepareSingleReferenceStateOp(params)
 
         return Circuit(
-            qsharp=qsharp_circuit,
-            qir=qir,
+            qsharp_factory=qsharp_factory,
             qsharp_op=qsharp_op,
             encoding="jordan-wigner",
         )
