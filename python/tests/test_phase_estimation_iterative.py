@@ -23,13 +23,14 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitHamiltonian,
 )
-from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.phase import (
     accumulated_phase_from_bits,
     energy_from_phase,
     iterative_phase_feedback_update,
     phase_fraction_from_feedback,
 )
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import (
     float_comparison_relative_tolerance,
@@ -37,18 +38,12 @@ from .reference_tolerances import (
     qpe_phase_fraction_tolerance,
 )
 
-if QDK_CHEMISTRY_HAS_QISKIT_AER:
-    from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
-
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import QuantumCircuit, qasm3
-    from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 
     from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
 
 _SEED = 42
-
-pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 
 
 @dataclass(frozen=True)
@@ -72,13 +67,15 @@ class PhaseEstimationProblem:
 def two_qubit_phase_problem() -> PhaseEstimationProblem:
     """Return the two-qubit phase estimation scenario used in documentation."""
     hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
-    state_prep = QuantumCircuit(2, name="psi")
-    state_prep.append(QiskitStatePreparation([0.6, 0.0, 0.0, 0.8]), list(range(2)))
+    state_vector = [0.6, 0.0, 0.0, 0.8]
+    state_prep_params = {"rowMap": [1, 0], "stateVector": state_vector, "expansionOps": []}
+    factories = [QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, state_prep_params, 2]
+    qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
 
     return PhaseEstimationProblem(
         label="two_qubit_reference",
         hamiltonian=hamiltonian,
-        state_prep=Circuit(qasm=qasm3.dumps(state_prep)),
+        state_prep=Circuit(qsharp_factory=factories, qsharp_op=qsharp_op),
         evolution_time=float(np.pi / 2.0),
         num_bits=4,
         expected_bits=[1, 1, 0, 0],
@@ -94,16 +91,17 @@ def two_qubit_phase_problem() -> PhaseEstimationProblem:
 def four_qubit_phase_problem() -> PhaseEstimationProblem:
     """Return the four-qubit benchmark used in documentation."""
     hamiltonian = QubitHamiltonian(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
-    state_prep = QuantumCircuit(4, name="psi_4q")
-    state_vector = np.zeros(2**4, dtype=complex)
+    state_vector = np.zeros(2**4, dtype=float)
     state_vector[int("1000", 2)] = 0.8
     state_vector[int("0111", 2)] = -0.6
-    state_prep.append(QiskitStatePreparation(state_vector), list(range(4)))
+    state_prep_params = {"rowMap": [3, 2, 1, 0], "stateVector": state_vector, "expansionOps": []}
+    factories = [QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, state_prep_params, 4]
+    qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
 
     return PhaseEstimationProblem(
         label="four_qubit_reference",
         hamiltonian=hamiltonian,
-        state_prep=Circuit(qasm=qasm3.dumps(state_prep)),
+        state_prep=Circuit(qsharp_factory=factories, qsharp_op=qsharp_op),
         evolution_time=float(np.pi / 8.0),
         num_bits=6,
         expected_bits=[1, 0, 1, 1, 0, 1],
@@ -199,8 +197,9 @@ def _run_iterative_with_parameters(
     hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients)
     num_qubits = int(np.log2(len(state_vector)))
 
-    state_prep = QuantumCircuit(num_qubits, name="state")
-    state_prep.append(QiskitStatePreparation(state_vector), list(range(num_qubits)))
+    state_prep_params = {"rowMap": list(range(num_qubits - 1, -1, -1)), "stateVector": state_vector, "expansionOps": []}
+    qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
+    qsharp_factories = [QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, state_prep_params, num_qubits]
 
     iqpe = IterativePhaseEstimation(num_bits=num_bits, evolution_time=evolution_time, shots_per_bit=shots_per_bit)
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=seed)
@@ -209,7 +208,7 @@ def _run_iterative_with_parameters(
 
     return iqpe.run(
         qubit_hamiltonian=hamiltonian,
-        state_preparation=Circuit(qasm=qasm3.dumps(state_prep)),
+        state_preparation=Circuit(qsharp_factory=qsharp_factories, qsharp_op=qsharp_op),
         circuit_executor=simulator,
         circuit_mapper=circuit_mapper,
         evolution_builder=evolution_builder,
@@ -262,6 +261,7 @@ def test_iterative_phase_estimation_extracts_phase_and_energy(two_qubit_phase_pr
     )
 
 
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 def test_iterative_and_traditional_results_match(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
     """Confirm iterative and traditional algorithms produce consistent estimates."""
     iterative_result = _run_iterative(two_qubit_phase_problem)
@@ -327,6 +327,7 @@ def test_iterative_phase_estimation_four_qubit_phase_and_energy(
     )
 
 
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 def test_iterative_and_traditional_match_on_four_qubits(four_qubit_phase_problem: PhaseEstimationProblem) -> None:
     """Ensure iterative and traditional approaches agree for four qubits."""
     iterative_result = _run_iterative(four_qubit_phase_problem)
@@ -374,7 +375,7 @@ def test_iterative_phase_estimation_non_commuting_xi_plus_zz() -> None:
     """Validate IQPE for H = 0.519 XI + ZZ with Hartree-Fock-like trial state."""
     pauli_strings = ["XI", "ZZ"]
     coefficients = [0.519, 1.0]
-    state_vector = np.array([0.97, 0.0, np.sqrt(1 - 0.97**2), 0.0], dtype=complex)
+    state_vector = np.array([0.97, 0.0, np.sqrt(1 - 0.97**2), 0.0], dtype=float)
 
     result = _run_iterative_with_parameters(
         pauli_strings,
@@ -383,7 +384,7 @@ def test_iterative_phase_estimation_non_commuting_xi_plus_zz() -> None:
         evolution_time=np.pi / 4,
         num_bits=6,
         shots_per_bit=3,
-        seed=42,
+        seed=_SEED,
     )
 
     assert list(result.bits_msb_first or []) == [1, 0, 0, 1, 0, 0]
@@ -397,7 +398,7 @@ def test_iterative_phase_estimation_second_non_commuting_example() -> None:
     """Validate IQPE for H = -0.0289(X1+X2) + 0.0541(Z1+Z2) + 0.0150 XX + 0.0590 ZZ."""
     pauli_strings = ["XI", "IX", "ZI", "IZ", "XX", "ZZ"]
     coefficients = [-0.0289, -0.0289, 0.0541, 0.0541, 0.0150, 0.059]
-    state_vector = np.array([0.0, 0.47, 0.47, 0.75], dtype=complex)
+    state_vector = np.array([0.0, 0.47, 0.47, 0.75], dtype=float)
     state_vector /= np.linalg.norm(state_vector)
 
     result = _run_iterative_with_parameters(
@@ -407,7 +408,7 @@ def test_iterative_phase_estimation_second_non_commuting_example() -> None:
         evolution_time=np.pi / 4,
         num_bits=11,
         shots_per_bit=3,
-        seed=42,
+        seed=_SEED,
     )
 
     assert list(result.bits_msb_first or []) == [1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1]
@@ -419,7 +420,6 @@ def test_iterative_phase_estimation_second_non_commuting_example() -> None:
     )
 
 
-@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available")
 def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
     """Integration test showing NoiseModel impact on iterative phase estimation accuracy."""
     # Run noiseless QPE
@@ -441,8 +441,8 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
         atol=qpe_energy_tolerance,
     )
 
-    # Create noise model with depolarizing error on cx gates
-    error_rate = 0.01
+    # Create noise model with depolarizing error
+    error_rate = 0.03
     error_profile = QuantumErrorProfile(
         name="qpe_noise_test",
         description="Depolarizing noise for QPE integration test",
@@ -453,7 +453,7 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
             "s": {"type": "depolarizing_error", "rate": error_rate, "num_qubits": 1},
         },
     )
-    simulator = QiskitAerSimulator(seed=_SEED)
+    simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
     evolution_builder = create("time_evolution_builder", "trotter")
     iqpe = IterativePhaseEstimation(

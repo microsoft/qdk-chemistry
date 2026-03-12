@@ -243,9 +243,9 @@ class Circuit(DataClass):
         """
         data: dict[str, Any] = {}
         if self.qasm is not None:
-            data["qasm"] = self.qasm
+            data["qasm"] = self.get_qasm()
         if self.qir is not None:
-            data["qir"] = str(self.qir)
+            data["qir"] = str(self.get_qir())
         if self.encoding is not None:
             data["encoding"] = self.encoding
         return self._add_json_version(data)
@@ -259,9 +259,9 @@ class Circuit(DataClass):
         """
         self._add_hdf5_version(group)
         if self.qasm is not None:
-            group.attrs["qasm"] = self.qasm
+            group.attrs["qasm"] = self.get_qasm()
         if self.qir is not None:
-            group.attrs["qir"] = str(self.qir)
+            group.attrs["qir"] = str(self.get_qir())
         if self.encoding is not None:
             group.attrs["encoding"] = self.encoding
 
