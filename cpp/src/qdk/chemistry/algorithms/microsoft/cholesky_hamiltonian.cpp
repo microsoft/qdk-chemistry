@@ -114,8 +114,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   }
 
   // setup libint engine for ERI computation
-  const double precision =
-      (threshold < 1e-13) ? 0.0 : std::numeric_limits<double>::epsilon();
+  const double precision = std::numeric_limits<double>::epsilon();
   const auto engine_precision = precision;
 #ifdef _OPENMP
   const int nthreads = omp_get_max_threads();
@@ -340,7 +339,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
                  L_rows.data(), n_cols, 1.0, eri_col.data(), num_aos2);
     }
 
-    // form new cholesky vector for each index in shell pair avoid redudant
+    // form new cholesky vector for each index in shell pair avoid redundant
     // vectors for symmetric shell pairs
     for (size_t local_i = 0; local_i < n1_max; ++local_i) {
       const size_t j_max = (s1_max == s2_max) ? (local_i + 1) : n2_max;
@@ -417,10 +416,8 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   if (current_col == max_rank) {
     QDK_LOGGER().warn(
         "Cholesky decomposition reached maximum rank (num_aos*(num_aos+1)/2 = "
-        "{}) with a remaining max diagonal error of {}. The requested "
-        "threshold "
-        "{} may not have been achieved.",
-        max_rank, D_max, threshold);
+        "{}). The requested threshold {} may not have been achieved.",
+        max_rank, threshold);
   }
 
   return {std::move(L_data), current_col};
