@@ -21,15 +21,15 @@ import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
-from qdk_chemistry.plugins.openfermion.conversion import (
-    qubit_hamiltonian_to_qubit_operator,
-    qubit_operator_to_qubit_hamiltonian,
-)
 from qdk_chemistry.utils import Logger
 
 # OpenFermion must be installed to run this example.
 try:
     import openfermion as of
+    from qdk_chemistry.plugins.openfermion.conversion import (
+        qubit_hamiltonian_to_qubit_operator,
+        qubit_operator_to_qubit_hamiltonian,
+    )
 except ImportError as e:
     raise ImportError(
         "OpenFermion is not installed. Please install it to run this example: "
