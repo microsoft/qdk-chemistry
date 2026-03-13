@@ -77,12 +77,12 @@ class QiskitQubitMapper(QubitMapper):
         self._settings = QiskitQubitMapperSettings()
         self._settings.set("encoding", encoding)
 
-    def _run_impl(self, hamiltonian: Hamiltonian, _symmetries: Symmetries | None = None) -> QubitHamiltonian:
+    def _run_impl(self, hamiltonian: Hamiltonian, symmetries: Symmetries | None = None) -> QubitHamiltonian:  # noqa: ARG002
         """Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.
 
         Args:
             hamiltonian: The fermionic Hamiltonian.
-            _symmetries: Optional symmetry information. Not used by this implementation.
+            symmetries: Optional symmetry information. Not used by this implementation.
 
         Returns:
             QubitHamiltonian: An instance of the QubitHamiltonian.
