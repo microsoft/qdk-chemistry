@@ -12,7 +12,7 @@ from qdk_chemistry.data import Circuit
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-__all__: list[str] = ["QsharpHadamardGenerator", "QiskitHadamardGenerator"]
+__all__: list[str] = ["QiskitHadamardGenerator", "QsharpHadamardGenerator"]
 
 
 class QsharpHadamardGenerator(HadamardTestGenerator):
@@ -21,9 +21,7 @@ class QsharpHadamardGenerator(HadamardTestGenerator):
     def __init__(
         self,
     ):
-        """Initialize QsharpHadamardGenerator.
-
-        """
+        """Initialize QsharpHadamardGenerator."""
         Logger.trace_entering()
         super().__init__()
 
@@ -32,7 +30,7 @@ class QsharpHadamardGenerator(HadamardTestGenerator):
         state_preparation: Circuit,
         num_system_qubits: int,
         ctrl_time_evol_unitary_circuit: Circuit,
-        test_basis: str="X",
+        test_basis: str = "X",
     ) -> Circuit:
         r"""Build a Hadamard test circuit using the Q# backend.
 
@@ -57,7 +55,9 @@ class QsharpHadamardGenerator(HadamardTestGenerator):
         try:
             ctrl_evol_op = ctrl_time_evol_unitary_circuit._qsharp_op  # noqa: SLF001
         except AttributeError:
-            raise ValueError("the input ctrl_time_evol_unitary_circuit circuit cannot be used for QsharpHadamardGenerator.")
+            raise ValueError(
+                "the input ctrl_time_evol_unitary_circuit circuit cannot be used for QsharpHadamardGenerator."
+            )
 
         systems = [i for i in range(1, num_system_qubits + 1)]
         hadamard_test_qsc = qsharp.circuit(
@@ -82,7 +82,7 @@ class QsharpHadamardGenerator(HadamardTestGenerator):
 
     def name(self) -> str:
         """Return the name of the QsharpHadamardGenerator algorithm."""
-        return "QsharpHadamardGenerator"
+        return "qsharp_hadamard_generator"
 
 
 class QiskitHadamardGenerator(HadamardTestGenerator):
@@ -111,7 +111,7 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
         state_preparation: Circuit,
         num_system_qubits: int,
         ctrl_time_evol_unitary_circuit: Circuit,
-        test_basis: str="X",
+        test_basis: str = "X",
     ) -> Circuit:
         r"""Build a Hadamard test circuit using the Qiskit backend.
 
@@ -149,7 +149,9 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
         try:
             ctrl_evol_qc = ctrl_time_evol_unitary_circuit.get_qiskit_circuit()
         except AttributeError:
-            raise ValueError("the input ctrl_time_evol_unitary_circuit circuit cannot be used for QiskitHadamardGenerator.")
+            raise ValueError(
+                "the input ctrl_time_evol_unitary_circuit circuit cannot be used for QiskitHadamardGenerator."
+            )
         circuit.append(ctrl_evol_qc.to_gate(), [control, *target_qubits])
 
         # Final basis rotation and measurement on the control qubit.
@@ -158,9 +160,7 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
         elif test_basis == "Y":
             circuit.sdg(control)
             circuit.h(control)
-        elif test_basis == "Z":
-            # do nothing here
-        else:
+        elif test_basis != "Z":  # if it is "Z", then do nothing; otherwise, raise error
             raise ValueError("currently test_basis can only be X, Y or Z.")
         circuit.measure(control, classical[0])
 
@@ -169,4 +169,4 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
 
     def name(self) -> str:
         """Return the name of the QiskitHadamardGenerator algorithm."""
-        return "QiskitHadamardGenerator"
+        return "qiskit_hadamard_generator"

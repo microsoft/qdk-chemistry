@@ -24,6 +24,7 @@ from qdk_chemistry.algorithms.active_space_selector import (
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator
 from qdk_chemistry.algorithms.energy_estimator import EnergyEstimator
+from qdk_chemistry.algorithms.hadamard_test.base import HadamardTestGenerator
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
@@ -88,6 +89,7 @@ __all__ = [
     "StabilityChecker",
     "StatePreparation",
     "TimeEvolutionBuilder",
+    "HadamardTestGenerator",
     # Factory functions
     "available",
     "create",

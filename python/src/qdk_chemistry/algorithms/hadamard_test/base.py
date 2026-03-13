@@ -59,4 +59,4 @@ class HadamardTestFactory(AlgorithmFactory):
 
     def default_algorithm_name(self) -> str:
         """Return the hadamard_test as default algorithm name."""
-        return "hadamard_test"
+        return "qsharp_hadamard_generator"

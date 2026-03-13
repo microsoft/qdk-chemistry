@@ -34,9 +34,9 @@ namespace QDKChemistry.Utils.HadamardTest {
         mutable basis = PauliX;
         if (testBasis == "X") {
             // Do nothing.
-        } else if (testBasis == "Y") {
+        } elif (testBasis == "Y") {
             set basis = PauliY;
-        } else if (testBasis == "Z") {
+        } elif (testBasis == "Z") {
             set basis = PauliZ;
         } else {
             fail "Invalid measurement basis.";
