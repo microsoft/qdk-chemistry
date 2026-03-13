@@ -49,17 +49,17 @@ class QsharpHadamardGenerator(HadamardTestGenerator):
 
         try:
             state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
-        except AttributeError:
-            raise ValueError("the input state_preparation circuit cannot be used for QsharpHadamardGenerator.")
+        except AttributeError as err:
+            raise ValueError("Input state_preparation cannot be used for QsharpHadamardGenerator.") from err
 
         try:
             ctrl_evol_op = ctrl_time_evol_unitary_circuit._qsharp_op  # noqa: SLF001
-        except AttributeError:
+        except AttributeError as err:
             raise ValueError(
-                "the input ctrl_time_evol_unitary_circuit circuit cannot be used for QsharpHadamardGenerator."
-            )
+                "Input ctrl_time_evol_unitary_circuit cannot be used for QsharpHadamardGenerator."
+            ) from err
 
-        systems = [i for i in range(1, num_system_qubits + 1)]
+        systems = list(i for i in range(1, num_system_qubits + 1))
         hadamard_test_qsc = qsharp.circuit(
             QSHARP_UTILS.HadamardTest.MakeHadamardCircuit,
             state_prep_op,
@@ -99,12 +99,6 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
         """
         Logger.trace_entering()
         super().__init__()
-        try:
-            from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
-        except ModuleNotFoundError as err:
-            raise ModuleNotFoundError(
-                "Qiskit is required to use QiskitHadamardGenerator. Install qiskit or use QsharpHadamardGenerator."
-            ) from err
 
     def _run_impl(
         self,
@@ -125,7 +119,12 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
             Circuit containing the OpenQASM3 representation of the Qiskit Hadamard test circuit.
 
         """
-        from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
+        try:
+            from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
+        except ModuleNotFoundError as err:
+            raise ModuleNotFoundError(
+                "Qiskit is required to use QiskitHadamardGenerator. Install qiskit or use QsharpHadamardGenerator."
+            ) from err
 
         # Build the base circuit with registers.
         ancilla = QuantumRegister(1, "ancilla")
@@ -136,8 +135,8 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
         # Apply state preparation.
         try:
             state_prep_qc = state_preparation.get_qiskit_circuit()
-        except AttributeError:
-            raise ValueError("the input state_preparation circuit cannot be used for QiskitHadamardGenerator.")
+        except (AttributeError, RuntimeError) as err:
+            raise ValueError("Input state_preparation cannot be used for QiskitHadamardGenerator.") from err
         circuit.append(state_prep_qc.to_gate(), system_target)
 
         # Prepare ancilla and apply controlled time evolution.
@@ -148,10 +147,10 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
 
         try:
             ctrl_evol_qc = ctrl_time_evol_unitary_circuit.get_qiskit_circuit()
-        except AttributeError:
+        except (AttributeError, RuntimeError) as err:
             raise ValueError(
-                "the input ctrl_time_evol_unitary_circuit circuit cannot be used for QiskitHadamardGenerator."
-            )
+                "Input ctrl_time_evol_unitary_circuit cannot be used for QiskitHadamardGenerator."
+            ) from err
         circuit.append(ctrl_evol_qc.to_gate(), [control, *target_qubits])
 
         # Final basis rotation and measurement on the control qubit.
