@@ -138,9 +138,7 @@ class Trotter(TimeEvolutionBuilder):
             TimeEvolutionUnitary: The time evolution unitary built by the Trotter decomposition.
 
         """
-        if self._settings.get("order") == 1:
-            return self._trotter(qubit_hamiltonian, time)
-        if self._settings.get("order") == 2:
+        if self._settings.get("order") in {1, 2}:
             return self._trotter(qubit_hamiltonian, time)
         raise NotImplementedError("Only orders 1 or 2 are currently supported.")
 
@@ -262,8 +260,7 @@ class Trotter(TimeEvolutionBuilder):
                 mapping = self._pauli_label_to_map(label)
                 angle = coeff * time / 2
                 terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
-        else:
-            raise NotImplementedError("Only orders 1 or 2 are currently supported.")
+
         return terms
 
     def name(self) -> str:
