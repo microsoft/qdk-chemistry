@@ -6,6 +6,7 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <string>
 #include <tuple>
 #include <type_traits>
 #include <vector>
@@ -13,6 +14,7 @@
 #include "qdk/chemistry/constants.hpp"
 #include "qdk/chemistry/data/hamiltonian_containers/sparse.hpp"
 #include "qdk/chemistry/data/lattice_graph.hpp"
+#include "qdk/chemistry/utils/logger.hpp"
 
 namespace qdk::chemistry::utils::model_hamiltonians {
 
@@ -36,25 +38,63 @@ constexpr bool is_pair_param_v =
     std::is_same_v<std::decay_t<T>, Eigen::MatrixXd>;
 
 /**
- * @brief Convert a per-site parameter to VectorXd. Pass-through for VectorXd.
+ * @brief Convert a per-site parameter to VectorXd with validation.
+ *
+ * For VectorXd input, validates that the vector length matches the number of
+ * lattice sites and returns a reference to the original vector.
+ * For double input, broadcasts to a constant VectorXd.
+ *
+ * @param v        Per-site parameter vector.
+ * @param lattice  Lattice graph whose site count defines the expected size.
+ * @param name     Parameter name used in error messages.
+ * @return Reference to the validated vector.
+ * @throws std::invalid_argument if the vector size does not match.
  */
-inline const Eigen::VectorXd& to_site_param(const Eigen::VectorXd& v, int) {
+inline const Eigen::VectorXd& to_site_param(
+    const Eigen::VectorXd& v, const qdk::chemistry::data::LatticeGraph& lattice,
+    const std::string& name = "parameter") {
+  auto n = static_cast<int>(lattice.num_sites());
+  if (static_cast<int>(v.size()) != n) {
+    throw std::invalid_argument(
+        name + " vector size must match the number of lattice sites.");
+  }
   return v;
 }
-/**
- * @brief Convert a scalar per-site parameter to a constant VectorXd of size n.
- */
-inline Eigen::VectorXd to_site_param(double val, int n) {
-  return Eigen::VectorXd::Constant(n, val);
+/** @brief Convert a scalar per-site parameter to a constant VectorXd. */
+inline Eigen::VectorXd to_site_param(
+    double val, const qdk::chemistry::data::LatticeGraph& lattice,
+    const std::string& = "parameter") {
+  return Eigen::VectorXd::Constant(static_cast<int>(lattice.num_sites()), val);
 }
+
 /**
- * @brief Convert a per-pair parameter to MatrixXd. Pass-through for MatrixXd.
+ * @brief Convert a per-pair parameter to MatrixXd with validation.
+ *
+ * For MatrixXd input, validates that both dimensions match the number of
+ * lattice sites and returns a reference to the original matrix.
+ * For double input, broadcasts to a constant n x n MatrixXd.
+ *
+ * @param m        Per-pair parameter matrix.
+ * @param lattice  Lattice graph whose site count defines the expected size.
+ * @param name     Parameter name used in error messages.
+ * @return Reference to the validated matrix.
+ * @throws std::invalid_argument if the matrix dimensions do not match.
  */
-inline const Eigen::MatrixXd& to_pair_param(const Eigen::MatrixXd& m, int) {
+inline const Eigen::MatrixXd& to_pair_param(
+    const Eigen::MatrixXd& m, const qdk::chemistry::data::LatticeGraph& lattice,
+    const std::string& name = "parameter") {
+  auto n = static_cast<int>(lattice.num_sites());
+  if (static_cast<int>(m.rows()) != n || static_cast<int>(m.cols()) != n) {
+    throw std::invalid_argument(
+        name + " matrix dimensions must match the number of lattice sites.");
+  }
   return m;
 }
 /** @brief Convert a scalar per-pair parameter to a constant n x n MatrixXd. */
-inline Eigen::MatrixXd to_pair_param(double val, int n) {
+inline Eigen::MatrixXd to_pair_param(
+    double val, const qdk::chemistry::data::LatticeGraph& lattice,
+    const std::string& = "parameter") {
+  auto n = static_cast<int>(lattice.num_sites());
   return Eigen::MatrixXd::Constant(n, n, val);
 }
 
@@ -85,6 +125,7 @@ template <typename EpsT, typename TT>
 inline Eigen::SparseMatrix<double> _build_huckel_integrals(
     const qdk::chemistry::data::LatticeGraph& lattice, EpsT&& epsilon_in,
     TT&& t_in) {
+  QDK_LOG_TRACE_ENTERING();
   // Check template types
   static_assert(detail::is_site_param_v<EpsT>,
                 "epsilon must be double or Eigen::VectorXd");
@@ -93,18 +134,10 @@ inline Eigen::SparseMatrix<double> _build_huckel_integrals(
 
   auto n = static_cast<int>(lattice.num_sites());
   const auto& epsilon =
-      detail::to_site_param(std::forward<EpsT>(epsilon_in), n);
-  const auto& t = detail::to_pair_param(std::forward<TT>(t_in), n);
+      detail::to_site_param(std::forward<EpsT>(epsilon_in), lattice, "epsilon");
+  const auto& t = detail::to_pair_param(std::forward<TT>(t_in), lattice, "t");
 
-  // Check dimensions and lattice symmetry
-  if (n != epsilon.size()) {
-    throw std::invalid_argument(
-        "Epsilon vector size must match the number of lattice sites.");
-  }
-  if (n != t.rows() || n != t.cols()) {
-    throw std::invalid_argument(
-        "T matrix dimensions must match the number of lattice sites.");
-  }
+  // Check lattice properties
   if (lattice.is_symmetric() == false) {
     throw std::invalid_argument(
         "Lattice graph must be symmetric for a valid Hamiltonian.");
@@ -168,6 +201,7 @@ inline std::tuple<Eigen::SparseMatrix<double>,
                   qdk::chemistry::data::SparseHamiltonianContainer::TwoBodyMap>
 _build_hubbard_integrals(const qdk::chemistry::data::LatticeGraph& lattice,
                          EpsT&& epsilon_in, TT&& t_in, UT&& U_in) {
+  QDK_LOG_TRACE_ENTERING();
   // Check template types
   static_assert(detail::is_site_param_v<EpsT>,
                 "epsilon must be double or Eigen::VectorXd");
@@ -176,16 +210,11 @@ _build_hubbard_integrals(const qdk::chemistry::data::LatticeGraph& lattice,
   static_assert(detail::is_site_param_v<UT>,
                 "U must be double or Eigen::VectorXd");
 
-  // check dimensions and lattice symmetry
   auto n = static_cast<int>(lattice.num_sites());
   const auto& epsilon =
-      detail::to_site_param(std::forward<EpsT>(epsilon_in), n);
-  const auto& t = detail::to_pair_param(std::forward<TT>(t_in), n);
-  const auto& U = detail::to_site_param(std::forward<UT>(U_in), n);
-  if (n != U.size()) {
-    throw std::invalid_argument(
-        "U vector size must match the number of lattice sites.");
-  }
+      detail::to_site_param(std::forward<EpsT>(epsilon_in), lattice, "epsilon");
+  const auto& t = detail::to_pair_param(std::forward<TT>(t_in), lattice, "t");
+  const auto& U = detail::to_site_param(std::forward<UT>(U_in), lattice, "U");
 
   // Build the one-body part using the Hückel constructor
   auto h1 = _build_huckel_integrals(lattice, epsilon, t);
@@ -229,6 +258,7 @@ inline std::tuple<Eigen::SparseMatrix<double>,
 _build_ppp_integrals(const qdk::chemistry::data::LatticeGraph& lattice,
                      EpsT&& epsilon_in, TT&& t_in, UT&& U_in, VT&& V_in,
                      ZT&& z_in) {
+  QDK_LOG_TRACE_ENTERING();
   // Check template types
   static_assert(detail::is_site_param_v<EpsT>,
                 "epsilon must be double or Eigen::VectorXd");
@@ -241,22 +271,13 @@ _build_ppp_integrals(const qdk::chemistry::data::LatticeGraph& lattice,
   static_assert(detail::is_site_param_v<ZT>,
                 "z must be double or Eigen::VectorXd");
 
-  // Check dimensions and lattice symmetry
   auto n = static_cast<int>(lattice.num_sites());
   const auto& epsilon =
-      detail::to_site_param(std::forward<EpsT>(epsilon_in), n);
-  const auto& t = detail::to_pair_param(std::forward<TT>(t_in), n);
-  const auto& U = detail::to_site_param(std::forward<UT>(U_in), n);
-  const auto& V = detail::to_pair_param(std::forward<VT>(V_in), n);
-  const auto& z = detail::to_site_param(std::forward<ZT>(z_in), n);
-  if (n != V.rows() || n != V.cols()) {
-    throw std::invalid_argument(
-        "V matrix dimensions must match the number of lattice sites.");
-  }
-  if (n != z.size()) {
-    throw std::invalid_argument(
-        "z vector size must match the number of lattice sites.");
-  }
+      detail::to_site_param(std::forward<EpsT>(epsilon_in), lattice, "epsilon");
+  const auto& t = detail::to_pair_param(std::forward<TT>(t_in), lattice, "t");
+  const auto& U = detail::to_site_param(std::forward<UT>(U_in), lattice, "U");
+  const auto& V = detail::to_pair_param(std::forward<VT>(V_in), lattice, "V");
+  const auto& z = detail::to_site_param(std::forward<ZT>(z_in), lattice, "z");
 
   // Build the Hubbard part using the Hubbard integral builder
   auto [h1_sparse, h2] = _build_hubbard_integrals(lattice, epsilon, t, U);
@@ -303,6 +324,7 @@ template <typename EpsT, typename TT>
 inline qdk::chemistry::data::Hamiltonian create_huckel_hamiltonian(
     const qdk::chemistry::data::LatticeGraph& lattice, EpsT&& epsilon_in,
     TT&& t_in) {
+  QDK_LOG_TRACE_ENTERING();
   auto h1 = detail::_build_huckel_integrals(
       lattice, std::forward<EpsT>(epsilon_in), std::forward<TT>(t_in));
   return qdk::chemistry::data::Hamiltonian(
@@ -326,6 +348,7 @@ template <typename EpsT, typename TT, typename UT>
 inline qdk::chemistry::data::Hamiltonian create_hubbard_hamiltonian(
     const qdk::chemistry::data::LatticeGraph& lattice, EpsT&& epsilon_in,
     TT&& t_in, UT&& U_in) {
+  QDK_LOG_TRACE_ENTERING();
   auto [h1, h2] = detail::_build_hubbard_integrals(
       lattice, std::forward<EpsT>(epsilon_in), std::forward<TT>(t_in),
       std::forward<UT>(U_in));
@@ -354,6 +377,7 @@ template <typename EpsT, typename TT, typename UT, typename VT, typename ZT>
 inline qdk::chemistry::data::Hamiltonian create_ppp_hamiltonian(
     const qdk::chemistry::data::LatticeGraph& lattice, EpsT&& epsilon_in,
     TT&& t_in, UT&& U_in, VT&& V_in, ZT&& z_in) {
+  QDK_LOG_TRACE_ENTERING();
   auto [h1, h2, core_energy] = detail::_build_ppp_integrals(
       lattice, std::forward<EpsT>(epsilon_in), std::forward<TT>(t_in),
       std::forward<UT>(U_in), std::forward<VT>(V_in), std::forward<ZT>(z_in));
@@ -389,6 +413,7 @@ template <typename UT, typename RT, typename PotentialFunc>
 inline Eigen::MatrixXd pairwise_potential(
     const qdk::chemistry::data::LatticeGraph& lattice, UT&& U_in, RT&& R_in,
     PotentialFunc&& func, bool nearest_neighbor_only = false) {
+  QDK_LOG_TRACE_ENTERING();
   // Check template types
   static_assert(detail::is_site_param_v<UT>,
                 "U must be double or Eigen::VectorXd");
@@ -398,18 +423,9 @@ inline Eigen::MatrixXd pairwise_potential(
       std::is_invocable_r_v<double, PotentialFunc, int, int, double, double>,
       "func must be callable as double(int, int, double, double)");
 
-  // Check dimensions and lattice symmetry
   auto n = static_cast<int>(lattice.num_sites());
-  const auto& U = detail::to_site_param(std::forward<UT>(U_in), n);
-  const auto& R = detail::to_pair_param(std::forward<RT>(R_in), n);
-  if (n != U.size()) {
-    throw std::invalid_argument(
-        "U vector size must match the number of lattice sites.");
-  }
-  if (n != R.rows() || n != R.cols()) {
-    throw std::invalid_argument(
-        "R matrix dimensions must match the number of lattice sites.");
-  }
+  const auto& U = detail::to_site_param(std::forward<UT>(U_in), lattice, "U");
+  const auto& R = detail::to_pair_param(std::forward<RT>(R_in), lattice, "R");
 
   // Compute pairwise potential matrix
   Eigen::MatrixXd V = Eigen::MatrixXd::Zero(n, n);
@@ -449,6 +465,7 @@ template <typename UT, typename RT>
 inline Eigen::MatrixXd ohno_potential(
     const qdk::chemistry::data::LatticeGraph& lattice, UT&& U, RT&& R,
     double epsilon_r = 1.0, bool nearest_neighbor_only = false) {
+  QDK_LOG_TRACE_ENTERING();
   // Check template types
   static_assert(detail::is_site_param_v<UT>,
                 "U must be double or Eigen::VectorXd");
@@ -487,6 +504,7 @@ template <typename UT, typename RT>
 inline Eigen::MatrixXd mataga_nishimoto_potential(
     const qdk::chemistry::data::LatticeGraph& lattice, UT&& U, RT&& R,
     double epsilon_r = 1.0, bool nearest_neighbor_only = false) {
+  QDK_LOG_TRACE_ENTERING();
   // Check template types
   static_assert(detail::is_site_param_v<UT>,
                 "U must be double or Eigen::VectorXd");
