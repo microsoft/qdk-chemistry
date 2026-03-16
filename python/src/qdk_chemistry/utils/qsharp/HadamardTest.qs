@@ -33,16 +33,14 @@ namespace QDKChemistry.Utils.HadamardTest {
 
         mutable basis = PauliX;
         if (testBasis == "X") {
-            // Do nothing.
+            H(control_q);
         } elif (testBasis == "Y") {
-            set basis = PauliY;
-        } elif (testBasis == "Z") {
-            set basis = PauliZ;
-        } else {
+            Adjoint S(control_q);
+            H(control_q);
+        } elif (testBasis != "Z") {
             fail "Invalid measurement basis.";
         }
-        let result = Measure([basis], [control_q]);
-        ResetAll(qs);
-        return [result];
+        ResetAll(system_q);
+        return [MResetZ(control_q)];
     }
 }

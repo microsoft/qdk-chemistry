@@ -7,7 +7,7 @@
 
 from qdk import qsharp
 
-from qdk_chemistry.algorithms.hadamard_test.base import HadamardTestGenerator
+from qdk_chemistry.algorithms.hadamard_test_generator.base import HadamardTestGenerator
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -33,6 +33,7 @@ class QsharpHadamardGenerator(HadamardTestGenerator):
         test_basis: str = "X",
     ) -> Circuit:
         r"""Build a Hadamard test circuit using the Q# backend.
+
         Currently, the function only accepts the controlled unitary circuit whose index of ancilla qubit is 0.
 
         Args:
@@ -49,11 +50,11 @@ class QsharpHadamardGenerator(HadamardTestGenerator):
             raise ValueError("currently test_basis can only be X, Y or Z.")
 
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
-        if state_prep_op == None:
+        if state_prep_op is None:
             raise ValueError("Input state_preparation cannot be used for QsharpHadamardGenerator.")
 
         ctrl_evol_op = ctrl_time_evol_unitary_circuit._qsharp_op  # noqa: SLF001
-        if ctrl_evol_op == None:
+        if ctrl_evol_op is None:
             raise ValueError("Input ctrl_time_evol_unitary_circuit cannot be used for QsharpHadamardGenerator.")
 
         systems = list(i for i in range(1, num_system_qubits + 1))
@@ -105,6 +106,7 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
         test_basis: str = "X",
     ) -> Circuit:
         r"""Build a Hadamard test circuit using the Qiskit backend.
+
         Currently, the function only accepts the controlled unitary circuit whose index of ancilla qubit is 0.
 
         Args:

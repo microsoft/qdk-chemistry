@@ -506,7 +506,7 @@ def _register_python_factories():
     """
     from qdk_chemistry.algorithms.circuit_executor import CircuitExecutorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory  # noqa: PLC0415
-    from qdk_chemistry.algorithms.hadamard_test import HadamardTestFactory
+    from qdk_chemistry.algorithms.hadamard_test_generator import HadamardTestFactory
     from qdk_chemistry.algorithms.phase_estimation import PhaseEstimationFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolverFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
@@ -578,7 +578,7 @@ def _register_python_algorithms():
     """
     from qdk_chemistry.algorithms.circuit_executor.qdk import QdkFullStateSimulator  # noqa: PLC0415
     from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator  # noqa: PLC0415
-    from qdk_chemistry.algorithms.hadamard_test.hadamard_test_generator import (
+    from qdk_chemistry.algorithms.hadamard_test_generator.hadamard_test_generator import (
         QiskitHadamardGenerator,
         QsharpHadamardGenerator,
     )
