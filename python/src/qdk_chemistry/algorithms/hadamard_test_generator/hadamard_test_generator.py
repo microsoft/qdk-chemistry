@@ -47,7 +47,7 @@ class QsharpHadamardGenerator(HadamardTestGenerator):
 
         """
         if test_basis not in {"X", "Y", "Z"}:
-            raise ValueError("currently test_basis can only be X, Y or Z.")
+            raise ValueError(f'Invalid value for test_basis: {test_basis!r}. Allowed values are "X", "Y", and "Z".')
 
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         if state_prep_op is None:
@@ -160,7 +160,7 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
             circuit.sdg(control)
             circuit.h(control)
         elif test_basis != "Z":  # if it is "Z", then do nothing; otherwise, raise error
-            raise ValueError("currently test_basis can only be X, Y or Z.")
+            raise ValueError(f'Invalid value for test_basis: {test_basis!r}. Allowed values are "X", "Y", and "Z".')
         circuit.measure(control, classical[0])
 
         Logger.info("Completed qiskit circuit for real observable measurement.")

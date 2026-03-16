@@ -33,6 +33,7 @@ class HadamardTestGenerator(Algorithm):
         test_basis: str = "X",
     ) -> Circuit:
         r"""Run the Hadamard test algorithm for a given state and controlled unitary.
+
         Currently, the function only accepts the controlled unitary circuit whose index of ancilla qubit is 0.
 
         Args:

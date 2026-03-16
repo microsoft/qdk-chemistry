@@ -31,7 +31,6 @@ namespace QDKChemistry.Utils.HadamardTest {
         H(control_q);
         repControlledEvolution(control_q, system_q);
 
-        mutable basis = PauliX;
         if (testBasis == "X") {
             H(control_q);
         } elif (testBasis == "Y") {

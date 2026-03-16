@@ -63,6 +63,7 @@ __all__ = [
     "ControlledEvolutionCircuitMapper",
     "DynamicalCorrelationCalculator",
     "EnergyEstimator",
+    "HadamardTestGenerator",
     "HamiltonianConstructor",
     "MultiConfigurationCalculator",
     "MultiConfigurationScf",
@@ -89,7 +90,6 @@ __all__ = [
     "StabilityChecker",
     "StatePreparation",
     "TimeEvolutionBuilder",
-    "HadamardTestGenerator",
     # Factory functions
     "available",
     "create",

@@ -54,7 +54,11 @@ def _measure_observable(
     test_basis: str = "X",
     shots: int = _SHOTS,
 ) -> float:
-    """Measure Re(<psi|U|psi>) with a Hadamard test circuit and simulator."""
+    """Measure the Hadamard-test expectation value for the given basis.
+
+    For ``test_basis="X"``, this equals ``Re(<psi|U|psi>)``; for ``test_basis="Y"``,
+    it corresponds (up to a sign convention) to ``Im(<psi|U|psi>)``.
+    """
     circuit = generator.run(
         state_preparation,
         num_system_qubits,
@@ -102,7 +106,7 @@ def water_hadamard_benchmark() -> HadamardWaterBenchmark:
     hamiltonian_constructor = create("hamiltonian_constructor")
     active_hamiltonian = hamiltonian_constructor.run(active_wfn.get_orbitals())
 
-    qubit_mapper = create("qubit_mapper", algorithm_name="qiskit", encoding="jordan-wigner")
+    qubit_mapper = create("qubit_mapper", algorithm_name="qdk", encoding="jordan-wigner")
     qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
 
     state_prep_builder = create("state_prep", algorithm_name="sparse_isometry_gf2x")
@@ -114,7 +118,7 @@ def water_hadamard_benchmark() -> HadamardWaterBenchmark:
 
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
     circuit_mapper.settings().update("power", _OBSERVABLE_POWER)
-    ctrl_time_evolution_circuit = circuit_mapper._run_impl(controlled_evolution=controlled_evolution)
+    ctrl_time_evolution_circuit = circuit_mapper.run(controlled_evolution=controlled_evolution)
 
     return HadamardWaterBenchmark(
         num_system_qubits=qubit_hamiltonian.num_qubits,
@@ -241,8 +245,8 @@ def test_qsharp_hadamard_generator_rejects_incompatible_input_circuits(
 ) -> None:
     """Q# generator raises errors when input circuits do not expose Q# operations."""
     generator = QsharpHadamardGenerator()
-    bad_state_preparation_circuit = Circuit(qasm=water_hadamard_benchmark.state_preparation.get_qasm())
-    bad_ctrl_time_evolution_circuit = Circuit(qasm=water_hadamard_benchmark.ctrl_time_evolution_circuit.get_qasm())
+    bad_state_preparation_circuit = Circuit(qasm="bad_state_preparation")
+    bad_ctrl_time_evolution_circuit = Circuit(qasm="bad_state_preparation")
 
     with pytest.raises(ValueError, match="state_preparation"):
         generator.run(bad_state_preparation_circuit, 1, water_hadamard_benchmark.ctrl_time_evolution_circuit, "X")
