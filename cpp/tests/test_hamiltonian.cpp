@@ -1709,12 +1709,12 @@ TEST_F(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {
   Eigen::VectorXd two_body_2x2 = 2 * Eigen::VectorXd::Ones(16);  // 2^4 = 16
 
   // Create appropriate inactive Fock matrix for the inactive space
-  Eigen::MatrixXd inactive_fock_2x2 = Eigen::MatrixXd::Zero(2, 2);
+  Eigen::MatrixXd inactive_fock_3x3 = Eigen::MatrixXd::Zero(3, 3);
 
   Hamiltonian h_active_space(
       std::make_unique<CanonicalFourCenterHamiltonianContainer>(
           one_body_2x2, two_body_2x2, orbitals_with_active_space, core_energy,
-          inactive_fock_2x2));
+          inactive_fock_3x3));
 
   // Should successfully write FCIDUMP using active space dimensions
   EXPECT_NO_THROW({
