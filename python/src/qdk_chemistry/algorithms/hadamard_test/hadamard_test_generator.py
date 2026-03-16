@@ -33,6 +33,7 @@ class QsharpHadamardGenerator(HadamardTestGenerator):
         test_basis: str = "X",
     ) -> Circuit:
         r"""Build a Hadamard test circuit using the Q# backend.
+        Currently, the function only accepts the controlled unitary circuit whose index of ancilla qubit is 0.
 
         Args:
             state_preparation: Circuit that prepares the trial state on system qubits.
@@ -47,17 +48,13 @@ class QsharpHadamardGenerator(HadamardTestGenerator):
         if test_basis not in {"X", "Y", "Z"}:
             raise ValueError("currently test_basis can only be X, Y or Z.")
 
-        try:
-            state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
-        except AttributeError as err:
-            raise ValueError("Input state_preparation cannot be used for QsharpHadamardGenerator.") from err
+        state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
+        if state_prep_op == None:
+            raise ValueError("Input state_preparation cannot be used for QsharpHadamardGenerator.")
 
-        try:
-            ctrl_evol_op = ctrl_time_evol_unitary_circuit._qsharp_op  # noqa: SLF001
-        except AttributeError as err:
-            raise ValueError(
-                "Input ctrl_time_evol_unitary_circuit cannot be used for QsharpHadamardGenerator."
-            ) from err
+        ctrl_evol_op = ctrl_time_evol_unitary_circuit._qsharp_op  # noqa: SLF001
+        if ctrl_evol_op == None:
+            raise ValueError("Input ctrl_time_evol_unitary_circuit cannot be used for QsharpHadamardGenerator.")
 
         systems = list(i for i in range(1, num_system_qubits + 1))
         hadamard_test_qsc = qsharp.circuit(
@@ -108,6 +105,7 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
         test_basis: str = "X",
     ) -> Circuit:
         r"""Build a Hadamard test circuit using the Qiskit backend.
+        Currently, the function only accepts the controlled unitary circuit whose index of ancilla qubit is 0.
 
         Args:
             state_preparation: Circuit that prepares the trial state on system qubits.
