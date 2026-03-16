@@ -248,6 +248,22 @@ void HamiltonianContainer::validate_active_space_dimensions() const {
         "For restricted Hamiltonian, alpha and beta active spaces must have "
         "same size");
   }
+
+  if (has_inactive_fock_matrix()) {
+    if (_inactive_fock_matrix.first->rows() !=
+        _orbitals->get_num_molecular_orbitals()) {
+      throw std::invalid_argument(
+          "Alpha inactive Fock matrix dimension does not match number of "
+          "molecular orbitals");
+    }
+
+    if (_inactive_fock_matrix.second->rows() !=
+        _orbitals->get_num_molecular_orbitals()) {
+      throw std::invalid_argument(
+          "Beta inactive Fock matrix dimension does not match number of "
+          "molecular orbitals");
+    }
+  }
 }
 
 std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
