@@ -28,14 +28,14 @@ The table below summarizes which [optional extras](https://github.com/microsoft/
 | `factory_list.ipynb` | `pip install 'qdk-chemistry[plugins]'` |
 | `interoperability/pennylane/` | `pip install pennylane` |
 | `interoperability/qiskit/` | `pip install 'qdk-chemistry[qiskit-extras]'` |
-| `interoperability/openFermion/` | `pip install openfermion` |
+| `interoperability/openFermion/` | `pip install 'qdk-chemistry[openfermion-extras]'` |
 | `interoperability/rdkit/` | `pip install rdkit` |
 
 To install everything needed for all examples at once:
 
 ```bash
 python -m pip install 'qdk-chemistry[all]'
-pip install pennylane openfermion rdkit
+python -m pip install pennylane rdkit
 ```
 
 ## Standalone examples and data

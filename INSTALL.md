@@ -91,10 +91,10 @@ To install everything:
 python -m pip install 'qdk-chemistry[all]'
 ```
 
-To run the OpenFermion integration example tests, you will also need to install `openfermion` and `rdkit`:
+To run the OpenFermion integration example tests, you will also need to install `rdkit`:
 
 ```bash
-python3 -m pip install openfermion rdkit
+python3 -m pip install rdkit
 ```
 
 Installing with the `dev` option allows you to run the tests in the `python/tests` directory of the source repository you cloned above.
