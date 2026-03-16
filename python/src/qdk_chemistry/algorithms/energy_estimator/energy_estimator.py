@@ -5,17 +5,21 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from __future__ import annotations
-
-import re
-from typing import Any
-
 import numpy as np
+import qsharp
 
+from qdk_chemistry._core.utils import pauli_string_to_masks
+from qdk_chemistry.algorithms import CircuitExecutor
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import Circuit, EnergyExpectationResult, QubitHamiltonian
-from qdk_chemistry.data.qubit_hamiltonian import _pauli_string_to_masks
+from qdk_chemistry.data import (
+    Circuit,
+    EnergyExpectationResult,
+    MeasurementData,
+    QuantumErrorProfile,
+    QubitHamiltonian,
+)
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 __all__: list[str] = []
 
@@ -28,9 +32,6 @@ def _parity(integer: int) -> int:
 def _paulis_to_nonid_masks(pauli_strings: list[str]) -> list[int]:
     """Converts a list of Pauli operators into a list of non-identity bitmasks.
 
-    Reuses ``_pauli_string_to_masks`` from ``qubit_hamiltonian`` to produce
-    integer masks where each set bit corresponds to a non-identity Pauli.
-
     Example:
         ["IZ", "ZX", "YZ", "ZY"] -> [1, 3, 3, 3]
 
@@ -41,8 +42,7 @@ def _paulis_to_nonid_masks(pauli_strings: list[str]) -> list[int]:
         A list of integer bitmasks (``x_mask | z_mask``) for each operator.
 
     """
-    n = len(pauli_strings[0])
-    return [x | z for x, z, _ in (_pauli_string_to_masks(ps, n) for ps in pauli_strings)]
+    return [x | z for x, z, _ in (pauli_string_to_masks(ps) for ps in pauli_strings)]
 
 
 def _compute_expval_and_variance_from_bitstrings(
@@ -120,50 +120,54 @@ def _determine_measurement_basis(pauli_strings: list[str]) -> str:
     return "".join(basis)
 
 
-def _append_measurement_to_qasm3(base_qasm: str, basis: str) -> str:
-    """Append measurement basis rotation and measurement to a QASM3 circuit string.
-
-    For each non-identity position in *basis*, the appropriate single-qubit
-    rotation is emitted followed by a measurement instruction:
-
-    * ``X`` basis: ``h`` then ``measure``
-    * ``Y`` basis: ``sdg`` then ``h`` then ``measure``
-    * ``Z`` basis: ``measure`` directly
+def _append_measurement_to_circuit(base_circuit: Circuit, m_basis: str) -> Circuit:
+    """Append measurement operations to a base circuit according to the specified measurement basis.
 
     Args:
-        base_qasm: Base circuit in QASM3 format (without measurements).
-        basis: Pauli label string (e.g. ``"YZI"``) using the standard label
-            convention where ``basis[0]`` = highest qubit (MSB).
+        base_circuit: The original quantum circuit to which measurement operations will be appended.
+        m_basis: Pauli label string (e.g. ``"YZI"``).
 
     Returns:
-        Complete QASM3 circuit string with measurement appended.
+        Circuit: The modified circuit with measurement operations appended.
 
     """
-    n_qubits = len(basis)
+    if base_circuit._qsharp_op:  # noqa: SLF001
+        pauli_base = []
+        for pauli in reversed(m_basis):
+            pauli_base.append(getattr(qsharp.Pauli, pauli))
+        qsharp_factory = [
+            QSHARP_UTILS.MeasurementBasis.MakeMeasurementCircuit,
+            base_circuit._qsharp_op,  # noqa: SLF001
+            pauli_base,
+            len(m_basis),
+        ]
+        qsc = qsharp.circuit(*qsharp_factory)
+        qir = qsharp.compile(*qsharp_factory)
+        return Circuit(qsharp=qsc, qir=qir)
 
-    # Resolve qubit register name from the QASM3 header
-    match = re.search(r"qubit\[(\d+)\]\s+(\w+)\s*;", base_qasm)
-    q_name = match.group(2) if match else "q"
-
-    # Map label positions to physical qubit indices: basis[j] -> qubit (n-1-j)
-    active = sorted(
-        ((n_qubits - 1 - j, ch) for j, ch in enumerate(basis) if ch != "I"),
-        key=lambda t: t[0],
-    )
-    n_meas = len(active)
-    if n_meas == 0:
-        return base_qasm
-
-    lines = [f"bit[{n_meas}] c;"]
-    for cidx, (qidx, pauli) in enumerate(active):
-        if pauli == "Y":
-            lines.append(f"sdg {q_name}[{qidx}];")
-            lines.append(f"h {q_name}[{qidx}];")
-        elif pauli == "X":
-            lines.append(f"h {q_name}[{qidx}];")
-        lines.append(f"c[{cidx}] = measure {q_name}[{qidx}];")
-
-    return base_qasm.rstrip() + "\n" + "\n".join(lines) + "\n"
+    try:
+        from qiskit import (  # noqa: PLC0415
+            ClassicalRegister,
+            QuantumCircuit,
+            QuantumRegister,
+            qasm3,
+        )
+        from qiskit.quantum_info import Pauli  # noqa: PLC0415
+    except ImportError as err:
+        raise ImportError("Qiskit is required to use Qiskit circuits with EnergyEstimator.") from err
+    base_circuit = base_circuit.get_qiskit_circuit()
+    basis = Pauli(m_basis)
+    active = np.arange(basis.num_qubits)[basis.z | basis.x]
+    qreg = QuantumRegister(basis.num_qubits, "q")
+    creg = ClassicalRegister(len(active), "c")
+    qc = QuantumCircuit(qreg, creg)
+    for cidx, qidx in enumerate(active):
+        if basis.x[qidx]:
+            if basis.z[qidx]:
+                qc.sdg(qreg[qidx])  # If x=1 and z=1, Y basis
+            qc.h(qreg[qidx])  # If x=1 and z=0, X basis
+        qc.measure(qreg[qidx], creg[cidx])
+    return Circuit(qasm=qasm3.dumps(qc))
 
 
 class EnergyEstimator(Algorithm):
@@ -177,19 +181,21 @@ class EnergyEstimator(Algorithm):
         """Return ``energy_estimator`` as the algorithm type name."""
         return "energy_estimator"
 
-    def run(
+    def _run_impl(
         self,
         circuit: Circuit,
         qubit_hamiltonians: list[QubitHamiltonian],
+        circuit_executor: CircuitExecutor,
         total_shots: int,
-        noise_model: Any | None = None,
+        noise_model: QuantumErrorProfile | None = None,
         classical_coeffs: list | None = None,
     ) -> EnergyExpectationResult:
         """Estimate the expectation value and variance of Hamiltonians.
 
         Args:
-            circuit: Circuit that provides an OpenQASM3 string of the quantum circuit to be evaluated.
+            circuit: Circuit.
             qubit_hamiltonians: List of ``QubitHamiltonian`` to estimate.
+            circuit_executor: An instance of ``CircuitExecutor`` to run quantum circuits.
             total_shots: Total number of shots to allocate across the observable terms.
             noise_model: Optional noise model to simulate noise in the quantum circuit.
             classical_coeffs: Optional list of coefficients for classical Pauli terms to calculate energy offset.
@@ -205,7 +211,37 @@ class EnergyEstimator(Algorithm):
         """
         # This function definition is not required it is present to add type hints and docstrings
         #  for the derived classes specialized run() method.
-        return super().run(circuit, qubit_hamiltonians, total_shots, noise_model, classical_coeffs)
+        Logger.trace_entering()
+        num_observables = len(qubit_hamiltonians)
+        if total_shots < num_observables:
+            raise ValueError(
+                f"Total shots {total_shots} is less than the number of observables {num_observables}. "
+                "Please increase total shots to ensure each observable is measured."
+            )
+
+        # Evenly distribute shots across all observables
+        shots_list = [total_shots // num_observables] * num_observables
+        Logger.debug(f"Shots allocated: {shots_list}")
+
+        energy_offset = sum(classical_coeffs) if classical_coeffs else 0.0
+
+        # Create measurement circuits
+        measurement_circuits = self._create_measurement_circuits(
+            circuit=circuit,
+            grouped_hamiltonians=qubit_hamiltonians,
+        )
+
+        measurement_data = self._get_measurement_data(
+            measurement_circuits=measurement_circuits,
+            qubit_hamiltonians=qubit_hamiltonians,
+            circuit_executor=circuit_executor,
+            shots_list=shots_list,
+            noise_model=noise_model,
+        )
+
+        return self._compute_energy_expectation_from_bitstrings(
+            qubit_hamiltonians, measurement_data.bitstring_counts, energy_offset
+        ), measurement_data
 
     @staticmethod
     def _create_measurement_circuits(circuit: Circuit, grouped_hamiltonians: list[QubitHamiltonian]) -> list[Circuit]:
@@ -221,22 +257,11 @@ class EnergyEstimator(Algorithm):
         """
         Logger.trace_entering()
         meas_circuits = []
-        base_qasm = circuit.get_qasm()
-
-        # Validate qubit count from the QASM3 header
-        qreg_match = re.search(r"qubit\[(\d+)\]", base_qasm)
-        if qreg_match:
-            circuit_num_qubits = int(qreg_match.group(1))
-            if circuit_num_qubits != grouped_hamiltonians[0].num_qubits:
-                raise ValueError(
-                    f"Number of qubits in the base circuit ({circuit_num_qubits}) does not match "
-                    f"the number of qubits in the Hamiltonian ({grouped_hamiltonians[0].num_qubits})."
-                )
 
         for hamiltonian in grouped_hamiltonians:
             basis = _determine_measurement_basis(hamiltonian.pauli_strings)
-            full_qasm = _append_measurement_to_qasm3(base_qasm, basis)
-            meas_circuits.append(Circuit(qasm=full_qasm))
+            full_circuit = _append_measurement_to_circuit(circuit, basis)
+            meas_circuits.append(full_circuit)
 
         return meas_circuits
 
@@ -285,6 +310,69 @@ class EnergyEstimator(Algorithm):
             variances_each_term=vars_list,
         )
 
+    def _run_measurement_circuits_and_get_bitstring_counts(
+        self,
+        measurement_circuits: list[Circuit],
+        circuit_executor: CircuitExecutor,
+        shots_list: list[int],
+        noise_model: QuantumErrorProfile | None = None,
+    ) -> list[dict[str, int]]:
+        """Run the measurement circuits and return the bitstring counts.
+
+        Args:
+            measurement_circuits: A list of Circuits that provide measurement circuits in OpenQASM3 format to run.
+            circuit_executor: An instance of CircuitExecutor to run the circuits.
+            shots_list: A list of shots allocated for each measurement circuit.
+            noise_model: Optional noise model to simulate noise in the quantum circuit.
+
+        Returns:
+            A list of dictionaries containing the bitstring counts for each measurement circuit.
+
+        """
+        all_bitstring_counts: list[dict[str, int]] = []
+        for circuit, shots in zip(measurement_circuits, shots_list, strict=True):
+            result = circuit_executor.run(
+                circuit,
+                shots=shots,
+                noise=noise_model,
+            )
+            all_bitstring_counts.append(result.bitstring_counts if result and result.bitstring_counts else {})
+        return all_bitstring_counts
+
+    def _get_measurement_data(
+        self,
+        measurement_circuits: list[Circuit],
+        qubit_hamiltonians: list[QubitHamiltonian],
+        circuit_executor: CircuitExecutor,
+        shots_list: list[int],
+        noise_model: QuantumErrorProfile | None = None,
+    ) -> MeasurementData:
+        """Get ``MeasurementData`` from running measurement circuits.
+
+        Args:
+            measurement_circuits: A list of measurement circuits to run.
+            qubit_hamiltonians: A list of ``QubitHamiltonian`` to be evaluated.
+            circuit_executor: An instance of ``CircuitExecutor`` to run the circuits.
+            shots_list: A list of shots allocated for each measurement circuit.
+            noise_model: Optional noise model to simulate noise in the quantum circuit.
+
+        Returns:
+            MeasurementData: Measurement counts paired with their corresponding ``QubitHamiltonian`` objects.
+
+        """
+        counts = self._run_measurement_circuits_and_get_bitstring_counts(
+            measurement_circuits, circuit_executor, shots_list, noise_model
+        )
+        return MeasurementData(
+            bitstring_counts=counts,
+            hamiltonians=qubit_hamiltonians,
+            shots_list=shots_list,
+        )
+
+    def name(self) -> str:
+        """Get the name of the estimator for registry purposes."""
+        return "qdk"
+
 
 class EnergyEstimatorFactory(AlgorithmFactory):
     """Factory class for creating EnergyEstimator instances."""
@@ -294,5 +382,5 @@ class EnergyEstimatorFactory(AlgorithmFactory):
         return "energy_estimator"
 
     def default_algorithm_name(self) -> str:
-        """Return ``qdk_base_simulator`` as the default algorithm name."""
-        return "qdk_base_simulator"
+        """Return ``qdk`` as the default algorithm name."""
+        return "qdk"

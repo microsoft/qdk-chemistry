@@ -287,10 +287,9 @@ static py::object pauli_to_sparse_matrix(
 }
 
 void bind_pauli_matrix(py::module_& m) {
-  m.def(
-      "pauli_to_dense_matrix", &pauli_to_dense_matrix, py::arg("pauli_strings"),
-      py::arg("coefficients"),
-      R"doc(Build a dense Hamiltonian matrix from Pauli strings and coefficients.
+  m.def("pauli_to_dense_matrix", &pauli_to_dense_matrix,
+        py::arg("pauli_strings"), py::arg("coefficients"),
+        R"(Build a dense Hamiltonian matrix from Pauli strings and coefficients.
 
 Args:
     pauli_strings: List of Pauli label strings (characters in {I, X, Y, Z}),
@@ -299,12 +298,12 @@ Args:
 
 Returns:
     numpy.ndarray: Dense complex matrix of shape (2**n, 2**n).
-)doc");
+)");
 
   m.def(
       "pauli_to_sparse_matrix", &pauli_to_sparse_matrix,
       py::arg("pauli_strings"), py::arg("coefficients"),
-      R"doc(Build a sparse CSR Hamiltonian matrix from Pauli strings and coefficients.
+      R"(Build a sparse CSR Hamiltonian matrix from Pauli strings and coefficients.
 Args:
     pauli_strings: List of Pauli label strings (characters in {I, X, Y, Z}),
         all of the same length n.
@@ -315,11 +314,11 @@ Returns:
 
 Raises:
     RuntimeError: If the matrix dimensions exceed int32 index limits.
-)doc");
+)");
 
   m.def("pauli_string_to_masks", &py_pauli_string_to_masks,
         py::arg("pauli_str"),
-        R"doc(Decompose a Pauli label string into bitmasks and phase factor.
+        R"(Decompose a Pauli label string into bitmasks and phase factor.
 
 X sets a bit in x_mask, Z sets a bit in z_mask, Y sets both.
 The cumulative phase factor (i)^(number of Y operators) is also returned.
@@ -331,12 +330,11 @@ Args:
 Returns:
     (x_mask, z_mask, y_phase) where x_mask and z_mask are integers
         and y_phase is a complex number.
-)doc");
+)");
 
-  m.def(
-      "pauli_expectation", &pauli_expectation, py::arg("pauli_str"),
-      py::arg("psi"),
-      R"doc(Compute the expectation value <psi|P|psi> for a single Pauli string.
+  m.def("pauli_expectation", &pauli_expectation, py::arg("pauli_str"),
+        py::arg("psi"),
+        R"(Compute the expectation value <psi|P|psi> for a single Pauli string.
 
 Args:
     pauli_str: Pauli label of length n (characters in {I, X, Y, Z}),
@@ -345,5 +343,5 @@ Args:
 
 Returns:
     Expectation value.
-)doc");
+)");
 }

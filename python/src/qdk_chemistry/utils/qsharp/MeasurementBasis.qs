@@ -2,19 +2,16 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-namespace QDKChemistry.Utils.MeasurementBasisRotation {
+namespace QDKChemistry.Utils.MeasurementBasis {
 
-    /// Applies measurement basis rotation and measures active qubits.
-    /// For each qubit, the Pauli basis determines the pre-measurement rotation:
+    /// Measures each qubit in the specified Pauli basis and resets it to |0⟩.
     /// - PauliI: qubit is not measured.
-    /// - PauliX: apply H, then measure.
-    /// - PauliY: apply Adjoint S then H, then measure.
-    /// - PauliZ: measure directly (computational basis).
+    /// - PauliX/Y/Z: measure in that basis via MResetX/Y/Z.
     ///
     /// # Parameters
     /// - `bases`: An array of Pauli values specifying the measurement basis
     ///   for each qubit.
-    /// - `qubits`: The qubits to apply basis rotation and measurement on.
+    /// - `qubits`: The qubits to measure.
     ///
     /// # Returns
     /// An array of measurement results for the non-identity (active) qubits.
@@ -22,13 +19,11 @@ namespace QDKChemistry.Utils.MeasurementBasisRotation {
         mutable results : Result[] = [];
         for idx in 0..Length(bases) - 1 {
             if bases[idx] == PauliX {
-                H(qubits[idx]);
+                set results += [MResetX(qubits[idx])];
             } elif bases[idx] == PauliY {
-                Adjoint S(qubits[idx]);
-                H(qubits[idx]);
-            }
-            if bases[idx] != PauliI {
-                set results += [M(qubits[idx])];
+                set results += [MResetY(qubits[idx])];
+            } elif bases[idx] == PauliZ {
+                set results += [MResetZ(qubits[idx])];
             }
         }
         return results;
@@ -38,7 +33,7 @@ namespace QDKChemistry.Utils.MeasurementBasisRotation {
     /// the specified basis.
     ///
     /// # Parameters
-    /// - `statePrep`: An operation that prepares the quantum state on the
+    /// - `baseCircuit`: An operation that prepares the quantum state on the
     ///   given qubits.
     /// - `bases`: An array of Pauli values specifying the measurement basis.
     /// - `numQubits`: The total number of qubits to allocate.
@@ -46,12 +41,12 @@ namespace QDKChemistry.Utils.MeasurementBasisRotation {
     /// # Returns
     /// An array of measurement results from measuring in the specified basis.
     operation MakeMeasurementCircuit(
-        statePrep : Qubit[] => Unit,
+        baseCircuit : Qubit[] => Unit,
         bases : Pauli[],
         numQubits : Int,
     ) : Result[] {
         use qs = Qubit[numQubits];
-        statePrep(qs);
+        baseCircuit(qs);
         return MeasureInBasis(bases, qs);
     }
 }

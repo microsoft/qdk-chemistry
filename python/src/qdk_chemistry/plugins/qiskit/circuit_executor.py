@@ -10,13 +10,20 @@ data classes and returns measurement bitstring results via CircuitExecutorData.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qiskit import qasm3, transpile
+from qiskit import transpile
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.data import Circuit, CircuitExecutorData, QuantumErrorProfile, Settings
-from qdk_chemistry.plugins.qiskit._interop.noise_model import get_noise_model_from_profile
+from qdk_chemistry.data import (
+    Circuit,
+    CircuitExecutorData,
+    QuantumErrorProfile,
+    Settings,
+)
+from qdk_chemistry.plugins.qiskit._interop.noise_model import (
+    get_noise_model_from_profile,
+)
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = ["QiskitAerSimulator", "QiskitAerSimulatorSettings"]
@@ -76,11 +83,13 @@ class QiskitAerSimulator(CircuitExecutor):
 
         """
         Logger.trace_entering()
-        meas_circuit = qasm3.loads(circuit.qasm)
-        Logger.debug("QASM circuit loaded into Qiskit QuantumCircuit.")
+        meas_circuit = circuit.get_qiskit_circuit()
+        Logger.debug("Qiskit QuantumCircuit loaded.")
         noise_model = get_noise_model_from_profile(noise) if noise else None
         backend = AerSimulator(
-            method=self._settings.get("method"), seed_simulator=self._settings.get("seed"), noise_model=noise_model
+            method=self._settings.get("method"),
+            seed_simulator=self._settings.get("seed"),
+            noise_model=noise_model,
         )
         if noise_model:
             transpiled_circuit = transpile(

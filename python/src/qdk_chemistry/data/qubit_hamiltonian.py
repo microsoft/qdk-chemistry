@@ -12,6 +12,7 @@ and quantum circuit construction or measurement workflows.
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -116,21 +117,19 @@ class QubitHamiltonian(DataClass):
         return float(np.sum(np.abs(self.coefficients)))
 
     def to_matrix(self, sparse: bool = False) -> np.ndarray:
-        r"""Convert the Hamiltonian to its full matrix representation.
+        """Convert the qubit Hamiltonian to its full matrix representation.
 
         Args:
-            sparse: If ``True``, return a csr matrix.
-                Otherwise return a dense matrix.  Defaults to ``False``.
+            sparse: If True, return a csr matrix.
+                Otherwise return a dense matrix. Defaults to False.
 
         Returns:
             The Hamiltonian matrix (dense or sparse).
 
         """
-        coeffs = self.coefficients.astype(np.complex128)
-
         if sparse:
-            return pauli_to_sparse_matrix(self.pauli_strings, coeffs)
-        return np.asarray(pauli_to_dense_matrix(self.pauli_strings, coeffs))
+            return pauli_to_sparse_matrix(self.pauli_strings, self.coefficients)
+        return np.asarray(pauli_to_dense_matrix(self.pauli_strings, self.coefficients))
 
     def equiv(self, other: QubitHamiltonian, atol: float = 1e-12) -> bool:
         """Check mathematical equivalence with another QubitHamiltonian.
@@ -635,11 +634,11 @@ def _validate_pauli_strings(pauli_strings: list[str]) -> None:
     """
     if not pauli_strings:
         return
-    valid_chars = set("IXYZ")
     length = len(pauli_strings[0])
+    valid_pauli_pattern = re.compile(r"^[IXYZ]+$")
     for i, ps in enumerate(pauli_strings):
         if len(ps) != length:
             raise ValueError(f"Pauli string at index {i} has length {len(ps)}, expected {length}.")
-        bad = set(ps) - valid_chars
-        if bad:
-            raise ValueError(f"Pauli string at index {i} contains invalid characters: {bad}.")
+        if not valid_pauli_pattern.fullmatch(ps):
+            invalid = set(ps) - set("IXYZ")
+            raise ValueError(f"Pauli string at index {i} contains invalid characters: {invalid}.")
