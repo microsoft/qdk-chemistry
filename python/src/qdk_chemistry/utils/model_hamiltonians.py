@@ -37,7 +37,7 @@ def _pauli_expr_to_qubit_hamiltonian(expr) -> QubitHamiltonian:
     n_qubits = simplified.num_qubits()
     terms = simplified.to_canonical_terms(n_qubits)
     pauli_strings = [t[1] for t in terms]
-    coefficients = np.array([complex(t[0]).real for t in terms])
+    coefficients = np.array([complex(t[0]) for t in terms])
     return QubitHamiltonian(pauli_strings, coefficients)
 
 
