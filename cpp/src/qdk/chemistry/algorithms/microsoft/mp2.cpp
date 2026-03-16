@@ -104,6 +104,13 @@ double MP2Calculator::calculate_restricted_mp2_energy(
 
   // Get orbital energies (same for alpha and beta in restricted case)
   const auto& [eps_alpha, eps_beta] = orbitals->get_energies();
+  
+  auto [active_indices_alpha, active_indices_beta] =
+      orbitals->get_active_space_indices();
+  Eigen::VectorXd eps_active_alpha(active_indices_alpha.size());
+  for (size_t i = 0; i < active_indices_alpha.size(); ++i) {
+    eps_active_alpha[i] = eps_alpha[active_indices_alpha[i]];
+  }
 
   // Calculate virtual orbital count
   const size_t n_vir = active_space_size - n_occ;
@@ -126,7 +133,7 @@ double MP2Calculator::calculate_restricted_mp2_energy(
       active_space_size * active_space_size * active_space_size;
 
   // Sum over all occupied and virtual orbital pairs
-  compute_restricted_t2(eps_alpha, moeri, n_occ, n_vir, stride_i, stride_j,
+  compute_restricted_t2(eps_active_alpha, moeri, n_occ, n_vir, stride_i, stride_j,
                         stride_k, t2_amplitudes, &E_MP2);
 
   return E_MP2;
@@ -168,6 +175,19 @@ double MP2Calculator::calculate_unrestricted_mp2_energy(
 
   // Core computation
   const auto& [eps_alpha, eps_beta] = orbitals->get_energies();
+
+  auto [active_indices_alpha, active_indices_beta] =
+      orbitals->get_active_space_indices();
+  Eigen::VectorXd eps_active_alpha(active_indices_alpha.size());
+  Eigen::VectorXd eps_active_beta(active_indices_beta.size());
+
+  for (size_t i = 0; i < active_indices_alpha.size(); ++i) {
+    eps_active_alpha[i] = eps_alpha[active_indices_alpha[i]];
+  }
+  for (size_t i = 0; i < active_indices_beta.size(); ++i) {
+    eps_active_beta[i] = eps_beta[active_indices_beta[i]];
+  }
+
   const size_t n_vir_alpha = active_space_size - n_alpha;
   const size_t n_vir_beta = active_space_size - n_beta;
 
@@ -196,16 +216,16 @@ double MP2Calculator::calculate_unrestricted_mp2_energy(
       active_space_size * active_space_size * active_space_size;
 
   // Alpha-Alpha contribution
-  compute_same_spin_t2(eps_alpha, moeri_aaaa, n_alpha, n_vir_alpha, stride_i,
+  compute_same_spin_t2(eps_active_alpha, moeri_aaaa, n_alpha, n_vir_alpha, stride_i,
                        stride_j, stride_k, t2_aa, &E_MP2_AA);
 
   // Alpha-Beta contribution
-  compute_opposite_spin_t2(eps_alpha, eps_beta, moeri_aabb, n_alpha, n_beta,
+  compute_opposite_spin_t2(eps_active_alpha, eps_active_beta, moeri_aabb, n_alpha, n_beta,
                            n_vir_alpha, n_vir_beta, stride_i, stride_j,
                            stride_k, t2_ab, &E_MP2_AB);
 
   // Beta-Beta contribution
-  compute_same_spin_t2(eps_beta, moeri_bbbb, n_beta, n_vir_beta, stride_i,
+  compute_same_spin_t2(eps_active_beta, moeri_bbbb, n_beta, n_vir_beta, stride_i,
                        stride_j, stride_k, t2_bb, &E_MP2_BB);
 
   double total_energy = E_MP2_AA + E_MP2_BB + E_MP2_AB;
