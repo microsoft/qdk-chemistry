@@ -19,6 +19,39 @@ The resulting qubit Hamiltonian is mathematically equivalent to the original fer
    total energies, add ``hamiltonian.get_core_energy()`` to expectation values computed from
    the QubitHamiltonian.
 
+Supported encodings
+~~~~~~~~~~~~~~~~~~~
+
+Different encoding strategies produce mathematically equivalent qubit Hamiltonians but with different Pauli-string structures.
+The choice of encoding can affect circuit depth and measurement requirements on quantum hardware.
+Not every implementation supports all encodings — see `Available implementations`_ for details.
+
+.. _encoding-jordan-wigner:
+
+Jordan-Wigner :cite:`Jordan-Wigner1928`
+   Encodes each fermionic mode in a single qubit whose state directly represents the orbital occupation.
+   Fermionic antisymmetry is enforced through a Z-string on all lower-indexed qubits.
+
+.. _encoding-bravyi-kitaev:
+
+Bravyi-Kitaev :cite:`Seeley2012`
+   Distributes both occupation and parity information across qubits using a binary-tree (Fenwick tree) structure, reducing the average Pauli-string weight to O(log n).
+
+.. _encoding-parity:
+
+Parity :cite:`Seeley2012`
+   Encodes qubits with cumulative electron-number parities of the orbitals.
+
+.. _encoding-scbk:
+
+Symmetry-conserving Bravyi-Kitaev :cite:`Bravyi2017tapering`
+   Exploits particle-number and spin-parity symmetries to reduce the qubit count by 2. Requires a :class:`~qdk_chemistry.data.Symmetries` object.
+
+.. _encoding-bk-tree:
+
+Bravyi-Kitaev tree :cite:`Havlicek2017`
+   A tree-based variant of the Bravyi-Kitaev transformation that uses a different qubit indexing strategy.
+
 
 Using the QubitMapper
 ---------------------
@@ -44,10 +77,10 @@ Hamiltonian
 
 .. note::
 
-   Different encoding strategies (Jordan-Wigner, Bravyi-Kitaev, parity) produce
-   mathematically equivalent qubit Hamiltonians but with different Pauli-string
-   structures. The choice of encoding can affect circuit depth and measurement
-   requirements on quantum hardware.
+   Different encoding strategies produce mathematically equivalent qubit Hamiltonians
+   but with different Pauli-string structures. The choice of encoding can affect circuit
+   depth and measurement requirements on quantum hardware.
+   See `Supported encodings`_ above for descriptions.
 
 .. rubric:: Creating a mapper
 
@@ -102,15 +135,10 @@ QDK
 Native QDK/Chemistry qubit mapping implementation built on the :doc:`PauliOperator <../data/pauli_operator>` expression layer.
 This implementation provides high-performance fermion-to-qubit transformations without external dependencies.
 
-Jordan-Wigner mapping :cite:`Jordan-Wigner1928`
-   Encodes each fermionic mode in a single qubit whose state directly represents the orbital occupation.
-   Fermionic antisymmetry is enforced through a Z-string on all lower-indexed qubits.
-
-Bravyi-Kitaev mapping :cite:`Seeley2012`
-   Distributes both occupation and parity information across qubits using a binary-tree structure, achieving O(log n) Pauli weight compared to O(n) for Jordan-Wigner.
+Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`
 
 The native mapper uses blocked spin-orbital ordering internally (alpha orbitals first, then beta orbitals).
-Use ``QubitHamiltonian.reorder_qubits()`` or ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if needed.
+Use ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if needed.
 
 .. rubric:: Settings
 
@@ -147,14 +175,9 @@ Qiskit
 
 .. rubric:: Factory name: ``"qiskit"``
 
-Qubit mapping implementation integrated through the Qiskit plugin. This module supports multiple encoding strategies:
+Qubit mapping implementation integrated through the Qiskit plugin.
 
-Jordan-Wigner mapping** :cite:`Jordan-Wigner1928`
-   Encodes each fermionic mode in a single qubit whose state directly represents the orbital occupation.
-Parity mapping** :cite:`Seeley2012`
-   Encodes qubits with cumulative electron-number parities of the orbitals.
-Bravyi-Kitaev mapping** :cite:`Seeley2012`
-   Distributes both occupation and parity information across qubits using a binary-tree (Fenwick tree) structure, reducing the average Pauli-string length to logarithmic scaling.
+Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Parity <encoding-parity>`
 
 .. rubric:: Settings
 
@@ -169,12 +192,53 @@ Bravyi-Kitaev mapping** :cite:`Seeley2012`
      - string
      - Qubit mapping strategy (``jordan-wigner``, ``bravyi-kitaev``, ``parity``)
 
+.. _openfermion-qubit-mapper:
+
+OpenFermion
+~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"openfermion"``
+
+Qubit mapping implementation integrated through the OpenFermion plugin.
+
+Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Symmetry-conserving Bravyi-Kitaev <encoding-scbk>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Setting
+     - Type
+     - Description
+   * - ``encoding``
+     - string
+     - Fermion-to-qubit encoding (``jordan-wigner``, ``bravyi-kitaev``, ``symmetry-conserving-bravyi-kitaev``, ``bravyi-kitaev-tree``)
+
+.. note::
+
+   The ``symmetry-conserving-bravyi-kitaev`` encoding requires a
+   :class:`~qdk_chemistry.data.Symmetries` object passed as the second argument
+   to ``run()``.  This object specifies the number of active alpha and beta
+   electrons so that the transform can exploit particle-number and spin-parity
+   symmetries to reduce the qubit count by 2.
+   See :doc:`Symmetries <../data/symmetries>` for full details and factory methods.
+
+   .. tab:: Python API
+
+      .. literalinclude:: ../../../_static/examples/python/qubit_mapper.py
+         :language: python
+         :start-after: # start-cell-scbk-mapper
+         :end-before: # end-cell-scbk-mapper
+
 
 Related classes
 ---------------
 
 - :doc:`Hamiltonian <../data/hamiltonian>`: Input Hamiltonian for mapping
 - :class:`~qdk_chemistry.data.QubitHamiltonian`: Output qubit operator representation
+- :doc:`Symmetries <../data/symmetries>`: Physical symmetries (e.g., conserved quantum numbers) for symmetry-exploiting algorithms
 
 Further reading
 ---------------
