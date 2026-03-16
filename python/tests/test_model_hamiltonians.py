@@ -137,7 +137,7 @@ class TestModelHamiltonians:
             expected["".join(pauli)] = h
 
         # scalar
-        qh = create_ising_hamiltonian(lattice, J=j, h=h)
+        qh = create_ising_hamiltonian(lattice, j=j, h=h)
         assert isinstance(qh, QubitHamiltonian)
         assert qh.num_qubits == n
         assert qh.is_hermitian()
@@ -149,16 +149,16 @@ class TestModelHamiltonians:
         # vector/matrix
         j_mat = np.ones((n, n)) * j
         h_vec = np.full(n, h)
-        qh_explicit = create_ising_hamiltonian(lattice, J=j_mat, h=h_vec)
+        qh_explicit = create_ising_hamiltonian(lattice, j=j_mat, h=h_vec)
         terms_explicit = _get_terms_dict(qh_explicit)
         assert set(terms_explicit.keys()) == set(terms.keys())
         for k in terms:
             assert terms_explicit[k] == pytest.approx(terms[k], abs=float_comparison_absolute_tolerance)
 
-        # modify J and h
+        # modify j and h
         j_mat[0, 1] = 2.5
         h_vec[2] = 0.9
-        qh_modified = create_ising_hamiltonian(lattice, J=j_mat, h=h_vec)
+        qh_modified = create_ising_hamiltonian(lattice, j=j_mat, h=h_vec)
         terms_mod = _get_terms_dict(qh_modified)
         assert terms_mod["ZZII"] == pytest.approx(2.5, abs=float_comparison_absolute_tolerance)
         assert terms_mod["IZZI"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
@@ -168,7 +168,7 @@ class TestModelHamiltonians:
 
         # weighted edges
         lattice_w = LatticeGraph.chain(3, t=0.5)
-        qh_w = create_ising_hamiltonian(lattice_w, J=2.0, h=1.0)
+        qh_w = create_ising_hamiltonian(lattice_w, j=2.0, h=1.0)
         terms_w = _get_terms_dict(qh_w)
         assert terms_w["ZZI"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
         assert terms_w["IZZ"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
@@ -203,7 +203,7 @@ class TestModelHamiltonians:
                 expected["".join(ps)] = h_val
 
         # scalar
-        qh = create_heisenberg_hamiltonian(lattice, Jx=jx, Jy=jy, Jz=jz, hx=hx, hy=hy, hz=hz)
+        qh = create_heisenberg_hamiltonian(lattice, jx=jx, jy=jy, jz=jz, hx=hx, hy=hy, hz=hz)
         assert isinstance(qh, QubitHamiltonian)
         assert qh.num_qubits == n
         assert qh.is_hermitian()
@@ -220,19 +220,19 @@ class TestModelHamiltonians:
         hy_vec = np.full(n, hy)
         hz_vec = np.full(n, hz)
         qh_explicit = create_heisenberg_hamiltonian(
-            lattice, Jx=jx_mat, Jy=jy_mat, Jz=jz_mat, hx=hx_vec, hy=hy_vec, hz=hz_vec
+            lattice, jx=jx_mat, jy=jy_mat, jz=jz_mat, hx=hx_vec, hy=hy_vec, hz=hz_vec
         )
         terms_explicit = _get_terms_dict(qh_explicit)
         assert set(terms_explicit.keys()) == set(terms.keys())
         for k in terms:
             assert terms_explicit[k] == pytest.approx(terms[k], abs=float_comparison_absolute_tolerance)
 
-        # modify Jx on edge (0,1) and Jz on edge (1,2)
+        # modify jx on edge (0,1) and jz on edge (1,2)
         jx_mat[0, 1] = 2.5
         jz_mat[1, 2] = 0.3
         hx_vec[2] = 0.9
         qh_modified = create_heisenberg_hamiltonian(
-            lattice, Jx=jx_mat, Jy=jy_mat, Jz=jz_mat, hx=hx_vec, hy=hy_vec, hz=hz_vec
+            lattice, jx=jx_mat, jy=jy_mat, jz=jz_mat, hx=hx_vec, hy=hy_vec, hz=hz_vec
         )
         terms_mod = _get_terms_dict(qh_modified)
         assert terms_mod["XXII"] == pytest.approx(2.5, abs=float_comparison_absolute_tolerance)
@@ -246,7 +246,7 @@ class TestModelHamiltonians:
 
         # weighted edges
         lattice_w = LatticeGraph.chain(3, t=2.0)
-        qh_w = create_heisenberg_hamiltonian(lattice_w, Jx=1.0, Jy=1.0, Jz=1.0)
+        qh_w = create_heisenberg_hamiltonian(lattice_w, jx=1.0, jy=1.0, jz=1.0)
         terms_w = _get_terms_dict(qh_w)
         for pauli_char in ["X", "Y", "Z"]:
             for edge in [(0, 1), (1, 2)]:
