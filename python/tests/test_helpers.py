@@ -103,6 +103,63 @@ def create_test_hamiltonian(num_orbitals: int, container_type: str = "canonical_
     raise ValueError(f"Unknown container_type: {container_type}. Use 'canonical_four_center' or 'density_fitted'.")
 
 
+def create_nontrivial_test_hamiltonian(num_orbitals: int = 2):
+    """Create a Hamiltonian with nonzero one- and two-body integrals.
+
+    Generates integrals deterministically (fixed seed) so that every orbital
+    participates in both one-body and two-body terms, producing non-trivial
+    qubit operators for any ``num_orbitals`` value.  The two-body tensor has
+    full 8-fold permutation symmetry appropriate for real orbitals in chemist
+    notation ``(pq|rs)``.
+
+    Args:
+        num_orbitals: Number of spatial orbitals (default 2).
+
+    Returns:
+        qdk_chemistry.data.Hamiltonian: A Hamiltonian with realistic integrals.
+
+    """
+    n = num_orbitals
+    rng = np.random.default_rng(42)
+
+    # Symmetric one-body matrix with diagonal dominance
+    raw = rng.standard_normal((n, n)) * 0.3
+    one_body = (raw + raw.T) / 2
+    one_body += np.diag(np.linspace(1.0, -0.5, n))
+
+    # Two-body integrals with 8-fold symmetry for real orbitals:
+    #   (pq|rs) = (qp|rs) = (pq|sr) = (qp|sr)
+    #           = (rs|pq) = (sr|pq) = (rs|qp) = (sr|qp)
+    h2 = np.zeros((n, n, n, n))
+    seen: set[tuple[int, ...]] = set()
+    for p in range(n):
+        for q in range(n):
+            for r in range(n):
+                for s in range(n):
+                    perms = {
+                        (p, q, r, s),
+                        (q, p, r, s),
+                        (p, q, s, r),
+                        (q, p, s, r),
+                        (r, s, p, q),
+                        (s, r, p, q),
+                        (r, s, q, p),
+                        (s, r, q, p),
+                    }
+                    canon = min(perms)
+                    if canon in seen:
+                        continue
+                    seen.add(canon)
+                    val = rng.standard_normal() * 0.2
+                    for a, b, c, d in perms:
+                        h2[a, b, c, d] = val
+
+    two_body = h2.ravel()
+    fock = np.eye(0)
+    orbitals = create_test_orbitals(n)
+    return Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 0.5, fock))
+
+
 def create_test_shells(num_atoms: int = 1, atoms_types: list | None = None):
     """Helper function to create test shells for BasisSet."""
     if atoms_types is None:

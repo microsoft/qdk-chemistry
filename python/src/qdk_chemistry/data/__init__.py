@@ -44,6 +44,7 @@ Exposed classes are:
 - :class:`SlaterDeterminantContainer`: Single Slater determinant wavefunction representation.
 - :class:`StabilityResult`: Result of stability analysis for electronic structure calculations.
 - :class:`Structure`: Molecular structure and geometry information.
+- :class:`Symmetries`: Physical symmetries of an electronic state for symmetry-exploiting algorithms.
 - :class:`TimeEvolutionUnitary`: Time evolution unitary.
 - :class:`TimeEvolutionUnitaryContainer`: Abstract base class for different time evolution unitary representation.
 - :class:`Wavefunction`: Electronic wavefunction data and coefficients.
@@ -108,10 +109,12 @@ from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
 from qdk_chemistry.data.encoding_validation import EncodingMismatchError, validate_encoding_compatibility
+from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.base import TimeEvolutionUnitaryContainer
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import PauliProductFormulaContainer
@@ -142,6 +145,7 @@ __all__ = [
     "Element",
     "EncodingMismatchError",
     "EnergyExpectationResult",
+    "FermionModeOrder",
     "Hamiltonian",
     "HamiltonianContainer",
     "HamiltonianType",
@@ -172,6 +176,7 @@ __all__ = [
     "SpinChannel",
     "StabilityResult",
     "Structure",
+    "Symmetries",
     "TimeEvolutionUnitary",
     "TimeEvolutionUnitaryContainer",
     "Wavefunction",

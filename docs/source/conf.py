@@ -111,6 +111,9 @@ autodoc_mock_imports = [  # Configure autodoc to handle C++ extension modules an
     "pybind11_builtins",
     "qiskit_nature",
     "qiskit_aer",
+    "openfermion",
+    "cirq",
+    "cirq_core",
     "h5py",
 ]
 
@@ -191,8 +194,12 @@ nitpick_ignore_regex = [
     (r"py:class", r"numpy.*"),
     (r"py:class", r"pathlib.*"),
     (r"py:class", r"pyscf.*"),
+    (r"py:class", r"pyqir.*"),
+    (r"py:class", r"^Module$"),
     (r"py:class", r"qiskit.*"),
     (r"py:class", r"qiskit_aer.*"),
+    (r"py:class", r"openfermion.*"),
+    (r"py:class", r"cirq.*"),
     (r"py:class", r"qdk_chemistry._core.data.DataClass"),
     (r"py:class", r"qdk_chemistry._core\.data\.PauliOperatorExpression"),
     (r"py:class", r"qdk::chemistry::data::SumPauliOperatorExpression"),
