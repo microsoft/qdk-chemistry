@@ -169,6 +169,7 @@ class ERI {
   size_t spin_density_factor_;     ///< Number of spin density matrices (1 or 2)
   bool use_thread_local_buffers_;  ///< Use thread-local buffers (true) or
                                    ///< atomic ops (false)
+  double eri_threshold_;           ///< Integral screening threshold
   ::libint2::BasisSet obs_;        ///< Libint2 orbital basis set representation
   std::vector<size_t>
       shell2bf_;  ///< Mapping from shell index to first atomic orbital
@@ -187,21 +188,29 @@ class ERI {
    *
    * @param spin_density_factor Number of spin density matrices (1 or 2)
    * @param basis_set QDK basis set (converted to Libint2 format internally)
+   * @param use_atomics Use atomic operations (true) or thread-local buffers
+   *        (false)
+   * @param shell_pair_threshold Overlap-based shell pair pre-screening
+   *        threshold (default: 1e-12)
+   * @param eri_threshold ERI screening threshold for skipping negligible
+   *        shell quartets during J/K builds (default: 1e-10)
    *
    * @note Construction involves significant overhead due to screening setup
    * @note Shell pair and Schwarz data is computed using OpenMP parallelization
    */
   ERI(size_t spin_density_factor, qdk::chemistry::scf::BasisSet& basis_set,
-      bool use_atomics)
+      bool use_atomics, double shell_pair_threshold = 1e-12,
+      double eri_threshold = 1e-10)
       : spin_density_factor_(spin_density_factor),
         use_thread_local_buffers_(!use_atomics),
+        eri_threshold_(eri_threshold),
         obs_(libint2_util::convert_to_libint_basisset(basis_set)) {
     QDK_LOG_TRACE_ENTERING();
 
     shell2bf_ = obs_.shell2bf();
 
     // Compute Shell Pairs
-    std::tie(splist_, spdata_) = compute_shellpairs(obs_);
+    std::tie(splist_, spdata_) = compute_shellpairs(obs_, shell_pair_threshold);
 
     // Compute Schwarz Screening
     K_schwarz_ = RowMajorMatrix(obs_.size(), obs_.size());
@@ -248,7 +257,6 @@ class ERI {
     const size_t mat_size =
         num_density_matrices * num_atomic_orbitals * num_atomic_orbitals;
     const bool is_rsx = std::abs(omega) > 1e-12;
-    const double precision = std::numeric_limits<double>::epsilon();
 
     if (is_rsx) throw std::runtime_error("RSX + LIBINT2_DIRECT NYI");
 
@@ -261,8 +269,9 @@ class ERI {
       throw std::runtime_error("Density matrix contains NaN/Inf values.");
     }
 
-    // Setup required precision
-    const auto engine_precision = precision / P_shmax;
+    // Setup required precision for libint2 engine
+    const auto engine_precision =
+        std::numeric_limits<double>::epsilon() / P_shmax;
 
     // Setup the engine
 #ifdef _OPENMP
@@ -363,7 +372,7 @@ class ERI {
                   std::max({P14_nrm, P24_nrm, P34_nrm, P123_nrm});
 
               if (P1234_nrm * K_schwarz_(s1, s2) * K_schwarz_(s3, s4) <
-                  precision)
+                  eri_threshold_)
                 continue;
 
               const auto bf4_st = shell2bf_[s4];
@@ -623,7 +632,6 @@ class ERI {
     AutoTimer t("ERI::quarter_trans");
     const size_t num_atomic_orbitals = obs_.nbf();
     const size_t nsh = obs_.size();
-    const double precision = std::numeric_limits<double>::epsilon();
 
     // Clear output tensor: (ij|kp) with p as fast index
     const size_t out_size =
@@ -634,8 +642,8 @@ class ERI {
     // No shell block norm needed for quarter transformation
     // We'll use Schwarz screening directly
 
-    // Setup required precision (using default Schwarz screening)
-    const auto engine_precision = precision;
+    // Setup required precision for libint2 engine
+    const auto engine_precision = std::numeric_limits<double>::epsilon();
 
     // Setup the engine
 #ifdef _OPENMP
@@ -711,7 +719,8 @@ class ERI {
               if ((s1234++) % nthreads != thread_id) continue;
 
               // Use Schwarz screening only
-              if (K_schwarz_(s1, s2) * K_schwarz_(s3, s4) < precision) continue;
+              if (K_schwarz_(s1, s2) * K_schwarz_(s3, s4) < eri_threshold_)
+                continue;
 
               const auto bf4_st = shell2bf_[s4];
               const auto n4 = obs_[s4].size();
@@ -870,11 +879,12 @@ class ERI {
 
 LIBINT2_DIRECT::LIBINT2_DIRECT(SCFOrbitalType scf_orbital_type,
                                BasisSet& basis_set, ParallelConfig _mpi,
-                               bool use_atomics)
-    : ERI(scf_orbital_type, 0.0, basis_set, _mpi),
+                               bool use_atomics, double eri_threshold,
+                               double shell_pair_threshold)
+    : ERI(scf_orbital_type, eri_threshold, basis_set, _mpi),
       eri_impl_(libint2::direct::ERI::make_libint2_direct_eri(
           scf_orbital_type == SCFOrbitalType::Restricted ? 1 : 2, basis_set,
-          use_atomics)) {
+          use_atomics, shell_pair_threshold, eri_threshold)) {
   QDK_LOG_TRACE_ENTERING();
   if (_mpi.world_size > 1) throw std::runtime_error("LIBINT2_DIRECT + MPI NYI");
 }
