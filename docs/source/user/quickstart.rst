@@ -23,9 +23,15 @@ Companion chemistry datasets and supporting assets are also available in `micros
 .. note::
 
    If you installed ``qdk-chemistry`` from PyPI, use the ``stable/major.minor`` branch
-   (e.g., ``stable/1.0``) when cloning the repository for examples.
+   when cloning the repository for examples.
    The ``main`` branch is the active development branch and may be incompatible with
-   the released pip package. See the `examples README <https://github.com/microsoft/qdk-chemistry/blob/main/examples/README.md>`_ for details.
+   the released pip package. For example, to clone the repository for the latest stable 1.0 release, use:
+
+   ```bash
+   git clone --branch stable/1.0 qdk-chemistry
+   ```
+
+   See the `examples README <https://github.com/microsoft/qdk-chemistry/blob/main/examples/README.md>`_ for details.
 
 Create a Structure object
 ^^^^^^^^^^^^^^^^^^^^^^^^^
