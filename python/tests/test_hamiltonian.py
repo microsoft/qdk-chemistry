@@ -50,9 +50,10 @@ _two_body = _rng.random(2**4)
 # produces two-body = 2.0 for all elements: 1.0^2 + 0.6^2 + 0.8^2 = 2.0
 _three_center = np.array(
     [
-        [1.0, 1.0, 1.0, 1.0],
-        [0.6, 0.6, 0.6, 0.6],
-        [0.8, 0.8, 0.8, 0.8],
+        [1.0, 0.6, 0.8],
+        [1.0, 0.6, 0.8],
+        [1.0, 0.6, 0.8],
+        [1.0, 0.6, 0.8],
     ]
 )
 
@@ -459,7 +460,7 @@ class TestRestrictedUnrestricted:
             two_body = rng.random(3**4)
             container = CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.0, inactive_fock)
         else:
-            three_center = rng.random((3, 9))
+            three_center = rng.random((9, 3))
             container = DensityFittedHamiltonianContainer(one_body, three_center, orbitals, 1.0, inactive_fock)
 
         h = Hamiltonian(container)
@@ -521,9 +522,10 @@ class TestRestrictedUnrestricted:
             # For density-fitted, use three-center integrals scaled appropriately
             base_three_center = np.array(
                 [
-                    [1.0, 1.0, 1.0, 1.0],
-                    [0.6, 0.6, 0.6, 0.6],
-                    [0.8, 0.8, 0.8, 0.8],
+                    [1.0, 0.6, 0.8],
+                    [1.0, 0.6, 0.8],
+                    [1.0, 0.6, 0.8],
+                    [1.0, 0.6, 0.8],
                 ]
             )
             three_center_aa = math.sqrt(0.5) * base_three_center
@@ -572,9 +574,10 @@ class TestRestrictedUnrestricted:
         else:
             three_center = np.array(
                 [
-                    [0.5, 0.5, 0.5, 0.5],
-                    [0.3, 0.3, 0.3, 0.3],
-                    [0.4, 0.4, 0.4, 0.4],
+                    [0.5, 0.3, 0.4],
+                    [0.5, 0.3, 0.4],
+                    [0.5, 0.3, 0.4],
+                    [0.5, 0.3, 0.4],
                 ]
             )
             container_restricted = DensityFittedHamiltonianContainer(
@@ -609,9 +612,10 @@ class TestRestrictedUnrestricted:
         else:
             base_three_center = np.array(
                 [
-                    [1.0, 1.0, 1.0, 1.0],
-                    [0.6, 0.6, 0.6, 0.6],
-                    [0.8, 0.8, 0.8, 0.8],
+                    [1.0, 0.6, 0.8],
+                    [1.0, 0.6, 0.8],
+                    [1.0, 0.6, 0.8],
+                    [1.0, 0.6, 0.8],
                 ]
             )
             three_center_aa = math.sqrt(0.5) * base_three_center
@@ -665,7 +669,7 @@ class TestRestrictedUnrestricted:
                 one_body, two_body, model_orbitals_restricted, 0.0, np.eye(4)
             )
         else:
-            three_center = np.zeros((4, 16))
+            three_center = np.zeros((16, 4))
             container_restricted = DensityFittedHamiltonianContainer(
                 one_body, three_center, model_orbitals_restricted, 0.0, np.eye(4)
             )
@@ -699,8 +703,8 @@ class TestRestrictedUnrestricted:
                 np.eye(4),
             )
         else:
-            three_center_aa = np.zeros((4, 16))
-            three_center_bb = np.zeros((4, 16))
+            three_center_aa = np.zeros((16, 4))
+            three_center_bb = np.zeros((16, 4))
             container_unrestricted = DensityFittedHamiltonianContainer(
                 one_body_alpha,
                 one_body_beta,
@@ -737,12 +741,13 @@ class TestDensityFittedSpecific:
     def test_three_center_integrals_storage(self):
         """Test three-center integral storage and retrieval."""
         one_body = np.eye(2)
-        # Three-center: [n_aux x n_geminals] = [3 x 4]
+        # Three-center: [n_geminals x n_aux] = [4 x 3]
         three_center = np.array(
             [
-                [1.0, 1.0, 1.0, 1.0],
-                [0.6, 0.6, 0.6, 0.6],
-                [0.8, 0.8, 0.8, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
             ]
         )
         orbitals = create_test_orbitals(2)
@@ -765,9 +770,10 @@ class TestDensityFittedSpecific:
         # 1.0^2 + 0.6^2 + 0.8^2 = 1.0 + 0.36 + 0.64 = 2.0
         three_center = np.array(
             [
-                [1.0, 1.0, 1.0, 1.0],
-                [0.6, 0.6, 0.6, 0.6],
-                [0.8, 0.8, 0.8, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
             ]
         )
         orbitals = create_test_orbitals(2)
@@ -796,9 +802,10 @@ class TestDensityFittedSpecific:
 
         base_three_center = np.array(
             [
-                [1.0, 1.0, 1.0, 1.0],
-                [0.6, 0.6, 0.6, 0.6],
-                [0.8, 0.8, 0.8, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
             ]
         )
         three_center_aa = math.sqrt(0.5) * base_three_center
@@ -854,9 +861,10 @@ class TestContainerEquivalence:
         # Three-center chosen so contraction equals two_body
         three_center = np.array(
             [
-                [1.0, 1.0, 1.0, 1.0],
-                [0.6, 0.6, 0.6, 0.6],
-                [0.8, 0.8, 0.8, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
             ]
         )
 
@@ -917,9 +925,10 @@ class TestContainerEquivalence:
         # Three-center chosen to produce matching two-body
         base_three_center = np.array(
             [
-                [1.0, 1.0, 1.0, 1.0],
-                [0.6, 0.6, 0.6, 0.6],
-                [0.8, 0.8, 0.8, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
             ]
         )
         three_center_aa = math.sqrt(0.5) * base_three_center
