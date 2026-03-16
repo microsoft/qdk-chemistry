@@ -57,7 +57,7 @@ class QsharpHadamardGenerator(HadamardTestGenerator):
         if ctrl_evol_op is None:
             raise ValueError("Input ctrl_time_evol_unitary_circuit cannot be used for QsharpHadamardGenerator.")
 
-        systems = list(i for i in range(1, num_system_qubits + 1))
+        systems = list(range(1, num_system_qubits + 1))
         hadamard_test_qsc = qsharp.circuit(
             QSHARP_UTILS.HadamardTest.MakeHadamardCircuit,
             state_prep_op,
@@ -120,7 +120,7 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
 
         """
         try:
-            from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
+            from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3  # noqa: PLC0415
         except ModuleNotFoundError as err:
             raise ModuleNotFoundError(
                 "Qiskit is required to use QiskitHadamardGenerator. Install qiskit or use QsharpHadamardGenerator."

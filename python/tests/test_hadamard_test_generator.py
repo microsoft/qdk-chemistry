@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 from dataclasses import dataclass
 
 import numpy as np
@@ -20,12 +21,7 @@ from qdk_chemistry.algorithms.hadamard_test_generator.hadamard_test_generator im
 from qdk_chemistry.data import Circuit, ControlledTimeEvolutionUnitary, Structure
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
-try:
-    from qdk import qsharp
-
-    _HAS_QSHARP = True
-except ImportError:
-    _HAS_QSHARP = False
+_HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import QuantumCircuit, qasm3
