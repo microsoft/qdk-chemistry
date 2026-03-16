@@ -58,7 +58,7 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
         4,
         std::make_tuple(std::vector<size_t>{2, 3}, std::vector<size_t>{0, 1}));
 
-    inactive_fock_non_empty = Eigen::MatrixXd::Random(2, 2);
+    inactive_fock_non_empty = Eigen::MatrixXd::Random(4, 4);
 
     // For density-fitted: 3-center integrals [n_orb^2 x n_aux]
     // Using 3 auxiliary basis functions for 2 orbitals (4 geminals)
@@ -1523,8 +1523,8 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
                      coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
                      std::nullopt, basis_set,
                      std::make_tuple(std::move(alpha_active_indices),
-                                     std::move(alpha_inactive_indices),
                                      std::move(beta_active_indices),
+                                     std::move(alpha_inactive_indices),
                                      std::move(beta_inactive_indices)));
                  hc->run(orbitals);
                }),
@@ -1543,8 +1543,8 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
                      coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
                      std::nullopt, basis_set,
                      std::make_tuple(std::move(alpha_active_indices),
-                                     std::move(alpha_inactive_indices),
                                      std::move(beta_active_indices),
+                                     std::move(alpha_inactive_indices),
                                      std::move(beta_inactive_indices)));
                  hc->run(orbitals);
                }),
@@ -1618,8 +1618,8 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
             coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
             basis_set,
             std::make_tuple(std::move(alpha_active_indices),
-                            std::move(alpha_inactive_indices),
                             std::move(beta_active_indices),
+                            std::move(alpha_inactive_indices),
                             std::move(beta_inactive_indices)));
         hc->run(orbitals);
       },
@@ -1656,9 +1656,10 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
     auto orbitals = std::make_shared<Orbitals>(
         coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
         large_basis_set,
-        std::make_tuple(
-            std::move(alpha_active_indices), std::move(alpha_inactive_indices),
-            std::move(beta_active_indices), std::move(beta_inactive_indices)));
+        std::make_tuple(std::move(alpha_active_indices),
+                        std::move(beta_active_indices),
+                        std::move(alpha_inactive_indices),
+                        std::move(beta_inactive_indices)));
     auto hamiltonian = hc->run(orbitals);
     EXPECT_TRUE(hamiltonian->has_one_body_integrals());
     EXPECT_TRUE(hamiltonian->has_two_body_integrals());
