@@ -19,3 +19,7 @@ They do not correspond to concrete symbols in the public API.
 .. py:class:: pybind11_builtins.pybind11_object
 
    Placeholder target for documents that refer to ``pybind11_builtins.pybind11_object``.
+
+.. py:class:: np.ndarray
+
+   Placeholder target for documents that refer to ``np.ndarray``.

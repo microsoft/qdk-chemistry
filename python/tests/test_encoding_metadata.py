@@ -11,6 +11,7 @@ import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Circuit, EncodingMismatchError, QubitHamiltonian, validate_encoding_compatibility
+from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE
 
 from .test_helpers import create_test_hamiltonian
@@ -295,3 +296,27 @@ def test_qubit_hamiltonian_summary_includes_encoding():
 
     assert "jordan-wigner" in summary
     assert "Encoding" in summary
+
+
+# -------------------------------------------------------------------------------------
+# Fermion mode order metadata
+# -------------------------------------------------------------------------------------
+
+
+def test_qdk_qubit_mapper_sets_fermion_mode_order():
+    """QDK native qubit mapper sets fermion_mode_order to BLOCKED."""
+    hamiltonian = create_test_hamiltonian(2)
+
+    for encoding in ("jordan-wigner", "bravyi-kitaev"):
+        qh = create("qubit_mapper", "qdk", encoding=encoding).run(hamiltonian)
+        assert qh.fermion_mode_order == FermionModeOrder.BLOCKED
+
+
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_NATURE, reason="Qiskit Nature not available")
+def test_qiskit_qubit_mapper_sets_fermion_mode_order():
+    """Qiskit qubit mapper sets fermion_mode_order to BLOCKED."""
+    hamiltonian = create_test_hamiltonian(2)
+
+    for encoding in ("jordan-wigner", "bravyi-kitaev", "parity"):
+        qh = create("qubit_mapper", "qiskit", encoding=encoding).run(hamiltonian)
+        assert qh.fermion_mode_order == FermionModeOrder.BLOCKED
