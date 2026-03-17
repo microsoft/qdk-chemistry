@@ -162,6 +162,22 @@ void MP2Container::_compute_t2_amplitudes() const {
   if (use_unrestricted) {
     // Unrestricted MP2
     const auto& [eps_alpha, eps_beta] = get_orbitals()->get_energies();
+    Eigen::VectorXd eps_active_alpha(active_space_size);
+    Eigen::VectorXd eps_active_beta(active_space_size);
+    if (get_orbitals()->has_active_space()) {
+      const auto& [active_space_ind_alpha, active_space_ind_beta] =
+          get_orbitals()->get_active_space_indices();
+      for (size_t i = 0; i < active_space_size; ++i) {
+        eps_active_alpha[i] = eps_alpha[active_space_ind_alpha[i]];
+      }
+      for (size_t i = 0; i < active_space_size; ++i) {
+        eps_active_beta[i] = eps_beta[active_space_ind_beta[i]];
+      }
+    } else {
+      eps_active_alpha = eps_alpha;
+      eps_active_beta = eps_beta;
+    }
+
     const size_t n_vir_alpha = active_space_size - n_alpha;
     const size_t n_vir_beta = active_space_size - n_beta;
 
@@ -188,12 +204,12 @@ void MP2Container::_compute_t2_amplitudes() const {
 
     // Alpha-Alpha contribution
     algorithms::microsoft::MP2Calculator::compute_same_spin_t2(
-        eps_alpha, moeri_aaaa, n_alpha, n_vir_alpha, stride_i, stride_j,
+        eps_active_alpha, moeri_aaaa, n_alpha, n_vir_alpha, stride_i, stride_j,
         stride_k, t2_aa);
 
     // Alpha-Beta contribution
     algorithms::microsoft::MP2Calculator::compute_opposite_spin_t2(
-        eps_alpha, eps_beta, moeri_aabb, n_alpha, n_beta, n_vir_alpha,
+        eps_active_alpha, eps_active_beta, moeri_aabb, n_alpha, n_beta, n_vir_alpha,
         n_vir_beta, stride_i, stride_j, stride_k, t2_ab);
 
     // Beta-Beta contribution
@@ -212,6 +228,18 @@ void MP2Container::_compute_t2_amplitudes() const {
     }
 
     const auto& [eps_alpha, eps_beta] = get_orbitals()->get_energies();
+
+    Eigen::VectorXd eps_active_alpha(active_space_size);
+
+    if (get_orbitals()->has_active_space()) {
+      const auto& [active_space_ind_alpha, active_space_ind_beta] =
+          get_orbitals()->get_active_space_indices();
+      for (size_t i = 0; i < active_space_size; ++i) {
+        eps_active_alpha[i] = eps_alpha[active_space_ind_alpha[i]];
+      }
+    } else {
+      eps_active_alpha = eps_alpha;
+    }
     const size_t n_occ = n_alpha;
     const size_t n_vir = active_space_size - n_occ;
 
@@ -232,7 +260,7 @@ void MP2Container::_compute_t2_amplitudes() const {
 
     // Compute T2 amplitudes
     algorithms::microsoft::MP2Calculator::compute_restricted_t2(
-        eps_alpha, moeri, n_occ, n_vir, stride_i, stride_j, stride_k,
+        eps_active_alpha, moeri, n_occ, n_vir, stride_i, stride_j, stride_k,
         t2_amplitudes);
 
     _t2_amplitudes_abab = std::make_shared<VectorVariant>(t2_amplitudes);
