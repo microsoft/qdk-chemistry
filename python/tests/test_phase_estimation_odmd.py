@@ -98,7 +98,7 @@ def _run_odmd(
     odmd = DynamicModeDecomposition(
         hankel_rows=_HANKEL_ROWS,
         hankel_columns=_HANKEL_COLUMNS,
-        time_step=_EVOLUTION_TIME,
+        evolution_time=_EVOLUTION_TIME,
         shots_per_observable=_SHOTS_PER_OBSERVABLE,
     )
 
@@ -134,6 +134,7 @@ def test_qsharp_odmd_water_reference(water_odmd_problem: tuple[QubitHamiltonian,
     assert result.metadata.get("hankel_columns") == _HANKEL_COLUMNS
 
 
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 def test_qiskit_odmd_water_reference(water_odmd_problem: tuple[QubitHamiltonian, Circuit, Circuit]) -> None:
     """Validate ODMD execution for the Qiskit state-preparation path."""
     qubit_hamiltonian, _, qiskit_state_prep = water_odmd_problem
@@ -150,11 +151,11 @@ def test_qiskit_odmd_water_reference(water_odmd_problem: tuple[QubitHamiltonian,
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [
-        ({"hankel_rows": 0, "hankel_columns": 12, "time_step": 0.1}, "hankel_rows must be"),
-        ({"hankel_rows": 24, "hankel_columns": 0, "time_step": 0.1}, "hankel_columns must be"),
-        ({"hankel_rows": 24, "hankel_columns": 12, "time_step": 0.0}, "time_step must be"),
+        ({"hankel_rows": 0, "hankel_columns": 12, "evolution_time": 0.1}, "hankel_rows must be"),
+        ({"hankel_rows": 24, "hankel_columns": 0, "evolution_time": 0.1}, "hankel_columns must be"),
+        ({"hankel_rows": 24, "hankel_columns": 12, "evolution_time": 0.0}, "evolution_time must be"),
         (
-            {"hankel_rows": 24, "hankel_columns": 12, "time_step": 0.1, "shots_per_observable": 0},
+            {"hankel_rows": 24, "hankel_columns": 12, "evolution_time": 0.1, "shots_per_observable": 0},
             "shots_per_observable must be",
         ),
     ],

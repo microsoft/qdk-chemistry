@@ -83,17 +83,12 @@ class DynamicModeDecompositionSettings(PhaseEstimationSettings):
     """Settings for the Dynamic Mode Decomposition algorithm."""
 
     def __init__(self):
-        """Initialize the settings for ODMD.
-
-        Args:
-            shots_per_observable: The number of shots to execute per measuring one overlap observable.
-
-        """
+        """Initialize the settings for ODMD."""
         super().__init__()
-        self._set_default("hankel_rows", "int", -1, "the row number of Hankel matrix X")
-        self._set_default("hankel_columns", "int", -1, "the column number of Hankel matrices X and X'")
+        self._set_default("hankel_rows", "int", -1, "Row number of Hankel matrix X")
+        self._set_default("hankel_columns", "int", -1, "Column number of Hankel matrices X and X'")
         self._set_default("evolution_time", "float", 0.0, "Time dt in the evolution unitary U = exp(-i H dt)")
-        self._set_default("shots_per_observable", "int", 100, "the number of shots to test one observable")
+        self._set_default("shots_per_observable", "int", 100, "Number of shots to use when measuring each observable in ODMD")
 
 
 class DynamicModeDecomposition(PhaseEstimation):
@@ -103,7 +98,7 @@ class DynamicModeDecomposition(PhaseEstimation):
         self,
         hankel_rows: int,
         hankel_columns: int,
-        time_step: float,
+        evolution_time: float,
         shots_per_observable: int = 100,
     ):
         """Initialize DynamicModeDecomposition with the given settings.
@@ -111,17 +106,16 @@ class DynamicModeDecomposition(PhaseEstimation):
         Args:
             hankel_rows: The row count of the Hankel matrix X. Must be a positive integer.
             hankel_columns: The column count of both Hankel matrices X and X'. Must be a positive integer.
-            time_step: Time parameter dt used in the time-evolution unitary U = exp(-i H dt)``. It must be non-negative.
-            shots_per_observable: The number of shots to execute per observable measurement. Defaults to 100. It must be
-                a positive integer.
+            evolution_time: Time parameter dt used in the time-evolution unitary U = exp(-i H dt)``. It must be positive.
+            shots_per_observable: The number of shots to use when measuring each observable in ODMD.
 
         """
         Logger.trace_entering()
-        super().__init__(evolution_time=time_step)
+        super().__init__(evolution_time=evolution_time)
         self._settings = DynamicModeDecompositionSettings()
         self._settings.set("hankel_rows", hankel_rows)
         self._settings.set("hankel_columns", hankel_columns)
-        self._settings.set("evolution_time", time_step)
+        self._settings.set("evolution_time", evolution_time)
         self._settings.set("shots_per_observable", shots_per_observable)
         self._iteration_circuits: list[Circuit] | None = None
 
@@ -130,8 +124,8 @@ class DynamicModeDecomposition(PhaseEstimation):
             raise ValueError("hankel_rows must be a positive integer.")
         if hankel_columns < 1:
             raise ValueError("hankel_columns must be a positive integer.")
-        if time_step <= 0.0:
-            raise ValueError("time_step must be a positive float.")
+        if evolution_time <= 0.0:
+            raise ValueError("evolution_time must be a positive float.")
         if shots_per_observable < 1:  # currently we use classical Hadamard test for measuring observable
             raise ValueError("shots_per_observable must be a positive integer.")
 
