@@ -199,8 +199,7 @@ class ERI {
    * @note Shell pair and Schwarz data is computed using OpenMP parallelization
    */
   ERI(size_t spin_density_factor, qdk::chemistry::scf::BasisSet& basis_set,
-      bool use_atomics, double eri_threshold,
-      double shell_pair_threshold)
+      bool use_atomics, double eri_threshold, double shell_pair_threshold)
       : spin_density_factor_(spin_density_factor),
         use_thread_local_buffers_(!use_atomics),
         eri_threshold_(eri_threshold),
@@ -271,7 +270,7 @@ class ERI {
 
     // Setup required precision for libint2 engine
     double engine_precision;
-    if(P_shmax <= 0.0) {
+    if (P_shmax <= 0.0) {
       // fallback for small density matrix
       engine_precision = std::numeric_limits<double>::epsilon();
     } else {

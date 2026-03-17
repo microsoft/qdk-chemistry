@@ -55,8 +55,7 @@ class ScfSettings
     set_default("eri_threshold", -1.0);
     set_default("shell_pair_threshold", 1e-12,
                 "Overlap-based shell pair pre-screening threshold. Shell "
-                "pairs with overlap norm below this value are excluded.",
-                qdk::chemistry::data::BoundConstraint<double>{0.0, 1.0});
+                "pairs with overlap norm below this value are excluded.");
     set_default(
         "eri_method", std::string("direct"),
         "ERI evaluation method: 'direct' computes integrals on-the-fly, "

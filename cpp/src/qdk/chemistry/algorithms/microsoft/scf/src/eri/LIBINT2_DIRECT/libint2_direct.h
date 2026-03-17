@@ -43,18 +43,16 @@ class LIBINT2_DIRECT : public ERI {
    * @param use_atomics Use atomic operations (true) or thread-local buffers
    * (false)
    * @param eri_threshold ERI screening threshold for skipping negligible
-   * shell quartets during J/K builds and quarter transformations (default:
-   * 1e-10)
+   * shell quartets during J/K builds and quarter transformations.
    * @param shell_pair_threshold Overlap-based shell pair pre-screening
-   * threshold (default: 1e-12)
+   * threshold.
    *
    * @throws std::runtime_error if Libint2 initialization fails
    * @throws std::runtime_error if screening matrix computation fails
    */
   LIBINT2_DIRECT(SCFOrbitalType scf_orbital_type, BasisSet& basis_set,
-                 ParallelConfig mpi, bool use_atomics,
-                 double eri_threshold = 1e-10,
-                 double shell_pair_threshold = 1e-12);
+                 ParallelConfig mpi, bool use_atomics, double eri_threshold,
+                 double shell_pair_threshold);
 
   /**
    * @brief Destructor
