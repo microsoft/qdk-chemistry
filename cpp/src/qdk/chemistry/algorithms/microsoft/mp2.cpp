@@ -105,8 +105,8 @@ double MP2Calculator::calculate_restricted_mp2_energy(
   // Get orbital energies (same for alpha and beta in restricted case)
   const auto& [eps_alpha, eps_beta] = orbitals->get_energies();
 
-  auto [active_indices_alpha, active_indices_beta] =
-      orbitals->get_active_space_indices();
+  const auto& active_space_indices = orbitals->get_active_space_indices();
+  const auto& active_indices_alpha = active_space_indices.first;
   Eigen::VectorXd eps_active_alpha(active_indices_alpha.size());
   for (size_t i = 0; i < active_indices_alpha.size(); ++i) {
     eps_active_alpha[i] = eps_alpha[active_indices_alpha[i]];
@@ -176,7 +176,7 @@ double MP2Calculator::calculate_unrestricted_mp2_energy(
   // Core computation
   const auto& [eps_alpha, eps_beta] = orbitals->get_energies();
 
-  auto [active_indices_alpha, active_indices_beta] =
+  const auto& [active_indices_alpha, active_indices_beta] =
       orbitals->get_active_space_indices();
   Eigen::VectorXd eps_active_alpha(active_indices_alpha.size());
   Eigen::VectorXd eps_active_beta(active_indices_beta.size());
