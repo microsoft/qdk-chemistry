@@ -50,7 +50,7 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 all = [
-  "qdk-chemistry[coverage,dev,docs,plugins,qiskit-extras]"
+  "qdk-chemistry[coverage,dev,docs,plugins,qiskit-extras,openfermion-extras]"
 ]
 coverage = [
   "coverage",
@@ -89,6 +89,9 @@ plugins = [
 qiskit-extras = [
   "qiskit-aer",
   "qiskit-nature"
+]
+openfermion-extras = [
+  "openfermion>=1.0.0"
 ]
 
 [project.urls]
