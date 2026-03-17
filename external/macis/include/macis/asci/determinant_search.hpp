@@ -663,6 +663,7 @@ std::vector<wfn_t<N>> asci_search(
   if (!logger)
     logger = world_rank ? spdlog::null_logger_mt("asci_search")
                         : spdlog::stdout_color_mt("asci_search");
+  logger->flush_on(logger->level());
 
 #ifdef MACIS_ENABLE_MPI
   auto print_mpi_stats = [&](auto str, auto vmin, auto vmax, auto vavg) {

@@ -11,6 +11,7 @@ import pytest
 from qdk_chemistry import algorithms
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
+from qdk_chemistry.utils import Logger
 
 from .reference_tolerances import (
     float_comparison_relative_tolerance,
@@ -126,6 +127,24 @@ class TestScfSolver:
 
         # Compare with expected energy from C++ test
         assert np.isclose(energy, -76.0205776518, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
+
+    def test_scf_solver_emits_iteration_logs_when_info_enabled(self, capfd):
+        """Test that SCF iteration diagnostics respect the shared global logger level."""
+        water = create_water_structure()
+        scf_solver = algorithms.create("scf_solver")
+        scf_solver.settings().set("method", "hf")
+
+        previous_level = Logger.get_global_level()
+        try:
+            Logger.set_global_level("info")
+            energy, _ = scf_solver.run(water, 0, 1, "sto-3g")
+            captured = capfd.readouterr()
+        finally:
+            Logger.set_global_level(previous_level)
+
+        assert isinstance(energy, float)
+        assert "Step 000:" in captured.out
+        assert "SCF converged: steps=" in captured.out
 
     def test_scf_solver_settings_edge_cases(self):
         """Test SCF solver with various invalid settings."""

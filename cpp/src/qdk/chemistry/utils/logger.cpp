@@ -178,6 +178,17 @@ static LogLevel from_spdlog_level(spdlog::level::level_enum level) {
   }
 }
 
+static void apply_logger_level_and_flush_policy(
+    const std::shared_ptr<spdlog::logger>& logger,
+    spdlog::level::level_enum level) {
+  if (!logger) {
+    return;
+  }
+
+  logger->set_level(level);
+  logger->flush_on(level);
+}
+
 static void init_global_logger() {
   try {
     g_logger = spdlog::stdout_color_mt("qdk-chemistry");
@@ -186,8 +197,15 @@ static void init_global_logger() {
   }
 
   if (g_logger) {
-    std::lock_guard<std::mutex> lock(g_level_mutex);
-    g_logger->set_level(g_global_level);
+    spdlog::level::level_enum global_level;
+    {
+      std::lock_guard<std::mutex> lock(g_level_mutex);
+      global_level = g_global_level;
+      apply_logger_level_and_flush_policy(g_logger, global_level);
+    }
+
+    spdlog::set_level(global_level);
+    spdlog::flush_on(global_level);
     // Pattern: [timestamp] [colored_level] message
     // The file context and method are added by ContextLogger in the message
     g_logger->set_pattern("[%Y-%m-%d %H:%M:%S.%f] [%^%l%$] %v");
@@ -201,8 +219,9 @@ std::shared_ptr<spdlog::logger> Logger::get() {
   // Update level if it changed (thread-safe check)
   if (g_logger) {
     std::lock_guard<std::mutex> lock(g_level_mutex);
-    if (g_logger->level() != g_global_level) {
-      g_logger->set_level(g_global_level);
+    if (g_logger->level() != g_global_level ||
+        g_logger->flush_level() != g_global_level) {
+      apply_logger_level_and_flush_policy(g_logger, g_global_level);
     }
   }
 
@@ -225,12 +244,11 @@ void Logger::set_global_level(LogLevel level) {
   {
     std::lock_guard<std::mutex> lock(g_level_mutex);
     g_global_level = spdlog_level;
-    if (g_logger) {
-      g_logger->set_level(spdlog_level);
-    }
+    apply_logger_level_and_flush_policy(g_logger, spdlog_level);
   }
 
   spdlog::set_level(spdlog_level);
+  spdlog::flush_on(spdlog_level);
 }
 
 LogLevel Logger::get_global_level() {
