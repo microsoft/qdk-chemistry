@@ -31,11 +31,10 @@ __all__ = [
 ]
 
 
-def _pauli_expr_to_qubit_hamiltonian(expr) -> QubitHamiltonian:
+def _pauli_expr_to_qubit_hamiltonian(expr, num_qubits: int) -> QubitHamiltonian:
     """Convert a simplified PauliOperator expression to a QubitHamiltonian."""
     simplified = expr.simplify()
-    n_qubits = simplified.num_qubits()
-    terms = simplified.to_canonical_terms(n_qubits)
+    terms = simplified.to_canonical_terms(num_qubits)
     pauli_strings = [t[1][::-1] for t in terms]
     coefficients = np.array([complex(t[0]) for t in terms])
     return QubitHamiltonian(pauli_strings, coefficients)
@@ -82,6 +81,9 @@ def create_heisenberg_hamiltonian(
         QubitHamiltonian: The Heisenberg model as a qubit Hamiltonian.
 
     """
+    if not graph.is_symmetric:
+        raise ValueError("Lattice graph must be symmetric for a valid Hamiltonian.")
+
     n = graph.num_sites
     adj = graph.adjacency_matrix()
 
@@ -116,7 +118,7 @@ def create_heisenberg_hamiltonian(
         if hz_vec[i] != 0.0:
             h = h + hz_vec[i] * PauliOperator.Z(i)
 
-    return _pauli_expr_to_qubit_hamiltonian(h)
+    return _pauli_expr_to_qubit_hamiltonian(h, n)
 
 
 def create_ising_hamiltonian(
