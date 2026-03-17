@@ -152,7 +152,7 @@ TEST_F(MP2Test, RMP2Energies_CCPVDZ) {
 }
 
 TEST_F(MP2Test, ActiveRMP2Energies_CCPVDZ) {
-  // Test the RMP2 energies against PySCF reference for singlet O2 with
+  // Test the RMP2 energies against Psi4 reference for singlet O2 with
   // cc-pvdz
   float psi4_act_rmp2_corr_cc_pvdz = -0.0779663051614509;
 
