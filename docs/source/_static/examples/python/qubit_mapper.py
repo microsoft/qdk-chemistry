@@ -84,3 +84,29 @@ qdk_qubit_hamiltonian = qdk_mapper.run(hamiltonian)
 print(f"QDK mapper produced {len(qdk_qubit_hamiltonian.pauli_strings)} Pauli terms")
 # end-cell-qdk-mapper
 ################################################################################
+
+################################################################################
+# start-cell-scbk-mapper
+from qdk_chemistry.data import Symmetries  # noqa: E402
+
+# Create an OpenFermion mapper with SCBK encoding
+scbk_mapper = create_algorithm(
+    "qubit_mapper", "openfermion", encoding="symmetry-conserving-bravyi-kitaev"
+)
+
+# Provide symmetries: the SCBK encoding needs active electron counts
+# Option 1: construct directly
+symmetries = Symmetries(n_alpha=2, n_beta=2)
+scbk_hamiltonian = scbk_mapper.run(hamiltonian, symmetries)
+
+# Option 2: derive from a wavefunction
+symmetries = Symmetries.from_wavefunction(active_wfn)
+scbk_hamiltonian = scbk_mapper.run(hamiltonian, symmetries)
+
+# SCBK reduces the qubit count by 2 compared to JW or BK
+print(
+    f"SCBK mapper: {scbk_hamiltonian.num_qubits} qubits "
+    f"(vs {qdk_qubit_hamiltonian.num_qubits} for JW)"
+)
+# end-cell-scbk-mapper
+################################################################################
