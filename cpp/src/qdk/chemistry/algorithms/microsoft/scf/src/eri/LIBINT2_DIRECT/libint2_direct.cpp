@@ -190,17 +190,18 @@ class ERI {
    * @param basis_set QDK basis set (converted to Libint2 format internally)
    * @param use_atomics Use atomic operations (true) or thread-local buffers
    *        (false)
+   * @param eri_threshold ERI screening threshold for skipping negligible
+   *        shell quartets during J/K builds and quarter transformations
+   *        (default: 1e-10)
    * @param shell_pair_threshold Overlap-based shell pair pre-screening
    *        threshold (default: 1e-12)
-   * @param eri_threshold ERI screening threshold for skipping negligible
-   *        shell quartets during J/K builds (default: 1e-10)
    *
    * @note Construction involves significant overhead due to screening setup
    * @note Shell pair and Schwarz data is computed using OpenMP parallelization
    */
   ERI(size_t spin_density_factor, qdk::chemistry::scf::BasisSet& basis_set,
-      bool use_atomics, double shell_pair_threshold = 1e-12,
-      double eri_threshold = 1e-10)
+      bool use_atomics, double eri_threshold = 1e-10,
+      double shell_pair_threshold = 1e-12)
       : spin_density_factor_(spin_density_factor),
         use_thread_local_buffers_(!use_atomics),
         eri_threshold_(eri_threshold),
@@ -884,7 +885,7 @@ LIBINT2_DIRECT::LIBINT2_DIRECT(SCFOrbitalType scf_orbital_type,
     : ERI(scf_orbital_type, eri_threshold, basis_set, _mpi),
       eri_impl_(libint2::direct::ERI::make_libint2_direct_eri(
           scf_orbital_type == SCFOrbitalType::Restricted ? 1 : 2, basis_set,
-          use_atomics, shell_pair_threshold, eri_threshold)) {
+          use_atomics, eri_threshold, shell_pair_threshold)) {
   QDK_LOG_TRACE_ENTERING();
   if (_mpi.world_size > 1) throw std::runtime_error("LIBINT2_DIRECT + MPI NYI");
 }

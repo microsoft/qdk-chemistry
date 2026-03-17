@@ -43,7 +43,8 @@ class LIBINT2_DIRECT : public ERI {
    * @param use_atomics Use atomic operations (true) or thread-local buffers
    * (false)
    * @param eri_threshold ERI screening threshold for skipping negligible
-   * shell quartets during J/K builds (default: 1e-10)
+   * shell quartets during J/K builds and quarter transformations (default:
+   * 1e-10)
    * @param shell_pair_threshold Overlap-based shell pair pre-screening
    * threshold (default: 1e-12)
    *
