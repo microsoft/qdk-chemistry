@@ -16,12 +16,6 @@ from qdk_chemistry.data import Circuit, QpeResult, QubitHamiltonian, Structure
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE
 from qdk_chemistry.utils.phase import energy_from_phase
 
-from .reference_tolerances import (
-    float_comparison_relative_tolerance,
-    qpe_energy_tolerance,
-    qpe_phase_fraction_tolerance,
-)
-
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import qasm3
 
@@ -33,13 +27,12 @@ pytestmark = pytest.mark.skipif(
 
 _SEED = 42
 _EVOLUTION_TIME = float(np.pi / 48.0)
-_HANKEL_ROWS = 8
-_INITIAL_HANKEL_COLUMNS = 4
+_HANKEL_ROWS = 12
+_HANKEL_COLUMNS = 6
 _SHOTS_PER_OBSERVABLE = 500
-_EIGEN_CONVERGE_TOL = 1e-2  # for running the test quickly
 
-_EXPECTED_PHASE_FRACTION = 0.9795868360
-_EXPECTED_ENERGY = -1.9596637398
+_EXPECTED_PHASE_FRACTION = 0.9802702159864114
+_EXPECTED_ENERGY = -1.8940592653045103
 
 
 @pytest.fixture(scope="module")
@@ -100,127 +93,68 @@ def _resolve_energy_alias(phase_fraction: float, expected_energy: float) -> tupl
 def _run_odmd(
     qubit_hamiltonian: QubitHamiltonian,
     state_preparation: Circuit,
-    *,
-    max_hankel_columns: int = 200,
-) -> tuple[QpeResult, DynamicModeDecomposition]:
-    """Execute ODMD and return both result and algorithm instance."""
+) -> QpeResult:
+    """Execute ODMD and return the phase-estimation result."""
     odmd = DynamicModeDecomposition(
         hankel_rows=_HANKEL_ROWS,
-        initial_hankel_columns=_INITIAL_HANKEL_COLUMNS,
+        hankel_columns=_HANKEL_COLUMNS,
         time_step=_EVOLUTION_TIME,
-        eigen_converge_tol=_EIGEN_CONVERGE_TOL,
         shots_per_observable=_SHOTS_PER_OBSERVABLE,
-        max_hankel_columns=max_hankel_columns,
     )
 
     evolution_builder = create("time_evolution_builder", "trotter")
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+    hadamard_test_generator = create(
+        "hadamard_test_generator",
+        "qsharp_hadamard_generator" if state_preparation._qsharp_op is not None else "qiskit_hadamard_generator",  # noqa: SLF001
+    )
     executor = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
 
     result = odmd.run(
         qubit_hamiltonian=qubit_hamiltonian,
         state_preparation=state_preparation,
+        hadamard_test_generator=hadamard_test_generator,
         circuit_executor=executor,
         circuit_mapper=circuit_mapper,
         evolution_builder=evolution_builder,
     )
-    return result, odmd
+    return result
 
 
 def test_qsharp_odmd_water_reference(water_odmd_problem: tuple[QubitHamiltonian, Circuit, Circuit]) -> None:
-    """Validate ODMD reference phase and energy for the Q# state-preparation path."""
+    """Validate ODMD execution for the Q# state-preparation path."""
     qubit_hamiltonian, qsharp_state_prep, _ = water_odmd_problem
-    result, odmd = _run_odmd(qubit_hamiltonian, qsharp_state_prep)
+    result = _run_odmd(qubit_hamiltonian, qsharp_state_prep)
     resolved_phase, resolved_energy = _resolve_energy_alias(result.phase_fraction, _EXPECTED_ENERGY)
 
-    assert np.isclose(
-        result.phase_fraction,
-        _EXPECTED_PHASE_FRACTION,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
-    assert np.isclose(
-        resolved_phase,
-        _EXPECTED_PHASE_FRACTION,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
-    assert np.isclose(
-        resolved_energy,
-        _EXPECTED_ENERGY,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_energy_tolerance,
-    )
-    assert odmd.is_converged() is True
+    assert np.isclose(resolved_phase, _EXPECTED_PHASE_FRACTION)
+    assert np.isclose(resolved_energy, _EXPECTED_ENERGY)
     assert result.metadata is not None
-    assert result.metadata.get("converged") is True
-    assert result.metadata.get("stop_reason") == "converged"
+    assert result.metadata.get("hankel_rows") == _HANKEL_ROWS
+    assert result.metadata.get("hankel_columns") == _HANKEL_COLUMNS
 
 
 def test_qiskit_odmd_water_reference(water_odmd_problem: tuple[QubitHamiltonian, Circuit, Circuit]) -> None:
-    """Validate ODMD reference phase and energy for the Qiskit state-preparation path."""
+    """Validate ODMD execution for the Qiskit state-preparation path."""
     qubit_hamiltonian, _, qiskit_state_prep = water_odmd_problem
-    result, odmd = _run_odmd(qubit_hamiltonian, qiskit_state_prep)
+    result = _run_odmd(qubit_hamiltonian, qiskit_state_prep)
     resolved_phase, resolved_energy = _resolve_energy_alias(result.phase_fraction, _EXPECTED_ENERGY)
 
-    assert np.isclose(
-        result.phase_fraction,
-        _EXPECTED_PHASE_FRACTION,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
-    assert np.isclose(
-        resolved_phase,
-        _EXPECTED_PHASE_FRACTION,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
-    assert np.isclose(
-        resolved_energy,
-        _EXPECTED_ENERGY,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_energy_tolerance,
-    )
-    assert odmd.is_converged() is True
+    assert np.isclose(resolved_phase, _EXPECTED_PHASE_FRACTION)
+    assert np.isclose(resolved_energy, _EXPECTED_ENERGY)
     assert result.metadata is not None
-    assert result.metadata.get("converged") is True
-    assert result.metadata.get("stop_reason") == "converged"
-
-
-def test_qsharp_odmd_max_hankel_limit(water_odmd_problem: tuple[QubitHamiltonian, Circuit, Circuit]) -> None:
-    """Verify ODMD reports non-convergence when max_hankel_columns is too small."""
-    qubit_hamiltonian, qsharp_state_prep, _ = water_odmd_problem
-    result, odmd = _run_odmd(
-        qubit_hamiltonian,
-        qsharp_state_prep,
-        max_hankel_columns=_INITIAL_HANKEL_COLUMNS + 1,
-    )
-
-    assert odmd.is_converged() is False
-    assert result.metadata is not None
-    assert result.metadata.get("converged") is False
-    assert result.metadata.get("stop_reason") == "max_hankel_columns_reached"
+    assert result.metadata.get("hankel_rows") == _HANKEL_ROWS
+    assert result.metadata.get("hankel_columns") == _HANKEL_COLUMNS
 
 
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [
-        ({"hankel_rows": 0, "initial_hankel_columns": 12, "time_step": 0.1}, "hankel_rows must be"),
+        ({"hankel_rows": 0, "hankel_columns": 12, "time_step": 0.1}, "hankel_rows must be"),
+        ({"hankel_rows": 24, "hankel_columns": 0, "time_step": 0.1}, "hankel_columns must be"),
+        ({"hankel_rows": 24, "hankel_columns": 12, "time_step": 0.0}, "time_step must be"),
         (
-            {"hankel_rows": 24, "initial_hankel_columns": 1, "time_step": 0.1},
-            "initial_hankel_columns must be larger than 1",
-        ),
-        (
-            {"hankel_rows": 24, "initial_hankel_columns": 8, "time_step": 0.1, "max_hankel_columns": 7},
-            "initial_hankel_columns must be no more than max_hankel_columns",
-        ),
-        ({"hankel_rows": 24, "initial_hankel_columns": 12, "time_step": 0.0}, "time_step must be"),
-        (
-            {"hankel_rows": 24, "initial_hankel_columns": 12, "time_step": 0.1, "eigen_converge_tol": 0.0},
-            "eigen_converge_tol must be",
-        ),
-        (
-            {"hankel_rows": 24, "initial_hankel_columns": 12, "time_step": 0.1, "shots_per_observable": 0},
+            {"hankel_rows": 24, "hankel_columns": 12, "time_step": 0.1, "shots_per_observable": 0},
             "shots_per_observable must be",
         ),
     ],
