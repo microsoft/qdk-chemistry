@@ -2357,6 +2357,8 @@ TEST_F(HamiltonianIntegrationTest, DensityFittedActiveRestrictedO2MP2) {
       DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
 
   auto [n_alpha, n_beta] = wfn->get_active_num_electrons();
+  EXPECT_EQ(n_alpha, n_beta);
+  EXPECT_EQ(n_alpha, 6);
 
   // Cast to MP2Calculator to access the specific method
   auto* mp2_calc_ptr =
@@ -2366,6 +2368,14 @@ TEST_F(HamiltonianIntegrationTest, DensityFittedActiveRestrictedO2MP2) {
       df_hamiltonian, orbitals, n_alpha);
 
   EXPECT_NEAR(rmp2_corr_energy, -0.0779523495,
+              testing::mp2_tolerance);  // reference value from Psi4
+
+  // Create ansatz from Hamiltonian and wavefunction
+  auto ansatz = std::make_shared<Ansatz>(df_hamiltonian, wfn);
+
+  // MP2 returns total energy
+  auto [mp2_total_energy, final_wavefunction, _] = mp2_calculator->run(ansatz);
+  EXPECT_NEAR(mp2_total_energy, -149.6209819271,
               testing::mp2_tolerance);  // reference value from Psi4
 }
 
