@@ -575,7 +575,7 @@ def _register_python_algorithms():
     be called by users.
     """
     from qdk_chemistry.algorithms.circuit_executor.qdk import QdkFullStateSimulator  # noqa: PLC0415
-    from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator  # noqa: PLC0415
+    from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (  # noqa: PLC0415
         IterativePhaseEstimation,
     )
@@ -595,7 +595,7 @@ def _register_python_algorithms():
         PauliSequenceMapper,
     )
 
-    register(lambda: QDKEnergyEstimator())
+    register(lambda: QdkEnergyEstimator())
     register(lambda: SparseIsometryGF2XStatePreparation())
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
