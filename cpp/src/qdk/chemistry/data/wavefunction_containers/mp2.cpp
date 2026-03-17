@@ -209,8 +209,8 @@ void MP2Container::_compute_t2_amplitudes() const {
 
     // Alpha-Beta contribution
     algorithms::microsoft::MP2Calculator::compute_opposite_spin_t2(
-        eps_active_alpha, eps_active_beta, moeri_aabb, n_alpha, n_beta, n_vir_alpha,
-        n_vir_beta, stride_i, stride_j, stride_k, t2_ab);
+        eps_active_alpha, eps_active_beta, moeri_aabb, n_alpha, n_beta,
+        n_vir_alpha, n_vir_beta, stride_i, stride_j, stride_k, t2_ab);
 
     // Beta-Beta contribution
     algorithms::microsoft::MP2Calculator::compute_same_spin_t2(

@@ -40,10 +40,10 @@ struct O2TestSetup {
 // bond_length: O-O bond length in Bohr (default 2.3)
 // multiplicity: 1 for singlet (restricted), 3 for triplet (unrestricted)
 // basis_set: basis set name (default "cc-pvdz")
-inline O2TestSetup create_o2_hf_setup(int multiplicity = 1,
-                                      const std::string& basis_set = "cc-pvdz",
-                                      double bond_length = 2.3,
-                                      std::optional<std::pair<int, int>> active_space = std::nullopt) {
+inline O2TestSetup create_o2_hf_setup(
+    int multiplicity = 1, const std::string& basis_set = "cc-pvdz",
+    double bond_length = 2.3,
+    std::optional<std::pair<int, int>> active_space = std::nullopt) {
   O2TestSetup setup;
 
   // O2 structure with specified bond length
@@ -64,12 +64,14 @@ inline O2TestSetup create_o2_hf_setup(int multiplicity = 1,
 
   if (active_space.has_value()) {
     auto valence_active_space_selector =
-      qdk::chemistry::algorithms::ActiveSpaceSelectorFactory::create(
-          "qdk_valence");
-    valence_active_space_selector->settings().set("num_active_electrons", active_space->first);
-    valence_active_space_selector->settings().set("num_active_orbitals", active_space->second);
+        qdk::chemistry::algorithms::ActiveSpaceSelectorFactory::create(
+            "qdk_valence");
+    valence_active_space_selector->settings().set("num_active_electrons",
+                                                  active_space->first);
+    valence_active_space_selector->settings().set("num_active_orbitals",
+                                                  active_space->second);
     auto wfn_active = valence_active_space_selector->run(hf_wavefunction);
-    
+
     setup.hf_wavefunction = wfn_active;
     setup.hf_orbitals = wfn_active->get_orbitals();
   }
@@ -78,7 +80,6 @@ inline O2TestSetup create_o2_hf_setup(int multiplicity = 1,
   setup.hf_hamiltonian = ham_factory->run(setup.hf_orbitals);
   return setup;
 }
-
 
 class MP2Test : public ::testing::Test {
  protected:
