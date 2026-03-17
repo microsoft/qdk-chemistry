@@ -161,6 +161,7 @@ def _append_measurement_to_circuit(base_circuit: Circuit, m_basis: str) -> Circu
     qreg = QuantumRegister(basis.num_qubits, "q")
     creg = ClassicalRegister(len(active), "c")
     qc = QuantumCircuit(qreg, creg)
+    qc.compose(base_circuit, inplace=True)
     for cidx, qidx in enumerate(active):
         if basis.x[qidx]:
             if basis.z[qidx]:

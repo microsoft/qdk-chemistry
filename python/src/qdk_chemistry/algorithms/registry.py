@@ -574,7 +574,10 @@ def _register_python_algorithms():
     This function is automatically called during module import and should not
     be called by users.
     """
-    from qdk_chemistry.algorithms.circuit_executor.qdk import QdkFullStateSimulator  # noqa: PLC0415
+    from qdk_chemistry.algorithms.circuit_executor.qdk import (  # noqa: PLC0415
+        QdkFullStateSimulator,
+        QdkSparseStateSimulator,
+    )
     from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (  # noqa: PLC0415
         IterativePhaseEstimation,
@@ -605,6 +608,7 @@ def _register_python_algorithms():
     register(lambda: PartiallyRandomized())
     register(lambda: PauliSequenceMapper())
     register(lambda: QdkFullStateSimulator())
+    register(lambda: QdkSparseStateSimulator())
     register(lambda: IterativePhaseEstimation())
 
 

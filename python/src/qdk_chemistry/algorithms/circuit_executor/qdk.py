@@ -22,6 +22,7 @@ from qsharp.openqasm import run as sparse_state_run_qasm
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import Circuit, CircuitExecutorData, QuantumErrorProfile, Settings
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.qir import get_qir_result_qubit_order
 
 __all__: list[str] = ["QdkFullStateSimulator", "QdkFullStateSimulatorSettings"]
 
@@ -37,17 +38,29 @@ class QdkFullStateSimulatorSettings(Settings):
             "type", "string", "cpu", "Type of simulator to use: 'cpu', 'gpu', or 'clifford'", ["cpu", "gpu", "clifford"]
         )
         self._set_default("seed", "int", 42, "Random seed for simulation reproducibility")
+        self._set_default(
+            "skip_qir_order_check",
+            "bool",
+            False,
+            "Whether to skip check of QIR to determine bitstring order (default: False)",
+        )
 
 
 class QdkFullStateSimulator(CircuitExecutor):
     """QDK Full State Simulator circuit executor implementation."""
 
-    def __init__(self, simulator_type: Literal["cpu", "gpu", "clifford"] = "cpu", seed: int = 42) -> None:
+    def __init__(
+        self,
+        simulator_type: Literal["cpu", "gpu", "clifford"] = "cpu",
+        seed: int = 42,
+        skip_qir_order_check: bool = False,
+    ) -> None:
         """Initialize the QDK Full State Simulator circuit executor.
 
         Args:
             simulator_type: The type of simulator to use.
             seed: The random seed for simulation reproducibility.
+            skip_qir_order_check: Whether to skip check of QIR to determine bitstring order.
 
         """
         Logger.trace_entering()
@@ -55,6 +68,7 @@ class QdkFullStateSimulator(CircuitExecutor):
         self._settings = QdkFullStateSimulatorSettings()
         self._settings.set("type", simulator_type)
         self._settings.set("seed", seed)
+        self._settings.set("skip_qir_order_check", skip_qir_order_check)
 
     def _run_impl(
         self,
@@ -81,8 +95,17 @@ class QdkFullStateSimulator(CircuitExecutor):
             qir, shots=shots, noise=noise_config, seed=self._settings.get("seed"), type=self._settings.get("type")
         )
         Logger.debug(f"Measurement results obtained: {raw_results}")
-        # Reverse the order of bits in each measurement result to match Little Endian convention
-        bitstrings = ["".join("0" if str(x) == "Zero" else "1" for x in reversed(one_run)) for one_run in raw_results]
+        # Reorder bits in each measurement result to match Little Endian convention
+        if not self._settings.get("skip_qir_order_check"):
+            qubit_order = get_qir_result_qubit_order(str(qir))
+            # Permutation that sorts qubit_order descending
+            perm = sorted(range(len(qubit_order)), key=lambda i: qubit_order[i], reverse=True)
+            bitstrings = ["".join("0" if str(one_run[i]) == "Zero" else "1" for i in perm) for one_run in raw_results]
+        else:
+            # Skip the check and assume the record order in qir matches the order of qubits
+            bitstrings = [
+                "".join("0" if str(x) == "Zero" else "1" for x in reversed(one_run)) for one_run in raw_results
+            ]
         counts = dict(Counter(bitstrings))
         return CircuitExecutorData(
             bitstring_counts=counts,
@@ -161,11 +184,15 @@ class QdkSparseStateSimulator(CircuitExecutor):
                 "Gate specific noise is not yet supported for the QDK Sparse State Simulator. "
                 "Please define noise at the settings level using the 'noise_type' and 'noise_rate' parameters."
             )
-        if self._settings.get("noise_type") != "none":
-            noise_class = _QSHARP_SPARSE_STATE_NOISE_MAPPING[self._settings.get("noise_type")]
-            if len(self._settings.get("noise_rate")) != 1 and self._settings.get("noise_type") != "pauli":
-                raise ValueError(f"Noise rate for {self._settings.get('noise_type')} noise must be a single value.")
-            noise_model = noise_class(self._settings.get("noise_rate"))
+
+        noise_type = self._settings.get("noise_type")
+        noise_rate = self._settings.get("noise_rate")
+        if noise_type != "none":
+            if noise_type in ["depolarizing", "bitflip", "phaseflip"] and len(noise_rate) != 1:
+                raise ValueError(f"Noise rate for {noise_type} noise must be a single value")
+            if noise_type == "pauli" and len(noise_rate) != 3:
+                raise ValueError("Noise rate for pauli noise must be a list of 3 values")
+            noise_model = _QSHARP_SPARSE_STATE_NOISE_MAPPING[noise_type](*noise_rate)
         else:
             noise_model = None
 

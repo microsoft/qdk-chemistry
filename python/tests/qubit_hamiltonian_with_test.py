@@ -10,11 +10,9 @@ and quantum circuit construction or measurement workflows.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from __future__ import annotations
+from typing import Any
 
-import re
-from typing import TYPE_CHECKING, Any
-
+import h5py
 import numpy as np
 
 from qdk_chemistry._core.utils import (
@@ -22,13 +20,8 @@ from qdk_chemistry._core.utils import (
     pauli_to_dense_matrix,
     pauli_to_sparse_matrix,
 )
+from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.base import DataClass
-
-if TYPE_CHECKING:
-    import h5py
-
-    from qdk_chemistry.data import Wavefunction
-from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
 
@@ -43,9 +36,6 @@ class QubitHamiltonian(DataClass):
         coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
         encoding (str | None): The fermion-to-qubit encoding used to create this Hamiltonian
             (e.g., "jordan-wigner", "bravyi-kitaev", "parity"). If None, encoding is not specified.
-        fermion_mode_order (FermionModeOrder | None): The fermion mode ordering convention used
-            when mapping fermionic modes to qubits (``"blocked"`` or ``"interleaved"``). If None,
-            the ordering is unspecified or not applicable.
 
     """
 
@@ -60,15 +50,15 @@ class QubitHamiltonian(DataClass):
         pauli_strings: list[str],
         coefficients: np.ndarray,
         encoding: str | None = None,
-        fermion_mode_order: FermionModeOrder | str | None = None,
     ) -> None:
         """Initialize a QubitHamiltonian.
 
         Args:
             pauli_strings (list[str]): List of Pauli strings representing the ``QubitHamiltonian``.
             coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
-            encoding (str | None): Fermion-to-qubit encoding (e.g., ``"jordan-wigner"``). Default ``None``.
-            fermion_mode_order (FermionModeOrder | str | None): Mode ordering (``"blocked"``/``"interleaved"``).
+            encoding (str | None): The fermion-to-qubit encoding used to create this Hamiltonian.
+                Valid values include "jordan-wigner", "bravyi-kitaev", "parity", or None.
+                Defaults to None.
 
         Raises:
             ValueError: If the number of Pauli strings and coefficients don't match,
@@ -82,9 +72,6 @@ class QubitHamiltonian(DataClass):
         self.pauli_strings = pauli_strings
         self.coefficients = coefficients
         self.encoding = encoding
-        self.fermion_mode_order: FermionModeOrder | None = (
-            FermionModeOrder(fermion_mode_order) if fermion_mode_order is not None else None
-        )
 
         # Validate Pauli strings
         _validate_pauli_strings(pauli_strings)
@@ -117,55 +104,21 @@ class QubitHamiltonian(DataClass):
         return float(np.sum(np.abs(self.coefficients)))
 
     def to_matrix(self, sparse: bool = False) -> np.ndarray:
-        """Convert the qubit Hamiltonian to its full matrix representation.
+        r"""Convert the Hamiltonian to its full matrix representation.
 
         Args:
-            sparse: If True, return a csr matrix.
-                Otherwise return a dense matrix. Defaults to False.
+            sparse: If ``True``, return a csr matrix.
+                Otherwise return a dense matrix.  Defaults to ``False``.
 
         Returns:
             The Hamiltonian matrix (dense or sparse).
 
         """
+        coeffs = self.coefficients.astype(np.complex128)
+
         if sparse:
-            return pauli_to_sparse_matrix(self.pauli_strings, self.coefficients)
-        return np.asarray(pauli_to_dense_matrix(self.pauli_strings, self.coefficients))
-
-    def equiv(self, other: QubitHamiltonian, atol: float = 1e-12) -> bool:
-        """Check mathematical equivalence with another QubitHamiltonian.
-
-        Two QubitHamiltonians are equivalent if they contain the same Pauli
-        terms with the same coefficients (within tolerance), regardless of
-        term ordering.  Duplicate Pauli strings are summed before comparison.
-
-        Args:
-            other: The QubitHamiltonian to compare against.
-            atol: Absolute tolerance for coefficient comparison. Defaults to 1e-12.
-
-        Returns:
-            ``True`` if the two QubitHamiltonians are mathematically equivalent.
-
-        Examples:
-            >>> qh1 = QubitHamiltonian(["XI", "ZZ"], np.array([0.5, 0.3]))
-            >>> qh2 = QubitHamiltonian(["ZZ", "XI"], np.array([0.3, 0.5]))
-            >>> qh1.equiv(qh2)
-            True
-
-        """
-        if not isinstance(other, QubitHamiltonian):
-            return False
-
-        def _sum_terms(qh: QubitHamiltonian) -> dict[str, complex]:
-            d: dict[str, complex] = {}
-            for ps, c in zip(qh.pauli_strings, qh.coefficients, strict=True):
-                d[ps] = d.get(ps, 0) + c
-            return d
-
-        self_dict = _sum_terms(self)
-        other_dict = _sum_terms(other)
-
-        all_keys = set(self_dict) | set(other_dict)
-        return all(abs(self_dict.get(k, 0) - other_dict.get(k, 0)) <= atol for k in all_keys)
+            return pauli_to_sparse_matrix(self.pauli_strings, coeffs)
+        return np.asarray(pauli_to_dense_matrix(self.pauli_strings, coeffs))
 
     def is_hermitian(self, tolerance: float = 1e-12) -> bool:
         """Check whether all coefficients are real within ``tolerance``.
@@ -212,7 +165,7 @@ class QubitHamiltonian(DataClass):
             terms.sort(key=lambda t: abs(t[1]), reverse=True)
         return terms
 
-    def reorder_qubits(self, permutation: list[int]) -> QubitHamiltonian:
+    def reorder_qubits(self, permutation: list[int]) -> "QubitHamiltonian":
         """Reorder qubits in all Pauli strings according to a permutation.
 
         Applies a qubit index permutation to all Pauli strings. The permutation
@@ -261,7 +214,7 @@ class QubitHamiltonian(DataClass):
             coefficients=self.coefficients.copy(),
         )
 
-    def to_interleaved(self, n_spatial: int) -> QubitHamiltonian:
+    def to_interleaved(self, n_spatial: int) -> "QubitHamiltonian":
         """Convert from blocked to interleaved spin-orbital ordering.
 
         Converts a qubit Hamiltonian from blocked ordering (alpha orbitals first,
@@ -295,30 +248,18 @@ class QubitHamiltonian(DataClass):
         # Build permutation: blocked -> interleaved
         # Blocked ordering:      a0, a1, ..., a(n-1), b0, b1, ..., b(n-1)
         # Interleaved ordering:  a0, b0, a1, b1, ..., a(n-1), b(n-1)
-        # Pauli strings are little-endian (rightmost char = qubit 0), so
-        # string position j corresponds to qubit (n_qubits - 1 - j).
-        # Qubit mapping: alpha (q < n_spatial) -> 2*q, beta -> 2*(q - n_spatial) + 1
-        permutation = [0] * n_qubits
-        for pos in range(n_qubits):
-            q_old = n_qubits - 1 - pos
-            q_new = 2 * q_old if q_old < n_spatial else 2 * (q_old - n_spatial) + 1
-            permutation[pos] = n_qubits - 1 - q_new
+        # For blocked index i, alpha spin (i < n_spatial) maps to 2*i,
+        # and beta spin (i >= n_spatial) maps to 2*(i - n_spatial) + 1
+        permutation = []
+        for i in range(n_qubits):
+            if i < n_spatial:
+                permutation.append(2 * i)
+            else:
+                permutation.append(2 * (i - n_spatial) + 1)
 
-        reordered_strings = []
-        for pauli_str in self.pauli_strings:
-            new_chars = ["I"] * n_qubits
-            for old_pos, char in enumerate(pauli_str):
-                new_chars[permutation[old_pos]] = char
-            reordered_strings.append("".join(new_chars))
+        return self.reorder_qubits(permutation)
 
-        return QubitHamiltonian(
-            pauli_strings=reordered_strings,
-            coefficients=self.coefficients.copy(),
-            encoding=self.encoding,
-            fermion_mode_order=FermionModeOrder.INTERLEAVED,
-        )
-
-    def group_commuting(self, qubit_wise: bool = True) -> list[QubitHamiltonian]:
+    def group_commuting(self, qubit_wise: bool = True) -> list["QubitHamiltonian"]:
         """Group the qubit Hamiltonian into commuting subsets.
 
         Args:
@@ -351,7 +292,6 @@ class QubitHamiltonian(DataClass):
                 pauli_strings=[p for p, _ in group],
                 coefficients=np.array([c for _, c in group]),
                 encoding=self.encoding,
-                fermion_mode_order=self.fermion_mode_order,
             )
             for group in groups
         ]
@@ -369,8 +309,6 @@ class QubitHamiltonian(DataClass):
         )
         if self.encoding is not None:
             summary += f"  Encoding: {self.encoding}\n"
-        if self.fermion_mode_order is not None:
-            summary += f"  Fermion mode order: {self.fermion_mode_order}\n"
         return summary
 
     def to_json(self) -> dict[str, Any]:
@@ -392,8 +330,6 @@ class QubitHamiltonian(DataClass):
         }
         if self.encoding is not None:
             data["encoding"] = self.encoding
-        if self.fermion_mode_order is not None:
-            data["fermion_mode_order"] = str(self.fermion_mode_order)
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -408,11 +344,9 @@ class QubitHamiltonian(DataClass):
         group.create_dataset("coefficients", data=self.coefficients)
         if self.encoding is not None:
             group.attrs["encoding"] = self.encoding
-        if self.fermion_mode_order is not None:
-            group.attrs["fermion_mode_order"] = str(self.fermion_mode_order)
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> QubitHamiltonian:
+    def from_json(cls, json_data: dict[str, Any]) -> "QubitHamiltonian":
         """Create a QubitHamiltonian from a JSON dictionary.
 
         Args:
@@ -437,11 +371,10 @@ class QubitHamiltonian(DataClass):
             pauli_strings=json_data["pauli_strings"],
             coefficients=coefficients,
             encoding=json_data.get("encoding"),
-            fermion_mode_order=json_data.get("fermion_mode_order"),
         )
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> QubitHamiltonian:
+    def from_hdf5(cls, group: h5py.Group) -> "QubitHamiltonian":
         """Load a QubitHamiltonian from an HDF5 group.
 
         Args:
@@ -461,15 +394,7 @@ class QubitHamiltonian(DataClass):
         # Decode encoding if it's stored as bytes (HDF5 behavior can vary)
         if encoding is not None and isinstance(encoding, bytes):
             encoding = encoding.decode("utf-8")
-        fermion_mode_order = group.attrs.get("fermion_mode_order")
-        if fermion_mode_order is not None and isinstance(fermion_mode_order, bytes):
-            fermion_mode_order = fermion_mode_order.decode("utf-8")
-        return cls(
-            pauli_strings=pauli_strings,
-            coefficients=coefficients,
-            encoding=encoding,
-            fermion_mode_order=fermion_mode_order,
-        )
+        return cls(pauli_strings=pauli_strings, coefficients=coefficients, encoding=encoding)
 
 
 def _filter_and_group_pauli_ops_from_statevector(
@@ -517,8 +442,9 @@ def _filter_and_group_pauli_ops_from_statevector(
     expectations: list[float] = []
     classical: list[float] = []
 
+    n = hamiltonian.num_qubits
     for pauli_str, coeff in zip(hamiltonian.pauli_strings, hamiltonian.coefficients, strict=True):
-        expval = pauli_expectation(pauli_str, psi)
+        expval = pauli_expectation(pauli_str, n, psi)
 
         if not trimming:
             retained_paulis.append(pauli_str)
@@ -565,12 +491,7 @@ def _filter_and_group_pauli_ops_from_statevector(
         reduced_pauli.append(best_pauli)
         reduced_coeffs.append(coeff_sum)
 
-    reduced_hamiltonian = QubitHamiltonian(
-        reduced_pauli,
-        np.array(reduced_coeffs),
-        encoding=hamiltonian.encoding,
-        fermion_mode_order=hamiltonian.fermion_mode_order,
-    )
+    reduced_hamiltonian = QubitHamiltonian(reduced_pauli, np.array(reduced_coeffs), encoding=hamiltonian.encoding)
 
     grouped_hamiltonians = (
         reduced_hamiltonian.group_commuting(qubit_wise=abelian_grouping) if abelian_grouping else [reduced_hamiltonian]
@@ -633,11 +554,300 @@ def _validate_pauli_strings(pauli_strings: list[str]) -> None:
     """
     if not pauli_strings:
         return
+    valid_chars = set("IXYZ")
     length = len(pauli_strings[0])
-    valid_pauli_pattern = re.compile(r"^[IXYZ]+$")
     for i, ps in enumerate(pauli_strings):
         if len(ps) != length:
             raise ValueError(f"Pauli string at index {i} has length {len(ps)}, expected {length}.")
-        if not valid_pauli_pattern.fullmatch(ps):
-            invalid = set(ps) - set("IXYZ")
-            raise ValueError(f"Pauli string at index {i} contains invalid characters: {invalid}.")
+        bad = set(ps) - valid_chars
+        if bad:
+            raise ValueError(f"Pauli string at index {i} contains invalid characters: {bad}.")
+
+
+if __name__ == "__main__":
+    # ------------------------------------------------------------------
+    # Quick smoke-test: verify qiskit label convention against explicit
+    # Kronecker-product matrices.
+    #
+    # Qiskit label convention: label[0] = highest qubit (MSB),
+    # label[n-1] = qubit 0 (LSB).  The matrix is
+    #   P_{label[0]} ⊗ P_{label[1]} ⊗ … ⊗ P_{label[n-1]}
+    # ------------------------------------------------------------------
+
+    I = np.eye(2, dtype=complex)
+    X = np.array([[0, 1], [1, 0]], dtype=complex)
+    Y = np.array([[0, -1j], [1j, 0]], dtype=complex)
+    Z = np.array([[1, 0], [0, -1]], dtype=complex)
+    _PAULI = {"I": I, "X": X, "Y": Y, "Z": Z}
+
+    def _kron_qiskit_order(label: str) -> np.ndarray:
+        """Build the matrix for a Pauli label in qiskit convention."""
+        # label[0] = highest qubit → standard left-to-right Kronecker product
+        mat = _PAULI[label[0]]
+        for ch in label[1:]:
+            mat = np.kron(mat, _PAULI[ch])
+        return mat
+
+    test_labels = ["XI", "IX", "ZI", "IZ", "YI", "IY", "XY", "YX", "ZZ", "XX", "YY", "XYZ", "ZIX", "YZX", "XXYZ"]
+
+    print("=== to_matrix Kronecker-product test ===")
+    all_pass = True
+    for label in test_labels:
+        expected = _kron_qiskit_order(label)
+        qh = QubitHamiltonian([label], np.array([1.0 + 0j]))
+        got = qh.to_matrix()
+        if np.allclose(expected, got):
+            print(f"  {label:6s}  PASS")
+        else:
+            print(f"  {label:6s}  FAIL")
+            print(f"    expected diag: {np.diag(expected)}")
+            print(f"    got      diag: {np.diag(got)}")
+            all_pass = False
+
+    # Also test _pauli_expectation against matrix-based <psi|P|psi>
+    print("\n=== _pauli_expectation test ===")
+    rng = np.random.default_rng(42)
+    for label in test_labels:
+        n = len(label)
+        psi = rng.standard_normal(2**n) + 1j * rng.standard_normal(2**n)
+        psi /= np.linalg.norm(psi)
+        mat = _kron_qiskit_order(label)
+        expected_ev = float(np.real(psi.conj() @ mat @ psi))
+        got_ev = pauli_expectation(label, psi)
+        ok = np.isclose(expected_ev, got_ev)
+        status = "PASS" if ok else "FAIL"
+        print(f"  {label:6s}  {status}  (expected {expected_ev:+.6f}, got {got_ev:+.6f})")
+        if not ok:
+            all_pass = False
+
+    # Multi-term Hamiltonian: H = 0.5*ZI + 0.3*IX + 0.2*XY
+    print("\n=== Multi-term Hamiltonian test ===")
+    labels = ["ZI", "IX", "XY"]
+    coeffs = np.array([0.5, 0.3, 0.2])
+    expected_H = sum(c * _kron_qiskit_order(l) for c, l in zip(coeffs, labels, strict=False))
+    qh = QubitHamiltonian(labels, coeffs)
+    got_H = qh.to_matrix()
+    ok = np.allclose(expected_H, got_H)
+    print(f"  H = 0.5*ZI + 0.3*IX + 0.2*XY  {'PASS' if ok else 'FAIL'}")
+    if not ok:
+        all_pass = False
+
+    print(f"\n{'ALL TESTS PASSED' if all_pass else 'SOME TESTS FAILED'}")
+
+    # ------------------------------------------------------------------
+    # Compare against qiskit SparsePauliOp to confirm consistency
+    # ------------------------------------------------------------------
+    try:
+        from qiskit.quantum_info import SparsePauliOp
+
+        print("\n=== Comparison with qiskit SparsePauliOp ===")
+
+        # Single-term matrix comparison
+        print("\n--- Single-term to_matrix vs SparsePauliOp.to_matrix ---")
+        for label in test_labels:
+            qiskit_mat = SparsePauliOp(label).to_matrix()
+            our_mat = QubitHamiltonian([label], np.array([1.0 + 0j])).to_matrix()
+            ok = np.allclose(qiskit_mat, our_mat)
+            status = "PASS" if ok else "FAIL"
+            print(f"  {label:6s}  {status}")
+            if not ok:
+                all_pass = False
+
+        # Multi-term Hamiltonian
+        print("\n--- Multi-term to_matrix vs SparsePauliOp.to_matrix ---")
+        multi_labels = ["ZI", "IX", "XY", "YZ", "XX", "YY", "ZZ", "IZ"]
+        multi_coeffs = [0.5, 0.3, 0.2, -0.1, 0.4, -0.25, 0.15, -0.35]
+        qiskit_H = SparsePauliOp(multi_labels, multi_coeffs).to_matrix()
+        our_H = QubitHamiltonian(multi_labels, np.array(multi_coeffs)).to_matrix()
+        ok = np.allclose(qiskit_H, our_H)
+        print(f"  8-term 2-qubit Hamiltonian  {'PASS' if ok else 'FAIL'}")
+        if not ok:
+            all_pass = False
+
+        # 3-qubit multi-term
+        labels_3q = ["XYZ", "ZIX", "YZX", "III", "ZZZ", "XXX"]
+        coeffs_3q = [0.3, -0.2, 0.15, 1.0, -0.5, 0.25]
+        qiskit_H3 = SparsePauliOp(labels_3q, coeffs_3q).to_matrix()
+        our_H3 = QubitHamiltonian(labels_3q, np.array(coeffs_3q)).to_matrix()
+        ok = np.allclose(qiskit_H3, our_H3)
+        print(f"  6-term 3-qubit Hamiltonian  {'PASS' if ok else 'FAIL'}")
+        if not ok:
+            all_pass = False
+
+        # Expectation value comparison
+        print("\n--- _pauli_expectation vs qiskit ---")
+        rng2 = np.random.default_rng(123)
+        for label in test_labels:
+            n = len(label)
+            psi = rng2.standard_normal(2**n) + 1j * rng2.standard_normal(2**n)
+            psi /= np.linalg.norm(psi)
+            qiskit_ev = float(np.real(psi.conj() @ SparsePauliOp(label).to_matrix() @ psi))
+            our_ev = pauli_expectation(label, psi)
+            ok = np.isclose(qiskit_ev, our_ev)
+            status = "PASS" if ok else "FAIL"
+            print(f"  {label:6s}  {status}  (qiskit {qiskit_ev:+.6f}, ours {our_ev:+.6f})")
+            if not ok:
+                all_pass = False
+
+        # group_commuting comparison
+        print("\n--- group_commuting vs SparsePauliOp.group_commuting ---")
+        gc_labels = ["ZI", "IZ", "ZZ", "XI", "IX", "XX", "YY"]
+        gc_coeffs = [0.5, 0.3, 0.2, -0.1, 0.4, -0.25, 0.15]
+        qiskit_groups = SparsePauliOp(gc_labels, gc_coeffs).group_commuting(qubit_wise=True)
+        our_groups = QubitHamiltonian(gc_labels, np.array(gc_coeffs)).group_commuting(qubit_wise=True)
+        # Reconstruct full matrix from groups — must equal original
+        qiskit_reconstructed = sum(g.to_matrix() for g in qiskit_groups)
+        our_reconstructed = sum(g.to_matrix() for g in our_groups)
+        qiskit_full = SparsePauliOp(gc_labels, gc_coeffs).to_matrix()
+        ok_qiskit = np.allclose(qiskit_reconstructed, qiskit_full)
+        ok_ours = np.allclose(our_reconstructed, qiskit_full)
+        print(f"  qiskit groups reconstruct original:  {'PASS' if ok_qiskit else 'FAIL'}")
+        print(f"  our groups reconstruct original:     {'PASS' if ok_ours else 'FAIL'}")
+        print(f"  number of groups: qiskit={len(qiskit_groups)}, ours={len(our_groups)}")
+        if not ok_ours:
+            all_pass = False
+
+        print(f"\n{'ALL TESTS PASSED (incl. qiskit)' if all_pass else 'SOME TESTS FAILED'}")
+
+        # ------------------------------------------------------------------
+        # 16-qubit sparse benchmark: memory + timing vs SparsePauliOp
+        # ------------------------------------------------------------------
+        import random
+        import threading
+        import time
+        import tracemalloc
+
+        try:
+            import psutil
+        except ImportError:
+            psutil = None
+
+        print("\n=== 22-qubit sparse benchmark (ours vs SparsePauliOp) ===")
+        n_qubits = 24
+        n_terms = 5
+        pauli_chars = "IXYZ"
+        random.seed(2025)
+        rng_bench = np.random.default_rng(2025)
+
+        bench_labels = ["".join(random.choice(pauli_chars) for _ in range(n_qubits)) for _ in range(n_terms)]
+        bench_coeffs = rng_bench.standard_normal(n_terms)
+
+        qh_bench = QubitHamiltonian(bench_labels, bench_coeffs)
+        spo_bench = SparsePauliOp(bench_labels, bench_coeffs)
+
+        print(f"  {n_qubits} qubits, {n_terms} terms  (dim = {2**n_qubits})")
+
+        def _measure_build(build_fn):
+            """Return (matrix, elapsed_seconds, py_peak_bytes, rss_delta_peak_bytes|None)."""
+            stop_evt = threading.Event()
+            proc = psutil.Process() if psutil is not None else None
+            rss_baseline = proc.memory_info().rss if proc is not None else None
+            rss_peak = [rss_baseline if rss_baseline is not None else 0]
+
+            def _sample_rss() -> None:
+                if proc is None:
+                    return
+                while not stop_evt.is_set():
+                    rss_now = proc.memory_info().rss
+                    rss_peak[0] = max(rss_peak[0], rss_now)
+                    time.sleep(0.001)
+
+            sampler = threading.Thread(target=_sample_rss, daemon=True)
+            sampler.start()
+
+            tracemalloc.start()
+            t0 = time.perf_counter()
+            mat = build_fn()
+            elapsed = time.perf_counter() - t0
+            _, py_peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            stop_evt.set()
+            sampler.join(timeout=0.1)
+
+            if proc is None:
+                rss_delta_peak = None
+            else:
+                rss_peak[0] = max(rss_peak[0], proc.memory_info().rss)
+                rss_delta_peak = max(0, rss_peak[0] - rss_baseline)
+
+            return mat, elapsed, py_peak, rss_delta_peak
+
+        our_sparse, t_ours, py_peak_ours, rss_peak_ours = _measure_build(lambda: qh_bench.to_matrix(sparse=True))
+        qiskit_sparse, t_qiskit, py_peak_qiskit, rss_peak_qiskit = _measure_build(
+            lambda: spo_bench.to_matrix(sparse=True)
+        )
+
+        diff = abs(our_sparse - qiskit_sparse).max()
+        ok = diff < 1e-12
+        print(f"\n  Matrices match (max diff {diff:.2e}): {'PASS' if ok else 'FAIL'}")
+        if not ok:
+            all_pass = False
+        rss_ours_txt = f"{(rss_peak_ours / 1024**2):.1f} MiB delta" if rss_peak_ours is not None else "n/a"
+        rss_qiskit_txt = f"{(rss_peak_qiskit / 1024**2):.1f} MiB delta" if rss_peak_qiskit is not None else "n/a"
+        print(
+            f"  Ours   sparse: {t_ours:.4f}s, "
+            f"tracemalloc peak {py_peak_ours / 1024**2:.1f} MiB, "
+            f"rss peak {rss_ours_txt}, "
+            f"nnz {our_sparse.nnz}"
+        )
+        print(
+            f"  Qiskit sparse: {t_qiskit:.4f}s, "
+            f"tracemalloc peak {py_peak_qiskit / 1024**2:.1f} MiB, "
+            f"rss peak {rss_qiskit_txt}, "
+            f"nnz {qiskit_sparse.nnz}"
+        )
+
+        # ------------------------------------------------------------------
+        # 6-qubit dense benchmark: small sanity check for dense path
+        # ------------------------------------------------------------------
+        print("\n=== 6-qubit dense benchmark (ours vs SparsePauliOp) ===")
+        n_qubits_dense = 6
+        n_terms_dense = 100
+
+        dense_labels = [
+            "".join(random.choice(pauli_chars) for _ in range(n_qubits_dense)) for _ in range(n_terms_dense)
+        ]
+        dense_coeffs = rng_bench.standard_normal(n_terms_dense)
+
+        qh_dense = QubitHamiltonian(dense_labels, dense_coeffs)
+        spo_dense = SparsePauliOp(dense_labels, dense_coeffs)
+
+        our_dense, t_ours_dense, py_peak_ours_dense, rss_peak_ours_dense = _measure_build(
+            lambda: qh_dense.to_matrix(sparse=False)
+        )
+        qiskit_dense, t_qiskit_dense, py_peak_qiskit_dense, rss_peak_qiskit_dense = _measure_build(
+            lambda: spo_dense.to_matrix(sparse=False)
+        )
+
+        dense_diff = np.max(np.abs(our_dense - qiskit_dense))
+        ok_dense = dense_diff < 1e-12
+        print(f"\n  Matrices match (max diff {dense_diff:.2e}): {'PASS' if ok_dense else 'FAIL'}")
+        if not ok_dense:
+            all_pass = False
+
+        rss_ours_dense_txt = (
+            f"{(rss_peak_ours_dense / 1024**2):.2f} MiB delta" if rss_peak_ours_dense is not None else "n/a"
+        )
+        rss_qiskit_dense_txt = (
+            f"{(rss_peak_qiskit_dense / 1024**2):.2f} MiB delta" if rss_peak_qiskit_dense is not None else "n/a"
+        )
+        print(
+            f"  Ours   dense: {t_ours_dense:.4f}s, "
+            f"tracemalloc peak {py_peak_ours_dense / 1024**2:.2f} MiB, "
+            f"rss peak {rss_ours_dense_txt}, "
+            f"shape {our_dense.shape}, bytes {our_dense.nbytes / 1024**2:.2f} MiB"
+        )
+        print(
+            f"  Qiskit dense: {t_qiskit_dense:.4f}s, "
+            f"tracemalloc peak {py_peak_qiskit_dense / 1024**2:.2f} MiB, "
+            f"rss peak {rss_qiskit_dense_txt}, "
+            f"shape {qiskit_dense.shape}, bytes {qiskit_dense.nbytes / 1024**2:.2f} MiB"
+        )
+
+        expected_dense_bytes = (2**n_qubits_dense) ** 2 * np.dtype(np.complex128).itemsize
+        print(f"  Expected dense payload: {expected_dense_bytes / 1024**2:.2f} MiB")
+
+        print(f"\n{'ALL BENCHMARKS + TESTS PASSED' if all_pass else 'SOME TESTS FAILED'}")
+    except ImportError:
+        print("\nqiskit not installed — skipping qiskit comparison tests.")

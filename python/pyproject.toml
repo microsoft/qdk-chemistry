@@ -32,11 +32,7 @@ classifiers = [
 dependencies = [
   "numpy>=1.20.0,<2.4.0",
   "scipy>=1.7.0",
-  "matplotlib>=3.10.0",
-  "qiskit[qasm3-import]>=2.2.0",
-  "pylatexenc==2.10",
   "ruamel-yaml>=0.18.10",
-  "pydantic-settings>=2.9.1",
   "qdk[jupyter]>=1.26.0",
   "pybind11-stubgen>=2.5.1",
   "h5py>=3.0.0"
@@ -87,8 +83,11 @@ plugins = [
   "pyscf>=2.9.0,<2.12.1"
 ]
 qiskit-extras = [
+  "qiskit[qasm3-import]>=2.2.0",
   "qiskit-aer",
-  "qiskit-nature"
+  "qiskit-nature",
+  "matplotlib>=3.10.0",
+  "pylatexenc==2.10",
 ]
 openfermion-extras = [
   "openfermion>=1.0.0"
