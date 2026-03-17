@@ -6,6 +6,7 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <type_traits>

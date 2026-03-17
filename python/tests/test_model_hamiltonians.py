@@ -127,13 +127,13 @@ class TestModelHamiltonians:
         # edges
         for edge in [(0, 1), (1, 2), (2, 3)]:
             pauli = ["I"] * n
-            pauli[edge[0]] = "Z"
-            pauli[edge[1]] = "Z"
+            pauli[n - 1 - edge[0]] = "Z"
+            pauli[n - 1 - edge[1]] = "Z"
             expected["".join(pauli)] = j
         # sites
         for i in range(n):
             pauli = ["I"] * n
-            pauli[i] = "X"
+            pauli[n - 1 - i] = "X"
             expected["".join(pauli)] = h
 
         # scalar
@@ -160,21 +160,21 @@ class TestModelHamiltonians:
         h_vec[2] = 0.9
         qh_modified = create_ising_hamiltonian(lattice, j=j_mat, h=h_vec)
         terms_mod = _get_terms_dict(qh_modified)
-        assert terms_mod["ZZII"] == pytest.approx(2.5, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IIZZ"] == pytest.approx(2.5, abs=float_comparison_absolute_tolerance)
         assert terms_mod["IZZI"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["IIZZ"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["XIII"] == pytest.approx(0.5, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["IIXI"] == pytest.approx(0.9, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["ZZII"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IIIX"] == pytest.approx(0.5, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IXII"] == pytest.approx(0.9, abs=float_comparison_absolute_tolerance)
 
         # weighted edges
         lattice_w = LatticeGraph.chain(3, t=0.5)
         qh_w = create_ising_hamiltonian(lattice_w, j=2.0, h=1.0)
         terms_w = _get_terms_dict(qh_w)
-        assert terms_w["ZZI"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
         assert terms_w["IZZ"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
-        assert terms_w["XII"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
-        assert terms_w["IXI"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
+        assert terms_w["ZZI"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
         assert terms_w["IIX"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
+        assert terms_w["IXI"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
+        assert terms_w["XII"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
 
     def test_heisenberg_chain(self):
         n = 4
@@ -192,14 +192,14 @@ class TestModelHamiltonians:
         for edge in edges:
             for pauli_char, j_val in [("X", jx), ("Y", jy), ("Z", jz)]:
                 ps = ["I"] * n
-                ps[edge[0]] = pauli_char
-                ps[edge[1]] = pauli_char
+                ps[n - 1 - edge[0]] = pauli_char
+                ps[n - 1 - edge[1]] = pauli_char
                 expected["".join(ps)] = j_val
         # sites
         for i in range(n):
             for pauli_char, h_val in [("X", hx), ("Y", hy), ("Z", hz)]:
                 ps = ["I"] * n
-                ps[i] = pauli_char
+                ps[n - 1 - i] = pauli_char
                 expected["".join(ps)] = h_val
 
         # scalar
@@ -235,14 +235,14 @@ class TestModelHamiltonians:
             lattice, jx=jx_mat, jy=jy_mat, jz=jz_mat, hx=hx_vec, hy=hy_vec, hz=hz_vec
         )
         terms_mod = _get_terms_dict(qh_modified)
-        assert terms_mod["XXII"] == pytest.approx(2.5, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["YYII"] == pytest.approx(jy, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["ZZII"] == pytest.approx(jz, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IIXX"] == pytest.approx(2.5, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IIYY"] == pytest.approx(jy, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IIZZ"] == pytest.approx(jz, abs=float_comparison_absolute_tolerance)
         assert terms_mod["IXXI"] == pytest.approx(jx, abs=float_comparison_absolute_tolerance)
         assert terms_mod["IYYI"] == pytest.approx(jy, abs=float_comparison_absolute_tolerance)
         assert terms_mod["IZZI"] == pytest.approx(0.3, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["XIII"] == pytest.approx(hx, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["IIXI"] == pytest.approx(0.9, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IIIX"] == pytest.approx(hx, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IXII"] == pytest.approx(0.9, abs=float_comparison_absolute_tolerance)
 
         # weighted edges
         lattice_w = LatticeGraph.chain(3, t=2.0)
@@ -251,6 +251,6 @@ class TestModelHamiltonians:
         for pauli_char in ["X", "Y", "Z"]:
             for edge in [(0, 1), (1, 2)]:
                 ps = ["I"] * 3
-                ps[edge[0]] = pauli_char
-                ps[edge[1]] = pauli_char
+                ps[3 - 1 - edge[0]] = pauli_char
+                ps[3 - 1 - edge[1]] = pauli_char
                 assert terms_w["".join(ps)] == pytest.approx(2.0, abs=float_comparison_absolute_tolerance)

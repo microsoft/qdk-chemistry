@@ -36,7 +36,7 @@ def _pauli_expr_to_qubit_hamiltonian(expr) -> QubitHamiltonian:
     simplified = expr.simplify()
     n_qubits = simplified.num_qubits()
     terms = simplified.to_canonical_terms(n_qubits)
-    pauli_strings = [t[1] for t in terms]
+    pauli_strings = [t[1][::-1] for t in terms]
     coefficients = np.array([complex(t[0]) for t in terms])
     return QubitHamiltonian(pauli_strings, coefficients)
 
@@ -128,7 +128,10 @@ def create_ising_hamiltonian(
 
     .. math::
 
-        H = \sum_{\langle i,j \rangle} J^{ij}\,\sigma_i^z \sigma_j^z + \sum_i h^{i}\,\sigma_i^x
+        H = \sum_{\langle i,j \rangle} w_{ij}\,J^{ij}\,\sigma_i^z \sigma_j^z
+          + \sum_i h^{i}\,\sigma_i^x
+
+    where :math:`w_{ij}` is the edge weight from the lattice adjacency matrix.
 
     Args:
         graph: Lattice graph defining the connectivity.
