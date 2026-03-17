@@ -27,9 +27,9 @@ Companion chemistry datasets and supporting assets are also available in `micros
    The ``main`` branch is the active development branch and may be incompatible with
    the released pip package. For example, to clone the repository for the latest stable 1.0 release, use:
 
-   ```bash
-   git clone --branch stable/1.0 qdk-chemistry
-   ```
+   .. code-block:: bash
+
+      git clone --branch stable/1.0 https://github.com/microsoft/qdk-chemistry.git
 
    See the `examples README <https://github.com/microsoft/qdk-chemistry/blob/main/examples/README.md>`_ for details.
 
