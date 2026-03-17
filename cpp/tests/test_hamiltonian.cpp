@@ -1715,7 +1715,8 @@ TEST_F(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {
 
   Eigen::VectorXd two_body_2x2 = 2 * Eigen::VectorXd::Ones(16);  // 2^4 = 16
 
-  // Create appropriate inactive Fock matrix for the inactive space
+  // Create appropriate inactive Fock matrix for the inactive space, size must
+  // match total number of orbitals (3x3) (see orbitals_with_active_space).
   Eigen::MatrixXd inactive_fock_3x3 = Eigen::MatrixXd::Zero(3, 3);
 
   Hamiltonian h_active_space(
