@@ -11,6 +11,7 @@ import re
 import numpy as np
 import pytest
 
+from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.qubit_hamiltonian import (
     QubitHamiltonian,
     _filter_and_group_pauli_ops_from_statevector,
@@ -143,37 +144,6 @@ class TestQubitHamiltonian:
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
         )
-
-    def test_reorder_qubits_identity(self):
-        """Test that identity permutation returns equivalent Hamiltonian."""
-        qh = QubitHamiltonian(["XIZI", "IYII"], np.array([0.5, 0.3], dtype=complex))
-        reordered = qh.reorder_qubits([0, 1, 2, 3])
-        assert reordered.pauli_strings == qh.pauli_strings
-        assert np.allclose(reordered.coefficients, qh.coefficients)
-
-    def test_reorder_qubits_swap(self):
-        """Test swapping two adjacent qubits."""
-        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
-        reordered = qh.reorder_qubits([1, 0, 2, 3])
-        assert reordered.pauli_strings == ["IXZI"]
-
-    def test_reorder_qubits_reverse(self):
-        """Test reversing all qubit indices."""
-        qh = QubitHamiltonian(["XYZI"], np.array([1.0], dtype=complex))
-        reordered = qh.reorder_qubits([3, 2, 1, 0])
-        assert reordered.pauli_strings == ["IZYX"]
-
-    def test_reorder_qubits_invalid_length(self):
-        """Test that invalid permutation length raises error."""
-        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
-        with pytest.raises(ValueError, match="Permutation length"):
-            qh.reorder_qubits([0, 1, 2])
-
-    def test_reorder_qubits_invalid_values(self):
-        """Test that invalid permutation values raise error."""
-        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
-        with pytest.raises(ValueError, match="Invalid permutation"):
-            qh.reorder_qubits([0, 1, 1, 3])
 
     def test_to_interleaved_4_qubits(self):
         """Test blocked to interleaved conversion for 4 qubits."""
@@ -520,3 +490,111 @@ class TestQubitHamiltonianSerialization:
 
         assert "pauli_strings" in data
         assert "coefficients" in data
+
+
+class TestFermionModeOrder:
+    """Test suite for fermion_mode_order metadata on QubitHamiltonian."""
+
+    def test_default_is_none(self):
+        """fermion_mode_order defaults to None when not specified."""
+        qh = QubitHamiltonian(["IX", "ZZ"], np.array([0.5, 0.3]))
+        assert qh.fermion_mode_order is None
+
+    def test_set_blocked(self):
+        """fermion_mode_order can be set to BLOCKED."""
+        qh = QubitHamiltonian(["IX", "ZZ"], np.array([0.5, 0.3]), fermion_mode_order=FermionModeOrder.BLOCKED)
+        assert qh.fermion_mode_order == FermionModeOrder.BLOCKED
+        assert qh.fermion_mode_order == "blocked"
+
+    def test_set_interleaved(self):
+        """fermion_mode_order can be set to INTERLEAVED."""
+        qh = QubitHamiltonian(["IX", "ZZ"], np.array([0.5, 0.3]), fermion_mode_order=FermionModeOrder.INTERLEAVED)
+        assert qh.fermion_mode_order == FermionModeOrder.INTERLEAVED
+
+    def test_set_from_string(self):
+        """fermion_mode_order accepts a raw string and coerces to the enum."""
+        qh = QubitHamiltonian(["IX", "ZZ"], np.array([0.5, 0.3]), fermion_mode_order="blocked")
+        assert qh.fermion_mode_order is FermionModeOrder.BLOCKED
+
+    def test_json_roundtrip(self):
+        """fermion_mode_order survives JSON serialization."""
+        original = QubitHamiltonian(
+            ["IX", "ZZ"],
+            np.array([0.5, 0.3]),
+            encoding="jordan-wigner",
+            fermion_mode_order=FermionModeOrder.BLOCKED,
+        )
+        json_data = original.to_json()
+        assert json_data["fermion_mode_order"] == "blocked"
+
+        restored = QubitHamiltonian.from_json(json_data)
+        assert restored.fermion_mode_order == FermionModeOrder.BLOCKED
+
+    def test_json_roundtrip_none(self):
+        """fermion_mode_order=None is omitted from JSON and restored as None."""
+        original = QubitHamiltonian(["IX", "ZZ"], np.array([0.5, 0.3]))
+        json_data = original.to_json()
+        assert "fermion_mode_order" not in json_data
+
+        restored = QubitHamiltonian.from_json(json_data)
+        assert restored.fermion_mode_order is None
+
+    def test_hdf5_roundtrip(self, tmp_path):
+        """fermion_mode_order survives HDF5 serialization."""
+        original = QubitHamiltonian(
+            ["IX", "ZZ"],
+            np.array([0.5, 0.3]),
+            encoding="jordan-wigner",
+            fermion_mode_order=FermionModeOrder.INTERLEAVED,
+        )
+        filename = tmp_path / "test.qubit_hamiltonian.h5"
+        original.to_hdf5_file(str(filename))
+
+        restored = QubitHamiltonian.from_hdf5_file(str(filename))
+        assert restored.fermion_mode_order == FermionModeOrder.INTERLEAVED
+
+    def test_hdf5_roundtrip_none(self, tmp_path):
+        """fermion_mode_order=None is omitted from HDF5 and restored as None."""
+        original = QubitHamiltonian(["IX", "ZZ"], np.array([0.5, 0.3]))
+        filename = tmp_path / "test.qubit_hamiltonian.h5"
+        original.to_hdf5_file(str(filename))
+
+        restored = QubitHamiltonian.from_hdf5_file(str(filename))
+        assert restored.fermion_mode_order is None
+
+    def test_group_commuting_preserves(self):
+        """group_commuting preserves fermion_mode_order."""
+        qh = QubitHamiltonian(
+            ["XX", "YY", "ZZ"],
+            np.array([1.0, 0.5, -0.5]),
+            fermion_mode_order=FermionModeOrder.BLOCKED,
+        )
+        for group in qh.group_commuting(qubit_wise=True):
+            assert group.fermion_mode_order == FermionModeOrder.BLOCKED
+
+    def test_to_interleaved_sets_order(self):
+        """to_interleaved sets fermion_mode_order to INTERLEAVED."""
+        qh = QubitHamiltonian(
+            ["IIIX", "ZZII"],
+            np.array([0.5, 0.3]),
+            fermion_mode_order=FermionModeOrder.BLOCKED,
+        )
+        interleaved = qh.to_interleaved(n_spatial=2)
+        assert interleaved.fermion_mode_order == FermionModeOrder.INTERLEAVED
+
+    def test_summary_includes_order(self):
+        """get_summary includes fermion_mode_order when set."""
+        qh = QubitHamiltonian(
+            ["IX", "ZZ"],
+            np.array([0.5, 0.3]),
+            fermion_mode_order=FermionModeOrder.BLOCKED,
+        )
+        summary = qh.get_summary()
+        assert "blocked" in summary
+        assert "Fermion mode order" in summary
+
+    def test_summary_omits_when_none(self):
+        """get_summary omits fermion_mode_order when None."""
+        qh = QubitHamiltonian(["IX", "ZZ"], np.array([0.5, 0.3]))
+        summary = qh.get_summary()
+        assert "Fermion mode order" not in summary

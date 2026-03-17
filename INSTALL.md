@@ -11,6 +11,9 @@ git clone https://github.com/microsoft/qdk-chemistry.git
 cd qdk-chemistry
 ```
 
+**Note**: Some examples require additional dependencies beyond the base package.
+See the [examples README](examples/README.md) for per-example installation requirements.
+
 ## Pip Wheel Installation
 
 **Note**: Before using pip to install QDK/Chemistry, ensure that Python 3.10+ and pip are installed on your system. On Ubuntu/Debian, you may need to install `python3-pip` and `python3-venv` first. See the [System Dependencies](#system-dependencies) section for more details.
@@ -58,6 +61,7 @@ The following extras are available:
 | `jupyter` | Jupyter notebook support | ipykernel, pandas, pyscf |
 | `plugins` | Third-party quantum chemistry backends | PySCF |
 | `qiskit-extras` | Optional Qiskit ecosystem packages | qiskit-aer, qiskit-nature |
+| `openfermion-extras` | Optional OpenFermion ecosystem packages | openfermion |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
 | `all` | All of the above | All optional dependencies |
 
@@ -75,16 +79,22 @@ To install with all optional Qiskit ecosystem packages:
 python -m pip install 'qdk-chemistry[qiskit-extras]'
 ```
 
+To install with OpenFermion support:
+
+```bash
+python -m pip install 'qdk-chemistry[openfermion-extras]'
+```
+
 To install everything:
 
 ```bash
 python -m pip install 'qdk-chemistry[all]'
 ```
 
-To run the OpenFermion integration example tests, you will also need to install `openfermion` and `rdkit`:
+To run the RDKit integration example, you will also need to install `rdkit`:
 
 ```bash
-python3 -m pip install openfermion rdkit
+python3 -m pip install rdkit
 ```
 
 Installing with the `dev` option allows you to run the tests in the `python/tests` directory of the source repository you cloned above.
