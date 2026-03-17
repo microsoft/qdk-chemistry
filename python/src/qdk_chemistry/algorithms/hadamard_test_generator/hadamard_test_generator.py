@@ -40,14 +40,14 @@ class QsharpHadamardGenerator(HadamardTestGenerator):
             state_preparation: Circuit that prepares the trial state on system qubits.
             num_system_qubits: Number of qubits in the system register.
             ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
-            test_basis: Measurement basis for the control qubit. Supported values are ``"X"``, ``"Y"``, and ``"Z"``.
+            test_basis: Measurement basis for the control qubit. Supported values are ``"X"`` and ``"Y"``.
 
         Returns:
             Circuit containing compiled and rendered Q# Hadamard test artifacts.
 
         """
-        if test_basis not in {"X", "Y", "Z"}:
-            raise ValueError(f'Invalid value for test_basis: {test_basis!r}. Allowed values are "X", "Y", and "Z".')
+        if test_basis not in {"X", "Y"}:
+            raise ValueError(f'Invalid value for test_basis: {test_basis!r}. Allowed values are "X" and "Y".')
 
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         if state_prep_op is None:
@@ -89,12 +89,7 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
     def __init__(
         self,
     ):
-        """Initialize QiskitHadamardGenerator.
-
-        Raises:
-            ModuleNotFoundError: If Qiskit is not installed.
-
-        """
+        """Initialize QiskitHadamardGenerator."""
         Logger.trace_entering()
         super().__init__()
 
@@ -113,10 +108,13 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
             state_preparation: Circuit that prepares the trial state on system qubits.
             num_system_qubits: Number of qubits in the system register.
             ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
-            test_basis: Measurement basis for the control qubit. Supported values are ``"X"``, ``"Y"``, and ``"Z"``.
+            test_basis: Measurement basis for the control qubit. Supported values are ``"X"`` and ``"Y"``.
 
         Returns:
             Circuit containing the OpenQASM3 representation of the Qiskit Hadamard test circuit.
+
+        Raises:
+            ModuleNotFoundError: If Qiskit is not installed.
 
         """
         try:
@@ -159,8 +157,8 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
         elif test_basis == "Y":
             circuit.sdg(control)
             circuit.h(control)
-        elif test_basis != "Z":  # if it is "Z", then do nothing; otherwise, raise error
-            raise ValueError(f'Invalid value for test_basis: {test_basis!r}. Allowed values are "X", "Y", and "Z".')
+        else:
+            raise ValueError(f'Invalid value for test_basis: {test_basis!r}. Allowed values are "X" and "Y".')
         circuit.measure(control, classical[0])
 
         Logger.info("Completed qiskit circuit for real observable measurement.")

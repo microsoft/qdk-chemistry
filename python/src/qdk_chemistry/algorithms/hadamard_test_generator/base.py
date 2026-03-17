@@ -40,7 +40,7 @@ class HadamardTestGenerator(Algorithm):
             state_preparation: Circuit that prepares the trial state on system qubits.
             num_system_qubits: Number of qubits in the system register.
             ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
-            test_basis: Measurement basis for the control qubit. Supported values are ``"X"``, ``"Y"``, and ``"Z"``.
+            test_basis: Measurement basis for the control qubit. Supported values are ``"X"`` and ``"Y"``.
 
         Returns:
             Circuit representing the Hadamard test workflow for the selected backend.
@@ -60,5 +60,5 @@ class HadamardTestFactory(AlgorithmFactory):
         return "hadamard_test_generator"
 
     def default_algorithm_name(self) -> str:
-        """Return the hadamard_test as default algorithm name."""
+        """Return 'qsharp_hadamard_generator' as the default algorithm name."""
         return "qsharp_hadamard_generator"

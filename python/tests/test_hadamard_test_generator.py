@@ -197,7 +197,7 @@ def test_qiskit_hadamard_generator_rejects_invalid_test_basis() -> None:
             Circuit(qasm=qasm3.dumps(state_prep_qc)),
             1,
             Circuit(qasm=qasm3.dumps(ctrl_evol_qc)),
-            test_basis="BAD",
+            test_basis="Z",
         )
 
 
@@ -209,7 +209,7 @@ def test_qsharp_hadamard_generator_rejects_invalid_test_basis() -> None:
             object(),
             1,
             object(),
-            test_basis="BAD",
+            test_basis="Z",
         )
 
 
