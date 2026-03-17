@@ -170,10 +170,11 @@ TEST_F(HamiltonianTest, ConstructorWithInactiveFock) {
   EXPECT_EQ(h.get_core_energy(), 1.5);
 
   Eigen::MatrixXd wrong_dim_inactive_fock = Eigen::MatrixXd::Identity(2, 2);
-  EXPECT_THROW(Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-                   one_body, two_body, orbitals_with_inactive, core_energy,
-                   wrong_dim_inactive_fock)),
-               std::invalid_argument);
+  EXPECT_THROW(
+      Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          one_body, two_body, orbitals_with_inactive, core_energy,
+          wrong_dim_inactive_fock)),
+      std::invalid_argument);
 }
 
 TEST_F(HamiltonianTest, MoveConstructor) {

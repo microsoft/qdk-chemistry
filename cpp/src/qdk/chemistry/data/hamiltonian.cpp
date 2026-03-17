@@ -251,14 +251,16 @@ void HamiltonianContainer::validate_active_space_dimensions() const {
 
   if (has_inactive_fock_matrix()) {
     auto nmo = _orbitals->get_num_molecular_orbitals();
-    if (_inactive_fock_matrix.first->rows() != nmo || _inactive_fock_matrix.first->cols() != nmo) {
+    if (_inactive_fock_matrix.first->rows() != nmo ||
+        _inactive_fock_matrix.first->cols() != nmo) {
       throw std::invalid_argument(
           "Alpha inactive Fock matrix dimension does not match number of "
           "molecular orbitals");
     }
 
     if (is_unrestricted()) {
-      if (_inactive_fock_matrix.second->rows() != nmo || _inactive_fock_matrix.second->cols() != nmo) {
+      if (_inactive_fock_matrix.second->rows() != nmo ||
+          _inactive_fock_matrix.second->cols() != nmo) {
         throw std::invalid_argument(
             "Beta inactive Fock matrix dimension does not match number of "
             "molecular orbitals");
