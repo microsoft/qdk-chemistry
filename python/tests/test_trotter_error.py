@@ -55,11 +55,11 @@ class TestTrotterStepsNaive:
         with pytest.raises(ValueError, match="positive"):
             trotter_steps_naive(h, 1.0, -0.1)
 
-    def test_order_2_raises(self):
-        """Test that order > 1 raises NotImplementedError."""
+    def test_order_3_raises(self):
+        """Test that order > 2 raises NotImplementedError."""
         h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        with pytest.raises(NotImplementedError, match="order 2"):
-            trotter_steps_naive(h, 1.0, 0.1, order=2)
+        with pytest.raises(NotImplementedError, match="order 3"):
+            trotter_steps_naive(h, 1.0, 0.1, order=3)
 
 
 class TestTrotterStepsCommutator:
@@ -107,8 +107,40 @@ class TestTrotterStepsCommutator:
         with pytest.raises(ValueError, match="positive"):
             trotter_steps_commutator(h, 1.0, 0.0)
 
-    def test_order_2_raises(self):
-        """Test that order > 1 raises NotImplementedError."""
+    def test_order_3_raises(self):
+        """Test that order > 2 raises NotImplementedError."""
         h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        with pytest.raises(NotImplementedError, match="order 2"):
-            trotter_steps_commutator(h, 1.0, 0.1, order=2)
+        with pytest.raises(NotImplementedError, match="order 3"):
+            trotter_steps_commutator(h, 1.0, 0.1, order=3)
+
+    # Second-order Trotter tests.
+
+    def test_all_commuting_second_order(self):
+        """Test with all commuting terms."""
+        # XI and IX commute: commutator bound = 0, N = 1
+        h = QubitHamiltonian(pauli_strings=["XI", "IX"], coefficients=[1.0, 1.0])
+        assert trotter_steps_commutator(h, 1.0, 0.1, order=2) == 1
+
+    def test_tighter_than_naive_second_order(self):
+        """Test that commutator bound is never looser than naive."""
+        h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
+        eps = 0.01
+        time = 1.0
+        n_naive = trotter_steps_naive(h, time, eps, order=2)
+        n_comm = trotter_steps_commutator(h, time, eps, order=2)
+        assert n_comm <= n_naive
+
+    def test_minimum_one_second_order(self):
+        """Test that result is at least 1 for commuting Hamiltonian."""
+        h = QubitHamiltonian(pauli_strings=["XI", "IX"], coefficients=[1.0, 1.0])
+        assert trotter_steps_commutator(h, 1.0, 100.0, order=2) == 1
+
+    def test_time_scaling_second_order(self):
+        """Test that step count scales with t^(3/2)."""
+        h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
+        n1 = trotter_steps_commutator(h, 1.0, 0.1, order=2)
+        n2 = trotter_steps_commutator(h, 4.0, 0.1, order=2)
+        # n2 should be approximately 4**1.5 * n1 (t^1.5 scaling)
+        if n1 > 1:
+            assert (n2 + 1) / (n1 - 1) >= math.ceil(4**1.5)  # Allow for ceiling effects
+        assert (n2 - 1) / (n1 + 1) <= math.ceil(4**1.5)  # Allow for ceiling effects

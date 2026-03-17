@@ -30,7 +30,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
-from qdk_chemistry.utils.pauli_commutation import commutator_bound_first_order
+from qdk_chemistry.utils.pauli_commutation import commutator_bound_first_order, commutator_bound_second_order
 
 if TYPE_CHECKING:
     from qdk_chemistry.data import QubitHamiltonian
@@ -77,14 +77,16 @@ def trotter_steps_naive(
     """
     if target_accuracy <= 0:
         raise ValueError(f"target_accuracy must be positive, got {target_accuracy}.")
-    if order != 1:
+    if order not in {1, 2}:
         raise NotImplementedError(
             f"Trotter step estimation for order {order} is not yet implemented. "
-            "Only first-order (order=1) is currently supported."
+            "Only orders 1 or 2 are currently supported."
         )
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
     one_norm = sum(abs(coeff) for _, coeff in real_terms)
-    return max(1, math.ceil(one_norm**2 * time**2 / target_accuracy))
+    return max(
+        1, math.ceil((one_norm ** (1 + 1 / order) * abs(time) ** (1 + 1 / order)) / (target_accuracy ** (1 / order)))
+    )
 
 
 def trotter_steps_commutator(
@@ -101,9 +103,15 @@ def trotter_steps_commutator(
 
     .. math::
 
-        N = \left\lceil \frac{t^2}{2\epsilon}
+        N_1 = \left\lceil \frac{\alpha_1 t^2}{2\epsilon}\right\rceil
+
+        \alpha_1 =
             \sum_{j<k} \lVert [\alpha_j P_j,\, \alpha_k P_k] \rVert
-        \right\rceil
+
+        N_2 = \left\lceil \frac{t^{3/2}\alpha_2^{1/2}}{(12\epsilon)^{1/2}} \right\rceil
+
+        \alpha_2 = \sum_{k > j,l > j} \lVert [\alpha_l P_l,\, [\alpha_k P_k,\, \alpha_j P_j] \rVert +
+            \frac{1}{2} \sum_{k > j} \lVert [\alpha_j P_j,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert
 
     For Pauli strings the commutator norm is :math:`2|\alpha_j||\alpha_k|`
     when the pair anticommutes and 0 when it commutes.  This bound is never
@@ -127,10 +135,13 @@ def trotter_steps_commutator(
     """
     if target_accuracy <= 0:
         raise ValueError(f"target_accuracy must be positive, got {target_accuracy}.")
-    if order != 1:
-        raise NotImplementedError(
-            f"Trotter step estimation for order {order} is not yet implemented. "
-            "Only first-order (order=1) is currently supported."
-        )
-    comm_bound = commutator_bound_first_order(hamiltonian, weight_threshold=weight_threshold)
-    return max(1, math.ceil(comm_bound * time**2 / (2.0 * target_accuracy)))
+
+    if order == 1:
+        comm_bound = commutator_bound_first_order(hamiltonian, weight_threshold=weight_threshold)
+        return max(1, math.ceil(comm_bound * time**2 / (2.0 * target_accuracy)))
+    if order == 2:
+        comm_bound = commutator_bound_second_order(hamiltonian, weight_threshold=weight_threshold)
+        return max(1, math.ceil(comm_bound**0.5 * abs(time) ** 1.5 / (12.0 * target_accuracy) ** 0.5))
+    raise NotImplementedError(
+        f"Trotter step estimation for order {order} is not yet implemented. Only orders 1 or 2 are currently supported."
+    )
