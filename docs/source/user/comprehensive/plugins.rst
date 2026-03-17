@@ -158,12 +158,6 @@ To install OpenFermion, use the ``openfermion-extras`` extra when installing QDK
 
    pip install 'qdk-chemistry[openfermion-extras]'
 
-Alternatively, you can install it directly:
-
-.. code-block:: bash
-
-   pip install openfermion
-
 **Checking what is loaded:**
 
 To determine which OpenFermion components are available in your environment, you can check the following module-level variables:
