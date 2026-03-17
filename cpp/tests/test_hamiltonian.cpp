@@ -2801,10 +2801,29 @@ TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
   }
 }
 
-class SparseTest : public ::HamiltonianTest {
+class SparseTest : public ::testing::Test {
  protected:
-  void SetUp() override {}
-  void TearDown() override {}
+  void SetUp() override {
+    one_body = Eigen::MatrixXd::Identity(2, 2);
+    one_body(0, 1) = 0.5;
+    one_body(1, 0) = 0.5;
+
+    two_body = 2 * Eigen::VectorXd::Ones(16);
+
+    core_energy = 1.5;
+
+    sparse_one_body = Eigen::SparseMatrix<double>(2, 2);
+    sparse_one_body.insert(0, 0) = 1.0;
+    sparse_one_body.insert(0, 1) = 0.5;
+    sparse_one_body.insert(1, 0) = 0.5;
+    sparse_one_body.insert(1, 1) = 1.0;
+    sparse_one_body.makeCompressed();
+  }
+
+  Eigen::MatrixXd one_body;
+  Eigen::VectorXd two_body;
+  double core_energy;
+  Eigen::SparseMatrix<double> sparse_one_body;
 };
 
 TEST_F(SparseTest, SparseContainerConstructionOneBodyOnly) {
