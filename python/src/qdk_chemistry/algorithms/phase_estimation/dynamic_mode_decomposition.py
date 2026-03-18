@@ -88,7 +88,9 @@ class DynamicModeDecompositionSettings(PhaseEstimationSettings):
         self._set_default("hankel_rows", "int", -1, "Row number of Hankel matrix X")
         self._set_default("hankel_columns", "int", -1, "Column number of Hankel matrices X and X'")
         self._set_default("evolution_time", "float", 0.0, "Time dt in the evolution unitary U = exp(-i H dt)")
-        self._set_default("shots_per_observable", "int", 100, "Number of shots to use when measuring each observable in ODMD")
+        self._set_default(
+            "shots_per_observable", "int", 100, "Number of shots to use when measuring each observable in ODMD"
+        )
 
 
 class DynamicModeDecomposition(PhaseEstimation):
