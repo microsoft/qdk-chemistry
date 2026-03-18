@@ -51,6 +51,7 @@ class TestRegistryShowDefault:
             "controlled_evolution_circuit_mapper",
             "phase_estimation",
             "time_evolution_builder",
+            "circuit_executor",
         ]
 
         for algorithm_type in expected_types:
@@ -90,6 +91,11 @@ class TestRegistryShowDefault:
         default_circuit_executor = registry.show_default("circuit_executor")
         assert isinstance(default_circuit_executor, str)
         assert default_circuit_executor == "qdk_full_state_simulator"
+
+        # Test for energy estimator
+        default_energy_estimator = registry.show_default("energy_estimator")
+        assert isinstance(default_energy_estimator, str)
+        assert default_energy_estimator == "qdk"
 
         # Test for phase estimation
         default_phase_estimation = registry.show_default("phase_estimation")

@@ -13,8 +13,8 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.energy_estimator import QdkEnergyEstimator
 from qdk_chemistry.algorithms.energy_estimator.qdk import (
+    QdkEnergyEstimator,
     _append_measurement_to_circuit,
     _compute_expval_and_variance_from_bitstrings,
     _determine_measurement_basis,

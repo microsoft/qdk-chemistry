@@ -16,7 +16,7 @@ from qdk_chemistry.data import (
     QubitHamiltonian,
 )
 
-__all__: list[str] = ["EnergyEstimatorFactory"]
+__all__: list[str] = ["EnergyEstimator", "EnergyEstimatorFactory"]
 
 
 class EnergyEstimator(Algorithm):
