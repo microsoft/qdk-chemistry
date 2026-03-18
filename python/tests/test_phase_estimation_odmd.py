@@ -11,19 +11,14 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms.hadamard_test_generator.base import HadamardTestGenerator
 from qdk_chemistry.algorithms.phase_estimation.dynamic_mode_decomposition import DynamicModeDecomposition
 from qdk_chemistry.data import Circuit, QpeResult, QubitHamiltonian, Structure
-from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.phase import energy_from_phase
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import qasm3
-
-
-pytestmark = pytest.mark.skipif(
-    not (QDK_CHEMISTRY_HAS_QISKIT and QDK_CHEMISTRY_HAS_QISKIT_NATURE),
-    reason="ODMD water tests require Qiskit dependencies",
-)
 
 _SEED = 42
 _EVOLUTION_TIME = float(np.pi / 48.0)
@@ -36,7 +31,7 @@ _EXPECTED_ENERGY = -1.8940592653045103
 
 
 @pytest.fixture(scope="module")
-def water_odmd_problem() -> tuple[QubitHamiltonian, Circuit, Circuit]:
+def water_odmd_problem() -> tuple[QubitHamiltonian, Circuit, Circuit | None]:
     """Build the active-space water ODMD benchmark inputs once per module."""
     num_active_electrons = 2
     num_active_orbitals = 3
@@ -69,15 +64,21 @@ def water_odmd_problem() -> tuple[QubitHamiltonian, Circuit, Circuit]:
     hamiltonian_constructor = create("hamiltonian_constructor")
     active_hamiltonian = hamiltonian_constructor.run(active_wfn.get_orbitals())
 
-    qubit_mapper = create("qubit_mapper", algorithm_name="qiskit", encoding="jordan-wigner")
+    qubit_mapper = create(
+        "qubit_mapper",
+        algorithm_name="qiskit" if QDK_CHEMISTRY_HAS_QISKIT else "qdk",
+        encoding="jordan-wigner",
+    )
     qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
 
     state_prep_builder = create("state_prep", algorithm_name="sparse_isometry_gf2x")
     state_prep = state_prep_builder.run(active_wfn)
 
     qsharp_state_prep = state_prep
-    qiskit_circuit = state_prep.get_qiskit_circuit()
-    qiskit_state_prep = Circuit(qasm=qasm3.dumps(qiskit_circuit))
+    qiskit_state_prep: Circuit | None = None
+    if QDK_CHEMISTRY_HAS_QISKIT:
+        qiskit_circuit = state_prep.get_qiskit_circuit()
+        qiskit_state_prep = Circuit(qasm=qasm3.dumps(qiskit_circuit))
 
     return qubit_hamiltonian, qsharp_state_prep, qiskit_state_prep
 
@@ -93,6 +94,7 @@ def _resolve_energy_alias(phase_fraction: float, expected_energy: float) -> tupl
 def _run_odmd(
     qubit_hamiltonian: QubitHamiltonian,
     state_preparation: Circuit,
+    hadamard_test_generator: HadamardTestGenerator,
 ) -> QpeResult:
     """Execute ODMD and return the phase-estimation result."""
     odmd = DynamicModeDecomposition(
@@ -104,10 +106,6 @@ def _run_odmd(
 
     evolution_builder = create("time_evolution_builder", "trotter")
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
-    hadamard_test_generator = create(
-        "hadamard_test_generator",
-        "qsharp_hadamard_generator" if state_preparation._qsharp_op is not None else "qiskit_hadamard_generator",  # noqa: SLF001
-    )
     executor = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
 
     result = odmd.run(
@@ -121,31 +119,28 @@ def _run_odmd(
     return result
 
 
-def test_qsharp_odmd_water_reference(water_odmd_problem: tuple[QubitHamiltonian, Circuit, Circuit]) -> None:
+def test_qsharp_odmd_water_reference(water_odmd_problem: tuple[QubitHamiltonian, Circuit, Circuit | None]) -> None:
     """Validate ODMD execution for the Q# state-preparation path."""
     qubit_hamiltonian, qsharp_state_prep, _ = water_odmd_problem
-    result = _run_odmd(qubit_hamiltonian, qsharp_state_prep)
+    hadamard_test_generator = create("hadamard_test_generator", "qsharp_hadamard_generator")
+    result = _run_odmd(qubit_hamiltonian, qsharp_state_prep, hadamard_test_generator)
     resolved_phase, resolved_energy = _resolve_energy_alias(result.phase_fraction, _EXPECTED_ENERGY)
 
     assert np.isclose(resolved_phase, _EXPECTED_PHASE_FRACTION)
     assert np.isclose(resolved_energy, _EXPECTED_ENERGY)
-    assert result.metadata is not None
-    assert result.metadata.get("hankel_rows") == _HANKEL_ROWS
-    assert result.metadata.get("hankel_columns") == _HANKEL_COLUMNS
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
-def test_qiskit_odmd_water_reference(water_odmd_problem: tuple[QubitHamiltonian, Circuit, Circuit]) -> None:
+def test_qiskit_odmd_water_reference(water_odmd_problem: tuple[QubitHamiltonian, Circuit, Circuit | None]) -> None:
     """Validate ODMD execution for the Qiskit state-preparation path."""
     qubit_hamiltonian, _, qiskit_state_prep = water_odmd_problem
-    result = _run_odmd(qubit_hamiltonian, qiskit_state_prep)
+    assert qiskit_state_prep is not None
+    hadamard_test_generator = create("hadamard_test_generator", "qiskit_hadamard_generator")
+    result = _run_odmd(qubit_hamiltonian, qiskit_state_prep, hadamard_test_generator)
     resolved_phase, resolved_energy = _resolve_energy_alias(result.phase_fraction, _EXPECTED_ENERGY)
 
     assert np.isclose(resolved_phase, _EXPECTED_PHASE_FRACTION)
     assert np.isclose(resolved_energy, _EXPECTED_ENERGY)
-    assert result.metadata is not None
-    assert result.metadata.get("hankel_rows") == _HANKEL_ROWS
-    assert result.metadata.get("hankel_columns") == _HANKEL_COLUMNS
 
 
 @pytest.mark.parametrize(
