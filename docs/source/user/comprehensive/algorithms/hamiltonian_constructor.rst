@@ -158,7 +158,7 @@ The decomposition represents the four-center ERIs as products of three-center in
 QDK Density-Fitted
 ~~~~~~~~~~~~~~~~~~
 
-.. rubric:: Factory name: ``"qdk_density_fitted"``
+.. rubric:: Factory name: ``"qdk_density_fitted_hamiltonian"``
 
 A memory-efficient implementation that uses density fitting (resolution-of-the-identity, RI) to approximate two-electron integrals.
 This implementation produces a ``DensityFittedHamiltonianContainer`` that stores three-center integrals instead of four-center integrals, significantly reducing memory requirements for large active spaces.
@@ -184,7 +184,7 @@ The ``run`` method requires an extra auxiliary basis set parameter.
    .. code-block:: cpp
 
       // Create density-fitted Hamiltonian constructor
-      auto constructor = algorithms::HamiltonianConstructor::create("qdk_density_fitted");
+      auto constructor = algorithms::HamiltonianConstructor::create("qdk_density_fitted_hamiltonian");
 
       // Specify auxiliary basis explicitly
       auto hamiltonian_with_aux = constructor->run(orbitals, "cc-pvtz-ri");
@@ -194,7 +194,7 @@ The ``run`` method requires an extra auxiliary basis set parameter.
    .. code-block:: python
 
       # Create density-fitted Hamiltonian constructor
-      constructor = HamiltonianConstructor.create("qdk_density_fitted")
+      constructor = HamiltonianConstructor.create("qdk_density_fitted_hamiltonian")
 
       # Specify auxiliary basis explicitly
       hamiltonian_with_aux = constructor.run(orbitals, "cc-pvtz-ri")

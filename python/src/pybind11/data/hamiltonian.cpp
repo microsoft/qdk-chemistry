@@ -258,7 +258,7 @@ Examples:
     >>> import numpy as np
     >>> # Create restricted Hamiltonian
     >>> one_body = np.random.rand(4, 4)  # 4 orbitals
-    >>> two_body = np.random.rand(256)   # 4^4 elements
+    >>> two_body = np.random.rand(256)   # 4⁴ elements
     >>> ao_cholesky_vectors = np.random.rand(4*4, 10)   # 10 Cholesky vectors
     >>> inactive_fock_matrix = np.random.rand(4, 4)
     >>> container = CholeskyHamiltonianContainer(
@@ -278,18 +278,18 @@ Constructor for restricted active space Hamiltonian with Cholesky-decomposed int
 
 Args:
     one_body_integrals (numpy.ndarray): One-electron integrals matrix [norb x norb]
-    two_body_integrals (numpy.ndarray): Two-electron integrals vector [norb^4]
+    two_body_integrals (numpy.ndarray): Two-electron integrals vector [norb⁴]
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [norb x norb]
-    ao_cholesky_vectors (numpy.ndarray): AO basis Cholesky vectors [norb^2 x nvec]
+    ao_cholesky_vectors (numpy.ndarray): AO basis Cholesky vectors [norb² x nvec]
     type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
 
 Examples:
     >>> import numpy as np
     >>> one_body = np.random.rand(4, 4)
-    >>> two_body = np.random.rand(256)  # 4^4 elements
-    >>> ao_cholesky_vecs = np.random.rand(16, 10)  # 16 = 4^2, 10 vectors
+    >>> two_body = np.random.rand(256)  # 4⁴ elements
+    >>> ao_cholesky_vecs = np.random.rand(16, 10)  # 16 = 4², 10 vectors
     >>> inactive_fock_matrix = np.random.rand(4, 4)
     >>> container = CholeskyHamiltonianContainer(
     ...     one_body, two_body, orbitals, 10.5, inactive_fock_matrix, ao_cholesky_vectors
@@ -313,14 +313,14 @@ Constructor for unrestricted active space Hamiltonian with Cholesky-decomposed i
 Args:
     one_body_integrals_alpha (numpy.ndarray): Alpha one-electron integrals [norb x norb]
     one_body_integrals_beta (numpy.ndarray): Beta one-electron integrals [norb x norb]
-    two_body_integrals_aaaa (numpy.ndarray): Alpha-alpha-alpha-alpha integrals [norb^4]
-    two_body_integrals_aabb (numpy.ndarray): Alpha-beta-alpha-beta integrals [norb^4]
-    two_body_integrals_bbbb (numpy.ndarray): Beta-beta-beta-beta integrals [norb^4]
+    two_body_integrals_aaaa (numpy.ndarray): Alpha-alpha-alpha-alpha integrals [norb⁴]
+    two_body_integrals_aabb (numpy.ndarray): Alpha-beta-alpha-beta integrals [norb⁴]
+    two_body_integrals_bbbb (numpy.ndarray): Beta-beta-beta-beta integrals [norb⁴]
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix [norb x norb]
     inactive_fock_matrix_beta (numpy.ndarray): Beta inactive Fock matrix [norb x norb]
-    ao_cholesky_vectors (numpy.ndarray): AO basis Cholesky vectors [norb^2 x nvec]
+    ao_cholesky_vectors (numpy.ndarray): AO basis Cholesky vectors [norb² x nvec]
     type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
 
 Examples:
@@ -354,25 +354,25 @@ Get two-electron integrals in molecular orbital basis.
 
 Returns:
     tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
-    integral vectors [norb^4] for aaaa, aabb, and bbbb spin channels.
+    integral vectors [norb⁴] for aaaa, aabb, and bbbb spin channels.
 
 Notes:
-    Integrals are stored as flattened vectors in chemist notation <ij|kl>
-    where indices are ordered as i + j*norb + k*norb^2 + l*norb^3
+    Integrals are stored as flattened vectors in chemist notation (ij|kl)
+    where indices are ordered as i + j*norb + k*norb² + l*norb³
 )",
                           py::return_value_policy::reference_internal);
 
   cholesky_container.def("get_two_body_element",
                          &CholeskyHamiltonianContainer::get_two_body_element,
                          R"(
-Get specific two-electron integral element <ij|kl>.
+Get specific two-electron integral element (ij|kl).
 
 Args:
     i, j, k, l (int): Orbital indices
     channel (SpinChannel): Spin channel (aaaa, aabb, or bbbb), defaults to aaaa
 
 Returns:
-    float: Value of the two-electron integral <ij|kl>
+    float: Value of the two-electron integral (ij|kl)
 )",
                          py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
                          py::arg("channel") = SpinChannel::aaaa);
@@ -444,13 +444,13 @@ specifically designed for active space methods. It contains:
 * Core energy contributions from inactive orbitals and nuclear repulsion
 
 This is the standard full integral storage format where two-electron integrals
-are stored as a flattened [norb^4] vector.
+are stored as a flattened [norb⁴] vector.
 
 Examples:
     >>> import numpy as np
     >>> # Create restricted Hamiltonian
     >>> one_body = np.random.rand(4, 4)  # 4 orbitals
-    >>> two_body = np.random.rand(256)   # 4^4 elements
+    >>> two_body = np.random.rand(256)   # 4⁴ elements
     >>> fock_matrix = np.random.rand(4, 4)
     >>> container = CanonicalFourCenterHamiltonianContainer(
     ...     one_body, two_body, orbitals, 10.5, fock_matrix
@@ -469,7 +469,7 @@ Constructor for restricted active space Hamiltonian with 4-center integrals.
 
 Args:
     one_body_integrals (numpy.ndarray): One-electron integrals matrix [norb x norb]
-    two_body_integrals (numpy.ndarray): Two-electron integrals vector [norb^4]
+    two_body_integrals (numpy.ndarray): Two-electron integrals vector [norb⁴]
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [norb x norb]
@@ -502,9 +502,9 @@ Constructor for unrestricted active space Hamiltonian with 4-center integrals.
 Args:
     one_body_integrals_alpha (numpy.ndarray): Alpha one-electron integrals [norb x norb]
     one_body_integrals_beta (numpy.ndarray): Beta one-electron integrals [norb x norb]
-    two_body_integrals_aaaa (numpy.ndarray): Alpha-alpha-alpha-alpha integrals [norb^4]
-    two_body_integrals_aabb (numpy.ndarray): Alpha-beta-alpha-beta integrals [norb^4]
-    two_body_integrals_bbbb (numpy.ndarray): Beta-beta-beta-beta integrals [norb^4]
+    two_body_integrals_aaaa (numpy.ndarray): Alpha-alpha-alpha-alpha integrals [norb⁴]
+    two_body_integrals_aabb (numpy.ndarray): Alpha-beta-alpha-beta integrals [norb⁴]
+    two_body_integrals_bbbb (numpy.ndarray): Beta-beta-beta-beta integrals [norb⁴]
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix [norb x norb]
@@ -543,11 +543,11 @@ Get two-electron integrals in molecular orbital basis.
 
 Returns:
     tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
-    integral vectors [norb^4] for aaaa, aabb, and bbbb spin channels.
+    integral vectors [norb⁴] for aaaa, aabb, and bbbb spin channels.
 
 Notes:
     Integrals are stored as flattened vectors in chemist notation (ij|kl)
-    where indices are ordered as i + j*norb + k*norb^2 + l*norb^3
+    where indices are ordered as i + j*norb + k*norb² + l*norb³
 )",
       py::return_value_policy::reference_internal);
 
@@ -647,8 +647,8 @@ Examples:
     >>> import numpy as np
     >>> # Create restricted density-fitted Hamiltonian
     >>> one_body = np.random.rand(4, 4)  # 4 orbitals
-    >>> # Three-center integrals: [naux x n_geminals] where n_geminals = norb^2
-    >>> three_center = np.random.rand(20, 16)  # 20 aux functions, 4^2 geminals
+    >>> # Three-center integrals: [n_orb_pairs x naux] where n_orb_pairs = norb²
+    >>> three_center = np.random.rand(16, 20)  # 4² orb_pairs, 20 aux functions
     >>> fock_matrix = np.random.rand(4, 4)
     >>> container = DensityFittedHamiltonianContainer(
     ...     one_body, three_center, orbitals, 10.5, fock_matrix
@@ -666,8 +666,8 @@ Constructor for restricted active space Hamiltonian with density-fitted integral
 
 Args:
     one_body_integrals (numpy.ndarray): One-electron integrals matrix [norb x norb]
-    three_center_integrals (numpy.ndarray): Three-center integrals matrix [naux x n_geminals]
-        where n_geminals = norb * norb
+    three_center_integrals (numpy.ndarray): Three-center integrals matrix [n_orb_pairs x naux]
+        where n_orb_pairs = norb * norb
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [norb x norb]
@@ -676,7 +676,7 @@ Args:
 Examples:
     >>> import numpy as np
     >>> one_body = np.random.rand(4, 4)
-    >>> three_center = np.random.rand(20, 16)  # 20 aux, 4^2 geminals
+    >>> three_center = np.random.rand(16, 20)  # 4² orb_pairs, 20 aux
     >>> fock_matrix = np.random.rand(4, 4)
     >>> container = DensityFittedHamiltonianContainer(
     ...     one_body, three_center, orbitals, 10.5, fock_matrix
@@ -699,8 +699,8 @@ Constructor for unrestricted active space Hamiltonian with density-fitted integr
 Args:
     one_body_integrals_alpha (numpy.ndarray): Alpha one-electron integrals [norb x norb]
     one_body_integrals_beta (numpy.ndarray): Beta one-electron integrals [norb x norb]
-    three_center_integrals_aa (numpy.ndarray): Alpha-alpha three-center integrals [naux x n_geminals]
-    three_center_integrals_bb (numpy.ndarray): Beta-beta three-center integrals [naux x n_geminals]
+    three_center_integrals_aa (numpy.ndarray): Alpha-alpha three-center integrals [n_orb_pairs x naux]
+    three_center_integrals_bb (numpy.ndarray): Beta-beta three-center integrals [n_orb_pairs x naux]
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix [norb x norb]
@@ -740,11 +740,11 @@ integrals and cached for subsequent accesses.
 
 Returns:
     tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
-    integral vectors [norb^4] for aaaa, aabb, and bbbb spin channels.
+    integral vectors [norb⁴] for aaaa, aabb, and bbbb spin channels.
 
 Notes:
     Integrals are computed as (ij|kl) = sum_P (ij|P) * (P|kl) and stored
-    in chemist notation where indices are ordered as i + j*norb + k*norb^2 + l*norb^3
+    in chemist notation where indices are ordered as i + j*norb + k*norb² + l*norb³
 )",
       py::return_value_policy::reference_internal);
 
@@ -758,12 +758,12 @@ Get three-center integrals in molecular orbital basis.
 
 Returns:
     tuple[numpy.ndarray, numpy.ndarray]: Pair of three-center
-    integral matrices [naux x n_geminals] for aa and bb spin channels,
-    where n_geminals = norb * norb.
+    integral matrices [n_orb_pairs x naux] for aa and bb spin channels,
+    where n_orb_pairs = norb * norb.
 
 Notes:
     Three-center integrals represent (ij|P) where i,j are MO indices and P is
-    an auxiliary basis function index. The geminal index combines i and j.
+    an auxiliary basis function index. The orb_pair index combines i and j.
 )",
       py::return_value_policy::reference_internal);
 
@@ -897,7 +897,7 @@ Construct from dense one-body and two-body integrals.
 
 Args:
     one_body_integrals (numpy.ndarray): Dense one-body integral matrix [n x n].
-    two_body_integrals (numpy.ndarray): Dense two-body integrals [n^4].
+    two_body_integrals (numpy.ndarray): Dense two-body integrals [n⁴].
     core_energy (float, optional): Scalar energy offset. Defaults to 0.0.
     type (HamiltonianType, optional): Hamiltonian type. Defaults to Hermitian.
 )",
@@ -926,7 +926,7 @@ Args:
                           R"(
 Get two-electron integrals as dense vectors for all spin channels.
 
-Materialises the sparse map into a dense n^4 vector on first access (cached).
+Materialises the sparse map into a dense n⁴ vector on first access (cached).
 Model Hamiltonians are restricted so all three channels are identical.
 
 Returns:
@@ -1134,7 +1134,7 @@ Get two-electron integrals in molecular orbital basis.
 
 Returns:
     tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
-    integral vectors [norb^4] for aaaa, aabb, and bbbb spin channels.
+    integral vectors [norb⁴] for aaaa, aabb, and bbbb spin channels.
 
 Raises:
     RuntimeError: If two-body integrals have not been set

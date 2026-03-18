@@ -218,9 +218,6 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
   /** Validation helper for integral dimensions */
   void validate_integral_dimensions() const override final;
 
-  double _get_two_body_element(const Eigen::MatrixXd& A, unsigned ij,
-                               const Eigen::MatrixXd& B, unsigned kl) const;
-
   static std::pair<std::shared_ptr<Eigen::MatrixXd>,
                    std::shared_ptr<Eigen::MatrixXd>>
   make_restricted_three_center_integrals(const Eigen::MatrixXd& integrals);

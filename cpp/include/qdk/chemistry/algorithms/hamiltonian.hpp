@@ -5,10 +5,12 @@
 #pragma once
 #include <functional>
 #include <iostream>
+#include <optional>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/settings.hpp>
+#include <variant>
 
 namespace qdk::chemistry::algorithms {
 

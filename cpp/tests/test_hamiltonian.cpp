@@ -1019,7 +1019,7 @@ TEST_P(HamiltonianTest, UnrestrictedSpinChannelAccess) {
     // Test accessing elements through different spin channels
     EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::aaaa),
                      1.0);
-    EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 0, 0, 0, SpinChannel::aabb),
+    EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 1, 0, SpinChannel::aabb),
                      2.0);
     EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 0, 1, 0, SpinChannel::bbbb),
                      4.0);

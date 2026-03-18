@@ -114,8 +114,8 @@ void DensityFittedHamiltonianContainer::_build_four_center_cache() const {
   size_t norb2 = norb * norb;
   size_t norb4 = norb2 * norb2;
 
-  // Helper lambda to build 4-center from 3-center: (ij|kl) = sum_P A_ij,P *
-  // B_kl,P This computes G = A^T * B using BLAS GEMM
+  // Helper lambda to build 4-center from 3-center: (ij|kl) = sum_Q L_ij,Q *
+  // R_Q,kl, where L and R are column-major, and (ij|kl) is row-major
   auto build_four_center =
       [&](std::shared_ptr<const Eigen::MatrixXd> three_center_left,
           std::shared_ptr<const Eigen::MatrixXd> three_center_right)
@@ -125,9 +125,12 @@ void DensityFittedHamiltonianContainer::_build_four_center_cache() const {
 
     size_t naux = three_center_left->cols();
 
+    // To make the resulting four-center integrals compatible with the row major
+    // storage, we calculate (kl|ij) = sum_Q R_kl,Q * L_Q,ij and store the
+    // result in col-major order, effectively (ij|kl) in row-major order.
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-               norb2, norb2, naux, 1.0, three_center_left->data(), norb2,
-               three_center_right->data(), norb2, 0.0, four_center->data(),
+               norb2, norb2, naux, 1.0, three_center_right->data(), norb2,
+               three_center_left->data(), norb2, 0.0, four_center->data(),
                norb2);
     return four_center;
   };
@@ -193,14 +196,6 @@ double DensityFittedHamiltonianContainer::get_two_body_element(
     default:
       throw std::invalid_argument("Invalid spin channel");
   }
-}
-
-double DensityFittedHamiltonianContainer::_get_two_body_element(
-    const Eigen::MatrixXd& A, unsigned ij, const Eigen::MatrixXd& B,
-    unsigned kl) const {
-  QDK_LOG_TRACE_ENTERING();
-  // Note three-center integral stores each orb_pair in a column
-  return A.col(ij).dot(B.col(kl));
 }
 
 bool DensityFittedHamiltonianContainer::has_two_body_integrals() const {

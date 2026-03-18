@@ -741,7 +741,7 @@ class TestDensityFittedSpecific:
     def test_three_center_integrals_storage(self):
         """Test three-center integral storage and retrieval."""
         one_body = np.eye(2)
-        # Three-center: [n_geminals x n_aux] = [4 x 3]
+        # Three-center: [n_orb_pairs x n_aux] = [4 x 3]
         three_center = np.array(
             [
                 [1.0, 0.6, 0.8],

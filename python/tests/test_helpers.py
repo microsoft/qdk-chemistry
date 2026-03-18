@@ -94,11 +94,11 @@ def create_test_hamiltonian(num_orbitals: int, container_type: str = "canonical_
         two_body = np.zeros(num_orbitals**4)
         return Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 0.0, fock))
     if container_type == "density_fitted":
-        # Create three-center integrals [n_aux x n_geminals]
+        # Create three-center integrals [n_orb_pairs x n_aux]
         # Using n_aux = num_orbitals auxiliary basis functions
-        n_geminals = num_orbitals**2
+        n_orb_pairs = num_orbitals**2
         n_aux = num_orbitals
-        three_center = np.zeros((n_geminals, n_aux))
+        three_center = np.zeros((n_orb_pairs, n_aux))
         return Hamiltonian(DensityFittedHamiltonianContainer(one_body, three_center, orbitals, 0.0, fock))
     raise ValueError(f"Unknown container_type: {container_type}. Use 'canonical_four_center' or 'density_fitted'.")
 
