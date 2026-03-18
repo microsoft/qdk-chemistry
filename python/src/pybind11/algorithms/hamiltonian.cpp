@@ -131,6 +131,27 @@ Raises:
 )",
       py::arg("orbitals"));
 
+  hamiltonian_constructor.def(
+      "run",
+      static_cast<std::shared_ptr<Hamiltonian> (HamiltonianConstructor::*)(
+          std::shared_ptr<Orbitals>, OptionalAuxBasis) const>(
+          &HamiltonianConstructor::run),
+      R"(
+Construct a Hamiltonian from the given orbitals and an auxiliary basis set.
+
+This overload is used by density-fitted Hamiltonian constructors that
+require an auxiliary basis set (e.g. "cc-pvdz-rifit").
+
+Args:
+    orbitals (qdk_chemistry.data.Orbitals): The orbital data to construct the Hamiltonian from
+    aux_basis (str or BasisSet): Auxiliary basis set name or object
+
+Returns:
+    qdk_chemistry.data.Hamiltonian: The constructed Hamiltonian matrix
+
+)",
+      py::arg("orbitals"), py::arg("aux_basis"));
+
   hamiltonian_constructor.def("settings", &HamiltonianConstructor::settings,
                               R"(
 Access the constructor's configuration settings.

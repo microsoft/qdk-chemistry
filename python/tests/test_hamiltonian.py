@@ -21,13 +21,16 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
+    Ansatz,
     CanonicalFourCenterHamiltonianContainer,
     CholeskyHamiltonianContainer,
     DensityFittedHamiltonianContainer,
     Hamiltonian,
     ModelOrbitals,
     Orbitals,
+    Structure,
 )
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
@@ -1490,3 +1493,49 @@ def test_hamiltonian_data_type_name():
     """Test that Hamiltonian has the correct _data_type_name class attribute."""
     assert hasattr(Hamiltonian, "_data_type_name")
     assert Hamiltonian._data_type_name == "hamiltonian"
+
+
+class TestDensityFittedHamiltonianConstructor:
+    """Integration tests for density-fitted Hamiltonian construction via the factory."""
+
+    def test_density_fitted_active_restricted_o2_mp2(self):
+        """Test density-fitted Hamiltonian with active space on O2, mirroring C++ DensityFittedActiveRestrictedO2MP2."""
+        scf_energy_tolerance = 1e-8
+        mp2_tolerance = 2e-8
+
+        # Create O2 molecule (bond length 2.3 Bohr)
+        coords = np.array([[0.0, 0.0, 0.0], [2.3, 0.0, 0.0]])
+        o2 = Structure(coords, [8, 8])
+
+        # RHF calculation
+        scf_solver = create("scf_solver")
+        scf_solver.settings().set("method", "hf")
+        rhf_energy, hf_wavefunction = scf_solver.run(o2, 0, 1, "cc-pvdz")
+
+        assert abs(rhf_energy - (-149.5410413101995744)) < scf_energy_tolerance
+
+        # Valence active space selection: 12 electrons, 8 orbitals
+        valence_selector = create("active_space_selector", "qdk_valence")
+        valence_selector.settings().set("num_active_electrons", 12)
+        valence_selector.settings().set("num_active_orbitals", 8)
+        wfn_active = valence_selector.run(hf_wavefunction)
+
+        # Density-fitted Hamiltonian construction with auxiliary basis
+        ham_constructor = create("hamiltonian_constructor", "qdk_density_fitted_hamiltonian")
+        df_hamiltonian = ham_constructor.run(wfn_active.get_orbitals(), "cc-pvdz-rifit")
+
+        assert df_hamiltonian.has_one_body_integrals()
+        assert df_hamiltonian.has_two_body_integrals()
+        assert df_hamiltonian.has_orbitals()
+        assert df_hamiltonian.is_restricted()
+        assert df_hamiltonian.get_container_type() == "density_fitted"
+
+        n_alpha, n_beta = wfn_active.get_active_num_electrons()
+        assert n_alpha == n_beta == 6
+
+        # MP2 energy via factory
+        ansatz = Ansatz(df_hamiltonian, wfn_active)
+        mp2_calculator = create("dynamical_correlation_calculator", "qdk_mp2_calculator")
+        mp2_total_energy, _, _ = mp2_calculator.run(ansatz)
+
+        assert abs(mp2_total_energy - (-149.6209819271)) < mp2_tolerance

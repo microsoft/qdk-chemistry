@@ -26,6 +26,7 @@ from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalC
 from qdk_chemistry.algorithms.energy_estimator import EnergyEstimator
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
+    QdkDensityFittedHamiltonianConstructor,
     QdkHamiltonianConstructor,
 )
 from qdk_chemistry.algorithms.multi_configuration_calculator import (
@@ -70,6 +71,7 @@ __all__ = [
     "ProjectedMultiConfigurationCalculator",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
+    "QdkDensityFittedHamiltonianConstructor",
     "QdkHamiltonianConstructor",
     "QdkMP2NaturalOrbitalLocalizer",
     "QdkMacisAsci",
