@@ -264,7 +264,6 @@ DensityFittedHamiltonianConstructor::_run_impl(
                          orbitals->is_restricted();
   }
 
-  dfmoeri_aa.resize(num_auxiliary_orbitals, df_orb_pair_size);
   detail_df::fold_metric_to_three_center(
       num_atomic_orbitals, num_auxiliary_orbitals, h_eri, h_metric);
   Eigen::Map<Eigen::MatrixXd> B_ao(h_eri.get(),
@@ -275,7 +274,6 @@ DensityFittedHamiltonianConstructor::_run_impl(
 
   if (!is_restricted_calc) {
     // Only allocate and compute (αα|αα) integrals - the others are identical
-    dfmoeri_bb.resize(num_auxiliary_orbitals, df_orb_pair_size);
     dfmoeri_bb =
         detail_three_center::transform_three_center_ao_to_mo(B_ao, Cb_active);
   }

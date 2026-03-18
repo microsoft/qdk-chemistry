@@ -358,7 +358,7 @@ Returns:
 
 Notes:
     Integrals are stored as flattened vectors in chemist notation (ij|kl)
-    where indices are ordered as i + j*norb + k*norb² + l*norb³
+    where indices are ordered as i*norb³ + j*norb² + k*norb + l
 )",
                           py::return_value_policy::reference_internal);
 
@@ -547,7 +547,7 @@ Returns:
 
 Notes:
     Integrals are stored as flattened vectors in chemist notation (ij|kl)
-    where indices are ordered as i + j*norb + k*norb² + l*norb³
+    where indices are ordered as i*norb³ + j*norb² + k*norb + l
 )",
       py::return_value_policy::reference_internal);
 
@@ -711,8 +711,8 @@ Examples:
     >>> import numpy as np
     >>> one_body_a = np.random.rand(4, 4)
     >>> one_body_b = np.random.rand(4, 4)
-    >>> three_center_aa = np.random.rand(20, 16)
-    >>> three_center_bb = np.random.rand(20, 16)
+    >>> three_center_aa = np.random.rand(16, 20)
+    >>> three_center_bb = np.random.rand(16, 20)
     >>> fock_a = np.random.rand(4, 4)
     >>> fock_b = np.random.rand(4, 4)
     >>> container = DensityFittedHamiltonianContainer(
@@ -744,7 +744,7 @@ Returns:
 
 Notes:
     Integrals are computed as (ij|kl) = sum_P (ij|P) * (P|kl) and stored
-    in chemist notation where indices are ordered as i + j*norb + k*norb² + l*norb³
+    in chemist notation where indices are ordered as i*norb³ + j*norb² + k*norb + l
 )",
       py::return_value_policy::reference_internal);
 

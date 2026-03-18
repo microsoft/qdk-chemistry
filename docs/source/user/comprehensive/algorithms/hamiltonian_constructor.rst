@@ -181,27 +181,38 @@ where :math:`P` indexes an auxiliary basis set. The four-center integrals are co
 
 The ``run`` method requires an extra auxiliary basis set parameter.
 
+.. tab:: C++ API
+
    .. code-block:: cpp
 
       // Create density-fitted Hamiltonian constructor
       auto constructor = algorithms::HamiltonianConstructor::create("qdk_density_fitted_hamiltonian");
 
       // Specify auxiliary basis explicitly
-      auto hamiltonian_with_aux = constructor->run(orbitals, "cc-pvtz-ri");
+      auto hamiltonian_with_aux = constructor->run(orbitals, aux_basis);
 
 .. tab:: Python API
 
    .. code-block:: python
 
       # Create density-fitted Hamiltonian constructor
-      constructor = HamiltonianConstructor.create("qdk_density_fitted_hamiltonian")
+      constructor = algorithms::create("hamiltonian_constructor", "qdk_density_fitted_hamiltonian")
 
       # Specify auxiliary basis explicitly
-      hamiltonian_with_aux = constructor.run(orbitals, "cc-pvtz-ri")
+      hamiltonian_with_aux = constructor.run(orbitals, aux_basis)
 
 .. rubric:: Settings
 
-This implementation currently has no configurable settings.
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Setting
+     - Type
+     - Description
+   * - ``scf_type``
+     - string
+     - Type of :term:`SCF` reference ("auto", "unrestricted" or "restricted"). Default: "auto" (automatically detected from orbitals)
 
 Related classes
 ---------------

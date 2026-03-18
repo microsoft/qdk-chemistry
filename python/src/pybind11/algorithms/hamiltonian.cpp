@@ -41,27 +41,24 @@ class HamiltonianConstructorBase
   std::shared_ptr<Hamiltonian> _run_impl(
       std::shared_ptr<Orbitals> orbitals,
       OptionalAuxBasis aux_basis) const override {
-    // Custom override logic to support both old (1-arg) and new (2-arg)
-    // Python implementations for backwards compatibility
+    // Support both old (1-arg) and new (2-arg) Python overrides for
+    // backwards compatibility. Try the 2-arg call first; fall back to
+    // 1-arg on TypeError.
     py::gil_scoped_acquire gil;
     py::function override = py::get_override(
         static_cast<const HamiltonianConstructor *>(this), "_run_impl");
     if (override) {
-      // Check how many parameters the Python method accepts
-      py::module_ inspect = py::module_::import("inspect");
-      py::object sig = inspect.attr("signature")(override);
-      py::object params = sig.attr("parameters");
-      size_t num_params = py::len(params);
-
-      py::object result;
-      if (num_params >= 2) {
-        // New signature: _run_impl(self, orbitals, aux_basis)
-        result = override(orbitals, aux_basis);
-      } else {
-        // Old signature: _run_impl(self, orbitals)
-        result = override(orbitals);
+      try {
+        return override(orbitals, aux_basis)
+            .cast<std::shared_ptr<Hamiltonian>>();
+      } catch (py::error_already_set &e) {
+        if (e.matches(PyExc_TypeError)) {
+          e.restore();
+          PyErr_Clear();
+          return override(orbitals).cast<std::shared_ptr<Hamiltonian>>();
+        }
+        throw;
       }
-      return result.cast<std::shared_ptr<Hamiltonian>>();
     }
     py::pybind11_fail(
         "Tried to call pure virtual function "
@@ -275,8 +272,11 @@ Typical usage:
     # Assuming you have orbitals from an SCF calculation
     constructor = alg.QdkDensityFittedHamiltonianConstructor()
 
+    # Specify an auxiliary basis required for density fitting (e.g., "cc-pvdz-rifit")
+    aux_basis = "cc-pvdz-rifit"
+
     # Construct Hamiltonian using density fitting
-    hamiltonian = constructor.run(orbitals)
+    hamiltonian = constructor.run(orbitals, aux_basis)
 
 See Also:
     :class:`HamiltonianConstructor`

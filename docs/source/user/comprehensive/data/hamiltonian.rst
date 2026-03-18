@@ -175,20 +175,20 @@ The storage size scales as :math:`O(N_{aux} \times N^2)` where :math:`N_{aux}` i
 .. rubric:: Creating with the HamiltonianConstructor
 
 The :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm can produce either container type depending on the implementation used.
-Use the ``qdk_density_fitted`` implementation to create a ``DensityFittedHamiltonianContainer``:
+Use the ``qdk_density_fitted_hamiltonian`` implementation to create a ``DensityFittedHamiltonianContainer``:
 
 .. tab:: C++ API
 
    .. code-block:: cpp
 
-      auto constructor = algorithms::HamiltonianConstructor::create("qdk_density_fitted");
+      auto constructor = algorithms::HamiltonianConstructor::create("qdk_density_fitted_hamiltonian");
       auto hamiltonian = constructor->run(orbitals, aux_basis);
 
 .. tab:: Python API
 
    .. code-block:: python
 
-      constructor = HamiltonianConstructor.create("qdk_density_fitted")
+      constructor = algorithms.create("hamiltonian_constructor", "qdk_density_fitted_hamiltonian")
       hamiltonian = constructor.run(orbitals, aux_basis)
 
 Serialization
