@@ -252,30 +252,28 @@ class IterativePhaseEstimation(PhaseEstimation):
             A Circuit object representing the IQPE iteration.
 
         """
-        from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3  # noqa: PLC0415
+        from qiskit import QuantumCircuit, qasm3  # noqa: PLC0415
+
+        from qdk_chemistry.algorithms.hadamard_test_generator.hadamard_test_generator import (  # noqa: PLC0415
+            QiskitHadamardGenerator,
+        )
 
         state_prep_qc = state_preparation.get_qiskit_circuit()
         ctrl_evol_qc = controlled_evolution.get_qiskit_circuit()
-        # Parse the state preparation circuit from QASM
-        ancilla = QuantumRegister(1, "ancilla")
-        system_target = QuantumRegister(state_prep_qc.num_qubits, "system")
-        classical = ClassicalRegister(1, "c")
-        circuit = QuantumCircuit(ancilla, system_target, classical)
-        circuit.append(state_prep_qc.to_gate(), system_target)
-        control = ancilla[0]
-        target_qubits = list(system_target)
-        circuit.h(control)
-
-        # Apply phase correction if provided
+        # Apply phase correction on the control qubit of the controlled evolution circuit
+        ctrl_evol_with_phase_qc = ctrl_evol_qc.copy()
         if phase_correction:
-            circuit.rz(phase_correction, control)
+            phase_correction_qc = QuantumCircuit(ctrl_evol_qc.num_qubits)
+            phase_correction_qc.rz(phase_correction, phase_correction_qc.qubits[0])
+            ctrl_evol_with_phase_qc = phase_correction_qc.compose(ctrl_evol_qc)
 
-        # Append the controlled evolution circuit
-        circuit.append(ctrl_evol_qc.to_gate(), [control, *target_qubits])
-        circuit.h(control)
-        circuit.measure(control, classical[0])
-
-        return Circuit(qasm=qasm3.dumps(circuit))
+        hadamard_test_generator = QiskitHadamardGenerator()
+        return hadamard_test_generator.run(
+            state_preparation=state_preparation,
+            num_system_qubits=state_prep_qc.num_qubits,
+            ctrl_time_evol_unitary_circuit=Circuit(qasm=qasm3.dumps(ctrl_evol_with_phase_qc)),
+            test_basis="X",
+        )
 
     def get_circuits(self) -> list[Circuit]:
         """Get the list of iteration circuits generated during algorithm execution.
