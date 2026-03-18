@@ -10,7 +10,6 @@ import qsharp
 
 from qdk_chemistry._core.utils import pauli_string_to_masks
 from qdk_chemistry.algorithms import CircuitExecutor
-from qdk_chemistry.algorithms.base import Algorithm
 from qdk_chemistry.data import (
     Circuit,
     EnergyExpectationResult,
@@ -20,6 +19,8 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+
+from .energy_estimator import EnergyEstimator
 
 __all__: list[str] = ["QdkEnergyEstimator"]
 
@@ -171,7 +172,7 @@ def _append_measurement_to_circuit(base_circuit: Circuit, m_basis: str) -> Circu
     return Circuit(qasm=qasm3.dumps(qc))
 
 
-class QdkEnergyEstimator(Algorithm):
+class QdkEnergyEstimator(EnergyEstimator):
     """QDK implementation of the EnergyEstimator."""
 
     def __init__(self):

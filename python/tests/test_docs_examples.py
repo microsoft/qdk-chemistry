@@ -25,14 +25,15 @@ PYTHON_EXAMPLES_DIR = EXAMPLES_DIR / "python"
 PYSCF_AVAILABLE = importlib.util.find_spec("pyscf") is not None
 
 
-def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool]:
+def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool]:
     """Check if an example file requires qiskit or pyscf.
 
     Args:
         example_file: Path to the example file to check
 
     Returns:
-        Tuple of (requires_pyscf, requires_qiskit)
+        Tuple of (requires_pyscf, requires_qiskit, requires_qiskit_aer,
+        requires_qiskit_nature, requires_energy_estimator)
 
     """
     content = example_file.read_text()
@@ -41,6 +42,7 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     requires_qiskit = False
     requires_qiskit_aer = False
     requires_qiskit_nature = False
+    requires_energy_estimator = False
 
     # Check for explicit imports
     if "import pyscf" in content or "from pyscf" in content:
@@ -62,6 +64,9 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
         requires_pyscf = True
     if 'algorithm_name="qiskit' in content or "algorithm_name='qiskit" in content:
         requires_qiskit = True
+
+    if "energy_estimator" in content:
+        requires_energy_estimator = True
 
     if any(
         pattern in content
@@ -102,7 +107,7 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     ):
         requires_qiskit_aer = True
 
-    return requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature
+    return requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature, requires_energy_estimator
 
 
 class TestExampleScripts(unittest.TestCase):
@@ -150,12 +155,14 @@ def _create_test_methods():
             test_name = f"test_py_{example_file.stem}"
 
             # Check requirements for this example
-            requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature = check_example_requirements(
-                example_file
+            requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature, requires_energy_estimator = (
+                check_example_requirements(example_file)
             )
 
             # Create the test method
-            def make_test(filepath, needs_pyscf, needs_qiskit, needs_qiskit_aer, needs_qiskit_nature):
+            def make_test(
+                filepath, needs_pyscf, needs_qiskit, needs_qiskit_aer, needs_qiskit_nature, needs_energy_estimator
+            ):
                 """Create a test method for the given example file."""
 
                 def test_method(self):
@@ -169,6 +176,8 @@ def _create_test_methods():
                         self.skipTest("Qiskit Aer not available")
                     if needs_qiskit_nature and not QDK_CHEMISTRY_HAS_QISKIT_NATURE:
                         self.skipTest("Qiskit Nature not available")
+                    if needs_energy_estimator:
+                        self.skipTest("Energy estimator examples are skipped for API change")
 
                     self._run_python_example(filepath)
 
@@ -178,7 +187,14 @@ def _create_test_methods():
             setattr(
                 TestExampleScripts,
                 test_name,
-                make_test(example_file, requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature),
+                make_test(
+                    example_file,
+                    requires_pyscf,
+                    requires_qiskit,
+                    requires_qiskit_aer,
+                    requires_qiskit_nature,
+                    requires_energy_estimator,
+                ),
             )
 
 

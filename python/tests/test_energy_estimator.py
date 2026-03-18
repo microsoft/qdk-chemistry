@@ -23,7 +23,7 @@ from qdk_chemistry.algorithms.energy_estimator.qdk import (
 )
 from qdk_chemistry.data import Circuit, MeasurementData, QubitHamiltonian
 from qdk_chemistry.data.qubit_hamiltonian import filter_and_group_pauli_ops_from_wavefunction
-from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 
 from .reference_tolerances import (
     estimator_energy_tolerance,
@@ -59,6 +59,7 @@ def test_determine_measurement_basis_not_qubit_wise_commuting():
         _determine_measurement_basis(pauli_strings)
 
 
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 @pytest.mark.parametrize(
     ("basis", "n_qubits", "expect_measure", "expect_h", "expect_sdg", "measure_count"),
     [
@@ -70,7 +71,7 @@ def test_determine_measurement_basis_not_qubit_wise_commuting():
     ],
     ids=["Z-basis", "X-basis", "Y-basis", "identity-only", "mixed-basis"],
 )
-def test_append_measurement_to_circuit(basis, n_qubits, expect_measure, expect_h, expect_sdg, measure_count):
+def test_append_measurement_to_circuit_qasm(basis, n_qubits, expect_measure, expect_h, expect_sdg, measure_count):
     """Test that _append_measurement_to_circuit applies correct rotations and measurements."""
     base_qasm = f'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[{n_qubits}] q;\n'
     base_circuit = Circuit(qasm=base_qasm)
@@ -83,43 +84,26 @@ def test_append_measurement_to_circuit(basis, n_qubits, expect_measure, expect_h
     assert qasm.count("measure") == measure_count
 
 
-def test_create_measurement_circuits_basic():
+def test_create_measurement_circuits_basic(wavefunction_4e4o):
     """Test measurement circuit generation for a simple observable."""
-    # Prepare input circuit
-    qasm = """
-        include "stdgates.inc";
-        qubit[2] q;
-        x q[0];
-        cx q[0], q[1];
-        """
-    circuit = Circuit(qasm=qasm)
+    state_prep = create("state_prep", "sparse_isometry_gf2x")
+    circuit = state_prep.run(wavefunction_4e4o)
 
     # Define observable
     observable = [
-        QubitHamiltonian(["ZI", "IZ", "ZZ"], np.array([1.0, 1.0, 1.0])),
-        QubitHamiltonian(["XX"], np.array([1.0])),
-        QubitHamiltonian(["YY"], np.array([1.0])),
+        QubitHamiltonian(["ZIIIIIII", "IZIIIIII", "ZZIIIIII"], np.array([1.0, 1.0, 1.0])),
+        QubitHamiltonian(["XXIIIIII"], np.array([1.0])),
+        QubitHamiltonian(["YYIIIIII"], np.array([1.0])),
     ]
 
     # Call function
     circuits = QdkEnergyEstimator._create_measurement_circuits(circuit, observable)
-
+    qsc_json = [circ.get_qsharp_circuit().json() for circ in circuits]
     # There should be one measurement circuit per observable
     assert isinstance(circuits, list)
     assert len(circuits) == 3
     assert all(isinstance(circ, Circuit) for circ in circuits)
-    assert all(isinstance(circ.get_qasm(), str) for circ in circuits)
-    assert "measure" in circuits[0].qasm  # Z basis
-    assert circuits[0].qasm.count("measure") == 2
-    assert "h q" not in circuits[0].qasm  # No basis change for Z
-    assert "h q" in circuits[1].qasm  # X basis change
-    assert circuits[1].qasm.count("h q") == 2  # One H gate added for X basis for each qubit
-    assert circuits[0].qasm.count("measure") == 2
-    assert "sdg q" in circuits[2].qasm  # Y basis change
-    assert circuits[2].qasm.count("sdg q") == 2  # One Sdg gate added for Y basis for each qubit
-    assert "h q" in circuits[2].qasm  # Y basis change
-    assert circuits[2].qasm.count("h q") == 2  # One H gate added for Y basis for each qubit
-    assert circuits[0].qasm.count("measure") == 2
+    assert all(qsc.count("measure") == 2 for qsc in qsc_json)
 
 
 @pytest.mark.parametrize(
@@ -285,7 +269,13 @@ def test_estimator_fewer_shots():
     "executor_name",
     [
         "qdk_full_state_simulator",
-        "qdk_sparse_state_simulator",
+        pytest.param(  # This will be fixed with qsharp factory support in Circuit
+            "qdk_sparse_state_simulator",
+            marks=pytest.mark.skipif(
+                not QDK_CHEMISTRY_HAS_QISKIT,
+                reason="Qiskit not available for QASM-based circuit generation in sparse state simulator",
+            ),
+        ),
         pytest.param(
             "qiskit_aer_simulator",
             marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available"),

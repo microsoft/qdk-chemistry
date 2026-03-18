@@ -6,10 +6,11 @@
 # --------------------------------------------------------------------------------------------
 
 import pyqir
-from pyqir import Module, QirModuleVisitor
+
+__all__ = ["QirBitstringOrderVisitor", "get_qir_result_qubit_order"]
 
 
-class QirBitstringOrderVisitor(QirModuleVisitor):
+class QirBitstringOrderVisitor(pyqir.QirModuleVisitor):
     """Extract the output bitstring qubit ordering from a QIR module.
 
     The visitor pass tracks:
@@ -59,7 +60,7 @@ def get_qir_result_qubit_order(qir: str) -> list[int]:
 
     """
     context = pyqir.Context()
-    module = Module.from_ir(context, qir)
+    module = pyqir.Module.from_ir(context, qir)
     visitor = QirBitstringOrderVisitor()
     visitor.run(module)
     qubit_order: list[int] = []

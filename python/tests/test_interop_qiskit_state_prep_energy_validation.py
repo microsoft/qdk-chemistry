@@ -9,21 +9,26 @@ from itertools import combinations
 
 import numpy as np
 import pytest
-from qiskit import transpile
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import SparseIsometryGF2XStatePreparation
 from qdk_chemistry.data import Circuit
-from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+if QDK_CHEMISTRY_HAS_QISKIT:
+    from qiskit import transpile
+    from qiskit.quantum_info import SparsePauliOp
 
 if QDK_CHEMISTRY_HAS_QISKIT_AER:
     from qiskit_aer import AerSimulator
     from qiskit_aer.primitives import EstimatorV2 as AerEstimator
 
 
-pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available")
+pytestmark = pytest.mark.skipif(
+    not QDK_CHEMISTRY_HAS_QISKIT_AER and not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"
+)
 
 
 def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamiltonian_4e4o, ref_energy_4e4o):
@@ -46,11 +51,15 @@ def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamilton
     # Create estimator and calculate energy for both circuits
     estimator = AerEstimator()
 
-    sparse_gf2x_job = estimator.run([(sparse_gf2x_circuit, hamiltonian_4e4o.pauli_ops)])
+    sparse_gf2x_job = estimator.run(
+        [(sparse_gf2x_circuit, SparsePauliOp(hamiltonian_4e4o.pauli_strings, hamiltonian_4e4o.coefficients))]
+    )
     result = sparse_gf2x_job.result()
     sparse_gf2x_energy = result[0].data.evs
 
-    regular_job = estimator.run([(regular_circuit, hamiltonian_4e4o.pauli_ops)])
+    regular_job = estimator.run(
+        [(regular_circuit, SparsePauliOp(hamiltonian_4e4o.pauli_strings, hamiltonian_4e4o.coefficients))]
+    )
     result = regular_job.result()
     regular_energy = result[0].data.evs
 
@@ -85,7 +94,7 @@ def test_sparse_isometry_gf2x_energy_validation(wavefunction_10e6o, hamiltonian_
 
     # Calculate circuit energy using the estimator
     estimator = AerEstimator()
-    job = estimator.run([(circuit, hamiltonian_10e6o.pauli_ops)])
+    job = estimator.run([(circuit, SparsePauliOp(hamiltonian_10e6o.pauli_strings, hamiltonian_10e6o.coefficients))])
     result = job.result()
     circuit_energy = result[0].data.evs
     # Basic validation: energy should be negative
@@ -99,7 +108,9 @@ def test_sparse_isometry_gf2x_energy_validation(wavefunction_10e6o, hamiltonian_
         f"reference energy. Got energy difference: {energy_diff:.8f} Hartree"
     )
 
-    job_2 = estimator.run([(qiskit_prep_circuit, hamiltonian_10e6o.pauli_ops)])
+    job_2 = estimator.run(
+        [(qiskit_prep_circuit, SparsePauliOp(hamiltonian_10e6o.pauli_strings, hamiltonian_10e6o.coefficients))]
+    )
     result_2 = job_2.result()
     qiskit_circuit_energy = result_2[0].data.evs
     energy_diff_qiskit = abs(qiskit_circuit_energy - ref_energy_10e6o)

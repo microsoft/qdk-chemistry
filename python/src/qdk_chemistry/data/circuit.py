@@ -21,7 +21,6 @@ import qsharp._native
 import qsharp.openqasm
 
 from qdk_chemistry.data.base import DataClass
-from qdk_chemistry.plugins.qiskit._interop.qir import qir_ir_to_qiskit
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
@@ -97,6 +96,8 @@ class Circuit(DataClass):
         if self.qir:
             try:
                 from qiskit import qasm3  # noqa: PLC0415
+
+                from qdk_chemistry.plugins.qiskit._interop.qir import qir_ir_to_qiskit  # noqa: PLC0415
             except ImportError as err:
                 raise RuntimeError("Qiskit is not available. Cannot convert circuit to QASM format.") from err
 

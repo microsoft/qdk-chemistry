@@ -9,11 +9,8 @@ quantum states from classical wavefunctions.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.energy_estimator.energy_estimator import (
-    EnergyEstimator,
-    EnergyEstimatorFactory,
-)
-from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator
+from .energy_estimator import EnergyEstimator, EnergyEstimatorFactory
+from .qdk import QdkEnergyEstimator
 
 __all__ = [
     "EnergyEstimator",
