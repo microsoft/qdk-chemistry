@@ -273,9 +273,7 @@ class QubitHamiltonian(DataClass):
         """Group the qubit Hamiltonian into commuting subsets.
 
         Args:
-            qubit_wise (bool): Whether to use qubit-wise commuting grouping.
-                Qubit-wise commutation is stricter than general commutation.
-                Default is True.
+            qubit_wise (bool): Whether to use qubit-wise commuting grouping. Default is True.
 
         Returns:
             list[QubitHamiltonian]: A list of ``QubitHamiltonian`` representing the grouped Hamiltonian.
