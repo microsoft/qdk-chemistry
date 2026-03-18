@@ -212,55 +212,6 @@ class QubitHamiltonian(DataClass):
             terms.sort(key=lambda t: abs(t[1]), reverse=True)
         return terms
 
-    def reorder_qubits(self, permutation: list[int]) -> QubitHamiltonian:
-        """Reorder qubits in all Pauli strings according to a permutation.
-
-        Applies a qubit index permutation to all Pauli strings. The permutation
-        specifies where each qubit should be mapped: permutation[old_index] = new_index.
-
-        Args:
-            permutation (list[int]): A permutation mapping old qubit indices to new indices.
-                Must be a valid permutation of [0, 1, ..., num_qubits-1].
-
-        Returns:
-            QubitHamiltonian: A new QubitHamiltonian with reordered Pauli strings.
-
-        Raises:
-            ValueError: If the permutation is invalid (wrong length or not a valid permutation).
-
-        Examples:
-            >>> qh = QubitHamiltonian(["XIZI", "IYII"], np.array([0.5, 0.3]))
-            >>> # Swap qubits 0 and 1: permutation[0]=1, permutation[1]=0, ...
-            >>> reordered = qh.reorder_qubits([1, 0, 2, 3])
-            >>> print(reordered.pauli_strings)
-            ['IXZI', 'YIII']
-
-        """
-        Logger.trace_entering()
-        n_qubits = self.num_qubits
-
-        # Validate permutation
-        if len(permutation) != n_qubits:
-            raise ValueError(f"Permutation length ({len(permutation)}) must match number of qubits ({n_qubits}).")
-        if sorted(permutation) != list(range(n_qubits)):
-            raise ValueError(f"Invalid permutation: must be a permutation of [0, 1, ..., {n_qubits - 1}].")
-
-        # Apply permutation to each Pauli string
-        # Pauli strings use qiskit label convention: string[i] corresponds to qubit n-1-i
-        reordered_strings = []
-        for pauli_str in self.pauli_strings:
-            # Create new string with reordered characters
-            new_chars = ["I"] * n_qubits
-            for old_idx, char in enumerate(pauli_str):
-                new_idx = permutation[old_idx]
-                new_chars[new_idx] = char
-            reordered_strings.append("".join(new_chars))
-
-        return QubitHamiltonian(
-            pauli_strings=reordered_strings,
-            coefficients=self.coefficients.copy(),
-        )
-
     def to_interleaved(self, n_spatial: int) -> QubitHamiltonian:
         """Convert from blocked to interleaved spin-orbital ordering.
 
