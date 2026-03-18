@@ -37,6 +37,9 @@ Quick reference
    * - ``QubitHamiltonian``
      - Pauli operator representation
      - :doc:`QubitMapper <../algorithms/qubit_mapper>`
+   * - :doc:`Symmetries <symmetries>`
+     - Physical symmetries
+     - Factory methods, User input
    * - :doc:`PauliOperator <pauli_operator>`
      - Pauli operator expressions with arithmetic
      - User construction
@@ -51,3 +54,4 @@ Quick reference
    orbitals
    pauli_operator
    structure
+   symmetries

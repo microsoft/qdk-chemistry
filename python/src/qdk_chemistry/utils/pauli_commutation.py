@@ -27,6 +27,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from qdk_chemistry.data import PauliTermAccumulator
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -34,12 +36,35 @@ if TYPE_CHECKING:
 
 __all__: list[str] = [
     "commutator_bound_first_order",
+    "commutator_bound_second_order",
     "do_pauli_labels_commute",
     "do_pauli_labels_qw_commute",
     "do_pauli_maps_commute",
     "do_pauli_maps_qw_commute",
+    "does_nested_commutator_vanish",
     "get_commutation_checker",
 ]
+
+
+def _label_to_sparse_word(label: str) -> list[tuple[int, int]]:
+    #    Convert a Pauli string label to a ``SparsePauliWord``.
+    word = []
+    # q_n...q_0
+    for i, c in enumerate(reversed(label)):
+        if c in {"X", "Y", "Z"}:
+            word.append((i, 1 if c == "X" else 2 if c == "Y" else 3))
+        elif c != "I":
+            raise ValueError(f"Invalid character {c!r} in Pauli label; expected 'I', 'X', 'Y', or 'Z'.")
+    return word
+
+
+def _sparse_word_to_label(word: list[tuple[int, int]], n_qubits: int) -> str:
+    #    Convert a ``SparsePauliWord`` back to a Pauli string label.
+    chars = ["I"] * n_qubits
+    for q, p in word:
+        chars[q] = "X" if p == 1 else "Y" if p == 2 else "Z"
+    # q_n...q_0
+    return "".join(reversed(chars))
 
 
 def do_pauli_labels_commute(label_a: str, label_b: str) -> bool:
@@ -186,6 +211,45 @@ def get_commutation_checker(
     raise ValueError(f"Unknown commutation_type {commutation_type!r}; expected 'general' or 'qubit_wise'.")
 
 
+def does_nested_commutator_vanish(*labels: str) -> bool:
+    """Check whether a nested commutator of Pauli labels vanishes.
+
+    Args:
+        labels: A sequence of Pauli labels representing the nested commutator.
+
+    Returns:
+        ``True`` if the nested commutator vanishes, ``False`` otherwise.
+
+    Raises:
+        ValueError: If fewer than two Pauli labels are provided.
+
+    """
+    if len(labels) < 2:
+        raise ValueError("At least two Pauli labels are required for a commutator.")
+
+    pauli_string_length = len(labels[0])
+    if any(len(lbl) != pauli_string_length for lbl in labels):
+        raise ValueError("All Pauli labels must have the same length.")
+
+    # Base case: [P_a, P_b] vanishes iff the two strings commute.
+    if len(labels) == 2:
+        return do_pauli_labels_commute(labels[0], labels[1])
+
+    # Recursive case: [P_1, [P_2, ..., P_n]]
+    # 1. Inner nested commutator vanishes => whole expression vanishes.
+    if does_nested_commutator_vanish(*labels[1:]):
+        return True
+
+    # 2. Compute the product P_2 P_3 … P_n via sparse-word multiplication
+    #    (proportional to the inner commutator when it is non-zero) and
+    #    check whether P_1 commutes with it.
+    word = _label_to_sparse_word(labels[1])
+    for lbl in labels[2:]:
+        _, word = PauliTermAccumulator.multiply_uncached(word, _label_to_sparse_word(lbl))
+    inner_product = _sparse_word_to_label(word, pauli_string_length)
+    return do_pauli_labels_commute(labels[0], inner_product)
+
+
 def commutator_bound_first_order(
     hamiltonian: QubitHamiltonian,
     weight_threshold: float = 1e-12,
@@ -230,3 +294,38 @@ def commutator_bound_first_order(
             if not do_pauli_labels_commute(pauli_labels[j], pauli_labels[k]):
                 total += 2.0 * abs(coefficients[j]) * abs(coefficients[k])
     return total
+
+
+def commutator_bound_second_order(
+    hamiltonian: QubitHamiltonian,
+    weight_threshold: float = 1e-12,
+) -> float:
+    r"""Compute the commutator bound term multiplying :math:`t^{3} / 12` in Proposition 10 in Childs et. al (2021).
+
+    Args:
+        hamiltonian: The qubit Hamiltonian for which to compute the bound.
+        weight_threshold: Absolute threshold for filtering small Hamiltonian coefficients.
+
+    Returns:
+        The commutator bound term multiplying :math:`t^{3} / 12`.
+
+    """
+    real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
+    pauli_labels = [label for label, _ in real_terms]
+    coefficients = [coeff for _, coeff in real_terms]
+
+    total_term1 = 0.0
+    n = len(pauli_labels)
+    for i in range(n):
+        for j in range(i + 1, n):
+            for k in range(i + 1, n):
+                if not does_nested_commutator_vanish(pauli_labels[k], pauli_labels[j], pauli_labels[i]):
+                    total_term1 += 2.0**2 * abs(coefficients[i]) * abs(coefficients[j]) * abs(coefficients[k])
+
+    total_term2 = 0.0
+    for i in range(n):
+        for j in range(i + 1, n):
+            if not does_nested_commutator_vanish(pauli_labels[i], pauli_labels[i], pauli_labels[j]):
+                total_term2 += 2.0**2 * abs(coefficients[i]) ** 2 * abs(coefficients[j])
+
+    return total_term1 + 0.5 * total_term2
