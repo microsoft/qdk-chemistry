@@ -12,6 +12,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <optional>
+#include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
@@ -39,9 +40,10 @@ struct O2TestSetup {
 // bond_length: O-O bond length in Bohr (default 2.3)
 // multiplicity: 1 for singlet (restricted), 3 for triplet (unrestricted)
 // basis_set: basis set name (default "cc-pvdz")
-inline O2TestSetup create_o2_hf_setup(int multiplicity = 1,
-                                      const std::string& basis_set = "cc-pvdz",
-                                      double bond_length = 2.3) {
+inline O2TestSetup create_o2_hf_setup(
+    int multiplicity = 1, const std::string& basis_set = "cc-pvdz",
+    double bond_length = 2.3,
+    std::optional<std::pair<int, int>> active_space = std::nullopt) {
   O2TestSetup setup;
 
   // O2 structure with specified bond length
@@ -60,10 +62,22 @@ inline O2TestSetup create_o2_hf_setup(int multiplicity = 1,
   setup.hf_wavefunction = hf_wavefunction;
   setup.hf_orbitals = hf_wavefunction->get_orbitals();
 
+  if (active_space.has_value()) {
+    auto valence_active_space_selector =
+        qdk::chemistry::algorithms::ActiveSpaceSelectorFactory::create(
+            "qdk_valence");
+    valence_active_space_selector->settings().set("num_active_electrons",
+                                                  active_space->first);
+    valence_active_space_selector->settings().set("num_active_orbitals",
+                                                  active_space->second);
+    auto wfn_active = valence_active_space_selector->run(hf_wavefunction);
+
+    setup.hf_wavefunction = wfn_active;
+    setup.hf_orbitals = wfn_active->get_orbitals();
+  }
   // Create Hamiltonian
   auto ham_factory = HamiltonianConstructorFactory::create("qdk");
   setup.hf_hamiltonian = ham_factory->run(setup.hf_orbitals);
-
   return setup;
 }
 
@@ -135,6 +149,42 @@ TEST_F(MP2Test, RMP2Energies_CCPVDZ) {
       << "RMP2 correlation energy mismatch (cc-pvdz). Calculated: "
       << mp2_corr_energy << ", Reference: " << pyscf_rmp2_corr_cc_pvdz
       << ", Difference: " << (mp2_corr_energy - pyscf_rmp2_corr_cc_pvdz);
+}
+
+TEST_F(MP2Test, ActiveRMP2Energies_CCPVDZ) {
+  // Test the RMP2 energies against Psi4 reference for singlet O2 with
+  // cc-pvdz
+  float psi4_act_rmp2_corr_cc_pvdz = -0.0779663051614509;
+
+  // Singlet O2 (restricted)
+  auto setup = create_o2_hf_setup(1, "cc-pvdz", 2.3, std::make_pair(12, 8));
+  auto [n_alpha_active, n_beta_active] =
+      setup.hf_wavefunction->get_active_num_electrons();
+
+  // Verify closed shell
+  EXPECT_EQ(n_alpha_active, n_beta_active)
+      << "Alpha and beta electrons should be equal for restricted "
+         "calculation";
+
+  // Create ansatz from Hamiltonian and wavefunction
+  auto ansatz =
+      std::make_shared<Ansatz>(*setup.hf_hamiltonian, *setup.hf_wavefunction);
+
+  // Use MP2 calculator
+  auto mp2_calculator =
+      DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
+
+  // MP2 returns total energy, subtract reference to get correlation energy
+  auto [mp2_total_energy, final_wavefunction, _] = mp2_calculator->run(ansatz);
+  double hf_reference_energy = ansatz->calculate_energy();
+  double mp2_corr_energy = mp2_total_energy - hf_reference_energy;
+
+  // Verify correlation energy matches PySCF reference
+  EXPECT_LT(std::abs(mp2_corr_energy - psi4_act_rmp2_corr_cc_pvdz),
+            testing::mp2_tolerance)
+      << "Active RMP2 correlation energy mismatch (cc-pvdz). Calculated: "
+      << mp2_corr_energy << ", Reference: " << psi4_act_rmp2_corr_cc_pvdz
+      << ", Difference: " << (mp2_corr_energy - psi4_act_rmp2_corr_cc_pvdz);
 }
 
 TEST_F(MP2Test, MP2Container) {
