@@ -254,18 +254,27 @@ void HamiltonianContainer::validate_active_space_dimensions() const {
   }
 
   if (has_inactive_fock_matrix()) {
-    if (_inactive_fock_matrix.first->rows() !=
-        _orbitals->get_num_molecular_orbitals()) {
+    auto nmo = _orbitals->get_num_molecular_orbitals();
+    if (_inactive_fock_matrix.first->rows() != nmo ||
+        _inactive_fock_matrix.first->cols() != nmo) {
       throw std::invalid_argument(
-          "Alpha inactive Fock matrix dimension does not match number of "
-          "molecular orbitals");
+          "Alpha inactive Fock matrix dimension mismatch: expected full-space "
+          "(" +
+          std::to_string(nmo) + " x " + std::to_string(nmo) + "), got " +
+          std::to_string(_inactive_fock_matrix.first->rows()) + " x " +
+          std::to_string(_inactive_fock_matrix.first->cols()) + ".");
     }
 
-    if (_inactive_fock_matrix.second->rows() !=
-        _orbitals->get_num_molecular_orbitals()) {
-      throw std::invalid_argument(
-          "Beta inactive Fock matrix dimension does not match number of "
-          "molecular orbitals");
+    if (is_unrestricted()) {
+      if (_inactive_fock_matrix.second->rows() != nmo ||
+          _inactive_fock_matrix.second->cols() != nmo) {
+        throw std::invalid_argument(
+            "Beta inactive Fock matrix dimension mismatch: expected full-space "
+            "(" +
+            std::to_string(nmo) + " x " + std::to_string(nmo) + "), got " +
+            std::to_string(_inactive_fock_matrix.second->rows()) + " x " +
+            std::to_string(_inactive_fock_matrix.second->cols()) + ".");
+      }
     }
   }
 }
@@ -286,7 +295,8 @@ HamiltonianContainer::make_restricted_inactive_fock_matrix(
   QDK_LOG_TRACE_ENTERING();
   auto shared_matrix = std::make_shared<Eigen::MatrixXd>(matrix);
   return std::make_pair(
-      shared_matrix, shared_matrix);  // Both alpha and beta point to same data
+      shared_matrix,
+      shared_matrix);  // Both alpha and beta point to same data
 }
 
 std::string Hamiltonian::get_summary() const {
@@ -636,9 +646,10 @@ std::shared_ptr<Hamiltonian> Hamiltonian::_from_json_file(
   QDK_LOG_TRACE_ENTERING();
   std::ifstream file(filename);
   if (!file.is_open()) {
-    throw std::runtime_error(
-        "Unable to open Hamiltonian JSON file '" + filename +
-        "'. Please check that the file exists and you have read permissions.");
+    throw std::runtime_error("Unable to open Hamiltonian JSON file '" +
+                             filename +
+                             "'. Please check that the file exists and you "
+                             "have read permissions.");
   }
 
   nlohmann::json j;

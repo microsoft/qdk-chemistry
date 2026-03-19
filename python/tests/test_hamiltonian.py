@@ -121,6 +121,41 @@ class TestHamiltonian:
         assert np.array_equal(aa, _one_body)
         assert np.array_equal(bb, _one_body)
 
+        # Verify two-body integrals for each container type.
+        aaaa, aabb, bbbb = h.get_two_body_integrals()
+        if container_type == "canonical_four_center":
+            # Canonical container should store the provided four-center integrals.
+            assert np.array_equal(aaaa, _two_body)
+            assert np.array_equal(aabb, _two_body)
+            assert np.array_equal(bbbb, _two_body)
+        elif container_type == "density_fitted":
+            # Density-fitted container should yield four-center integrals equal
+            # to the contraction of the three-center integrals over the
+            # auxiliary index (assuming identity metric):
+            # (ij|kl) = sum_P (ij|P) (kl|P).
+            expected_aaaa = np.einsum("ip,kp->ik", _three_center, _three_center).flatten()
+            assert np.allclose(
+                aaaa,
+                expected_aaaa,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            # In the restricted case, mixed- and beta-beta blocks should match.
+            assert np.allclose(
+                aabb,
+                expected_aaaa,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                bbbb,
+                expected_aaaa,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+        else:
+            pytest.fail(f"Unexpected container_type: {container_type}")
+
     @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
     def test_one_body_integrals(self, container_type):
         """Test one-body integrals retrieval."""
@@ -1512,6 +1547,7 @@ class TestDensityFittedHamiltonianConstructor:
         # RHF calculation
         scf_solver = create("scf_solver")
         scf_solver.settings().set("method", "hf")
+        scf_solver.settings().set("convergence_threshold", 1e-8)
         rhf_energy, hf_wavefunction = scf_solver.run(o2, 0, 1, "cc-pvdz")
 
         assert abs(rhf_energy - (-149.5410413101995744)) < scf_energy_tolerance

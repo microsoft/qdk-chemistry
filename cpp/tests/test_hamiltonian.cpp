@@ -1766,6 +1766,13 @@ TEST_F(HamiltonianConstructorTest, CholeskyFactory) {
 
   auto cholesky_hc = HamiltonianConstructorFactory::create("qdk_cholesky");
   EXPECT_EQ(cholesky_hc->name(), "qdk_cholesky");
+
+  // Test default eri_threshold
+  EXPECT_DOUBLE_EQ(cholesky_hc->settings().get<double>("eri_threshold"), 1e-12);
+
+  // Test setting eri_threshold
+  EXPECT_NO_THROW(cholesky_hc->settings().set("eri_threshold", 1e-10));
+  EXPECT_DOUBLE_EQ(cholesky_hc->settings().get<double>("eri_threshold"), 1e-10);
 }
 
 TEST_F(HamiltonianConstructorTest, CholeskyRestrictedO2) {
