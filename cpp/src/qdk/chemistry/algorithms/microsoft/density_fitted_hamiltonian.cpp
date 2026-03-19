@@ -32,7 +32,6 @@
 #include <qdk/chemistry/data/hamiltonian_containers/density_fitted.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
-#include "qdk/chemistry/scf/util/libint2_util.h"
 #include "utils.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -147,10 +146,6 @@ DensityFittedHamiltonianConstructor::_run_impl(
     beta_space_is_contiguous = alpha_space_is_contiguous;
   }
 
-  // Overall contiguity requires both alpha and beta to be contiguous
-  bool active_space_is_contiguous =
-      alpha_space_is_contiguous && beta_space_is_contiguous;
-
   // Ensure alpha and beta active spaces have the same size
   if (nactive_alpha != nactive_beta) {
     throw std::runtime_error(
@@ -219,8 +214,6 @@ DensityFittedHamiltonianConstructor::_run_impl(
   // Declare MOERI vectors
   Eigen::MatrixXd dfmoeri_aa;
   Eigen::MatrixXd dfmoeri_bb;
-
-  const size_t df_orb_pair_size = nactive * nactive;
 
   auto basis_libint2 =
       qcs::libint2_util::convert_to_libint_basisset(*internal_basis_set);
