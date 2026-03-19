@@ -24,6 +24,7 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitHamiltonian,
 )
+from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.phase import iterative_phase_feedback_update, phase_fraction_from_feedback
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -217,16 +218,18 @@ class IterativePhaseEstimation(PhaseEstimation):
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_evol_op = controlled_evolution._qsharp_op  # noqa: SLF001
-        qsharp_factory = [
-            QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
-            state_prep_op,
-            ctrl_evol_op,
-            phase_correction,
-            0,
-            [1 + i for i in range(num_system_qubits)],  # target qubits
-        ]
-
-        return Circuit(qsharp_factory=qsharp_factory)
+        return Circuit(
+            qsharp_factory=QsharpFactoryData(
+                program=QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
+                parameters=[
+                    state_prep_op,
+                    ctrl_evol_op,
+                    phase_correction,
+                    0,
+                    [1 + i for i in range(num_system_qubits)],
+                ],
+            )
+        )
 
     def _create_circuit_from_qiskit(
         self, state_preparation: Circuit, controlled_evolution: Circuit, phase_correction: float

@@ -15,6 +15,7 @@ import pytest
 import qsharp
 
 from qdk_chemistry.data import Circuit
+from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -110,7 +111,9 @@ class TestGetQsharpCircuit:
     def test_get_circuit_from_factory(self):
         """Test that get_qir and get_qsharp_circuit can generate and cache QIR and Q# circuit from Q# factory data."""
         state_prep_params = {"rowMap": [1, 0], "stateVector": [0.6, 0.0, 0.0, 0.8], "expansionOps": []}
-        qsharp_factory = [QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, state_prep_params, 2]
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameters=[state_prep_params, 2]
+        )
         circuit = Circuit(qsharp_factory=qsharp_factory)
         assert circuit.qir is None
         assert circuit.qsharp is None

@@ -40,6 +40,7 @@ import numpy as np
 import qdk_chemistry.plugins.qiskit
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
 from qdk_chemistry.data import Circuit, Wavefunction
+from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -167,11 +168,10 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             "expansionOps": expansion_ops,
         }
 
-        qsharp_factory = [
-            QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
-            state_prep_params,
-            n_qubits,
-        ]
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameters=[state_prep_params, n_qubits],
+        )
 
         state_prep_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=state_prep_op, encoding="jordan-wigner")
@@ -407,7 +407,9 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         n_qubits = len(bitstring_array)
         params = {"bitStrings": bitstring_array[::-1]}  # Reverse for Q# convention
 
-        qsharp_factory = [QSHARP_UTILS.StatePreparation.MakeSingleReferenceStateCircuit, params, n_qubits]
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeSingleReferenceStateCircuit, parameters=[params, n_qubits]
+        )
         qsharp_op = QSHARP_UTILS.StatePreparation.MakePrepareSingleReferenceStateOp(params)
 
         return Circuit(

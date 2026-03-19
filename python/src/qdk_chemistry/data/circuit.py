@@ -14,6 +14,7 @@ Supported formats and conversions:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import h5py
@@ -24,6 +25,17 @@ from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
+
+
+@dataclass
+class QsharpFactoryData:
+    """Data class for Q# factory data used to create Q# circuit."""
+
+    program: Callable
+    """The Q# Callable."""
+
+    parameters: list[Any]
+    """The parameters to be passed to the Q# Callable when creating the circuit."""
 
 
 class Circuit(DataClass):
@@ -42,7 +54,7 @@ class Circuit(DataClass):
         qir: qsharp._qsharp.QirInputData | str | None = None,
         qsharp: qsharp._native.Circuit | None = None,
         qsharp_op: Callable[..., Any] | None = None,
-        qsharp_factory: list[Any] | None = None,
+        qsharp_factory: QsharpFactoryData | None = None,
         encoding: str | None = None,
     ) -> None:
         """Initialize a Circuit.
@@ -70,12 +82,12 @@ class Circuit(DataClass):
         self.qasm = qasm
         self.qir = qir
         self.qsharp = qsharp
-        self.qsharp_factory = qsharp_factory
+        self._qsharp_factory = qsharp_factory
         self._qsharp_op = qsharp_op
         self.encoding = encoding
 
         # Check that a representation of the quantum circuit is given by the keyword arguments
-        if not any([self.qasm, self.qsharp, self.qir, self.qsharp_factory]):
+        if not any([self.qasm, self.qsharp, self.qir, self._qsharp_factory]):
             raise RuntimeError("No representation of the quantum circuit is set.")
 
         # Make instance immutable after construction (handled by base class)
@@ -88,7 +100,7 @@ class Circuit(DataClass):
             True if either qir or qsharp_factory is set, indicating that a QIR representation is available.
 
         """
-        return self.qir is not None or self.qsharp_factory is not None
+        return self.qir is not None or self._qsharp_factory is not None
 
     def get_qasm(self) -> str:
         """Get the quantum circuit in QASM format.
@@ -135,8 +147,8 @@ class Circuit(DataClass):
             if self.qasm:
                 Logger.warn("Both QIR and QASM representations are available. Return QIR.")
             return self.qir
-        if self.qsharp_factory and self.qir is None:
-            compiled_qir = qsharp.compile(*self.qsharp_factory)
+        if self._qsharp_factory and self.qir is None:
+            compiled_qir = qsharp.compile(self._qsharp_factory.program, *self._qsharp_factory.parameters)
             # Cache the compiled qir if qir is not already set
             object.__setattr__(self, "qir", compiled_qir)
             return compiled_qir
@@ -148,8 +160,7 @@ class Circuit(DataClass):
     def get_qsharp_circuit(self, prune_classical_qubits: bool = False) -> qsharp._native.Circuit:
         """Parse a Circuit object into a Q# circuit object.
 
-        Returns:
-            qsharp._native.Circuit: A Q# circuit object.
+        Args:
             prune_classical_qubits: If True, classical qubits are removed from the circuit. Only applicable
             when converting from qsharp_factory.
 
@@ -169,8 +180,12 @@ class Circuit(DataClass):
             if self.qasm:
                 Logger.warn("Both Q# and QASM representations are available. Return Q# circuit.")
             return self.qsharp
-        if self.qsharp_factory and self.qsharp is None:
-            compiled_qsharp = qsharp.circuit(*self.qsharp_factory, prune_classical_qubits=prune_classical_qubits)
+        if self._qsharp_factory and self.qsharp is None:
+            compiled_qsharp = qsharp.circuit(
+                self._qsharp_factory.program,
+                *self._qsharp_factory.parameters,
+                prune_classical_qubits=prune_classical_qubits,
+            )
             # Cache the compiled Q# circuit if Q# is not already set
             object.__setattr__(self, "qsharp", compiled_qsharp)
             return compiled_qsharp
@@ -244,7 +259,7 @@ class Circuit(DataClass):
         data: dict[str, Any] = {}
         if self.qasm is not None:
             data["qasm"] = self.get_qasm()
-        if self.qir is not None:
+        if self._has_qir():
             data["qir"] = str(self.get_qir())
         if self.encoding is not None:
             data["encoding"] = self.encoding
@@ -260,7 +275,7 @@ class Circuit(DataClass):
         self._add_hdf5_version(group)
         if self.qasm is not None:
             group.attrs["qasm"] = self.get_qasm()
-        if self.qir is not None:
+        if self._has_qir():
             group.attrs["qir"] = str(self.get_qir())
         if self.encoding is not None:
             group.attrs["encoding"] = self.encoding

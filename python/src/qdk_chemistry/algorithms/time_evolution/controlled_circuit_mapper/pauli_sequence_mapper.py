@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from qdk import qsharp
 
 from qdk_chemistry.data import Settings
-from qdk_chemistry.data.circuit import Circuit
+from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     PauliProductFormulaContainer,
 )
@@ -146,12 +146,10 @@ class PauliSequenceMapper(ControlledEvolutionCircuitMapper):
             "repetitions": power,
         }
 
-        qsharp_factory = [
-            QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
-            controlled_evo_params,
-            controlled_evolution.control_indices[0],
-            target_indices,
-        ]
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
+            parameters=[controlled_evo_params, controlled_evolution.control_indices[0], target_indices],
+        )
 
         controlled_evolution_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(controlled_evo_params)
 
