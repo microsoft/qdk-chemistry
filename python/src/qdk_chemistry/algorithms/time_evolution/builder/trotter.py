@@ -1,4 +1,17 @@
-"""QDK/Chemistry implementation of the Trotter decomposition Builder."""
+r"""QDK/Chemistry implementation of the Trotter decomposition Builder.
+
+References:
+    Childs, A. M., et al. "Theory of Trotter Error with Commutator
+    Scaling." *Physical Review X* 11.1 (2021): 011020.
+
+    Strang, G. "On the construction and comparison of difference
+    schemes." SIAM Journal on Numerical Analysis 5.3 (1968): 506-517.
+
+    Suzuki, M. "General theory of higher-order decomposition of
+    exponential operators and symplectic integrators."
+    Physics Letters A 165.5-6 (1992): 387-395.
+
+"""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -153,11 +166,11 @@ class Trotter(TimeEvolutionBuilder):
         The Second Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`
         by decomposing the Hamiltonian H into a sum of terms and using the product formula:
         :math:`e^{-iHt} \approx \left[\prod_{i=1}^{L-1} e^{-iH_i t/2n}e^{-iH_L t/n}\prod_{i=L-1}^{1}
-        e^{-iH_i t/2n}\right]^n`, where n is the number of divisions (See Strang, G. "On the construction and comparison of difference schemes." SIAM Journal on Numerical Analysis 5.3 (1968): 506-517).
+        e^{-iH_i t/2n}\right]^n`, where n is the number of divisions (See Strang (1968)).
 
         Higher order Trotter methods are constructed using the recursive Suzuki method, which builds order 2k formulas
         as: :math:`S_{2k}(t) = S_{2k-2}(u_k t)^2 S_{2k-2}((1-4u_k) t) S_{2k-2}(u_k t)^2`,
-        where :math:`u_k = 1/(4-4^{1/(2k-1)})` (See Suzuki, M. "General theory of higher-order decomposition of exponential operators and symplectic integrators." Physics Letters A 165.5-6 (1992): 387-395).
+        where :math:`u_k = 1/(4-4^{1/(2k-1)})` (See Suzuki (1992)).
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
@@ -166,7 +179,7 @@ class Trotter(TimeEvolutionBuilder):
         Returns:
             TimeEvolutionUnitary: The time evolution unitary built by the Trotter decomposition.
 
-        """  # noqa: E501
+        """
         weight_threshold = self._settings.get("weight_threshold")
 
         num_divisions = self._resolve_num_divisions(qubit_hamiltonian, time)
