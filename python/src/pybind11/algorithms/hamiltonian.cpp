@@ -53,9 +53,18 @@ class HamiltonianConstructorBase
             .cast<std::shared_ptr<Hamiltonian>>();
       } catch (py::error_already_set &e) {
         if (e.matches(PyExc_TypeError)) {
-          e.restore();
-          PyErr_Clear();
-          return override(orbitals).cast<std::shared_ptr<Hamiltonian>>();
+          // Only fall back to the 1-argument override if the TypeError
+          // message suggests an argument/signature mismatch.
+          py::object exc = e.value();
+          std::string msg = py::str(exc);
+          if (msg.find("positional argument") != std::string::npos ||
+              msg.find("positional arguments") != std::string::npos ||
+              msg.find("required positional argument") != std::string::npos ||
+              msg.find("takes") != std::string::npos) {
+            e.restore();
+            PyErr_Clear();
+            return override(orbitals).cast<std::shared_ptr<Hamiltonian>>();
+          }
         }
         throw;
       }
