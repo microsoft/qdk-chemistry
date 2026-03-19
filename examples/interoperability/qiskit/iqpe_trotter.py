@@ -118,6 +118,7 @@ iqpe = create(
 aer_simulator = create("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED)
 evolution_builder = create("time_evolution_builder", "trotter")
 circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+hadamard_test_generator = create("hadamard_test_generator", "qiskit_hadamard_generator")
 
 
 Logger.info("\n=== Running iterative phase estimation (Trotterized) ===")
@@ -131,6 +132,7 @@ result = iqpe.run(
     circuit_executor=aer_simulator,
     evolution_builder=evolution_builder,
     circuit_mapper=circuit_mapper,
+    hadamard_test_generator=hadamard_test_generator,
 )
 
 ########################################################################################
