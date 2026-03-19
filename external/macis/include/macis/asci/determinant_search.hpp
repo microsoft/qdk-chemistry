@@ -417,6 +417,12 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     }
   }
 
+  // Precompute cumulative alpha offsets for direct indexing
+  std::vector<size_t> uniq_alpha_ioff(nuniq_alpha);
+  std::transform_exclusive_scan(
+      uniq_alpha.begin(), uniq_alpha.end(), uniq_alpha_ioff.begin(), 0ul,
+      std::plus<size_t>(), [](const auto& p) { return p.second; });
+
   const auto num_alpha_occupied_orbitals =
       spin_wfn_traits::count(uniq_alpha[0].first);
   const auto num_alpha_virtual_orbitals = norb - num_alpha_occupied_orbitals;
@@ -455,13 +461,28 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     logger->info("  * Will Generate up to {}", cl_string);
   }
 
+  // Use total worker count (MPI ranks * OpenMP threads) so constraints
+  // are split finely enough for thread-level load balancing.
+  int num_threads = 1;
+#ifdef _OPENMP
+  num_threads = omp_get_max_threads();
+#endif
+  const int total_workers = world_size * num_threads;
+
+  logger->info("  * NUNIQ_ALPHA = {}, NCDETS = {}", nuniq_alpha, ncdets);
+  logger->info("  * NS_ALPHA = {}, ND_ALPHA = {}", n_sing_alpha, n_doub_alpha);
+  logger->info("  * NS_BETA  = {}, ND_BETA  = {}", n_sing_beta, n_doub_beta);
+  logger->info("  * MPI_RANKS = {}, OMP_THREADS = {}, TOTAL_WORKERS = {}",
+               world_size, num_threads, total_workers);
+
   auto gen_c_st = clock_type::now();
   auto constraints = gen_constraints_general<wfn_t<N>>(
       asci_settings.constraint_level, norb, n_sing_beta, n_doub_beta,
-      uniq_alpha, world_size);
+      uniq_alpha, total_workers);
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
-  logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
+  logger->info("  * NCONSTRAINTS = {}, GEN_DUR = {:.2e} ms", constraints.size(),
+               gen_c_dur.count());
 
   size_t max_size =
       std::min(std::min(ntdets, asci_settings.pair_size_max),
@@ -480,7 +501,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 #endif /* MACIS_ENABLE_MPI */
 
   asci_contrib_container<wfn_t<N>> asci_pairs_total;
-#pragma omp parallel
+#pragma omp parallel schedule(dynamic)
   {
     // Process ASCI pair contributions for each constraint
     asci_contrib_container<wfn_t<N>> asci_pairs;
@@ -503,14 +524,17 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
       for (; ic < c_end; ++ic) {
         const auto& con = constraints[ic].first;
 
-        for (size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
+        for (size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
           const auto& alpha_det = uniq_alpha[i_alpha].first;
+          const auto ncon_alpha = constraint_histogram(alpha_det, 1, 1, con);
+          if (!ncon_alpha) continue;
           const auto occ_alpha = bits_to_indices(alpha_det);
           const bool alpha_satisfies_con = satisfies_constraint(alpha_det, con);
 
           const auto& bcd = uad[i_alpha];
           const size_t nbeta = bcd.size();
-          for (size_t j_beta = 0; j_beta < nbeta; ++j_beta, ++iw) {
+          for (size_t j_beta = 0; j_beta < nbeta; ++j_beta) {
+            const size_t iw = uniq_alpha_ioff[i_alpha] + j_beta;
             const auto w = *(cdets_begin + iw);
             const auto c = C[iw];
             const auto& beta_det = bcd[j_beta].beta_string;
@@ -681,14 +705,44 @@ std::vector<wfn_t<N>> asci_search(
   // Print Search Header to logger
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
   logger->info("[ASCI Search Settings]:");
+  logger->info("  * NCDETS                 = {}", ncdets);
+  logger->info("  * NDETS_MAX              = {}", ndets_max);
+  logger->info("  * NORB                   = {}", norb);
+  logger->info("  * H_EL_TOL               = {:.4e}", asci_settings.h_el_tol);
+  logger->info("  * RV_PRUNE_TOL           = {:.4e}",
+               asci_settings.rv_prune_tol);
+  logger->info("  * PAIR_SIZE_MAX          = {}", asci_settings.pair_size_max);
+  logger->info("  * JUST_SINGLES           = {}", asci_settings.just_singles);
+  logger->info("  * CONSTRAINT_LEVEL       = {}",
+               asci_settings.constraint_level);
+  logger->info("  * GROW_FACTOR            = {:.2f}",
+               asci_settings.grow_factor);
+  logger->info("  * MIN_GROW_FACTOR        = {:.2f}",
+               asci_settings.min_grow_factor);
+  logger->info("  * GROWTH_BACKOFF_RATE    = {:.2f}",
+               asci_settings.growth_backoff_rate);
+  logger->info("  * GROWTH_RECOVERY_RATE   = {:.2f}",
+               asci_settings.growth_recovery_rate);
+  logger->info("  * MAX_REFINE_ITER        = {}",
+               asci_settings.max_refine_iter);
+  logger->info("  * REFINE_ENERGY_TOL      = {:.4e}",
+               asci_settings.refine_energy_tol);
   logger->info(
-      "  NCDETS = {:6}, NDETS_MAX = {:9}, H_EL_TOL = {:4e}, RV_TOL = {:4e}",
-      ncdets, ndets_max, asci_settings.h_el_tol, asci_settings.rv_prune_tol);
-  logger->info("  MAX_RV_SIZE = {}, JUST_SINGLES = {}",
-               asci_settings.pair_size_max, asci_settings.just_singles);
-  logger->info("  CDET_SUM = {:.2e}",
+      "  * CORE_SELECTION         = {}",
+      core_selection_strategy_to_string(asci_settings.core_selection_strategy));
+  logger->info("  * CORE_SELECT_THRESHOLD  = {:.4f}",
+               asci_settings.core_selection_threshold);
+  logger->info("  * NCDETS_MAX             = {}", asci_settings.ncdets_max);
+  logger->info("  * NXTVAL_BCOUNT_THRESH   = {}",
+               asci_settings.nxtval_bcount_thresh);
+  logger->info("  * NXTVAL_BCOUNT_INC      = {}",
+               asci_settings.nxtval_bcount_inc);
+  logger->info("  * GROW_WITH_ROT          = {}", asci_settings.grow_with_rot);
+  logger->info("  * E_ASCI                 = {:.10e}", E_ASCI);
+  logger->info("  * CDET_SUM               = {:.6e}",
                std::accumulate(C.begin(), C.begin() + ncdets, 0.0,
                                [](auto s, auto c) { return s + c * c; }));
+  logger->info("");
 
   MACIS_MPI_CODE(MPI_Barrier(comm);)
   auto asci_search_st = clock_type::now();
