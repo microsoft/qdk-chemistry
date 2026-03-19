@@ -24,7 +24,7 @@ import qsharp.openqasm
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
 
-__all__: list[str] = []
+__all__: list[str] = ["QsharpFactoryData"]
 
 
 @dataclass
@@ -162,7 +162,7 @@ class Circuit(DataClass):
 
         Args:
             prune_classical_qubits: If True, classical qubits are removed from the circuit. Only applicable
-            when converting from qsharp_factory.
+                when converting from Q# factory data.
 
         Returns:
             qsharp._native.Circuit: A Q# Circuit object.
