@@ -122,7 +122,22 @@ class TestGetQsharpCircuit:
         assert isinstance(qir, qsharp._qsharp.QirInputData)
         assert isinstance(circuit.qir, qsharp._qsharp.QirInputData)
         assert isinstance(qsc, qsharp._native.Circuit)
-        assert isinstance(circuit.qsharp, qsharp._native.Circuit)
+
+    def test_get_qsharp_circuit_prune_classical_qubits(self):
+        """Test that get_qsharp_circuit can prune classical qubits when requested."""
+        state_prep_params = {"rowMap": [1, 0], "stateVector": [0.6, 0.0, 0.0, 0.8], "expansionOps": [[2]]}
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameters=[state_prep_params, 4]
+        )
+        circuit = Circuit(qsharp_factory=qsharp_factory)
+        qsc_pruned = circuit.get_qsharp_circuit(prune_classical_qubits=True)
+        qsc = circuit.get_qsharp_circuit(prune_classical_qubits=False)
+        print(qsc)
+        qsc_pruned_info = json.loads(qsc_pruned.json())
+        qsc_info = json.loads(qsc.json())
+        print(qsc_info)
+        assert len(qsc_info["qubits"]) == 4
+        assert len(qsc_pruned_info["qubits"]) == 2
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")

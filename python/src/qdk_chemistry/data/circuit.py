@@ -27,7 +27,7 @@ from qdk_chemistry.utils import Logger
 __all__: list[str] = ["QsharpFactoryData"]
 
 
-@dataclass
+@dataclass(frozen=True)
 class QsharpFactoryData:
     """Data class for Q# factory data used to create Q# circuit."""
 
@@ -181,14 +181,11 @@ class Circuit(DataClass):
                 Logger.warn("Both Q# and QASM representations are available. Return Q# circuit.")
             return self.qsharp
         if self._qsharp_factory and self.qsharp is None:
-            compiled_qsharp = qsharp.circuit(
+            return qsharp.circuit(
                 self._qsharp_factory.program,
                 *self._qsharp_factory.parameters,
                 prune_classical_qubits=prune_classical_qubits,
             )
-            # Cache the compiled Q# circuit if Q# is not already set
-            object.__setattr__(self, "qsharp", compiled_qsharp)
-            return compiled_qsharp
         if self.qasm:
             return qsharp.openqasm.circuit(self.qasm)
 

@@ -97,7 +97,7 @@ def four_qubit_phase_problem() -> PhaseEstimationProblem:
     state_vector = np.zeros(2**4, dtype=float)
     state_vector[int("1000", 2)] = 0.8
     state_vector[int("0111", 2)] = -0.6
-    state_prep_params = {"rowMap": [3, 2, 1, 0], "stateVector": state_vector, "expansionOps": []}
+    state_prep_params = {"rowMap": [3, 2, 1, 0], "stateVector": state_vector.tolist(), "expansionOps": []}
     factories = QsharpFactoryData(
         program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameters=[state_prep_params, 4]
     )
@@ -202,7 +202,11 @@ def _run_iterative_with_parameters(
     hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients)
     num_qubits = int(np.log2(len(state_vector)))
 
-    state_prep_params = {"rowMap": list(range(num_qubits - 1, -1, -1)), "stateVector": state_vector, "expansionOps": []}
+    state_prep_params = {
+        "rowMap": list(range(num_qubits - 1, -1, -1)),
+        "stateVector": state_vector.tolist(),
+        "expansionOps": [],
+    }
     qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
     qsharp_factories = QsharpFactoryData(
         program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameters=[state_prep_params, num_qubits]
