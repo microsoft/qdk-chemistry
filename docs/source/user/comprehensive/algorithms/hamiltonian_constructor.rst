@@ -196,7 +196,7 @@ The ``run`` method requires an extra auxiliary basis set parameter.
    .. code-block:: python
 
       # Create density-fitted Hamiltonian constructor
-      constructor = algorithms::create("hamiltonian_constructor", "qdk_density_fitted_hamiltonian")
+      constructor = algorithms.create("hamiltonian_constructor", "qdk_density_fitted_hamiltonian")
 
       # Specify auxiliary basis explicitly
       hamiltonian_with_aux = constructor.run(orbitals, aux_basis)

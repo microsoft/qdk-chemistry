@@ -30,7 +30,7 @@ class DensityFittedHamiltonianSettings : public qdk::chemistry::data::Settings {
  * This class implements Hamiltonian construction using density fitting
  * (also known as resolution-of-the-identity, RI) to approximate two-electron
  * integrals. Instead of computing and storing full four-center integrals
- * (ij|kl), it computes three-center integrals (P|ij) where P indexes an
+ * (ij|kl), it computes three-center integrals (ij|P) where P indexes an
  * auxiliary basis set.
  *
  * The density fitting approximation expresses four-center integrals as:

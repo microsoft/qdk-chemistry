@@ -41,6 +41,11 @@ namespace qcs = qdk::chemistry::scf;
 
 namespace detail_df {
 
+// Helper function that takes in DF integrals (ij|P) and metric integral (P|Q),
+// fold (P|Q)^(-1/2) into (ij|P), such that the resulting integrals (ij|P), also
+// written as B^Q_ij, can be used directly in the DF expression for four-center
+// integrals: (ij|kl) ≈ Σ_Q B^Q_ij B^Q_kl. This assumes everything is in the
+// atomic orbital basis. The variable df_eri is over-written upon output.
 void fold_metric_to_three_center(size_t num_atomic_orbitals, size_t naux,
                                  std::unique_ptr<double[]>& df_eri,
                                  std::unique_ptr<double[]>& df_metric) {
@@ -56,29 +61,6 @@ void fold_metric_to_three_center(size_t num_atomic_orbitals, size_t naux,
   blas::trsm(blas::Layout::ColMajor, blas::Side::Right, blas::Uplo::Lower,
              blas::Op::Trans, blas::Diag::NonUnit, nao2, naux, 1.0,
              df_metric.get(), naux, df_eri.get(), nao2);
-
-  // Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-  //     df_eri_mo_rm(df_mo_eri_cm.rows(), df_mo_eri_cm.cols());
-
-  // std::vector<double> tmp(naux * nao * nmo);
-
-  // // TMP(Q,i,q) = C(p,i) * B_ao(Q,p,q)
-  // for (size_t Q = 0; Q < naux; ++Q) {
-  //   auto TMP = tmp.data() + Q * nao * nmo;
-  //   auto B_pt = df_eri.get() + Q * nao2;
-  //   blas::gemm(blas::Layout::RowMajor, blas::Op::Trans, blas::Op::NoTrans,
-  //   nmo,
-  //              nao, nao, 1.0, C_active_row_maj.data(), nmo, B_pt, nao, 0.0,
-  //              TMP, nao);
-  // }
-
-  // // B(Q,i,j) = C(q,j) * TMP(Q,i,q)
-  // // B(Qi,j) = TMP(Qi,q) * C(q,j)
-  // blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-  //            naux * nmo, nmo, nao, 1.0, tmp.data(), nao,
-  //            C_active_row_maj.data(), nmo, 0.0, df_eri_mo_rm.data(), nmo);
-
-  // df_mo_eri_cm = df_eri_mo_rm;
 }
 }  // namespace detail_df
 
@@ -115,7 +97,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
                  aux_basis_set_name.begin(), ::tolower);
 
   std::shared_ptr<data::BasisSet> qdk_raw_aux_basis_set = nullptr;
-  // TODO: (RL) test the custom_name path here!
+
   if (aux_basis_set_name == data::BasisSet::custom_name ||
       aux_basis_set_type == BasisSetType::Explicit) {
     qdk_raw_aux_basis_set =
@@ -273,7 +255,6 @@ DensityFittedHamiltonianConstructor::_run_impl(
       detail_three_center::transform_three_center_ao_to_mo(B_ao, Ca_active);
 
   if (!is_restricted_calc) {
-    // Only allocate and compute (αα|αα) integrals - the others are identical
     dfmoeri_bb =
         detail_three_center::transform_three_center_ao_to_mo(B_ao, Cb_active);
   }
@@ -318,21 +299,6 @@ DensityFittedHamiltonianConstructor::_run_impl(
               dummy_fock_beta));
     }
   }
-
-  // Active space Hamiltonian need to update core energy to include core
-  // electronic contribution
-  // // Create dummy SCFConfig
-  // auto scf_config = std::make_unique<qcs::SCFConfig>();
-  // scf_config->do_dfj = true;
-  // scf_config->basis = basis_set->get_name();
-  // scf_config->aux_basis = aux_basis_set->get_name();
-  // scf_config->eri.method = qcs::ERIMethod::Incore;
-  // scf_config->scf_orbital_type = qcs::SCFOrbitalType::Restricted;
-  // scf_config->mpi = qcs::mpi_default_input();
-
-  // // Create Integral Instance
-  // auto eri = qcs::ERIMultiplexer::create(
-  //     *internal_basis_set, *internal_aux_basis_set, *scf_config, 0.0);
 
   if (is_restricted_calc) {
     // Restricted case

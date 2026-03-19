@@ -19,7 +19,7 @@ namespace qdk::chemistry::data {
 
 /**
  * @class DensityFittedHamiltonianContainer
- * @brief Contains a molecular Hamiltonian using three center
+ * @brief Contains a molecular Hamiltonian using three-center
  * integrals.
  *
  * In addition to those contained in HamiltonianContainer, this subclass also

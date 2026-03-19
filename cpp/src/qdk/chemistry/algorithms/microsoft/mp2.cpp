@@ -107,9 +107,9 @@ double MP2Calculator::calculate_restricted_mp2_energy(
 
   auto [active_indices_alpha, active_indices_beta] =
       orbitals->get_active_space_indices();
-  Eigen::VectorXd eps_alpha_active(active_indices_alpha.size());
+  Eigen::VectorXd eps_active_alpha(active_indices_alpha.size());
   for (size_t i = 0; i < active_indices_alpha.size(); ++i) {
-    eps_alpha_active[i] = eps_alpha[active_indices_alpha[i]];
+    eps_active_alpha[i] = eps_alpha[active_indices_alpha[i]];
   }
 
   // Calculate virtual orbital count
@@ -133,7 +133,7 @@ double MP2Calculator::calculate_restricted_mp2_energy(
       active_space_size * active_space_size * active_space_size;
 
   // Sum over all occupied and virtual orbital pairs
-  compute_restricted_t2(eps_alpha_active, moeri, n_occ, n_vir, stride_i,
+  compute_restricted_t2(eps_active_alpha, moeri, n_occ, n_vir, stride_i,
                         stride_j, stride_k, t2_amplitudes, &E_MP2);
 
   return E_MP2;
