@@ -105,7 +105,8 @@ class OneBodyIntegral {
    * @brief Compute significant shell pairs based on overlap threshold
    *
    * @param shells Vector of atomic orbital shells from basis set
-   * @param threshold Screening threshold for Schwarz inequality (default 1e-12)
+   * @param threshold Screening threshold for overlap-based shell pair
+   *        pre-screening (default 1e-12)
    * @return std::vector<std::pair<int, int>> List of (shellA, shellB) pairs to
    * compute
    */

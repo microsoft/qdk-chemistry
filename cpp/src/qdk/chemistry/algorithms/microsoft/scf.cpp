@@ -202,6 +202,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
         convergence_threshold * eri_threshold_multiplier;
   }
   ms_scf_config->eri.use_atomics = _settings->get<bool>("eri_use_atomics");
+  ms_scf_config->eri.shell_pair_threshold =
+      _settings->get<double>("shell_pair_threshold");
   ms_scf_config->k_eri = ms_scf_config->eri;
   ms_scf_config->grad_eri = ms_scf_config->eri;
 
