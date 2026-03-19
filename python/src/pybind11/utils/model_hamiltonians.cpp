@@ -13,22 +13,26 @@ namespace py = pybind11;
 
 namespace {
 
-/// Convert a Python scalar or 1-D array to Eigen::VectorXd.
-/// Scalars are broadcast to a constant vector of size n.
-Eigen::VectorXd to_site_param(const py::object& obj, int n) {
+namespace detail = qdk::chemistry::utils::model_hamiltonians::detail;
+
+/// Dispatch a py::object to the appropriate C++ to_site_param overload.
+Eigen::VectorXd to_site_param(const py::object& obj,
+                              const qdk::chemistry::data::LatticeGraph& lattice,
+                              const std::string& name = "parameter") {
   if (py::isinstance<py::float_>(obj) || py::isinstance<py::int_>(obj)) {
-    return Eigen::VectorXd::Constant(n, obj.cast<double>());
+    return detail::to_site_param(obj.cast<double>(), lattice, name);
   }
-  return obj.cast<Eigen::VectorXd>();
+  return detail::to_site_param(obj.cast<Eigen::VectorXd>(), lattice, name);
 }
 
-/// Convert a Python scalar or 2-D array to Eigen::MatrixXd.
-/// Scalars are broadcast to a constant n×n matrix.
-Eigen::MatrixXd to_pair_param(const py::object& obj, int n) {
+/// Dispatch a py::object to the appropriate C++ to_pair_param overload.
+Eigen::MatrixXd to_pair_param(const py::object& obj,
+                              const qdk::chemistry::data::LatticeGraph& lattice,
+                              const std::string& name = "parameter") {
   if (py::isinstance<py::float_>(obj) || py::isinstance<py::int_>(obj)) {
-    return Eigen::MatrixXd::Constant(n, n, obj.cast<double>());
+    return detail::to_pair_param(obj.cast<double>(), lattice, name);
   }
-  return obj.cast<Eigen::MatrixXd>();
+  return detail::to_pair_param(obj.cast<Eigen::MatrixXd>(), lattice, name);
 }
 
 }  // namespace
@@ -52,6 +56,60 @@ of shape ``(n, n)``. These can be freely mixed.
 )");
 
   // ======================================================================
+  // Utility functions
+  // ======================================================================
+
+  mh.def(
+      "to_site_param",
+      [](const py::object& value,
+         const qdk::chemistry::data::LatticeGraph& lattice,
+         const std::string& name) {
+        return to_site_param(value, lattice, name);
+      },
+      R"(
+Broadcast a scalar or 1-D array to a per-site parameter vector.
+
+If ``value`` is a scalar, returns a constant ``numpy.ndarray`` of length
+``n``.  If it is already a 1-D array, it is validated against the lattice
+site count and returned.
+
+Args:
+    value (float or numpy.ndarray): Scalar or per-site array.
+    lattice (LatticeGraph): Lattice graph defining the expected size.
+    name (str, optional): Parameter name for error messages.
+        Defaults to ``"parameter"``.
+
+Returns:
+    numpy.ndarray: 1-D array of length ``n``.
+)",
+      py::arg("value"), py::arg("lattice"), py::arg("name") = "parameter");
+
+  mh.def(
+      "to_pair_param",
+      [](const py::object& value,
+         const qdk::chemistry::data::LatticeGraph& lattice,
+         const std::string& name) {
+        return to_pair_param(value, lattice, name);
+      },
+      R"(
+Broadcast a scalar or 2-D array to a per-pair parameter matrix.
+
+If ``value`` is a scalar, returns a constant ``numpy.ndarray`` of shape
+``(n, n)``.  If it is already a 2-D array, it is validated against the
+lattice site count and returned.
+
+Args:
+    value (float or numpy.ndarray): Scalar or per-pair matrix.
+    lattice (LatticeGraph): Lattice graph defining the expected size.
+    name (str, optional): Parameter name for error messages.
+        Defaults to ``"parameter"``.
+
+Returns:
+    numpy.ndarray: 2-D array of shape ``(n, n)``.
+)",
+      py::arg("value"), py::arg("lattice"), py::arg("name") = "parameter");
+
+  // ======================================================================
   // Hamiltonian factory functions
   // ======================================================================
 
@@ -60,9 +118,9 @@ of shape ``(n, n)``. These can be freely mixed.
       "create_huckel_hamiltonian",
       [](const qdk::chemistry::data::LatticeGraph& lattice,
          const py::object& epsilon, const py::object& t) {
-        auto n = static_cast<int>(lattice.num_sites());
-        return create_huckel_hamiltonian(lattice, to_site_param(epsilon, n),
-                                         to_pair_param(t, n));
+        return create_huckel_hamiltonian(
+            lattice, to_site_param(epsilon, lattice, "epsilon"),
+            to_pair_param(t, lattice, "t"));
       },
       R"(
 Create a Hückel model Hamiltonian.
@@ -86,10 +144,9 @@ Returns:
       "create_hubbard_hamiltonian",
       [](const qdk::chemistry::data::LatticeGraph& lattice,
          const py::object& epsilon, const py::object& t, const py::object& U) {
-        auto n = static_cast<int>(lattice.num_sites());
-        return create_hubbard_hamiltonian(lattice, to_site_param(epsilon, n),
-                                          to_pair_param(t, n),
-                                          to_site_param(U, n));
+        return create_hubbard_hamiltonian(
+            lattice, to_site_param(epsilon, lattice, "epsilon"),
+            to_pair_param(t, lattice, "t"), to_site_param(U, lattice, "U"));
       },
       R"(
 Create a Hubbard model Hamiltonian.
@@ -114,10 +171,10 @@ Returns:
       [](const qdk::chemistry::data::LatticeGraph& lattice,
          const py::object& epsilon, const py::object& t, const py::object& U,
          const py::object& V, const py::object& z) {
-        auto n = static_cast<int>(lattice.num_sites());
-        return create_ppp_hamiltonian(lattice, to_site_param(epsilon, n),
-                                      to_pair_param(t, n), to_site_param(U, n),
-                                      to_pair_param(V, n), to_site_param(z, n));
+        return create_ppp_hamiltonian(
+            lattice, to_site_param(epsilon, lattice, "epsilon"),
+            to_pair_param(t, lattice, "t"), to_site_param(U, lattice, "U"),
+            to_pair_param(V, lattice, "V"), to_site_param(z, lattice, "z"));
       },
       R"(
 Create a Pariser-Parr-Pople (PPP) model Hamiltonian.
@@ -148,9 +205,9 @@ Returns:
       "ohno_potential",
       [](const qdk::chemistry::data::LatticeGraph& lattice, const py::object& U,
          const py::object& R, double epsilon_r, bool nearest_neighbor_only) {
-        auto n = static_cast<int>(lattice.num_sites());
-        return ohno_potential(lattice, to_site_param(U, n), to_pair_param(R, n),
-                              epsilon_r, nearest_neighbor_only);
+        return ohno_potential(lattice, to_site_param(U, lattice, "U"),
+                              to_pair_param(R, lattice, "R"), epsilon_r,
+                              nearest_neighbor_only);
       },
       R"(
 Compute the Ohno intersite potential matrix.
@@ -178,10 +235,9 @@ Returns:
       "mataga_nishimoto_potential",
       [](const qdk::chemistry::data::LatticeGraph& lattice, const py::object& U,
          const py::object& R, double epsilon_r, bool nearest_neighbor_only) {
-        auto n = static_cast<int>(lattice.num_sites());
-        return mataga_nishimoto_potential(lattice, to_site_param(U, n),
-                                          to_pair_param(R, n), epsilon_r,
-                                          nearest_neighbor_only);
+        return mataga_nishimoto_potential(
+            lattice, to_site_param(U, lattice, "U"),
+            to_pair_param(R, lattice, "R"), epsilon_r, nearest_neighbor_only);
       },
       R"(
 Compute the Mataga-Nishimoto intersite potential matrix.
@@ -211,10 +267,9 @@ Returns:
          const py::object& R,
          std::function<double(int, int, double, double)> func,
          bool nearest_neighbor_only) {
-        auto n = static_cast<int>(lattice.num_sites());
-        return pairwise_potential(lattice, to_site_param(U, n),
-                                  to_pair_param(R, n), std::move(func),
-                                  nearest_neighbor_only);
+        return pairwise_potential(lattice, to_site_param(U, lattice, "U"),
+                                  to_pair_param(R, lattice, "R"),
+                                  std::move(func), nearest_neighbor_only);
       },
       R"(
 Compute a symmetric pairwise potential matrix from a user-supplied formula.
