@@ -155,6 +155,7 @@ iqpe_2 = create(
 simulator_2 = create("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED_2)
 evolution_builder = create("time_evolution_builder", "trotter")
 circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+hadamard_test_generator = create("hadamard_test_generator", "qiskit_hadamard_generator")
 
 result_2 = iqpe_2.run(
     state_preparation=state_prep_circuit_2,
@@ -162,6 +163,7 @@ result_2 = iqpe_2.run(
     circuit_executor=simulator_2,
     evolution_builder=evolution_builder,
     circuit_mapper=circuit_mapper,
+    hadamard_test_generator=hadamard_test_generator,
 )
 
 phase_angle_2 = result_2.phase_angle
