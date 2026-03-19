@@ -15,7 +15,7 @@ namespace QDKChemistry.Utils.HadamardTest {
     /// - `systems`: An array of indices representing the system qubits.
     /// # Returns
     /// A single-element result array containing the control-qubit measurement in the selected basis.
-    operation MakeHadamardCircuit(
+    operation HadamardTest(
         statePrep : Qubit[] => Unit,
         repControlledEvolution : (Qubit, Qubit[]) => Unit,
         testBasis : String,

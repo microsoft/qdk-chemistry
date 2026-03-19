@@ -7,27 +7,27 @@
 
 from qdk import qsharp
 
-from qdk_chemistry.algorithms.hadamard_test_generator.base import HadamardTestGenerator
+from qdk_chemistry.algorithms.hadamard_test_generator.base import HadamardTest
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-__all__: list[str] = ["QiskitHadamardGenerator", "QsharpHadamardGenerator"]
+__all__: list[str] = ["QdkHadamardTest", "QiskitHadamardTest"]
 
 
-class QsharpHadamardGenerator(HadamardTestGenerator):
+class QdkHadamardTest(HadamardTest):
     """Hadamard test circuit generator based on Q# framework."""
 
     def __init__(
         self,
     ):
-        """Initialize QsharpHadamardGenerator."""
+        """Initialize QdkHadamardTest."""
         Logger.trace_entering()
         super().__init__()
 
     def _run_impl(
         self,
-        state_preparation: Circuit,
+        state_preparation_circuit: Circuit,
         num_system_qubits: int,
         ctrl_time_evol_unitary_circuit: Circuit,
         test_basis: str = "X",
@@ -37,7 +37,7 @@ class QsharpHadamardGenerator(HadamardTestGenerator):
         Currently, the function only accepts the controlled unitary circuit whose index of ancilla qubit is 0.
 
         Args:
-            state_preparation: Circuit that prepares the trial state on system qubits.
+            state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             num_system_qubits: Number of qubits in the system register.
             ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
             test_basis: Measurement basis for the control qubit. Supported values are ``"X"`` and ``"Y"``.
@@ -49,17 +49,17 @@ class QsharpHadamardGenerator(HadamardTestGenerator):
         if test_basis not in {"X", "Y"}:
             raise ValueError(f'Invalid value for test_basis: {test_basis!r}. Allowed values are "X" and "Y".')
 
-        state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
+        state_prep_op = state_preparation_circuit._qsharp_op  # noqa: SLF001
         if state_prep_op is None:
-            raise ValueError("Input state_preparation cannot be used for QsharpHadamardGenerator.")
+            raise ValueError("Input state_preparation_circuit cannot be used for QdkHadamardTest.")
 
         ctrl_evol_op = ctrl_time_evol_unitary_circuit._qsharp_op  # noqa: SLF001
         if ctrl_evol_op is None:
-            raise ValueError("Input ctrl_time_evol_unitary_circuit cannot be used for QsharpHadamardGenerator.")
+            raise ValueError("Input ctrl_time_evol_unitary_circuit cannot be used for QdkHadamardTest.")
 
         systems = list(range(1, num_system_qubits + 1))
         hadamard_test_qsc = qsharp.circuit(
-            QSHARP_UTILS.HadamardTest.MakeHadamardCircuit,
+            QSHARP_UTILS.HadamardTest.HadamardTest,
             state_prep_op,
             ctrl_evol_op,
             test_basis,
@@ -67,7 +67,7 @@ class QsharpHadamardGenerator(HadamardTestGenerator):
             systems,
         )
         hadamard_test_qir = qsharp.compile(
-            QSHARP_UTILS.HadamardTest.MakeHadamardCircuit,
+            QSHARP_UTILS.HadamardTest.HadamardTest,
             state_prep_op,
             ctrl_evol_op,
             test_basis,
@@ -75,27 +75,27 @@ class QsharpHadamardGenerator(HadamardTestGenerator):
             systems,
         )
 
-        Logger.info("Completed qsharp circuit for real observable measurement.")
+        Logger.debug(f"Completed qsharp circuit for measurement on {test_basis} basis.")
         return Circuit(qsharp=hadamard_test_qsc, qir=hadamard_test_qir)
 
     def name(self) -> str:
-        """Return the name of the QsharpHadamardGenerator algorithm."""
-        return "qsharp_hadamard_generator"
+        """Return the name of the QdkHadamardTest algorithm."""
+        return "qdk_hadamard_test"
 
 
-class QiskitHadamardGenerator(HadamardTestGenerator):
+class QiskitHadamardTest(HadamardTest):
     """Hadamard test circuit generator based on Qiskit framework."""
 
     def __init__(
         self,
     ):
-        """Initialize QiskitHadamardGenerator."""
+        """Initialize QiskitHadamardTest."""
         Logger.trace_entering()
         super().__init__()
 
     def _run_impl(
         self,
-        state_preparation: Circuit,
+        state_preparation_circuit: Circuit,
         num_system_qubits: int,
         ctrl_time_evol_unitary_circuit: Circuit,
         test_basis: str = "X",
@@ -105,7 +105,7 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
         Currently, the function only accepts the controlled unitary circuit whose index of ancilla qubit is 0.
 
         Args:
-            state_preparation: Circuit that prepares the trial state on system qubits.
+            state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             num_system_qubits: Number of qubits in the system register.
             ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
             test_basis: Measurement basis for the control qubit. Supported values are ``"X"`` and ``"Y"``.
@@ -121,7 +121,7 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
             from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3  # noqa: PLC0415
         except ModuleNotFoundError as err:
             raise ModuleNotFoundError(
-                "Qiskit is required to use QiskitHadamardGenerator. Install qiskit or use QsharpHadamardGenerator."
+                "Qiskit is required to use QiskitHadamardTest. Install qiskit or use QdkHadamardTest."
             ) from err
 
         # Build the base circuit with registers.
@@ -132,9 +132,9 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
 
         # Apply state preparation.
         try:
-            state_prep_qc = state_preparation.get_qiskit_circuit()
+            state_prep_qc = state_preparation_circuit.get_qiskit_circuit()
         except (AttributeError, RuntimeError) as err:
-            raise ValueError("Input state_preparation cannot be used for QiskitHadamardGenerator.") from err
+            raise ValueError("Input state_preparation_circuit cannot be used for QiskitHadamardTest.") from err
         circuit.append(state_prep_qc.to_gate(), system_target)
 
         # Prepare ancilla and apply controlled time evolution.
@@ -146,9 +146,7 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
         try:
             ctrl_evol_qc = ctrl_time_evol_unitary_circuit.get_qiskit_circuit()
         except (AttributeError, RuntimeError) as err:
-            raise ValueError(
-                "Input ctrl_time_evol_unitary_circuit cannot be used for QiskitHadamardGenerator."
-            ) from err
+            raise ValueError("Input ctrl_time_evol_unitary_circuit cannot be used for QiskitHadamardTest.") from err
         circuit.append(ctrl_evol_qc.to_gate(), [control, *target_qubits])
 
         # Final basis rotation and measurement on the control qubit.
@@ -161,9 +159,9 @@ class QiskitHadamardGenerator(HadamardTestGenerator):
             raise ValueError(f'Invalid value for test_basis: {test_basis!r}. Allowed values are "X" and "Y".')
         circuit.measure(control, classical[0])
 
-        Logger.info("Completed qiskit circuit for real observable measurement.")
+        Logger.debug(f"Completed qiskit circuit forfor measurement on {test_basis} basis.")
         return Circuit(qasm=qasm3.dumps(circuit))
 
     def name(self) -> str:
-        """Return the name of the QiskitHadamardGenerator algorithm."""
-        return "qiskit_hadamard_generator"
+        """Return the name of the QiskitHadamardTest algorithm."""
+        return "qiskit_hadamard_test"

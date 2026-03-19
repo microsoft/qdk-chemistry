@@ -15,8 +15,8 @@ import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hadamard_test_generator.hadamard_test_generator import (
-    QiskitHadamardGenerator,
-    QsharpHadamardGenerator,
+    QdkHadamardTest,
+    QiskitHadamardTest,
 )
 from qdk_chemistry.data import Circuit, ControlledTimeEvolutionUnitary, Structure
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
@@ -46,7 +46,7 @@ def _measure_observable(
     state_preparation: Circuit,
     num_system_qubits: int,
     ctrl_time_evolution_circuit: Circuit,
-    generator: QiskitHadamardGenerator | QsharpHadamardGenerator,
+    generator: QiskitHadamardTest | QdkHadamardTest,
     test_basis: str = "X",
     shots: int = _SHOTS,
 ) -> float:
@@ -132,14 +132,14 @@ def test_qiskit_hadamard_generator_measures_water_observable(
         state_preparation=water_hadamard_benchmark.state_preparation,
         num_system_qubits=water_hadamard_benchmark.num_system_qubits,
         ctrl_time_evolution_circuit=water_hadamard_benchmark.ctrl_time_evolution_circuit,
-        generator=QiskitHadamardGenerator(),
+        generator=QiskitHadamardTest(),
     )
 
     assert np.isclose(observable_value, 0.34, atol=1e-12)
 
 
 @pytest.mark.skipif(not _HAS_QSHARP, reason="Q# not available")
-def test_qsharp_hadamard_generator_measures_water_observable(
+def test_qdk_hadamard_test_measures_water_observable(
     water_hadamard_benchmark: HadamardWaterBenchmark,
 ) -> None:
     """Q# Hadamard generator reproduces the reference observable for water."""
@@ -147,7 +147,7 @@ def test_qsharp_hadamard_generator_measures_water_observable(
         state_preparation=water_hadamard_benchmark.state_preparation,
         num_system_qubits=water_hadamard_benchmark.num_system_qubits,
         ctrl_time_evolution_circuit=water_hadamard_benchmark.ctrl_time_evolution_circuit,
-        generator=QsharpHadamardGenerator(),
+        generator=QdkHadamardTest(),
     )
 
     assert np.isclose(observable_value, 0.34, atol=1e-12)
@@ -162,7 +162,7 @@ def test_qiskit_hadamard_generator_measures_water_observable_in_y_basis(
         state_preparation=water_hadamard_benchmark.state_preparation,
         num_system_qubits=water_hadamard_benchmark.num_system_qubits,
         ctrl_time_evolution_circuit=water_hadamard_benchmark.ctrl_time_evolution_circuit,
-        generator=QiskitHadamardGenerator(),
+        generator=QiskitHadamardTest(),
         test_basis="Y",
     )
 
@@ -170,7 +170,7 @@ def test_qiskit_hadamard_generator_measures_water_observable_in_y_basis(
 
 
 @pytest.mark.skipif(not _HAS_QSHARP, reason="Q# not available")
-def test_qsharp_hadamard_generator_measures_water_observable_in_y_basis(
+def test_qdk_hadamard_test_measures_water_observable_in_y_basis(
     water_hadamard_benchmark: HadamardWaterBenchmark,
 ) -> None:
     """Q# Hadamard generator reproduces the Y-basis reference observable for water."""
@@ -178,7 +178,7 @@ def test_qsharp_hadamard_generator_measures_water_observable_in_y_basis(
         state_preparation=water_hadamard_benchmark.state_preparation,
         num_system_qubits=water_hadamard_benchmark.num_system_qubits,
         ctrl_time_evolution_circuit=water_hadamard_benchmark.ctrl_time_evolution_circuit,
-        generator=QsharpHadamardGenerator(),
+        generator=QdkHadamardTest(),
         test_basis="Y",
     )
 
@@ -193,7 +193,7 @@ def test_qiskit_hadamard_generator_rejects_invalid_test_basis() -> None:
     ctrl_evol_qc.cx(0, 1)
 
     with pytest.raises(ValueError, match="test_basis"):
-        QiskitHadamardGenerator().run(
+        QiskitHadamardTest().run(
             Circuit(qasm=qasm3.dumps(state_prep_qc)),
             1,
             Circuit(qasm=qasm3.dumps(ctrl_evol_qc)),
@@ -202,10 +202,10 @@ def test_qiskit_hadamard_generator_rejects_invalid_test_basis() -> None:
 
 
 @pytest.mark.skipif(not _HAS_QSHARP, reason="Q# not available")
-def test_qsharp_hadamard_generator_rejects_invalid_test_basis() -> None:
+def test_qdk_hadamard_test_rejects_invalid_test_basis() -> None:
     """Q# generator rejects unsupported Hadamard measurement bases."""
     with pytest.raises(ValueError, match="test_basis"):
-        QsharpHadamardGenerator().run(  # type: ignore[arg-type]
+        QdkHadamardTest().run(  # type: ignore[arg-type]
             object(),
             1,
             object(),
@@ -216,7 +216,7 @@ def test_qsharp_hadamard_generator_rejects_invalid_test_basis() -> None:
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 def test_qiskit_hadamard_generator_rejects_incompatible_input_circuits() -> None:
     """Qiskit generator raises errors when inputs cannot produce Qiskit circuits."""
-    generator = QiskitHadamardGenerator()
+    generator = QiskitHadamardTest()
 
     with pytest.raises(ValueError, match="state_preparation"):
         generator.run(  # type: ignore[arg-type]
@@ -236,11 +236,11 @@ def test_qiskit_hadamard_generator_rejects_incompatible_input_circuits() -> None
 
 
 @pytest.mark.skipif(not _HAS_QSHARP, reason="Q# not available")
-def test_qsharp_hadamard_generator_rejects_incompatible_input_circuits(
+def test_qdk_hadamard_test_rejects_incompatible_input_circuits(
     water_hadamard_benchmark: HadamardWaterBenchmark,
 ) -> None:
     """Q# generator raises errors when input circuits do not expose Q# operations."""
-    generator = QsharpHadamardGenerator()
+    generator = QdkHadamardTest()
     bad_state_preparation_circuit = Circuit(qasm="bad_state_preparation")
     bad_ctrl_time_evolution_circuit = Circuit(qasm="bad_state_preparation")
 

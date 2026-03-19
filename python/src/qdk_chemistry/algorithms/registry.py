@@ -579,8 +579,8 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.circuit_executor.qdk import QdkFullStateSimulator  # noqa: PLC0415
     from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.hadamard_test_generator.hadamard_test_generator import (  # noqa: PLC0415
-        QiskitHadamardGenerator,
-        QsharpHadamardGenerator,
+        QdkHadamardTest,
+        QiskitHadamardTest,
     )
     from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (  # noqa: PLC0415
         IterativePhaseEstimation,
@@ -612,8 +612,8 @@ def _register_python_algorithms():
     register(lambda: PauliSequenceMapper())
     register(lambda: QdkFullStateSimulator())
     register(lambda: IterativePhaseEstimation())
-    register(lambda: QsharpHadamardGenerator())
-    register(lambda: QiskitHadamardGenerator())
+    register(lambda: QdkHadamardTest())
+    register(lambda: QiskitHadamardTest())
 
 
 _register_python_algorithms()
