@@ -141,7 +141,8 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
       QDK_LOGGER().info("aux_basis={}, naux={}", ctx_.aux_basis_set->name,
                         ctx_.aux_basis_set->num_atomic_orbitals);
     }
-    QDK_LOGGER().info("eri_tolerance={:.2e}", cfg.eri.eri_threshold);
+    QDK_LOGGER().info("eri_threshold={:.2e}, shell_pair_threshold={:.2e}",
+                      cfg.eri.eri_threshold, cfg.eri.shell_pair_threshold);
 
 #ifdef QDK_CHEMISTRY_ENABLE_DFTD3
     QDK_LOGGER().info("disp={}", to_string(cfg.disp));

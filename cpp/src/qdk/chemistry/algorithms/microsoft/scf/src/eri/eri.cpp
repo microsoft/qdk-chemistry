@@ -59,8 +59,9 @@ std::shared_ptr<ERI> ERI::create(BasisSet& basis_set, const SCFConfig& cfg,
       return std::make_shared<SNK>(cfg.scf_orbital_type, basis_set,
                                    cfg.snk_input, cfg.exc.xc_name, cfg.mpi);
     case ERIMethod::Libint2Direct:
-      return std::make_shared<LIBINT2_DIRECT>(cfg.scf_orbital_type, basis_set,
-                                              cfg.mpi, cfg.eri.use_atomics);
+      return std::make_shared<LIBINT2_DIRECT>(
+          cfg.scf_orbital_type, basis_set, cfg.mpi, cfg.eri.use_atomics,
+          cfg.eri.eri_threshold, cfg.eri.shell_pair_threshold);
     default:
       throw std::runtime_error("Invalid ERI Method");
   }

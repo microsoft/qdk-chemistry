@@ -150,6 +150,9 @@ The decomposition represents the four-center ERIs as products of three-center in
    * - ``cholesky_tolerance``
      - float
      - Tolerance for Cholesky decomposition accuracy. Smaller values give higher accuracy but more Cholesky vectors. Default: 1e-8
+   * - ``eri_threshold``
+     - float
+     - ERI screening threshold for skipping negligible shell quartets during Cholesky decomposition. Default: 1e-12
    * - ``store_cholesky_vectors``
      - bool
      - Whether to store the AO Cholesky vectors in the output Hamiltonian container for potential reuse. Default: false

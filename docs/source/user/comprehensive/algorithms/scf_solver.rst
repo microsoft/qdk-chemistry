@@ -270,7 +270,11 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
    * - ``eri_threshold``
      - float
      - ``-1.0``
-     - Electron repulsion integral threshold (negative = auto)
+     - Electron repulsion integral screening threshold (negative = auto)
+   * - ``shell_pair_threshold``
+     - float
+     - ``1e-12``
+     - Overlap-based shell pair pre-screening threshold. Shell pairs with overlap norm below this value are excluded.
    * - ``eri_use_atomics``
      - bool
      - ``False``

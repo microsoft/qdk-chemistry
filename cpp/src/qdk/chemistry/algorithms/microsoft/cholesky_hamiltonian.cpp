@@ -56,14 +56,18 @@ namespace detail {
  *
  * @param basis_set QDK basis set for the molecule
  * @param threshold Cholesky decomposition threshold controlling accuracy
+ * @param eri_threshold ERI screening threshold for skipping negligible
+ *        shell quartets during integral evaluation
  * @return Tuple of (pointer to array of Cholesky vectors stored in column-major
  *         order with dimensions (num_aos * num_aos) × num_vectors, number of
  *         Cholesky vectors generated (rank))
  */
 std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
-    qdk::chemistry::scf::BasisSet& basis_set, double threshold) {
+    qdk::chemistry::scf::BasisSet& basis_set, double threshold,
+    double eri_threshold) {
   QDK_LOG_TRACE_ENTERING();
   QDK_LOGGER().info("Cholesky decomposition threshold: {}", threshold);
+  QDK_LOGGER().info("ERI screening threshold: {}", eri_threshold);
 
   using qdk::chemistry::scf::RowMajorMatrix;
 
@@ -114,8 +118,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   }
 
   // setup libint engine for ERI computation
-  const double precision = std::numeric_limits<double>::epsilon();
-  const auto engine_precision = precision;
+  const auto engine_precision = std::numeric_limits<double>::epsilon();
 #ifdef _OPENMP
   const int nthreads = omp_get_max_threads();
 #else
@@ -169,7 +172,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
         const size_t n12 = n1 * n2;
 
         // screening via schwarz bounds
-        if (K_schwarz(s1, s2) * K_schwarz(s1, s2) < precision) {
+        if (K_schwarz(s1, s2) * K_schwarz(s1, s2) < eri_threshold) {
           continue;
         }
 
@@ -265,7 +268,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
           if ((s34++) % nthreads != thread_id) continue;
 
           // screening via schwarz bounds
-          if (K_schwarz(s1_max, s2_max) * K_schwarz(s3, s4) < precision) {
+          if (K_schwarz(s1_max, s2_max) * K_schwarz(s3, s4) < eri_threshold) {
             continue;
           }
 
@@ -739,10 +742,11 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
 
   // Use Cholesky Decomposition
   double cholesky_tol = _settings->get<double>("cholesky_tolerance");
+  double eri_tol = _settings->get<double>("eri_threshold");
 
   // get cholesky vectors
-  auto [output, num_cholesky_vectors] =
-      detail::compute_cholesky_vectors(*internal_basis_set, cholesky_tol);
+  auto [output, num_cholesky_vectors] = detail::compute_cholesky_vectors(
+      *internal_basis_set, cholesky_tol, eri_tol);
 
   // map output to Eigen matrix
   Eigen::Map<const Eigen::MatrixXd> L_ao(

@@ -482,6 +482,21 @@ TEST_F(ScfTest, EriMethodSetting) {
         scf_solver->settings().set("eri_method", "not_a_method");
       },
       std::invalid_argument);
+
+  // Test default shell_pair_threshold
+  auto scf_solver_spt = ScfSolverFactory::create();
+  EXPECT_DOUBLE_EQ(
+      scf_solver_spt->settings().get<double>("shell_pair_threshold"), 1e-12);
+
+  // Test setting shell_pair_threshold and running
+  scf_solver_spt->settings().set("shell_pair_threshold", 1e-10);
+  EXPECT_DOUBLE_EQ(
+      scf_solver_spt->settings().get<double>("shell_pair_threshold"), 1e-10);
+  auto [energy_spt, wfn_spt] = scf_solver_spt->run(water, 0, 1, "sto-3g");
+
+  // Loosening the shell pair threshold on a small basis should not change
+  // the result
+  EXPECT_NEAR(energy_spt, energy_direct, testing::scf_energy_tolerance);
 }
 
 TEST_F(ScfTest, InitialGuessRestart) {
