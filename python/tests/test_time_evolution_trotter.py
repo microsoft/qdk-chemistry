@@ -24,6 +24,15 @@ from qdk_chemistry.utils.pauli_commutation import (
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 
+def _pauli_matrix(label: str) -> np.ndarray:
+    """Helper to get Pauli matrix from label."""
+    if label == "X":
+        return np.array([[0, 1], [1, 0]], dtype=complex)
+    if label == "Z":
+        return np.array([[1, 0], [0, -1]], dtype=complex)
+    raise ValueError(f"Unsupported Pauli label: {label}")
+
+
 class TestPauliLabelToMap:
     """Tests for the _pauli_label_to_map helper function."""
 
@@ -136,7 +145,9 @@ class TestTrotter:
         builder = Trotter(order=3)
         hamiltonian = QubitHamiltonian(pauli_strings=["X"], coefficients=[1.0])
 
-        with pytest.raises(NotImplementedError, match="Non-positive and higher odd orders are not supported."):
+        with pytest.raises(
+            NotImplementedError, match="Trotter orders must be positive and even for orders greater than 1"
+        ):
             builder.run(hamiltonian, time=1.0)
 
     def test_trotter_x_z_example(self):
@@ -148,14 +159,6 @@ class TestTrotter:
         t = 0.1
         unitary = builder.run(hamiltonian, time=t)
         container = unitary.get_container()
-
-        def _pauli_matrix(label: str) -> np.ndarray:
-            """Helper to get Pauli matrix from label."""
-            if label == "X":
-                return np.array([[0, 1], [1, 0]], dtype=complex)
-            if label == "Z":
-                return np.array([[1, 0], [0, -1]], dtype=complex)
-            raise ValueError(f"Unsupported Pauli label: {label}")
 
         # Build Trotter unitary matrix
         u_trot = np.eye(2, dtype=complex)
@@ -262,14 +265,6 @@ class TestTrotter:
         t = 0.1
         unitary = builder.run(hamiltonian, time=t)
         container = unitary.get_container()
-
-        def _pauli_matrix(label: str) -> np.ndarray:
-            """Helper to get Pauli matrix from label."""
-            if label == "X":
-                return np.array([[0, 1], [1, 0]], dtype=complex)
-            if label == "Z":
-                return np.array([[1, 0], [0, -1]], dtype=complex)
-            raise ValueError(f"Unsupported Pauli label: {label}")
 
         # Build Trotter unitary matrix
         u_trot = np.eye(2, dtype=complex)
@@ -503,14 +498,6 @@ class TestTrotter:
         t = 0.1
         unitary = builder.run(hamiltonian, time=t)
         container = unitary.get_container()
-
-        def _pauli_matrix(label: str) -> np.ndarray:
-            """Helper to get Pauli matrix from label."""
-            if label == "X":
-                return np.array([[0, 1], [1, 0]], dtype=complex)
-            if label == "Z":
-                return np.array([[1, 0], [0, -1]], dtype=complex)
-            raise ValueError(f"Unsupported Pauli label: {label}")
 
         # Build Trotter unitary matrix
         u_trot = np.eye(2, dtype=complex)

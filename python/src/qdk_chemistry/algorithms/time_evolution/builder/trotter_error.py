@@ -85,17 +85,11 @@ def trotter_steps_naive(
     if order not in {1, 2} and not (order > 2 and order % 2 == 0):
         raise NotImplementedError(
             f"Trotter step estimation for order {order} is not yet implemented. "
-            "Non-positive and higher odd orders are not supported."
+            "Trotter orders must be positive and even for orders greater than 1"
         )
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
     one_norm = sum(abs(coeff) for _, coeff in real_terms)
-    if order == 1:
-        return max(1, math.ceil(((2 * one_norm**2) * time**2) / target_accuracy))
-    if order == 2:
-        return max(
-            1,
-            math.ceil(((2**2 * one_norm**3) ** (1 / 2) * abs(time) ** (1 + 1 / 2)) / target_accuracy ** (1 / 2)),
-        )
+
     return max(
         1,
         math.ceil(
@@ -160,7 +154,7 @@ def trotter_steps_commutator(
     if order not in {1, 2} and not (order > 2 and order % 2 == 0):
         raise NotImplementedError(
             f"Trotter step estimation for order {order} is not yet implemented. "
-            "Non-positive and higher odd orders are not supported."
+            "Trotter orders must be positive and even for orders greater than 1"
         )
     if order == 1:
         comm_bound = commutator_bound_first_order(hamiltonian, weight_threshold=weight_threshold)
