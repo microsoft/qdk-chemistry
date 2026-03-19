@@ -33,7 +33,12 @@ from qdk_chemistry.data import (
     Structure,
 )
 
-from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+from .reference_tolerances import (
+    float_comparison_absolute_tolerance,
+    float_comparison_relative_tolerance,
+    mp2_energy_tolerance,
+    scf_energy_tolerance,
+)
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
 
 # Container types for parametrization
@@ -1500,9 +1505,6 @@ class TestDensityFittedHamiltonianConstructor:
 
     def test_density_fitted_active_restricted_o2_mp2(self):
         """Test density-fitted Hamiltonian with active space on O2, mirroring C++ DensityFittedActiveRestrictedO2MP2."""
-        scf_energy_tolerance = 1e-8
-        mp2_tolerance = 2e-8
-
         # Create O2 molecule (bond length 2.3 Bohr)
         coords = np.array([[0.0, 0.0, 0.0], [2.3, 0.0, 0.0]])
         o2 = Structure(coords, [8, 8])
@@ -1538,4 +1540,4 @@ class TestDensityFittedHamiltonianConstructor:
         mp2_calculator = create("dynamical_correlation_calculator", "qdk_mp2_calculator")
         mp2_total_energy, _, _ = mp2_calculator.run(ansatz)
 
-        assert abs(mp2_total_energy - (-149.6209819271)) < mp2_tolerance
+        assert abs(mp2_total_energy - (-149.6209819271)) < mp2_energy_tolerance

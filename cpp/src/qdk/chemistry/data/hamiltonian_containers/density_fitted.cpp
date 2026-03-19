@@ -264,7 +264,7 @@ void DensityFittedHamiltonianContainer::validate_integral_dimensions() const {
         static_cast<unsigned>(_three_center_integrals.second->cols()) !=
             static_cast<unsigned>(_three_center_integrals.first->cols())) {
       throw std::invalid_argument(
-          "Alpha-beta three-center integrals size mismatch");
+          "Beta three-center integrals size does not match with Alpha");
     }
   }
 }

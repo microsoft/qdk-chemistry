@@ -157,7 +157,7 @@ Density-fitted container
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 A memory-efficient container that stores two-electron integrals using density fitting (also known as resolution-of-the-identity, RI) approximation.
-Instead of directly storing four-center integrals in the molecular orbital basis :math:`( ij|kl )`, it stores three-center integrals :math:`(P|ij)` where :math:`P` indexes an auxiliary basis set.
+Instead of directly storing four-center integrals in the molecular orbital basis :math:`( ij|kl )`, it stores three-center integrals :math:`(ij|P)` where :math:`P` indexes an auxiliary basis set.
 The four-center integrals are computed on-the-fly when needed via:
 
 .. math::
