@@ -16,7 +16,6 @@
 #include <stdexcept>
 
 #include "../utils.hpp"
-#include "util/timer.h"
 
 namespace qcs = qdk::chemistry::scf;
 
@@ -112,10 +111,7 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
         "orbitals in the selected subspace");
   }
 
-  scf::Timer::start_timing("mp2no::total");
-
   // Extract subspace orbital coefficients
-  scf::Timer::start_timing("mp2no::coeff_extraction");
   Eigen::MatrixXd selected_coeffs(full_coeffs.rows(), num_orbitals);
   for (size_t i = 0; i < num_orbitals; ++i) {
     selected_coeffs.col(i) = full_coeffs.col(loc_indices_a[i]);
@@ -143,10 +139,8 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
   for (size_t i = 0; i < num_virtual; ++i) {
     eps_virt[i] = full_energies_a[virt_indices[i]];
   }
-  scf::Timer::stop_timing("mp2no::coeff_extraction");
 
   // Create ERI engine directly (bypass Hamiltonian constructor)
-  scf::Timer::start_timing("mp2no::eri_creation");
   auto basis_set = orbitals->get_basis_set();
   auto internal_basis_set =
       utils::microsoft::convert_basis_set_from_qdk(*basis_set);
@@ -169,20 +163,16 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
   }
 
   auto eri = qcs::ERIMultiplexer::create(*internal_basis_set, *scf_config, 0.0);
-  scf::Timer::stop_timing("mp2no::eri_creation");
 
   // Compute only (ia|jb) integrals via generalized MOERI transform
-  scf::Timer::start_timing("mp2no::moeri_iajb");
   qcs::MOERI moeri(eri);
   std::vector<double> V_iajb(num_occupied * num_virtual * num_occupied *
                              num_virtual);
   moeri.compute(num_atomic_orbitals, num_occupied, C_occ_rm.data(), num_virtual,
                 C_virt_rm.data(), num_occupied, C_occ_rm.data(), num_virtual,
                 C_virt_rm.data(), V_iajb.data());
-  scf::Timer::stop_timing("mp2no::moeri_iajb");
 
   // Compute MP2 Natural Orbitals directly from (ia|jb) + orbital energies
-  scf::Timer::start_timing("mp2no::macis_mp2_natural_orbitals");
   Eigen::MatrixXd mp2_natural_orbitals(num_orbitals, num_orbitals);
   mp2_natural_orbitals.setZero();
   Eigen::VectorXd mp2_natural_orbital_occupations(num_orbitals);
@@ -192,10 +182,8 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
                                  eps_occ.data(), eps_virt.data(), V_iajb.data(),
                                  mp2_natural_orbital_occupations.data(),
                                  mp2_natural_orbitals.data(), num_orbitals);
-  scf::Timer::stop_timing("mp2no::macis_mp2_natural_orbitals");
 
   // Transform selected orbitals with MP2 natural orbital rotation
-  scf::Timer::start_timing("mp2no::orbital_rotation");
   Eigen::MatrixXd selected_no_coeffs =
       Eigen::MatrixXd::Zero(num_atomic_orbitals, num_orbitals);
   blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
@@ -203,15 +191,12 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
              selected_coeffs.data(), num_atomic_orbitals,
              mp2_natural_orbitals.data(), num_orbitals, 0.0,
              selected_no_coeffs.data(), num_atomic_orbitals);
-  scf::Timer::stop_timing("mp2no::orbital_rotation");
 
   // Form final orbitals by updating only the selected orbitals
-  scf::Timer::start_timing("mp2no::coeff_merge");
   Eigen::MatrixXd coeffs = full_coeffs;  // Start with original coefficients
   for (size_t i = 0; i < num_orbitals; ++i) {
     coeffs.col(loc_indices_a[i]) = selected_no_coeffs.col(i);
   }
-  scf::Timer::stop_timing("mp2no::coeff_merge");
 
   // Preserve active space indices from input orbitals if they exist
   // MP2 natural orbitals only supports restricted orbitals (alpha == beta)
@@ -225,18 +210,12 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
   }
 
   // Create new orbitals with MP2 natural orbital data
-  scf::Timer::start_timing("mp2no::orbitals_creation");
   auto new_orbitals = std::make_shared<data::Orbitals>(
       coeffs,
       std::nullopt,  // no energies for natural orbitals
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
       restricted_indices);  // preserve active space indices from input
-  auto result = detail::new_wavefunction(wavefunction, new_orbitals);
-  scf::Timer::stop_timing("mp2no::orbitals_creation");
-
-  scf::Timer::stop_timing("mp2no::total");
-  scf::Timer::print_summary();
-  return result;
+  return detail::new_wavefunction(wavefunction, new_orbitals);
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft
