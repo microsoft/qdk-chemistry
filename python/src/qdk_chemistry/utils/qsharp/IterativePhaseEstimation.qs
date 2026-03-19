@@ -6,35 +6,44 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
 
     import Std.Arrays.Subarray;
 
-    /// Prepare iterative Quantum Phase Estimation (IQPE) circuit.
+    /// Creates a callable implementing phase-corrected repeated controlled evolution.
     /// # Parameters
-    /// - `statePrep`: A function to prepare the initial quantum state.
     /// - `repControlledEvolution`: A function to perform repeated controlled evolution.
-    /// - `accumulatePhase`: The phase to accumulate during the evolution.
+    /// - `accumulatePhase`: The phase to accumulate before controlled evolution.
+    /// # Returns
+    /// A callable that applies phase correction on the control qubit and then controlled evolution.
+    function MakePhaseCorrectedControlledEvolutionOp(
+        repControlledEvolution : (Qubit, Qubit[]) => Unit,
+        accumulatePhase : Double,
+    ) : (Qubit, Qubit[]) => Unit {
+        (control, system) => {
+            Rz(accumulatePhase, control);
+            repControlledEvolution(control, system);
+        }
+    }
+
+    /// Helper operation to render a phase-corrected controlled-evolution circuit artifact.
+    /// # Parameters
+    /// - `repControlledEvolution`: A function to perform repeated controlled evolution.
+    /// - `accumulatePhase`: The phase to accumulate before controlled evolution.
     /// - `control`: The index of the control qubit.
     /// - `systems`: An array of indices representing the system qubits.
     /// # Returns
-    /// The result of measuring the control qubit after the IQPE circuit is executed.
-    operation MakeIQPECircuit(
-        statePrep : Qubit[] => Unit,
+    /// A single-element result array containing the control-qubit measurement.
+    operation MakePhaseCorrectedControlledEvolutionCircuit(
         repControlledEvolution : (Qubit, Qubit[]) => Unit,
         accumulatePhase : Double,
         control : Int,
         systems : Int[],
     ) : Result[] {
         use qs = Qubit[Length(systems) + 1];
-        let control = qs[control];
-        let system = Subarray(systems, qs);
+        let control_q = qs[control];
+        let system_q = Subarray(systems, qs);
 
-        statePrep(system);
-
-        within {
-            H(control);
-        } apply {
-            Rz(accumulatePhase, control);
-            repControlledEvolution(control, system);
-        }
-        ResetAll(system);
-        return [MResetZ(control)];
+        Rz(accumulatePhase, control_q);
+        repControlledEvolution(control_q, system_q);
+        ResetAll(system_q);
+        return [MResetZ(control_q)];
     }
+
 }

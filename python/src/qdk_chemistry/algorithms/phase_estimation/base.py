@@ -9,6 +9,7 @@ from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
+from qdk_chemistry.algorithms.hadamard_test_generator.base import HadamardTestGenerator
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import (
     ControlledEvolutionCircuitMapper,
@@ -78,6 +79,7 @@ class PhaseEstimation(Algorithm):
         *,
         evolution_builder: TimeEvolutionBuilder,
         circuit_mapper: ControlledEvolutionCircuitMapper,
+        hadamard_test_generator: HadamardTestGenerator,
         circuit_executor: CircuitExecutor,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -96,6 +98,8 @@ class PhaseEstimation(Algorithm):
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
             evolution_builder: Builder that constructs time evolution unitaries from the Hamiltonian.
             circuit_mapper: Maps controlled time evolution unitaries to circuit operations.
+            hadamard_test_generator: Hadamard-test circuit generator used by phase-estimation variants
+                that evaluate controlled overlaps via Hadamard test circuits.
             circuit_executor: The executor to run quantum circuits on a backend or simulator.
             noise: The quantum error profile to simulate noise, defaults to None.
 

@@ -108,7 +108,7 @@ class DynamicModeDecomposition(PhaseEstimation):
         Args:
             hankel_rows: The row count of the Hankel matrix X. Must be a positive integer.
             hankel_columns: The column count of both Hankel matrices X and X'. Must be a positive integer.
-            evolution_time: Time parameter dt used in the time-evolution unitary U = exp(-i H dt)``. It must be positive.
+            evolution_time: Time parameter dt in time-evolution unitary U = exp(-i H dt)``. It must be positive.
             shots_per_observable: The number of shots to use when measuring each observable in ODMD.
 
         """

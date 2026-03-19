@@ -8,16 +8,19 @@
 from __future__ import annotations
 
 from functools import cache
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.hadamard_test_generator.base import HadamardTestGenerator
 from qdk_chemistry.algorithms.phase_estimation.dynamic_mode_decomposition import DynamicModeDecomposition
 from qdk_chemistry.data import Circuit, QpeResult, QubitHamiltonian, Structure
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE
 from qdk_chemistry.utils.phase import energy_from_phase
+
+if TYPE_CHECKING:
+    from qdk_chemistry.algorithms.hadamard_test_generator.base import HadamardTestGenerator
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import qasm3
@@ -110,7 +113,7 @@ def _run_odmd(
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
     executor = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
 
-    result = odmd.run(
+    return odmd.run(
         qubit_hamiltonian=qubit_hamiltonian,
         state_preparation=state_preparation,
         hadamard_test_generator=hadamard_test_generator,
@@ -118,7 +121,6 @@ def _run_odmd(
         circuit_mapper=circuit_mapper,
         evolution_builder=evolution_builder,
     )
-    return result
 
 
 def test_qsharp_odmd_water_reference() -> None:
