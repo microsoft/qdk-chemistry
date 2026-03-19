@@ -56,14 +56,18 @@ namespace detail {
  *
  * @param basis_set QDK basis set for the molecule
  * @param threshold Cholesky decomposition threshold controlling accuracy
+ * @param eri_threshold ERI screening threshold for skipping negligible
+ *        shell quartets during integral evaluation
  * @return Tuple of (pointer to array of Cholesky vectors stored in column-major
  *         order with dimensions (num_aos * num_aos) × num_vectors, number of
  *         Cholesky vectors generated (rank))
  */
 std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
-    qdk::chemistry::scf::BasisSet& basis_set, double threshold) {
+    qdk::chemistry::scf::BasisSet& basis_set, double threshold,
+    double eri_threshold) {
   QDK_LOG_TRACE_ENTERING();
   QDK_LOGGER().info("Cholesky decomposition threshold: {}", threshold);
+  QDK_LOGGER().info("ERI screening threshold: {}", eri_threshold);
 
   using qdk::chemistry::scf::RowMajorMatrix;
 
@@ -83,6 +87,21 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   const size_t num_shells = obs.size();
   const size_t num_shell_pairs = num_shells * (num_shells + 1) / 2;
 
+  // Cholesky decomposition (rank is bounded by num_aos*(num_aos+1)/2)
+  const size_t max_rank = num_aos * (num_aos + 1) / 2;
+  QDK_LOGGER().debug("Maximum possible Cholesky rank: {}", max_rank);
+
+  // Fix threshold to (= sqrt(max_rank) * eps), to prevent numerical noise.
+  const double min_threshold = std::sqrt(static_cast<double>(max_rank)) *
+                               std::numeric_limits<double>::epsilon();
+  if (threshold < min_threshold) {
+    QDK_LOGGER().warn(
+        "Cholesky threshold {:.2e} set to {:.2e} (= sqrt({}) * eps) to prevent "
+        "noise.",
+        threshold, min_threshold, max_rank);
+    threshold = min_threshold;
+  }
+
   // map shell pair to index
   auto shell_pair_index = [num_shell_pairs](size_t s1, size_t s2) {
     if (s1 < s2) std::swap(s1, s2);
@@ -99,8 +118,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   }
 
   // setup libint engine for ERI computation
-  const double precision = std::numeric_limits<double>::epsilon();
-  const auto engine_precision = precision;
+  const auto engine_precision = std::numeric_limits<double>::epsilon();
 #ifdef _OPENMP
   const int nthreads = omp_get_max_threads();
 #else
@@ -130,6 +148,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
 #endif
 
   // Compute diagonal elements for all shell pairs
+  QDK_LOGGER().debug("Computing diagonal elements");
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -153,7 +172,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
         const size_t n12 = n1 * n2;
 
         // screening via schwarz bounds
-        if (K_schwarz(s1, s2) * K_schwarz(s1, s2) < precision) {
+        if (K_schwarz(s1, s2) * K_schwarz(s1, s2) < eri_threshold) {
           continue;
         }
 
@@ -188,11 +207,17 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   }
 #endif
 
-  // Cholesky decomposition (rank is bounded by num_aos^2)
-  while (current_col < num_aos2) {
+  QDK_LOGGER().debug("Cholesky Rank | Max Diagonal Element");
+  double D_max = 0.0;
+  while (current_col < max_rank) {
+    if (active_shell_pairs.empty()) {
+      QDK_LOGGER().debug("{:>13} | all shell pairs converged", current_col);
+      break;
+    }
+
     // get max diagonal element
     size_t q_shell_pair_max;
-    double D_max = 0.0;
+    D_max = 0.0;
     size_t s1_max, s2_max;
     for (const auto sp_index : active_shell_pairs) {
       const auto [s1, s2] = sp_index_to_shells[sp_index];
@@ -206,6 +231,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
         s2_max = s2;
       }
     }
+    QDK_LOGGER().debug("{:>13} | {}", current_col, D_max);
 
     // check convergence
     if (D_max < threshold) {
@@ -242,7 +268,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
           if ((s34++) % nthreads != thread_id) continue;
 
           // screening via schwarz bounds
-          if (K_schwarz(s1_max, s2_max) * K_schwarz(s3, s4) < precision) {
+          if (K_schwarz(s1_max, s2_max) * K_schwarz(s3, s4) < eri_threshold) {
             continue;
           }
 
@@ -316,9 +342,11 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
                  L_rows.data(), n_cols, 1.0, eri_col.data(), num_aos2);
     }
 
-    // form new cholesky vector for each index in shell pair
+    // form new cholesky vector for each index in shell pair avoid redundant
+    // vectors for symmetric shell pairs
     for (size_t local_i = 0; local_i < n1_max; ++local_i) {
-      for (size_t local_j = 0; local_j < n2_max; ++local_j) {
+      const size_t j_max = (s1_max == s2_max) ? (local_i + 1) : n2_max;
+      for (size_t local_j = 0; local_j < j_max; ++local_j) {
         const size_t local_index = local_i * n2_max + local_j;
         const double D_val = D_shell_pair[q_shell_pair_max][local_index];
 
@@ -388,11 +416,11 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
 
   QDK_LOGGER().debug("Cholesky rank: {}", current_col);
 
-  if (current_col == num_aos2) {
+  if (current_col == max_rank) {
     QDK_LOGGER().warn(
-        "Cholesky decomposition reached maximum rank (num_aos^2 = {}). "
-        "Threshold {} may not have been achieved.",
-        num_aos2, threshold);
+        "Cholesky decomposition reached maximum rank (num_aos*(num_aos+1)/2 = "
+        "{}). The requested threshold {} may not have been achieved.",
+        max_rank, threshold);
   }
 
   return {std::move(L_data), current_col};
@@ -401,6 +429,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
 Eigen::MatrixXd transform_cholesky_to_mo(
     const Eigen::MatrixXd& ao_cholesky_vectors,
     const Eigen::MatrixXd& mo_coeffs) {
+  QDK_LOG_TRACE_ENTERING();
   size_t n_ao = mo_coeffs.rows();
   size_t n_mo = mo_coeffs.cols();
   size_t rank = ao_cholesky_vectors.cols();
@@ -435,6 +464,7 @@ Eigen::MatrixXd transform_cholesky_to_mo(
 Eigen::MatrixXd build_J_from_cholesky(
     const Eigen::MatrixXd& ao_cholesky_vectors,
     const Eigen::MatrixXd& density) {
+  QDK_LOG_TRACE_ENTERING();
   size_t n_ao = density.rows();
   size_t rank = ao_cholesky_vectors.cols();
 
@@ -467,6 +497,7 @@ Eigen::MatrixXd build_J_from_cholesky(
 Eigen::MatrixXd build_K_from_cholesky(
     const Eigen::MatrixXd& ao_cholesky_vectors, const Eigen::MatrixXd& coeffs,
     const std::vector<size_t>& occ_orb_ind) {
+  QDK_LOG_TRACE_ENTERING();
   size_t n_ao = coeffs.rows();
   size_t n_occ = occ_orb_ind.size();
   size_t rank = ao_cholesky_vectors.cols();
@@ -711,10 +742,11 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
 
   // Use Cholesky Decomposition
   double cholesky_tol = _settings->get<double>("cholesky_tolerance");
+  double eri_tol = _settings->get<double>("eri_threshold");
 
   // get cholesky vectors
-  auto [output, num_cholesky_vectors] =
-      detail::compute_cholesky_vectors(*internal_basis_set, cholesky_tol);
+  auto [output, num_cholesky_vectors] = detail::compute_cholesky_vectors(
+      *internal_basis_set, cholesky_tol, eri_tol);
 
   // map output to Eigen matrix
   Eigen::Map<const Eigen::MatrixXd> L_ao(

@@ -134,7 +134,10 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
         """
         data: dict[str, Any] = {
             "container_type": self.type,
-            "step_terms": [{"pauli_term": term.pauli_term, "angle": term.angle} for term in self.step_terms],
+            "step_terms": [
+                {"pauli_term": {str(k): v for k, v in term.pauli_term.items()}, "angle": term.angle}
+                for term in self.step_terms
+            ],
             "step_reps": self.step_reps,
             "num_qubits": self.num_qubits,
         }
@@ -172,13 +175,25 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
 
         """
         cls._validate_json_version(cls._serialization_version, json_data)
-        step_terms = [
-            ExponentiatedPauliTerm(
-                pauli_term=term_data["pauli_term"],
-                angle=term_data["angle"],
-            )
-            for term_data in json_data["step_terms"]
-        ]
+        step_terms = []
+        for i, term_data in enumerate(json_data["step_terms"]):
+            pauli_term: dict[int, str] = {}
+            for k, v in term_data["pauli_term"].items():
+                if not isinstance(k, str):
+                    raise TypeError(f"step_terms[{i}].pauli_term: expected str key, got {type(k).__name__} ({k!r})")
+                try:
+                    qubit_index = int(k)
+                except ValueError as exc:
+                    raise ValueError(
+                        f"step_terms[{i}].pauli_term: key {k!r} is not a valid integer qubit index"
+                    ) from exc
+                if str(qubit_index) != k:
+                    raise ValueError(
+                        f"step_terms[{i}].pauli_term: key {k!r} is not a canonical integer "
+                        f"(expected {str(qubit_index)!r})"
+                    )
+                pauli_term[qubit_index] = v
+            step_terms.append(ExponentiatedPauliTerm(pauli_term=pauli_term, angle=term_data["angle"]))
         step_reps = json_data["step_reps"]
         num_qubits = json_data["num_qubits"]
         return cls(
