@@ -76,6 +76,8 @@ struct ERIConfig {
   uint32_t with_k = 1;           ///< Compute exchange (K) matrix (1=yes, 0=no)
   uint32_t dm_cnt = 1;           ///< Number of density matrices to process
   double eri_threshold = 1e-10;  ///< Integral screening threshold
+  double shell_pair_threshold =
+      1e-12;  ///< Overlap-based shell pair pre-screening threshold
   bool use_atomics =
       false;  ///< Use atomic operations (true) or thread-local buffers (false)
   uint32_t gpu_device_cnt = 1;  ///< Number of GPU devices to use
