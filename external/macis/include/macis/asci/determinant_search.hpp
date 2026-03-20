@@ -500,16 +500,34 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   std::atomic<size_t> nxtval(0);
 #endif /* MACIS_ENABLE_MPI */
 
-  asci_contrib_container<wfn_t<N>> asci_pairs_total;
-#pragma omp parallel schedule(dynamic)
+  // Each thread writes its accumulated results to its own slot;
+  // merged serially after the parallel region (no omp critical needed).
+  std::vector<asci_contrib_container<wfn_t<N>>> thread_pairs(num_threads);
+#pragma omp parallel
   {
-    // Process ASCI pair contributions for each constraint
-    asci_contrib_container<wfn_t<N>> asci_pairs;
-    asci_pairs.reserve(max_size);
+    const int tid = omp_get_thread_num();
+
+    // Accumulated results from all constraints processed by this thread.
+    asci_contrib_container<wfn_t<N>> accumulated_pairs;
+    const size_t per_thread_reserve =
+        std::max(size_t(1024), max_size / num_threads);
+    accumulated_pairs.reserve(per_thread_reserve);
+
+    // Working set for the current constraint — grows during excitation
+    // generation, then gets S&A'd and merged into accumulated_pairs.
+    // clear() preserves capacity, so after the first constraint this
+    // buffer never allocates again.
+    asci_contrib_container<wfn_t<N>> working_pairs;
+
+    // Thread-local reusable buffers — capacity persists across iterations,
+    // so subsequent calls reuse existing memory.
+    std::vector<uint32_t> occ_alpha_buf;
+    using spin_wfn_type = spin_wfn_t<wfn_t<N>>;
+    std::vector<spin_wfn_type> O_buf, V_buf;
+    std::vector<uint32_t> virt_ind_buf, occ_ind_buf;
 
     size_t ic = 0;
     while (ic < ncon_total) {
-      auto size_before = asci_pairs.size();
       const double h_el_tol = asci_settings.h_el_tol;
 
       // Atomically get the next task ID and increment for other
@@ -523,12 +541,14 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
       const size_t c_end = std::min(ncon_total, ic + ntake);
       for (; ic < c_end; ++ic) {
         const auto& con = constraints[ic].first;
+        working_pairs.clear();
 
         for (size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
           const auto& alpha_det = uniq_alpha[i_alpha].first;
           const auto ncon_alpha = constraint_histogram(alpha_det, 1, 1, con);
           if (!ncon_alpha) continue;
-          const auto occ_alpha = bits_to_indices(alpha_det);
+          bits_to_indices(alpha_det, occ_alpha_buf);
+          const auto& occ_alpha = occ_alpha_buf;
           const bool alpha_satisfies_con = satisfies_constraint(alpha_det, con);
 
           const auto& bcd = uad[i_alpha];
@@ -548,80 +568,84 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
             generate_constraint_singles_contributions_ss(
                 c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), T_pq,
                 norb, G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI,
-                ham_gen, asci_pairs);
+                ham_gen, working_pairs);
 
             // AAAA excitations
             generate_constraint_doubles_contributions_ss(
                 c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), G_pqrs,
-                norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
+                norb, h_el_tol, h_diag, E_ASCI, ham_gen, working_pairs, O_buf,
+                V_buf, virt_ind_buf, occ_ind_buf);
 
             // AABB excitations
             generate_constraint_doubles_contributions_os(
                 c, w, con, occ_alpha, occ_beta, vir_beta, orb_ens_alpha.data(),
                 orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-                ham_gen, asci_pairs);
+                ham_gen, working_pairs);
 
             if (alpha_satisfies_con) {
               // BB excitations
               append_singles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, occ_beta, vir_beta, occ_alpha,
                   orb_ens_beta.data(), T_pq, norb, G_red, norb, V_red, norb,
-                  h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
+                  h_el_tol, h_diag, E_ASCI, ham_gen, working_pairs);
 
               // BBBB excitations
               append_ss_doubles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
                   orb_ens_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-                  ham_gen, asci_pairs);
+                  ham_gen, working_pairs);
 
               // No excitation (push inf to remove from list)
-              asci_pairs.push_back(
+              working_pairs.push_back(
                   {w, std::numeric_limits<double>::infinity(), 1.0});
             }
           }
 
-          // Prune Down Contributions
-          if (asci_pairs.size() > asci_settings.pair_size_max) {
+          // Prune working set if it gets too large
+          if (working_pairs.size() > asci_settings.pair_size_max) {
             logger->info("  * PRUNING AT CON = {} IALPHA = {}", ic, i_alpha);
-            auto uit = sort_and_accumulate_asci_pairs(
-                asci_pairs.begin() + size_before, asci_pairs.end());
-            asci_pairs.erase(uit, asci_pairs.end());
+            auto uit = sort_and_accumulate_asci_pairs(working_pairs.begin(),
+                                                      working_pairs.end());
+            working_pairs.erase(uit, working_pairs.end());
           }
 
         }  // Unique Alpha Loop
 
-        // Local S&A for each quad
+        // S&A the working set and prune small contributions
         {
-          auto uit = sort_and_accumulate_asci_pairs(
-              asci_pairs.begin() + size_before, asci_pairs.end());
-          asci_pairs.erase(uit, asci_pairs.end());
+          sort_and_accumulate_asci_pairs(working_pairs);
 
-          // Remove small contributions
-          uit = std::partition(asci_pairs.begin() + size_before,
-                               asci_pairs.end(), [=](const auto& x) {
-                                 return std::abs(x.rv()) >
-                                        asci_settings.rv_prune_tol;
-                               });
-          asci_pairs.erase(uit, asci_pairs.end());
+          auto uit = std::partition(
+              working_pairs.begin(), working_pairs.end(), [=](const auto& x) {
+                return std::abs(x.rv()) > asci_settings.rv_prune_tol;
+              });
+          working_pairs.erase(uit, working_pairs.end());
         }
+
+        // Merge into accumulated results
+        accumulated_pairs.insert(accumulated_pairs.end(), working_pairs.begin(),
+                                 working_pairs.end());
       }  // Loc constraint loop
     }  // Constraint Loop
 
-// Insert into list
-#pragma omp critical
-    {
-      if (asci_pairs_total.size()) {
-        // Preallocate space for insertion
-        asci_pairs_total.reserve(asci_pairs.size() + asci_pairs_total.size());
-        asci_pairs_total.insert(asci_pairs_total.end(), asci_pairs.begin(),
-                                asci_pairs.end());
-      } else {
-        asci_pairs_total = std::move(asci_pairs);
-      }
-      asci_contrib_container<wfn_t<N>>().swap(asci_pairs);
-    }
+    // Move thread results to shared slot — no synchronization needed
+    // since each thread writes to its own index.
+    thread_pairs[tid] = std::move(accumulated_pairs);
 
   }  // OpenMP
+
+  // Serial merge: compute total size, reserve once, concatenate.
+  size_t total_size = 0;
+  for (const auto& tp : thread_pairs) total_size += tp.size();
+  asci_contrib_container<wfn_t<N>> asci_pairs_total;
+  asci_pairs_total.reserve(total_size);
+  for (auto& tp : thread_pairs) {
+    asci_pairs_total.insert(asci_pairs_total.end(),
+                            std::make_move_iterator(tp.begin()),
+                            std::make_move_iterator(tp.end()));
+    // Release thread-local memory immediately
+    asci_contrib_container<wfn_t<N>>().swap(tp);
+  }
 
   return asci_pairs_total;
 }

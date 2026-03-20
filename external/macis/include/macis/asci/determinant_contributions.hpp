@@ -307,6 +307,7 @@ void append_os_doubles_asci_contributions(
 template <size_t N, typename IndContainer>
 void generate_pairs(const IndContainer& inds, std::vector<wfn_t<N>>& w) {
   const size_t nind = inds.size();
+  w.clear();
   w.resize((nind * (nind - 1)) / 2, 0);
   for (int i = 0, ij = 0; i < nind; ++i)
     for (int j = i + 1; j < nind; ++j, ++ij) {
