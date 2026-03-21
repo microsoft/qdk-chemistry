@@ -144,11 +144,13 @@ class PauliSequenceMapper(ControlledEvolutionCircuitMapper):
             "pauliExponents": flattened_pauli_terms,
             "pauliCoefficients": flattened_angles,
             "repetitions": power,
+            "control": controlled_evolution.control_indices[0],
+            "systems": target_indices,
         }
 
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
-            parameters=[controlled_evo_params, controlled_evolution.control_indices[0], target_indices],
+            parameter=controlled_evo_params,
         )
 
         controlled_evolution_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(controlled_evo_params)

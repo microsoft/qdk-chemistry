@@ -9,12 +9,14 @@ namespace QDKChemistry.Utils.StatePreparation {
 
     /// A struct to hold parameters for state preparation.
     /// - `rowMap`: An array of integers representing the mapping of qubits to rows in the state vector.
-    /// - `stateVector`: An array of doubles representing the amplitudes of the quantum state
+    /// - `stateVector`: An array of doubles representing the amplitudes of the quantum state.
     /// - `expansionOps`: An array of arrays of integers representing the operations to expand the state preparation (e.g., CNOTs, X gates).
+    /// - `numQubits`: The number of qubits to allocate for the state preparation.
     struct StatePreparationParams {
         rowMap : Int[],
         stateVector : Double[],
         expansionOps : Int[][],
+        numQubits : Int,
     }
 
 
@@ -52,24 +54,35 @@ namespace QDKChemistry.Utils.StatePreparation {
 
     /// A helper operation to create a circuit for state preparation.
     /// # Parameters
-    /// - `params`: A `StatePreparationParams` struct containing the parameters for state preparation.
+    /// - `rowMap`: An array of integers representing the mapping of qubits to rows in the state vector.
+    /// - `stateVector`: An array of doubles representing the amplitudes of the quantum state.
+    /// - `expansionOps`: An array of arrays of integers representing the operations to expand the state preparation (e.g., CNOTs, X gates).
     /// - `numQubits`: The number of qubits to allocate for the state preparation.
     /// # Returns
     /// - `Unit`: The operation prepares the quantum state on the allocated qubits.
     operation MakeStatePreparationCircuit(
-        params : StatePreparationParams,
+        rowMap : Int[],
+        stateVector : Double[],
+        expansionOps : Int[][],
         numQubits : Int,
     ) : Unit {
         use qs = Qubit[numQubits];
-        StatePreparation(params, qs);
+        StatePreparation(new StatePreparationParams {
+            rowMap = rowMap,
+            stateVector = stateVector,
+            expansionOps = expansionOps,
+            numQubits = numQubits
+        }, qs);
     }
 
     /// Prepares a single reference quantum state |ψ⟩ corresponding to a given bitstring.
     /// # Parameters
     /// - `bitStrings`: An array of integers (0s and 1s) representing the desired quantum state.
     ///   For example, [0, 1, 0, 1].
+    /// - `numQubits`: The number of qubits to allocate for the state preparation.
     struct SingleReferenceParams {
         bitStrings : Int[],
+        numQubits : Int,
     }
 
 
@@ -83,7 +96,7 @@ namespace QDKChemistry.Utils.StatePreparation {
         params : SingleReferenceParams,
         qs : Qubit[],
     ) : Unit {
-        let numQubits = Length(params.bitStrings);
+        let numQubits = params.numQubits;
         for i in 0..numQubits - 1 {
             if params.bitStrings[i] == 1 {
                 X(qs[i]);
@@ -93,16 +106,19 @@ namespace QDKChemistry.Utils.StatePreparation {
 
     /// A helper operation to create a circuit for preparing a single reference quantum state.
     /// # Parameters
-    /// - `params`: A `SingleReferenceParams` struct containing the parameters for state preparation.
+    /// - `bitStrings`: An array of integers (0s and 1s) representing the desired quantum state.
     /// - `numQubits`: The number of qubits to allocate for the state preparation.
     /// # Returns
     /// - `Unit`: The operation prepares the quantum state on the allocated qubits.
     operation MakeSingleReferenceStateCircuit(
-        params : SingleReferenceParams,
+        bitStrings : Int[],
         numQubits : Int,
     ) : Unit {
         use qs = Qubit[numQubits];
-        PrepareSingleReferenceState(params, qs);
+        PrepareSingleReferenceState(new SingleReferenceParams {
+            bitStrings = bitStrings,
+            numQubits = numQubits
+        }, qs);
     }
 
     /// A helper function to create a callable for preparing a single reference quantum state.

@@ -166,11 +166,12 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             "rowMap": gf2x_operation_results.row_map[::-1],  # Reverse for Q# convention
             "stateVector": statevector_data.tolist(),
             "expansionOps": expansion_ops,
+            "numQubits": n_qubits,
         }
 
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
-            parameters=[state_prep_params, n_qubits],
+            parameter=state_prep_params,
         )
 
         state_prep_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
@@ -405,10 +406,10 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
         bitstring_array = [int(bit) for bit in bitstring]
         n_qubits = len(bitstring_array)
-        params = {"bitStrings": bitstring_array[::-1]}  # Reverse for Q# convention
+        params = {"bitStrings": bitstring_array[::-1], "numQubits": n_qubits}
 
         qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.StatePreparation.MakeSingleReferenceStateCircuit, parameters=[params, n_qubits]
+            program=QSHARP_UTILS.StatePreparation.MakeSingleReferenceStateCircuit, parameter=params
         )
         qsharp_op = QSHARP_UTILS.StatePreparation.MakePrepareSingleReferenceStateOp(params)
 

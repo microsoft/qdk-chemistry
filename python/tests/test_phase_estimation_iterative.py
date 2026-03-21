@@ -69,9 +69,9 @@ def two_qubit_phase_problem() -> PhaseEstimationProblem:
     """Return the two-qubit phase estimation scenario used in documentation."""
     hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
     state_vector = [0.6, 0.0, 0.0, 0.8]
-    state_prep_params = {"rowMap": [1, 0], "stateVector": state_vector, "expansionOps": []}
+    state_prep_params = {"rowMap": [1, 0], "stateVector": state_vector, "expansionOps": [], "numQubits": 2}
     factories = QsharpFactoryData(
-        program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameters=[state_prep_params, 2]
+        program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
     )
     qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
 
@@ -97,9 +97,14 @@ def four_qubit_phase_problem() -> PhaseEstimationProblem:
     state_vector = np.zeros(2**4, dtype=float)
     state_vector[int("1000", 2)] = 0.8
     state_vector[int("0111", 2)] = -0.6
-    state_prep_params = {"rowMap": [3, 2, 1, 0], "stateVector": state_vector.tolist(), "expansionOps": []}
+    state_prep_params = {
+        "rowMap": [3, 2, 1, 0],
+        "stateVector": state_vector.tolist(),
+        "expansionOps": [],
+        "numQubits": 4,
+    }
     factories = QsharpFactoryData(
-        program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameters=[state_prep_params, 4]
+        program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
     )
     qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
 
@@ -206,10 +211,11 @@ def _run_iterative_with_parameters(
         "rowMap": list(range(num_qubits - 1, -1, -1)),
         "stateVector": state_vector.tolist(),
         "expansionOps": [],
+        "numQubits": num_qubits,
     }
     qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
     qsharp_factories = QsharpFactoryData(
-        program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameters=[state_prep_params, num_qubits]
+        program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
     )
 
     iqpe = IterativePhaseEstimation(num_bits=num_bits, evolution_time=evolution_time, shots_per_bit=shots_per_bit)

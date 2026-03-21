@@ -34,8 +34,8 @@ class QsharpFactoryData:
     program: Callable
     """The Q# Callable."""
 
-    parameters: list[Any]
-    """The parameters to be passed to the Q# Callable when creating the circuit."""
+    parameter: dict[str, Any]
+    """The parameter to be passed to the Q# Callable when creating the circuit."""
 
 
 class Circuit(DataClass):
@@ -148,7 +148,7 @@ class Circuit(DataClass):
                 Logger.warn("Both QIR and QASM representations are available. Return QIR.")
             return self.qir
         if self._qsharp_factory and self.qir is None:
-            compiled_qir = qsharp.compile(self._qsharp_factory.program, *self._qsharp_factory.parameters)
+            compiled_qir = qsharp.compile(self._qsharp_factory.program, *self._qsharp_factory.parameter.values())
             # Cache the compiled qir if qir is not already set
             object.__setattr__(self, "qir", compiled_qir)
             return compiled_qir
@@ -183,7 +183,7 @@ class Circuit(DataClass):
         if self._qsharp_factory and self.qsharp is None:
             return qsharp.circuit(
                 self._qsharp_factory.program,
-                *self._qsharp_factory.parameters,
+                *self._qsharp_factory.parameter.values(),
                 prune_classical_qubits=prune_classical_qubits,
             )
         if self.qasm:

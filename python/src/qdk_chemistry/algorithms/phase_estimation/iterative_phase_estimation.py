@@ -218,16 +218,17 @@ class IterativePhaseEstimation(PhaseEstimation):
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_evol_op = controlled_evolution._qsharp_op  # noqa: SLF001
+        iterative_parameters = {
+            "statePrep": state_prep_op,
+            "repControlledEvolution": ctrl_evol_op,
+            "accumulatePhase": phase_correction,
+            "control": 0,
+            "systems": [i + 1 for i in range(num_system_qubits)],
+        }
         return Circuit(
             qsharp_factory=QsharpFactoryData(
                 program=QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
-                parameters=[
-                    state_prep_op,
-                    ctrl_evol_op,
-                    phase_correction,
-                    0,
-                    [1 + i for i in range(num_system_qubits)],
-                ],
+                parameter=iterative_parameters,
             )
         )
 

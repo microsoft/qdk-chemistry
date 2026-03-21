@@ -110,9 +110,9 @@ class TestGetQsharpCircuit:
 
     def test_get_circuit_from_factory(self):
         """Test that get_qir and get_qsharp_circuit can generate and cache QIR and Q# circuit from Q# factory data."""
-        state_prep_params = {"rowMap": [1, 0], "stateVector": [0.6, 0.0, 0.0, 0.8], "expansionOps": []}
+        state_prep_params = {"rowMap": [1, 0], "stateVector": [0.6, 0.0, 0.0, 0.8], "expansionOps": [], "numQubits": 2}
         qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameters=[state_prep_params, 2]
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
         )
         circuit = Circuit(qsharp_factory=qsharp_factory)
         assert circuit.qir is None
@@ -125,9 +125,14 @@ class TestGetQsharpCircuit:
 
     def test_get_qsharp_circuit_prune_classical_qubits(self):
         """Test that get_qsharp_circuit can prune classical qubits when requested."""
-        state_prep_params = {"rowMap": [1, 0], "stateVector": [0.6, 0.0, 0.0, 0.8], "expansionOps": [[2]]}
+        state_prep_params = {
+            "rowMap": [1, 0],
+            "stateVector": [0.6, 0.0, 0.0, 0.8],
+            "expansionOps": [[2]],
+            "numQubits": 4,
+        }
         qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameters=[state_prep_params, 4]
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
         )
         circuit = Circuit(qsharp_factory=qsharp_factory)
         qsc_pruned = circuit.get_qsharp_circuit(prune_classical_qubits=True)
