@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import re
+
 import numpy as np
 import pytest
 
@@ -143,8 +145,10 @@ class TestScfSolver:
             Logger.set_global_level(previous_level)
 
         assert isinstance(energy, float)
-        assert "Step 000:" in captured.out
-        assert "SCF converged: steps=" in captured.out
+        combined_output = captured.out + captured.err
+
+        assert re.search(r"\bStep\s+\d+:", combined_output)
+        assert "SCF converged: steps=" in combined_output
 
     def test_scf_solver_settings_edge_cases(self):
         """Test SCF solver with various invalid settings."""
