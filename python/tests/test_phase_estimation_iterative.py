@@ -132,6 +132,7 @@ def _run_iterative(problem: PhaseEstimationProblem) -> QpeResult:
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
     evolution_builder = create("time_evolution_builder", "trotter")
+    hadamard_test_generator = create("hadamard_test_generator", "qiskit_hadamard_generator")
 
     return iqpe.run(
         qubit_hamiltonian=problem.hamiltonian,
@@ -139,6 +140,7 @@ def _run_iterative(problem: PhaseEstimationProblem) -> QpeResult:
         circuit_executor=simulator,
         circuit_mapper=circuit_mapper,
         evolution_builder=evolution_builder,
+        hadamard_test_generator=hadamard_test_generator,
     )
 
 
@@ -206,6 +208,7 @@ def _run_iterative_with_parameters(
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=seed)
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
     evolution_builder = create("time_evolution_builder", "trotter")
+    hadamard_test_generator = create("hadamard_test_generator", "qiskit_hadamard_generator")
 
     return iqpe.run(
         qubit_hamiltonian=hamiltonian,
@@ -213,6 +216,7 @@ def _run_iterative_with_parameters(
         circuit_executor=simulator,
         circuit_mapper=circuit_mapper,
         evolution_builder=evolution_builder,
+        hadamard_test_generator=hadamard_test_generator,
     )
 
 
@@ -456,6 +460,7 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
     simulator = QiskitAerSimulator(seed=_SEED)
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
     evolution_builder = create("time_evolution_builder", "trotter")
+    hadamard_test_generator = create("hadamard_test_generator", "qiskit_hadamard_generator")
     iqpe = IterativePhaseEstimation(
         num_bits=two_qubit_phase_problem.num_bits,
         evolution_time=two_qubit_phase_problem.evolution_time,
@@ -467,6 +472,7 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
         circuit_executor=simulator,
         circuit_mapper=circuit_mapper,
         evolution_builder=evolution_builder,
+        hadamard_test_generator=hadamard_test_generator,
         noise=error_profile,
     )
 
@@ -510,6 +516,7 @@ def test_iterative_qpe_generates_correct_number_of_circuits(
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
     evolution_builder = create("time_evolution_builder", "trotter")
+    hadamard_test_generator = create("hadamard_test_generator", "qiskit_hadamard_generator")
 
     with pytest.raises(ValueError, match="No iteration circuits have been generated"):
         iqpe.get_circuits()
@@ -520,6 +527,7 @@ def test_iterative_qpe_generates_correct_number_of_circuits(
         circuit_executor=simulator,
         circuit_mapper=circuit_mapper,
         evolution_builder=evolution_builder,
+        hadamard_test_generator=hadamard_test_generator,
     )
 
     assert len(iqpe.get_circuits()) == two_qubit_phase_problem.num_bits
@@ -598,6 +606,7 @@ def test_create_iteration_circuit_power_calculation() -> None:
     state_prep_circuit = Circuit(qasm=qasm3.dumps(state_prep))
     circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
     evolution_builder = create("time_evolution_builder", "trotter")
+    hadamard_test_generator = create("hadamard_test_generator", "qiskit_hadamard_generator")
 
     iqpe = IterativePhaseEstimation(num_bits=5, evolution_time=np.pi, shots_per_bit=10)
     iter_0_circuit = iqpe.create_iteration_circuit(
@@ -605,6 +614,7 @@ def test_create_iteration_circuit_power_calculation() -> None:
         qubit_hamiltonian=hamiltonian,
         circuit_mapper=circuit_mapper,
         evolution_builder=evolution_builder,
+        hadamard_test_generator=hadamard_test_generator,
         iteration=0,
         total_iterations=5,
     )

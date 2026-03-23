@@ -17,6 +17,7 @@ References:
 from qdk import qsharp
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
+from qdk_chemistry.algorithms.hadamard_test_generator.base import HadamardTestGenerator
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
 from qdk_chemistry.data import (
@@ -87,6 +88,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         *,
         evolution_builder: TimeEvolutionBuilder,
         circuit_mapper: ControlledEvolutionCircuitMapper,
+        hadamard_test_generator: HadamardTestGenerator,
         circuit_executor: CircuitExecutor,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -97,6 +99,8 @@ class IterativePhaseEstimation(PhaseEstimation):
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
             evolution_builder: The time evolution builder to use.
             circuit_mapper: The controlled evolution circuit mapper to use.
+            hadamard_test_generator: Hadamard-test circuit generator used to build
+                each IQPE iteration circuit.
             circuit_executor: The executor to run quantum circuits.
             noise: The quantum error profile to simulate noise, defaults to None.
 
@@ -117,6 +121,7 @@ class IterativePhaseEstimation(PhaseEstimation):
                 qubit_hamiltonian=qubit_hamiltonian,
                 evolution_builder=evolution_builder,
                 circuit_mapper=circuit_mapper,
+                hadamard_test_generator=hadamard_test_generator,
                 iteration=iteration,
                 total_iterations=self.settings().get("num_bits"),
                 phase_correction=phase_feedback,
@@ -159,6 +164,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         *,
         evolution_builder: TimeEvolutionBuilder,
         circuit_mapper: ControlledEvolutionCircuitMapper,
+        hadamard_test_generator: HadamardTestGenerator,
         iteration: int,
         total_iterations: int,
         phase_correction: float = 0.0,
@@ -170,6 +176,8 @@ class IterativePhaseEstimation(PhaseEstimation):
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
             evolution_builder: The time evolution builder to use.
             circuit_mapper: The controlled evolution circuit mapper to use.
+            hadamard_test_generator: Hadamard-test circuit generator used to build
+                the per-iteration readout circuit.
             iteration: Current iteration index (0-based), where 0 corresponds to the most-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.
             phase_correction: Feedback phase angle to apply before controlled evolution, defaults to 0.0.
@@ -192,24 +200,39 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         if state_preparation._qsharp_op and ctrl_evol_circuit._qsharp_op:  # noqa: SLF001
             return self._create_circuit_from_qsharp_op(
-                state_preparation, ctrl_evol_circuit, phase_correction, num_system_qubits
+                state_preparation,
+                ctrl_evol_circuit,
+                hadamard_test_generator,
+                phase_correction,
+                num_system_qubits,
             )
 
         if state_preparation.get_qiskit_circuit() and ctrl_evol_circuit.get_qiskit_circuit():
-            return self._create_circuit_from_qiskit(state_preparation, ctrl_evol_circuit, phase_correction)
+            return self._create_circuit_from_qiskit(
+                state_preparation,
+                ctrl_evol_circuit,
+                hadamard_test_generator,
+                phase_correction,
+            )
 
         raise RuntimeError(
             "Failed to create iteration circuit: Q# operations or Qiskit dependencies are not available."
         )
 
     def _create_circuit_from_qsharp_op(
-        self, state_preparation: Circuit, controlled_evolution: Circuit, phase_correction: float, num_system_qubits: int
+        self,
+        state_preparation: Circuit,
+        controlled_evolution: Circuit,
+        hadamard_test_generator: HadamardTestGenerator,
+        phase_correction: float,
+        num_system_qubits: int,
     ) -> Circuit:
         """Create a Circuit object from a Q# operation.
 
         Args:
             state_preparation: Circuit object containing a Q# operation for state preparation.
             controlled_evolution: Circuit object containing a Q# operation for the controlled time evolution.
+            hadamard_test_generator: Hadamard-test circuit generator used to build the IQPE iteration circuit.
             phase_correction: Feedback phase angle to apply before controlled evolution.
             num_system_qubits: Number of system qubits.
 
@@ -217,65 +240,69 @@ class IterativePhaseEstimation(PhaseEstimation):
             A Circuit object representing the IQPE iteration.
 
         """
-        state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_evol_op = controlled_evolution._qsharp_op  # noqa: SLF001
-        iqpe_iter_qsc = qsharp.circuit(
-            QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
-            state_prep_op,
+        if ctrl_evol_op is None:
+            raise ValueError("Input ctrl_time_evol_unitary_circuit cannot be used for QsharpHadamardGenerator.")
+
+        systems = [1 + i for i in range(num_system_qubits)]
+        ctrl_evol_with_phase_op = QSHARP_UTILS.IterativePhaseEstimation.MakePhaseCorrectedControlledEvolutionOp(
             ctrl_evol_op,
             phase_correction,
-            0,
-            [1 + i for i in range(num_system_qubits)],  # target qubits
         )
-        iqpe_iter_qir = qsharp.compile(
-            QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
-            state_prep_op,
+        ctrl_evol_with_phase_qsc = qsharp.circuit(
+            QSHARP_UTILS.IterativePhaseEstimation.MakePhaseCorrectedControlledEvolutionCircuit,
             ctrl_evol_op,
             phase_correction,
             0,
-            [1 + i for i in range(num_system_qubits)],  # target qubits
+            systems,
         )
 
-        return Circuit(qsharp=iqpe_iter_qsc, qir=iqpe_iter_qir)
+        return hadamard_test_generator.run(
+            state_preparation=state_preparation,
+            num_system_qubits=num_system_qubits,
+            ctrl_time_evol_unitary_circuit=Circuit(
+                qsharp=ctrl_evol_with_phase_qsc,
+                qsharp_op=ctrl_evol_with_phase_op,
+            ),
+            test_basis="X",
+        )
 
     def _create_circuit_from_qiskit(
-        self, state_preparation: Circuit, controlled_evolution: Circuit, phase_correction: float
+        self,
+        state_preparation: Circuit,
+        controlled_evolution: Circuit,
+        hadamard_test_generator: HadamardTestGenerator,
+        phase_correction: float,
     ) -> Circuit:
         """Create a Circuit object from Qiskit QuantumCircuit objects.
 
         Args:
             state_preparation: Circuit object containing a Qiskit QuantumCircuit for state preparation.
             controlled_evolution: Circuit object containing a Qiskit QuantumCircuit for the controlled time evolution.
+            hadamard_test_generator: Hadamard-test circuit generator used to build the IQPE iteration circuit.
             phase_correction: Feedback phase angle to apply before controlled evolution.
 
         Returns:
             A Circuit object representing the IQPE iteration.
 
         """
-        from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3  # noqa: PLC0415
+        from qiskit import QuantumCircuit, qasm3  # noqa: PLC0415
 
         state_prep_qc = state_preparation.get_qiskit_circuit()
         ctrl_evol_qc = controlled_evolution.get_qiskit_circuit()
-        # Parse the state preparation circuit from QASM
-        ancilla = QuantumRegister(1, "ancilla")
-        system_target = QuantumRegister(state_prep_qc.num_qubits, "system")
-        classical = ClassicalRegister(1, "c")
-        circuit = QuantumCircuit(ancilla, system_target, classical)
-        circuit.append(state_prep_qc.to_gate(), system_target)
-        control = ancilla[0]
-        target_qubits = list(system_target)
-        circuit.h(control)
-
-        # Apply phase correction if provided
+        # Apply phase correction on the control qubit of the controlled evolution circuit
+        ctrl_evol_with_phase_qc = ctrl_evol_qc.copy()
         if phase_correction:
-            circuit.rz(phase_correction, control)
+            phase_correction_qc = QuantumCircuit(ctrl_evol_qc.num_qubits)
+            phase_correction_qc.rz(phase_correction, phase_correction_qc.qubits[0])
+            ctrl_evol_with_phase_qc = phase_correction_qc.compose(ctrl_evol_qc)
 
-        # Append the controlled evolution circuit
-        circuit.append(ctrl_evol_qc.to_gate(), [control, *target_qubits])
-        circuit.h(control)
-        circuit.measure(control, classical[0])
-
-        return Circuit(qasm=qasm3.dumps(circuit))
+        return hadamard_test_generator.run(
+            state_preparation=state_preparation,
+            num_system_qubits=state_prep_qc.num_qubits,
+            ctrl_time_evol_unitary_circuit=Circuit(qasm=qasm3.dumps(ctrl_evol_with_phase_qc)),
+            test_basis="X",
+        )
 
     def get_circuits(self) -> list[Circuit]:
         """Get the list of iteration circuits generated during algorithm execution.
