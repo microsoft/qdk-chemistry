@@ -59,10 +59,11 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   using dur_t = std::chrono::duration<double, std::milli>;
 
   auto logger = spdlog::get("asci_grow");
-  if (!logger)
+  if (!logger) {
     logger = world_rank ? spdlog::null_logger_mt("asci_grow")
                         : spdlog::stdout_color_mt("asci_grow");
-  logger->flush_on(logger->level());
+    logger->flush_on(logger->level());
+  }
 
   logger->info("[ASCI Grow Settings]:");
   logger->info("  NTDETS_MAX = {:6}, NCDETS_MAX = {:6}, GROW_FACTOR = {}",

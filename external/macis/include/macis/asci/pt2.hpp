@@ -79,10 +79,11 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
   auto logger = spdlog::get("asci_pt2");
-  if (!logger)
+  if (!logger) {
     logger = world_rank ? spdlog::null_logger_mt("asci_pt2")
                         : spdlog::stdout_color_mt("asci_pt2");
-  logger->flush_on(logger->level());
+    logger->flush_on(logger->level());
+  }
 
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
   logger->info("[ASCI PT2 Settings]");
