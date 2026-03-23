@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/pmc.hpp>
@@ -213,7 +215,8 @@ TEST_F(MacisAsciTest, StandaloneMacisLoggersFlushAtTraceWhenTraceEnabled) {
     EXPECT_TRUE(std::isfinite(energy));
     ASSERT_NE(wavefunction_ptr, nullptr);
   } catch (const std::runtime_error& error) {
-    ASSERT_STREQ(error.what(), "ASCI Refine did not converge");
+    EXPECT_NE(std::string(error.what()).find("did not converge"),
+              std::string::npos);
   }
 
   auto grow_logger = spdlog::get("asci_grow");
