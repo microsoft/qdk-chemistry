@@ -40,6 +40,9 @@ Quick reference
    * - :doc:`Symmetries <symmetries>`
      - Physical symmetries
      - Factory methods, User input
+   * - :doc:`LatticeGraph <lattice_graph>`
+     - Lattice topology for model Hamiltonians
+     - Factory methods, User input
    * - :doc:`PauliOperator <pauli_operator>`
      - Pauli operator expressions with arithmetic
      - User construction
@@ -51,6 +54,7 @@ Quick reference
    serialization
    basis_set
    hamiltonian
+   lattice_graph
    orbitals
    pauli_operator
    structure
