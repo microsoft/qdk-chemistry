@@ -204,12 +204,14 @@ static void init_global_logger() {
 
   if (g_logger) {
     spdlog::level::level_enum global_level;
+    std::shared_ptr<spdlog::logger> logger;
     {
       std::lock_guard<std::mutex> lock(g_level_mutex);
       global_level = g_global_level;
-      apply_logger_instance_level_and_flush_policy(g_logger, global_level);
+      logger = g_logger;
     }
 
+    apply_logger_instance_level_and_flush_policy(logger, global_level);
     apply_spdlog_global_level_and_flush_policy(global_level);
     // Pattern: [timestamp] [colored_level] message
     // The file context and method are added by ContextLogger in the message
@@ -222,12 +224,18 @@ std::shared_ptr<spdlog::logger> Logger::get() {
   std::call_once(g_logger_init_flag, init_global_logger);
 
   // Update level if it changed (thread-safe check)
-  if (g_logger) {
+  std::shared_ptr<spdlog::logger> logger;
+  spdlog::level::level_enum global_level;
+  {
     std::lock_guard<std::mutex> lock(g_level_mutex);
-    if (g_logger->level() != g_global_level ||
-        g_logger->flush_level() != g_global_level) {
-      apply_logger_instance_level_and_flush_policy(g_logger, g_global_level);
-    }
+    logger = g_logger;
+    global_level = g_global_level;
+  }
+
+  if (logger &&
+      (logger->level() != global_level ||
+       logger->flush_level() != global_level)) {
+    apply_logger_instance_level_and_flush_policy(logger, global_level);
   }
 
   return g_logger;
@@ -244,14 +252,16 @@ std::string Logger::get_source_context(const std::source_location& location) {
 
 void Logger::set_global_level(LogLevel level) {
   auto spdlog_level = to_spdlog_level(level);
+  std::shared_ptr<spdlog::logger> logger;
 
   // Update both our tracked level and spdlog's global level
   {
     std::lock_guard<std::mutex> lock(g_level_mutex);
     g_global_level = spdlog_level;
-    apply_logger_instance_level_and_flush_policy(g_logger, spdlog_level);
+    logger = g_logger;
   }
 
+  apply_logger_instance_level_and_flush_policy(logger, spdlog_level);
   apply_spdlog_global_level_and_flush_policy(spdlog_level);
 }
 
