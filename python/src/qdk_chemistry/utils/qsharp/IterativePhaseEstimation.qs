@@ -17,7 +17,7 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         repControlledEvolution : (Qubit, Qubit[]) => Unit,
         accumulatePhase : Double,
         control : Int,
-        system : Int[],
+        systems : Int[],
     }
 
     /// Runs the iterative Quantum Phase Estimation (IQPE) circuit based on the provided parameters.
@@ -26,19 +26,19 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// # Returns
     /// - `Result[]`: The result of measuring the control qubit after the IQPE circuit is executed.
     operation RunIQPE(params : IterativePhaseEstimationParams) : Result[] {
-        use qs = Qubit[Length(params.system) + 1];
+        use qs = Qubit[Length(params.systems) + 1];
         let control = qs[params.control];
-        let system = Subarray(params.system, qs);
+        let systems = Subarray(params.systems, qs);
 
-        params.statePrep(system);
+        params.statePrep(systems);
 
         within {
             H(control);
         } apply {
             Rz(params.accumulatePhase, control);
-            params.repControlledEvolution(control, system);
+            params.repControlledEvolution(control, systems);
         }
-        ResetAll(system);
+        ResetAll(systems);
         return [MResetZ(control)];
     }
 
@@ -48,7 +48,7 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// - `repControlledEvolution`: A function to perform repeated controlled evolution.
     /// - `accumulatePhase`: The phase to accumulate during the evolution.
     /// - `control`: The index of the control qubit.
-    /// - `system`: An array of indices representing the system qubits.
+    /// - `systems`: An array of indices representing the system qubits.
     /// # Returns
     /// The result of measuring the control qubit after the IQPE circuit is executed.
     operation MakeIQPECircuit(
@@ -56,14 +56,14 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         repControlledEvolution : (Qubit, Qubit[]) => Unit,
         accumulatePhase : Double,
         control : Int,
-        system : Int[],
+        systems : Int[],
     ) : Result[] {
         return RunIQPE(new IterativePhaseEstimationParams {
             statePrep = statePrep,
             repControlledEvolution = repControlledEvolution,
             accumulatePhase = accumulatePhase,
             control = control,
-            system = system
+            systems = systems
         });
     }
 }

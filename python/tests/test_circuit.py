@@ -137,10 +137,8 @@ class TestGetQsharpCircuit:
         circuit = Circuit(qsharp_factory=qsharp_factory)
         qsc_pruned = circuit.get_qsharp_circuit(prune_classical_qubits=True)
         qsc = circuit.get_qsharp_circuit(prune_classical_qubits=False)
-        print(qsc)
         qsc_pruned_info = json.loads(qsc_pruned.json())
         qsc_info = json.loads(qsc.json())
-        print(qsc_info)
         assert len(qsc_info["qubits"]) == 4
         assert len(qsc_pruned_info["qubits"]) == 2
 

@@ -140,17 +140,17 @@ class PauliSequenceMapper(ControlledEvolutionCircuitMapper):
         if power < 1:
             raise ValueError("PauliSequenceMapper requires 'power' to be an integer greater than or equal to 1.")
 
-        controlled_evo_params = {
-            "pauliExponents": flattened_pauli_terms,
-            "pauliCoefficients": flattened_angles,
-            "repetitions": power,
-            "control": controlled_evolution.control_indices[0],
-            "systems": target_indices,
-        }
+        controlled_evo_params = QSHARP_UTILS.ControlledPauliExp.RepControlledPauliExpParams(
+            pauliExponents=flattened_pauli_terms,
+            pauliCoefficients=flattened_angles,
+            repetitions=power,
+            control=controlled_evolution.control_indices[0],
+            systems=target_indices,
+        )
 
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
-            parameter=controlled_evo_params,
+            parameter=vars(controlled_evo_params),
         )
 
         controlled_evolution_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(controlled_evo_params)
