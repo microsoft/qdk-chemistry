@@ -405,10 +405,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             raise ValueError("Bitstring must contain only '0' and '1' characters")
 
         bitstring_array = [int(bit) for bit in bitstring]
-        n_qubits = len(bitstring_array)
-        params = QSHARP_UTILS.StatePreparation.SingleReferenceParams(
-            bitStrings=bitstring_array[::-1], numQubits=n_qubits
-        )
+        params = QSHARP_UTILS.StatePreparation.SingleReferenceParams(bitStrings=bitstring_array[::-1])
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.StatePreparation.MakeSingleReferenceStateCircuit, parameter=vars(params)
         )
