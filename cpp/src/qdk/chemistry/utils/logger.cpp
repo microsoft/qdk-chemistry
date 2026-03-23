@@ -232,9 +232,8 @@ std::shared_ptr<spdlog::logger> Logger::get() {
     global_level = g_global_level;
   }
 
-  if (logger &&
-      (logger->level() != global_level ||
-       logger->flush_level() != global_level)) {
+  if (logger && (logger->level() != global_level ||
+                 logger->flush_level() != global_level)) {
     apply_logger_instance_level_and_flush_policy(logger, global_level);
   }
 

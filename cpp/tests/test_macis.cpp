@@ -4,8 +4,6 @@
 
 #include <gtest/gtest.h>
 
-#include <string>
-
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/pmc.hpp>
@@ -15,6 +13,7 @@
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <string>
 
 #include "ut_common.hpp"
 
