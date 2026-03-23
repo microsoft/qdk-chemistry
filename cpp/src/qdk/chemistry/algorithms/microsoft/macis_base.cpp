@@ -88,6 +88,12 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
   SET_MACIS_ENUM_SETTING(settings_, asci_settings, core_selection_strategy,
                          string_to_core_selection_strategy);
   SET_MACIS_SETTING(settings_, asci_settings, core_selection_threshold, double);
+  SET_MACIS_SETTING(settings_, asci_settings, warm_start_davidson, bool);
+  SET_MACIS_SETTING(settings_, asci_settings, min_warm_start_overlap, double);
+  SET_MACIS_SETTING(settings_, asci_settings, min_patch_overlap, double);
+  SET_MACIS_SETTING(settings_, asci_settings, grow_ci_residual_tolerance,
+                    double);
+  SET_MACIS_SETTING(settings_, asci_settings, taper_grow_factor, double);
 
   // Validate grow_factor and related parameters
   if (asci_settings.grow_factor <= 1.0) {

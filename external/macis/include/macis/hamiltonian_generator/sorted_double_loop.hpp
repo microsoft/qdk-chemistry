@@ -436,6 +436,15 @@ class SortedDoubleLoopHamiltonianGenerator
     auto duration_thresh =
         std::chrono::duration<double>(thresh_en - thresh_st).count();
 
+    auto h_logger = spdlog::get("h_build");
+    if (h_logger) {
+      h_logger->info(
+          "  H_BUILD: setup={:.2e}s count={:.2e}s alloc={:.2e}s "
+          "fill={:.2e}s sort={:.2e}s thresh={:.2e}s",
+          duration_setup, duration_compute, duration_alloc, duration_fill,
+          duration_sort, duration_thresh);
+    }
+
     return csr_mat;
   }
 

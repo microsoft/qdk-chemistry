@@ -72,11 +72,14 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   bool converged = false;
   double prev_E_delta = 0.0;
   int oscillation_count = 0;
+  // Incremental H_build cache — carried across refine iterations
+  CachedHamiltonianState<wfn_t<N>, index_t> h_cache;
+
   for (size_t iter = 0; iter < asci_settings.max_refine_iter; ++iter) {
     double E;
     std::tie(E, wfn, X) = asci_iter<N, index_t>(
         asci_settings, mcscf_settings, ndets, E0, std::move(wfn), std::move(X),
-        ham_gen, norb MACIS_MPI_CODE(, comm));
+        ham_gen, norb, &h_cache MACIS_MPI_CODE(, comm));
 
     // Check if wavefunction size changed
     if (wfn.size() != ndets) {

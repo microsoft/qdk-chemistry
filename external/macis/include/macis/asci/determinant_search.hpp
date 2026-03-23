@@ -147,6 +147,30 @@ struct ASCISettings {
   /// @brief Energy convergence tolerance for refinement
   double refine_energy_tol = 1e-6;
 
+  /// @brief Enable warm-starting Davidson from previous eigenvector.
+  /// When true, CI coefficients from the previous iteration are mapped
+  /// onto the new determinant set and used as the initial guess.
+  bool warm_start_davidson = true;
+
+  /// @brief Minimum determinant overlap fraction for warm-starting Davidson.
+  /// If the fraction of new dets also present in the old set falls below
+  /// this, the warm-start guess is discarded in favour of a diagonal guess.
+  double min_warm_start_overlap = 0.5;
+
+  /// @brief Minimum determinant overlap fraction for using incremental
+  /// (patched) Hamiltonian build.  Below this threshold the full CSR is
+  /// rebuilt from scratch.  Range: (0, 1].
+  double min_patch_overlap = 0.3;
+
+  /// @brief CI residual tolerance used during the grow phase.
+  /// A looser tolerance here speeds up growth iterations where tight
+  /// convergence is unnecessary.  Set to 0 to use the refine tolerance.
+  double grow_ci_residual_tolerance = 0;
+
+  /// @brief Growth factor applied when the next expansion would exceed
+  /// ntdets_max.  0 disables tapering (the normal grow_factor is used).
+  double taper_grow_factor = 0;
+
   /// @brief Enable growing with rotations
   bool grow_with_rot = false;
   /// @brief Starting size for rotations

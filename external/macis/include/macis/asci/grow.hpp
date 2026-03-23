@@ -68,6 +68,13 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                asci_settings.ntdets_max, asci_settings.ncdets_max,
                asci_settings.grow_factor);
 
+  // Override CI tolerance for the grow phase if configured
+  MCSCFSettings grow_mcscf = mcscf_settings;
+  if (asci_settings.grow_ci_residual_tolerance > 0) {
+    grow_mcscf.ci_res_tol = asci_settings.grow_ci_residual_tolerance;
+    logger->info("  GROW_CI_RES_TOL = {:.2e}", grow_mcscf.ci_res_tol);
+  }
+
   constexpr const char* fmt_string =
       "iter = {:4}, E0 = {:20.12e}, dE = {:14.6e}, WFN_SIZE = {}";
 
@@ -80,13 +87,29 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   const double growth_backoff_rate = asci_settings.growth_backoff_rate;
   const double growth_recovery_rate = asci_settings.growth_recovery_rate;
 
+  // Incremental H_build cache — carried across grow iterations
+  CachedHamiltonianState<wfn_t<N>, index_t> h_cache;
+
   auto grow_st = hrt_t::now();
   while (wfn.size() < asci_settings.ntdets_max) {
+    // Apply taper: when the next full-factor expansion would overshoot
+    // ntdets_max, use the (smaller) taper_grow_factor instead.
+    double effective_grow_factor = current_grow_factor;
+    if (asci_settings.taper_grow_factor > 0 &&
+        static_cast<size_t>(std::ceil(wfn.size() * current_grow_factor)) >
+            asci_settings.ntdets_max) {
+      effective_grow_factor =
+          std::max(asci_settings.min_grow_factor,
+                   asci_settings.taper_grow_factor);
+      logger->info("  * Tapering grow_factor from {:.2f} to {:.2f}",
+                   current_grow_factor, effective_grow_factor);
+    }
+
     // Use std::ceil to avoid truncation when grow_factor is close to 1.0
     size_t ndets_new = std::min(
         std::max(
             asci_settings.ntdets_min,
-            static_cast<size_t>(std::ceil(wfn.size() * current_grow_factor))),
+            static_cast<size_t>(std::ceil(wfn.size() * effective_grow_factor))),
         asci_settings.ntdets_max);
 
     // Force +1 growth if ndets_new <= wfn.size() (can happen if grow_factor
@@ -103,8 +126,8 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     double E;
     auto ai_st = hrt_t::now();
     std::tie(E, wfn, X) = asci_iter<N, index_t>(
-        asci_settings, mcscf_settings, ndets_new, E0, std::move(wfn),
-        std::move(X), ham_gen, norb MACIS_MPI_CODE(, comm));
+        asci_settings, grow_mcscf, ndets_new, E0, std::move(wfn),
+        std::move(X), ham_gen, norb, &h_cache MACIS_MPI_CODE(, comm));
     auto ai_en = hrt_t::now();
     dur_t ai_dur = ai_en - ai_st;
     logger->trace("  * ASCI_ITER_DUR = {:.2e} ms", ai_dur.count());
@@ -190,6 +213,9 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 
       // Regenerate intermediates
       ham_gen.generate_integral_intermediates();
+
+      // Rotation invalidates cached H (integrals changed)
+      h_cache.clear();
 
       logger->trace("  * Rediagonalizing");
       auto rdg_st = hrt_t::now();

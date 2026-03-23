@@ -118,6 +118,27 @@ class MacisAsciSettings : public MultiConfigurationSettings {
                         "Cumulative weight threshold for core selection",
                         data::BoundConstraint<double>{
                             std::numeric_limits<double>::epsilon(), 1.0});
+
+    // Warm-start and tolerance controls
+    set_default<bool>("warm_start_davidson",
+                      macis_defaults.warm_start_davidson,
+                      "Warm-start Davidson from previous eigenvector");
+    set_default<double>(
+        "min_warm_start_overlap",
+        macis_defaults.min_warm_start_overlap,
+        "Minimum determinant overlap fraction for warm-start Davidson",
+        data::BoundConstraint<double>{0.0, 1.0});
+    set_default<double>(
+        "min_patch_overlap", macis_defaults.min_patch_overlap,
+        "Minimum determinant overlap fraction for incremental H build",
+        data::BoundConstraint<double>{0.0, 1.0});
+    set_default<double>(
+        "grow_ci_residual_tolerance",
+        macis_defaults.grow_ci_residual_tolerance,
+        "CI residual tolerance during grow phase (0 = use refine tolerance)");
+    set_default<double>(
+        "taper_grow_factor", macis_defaults.taper_grow_factor,
+        "Growth factor for final expansion near ntdets_max (0 = disabled)");
   }
 
   /**
