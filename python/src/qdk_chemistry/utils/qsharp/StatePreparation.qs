@@ -78,9 +78,11 @@ namespace QDKChemistry.Utils.StatePreparation {
     /// Prepares a single reference quantum state |ψ⟩ corresponding to a given bitstring.
     /// # Parameters
     /// - `bitStrings`: An array of integers (0s and 1s) representing the desired quantum state.
+    /// - `numQubits`: The number of qubits to allocate for the state preparation.
     ///   For example, [0, 1, 0, 1].
     struct SingleReferenceParams {
         bitStrings : Int[],
+        numQubits : Int,
     }
 
 
@@ -95,6 +97,9 @@ namespace QDKChemistry.Utils.StatePreparation {
         qs : Qubit[],
     ) : Unit {
         let bitLen = Length(params.bitStrings);
+        if bitLen != Length(qs) {
+            fail "Length of bitStrings must match the number of qubits.";
+        }
         for i in 0..bitLen - 1 {
             if params.bitStrings[i] == 1 {
                 X(qs[i]);
@@ -105,14 +110,17 @@ namespace QDKChemistry.Utils.StatePreparation {
     /// A helper operation to create a circuit for preparing a single reference quantum state.
     /// # Parameters
     /// - `bitStrings`: An array of integers (0s and 1s) representing the desired quantum state.
+    /// - `numQubits`: The number of qubits to allocate for the state preparation.
     /// # Returns
     /// - `Unit`: The operation prepares the quantum state on the allocated qubits.
     operation MakeSingleReferenceStateCircuit(
         bitStrings : Int[],
+        numQubits : Int
     ) : Unit {
-        use qs = Qubit[Length(bitStrings)];
+        use qs = Qubit[numQubits];
         PrepareSingleReferenceState(new SingleReferenceParams {
             bitStrings = bitStrings,
+            numQubits = numQubits
         }, qs);
     }
 
