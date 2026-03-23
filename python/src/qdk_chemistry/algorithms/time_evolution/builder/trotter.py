@@ -28,6 +28,7 @@ from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
+from qdk_chemistry.utils import Logger
 
 __all__: list[str] = ["Trotter", "TrotterSettings"]
 
@@ -260,18 +261,20 @@ class Trotter(TimeEvolutionBuilder):
 
         order = self._settings.get("order")
 
+        coeffs = list(qubit_hamiltonian.get_real_coefficients(tolerance=atol))
+        # If there are no coefficients (e.g., empty Hamiltonian or all filtered by atol),
+        # there is nothing to decompose; return the empty list of terms.
+        if not coeffs:
+            Logger.warn("No coefficients above the tolerance; returning empty term list.")
+            return terms
+
         if order == 1:
-            for label, coeff in qubit_hamiltonian.get_real_coefficients(tolerance=atol):
+            for label, coeff in coeffs:
                 mapping = self._pauli_label_to_map(label)
                 angle = coeff * time
                 terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
         # order = 2 or order = 2k with k>1
         else:
-            coeffs = list(qubit_hamiltonian.get_real_coefficients(tolerance=atol))
-            # If there are no coefficients (e.g., empty Hamiltonian or all filtered by atol),
-            # there is nothing to decompose; return the empty list of terms.
-            if not coeffs:
-                return terms
             # \prod_{i=1}^{L-1} e^{-iH_i t/(2n)}
             for label, coeff in coeffs[:-1]:
                 mapping = self._pauli_label_to_map(label)
