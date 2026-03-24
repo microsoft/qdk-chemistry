@@ -15,12 +15,10 @@ import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hadamard_test_generator.base import HadamardTestBasis
-from qdk_chemistry.algorithms.hadamard_test_generator.hadamard_test_generator import (
-    QdkHadamardTest,
-    QiskitHadamardTest,
-)
+from qdk_chemistry.algorithms.hadamard_test_generator.hadamard_test_generator import QdkHadamardTest
 from qdk_chemistry.data import Circuit, ControlledTimeEvolutionUnitary, Structure
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+from qdk_chemistry.plugins.qiskit.hadamard_test import QiskitHadamardTest
 
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
 

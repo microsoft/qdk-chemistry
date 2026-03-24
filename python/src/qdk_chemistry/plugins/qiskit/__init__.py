@@ -43,16 +43,19 @@ def qiskit_load():
     Logger.trace_entering()
 
     from qdk_chemistry.algorithms import register  # noqa: PLC0415
+    from qdk_chemistry.plugins.qiskit.hadamard_test import QiskitHadamardTest  # noqa: PLC0415
     from qdk_chemistry.plugins.qiskit.regular_isometry import RegularIsometryStatePreparation  # noqa: PLC0415
     from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation  # noqa: PLC0415
 
     register(lambda: RegularIsometryStatePreparation())
     register(lambda: QiskitStandardPhaseEstimation())
+    register(lambda: QiskitHadamardTest())
 
     Logger.debug(
         "Qiskit plugins loaded: "
         f"[{RegularIsometryStatePreparation().type_name()}: {RegularIsometryStatePreparation().name()}], "
-        f"[{QiskitStandardPhaseEstimation().type_name()}: {QiskitStandardPhaseEstimation().name()}]."
+        f"[{QiskitStandardPhaseEstimation().type_name()}: {QiskitStandardPhaseEstimation().name()}], "
+        f"[{QiskitHadamardTest().type_name()}: {QiskitHadamardTest().name()}]."
     )
 
 
