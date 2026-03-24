@@ -126,4 +126,6 @@ print(f"Loaded lattice: {loaded.num_sites} sites, {loaded.num_edges} edges")
 # Save to HDF5
 lattice.to_hdf5_file(Path("chain.lattice_graph.hdf5"))
 # end-cell-serialization
+Path("chain.lattice_graph.json").unlink()
+Path("chain.lattice_graph.hdf5").unlink()
 ################################################################################
