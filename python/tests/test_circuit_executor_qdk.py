@@ -93,7 +93,7 @@ class TestQdkFullStateCircuitExecutor:
         assert counts_2.get("11", 0) == 0
         assert len(raw_data) == 10
         for outcome in raw_data:
-            assert "Zero, One" in str(outcome)
+            assert "One, Zero" in str(outcome)  # Raw data bitstring outcomes should be in qubit order
 
     def test_noise_with_depolarizing_error(self, test_circuit_1, simple_error_profile):
         """Test execution with a depolarizing noise model."""
