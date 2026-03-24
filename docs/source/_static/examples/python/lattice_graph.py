@@ -5,10 +5,14 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-################################################################################
-# start-cell-create-chain
+from pathlib import Path
+
+import numpy as np
+
 from qdk_chemistry.data import LatticeGraph
 
+################################################################################
+# start-cell-create-chain
 # Create a 6-site open chain
 chain = LatticeGraph.chain(6)
 print(f"Chain: {chain.num_sites} sites, {chain.num_edges} edges")
@@ -64,8 +68,6 @@ print(f"Torus: {torus.num_sites} sites, {torus.num_edges} edges")
 
 ################################################################################
 # start-cell-from-matrix
-import numpy as np
-
 # Create a lattice from a dense adjacency matrix (star graph)
 adj = np.zeros((5, 5))
 for i in range(1, 5):
@@ -112,8 +114,6 @@ print(f"Adjacency matrix:\n{adj_matrix}")
 
 ################################################################################
 # start-cell-serialization
-from pathlib import Path
-
 lattice = LatticeGraph.chain(4)
 
 # Save to JSON
