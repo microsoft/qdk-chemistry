@@ -36,11 +36,11 @@ Algorithm Details:
 from dataclasses import dataclass
 
 import numpy as np
-from qdk import qsharp
 
 import qdk_chemistry.plugins.qiskit
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
 from qdk_chemistry.data import Circuit, Wavefunction
+from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -53,9 +53,6 @@ class SparseIsometryGF2XStatePreparationSettings(StatePreparationSettings):
     def __init__(self):
         """Initialize the StatePreparationSettings."""
         super().__init__()
-        self._set_default(
-            "prune_classical_qubits", "bool", False, "Whether to prune classical qubits and return the circuit."
-        )
         self._set_default(
             "dense_preparation_method", "string", "qdk", "The dense state preparation method to use.", ["qdk", "qiskit"]
         )
@@ -165,27 +162,20 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 expansion_ops.append([qubit])
 
         # State vector indexing is in little-endian order, the row map is reversed for Q# convention
-        state_prep_params = {
-            "rowMap": gf2x_operation_results.row_map[::-1],  # Reverse for Q# convention
-            "stateVector": statevector_data.tolist(),
-            "expansionOps": expansion_ops,
-        }
-
-        qsharp_circuit = qsharp.circuit(
-            QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
-            state_prep_params,
-            n_qubits,
-            prune_classical_qubits=self._settings.get("prune_classical_qubits"),
+        state_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
+            rowMap=gf2x_operation_results.row_map[::-1],
+            stateVector=statevector_data.tolist(),
+            expansionOps=expansion_ops,
+            numQubits=n_qubits,
         )
 
-        qir = qsharp.compile(
-            QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
-            state_prep_params,
-            n_qubits,
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=vars(state_prep_params),
         )
 
         state_prep_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
-        return Circuit(qsharp=qsharp_circuit, qir=qir, qsharp_op=state_prep_op, encoding="jordan-wigner")
+        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=state_prep_op, encoding="jordan-wigner")
 
     def _qiskit_dense_preparation(
         self, gf2x_operation_results: "GF2XEliminationResult", statevector_data: np.ndarray, num_qubits: int
@@ -415,25 +405,17 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             raise ValueError("Bitstring must contain only '0' and '1' characters")
 
         bitstring_array = [int(bit) for bit in bitstring]
-        n_qubits = len(bitstring_array)
-        params = {"bitStrings": bitstring_array[::-1]}  # Reverse for Q# convention
-
-        qsharp_circuit = qsharp.circuit(
-            QSHARP_UTILS.StatePreparation.MakeSingleReferenceStateCircuit,
-            params,
-            n_qubits,
-            prune_classical_qubits=self._settings.get("prune_classical_qubits"),
+        num_qubits = len(bitstring_array)
+        params = QSHARP_UTILS.StatePreparation.SingleReferenceParams(
+            bitStrings=bitstring_array[::-1], numQubits=num_qubits
         )
-        qir = qsharp.compile(
-            QSHARP_UTILS.StatePreparation.MakeSingleReferenceStateCircuit,
-            params,
-            n_qubits,
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeSingleReferenceStateCircuit, parameter=vars(params)
         )
         qsharp_op = QSHARP_UTILS.StatePreparation.MakePrepareSingleReferenceStateOp(params)
 
         return Circuit(
-            qsharp=qsharp_circuit,
-            qir=qir,
+            qsharp_factory=qsharp_factory,
             qsharp_op=qsharp_op,
             encoding="jordan-wigner",
         )
