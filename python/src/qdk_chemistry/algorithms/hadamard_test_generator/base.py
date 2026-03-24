@@ -1,12 +1,9 @@
 """QDK/Chemistry Hadamard test circuit generator abstractions and utilities."""
 
-from __future__ import annotations
-
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-
 from abc import abstractmethod
 from enum import Enum
 from typing import Any
@@ -15,11 +12,12 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit
 
 __all__: list[str] = [
-    "HadamardTestBasis",
-    "basis_to_qsharp_pauli",
     "HadamardTest",
+    "HadamardTestBasis",
     "HadamardTestFactory",
+    "basis_to_qsharp_pauli",
 ]
+
 
 class HadamardTestBasis(Enum):
     """Measurement bases supported by the Hadamard test control qubit."""
@@ -28,13 +26,14 @@ class HadamardTestBasis(Enum):
     Y = "Y"
 
     def __str__(self) -> str:
+        """Return the string label ("X" or "Y") for this basis."""
         return str(self.value)
 
 
 def basis_to_qsharp_pauli(basis: HadamardTestBasis) -> Any:
     """Map a ``HadamardTestBasis`` to ``qsharp.Pauli`` for Q# interop."""
     try:
-        from qdk import qsharp as _qsharp
+        from qdk import qsharp as _qsharp  # noqa: PLC0415
     except ModuleNotFoundError as err:
         raise ModuleNotFoundError(
             "qdk.qsharp is required to convert Hadamard test bases into qsharp.Pauli values."
