@@ -147,6 +147,11 @@ The PPP model extends the Hubbard model with long-range intersite Coulomb intera
 where :math:`V_{ij}` is the intersite Coulomb repulsion and :math:`z_i` are effective core charges.
 The intersite potential :math:`V_{ij}` is typically computed using the Ohno or Mataga-Nishimoto parametrizations (see `Intersite potentials`_ below).
 
+.. note::
+
+   The stored two-body integrals do **not** include the :math:`\frac{1}{2}` prefactor.
+   This follows the standard quantum chemistry convention where the factor is applied at contraction time rather than stored in the integrals.
+
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/model_hamiltonians.cpp

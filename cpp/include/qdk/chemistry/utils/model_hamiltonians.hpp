@@ -249,6 +249,10 @@ _build_hubbard_integrals(const qdk::chemistry::data::LatticeGraph& lattice,
  * @param U_in  On-site Coulomb repulsion. Scalar or VectorXd of size n.
  * @param V_in  Intersite Coulomb interaction matrix. Scalar or n x n MatrixXd.
  * @param z_in  Effective core charges. Scalar or VectorXd of size n.
+ *
+ * @note The 1/2 prefactor from the PPP formula is **not** included in the
+ * stored two-body integrals.
+ *
  * @return Tuple of (sparse one-body matrix, two-body map, energy offset).
  * @throws std::invalid_argument if V or z dimensions mismatch.
  */
@@ -290,7 +294,7 @@ _build_ppp_integrals(const qdk::chemistry::data::LatticeGraph& lattice,
   for (int i = 0; i < n; i++) {
     for (int j = 0; j < n; j++) {
       if (i == j) continue;
-      double V_ij = 0.5 * V(i, j);
+      double V_ij = V(i, j);
       if (V_ij == 0.0) continue;
 
       // two-body: (ii|jj) = V_ij for both orderings

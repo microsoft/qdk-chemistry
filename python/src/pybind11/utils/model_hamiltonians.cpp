@@ -182,6 +182,8 @@ Create a Pariser-Parr-Pople (PPP) model Hamiltonian.
 Extends the Hubbard model with long-range intersite Coulomb interactions
 ``H = H_hubbard + 1/2 sum_{i!=j} V_ij (n_i - z_i)(n_j - z_j)``.
 
+Note: The stored two-body integrals do not include the 1/2 prefactor.
+
 Args:
     lattice (LatticeGraph): Symmetric lattice graph defining connectivity.
     epsilon (float or numpy.ndarray): On-site orbital energy/energies.
