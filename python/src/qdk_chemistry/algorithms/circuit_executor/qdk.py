@@ -6,6 +6,7 @@ data classes and returns measurement bitstring results via CircuitExecutorData.
 
 Supported QDK backends include:
     * QDK Full State Simulator
+    * QDK Sparse State Simulator
 """
 
 # --------------------------------------------------------------------------------------------
@@ -107,7 +108,7 @@ class QdkSparseStateSimulatorSettings(Settings):
         """Initialize QDK Sparse State Simulator settings."""
         Logger.trace_entering()
         super().__init__()
-        self._set_default("qubit_loss", "double", 0.0, "Qubit loss rate for sparse state simulation")
+        self._set_default("qubit_loss", "double", -1.0, "Qubit loss rate for sparse state simulation")
         self._set_default("seed", "int", 42, "Random seed for simulation reproducibility")
         self._set_default(
             "noise_type",
@@ -159,7 +160,7 @@ class QdkSparseStateSimulator(CircuitExecutor):
 
         """
         Logger.trace_entering()
-        qasm = circuit.get_qasm()
+
         if noise is not None:
             raise NotImplementedError(
                 "Gate specific noise is not yet supported for the QDK Sparse State Simulator. "
@@ -176,20 +177,36 @@ class QdkSparseStateSimulator(CircuitExecutor):
             noise_model = _QSHARP_SPARSE_STATE_NOISE_MAPPING[noise_type](*noise_rate)
         else:
             noise_model = None
-
-        raw_results = sparse_state_run_qasm(
-            qasm,
-            shots=shots,
-            noise=noise_model,
-            as_bitstring=True,
-            seed=self._settings.get("seed"),
-            qubit_loss=self._settings.get("qubit_loss"),
-        )
-        Logger.debug(f"Measurement results obtained: {raw_results}")
-        # Reverse the order of bits in each measurement result to match Little Endian convention
-        bitstring_count = {bitstring[::-1]: count for bitstring, count in Counter(raw_results).items()}
+        qubit_loss = self._settings.get("qubit_loss")
+        qubit_loss_rate = qubit_loss if qubit_loss >= 0.0 else None
+        if circuit._qsharp_factory is not None:  # noqa: SLF001
+            raw_results = qsharp.run(
+                circuit._qsharp_factory.program,  # noqa: SLF001
+                shots,
+                *circuit._qsharp_factory.parameter.values(),  # noqa: SLF001
+                noise=noise_model,
+                qubit_loss=qubit_loss_rate,
+            )
+            Logger.debug(f"Measurement results obtained: {raw_results}")
+            bitstrings = [
+                "".join("0" if str(x) == "Zero" else "1" for x in reversed(one_run)) for one_run in raw_results
+            ]
+            bitstring_counts = dict(Counter(bitstrings))
+        else:
+            qasm = circuit.get_qasm()
+            raw_results = sparse_state_run_qasm(
+                qasm,
+                shots=shots,
+                noise=noise_model,
+                as_bitstring=True,
+                seed=self._settings.get("seed"),
+                qubit_loss=qubit_loss_rate,
+            )
+            Logger.debug(f"Measurement results obtained: {raw_results}")
+            # Reverse the order of bits in each measurement result to match Little Endian convention
+            bitstring_counts = {bitstring[::-1]: count for bitstring, count in Counter(raw_results).items()}
         return CircuitExecutorData(
-            bitstring_counts=bitstring_count,
+            bitstring_counts=bitstring_counts,
             total_shots=shots,
             executor=self.name(),
             executor_metadata=raw_results,
