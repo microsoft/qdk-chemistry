@@ -165,7 +165,7 @@ markers = [
 ]
 testpaths = ["tests"]
 env = [
-  "QSHARP_PYTHON_TELEMETRY=none"
+  "QSHARP_PYTHON_TELEMETRY=false"
 ]
 
 [tool.ruff]
