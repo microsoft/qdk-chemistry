@@ -46,14 +46,12 @@ class QdkFullStateSimulator(CircuitExecutor):
         self,
         simulator_type: Literal["cpu", "gpu", "clifford"] = "cpu",
         seed: int = 42,
-        skip_qir_order_check: bool = False,
     ) -> None:
         """Initialize the QDK Full State Simulator circuit executor.
 
         Args:
             simulator_type: The type of simulator to use.
             seed: The random seed for simulation reproducibility.
-            skip_qir_order_check: Whether to skip check of QIR to determine bitstring order.
 
         """
         Logger.trace_entering()
@@ -61,7 +59,6 @@ class QdkFullStateSimulator(CircuitExecutor):
         self._settings = QdkFullStateSimulatorSettings()
         self._settings.set("type", simulator_type)
         self._settings.set("seed", seed)
-        self._settings.set("skip_qir_order_check", skip_qir_order_check)
 
     def _run_impl(
         self,

@@ -62,10 +62,9 @@ class TestQdkFullStateCircuitExecutor:
 
     def test_initialization_with_params(self):
         """Test initialization with custom parameters."""
-        executor = QdkFullStateSimulator(simulator_type="clifford", seed=123, skip_qir_order_check=True)
+        executor = QdkFullStateSimulator(simulator_type="clifford", seed=123)
         assert executor.settings().get("seed") == 123
         assert executor.settings().get("type") == "clifford"
-        assert executor.settings().get("skip_qir_order_check") is True
 
     def test_executor_name(self):
         """Test executor name."""
@@ -95,37 +94,6 @@ class TestQdkFullStateCircuitExecutor:
         assert len(raw_data) == 10
         for outcome in raw_data:
             assert "Zero, One" in str(outcome)
-
-    def test_skip_qir_order_check(self, test_data_files_path):
-        """Test execution with skip_qir_order_check enabled."""
-        executor_no_check = QdkFullStateSimulator(skip_qir_order_check=True)
-        executor_check = QdkFullStateSimulator(skip_qir_order_check=False)
-
-        with open(test_data_files_path / "test_circuit_qir.ll") as f:
-            qir_result_order_one_zero = f.read()
-        test_circuit = Circuit(qir=qir_result_order_one_zero)
-
-        assert executor_no_check.settings().get("skip_qir_order_check") is True
-        assert executor_check.settings().get("skip_qir_order_check") is False
-
-        result_no_check = executor_no_check.run(test_circuit, shots=10)
-        counts_no_check = result_no_check.bitstring_counts
-        raw_data_no_check = result_no_check.get_executor_metadata()
-
-        result_check = executor_check.run(test_circuit, shots=10)
-        counts_check = result_check.bitstring_counts
-        raw_data_check = result_check.get_executor_metadata()
-
-        # With skip_qir_order_check, the record order is [Result1, Result0] -> [Qubit1, Qubit0] -> [Zero, One].
-        # Bitstring reports to reverse the order of bits for little-endian as "10".
-        for outcome in raw_data_no_check:
-            assert "Zero, One" in str(outcome)
-        assert counts_no_check.get("10", 0) == 10
-
-        # With check, the record order in qir will be checked before reporting it in little-endian bitstring.
-        for outcome in raw_data_check:
-            assert "Zero, One" in str(outcome)
-        assert counts_check.get("01", 0) == 10  # "10" in qubit order is "01" in bitstring order
 
     def test_noise_with_depolarizing_error(self, test_circuit_1, simple_error_profile):
         """Test execution with a depolarizing noise model."""
