@@ -5,14 +5,13 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk import qsharp
-
 from qdk_chemistry.algorithms.hadamard_test_generator.base import (
     HadamardTest,
     HadamardTestBasis,
     basis_to_qsharp_pauli,
 )
 from qdk_chemistry.data import Circuit
+from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -50,8 +49,11 @@ class QdkHadamardTest(HadamardTest):
             Circuit containing compiled and rendered Q# Hadamard test artifacts.
 
         """
+
         if not isinstance(test_basis, HadamardTestBasis):
             raise TypeError("test_basis must be an instance of HadamardTestBasis.")
+
+        Logger.debug(f"Building qsharp circuit for measurement on {test_basis.value} basis.")
 
         qsharp_basis = basis_to_qsharp_pauli(test_basis)
 
@@ -63,26 +65,20 @@ class QdkHadamardTest(HadamardTest):
         if ctrl_evol_op is None:
             raise ValueError("Input ctrl_time_evol_unitary_circuit cannot be used for QdkHadamardTest.")
 
-        systems = list(range(1, num_system_qubits + 1))
-        hadamard_test_qsc = qsharp.circuit(
-            QSHARP_UTILS.HadamardTest.HadamardTest,
-            state_prep_op,
-            ctrl_evol_op,
-            qsharp_basis,
-            0,
-            systems,
-        )
-        hadamard_test_qir = qsharp.compile(
-            QSHARP_UTILS.HadamardTest.HadamardTest,
-            state_prep_op,
-            ctrl_evol_op,
-            qsharp_basis,
-            0,
-            systems,
-        )
+        hadamard_parameters = {
+            "statePrep": state_prep_op,
+            "repControlledEvolution": ctrl_evol_op,
+            "testBasis": qsharp_basis,
+            "control": 0,
+            "systems": [i + 1 for i in range(num_system_qubits)],
+        }
 
-        Logger.debug(f"Completed qsharp circuit for measurement on {test_basis.value} basis.")
-        return Circuit(qsharp=hadamard_test_qsc, qir=hadamard_test_qir)
+        return Circuit(
+            qsharp_factory=QsharpFactoryData(
+                program=QSHARP_UTILS.HadamardTest.HadamardTest,
+                parameter=hadamard_parameters,
+            )
+        )
 
     def name(self) -> str:
         """Return the name of the QdkHadamardTest algorithm."""
