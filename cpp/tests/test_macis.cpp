@@ -12,11 +12,15 @@
 #include <qdk/chemistry/data/configuration.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
+#include <string>
 
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
+using qdk::chemistry::utils::Logger;
+using qdk::chemistry::utils::LogLevel;
 
 namespace macis_params {  // namespace for MACIS specific test parameters
 ///@brief # Davidson iterations
@@ -177,6 +181,57 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
   // Energy should be reasonable (above HF but below exact)
   EXPECT_NEAR(energy, -75.945264376786554,
               macis_params::energy_tol);  // Should be negative for bound system
+}
+
+TEST_F(MacisAsciTest, StandaloneMacisLoggersFlushAtTraceWhenTraceEnabled) {
+  auto previous_level = Logger::get_global_level();
+
+  struct LoggerLevelGuard {
+    LogLevel previous_level;
+
+    ~LoggerLevelGuard() { Logger::set_global_level(previous_level); }
+  } logger_level_guard{previous_level};
+
+  Logger::set_global_level(LogLevel::trace);
+
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+  ASSERT_NE(calculator, nullptr);
+
+  auto& settings = calculator->settings();
+  settings.set("ntdets_max", macis_params::ntdets_max_large);
+  settings.set("ntdets_min", macis_params::ntdets_min);
+  settings.set("grow_factor", macis_params::grow_factor);
+  settings.set("max_refine_iter", static_cast<size_t>(1));
+  settings.set("core_selection_strategy", "fixed");
+
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+
+  // One refinement iteration is enough to instantiate the standalone refine
+  // logger, but convergence is not guaranteed for this numerical setup.
+  try {
+    auto [energy, wavefunction_ptr] = calculator->run(hamiltonian, 3, 3);
+
+    EXPECT_TRUE(std::isfinite(energy));
+    ASSERT_NE(wavefunction_ptr, nullptr);
+  } catch (const std::runtime_error& error) {
+    EXPECT_NE(std::string(error.what()).find("did not converge"),
+              std::string::npos);
+  }
+
+  auto grow_logger = spdlog::get("asci_grow");
+  ASSERT_NE(grow_logger, nullptr);
+  EXPECT_EQ(grow_logger->level(), spdlog::level::trace);
+  EXPECT_EQ(grow_logger->flush_level(), spdlog::level::trace);
+
+  auto search_logger = spdlog::get("asci_search");
+  ASSERT_NE(search_logger, nullptr);
+  EXPECT_EQ(search_logger->level(), spdlog::level::trace);
+  EXPECT_EQ(search_logger->flush_level(), spdlog::level::trace);
+
+  auto refine_logger = spdlog::get("asci_refine");
+  ASSERT_NE(refine_logger, nullptr);
+  EXPECT_EQ(refine_logger->level(), spdlog::level::trace);
+  EXPECT_EQ(refine_logger->flush_level(), spdlog::level::trace);
 }
 
 // Test percentage-based core selection strategy
