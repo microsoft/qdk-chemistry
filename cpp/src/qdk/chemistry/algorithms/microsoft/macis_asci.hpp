@@ -139,6 +139,13 @@ class MacisAsciSettings : public MultiConfigurationSettings {
     set_default<double>(
         "taper_grow_factor", macis_defaults.taper_grow_factor,
         "Growth factor for final expansion near ntdets_max (0 = disabled)");
+
+    // Hamiltonian build algorithm selection
+    set_default<std::string>(
+        "h_build_algo", macis_defaults.h_build_algo,
+        "Algorithm for diagonal Hamiltonian construction: "
+        "'' or 'sorted_double_loop' (default), "
+        "'residue_arrays', 'dynamic_bit_masking'");
   }
 
   /**

@@ -95,6 +95,14 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
                     double);
   SET_MACIS_SETTING(settings_, asci_settings, taper_grow_factor, double);
 
+  // h_build_algo is stored as a string; it may not be present in all
+  // Settings objects, so silently fall back to the default (empty string).
+  try {
+    asci_settings.h_build_algo = settings_.get<std::string>("h_build_algo");
+  } catch (...) {
+    // leave empty — default sorted_double_loop
+  }
+
   // Validate grow_factor and related parameters
   if (asci_settings.grow_factor <= 1.0) {
     throw std::runtime_error("grow_factor must be > 1.0, got " +

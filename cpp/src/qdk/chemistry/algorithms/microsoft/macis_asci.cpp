@@ -8,6 +8,8 @@
 #include <macis/asci/grow.hpp>
 #include <macis/asci/refine.hpp>
 #include <macis/hamiltonian_generator/sorted_double_loop.hpp>
+#include <macis/hamiltonian_generator/residue_arrays.hpp>
+#include <macis/hamiltonian_generator/dynamic_bit_masking.hpp>
 #include <macis/mcscf/cas.hpp>
 #include <macis/util/mpi.hpp>
 #include <qdk/chemistry/data/structure.hpp>
@@ -41,7 +43,9 @@ struct asci_helper {
     QDK_LOG_TRACE_ENTERING();
 
     using wfn_type = macis::wfn_t<N>;
-    using generator_t = macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>;
+    using sdl_gen_t = macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>;
+    using ra_gen_t = macis::ResidueArrayHamiltonianGenerator<wfn_type>;
+    using dbm_gen_t = macis::DynamicBitMaskHamiltonianGenerator<wfn_type>;
 
     auto orbitals = hamiltonian.get_orbitals();
     const auto& [active_indices, active_indices_beta] =
@@ -62,17 +66,33 @@ struct asci_helper {
     macis::MCSCFSettings mcscf_settings = get_mcscf_settings_(settings_);
     macis::ASCISettings asci_settings = get_asci_settings_(settings_);
 
+    macis::matrix_span<double> T_span(
+        const_cast<double*>(T_a.data()),
+        num_molecular_orbitals, num_molecular_orbitals);
+    macis::rank4_span<double> V_span(
+        const_cast<double*>(V_aaaa.data()),
+        num_molecular_orbitals, num_molecular_orbitals,
+        num_molecular_orbitals, num_molecular_orbitals);
+
+    // Select Hamiltonian generator based on h_build_algo
+    std::unique_ptr<macis::HamiltonianGenerator<wfn_type>> ham_gen_ptr;
+    const auto& algo = asci_settings.h_build_algo;
+    if (algo == "residue_arrays") {
+      ham_gen_ptr = std::make_unique<ra_gen_t>(T_span, V_span);
+    } else if (algo == "dynamic_bit_masking") {
+      ham_gen_ptr = std::make_unique<dbm_gen_t>(T_span, V_span);
+    } else if (algo == "dynamic_bit_masking_8") {
+      auto p = std::make_unique<dbm_gen_t>(T_span, V_span);
+      p->set_num_masks(8);
+      ham_gen_ptr = std::move(p);
+    } else {
+      ham_gen_ptr = std::make_unique<sdl_gen_t>(T_span, V_span);
+    }
+    auto& ham_gen = *ham_gen_ptr;
+
     std::vector<double> C_casci;
     std::vector<wfn_type> dets;
     double E_casci = 0.0;
-
-    generator_t ham_gen(macis::matrix_span<double>(
-                            const_cast<double*>(T_a.data()),
-                            num_molecular_orbitals, num_molecular_orbitals),
-                        macis::rank4_span<double>(
-                            const_cast<double*>(V_aaaa.data()),
-                            num_molecular_orbitals, num_molecular_orbitals,
-                            num_molecular_orbitals, num_molecular_orbitals));
 
     size_t fci_dimension =
         qdk::chemistry::utils::microsoft::binomial_coefficient(
@@ -84,12 +104,12 @@ struct asci_helper {
       QDK_LOGGER().info(
           "Requested number of determinants ({}) exceeds FCI dimension ({}).",
           asci_settings.ntdets_max, fci_dimension);
-      E_casci = macis::CASRDMFunctor<generator_t>::rdms(
+      E_casci = macis::CASRDMFunctor<sdl_gen_t>::rdms(
           mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
           nbeta, const_cast<double*>(T_a.data()),
           const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
       // Generate determinant basis for RDM calculation
-      dets = macis::generate_hilbert_space<typename generator_t::full_det_t>(
+      dets = macis::generate_hilbert_space<typename sdl_gen_t::full_det_t>(
           num_molecular_orbitals, nalpha, nbeta);
     } else {
       // HF Guess

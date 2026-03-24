@@ -185,6 +185,12 @@ struct ASCISettings {
   int pt2_min_constraint_level = 0;
   /// @brief Force constraint refinement for PT2 calculations
   int64_t pt2_constraint_refine_force = 0;
+
+  /// @brief Hamiltonian build algorithm for diagonal blocks.
+  /// "" or "sorted_double_loop" = default alpha-sorted double loop;
+  /// "residue_arrays" = Algorithm 5 from Tubman et al. (arXiv:1807.00821);
+  /// "dynamic_bit_masking" = Algorithm 6 from Tubman et al.
+  std::string h_build_algo;
 };
 
 /**
