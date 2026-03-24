@@ -247,12 +247,6 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   }
 #endif
 
-  // Save the current global level before disabling SCF logging
-  auto saved_level = Logger::get_global_level();
-
-  // Disable SCF logging
-  Logger::set_global_level(LogLevel::off);
-
   // Create SCF solver based on method and basis set type
   std::shared_ptr<qcs::SCF> scf;
   if (method == "hf") {
@@ -488,9 +482,6 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
   // Return total energy
   double total_energy = context.result.scf_total_energy;
-
-  // Restore the original global logging level
-  Logger::set_global_level(saved_level);
 
   return std::make_pair(total_energy, std::make_shared<data::Wavefunction>(
                                           std::move(wavefunction)));

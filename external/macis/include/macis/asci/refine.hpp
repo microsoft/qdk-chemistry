@@ -51,9 +51,11 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 #else
   int world_rank = 0;
 #endif /* MACIS_ENABLE_MPI */
-  if (!logger)
+  if (!logger) {
     logger = world_rank ? spdlog::null_logger_mt("asci_refine")
                         : spdlog::stdout_color_mt("asci_refine");
+    logger->flush_on(logger->level());
+  }
 
   logger->info("[ASCI Refine Settings]:");
   logger->info(
