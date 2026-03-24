@@ -90,7 +90,7 @@ class TestRegistryShowDefault:
         # Test for circuit executor
         default_circuit_executor = registry.show_default("circuit_executor")
         assert isinstance(default_circuit_executor, str)
-        assert default_circuit_executor == "qdk_full_state_simulator"
+        assert default_circuit_executor == "qdk_sparse_state_simulator"
 
         # Test for energy estimator
         default_energy_estimator = registry.show_default("energy_estimator")

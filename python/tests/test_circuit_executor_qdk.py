@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.circuit_executor.qdk import (
@@ -12,6 +13,8 @@ from qdk_chemistry.algorithms.circuit_executor.qdk import (
     QdkSparseStateSimulator,
 )
 from qdk_chemistry.data import Circuit, QuantumErrorProfile
+
+from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 
 @pytest.fixture
@@ -133,8 +136,19 @@ class TestQdkSparseStateCircuitExecutor:
         executor = QdkSparseStateSimulator()
         assert executor.settings().get("seed") == 42
         assert executor.settings().get("noise_type") == "none"
-        assert executor.settings().get("noise_rate") == [0.0]
-        assert executor.settings().get("qubit_loss") == 0.0
+        assert len(executor.settings().get("noise_rate")) == 1
+        assert np.isclose(
+            executor.settings().get("noise_rate")[0],
+            0.0,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            executor.settings().get("qubit_loss"),
+            -1.0,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
 
     def test_executor_name(self):
         """Test executor name."""
