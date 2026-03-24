@@ -19,6 +19,7 @@ from typing import Any
 import h5py
 import qsharp._native
 import qsharp.openqasm
+from qsharp.openqasm import OutputSemantics
 
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
@@ -121,7 +122,7 @@ class Circuit(DataClass):
                 Logger.warn("Both QIR and QASM representations are available. Return QIR.")
             return self.qir
         if self.qasm:
-            return qsharp.openqasm.compile(self.qasm)
+            return qsharp.openqasm.compile(self.qasm, output_semantics=OutputSemantics.OpenQasm)
 
         raise RuntimeError("The QIR representation of the quantum circuit is not set.")
 

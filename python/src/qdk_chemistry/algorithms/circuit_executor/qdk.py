@@ -22,7 +22,6 @@ from qsharp.openqasm import run as sparse_state_run_qasm
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import Circuit, CircuitExecutorData, QuantumErrorProfile, Settings
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.qir import get_qir_result_qubit_order
 
 __all__: list[str] = ["QdkFullStateSimulator", "QdkFullStateSimulatorSettings"]
 
@@ -38,12 +37,6 @@ class QdkFullStateSimulatorSettings(Settings):
             "type", "string", "cpu", "Type of simulator to use: 'cpu', 'gpu', or 'clifford'", ["cpu", "gpu", "clifford"]
         )
         self._set_default("seed", "int", 42, "Random seed for simulation reproducibility")
-        self._set_default(
-            "skip_qir_order_check",
-            "bool",
-            False,
-            "Whether to skip check of QIR to determine bitstring order (default: False)",
-        )
 
 
 class QdkFullStateSimulator(CircuitExecutor):
@@ -96,16 +89,7 @@ class QdkFullStateSimulator(CircuitExecutor):
         )
         Logger.debug(f"Measurement results obtained: {raw_results}")
         # Reorder bits in each measurement result to match Little Endian convention
-        if not self._settings.get("skip_qir_order_check"):
-            qubit_order = get_qir_result_qubit_order(str(qir))
-            # Permutation that sorts qubit_order descending
-            perm = sorted(range(len(qubit_order)), key=lambda i: qubit_order[i], reverse=True)
-            bitstrings = ["".join("0" if str(one_run[i]) == "Zero" else "1" for i in perm) for one_run in raw_results]
-        else:
-            # Skip the check and assume the record order in qir matches the order of qubits
-            bitstrings = [
-                "".join("0" if str(x) == "Zero" else "1" for x in reversed(one_run)) for one_run in raw_results
-            ]
+        bitstrings = ["".join("0" if str(x) == "Zero" else "1" for x in reversed(one_run)) for one_run in raw_results]
         counts = dict(Counter(bitstrings))
         return CircuitExecutorData(
             bitstring_counts=counts,
