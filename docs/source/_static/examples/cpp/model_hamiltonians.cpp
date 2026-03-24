@@ -105,7 +105,7 @@ int main() {
   auto solve_lattice = LatticeGraph::chain(4);
   auto solve_hamiltonian = std::make_shared<Hamiltonian>(
       create_hubbard_hamiltonian(solve_lattice,
-          /*epsilon=*/0.0, /*t=*/1.0, /*U=*/4.0));
+                                 /*epsilon=*/0.0, /*t=*/1.0, /*U=*/4.0));
 
   // Run exact diagonalization (CASCI) with half filling (2 alpha + 2 beta)
   auto mc_calculator =
