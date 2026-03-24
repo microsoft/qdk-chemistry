@@ -14,8 +14,6 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk import qsharp
-
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
@@ -26,6 +24,7 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitHamiltonian,
 )
+from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.phase import iterative_phase_feedback_update, phase_fraction_from_feedback
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -219,24 +218,19 @@ class IterativePhaseEstimation(PhaseEstimation):
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_evol_op = controlled_evolution._qsharp_op  # noqa: SLF001
-        iqpe_iter_qsc = qsharp.circuit(
-            QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
-            state_prep_op,
-            ctrl_evol_op,
-            phase_correction,
-            0,
-            [1 + i for i in range(num_system_qubits)],  # target qubits
+        iterative_parameters = {
+            "statePrep": state_prep_op,
+            "repControlledEvolution": ctrl_evol_op,
+            "accumulatePhase": phase_correction,
+            "control": 0,
+            "systems": [i + 1 for i in range(num_system_qubits)],
+        }
+        return Circuit(
+            qsharp_factory=QsharpFactoryData(
+                program=QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
+                parameter=iterative_parameters,
+            )
         )
-        iqpe_iter_qir = qsharp.compile(
-            QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
-            state_prep_op,
-            ctrl_evol_op,
-            phase_correction,
-            0,
-            [1 + i for i in range(num_system_qubits)],  # target qubits
-        )
-
-        return Circuit(qsharp=iqpe_iter_qsc, qir=iqpe_iter_qir)
 
     def _create_circuit_from_qiskit(
         self, state_preparation: Circuit, controlled_evolution: Circuit, phase_correction: float
