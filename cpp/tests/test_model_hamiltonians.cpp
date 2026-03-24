@@ -134,7 +134,7 @@ TEST_F(ModelHamiltonianTest, HubbardChain) {
 
 TEST_F(ModelHamiltonianTest, PPPChainPotentialAndChargeOnly) {
   const int n = 4;
-  double V = 2.0;
+  double V = 1.0;
   double z = 1.0;
   auto lattice = LatticeGraph::chain(n);
   Eigen::MatrixXd h1_expected = Eigen::MatrixXd::Zero(n, n);
@@ -144,7 +144,7 @@ TEST_F(ModelHamiltonianTest, PPPChainPotentialAndChargeOnly) {
   for (int i = 0; i < n; i++) {
     for (int j = 0; j < n; j++) {
       if (i == j) continue;
-      h2_expected[i * n * n * n + i * n * n + j * n + j] = 0.5 * V;
+      h2_expected[i * n * n * n + i * n * n + j * n + j] = V;
     }
   }
 
@@ -174,7 +174,7 @@ TEST_F(ModelHamiltonianTest, PPPChainPotentialAndChargeOnly) {
               testing::numerical_zero_tolerance);
 
   // change V and z and verify different integrals
-  V_mat(0, 1) = V_mat(1, 0) = 4.0;
+  V_mat(0, 1) = V_mat(1, 0) = 2.0;
   z_vec(0) = 2.0;
   auto [h1_mod, h2_mod, offset_mod] =
       model_hamiltonians::detail::_build_ppp_integrals(lattice, 0.0, 0.0, 0.0,
@@ -283,7 +283,7 @@ TEST_F(ModelHamiltonianTest, CreateHubbardHamiltonian) {
 TEST_F(ModelHamiltonianTest, CreatePPPHamiltonian) {
   const int n = 4;
   auto lattice = LatticeGraph::chain(n);
-  double V = 2.0, z = 1.0;
+  double V = 1.0, z = 1.0;
 
   auto ham =
       model_hamiltonians::create_ppp_hamiltonian(lattice, 0.0, 0.0, 0.0, V, z);
