@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms.hadamard_test_generator.base import HadamardTestBasis
 from qdk_chemistry.algorithms.hadamard_test_generator.hadamard_test_generator import (
     QdkHadamardTest,
     QiskitHadamardTest,
@@ -47,12 +48,12 @@ def _measure_observable(
     num_system_qubits: int,
     ctrl_time_evolution_circuit: Circuit,
     generator: QiskitHadamardTest | QdkHadamardTest,
-    test_basis: str = "X",
+    test_basis: HadamardTestBasis = HadamardTestBasis.X,
     shots: int = _SHOTS,
 ) -> float:
     """Measure the Hadamard-test expectation value for the given basis.
 
-    For ``test_basis="X"``, this equals ``Re(<psi|U|psi>)``; for ``test_basis="Y"``,
+    For ``test_basis=HadamardTestBasis.X``, this equals ``Re(<psi|U|psi>)``; for ``test_basis=HadamardTestBasis.Y``,
     it corresponds (up to a sign convention) to ``Im(<psi|U|psi>)``.
     """
     circuit = generator.run(
@@ -163,7 +164,7 @@ def test_qiskit_hadamard_generator_measures_water_observable_in_y_basis(
         num_system_qubits=water_hadamard_benchmark.num_system_qubits,
         ctrl_time_evolution_circuit=water_hadamard_benchmark.ctrl_time_evolution_circuit,
         generator=QiskitHadamardTest(),
-        test_basis="Y",
+        test_basis=HadamardTestBasis.Y,
     )
 
     assert np.isclose(observable_value, 0.98, atol=1e-12)
@@ -179,7 +180,7 @@ def test_qdk_hadamard_test_measures_water_observable_in_y_basis(
         num_system_qubits=water_hadamard_benchmark.num_system_qubits,
         ctrl_time_evolution_circuit=water_hadamard_benchmark.ctrl_time_evolution_circuit,
         generator=QdkHadamardTest(),
-        test_basis="Y",
+        test_basis=HadamardTestBasis.Y,
     )
 
     assert np.isclose(observable_value, 0.98, atol=1e-12)
@@ -192,7 +193,7 @@ def test_qiskit_hadamard_generator_rejects_invalid_test_basis() -> None:
     ctrl_evol_qc = QuantumCircuit(2, name="ctrl")
     ctrl_evol_qc.cx(0, 1)
 
-    with pytest.raises(ValueError, match="test_basis"):
+    with pytest.raises(TypeError, match="HadamardTestBasis"):
         QiskitHadamardTest().run(
             Circuit(qasm=qasm3.dumps(state_prep_qc)),
             1,
@@ -204,7 +205,7 @@ def test_qiskit_hadamard_generator_rejects_invalid_test_basis() -> None:
 @pytest.mark.skipif(not _HAS_QSHARP, reason="Q# not available")
 def test_qdk_hadamard_test_rejects_invalid_test_basis() -> None:
     """Q# generator rejects unsupported Hadamard measurement bases."""
-    with pytest.raises(ValueError, match="test_basis"):
+    with pytest.raises(TypeError, match="HadamardTestBasis"):
         QdkHadamardTest().run(  # type: ignore[arg-type]
             object(),
             1,
@@ -223,7 +224,7 @@ def test_qiskit_hadamard_generator_rejects_incompatible_input_circuits() -> None
             object(),
             1,
             Circuit(qasm=qasm3.dumps(QuantumCircuit(2))),
-            test_basis="X",
+            test_basis=HadamardTestBasis.X,
         )
 
     with pytest.raises(ValueError, match="ctrl_time_evol_unitary_circuit"):
@@ -231,7 +232,7 @@ def test_qiskit_hadamard_generator_rejects_incompatible_input_circuits() -> None
             Circuit(qasm=qasm3.dumps(QuantumCircuit(1))),
             1,
             object(),
-            test_basis="X",
+            test_basis=HadamardTestBasis.X,
         )
 
 
@@ -245,12 +246,17 @@ def test_qdk_hadamard_test_rejects_incompatible_input_circuits(
     bad_ctrl_time_evolution_circuit = Circuit(qasm="bad_state_preparation")
 
     with pytest.raises(ValueError, match="state_preparation"):
-        generator.run(bad_state_preparation_circuit, 1, water_hadamard_benchmark.ctrl_time_evolution_circuit, "X")
+        generator.run(
+            bad_state_preparation_circuit,
+            1,
+            water_hadamard_benchmark.ctrl_time_evolution_circuit,
+            HadamardTestBasis.X,
+        )
 
     with pytest.raises(ValueError, match="ctrl_time_evol_unitary_circuit"):
         generator.run(
             water_hadamard_benchmark.state_preparation,
             water_hadamard_benchmark.num_system_qubits,
             bad_ctrl_time_evolution_circuit,
-            "X",
+            HadamardTestBasis.X,
         )

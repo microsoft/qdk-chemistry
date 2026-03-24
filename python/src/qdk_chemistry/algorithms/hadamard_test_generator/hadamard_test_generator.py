@@ -7,7 +7,11 @@
 
 from qdk import qsharp
 
-from qdk_chemistry.algorithms.hadamard_test_generator.base import HadamardTest
+from qdk_chemistry.algorithms.hadamard_test_generator.base import (
+    HadamardTest,
+    HadamardTestBasis,
+    basis_to_qsharp_pauli,
+)
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -30,7 +34,7 @@ class QdkHadamardTest(HadamardTest):
         state_preparation_circuit: Circuit,
         num_system_qubits: int,
         ctrl_time_evol_unitary_circuit: Circuit,
-        test_basis: str = "X",
+        test_basis: HadamardTestBasis = HadamardTestBasis.X,
     ) -> Circuit:
         r"""Build a Hadamard test circuit using the Q# backend.
 
@@ -40,14 +44,16 @@ class QdkHadamardTest(HadamardTest):
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             num_system_qubits: Number of qubits in the system register.
             ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
-            test_basis: Measurement basis for the control qubit. Supported values are ``"X"`` and ``"Y"``.
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X`` or ``HadamardTestBasis.Y``).
 
         Returns:
             Circuit containing compiled and rendered Q# Hadamard test artifacts.
 
         """
-        if test_basis not in {"X", "Y"}:
-            raise ValueError(f'Invalid value for test_basis: {test_basis!r}. Allowed values are "X" and "Y".')
+        if not isinstance(test_basis, HadamardTestBasis):
+            raise TypeError("test_basis must be an instance of HadamardTestBasis.")
+
+        qsharp_basis = basis_to_qsharp_pauli(test_basis)
 
         state_prep_op = state_preparation_circuit._qsharp_op  # noqa: SLF001
         if state_prep_op is None:
@@ -62,7 +68,7 @@ class QdkHadamardTest(HadamardTest):
             QSHARP_UTILS.HadamardTest.HadamardTest,
             state_prep_op,
             ctrl_evol_op,
-            test_basis,
+            qsharp_basis,
             0,
             systems,
         )
@@ -70,12 +76,12 @@ class QdkHadamardTest(HadamardTest):
             QSHARP_UTILS.HadamardTest.HadamardTest,
             state_prep_op,
             ctrl_evol_op,
-            test_basis,
+            qsharp_basis,
             0,
             systems,
         )
 
-        Logger.debug(f"Completed qsharp circuit for measurement on {test_basis} basis.")
+        Logger.debug(f"Completed qsharp circuit for measurement on {test_basis.value} basis.")
         return Circuit(qsharp=hadamard_test_qsc, qir=hadamard_test_qir)
 
     def name(self) -> str:
@@ -98,7 +104,7 @@ class QiskitHadamardTest(HadamardTest):
         state_preparation_circuit: Circuit,
         num_system_qubits: int,
         ctrl_time_evol_unitary_circuit: Circuit,
-        test_basis: str = "X",
+        test_basis: HadamardTestBasis = HadamardTestBasis.X,
     ) -> Circuit:
         r"""Build a Hadamard test circuit using the Qiskit backend.
 
@@ -108,7 +114,7 @@ class QiskitHadamardTest(HadamardTest):
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             num_system_qubits: Number of qubits in the system register.
             ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
-            test_basis: Measurement basis for the control qubit. Supported values are ``"X"`` and ``"Y"``.
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X`` or ``HadamardTestBasis.Y``).
 
         Returns:
             Circuit containing the OpenQASM3 representation of the Qiskit Hadamard test circuit.
@@ -117,6 +123,8 @@ class QiskitHadamardTest(HadamardTest):
             ModuleNotFoundError: If Qiskit is not installed.
 
         """
+        if not isinstance(test_basis, HadamardTestBasis):
+            raise TypeError("test_basis must be an instance of HadamardTestBasis.")
         try:
             from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3  # noqa: PLC0415
         except ModuleNotFoundError as err:
@@ -150,16 +158,14 @@ class QiskitHadamardTest(HadamardTest):
         circuit.append(ctrl_evol_qc.to_gate(), [control, *target_qubits])
 
         # Final basis rotation and measurement on the control qubit.
-        if test_basis == "X":
+        if test_basis is HadamardTestBasis.X:
             circuit.h(control)
-        elif test_basis == "Y":
+        elif test_basis is HadamardTestBasis.Y:
             circuit.sdg(control)
             circuit.h(control)
-        else:
-            raise ValueError(f'Invalid value for test_basis: {test_basis!r}. Allowed values are "X" and "Y".')
         circuit.measure(control, classical[0])
 
-        Logger.debug(f"Completed qiskit circuit forfor measurement on {test_basis} basis.")
+        Logger.debug(f"Completed qiskit circuit for measurement on {test_basis.value} basis.")
         return Circuit(qasm=qasm3.dumps(circuit))
 
     def name(self) -> str:

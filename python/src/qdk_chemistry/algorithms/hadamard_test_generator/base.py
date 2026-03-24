@@ -1,16 +1,46 @@
 """QDK/Chemistry Hadamard test circuit generator abstractions and utilities."""
 
+from __future__ import annotations
+
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
 from abc import abstractmethod
+from enum import Enum
+from typing import Any
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit
 
-__all__: list[str] = ["HadamardTest", "HadamardTestFactory"]
+__all__: list[str] = [
+    "HadamardTestBasis",
+    "basis_to_qsharp_pauli",
+    "HadamardTest",
+    "HadamardTestFactory",
+]
+
+class HadamardTestBasis(Enum):
+    """Measurement bases supported by the Hadamard test control qubit."""
+
+    X = "X"
+    Y = "Y"
+
+    def __str__(self) -> str:
+        return str(self.value)
+
+
+def basis_to_qsharp_pauli(basis: HadamardTestBasis) -> Any:
+    """Map a ``HadamardTestBasis`` to ``qsharp.Pauli`` for Q# interop."""
+    try:
+        from qdk import qsharp as _qsharp
+    except ModuleNotFoundError as err:
+        raise ModuleNotFoundError(
+            "qdk.qsharp is required to convert Hadamard test bases into qsharp.Pauli values."
+        ) from err
+
+    return getattr(_qsharp.Pauli, basis.value)
 
 
 class HadamardTest(Algorithm):
@@ -30,7 +60,7 @@ class HadamardTest(Algorithm):
         state_preparation_circuit: Circuit,
         num_system_qubits: int,
         ctrl_time_evol_unitary_circuit: Circuit,
-        test_basis: str = "X",
+        test_basis: HadamardTestBasis = HadamardTestBasis.X,
     ) -> Circuit:
         r"""Build the Hadamard test circuit for a given state and controlled unitary.
 
@@ -40,7 +70,7 @@ class HadamardTest(Algorithm):
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             num_system_qubits: Number of qubits in the system register.
             ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
-            test_basis: Measurement basis for the control qubit. Supported values are ``"X"`` and ``"Y"``.
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X`` or ``HadamardTestBasis.Y``).
 
         Returns:
             Circuit representing the Hadamard test workflow for the selected backend.
