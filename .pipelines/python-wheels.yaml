@@ -51,7 +51,7 @@ parameters:
   displayName: Publish to PyPI
 - name: devTag
   type: string
-  default: ''
+  default: 'None'
   displayName: PyPI Development Tag (e.g. 'dev1', 'rc1', etc.)
 
 variables:
@@ -146,7 +146,7 @@ extends:
               --version-file $(System.DefaultWorkingDirectory)/qdk-chemistry/VERSION \
               --dev-tag ${{ parameters.devTag }}
             displayName: Validate/Set Development Version for Wheels
-            condition: and(succeeded(), ne('${{ parameters.devTag }}', ''))
+            condition: and(succeeded(), ne('${{ parameters.devTag }}', 'None'))
 
           # Build - Linux x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
