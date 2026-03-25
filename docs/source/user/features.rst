@@ -32,7 +32,6 @@ Standard QFT-based Quantum Phase Estimation (:term:`QPE`)
    Parallel phase-register measurement via quantum Fourier transform, providing all precision bits simultaneously.
 
 Phase estimation implementations include post-processing with automatic phase wrapping, energy alias detection and resolution, and full serialization of results.
-See :doc:`comprehensive/algorithms/energy_estimator` for further details.
 
 State Preparation
 """""""""""""""""
@@ -97,7 +96,7 @@ This generally involves the following steps:
    The target operator (e.g., the electronic Hamiltonian) is decomposed into a sum of measurable components, often expressed in terms of Pauli operators.
    This decomposition facilitates efficient measurement on quantum hardware.
    Starting from a qubit-mapped Hamiltonian, this task generally involves grouping Pauli terms into sets of mutually commuting operators that can be measured simultaneously.
-   QDK/Chemistry provides utilities to perform Pauli grouping by qubit-wise commutativity through its Qiskit plugin.
+   QDK/Chemistry provides utilities for Pauli grouping by qubit-wise commutativity via the :class:`~qdk_chemistry.data.QubitHamiltonian.group_commuting` method.
 2. **Circuit Execution and Measurement**:
    Given the state preparation circuit and the decomposed operator, quantum circuits are executed on quantum hardware or simulators to obtain measurement outcomes.
 3. **Classical Post-Processing**:
