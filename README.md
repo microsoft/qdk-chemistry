@@ -1,18 +1,17 @@
 # Microsoft Quantum Development Kit for Chemistry (QDK/Chemistry)
 
 QDK/Chemistry is an open-source C++ and Python package within the [Microsoft Quantum Development Kit (QDK)](https://github.com/microsoft/qdk).
-It provides an end-to-end toolkit for quantum chemistry:  from molecular setup and Hamiltonian generation to quantum algorithm execution and results analysis.
-Designed for seamless integration with existing Python and chemistry workflows, QDK Chemistry enables researchers to simulate and run problems on near-term quantum hardware, explore strongly correlated systems, and advance toward practical quantum chemistry applications.
+It provides an end-to-end toolkit for quantum chemistry: from molecular setup and classical electronic structure through quantum algorithm execution and simulation.
+Designed as both a **development platform** and a **composable framework**, QDK/Chemistry enables researchers to assemble modular quantum–classical pipelines, explore strongly correlated systems, and advance toward practical quantum chemistry applications on near-term and fault-tolerant quantum computers.
 
 ## Overview
 
-QDK/Chemistry provides a comprehensive suite of tools for:
+QDK/Chemistry bridges classical computational chemistry with quantum computing by providing every stage of the quantum applications pipeline in a single, modular toolkit:
 
-- Molecular structure representation and manipulation
-- Molecular orbital calculations and analysis
-- Basis set management
-- Configuration and settings management
-- High-performance quantum algorithms
+- **Quantum algorithms** — including phase estimation, state preparation, fermion-to-qubit encoding, Hamiltonian time evolution, and observable estimation, with the building blocks to compose higher-level quantum workflows
+- **Classical electronic structure** — self-consistent field solvers, multi-configuration methods, orbital localization, and automated active space selection that produce the high-quality inputs quantum algorithms require
+- **Composable architecture** — a plugin architecture with a factory/registry pattern that lets users assemble custom pipelines from interchangeable algorithm implementations, mixing native high-performance C++ backends with established community packages
+- **Multiple quantum backends** — execute circuits on a variety of simulators through a unified interface that decouples algorithm development from backend selection
 
 ## Documentation
 

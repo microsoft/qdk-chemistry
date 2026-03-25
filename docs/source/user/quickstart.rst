@@ -1,8 +1,10 @@
 Quickstart
 ==========
 
-These quickstart instructions provide a high-level overview of the typical workflow when using the QDK/Chemistry library.
-More comprehensive documentation can be found in the :doc:`comprehensive/index`. A list of features can be found in the :doc:`features` document.
+This quickstart walks through a complete quantum chemistry workflow: starting from a molecular structure and ending with an energy estimate obtained via quantum circuit simulation.
+Each step in the pipeline — SCF calculation, active space selection, Hamiltonian construction, qubit mapping, state preparation, and energy estimation — uses QDK/Chemistry's modular architecture, meaning any component can be swapped for an alternative implementation without changing the rest of the workflow.
+
+More detailed documentation can be found in the :doc:`comprehensive/index`. A list of features can be found in the :doc:`features` document.
 
 Installation
 ------------
@@ -12,10 +14,8 @@ To install QDK/Chemistry, please see the `installation instructions <https://git
 End-to-end example
 ------------------
 
-This document is intended to provide a brief introduction to the QDK/Chemistry library by walking through a minimal end-to-end example for ground state energy estimation with state preparation and measurement.
-The emphasis of this example is optimization:  reducing the resources required for the quantum computer to run a simple chemistry application.
-The example starts with a molecular structure and ends with an energy estimation computed by simulating a quantum circuit.
-The focus of this example is on high-level concepts and common coding patterns that can be extended to other applications.
+This example demonstrates the full quantum applications workflow: beginning with a molecular structure, building up classical context through SCF and active-space methods, then transitioning to the quantum side with qubit Hamiltonian construction, state preparation circuit synthesis, and shot-based energy estimation on a quantum simulator.
+The emphasis is on optimizing the quantum resource requirements at every stage — using active space selection to shrink the problem, sparse wavefunction methods to reduce circuit depth, and Hamiltonian filtering to minimize measurement overhead.
 
 You can also view a related code sample in a Jupyter notebook format, along with several other examples, in the `examples folder <https://github.com/microsoft/qdk-chemistry/blob/main/examples/>`_ of the GitHub repository.
 Companion chemistry datasets and supporting assets are also available in `microsoft/qdk-chemistry-data <https://github.com/microsoft/qdk-chemistry-data>`_.

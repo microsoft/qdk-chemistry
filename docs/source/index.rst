@@ -5,9 +5,12 @@ QDK/Chemistry:  A Quantum Applications Toolkit
 Welcome to QDK/Chemistry
 ========================
 
-**QDK/Chemistry** provides a set of tools and libraries to enable cutting edge quantum chemistry calculations on quantum computers.
-QDK/Chemistry tackles this problem holistically, by recognizing that a significant portion of the quantum applications pipeline heavily relies on the quality, robustness, and efficiency of the classical data preparation and post-processing steps.
-QDK/Chemistry also serves as a platform for innovation, by providing a unified interface to a variety of quantum chemistry methods and packages, allowing researchers to focus on their areas of interest while integrating with a vast community of existing tools to accelerate development.
+**QDK/Chemistry** provides an end-to-end toolkit for developing, simulating, and running quantum chemistry calculations on quantum computers.
+It spans the entire quantum applications pipeline — from molecular setup and classical electronic structure computation through fermion-to-qubit encoding, quantum circuit synthesis, and simulation — all within a single, modular framework.
+
+QDK/Chemistry recognizes that practical quantum chemistry applications depend on the quality of every stage: robust classical preprocessing, efficient quantum algorithm selection, and accurate post-processing.
+By treating each stage as an interchangeable module, QDK/Chemistry serves as both a **development platform** for building new quantum algorithms and a **composable framework** for assembling reproducible quantum–classical pipelines from proven components.
+Its plugin architecture provides a unified interface to native high-performance C++ implementations alongside established community packages, allowing researchers to mix and match the best tools for each stage of their workflow.
 
 .. note::
 
@@ -32,18 +35,22 @@ QDK/Chemistry also serves as a platform for innovation, by providing a unified i
 Key Features
 ============
 
-A Unified Interface for Modular Quantum Applications Development
-  The primary feature of QDK/Chemistry is its modular architecture that allows users to easily swap components in and out of their quantum applications workflows.
-  This design promotes code reuse and accelerates development by enabling researchers to focus on their specific areas of interest.
+Quantum Algorithms for Chemistry
+  QDK/Chemistry provides a growing collection of quantum algorithms for molecular simulation, including phase estimation, state preparation, fermion-to-qubit encoding, Hamiltonian time evolution, and observable estimation.
+  These algorithms are designed to leverage chemical structure — exploiting sparsity, symmetry, and active-space reduction — to minimize quantum resources on both near-term and fault-tolerant hardware.
+
+Classical Electronic Structure as Quantum Input
+  The classical methods in QDK/Chemistry — self-consistent field solvers, multi-configuration techniques, orbital localization, and automated active space selection — are essential stages in the quantum pipeline.
+  They produce the high-quality molecular orbitals, reference wavefunctions, and compact Hamiltonians that make quantum algorithms practical.
+
+Composable Framework
+  Every algorithm in QDK/Chemistry is an interchangeable module with a standardized interface.
+  The factory/registry architecture lets users assemble custom quantum–classical pipelines by selecting and combining implementations at each stage — without changing application code.
 
 Extensible-by-Design
-  We recognize that the field of quantum algorithms for chemistry is rapidly evolving, and our goal is to provide a platform that can adapt to these changes.
-  Through our plugin system, QDK/Chemistry is built with extensibility in mind, allowing users to easily integrate and modify new quantum chemistry methods, algorithms, and workflows to the framework.
+  The field of quantum algorithms for chemistry evolves rapidly, and QDK/Chemistry is built to adapt.
+  Its plugin system allows new methods and integrations to be registered and used through the same unified API.
 
-Access to State-of-the-Art Algorithms
-  QDK/Chemistry provides access to an ever-evolving collection of cutting-edge methods for solving quantum chemistry problems on quantum computers, available through both built-in modules and our extensible plugin system.
-  This comprehensive toolkit spans from robust, best-in-class implementations of classical computational chemistry methods that generate essential input data for quantum algorithms, to sophisticated "chemistry-aware" quantum algorithms that leverage symmetries and other chemical properties to optimize calculations for near-term quantum hardware.
-  By maintaining this broad spectrum of capabilities, we ensure researchers have the tools they need to push the boundaries of quantum chemistry while remaining practical for current quantum computing limitations.
 
 .. toctree::
    :maxdepth: 2
