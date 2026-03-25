@@ -1,4 +1,4 @@
-"""Tests for pybind11 Pauli matrix utility functions."""
+"""Tests for Pauli matrix utility functions."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

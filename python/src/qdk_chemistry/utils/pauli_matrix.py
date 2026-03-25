@@ -74,6 +74,12 @@ def pauli_expectation(pauli_str: str, psi: np.ndarray) -> float:
 
     """
     psi = np.asarray(psi, dtype=np.complex128).ravel()
+    expected_dim = 1 << len(pauli_str)
+    if psi.size != expected_dim:
+        raise ValueError(
+            f"State vector length {psi.size} does not match the expected "
+            f"dimension 2**{len(pauli_str)} = {expected_dim} for Pauli string '{pauli_str}'."
+        )
     x_mask, z_mask, phase = pauli_string_to_masks(pauli_str)
     dim = psi.shape[0]
 

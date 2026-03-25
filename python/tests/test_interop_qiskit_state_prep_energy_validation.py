@@ -27,7 +27,7 @@ if QDK_CHEMISTRY_HAS_QISKIT_AER:
 
 
 pytestmark = pytest.mark.skipif(
-    not QDK_CHEMISTRY_HAS_QISKIT_AER and not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"
+    not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"
 )
 
 
