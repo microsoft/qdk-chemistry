@@ -5,7 +5,7 @@
 namespace QDKChemistry.Utils.MeasurementBasis {
 
     /// Measures each qubit in the specified Pauli basis and resets it to |0⟩.
-    /// - PauliI: qubit is not measured.
+    /// - PauliI: qubit is not measured. Reset to |0⟩ via Reset.
     /// - PauliX/Y/Z: measure in that basis via MResetX/Y/Z.
     ///
     /// # Parameters
@@ -24,8 +24,11 @@ namespace QDKChemistry.Utils.MeasurementBasis {
                 set results += [MResetY(qubits[idx])];
             } elif bases[idx] == PauliZ {
                 set results += [MResetZ(qubits[idx])];
+            } elif bases[idx] == PauliI {
+                Reset(qubits[idx]);
             }
         }
+
         return results;
     }
 

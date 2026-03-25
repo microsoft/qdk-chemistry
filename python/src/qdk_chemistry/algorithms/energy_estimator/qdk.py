@@ -17,6 +17,7 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitHamiltonian,
 )
+from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -136,15 +137,11 @@ def _append_measurement_to_circuit(base_circuit: Circuit, m_basis: str) -> Circu
         pauli_base = []
         for pauli in reversed(m_basis):
             pauli_base.append(getattr(qsharp.Pauli, pauli))
-        qsharp_factory = [
-            QSHARP_UTILS.MeasurementBasis.MakeMeasurementCircuit,
-            base_circuit._qsharp_op,  # noqa: SLF001
-            pauli_base,
-            len(m_basis),
-        ]
-        qsc = qsharp.circuit(*qsharp_factory)
-        qir = qsharp.compile(*qsharp_factory)
-        return Circuit(qsharp=qsc, qir=qir)
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.MeasurementBasis.MakeMeasurementCircuit,
+            parameter={"baseCircuit": base_circuit._qsharp_op, "bases": pauli_base, "numQubits": len(m_basis)},  # noqa: SLF001
+        )
+        return Circuit(qsharp_factory=qsharp_factory)
 
     try:
         from qiskit import (  # noqa: PLC0415
