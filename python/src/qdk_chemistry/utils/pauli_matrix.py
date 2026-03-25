@@ -34,8 +34,7 @@ def pauli_string_to_masks(pauli_str: str) -> tuple[int, int, complex]:
     returned.
 
     Args:
-        pauli_str: Pauli string (characters in {I, X, Y, Z}), using
-            Little-Endian label convention (``label[0]`` = qubit *n*-1).
+        pauli_str: Pauli string (characters in {I, X, Y, Z}), using Little-Endian label convention.
 
     Returns:
         ``(x_mask, z_mask, y_phase)`` where *x_mask* and *z_mask* are
@@ -60,17 +59,12 @@ def pauli_string_to_masks(pauli_str: str) -> tuple[int, int, complex]:
 def pauli_expectation(pauli_str: str, psi: np.ndarray) -> float:
     """Compute the expectation value ``<psi|P|psi>`` for a single Pauli string.
 
-    Uses the bitmask approach to evaluate the expectation value without
-    materialising the full Pauli matrix.  Only the real part is returned
-    because every Pauli string is Hermitian.
-
     Args:
-        pauli_str: Pauli label of length *n* (characters in {I, X, Y, Z}),
-            using Little-Endian convention (``label[0]`` = qubit *n*-1).
+        pauli_str: Pauli label of length *n* (characters in {I, X, Y, Z}), using Little-Endian convention.
         psi: Complex state vector of length ``2**n``.
 
     Returns:
-        Real-valued expectation value.
+        Expectation value.
 
     """
     psi = np.asarray(psi, dtype=np.complex128).ravel()
@@ -105,8 +99,7 @@ def pauli_to_dense_matrix(
     :math:`P_t` is a Pauli string in Little-Endian convention.
 
     Args:
-        pauli_strings: List of Pauli label strings (characters in
-            {I, X, Y, Z}), all of the same length *n*.
+        pauli_strings: List of Pauli label strings (characters in {I, X, Y, Z}), all of the same length *n*.
         coefficients: Complex array of coefficients, one per Pauli term.
 
     Returns:
@@ -149,8 +142,7 @@ def pauli_to_sparse_matrix(
     result as a :class:`scipy.sparse.csr_matrix`.
 
     Args:
-        pauli_strings: List of Pauli label strings (characters in
-            {I, X, Y, Z}), all of the same length *n*.
+        pauli_strings: List of Pauli label strings (characters in {I, X, Y, Z}), all of the same length *n*.
         coefficients: Complex array of coefficients, one per Pauli term.
 
     Returns:
