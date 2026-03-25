@@ -6,10 +6,13 @@
 
 import os
 import re
+import sys
 import argparse
 import logging
 
 LOG = logging.getLogger(__name__)
+handler = logging.StreamHandler(stream=sys.stdout)  # Necessary to capture logs in ADO
+LOG.addHandler(handler)
 
 
 def validate_dev_tag(dev_tag: str) -> bool:
