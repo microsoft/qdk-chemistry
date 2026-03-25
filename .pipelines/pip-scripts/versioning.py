@@ -10,9 +10,11 @@ import sys
 import argparse
 import logging
 
+# Setup logging
 LOG = logging.getLogger(__name__)
 handler = logging.StreamHandler(stream=sys.stdout)  # Necessary to capture logs in ADO
 LOG.addHandler(handler)
+LOG.setLevel(logging.INFO)
 
 
 def validate_dev_tag(dev_tag: str) -> bool:
@@ -88,7 +90,7 @@ def update_version_file(version_file: str, new_version_string: str) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Update version numbers in setup.py and __init__.py"
+        description="Validate and update the top level VERSION file when performing dev PyPI releases."
     )
     parser.add_argument(
         "--dev-tag",
@@ -108,28 +110,36 @@ def main():
     args = parser.parse_args()
 
     # Check if dev tag was passed from pipeline and validate against PyPA version specifications
-    dev_tag_is_valid = validate_dev_tag(args.dev_tag)
-    if not dev_tag_is_valid and args.dev_tag is not None:
-        LOG.error(f"""
-            Invalid dev tag provided for the wheels: {args.dev_tag}.\n
-            Please ensure that the dev tag provided in the parameters section of the pipeline is compliant with PyPA version specifications.
-            The dev tag should take the form of devN|rcN|aN|bN|postN, where N is an integer. For example: dev0, rc1, a2, b3, etc.
-        """)
-        exit(1)
-    elif dev_tag_is_valid and args.dev_tag is not None:
-        LOG.info(f"Dev tag provided for the wheels: {args.dev_tag} is valid.")
-        LOG.info(
-            f"New version to be published on PyPI will be suffixed with the dev tag: {args.dev_tag}"
-        )
+    if args.dev_tag is not None:
+        dev_tag_is_valid = validate_dev_tag(args.dev_tag)
+
+        if not dev_tag_is_valid and args.dev_tag is not None:
+            LOG.error(f"""
+                Invalid dev tag provided for the wheels: {args.dev_tag}.
+                Please ensure that the dev tag provided in the parameters section of the pipeline is compliant with PyPA version specifications.
+                The dev tag should take the form of devN|rcN|aN|bN|postN, where N is an integer. For example: dev0, rc1, a2, b3, etc.
+            """)
+            exit(1)
+        elif dev_tag_is_valid and args.dev_tag is not None:
+            LOG.info(f"Dev tag provided for the wheels: {args.dev_tag} is valid.")
+            LOG.info(
+                f"New version to be published on PyPI will be suffixed with the dev tag: {args.dev_tag}"
+            )
 
     current_version = open(args.version_file).read().strip()
     LOG.info(f"Current version read from version file: {current_version}")
 
-    if args.dev_tag:
-        new_version = f"{current_version}.{args.dev_tag}"
+    if args.dev_tag is not None:
+        # PEP 440 prerelease tags are joined directly: 1.2.3rc1 / 1.2.3a1 / 1.2.3b1
+        if re.fullmatch(r"(?:rc|a|b)\d+", args.dev_tag):
+            new_version = f"{current_version}{args.dev_tag}"
+        else:
+            # dev/post tags are joined with a period: 1.2.3.dev1 / 1.2.3.post1
+            new_version = f"{current_version}.{args.dev_tag}"
         update_version_file(args.version_file, new_version)
-
-    LOG.info(f"New version to be published on PyPI: {new_version}")
+    else:  # Not a development release, use the current version as is for the release to PyPI
+        new_version = current_version
+        LOG.info(f"Version to be published on PyPI: {new_version}")
 
 
 if __name__ == "__main__":
