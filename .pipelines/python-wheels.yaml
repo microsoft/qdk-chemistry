@@ -142,8 +142,8 @@ extends:
           # If a development tag is provided and is valid, the VERSION file in the top level directory
           # will be updated to include the dev tag before publishing to PyPI.
           - script: |
-              python3 .pipelines/pip-scripts/versioning.py \
-              --version-file $(System.DefaultWorkingDirectory)/VERSION \
+              python3 $(System.DefaultWorkingDirectory)/qdk-chemistry/.pipelines/pip-scripts/versioning.py \
+              --version-file $(System.DefaultWorkingDirectory)/qdk-chemistry/VERSION \
               --dev-tag ${{ parameters.devTag }}
             displayName: Validate/Set Development Version for Wheels
             condition: and(succeeded(), ne('${{ parameters.devTag }}', 'None'))
