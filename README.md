@@ -8,9 +8,9 @@ Designed as both a **development platform** and a **composable framework**, QDK/
 
 QDK/Chemistry bridges classical computational chemistry with quantum computing by providing every stage of the quantum applications pipeline in a single, modular toolkit:
 
-- **Quantum algorithms** — including phase estimation, state preparation, fermion-to-qubit encoding, Hamiltonian time evolution, and observable estimation, with the building blocks to compose higher-level quantum workflows
-- **Classical electronic structure** — self-consistent field solvers, multi-configuration methods, orbital localization, and automated active space selection that produce the high-quality inputs quantum algorithms require
-- **Composable architecture** — a plugin architecture with a factory/registry pattern that lets users assemble custom pipelines from interchangeable algorithm implementations, mixing native high-performance C++ backends with established community packages
+- **Quantum algorithms** — a growing collection of chemistry-aware quantum algorithms, with composable building blocks for constructing higher-level quantum workflows
+- **Classical electronic structure** — production-quality classical methods that generate the high-quality inputs quantum algorithms require
+- **Composable architecture** — a plugin system that lets users assemble custom pipelines from interchangeable components, mixing native high-performance C++ backends with established community packages
 - **Multiple quantum backends** — execute circuits on a variety of simulators through a unified interface that decouples algorithm development from backend selection
 
 ## Documentation

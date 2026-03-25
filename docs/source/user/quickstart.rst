@@ -1,10 +1,10 @@
 Quickstart
 ==========
 
-This quickstart walks through a complete quantum chemistry workflow: starting from a molecular structure and ending with an energy estimate obtained via quantum circuit simulation.
-Each step in the pipeline — SCF calculation, active space selection, Hamiltonian construction, qubit mapping, state preparation, and energy estimation — uses QDK/Chemistry's modular architecture, meaning any component can be swapped for an alternative implementation without changing the rest of the workflow.
+This quickstart walks through a complete quantum chemistry workflow, from molecular structure to energy estimate, using QDK/Chemistry's modular architecture.
+Each stage in the pipeline is an interchangeable component, so any step can be swapped for an alternative implementation without changing the rest of the workflow.
 
-More detailed documentation can be found in the :doc:`comprehensive/index`. A list of features can be found in the :doc:`features` document.
+More detailed documentation can be found in the :doc:`comprehensive/index`. A complete list of supported methods can be found in the :doc:`features` document.
 
 Installation
 ------------
@@ -14,8 +14,8 @@ To install QDK/Chemistry, please see the `installation instructions <https://git
 End-to-end example
 ------------------
 
-This example demonstrates the full quantum applications workflow: beginning with a molecular structure, building up classical context through SCF and active-space methods, then transitioning to the quantum side with qubit Hamiltonian construction, state preparation circuit synthesis, and shot-based energy estimation on a quantum simulator.
-The emphasis is on optimizing the quantum resource requirements at every stage — using active space selection to shrink the problem, sparse wavefunction methods to reduce circuit depth, and Hamiltonian filtering to minimize measurement overhead.
+This example walks through the full quantum applications workflow: from building classical context around a molecular structure, through encoding for a quantum computer, to estimating the ground-state energy via circuit simulation.
+The emphasis is on optimizing the quantum resource requirements at every stage, demonstrating how QDK/Chemistry's modular pipeline makes it easy to select the right method for each step.
 
 You can also view a related code sample in a Jupyter notebook format, along with several other examples, in the `examples folder <https://github.com/microsoft/qdk-chemistry/blob/main/examples/>`_ of the GitHub repository.
 Companion chemistry datasets and supporting assets are also available in `microsoft/qdk-chemistry-data <https://github.com/microsoft/qdk-chemistry-data>`_.

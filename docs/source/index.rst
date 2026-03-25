@@ -6,11 +6,11 @@ Welcome to QDK/Chemistry
 ========================
 
 **QDK/Chemistry** provides an end-to-end toolkit for developing, simulating, and running quantum chemistry calculations on quantum computers.
-It spans the entire quantum applications pipeline — from molecular setup and classical electronic structure computation through fermion-to-qubit encoding, quantum circuit synthesis, and simulation — all within a single, modular framework.
+It spans the entire quantum applications pipeline — from molecular setup and classical electronic structure through quantum algorithm execution and simulation — all within a single, modular framework.
 
-QDK/Chemistry recognizes that practical quantum chemistry applications depend on the quality of every stage: robust classical preprocessing, efficient quantum algorithm selection, and accurate post-processing.
+QDK/Chemistry recognizes that practical quantum chemistry depends on the quality of every stage, not just the quantum algorithm itself.
 By treating each stage as an interchangeable module, QDK/Chemistry serves as both a **development platform** for building new quantum algorithms and a **composable framework** for assembling reproducible quantum–classical pipelines from proven components.
-Its plugin architecture provides a unified interface to native high-performance C++ implementations alongside established community packages, allowing researchers to mix and match the best tools for each stage of their workflow.
+Its plugin architecture provides a unified interface to native high-performance C++ implementations alongside established community packages, so researchers can mix and match the best tools for their problem without being locked into any single approach.
 
 .. note::
 
@@ -36,20 +36,14 @@ Key Features
 ============
 
 Quantum Algorithms for Chemistry
-  QDK/Chemistry provides a growing collection of quantum algorithms for molecular simulation, including phase estimation, state preparation, fermion-to-qubit encoding, Hamiltonian time evolution, and observable estimation.
-  These algorithms are designed to leverage chemical structure — exploiting sparsity, symmetry, and active-space reduction — to minimize quantum resources on both near-term and fault-tolerant hardware.
+  A growing collection of chemistry-aware quantum algorithms that leverage molecular structure to minimize quantum resources on both near-term and fault-tolerant hardware.
 
-Classical Electronic Structure as Quantum Input
-  The classical methods in QDK/Chemistry — self-consistent field solvers, multi-configuration techniques, orbital localization, and automated active space selection — are essential stages in the quantum pipeline.
-  They produce the high-quality molecular orbitals, reference wavefunctions, and compact Hamiltonians that make quantum algorithms practical.
+Classical Electronic Structure
+  Production-quality classical methods that generate the molecular orbitals, reference states, and compact Hamiltonians that quantum algorithms depend on.
 
-Composable Framework
-  Every algorithm in QDK/Chemistry is an interchangeable module with a standardized interface.
-  The factory/registry architecture lets users assemble custom quantum–classical pipelines by selecting and combining implementations at each stage — without changing application code.
-
-Extensible-by-Design
-  The field of quantum algorithms for chemistry evolves rapidly, and QDK/Chemistry is built to adapt.
-  Its plugin system allows new methods and integrations to be registered and used through the same unified API.
+Composable, Extensible Architecture
+  Every component is an interchangeable module with a standardized interface.
+  The plugin system lets users swap implementations, integrate external packages, and assemble custom quantum–classical pipelines — without changing application code.
 
 
 .. toctree::
