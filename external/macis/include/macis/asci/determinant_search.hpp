@@ -514,6 +514,23 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   logger->info("  * NCONSTRAINTS = {}, GEN_DUR = {:.2e} ms", constraints.size(),
                gen_c_dur.count());
 
+  // Log constraint work distribution for load-balance diagnostics (debug only)
+  if (logger->should_log(spdlog::level::debug) && !constraints.empty()) {
+    size_t total_cwork = 0, max_cwork = 0;
+    for (const auto& [c, w] : constraints) {
+      total_cwork += w;
+      if (w > max_cwork) max_cwork = w;
+    }
+    size_t avg_per_worker = total_cwork / total_workers;
+    logger->debug(
+        "  * CONSTRAINT_WORK: total={}, max_single={}, avg/worker={}, "
+        "max/avg={:.2f}",
+        total_cwork, max_cwork, avg_per_worker,
+        avg_per_worker > 0
+            ? static_cast<double>(max_cwork) / avg_per_worker
+            : 1.0);
+  }
+
   size_t max_size =
       std::min(std::min(ntdets, asci_settings.pair_size_max),
                ncdets * (n_sing_alpha + n_sing_beta +  // AA + BB
@@ -533,9 +550,12 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   // Each thread writes its accumulated results to its own slot;
   // merged serially after the parallel region (no omp critical needed).
   std::vector<asci_contrib_container<wfn_t<N>>> thread_pairs(num_threads);
+  const bool debug_timing = logger->should_log(spdlog::level::debug);
+  std::vector<double> thread_wall(debug_timing ? num_threads : 0, 0.0);
 #pragma omp parallel
   {
     const int tid = omp_get_thread_num();
+    auto t_wall_st = clock_type::now();
 
     // Accumulated results from all constraints processed by this thread.
     asci_contrib_container<wfn_t<N>> accumulated_pairs;
@@ -661,8 +681,27 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     // Move thread results to shared slot — no synchronization needed
     // since each thread writes to its own index.
     thread_pairs[tid] = std::move(accumulated_pairs);
+    if (debug_timing) {
+      auto t_wall_en = clock_type::now();
+      thread_wall[tid] = duration_type(t_wall_en - t_wall_st).count();
+    }
 
   }  // OpenMP
+
+  // Log per-thread load balance (debug only)
+  if (debug_timing) {
+    double t_max = *std::max_element(thread_wall.begin(), thread_wall.end());
+    double t_min = *std::min_element(thread_wall.begin(), thread_wall.end());
+    double t_sum = 0;
+    for (auto t : thread_wall) t_sum += t;
+    double t_avg = t_sum / num_threads;
+    logger->debug(
+        "  * THREAD_WALL: min={:.3f}s max={:.3f}s avg={:.3f}s "
+        "imbalance={:.2f}x efficiency={:.1f}%",
+        t_min, t_max, t_avg,
+        t_avg > 0 ? t_max / t_avg : 1.0,
+        t_max > 0 ? 100.0 * t_avg / t_max : 100.0);
+  }
 
   // Serial merge: compute total size, reserve once, concatenate.
   size_t total_size = 0;
@@ -843,7 +882,7 @@ std::vector<wfn_t<N>> asci_search(
   // Accumulate unique score contributions
   // MPI + Constraint Search already does S&A
   auto bit_sort_st = clock_type::now();
-  if (world_size == 1) sort_and_accumulate_asci_pairs(asci_pairs);
+  if (world_size == 1) parallel_sort_and_accumulate_asci_pairs(asci_pairs);
   auto bit_sort_en = clock_type::now();
 
   {

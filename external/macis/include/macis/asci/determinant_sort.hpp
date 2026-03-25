@@ -15,6 +15,19 @@
 #include <boost/sort/sort.hpp>
 #endif /* __has_include(<boost/sort/pdqsort/pdqsort.hpp>) */
 
+#ifndef MACIS_HAS_IPS4O
+#if __has_include(<ips4o.hpp>)
+#include <ips4o.hpp>
+#define MACIS_HAS_IPS4O 1
+#else
+#define MACIS_HAS_IPS4O 0
+#endif
+#endif
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 namespace macis {
 
 /**
@@ -154,6 +167,49 @@ PairIterator sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
       (pairs_begin, pairs_end, comparator);
 
   return accumulate_asci_pairs(pairs_begin, pairs_end);
+}
+
+/**
+ * @brief Parallel sort ASCI pairs by bitstring and accumulate duplicates
+ *
+ * Uses ips4o parallel sort when available for better scaling on large pair
+ * arrays. Falls back to the serial implementation otherwise.
+ * Must NOT be called from inside an OMP parallel region.
+ *
+ * @tparam PairIterator Iterator type for ASCI contribution container
+ * @param[in,out] pairs_begin Iterator to the beginning of the pairs range
+ * @param[in,out] pairs_end Iterator to the end of the pairs range
+ * @return Iterator pointing to the new end after removing duplicates
+ */
+template <typename PairIterator>
+PairIterator parallel_sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
+                                                     PairIterator pairs_end) {
+  const size_t npairs = std::distance(pairs_begin, pairs_end);
+  if (!npairs) return pairs_end;
+
+#if MACIS_HAS_IPS4O && defined(_OPENMP)
+  auto comparator = [](const auto& x, const auto& y) {
+    return bitset_less(x.state, y.state);
+  };
+  ips4o::parallel::sort(pairs_begin, pairs_end, comparator);
+  return accumulate_asci_pairs(pairs_begin, pairs_end);
+#else
+  return sort_and_accumulate_asci_pairs(pairs_begin, pairs_end);
+#endif
+}
+
+/**
+ * @brief Parallel sort and accumulate ASCI pairs in a container
+ *
+ * @tparam WfnT Wavefunction type for the ASCI contributions
+ * @param[in,out] asci_pairs Container of ASCI contributions to process
+ */
+template <typename WfnT>
+void parallel_sort_and_accumulate_asci_pairs(
+    asci_contrib_container<WfnT>& asci_pairs) {
+  auto uit = parallel_sort_and_accumulate_asci_pairs(asci_pairs.begin(),
+                                                     asci_pairs.end());
+  asci_pairs.erase(uit, asci_pairs.end());
 }
 
 /**
