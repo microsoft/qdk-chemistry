@@ -26,6 +26,7 @@ from qdk_chemistry.data.base import DataClass
 
 if TYPE_CHECKING:
     import h5py
+    import scipy
 
     from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
@@ -116,7 +117,7 @@ class QubitHamiltonian(DataClass):
         """
         return float(np.sum(np.abs(self.coefficients)))
 
-    def to_matrix(self, sparse: bool = False) -> np.ndarray:
+    def to_matrix(self, sparse: bool = False) -> np.ndarray | scipy.sparse.spmatrix:
         """Convert the qubit Hamiltonian to its full matrix representation.
 
         Args:
@@ -285,7 +286,7 @@ class QubitHamiltonian(DataClass):
         # Each group is a list of (pauli_string, coefficient)
         groups: list[list[tuple[str, complex]]] = []
 
-        for pauli_str, coeff in zip(self.pauli_strings, self.coefficients, strict=False):
+        for pauli_str, coeff in zip(self.pauli_strings, self.coefficients, strict=True):
             placed = False
             for group in groups:
                 if all(commutes(pauli_str, existing_str) for existing_str, _ in group):
@@ -577,14 +578,16 @@ def _validate_pauli_strings(pauli_strings: list[str]) -> None:
     that all strings have the same length.
 
     Raises:
-        ValueError: If any string contains invalid characters or lengths differ.
+        ValueError: If any string is empty, has invalid characters, or if strings have inconsistent lengths.
 
     """
     if not pauli_strings:
-        return
+        raise ValueError("Pauli strings list cannot be empty.")
     length = len(pauli_strings[0])
     valid_pauli_pattern = re.compile(r"^[IXYZ]+$")
     for i, ps in enumerate(pauli_strings):
+        if not ps:
+            raise ValueError(f"Pauli string at index {i} is empty.")
         if len(ps) != length:
             raise ValueError(f"Pauli string at index {i} has length {len(ps)}, expected {length}.")
         if not valid_pauli_pattern.fullmatch(ps):

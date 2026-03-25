@@ -75,4 +75,4 @@ def qiskit_aer_load():
     from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator  # noqa: PLC0415
 
     register(lambda: QiskitAerSimulator())
-    Logger.debug(f"Qiskit Aer plugins loaded: [{QiskitAerSimulator().type_name()}: {QiskitAerSimulator().name()}], ")
+    Logger.debug(f"Qiskit Aer plugins loaded: [{QiskitAerSimulator().type_name()}: {QiskitAerSimulator().name()}].")

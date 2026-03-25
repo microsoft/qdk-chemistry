@@ -130,10 +130,14 @@ print(f"Number of classical coefficients: {len(classical_coeffs)}")
 ################################################################################
 # start-cell-energy-estimation
 # Estimate energy using the optimized circuit and filtered Hamiltonian operators
-estimator = create("energy_estimator", algorithm_name="qdk_base_simulator")
+estimator = create("energy_estimator", algorithm_name="qdk")
+circuit_executor = create(
+    "circuit_executor", algorithm_name="qdk_sparse_state_simulator"
+)
 energy_results, simulation_data = estimator.run(
     circuit=sparse_isometry_circuit,
     qubit_hamiltonians=filtered_hamiltonian_ops,
+    circuit_executor=circuit_executor,
     total_shots=250000,
     classical_coeffs=classical_coeffs,
 )

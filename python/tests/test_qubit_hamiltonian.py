@@ -65,6 +65,10 @@ class TestQubitHamiltonian:
             QubitHamiltonian(pauli_strings=["X", "ZY"], coefficients=np.array([1.0, 2.0]))
         with pytest.raises(ValueError, match="invalid characters"):
             QubitHamiltonian(pauli_strings=["XZ", "A1"], coefficients=np.array([1.0, 0.5]))
+        with pytest.raises(ValueError, match="empty"):
+            QubitHamiltonian(pauli_strings=["X", ""], coefficients=np.array([1.0, 0.5]))
+        with pytest.raises(ValueError, match="empty"):
+            QubitHamiltonian(pauli_strings=[], coefficients=[])
 
     def test_group_commuting(self):
         """Test group_commuting."""

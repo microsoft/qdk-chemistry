@@ -191,7 +191,7 @@ class QdkEnergyEstimator(EnergyEstimator):
         total_shots: int,
         noise_model: QuantumErrorProfile | None = None,
         classical_coeffs: list | None = None,
-    ) -> EnergyExpectationResult:
+    ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Estimate the expectation value and variance of Hamiltonians.
 
         Args:
@@ -203,7 +203,10 @@ class QdkEnergyEstimator(EnergyEstimator):
             classical_coeffs: Optional list of coefficients for classical Pauli terms to calculate energy offset.
 
         Returns:
-            ``EnergyExpectationResult`` containing the energy expectation value and variance.
+            tuple[EnergyExpectationResult, MeasurementData]: Tuple containing:
+
+                * ``energy_result``: Energy expectation value and variance for the provided Hamiltonians.
+                * ``measurement_data``: Raw measurement counts and metadata used to compute the expectation value.
 
         Note:
             * Measurement circuits are generated for each QubitHamiltonian term.

@@ -12,6 +12,7 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     Circuit,
     EnergyExpectationResult,
+    MeasurementData,
     QuantumErrorProfile,
     QubitHamiltonian,
 )
@@ -38,7 +39,7 @@ class EnergyEstimator(Algorithm):
         circuit_executor: CircuitExecutor,
         total_shots: int,
         noise_model: QuantumErrorProfile | None = None,
-    ) -> EnergyExpectationResult:
+    ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Estimate the expectation value and variance of Hamiltonians.
 
         Args:
@@ -49,7 +50,10 @@ class EnergyEstimator(Algorithm):
             noise_model: Optional noise model to simulate noise in the quantum circuit.
 
         Returns:
-            ``EnergyExpectationResult`` containing the energy expectation value and variance.
+            tuple[EnergyExpectationResult, MeasurementData]: Tuple containing:
+
+                * ``energy_result``: Energy expectation value and variance for the provided Hamiltonians.
+                * ``measurement_data``: Raw measurement counts and metadata used to compute the expectation value.
 
         """
 
