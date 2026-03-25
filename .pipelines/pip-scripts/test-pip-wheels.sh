@@ -88,7 +88,11 @@ python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
 
 # Install the wheel in the clean environment
 cd "$PYTHON_DIR"
-python3 -m pip install pytest pyscf
+
+# Install testing/optional dependencies
+python3 -m pip install pytest "pyscf>=2.9.0,<2.12.1" "openfermion>=1.0.0"
+
+# Install built wheel into fresh venv
 pip3 install repaired_wheelhouse/qdk_chemistry*.whl
 
 # Install qiskit-extras if supported (not available on Python 3.14+)
