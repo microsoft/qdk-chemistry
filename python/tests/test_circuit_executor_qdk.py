@@ -5,7 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.circuit_executor.qdk import (
@@ -13,8 +12,6 @@ from qdk_chemistry.algorithms.circuit_executor.qdk import (
     QdkSparseStateSimulator,
 )
 from qdk_chemistry.data import Circuit, QuantumErrorProfile
-
-from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 
 @pytest.fixture
@@ -135,20 +132,6 @@ class TestQdkSparseStateCircuitExecutor:
         """Test initialization of the sparse state executor."""
         executor = QdkSparseStateSimulator()
         assert executor.settings().get("seed") == 42
-        assert executor.settings().get("noise_type") == "none"
-        assert len(executor.settings().get("noise_rate")) == 1
-        assert np.isclose(
-            executor.settings().get("noise_rate")[0],
-            0.0,
-            atol=float_comparison_absolute_tolerance,
-            rtol=float_comparison_relative_tolerance,
-        )
-        assert np.isclose(
-            executor.settings().get("qubit_loss"),
-            -1.0,
-            atol=float_comparison_absolute_tolerance,
-            rtol=float_comparison_relative_tolerance,
-        )
 
     def test_executor_name(self):
         """Test executor name."""
@@ -184,52 +167,8 @@ class TestQdkSparseStateCircuitExecutor:
         assert result.get_executor_metadata() is not None
         assert all("10" in str(outcome) for outcome in result.get_executor_metadata())
 
-    def test_depolarizing_noise(self, test_circuit_2):
-        """Test sparse state executor with depolarizing noise."""
-        executor = QdkSparseStateSimulator()
-        executor.settings().update("noise_type", "depolarizing")
-        executor.settings().update("noise_rate", [0.1])
-        result = executor.run(test_circuit_2, shots=1000)
-        counts = result.bitstring_counts
-        assert sum(counts.values()) == 1000
-        # Depolarizing noise should introduce errors in a deterministic circuit
-        assert len(counts) > 1, "Depolarizing noise should produce additional outcomes"
-
-    def test_bitflip_noise(self, test_circuit_2):
-        """Test sparse state executor with bit-flip noise."""
-        executor = QdkSparseStateSimulator()
-        executor.settings().update("noise_type", "bitflip")
-        executor.settings().update("noise_rate", [0.1])
-        result = executor.run(test_circuit_2, shots=1000)
-        counts = result.bitstring_counts
-        assert sum(counts.values()) == 1000
-        assert len(counts) > 1, "Bit-flip noise should produce additional outcomes"
-
-    def test_qubit_loss(self, test_circuit_2):
-        """Test sparse state executor with qubit loss."""
-        executor = QdkSparseStateSimulator()
-        executor.settings().update("qubit_loss", 0.5)
-        result = executor.run(test_circuit_2, shots=1000)
-        counts = result.bitstring_counts
-        assert sum(counts.values()) == 1000
-        assert len(counts) > 1, "Qubit loss should produce additional outcomes due to lost qubits"
-
     def test_gate_noise_profile_raises(self, test_circuit_1, simple_error_profile):
         """Test that passing a QuantumErrorProfile noise raises NotImplementedError."""
         executor = QdkSparseStateSimulator()
         with pytest.raises(NotImplementedError, match="Gate specific noise is not yet supported"):
             executor.run(test_circuit_1, shots=10, noise=simple_error_profile)
-
-    def test_invalid_noise_rate_raises(self, test_circuit_1):
-        """Test that multi-value noise rate raises for non-pauli noise types."""
-        executor = QdkSparseStateSimulator()
-        executor.settings().update("noise_type", "depolarizing")
-        executor.settings().update("noise_rate", [0.1, 0.2])
-        with pytest.raises(ValueError, match="Noise rate for depolarizing noise must be a single value"):
-            executor.run(test_circuit_1, shots=10)
-
-        executor = QdkSparseStateSimulator()
-        executor.settings().update("noise_type", "pauli")
-        executor.settings().update("noise_rate", [0.1, 0.2])  # Not enough values for pauli noise
-        with pytest.raises(ValueError, match="Noise rate for pauli noise must be a list of 3 values"):
-            executor.run(test_circuit_1, shots=10)

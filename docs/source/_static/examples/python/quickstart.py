@@ -139,7 +139,6 @@ energy_results, simulation_data = estimator.run(
     qubit_hamiltonians=filtered_hamiltonian_ops,
     circuit_executor=circuit_executor,
     total_shots=250000,
-    classical_coeffs=classical_coeffs,
 )
 
 for i, results in enumerate(simulation_data.bitstring_counts):
@@ -148,7 +147,11 @@ for i, results in enumerate(simulation_data.bitstring_counts):
     )
 
 # Print statistics for the measured energy
-energy_mean = energy_results.energy_expectation_value + hamiltonian.get_core_energy()
+energy_mean = (
+    energy_results.energy_expectation_value
+    + sum(classical_coeffs)
+    + hamiltonian.get_core_energy()
+)
 energy_stddev = np.sqrt(energy_results.energy_variance)
 print(
     f"Estimated energy from quantum circuit: {energy_mean:.3f} ± {energy_stddev:.3f} Hartree"

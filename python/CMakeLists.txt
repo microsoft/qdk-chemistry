@@ -107,7 +107,6 @@ pybind11_add_module(_core
     src/pybind11/utils/valence_space.cpp
     src/pybind11/utils/orbital_rotation.cpp
     src/pybind11/utils/model_hamiltonians.cpp
-    src/pybind11/utils/pauli_matrix.cpp
     src/pybind11/constants.cpp
     src/pybind11/qdk_scf_config.cpp
     src/pybind11/module.cpp

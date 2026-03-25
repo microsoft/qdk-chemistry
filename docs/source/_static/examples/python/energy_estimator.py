@@ -41,30 +41,43 @@ print(
 )
 
 # Create energy estimator using Qsharp simulator with depolarizing noise
-circuit_executor_with_noise = create(
-    "circuit_executor",
-    "qdk_sparse_state_simulator",
-    noise_type="depolarizing",
-    noise_rate=[0.01],
+noise_model = QuantumErrorProfile(
+    name="noise model",
+    description="Noise model for QDK full state simulator",
+    errors={
+        "rz": {
+            "type": "depolarizing_error",
+            "rate": 0.005,
+            "num_qubits": 1,
+        },
+        "h": {
+            "type": "depolarizing_error",
+            "rate": 0.005,
+            "num_qubits": 1,
+        },
+        "s": {
+            "type": "depolarizing_error",
+            "rate": 0.005,
+            "num_qubits": 1,
+        },
+        "cx": {
+            "type": "depolarizing_error",
+            "rate": 0.007,
+            "num_qubits": 2,
+        },
+    },
 )
+circuit_executor = create("circuit_executor", "qdk_full_state_simulator", type="cpu")
 qdk_estimator = create("energy_estimator", "qdk")
 energy_expectation_results, measurement_data = qdk_estimator.run(
-    circuit, qubit_hamiltonians, circuit_executor_with_noise, total_shots=1000
+    circuit,
+    qubit_hamiltonians,
+    circuit_executor,
+    total_shots=1000,
+    noise_model=noise_model,
 )
 print(
     "Energy expectation value from QDK Simulator with depolarizing noise: "
-    f"{energy_expectation_results.energy_expectation_value}"
-)
-
-# Create energy estimator using Qsharp simulator with qubit loss
-circuit_executor_with_qubit_loss = create(
-    "circuit_executor", "qdk_sparse_state_simulator", qubit_loss=0.05
-)
-energy_expectation_results, measurement_data = qdk_estimator.run(
-    circuit, qubit_hamiltonians, circuit_executor_with_qubit_loss, total_shots=1000
-)
-print(
-    "Energy expectation value from QDK Simulator with qubit loss: "
     f"{energy_expectation_results.energy_expectation_value}"
 )
 # end-cell-qdk

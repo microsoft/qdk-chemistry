@@ -129,9 +129,6 @@ Native QDK/Chemistry implementation of energy estimator. Supports various simula
    * - ``total_shots``
      - int
      - Total number of measurement shots
-   * - ``classical_coeffs``
-     - list | None
-     - Pre-computed classical coefficients from Hamiltonian filtering. Default is None.
 
 Related classes
 ---------------

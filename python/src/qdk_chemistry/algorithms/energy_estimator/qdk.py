@@ -8,7 +8,6 @@
 import numpy as np
 import qsharp
 
-from qdk_chemistry._core.utils import pauli_string_to_masks
 from qdk_chemistry.algorithms import CircuitExecutor
 from qdk_chemistry.data import (
     Circuit,
@@ -19,6 +18,7 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.pauli_matrix import pauli_string_to_masks
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .energy_estimator import EnergyEstimator
@@ -154,7 +154,7 @@ def _append_measurement_to_circuit(base_circuit: Circuit, m_basis: str) -> Circu
     except ImportError as err:
         raise ImportError("Qiskit is required to use Qiskit circuits with EnergyEstimator.") from err
     base_circuit = base_circuit.get_qiskit_circuit()
-    if len(base_circuit.num_qubits) != len(m_basis):
+    if base_circuit.num_qubits != len(m_basis):
         raise ValueError("Measurement basis length must match the number of qubits in the circuit.")
     basis = Pauli(m_basis)
     active = np.arange(basis.num_qubits)[basis.z | basis.x]
@@ -189,7 +189,6 @@ class QdkEnergyEstimator(EnergyEstimator):
         circuit_executor: CircuitExecutor,
         total_shots: int,
         noise_model: QuantumErrorProfile | None = None,
-        classical_coeffs: list[float] | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Estimate the expectation value and variance of Hamiltonians.
 
@@ -199,7 +198,6 @@ class QdkEnergyEstimator(EnergyEstimator):
             circuit_executor: An instance of ``CircuitExecutor`` to run quantum circuits.
             total_shots: Total number of shots to allocate across the observable terms.
             noise_model: Optional noise model to simulate noise in the quantum circuit.
-            classical_coeffs: Optional list of coefficients for classical Pauli terms to calculate energy offset.
 
         Returns:
             tuple[EnergyExpectationResult, MeasurementData]: Tuple containing:
@@ -227,8 +225,6 @@ class QdkEnergyEstimator(EnergyEstimator):
         shots_list = [total_shots // num_observables] * num_observables
         Logger.debug(f"Shots allocated: {shots_list}")
 
-        energy_offset = sum(classical_coeffs) if classical_coeffs else 0.0
-
         # Create measurement circuits
         measurement_circuits = self._create_measurement_circuits(
             circuit=circuit,
@@ -244,7 +240,7 @@ class QdkEnergyEstimator(EnergyEstimator):
         )
 
         return self._compute_energy_expectation_from_bitstrings(
-            qubit_hamiltonians, measurement_data.bitstring_counts, energy_offset
+            qubit_hamiltonians, measurement_data.bitstring_counts
         ), measurement_data
 
     @staticmethod
@@ -273,14 +269,12 @@ class QdkEnergyEstimator(EnergyEstimator):
     def _compute_energy_expectation_from_bitstrings(
         hamiltonians: list[QubitHamiltonian],
         bitstring_counts_list: list[dict[str, int] | None],
-        energy_offset: float = 0.0,
     ) -> EnergyExpectationResult:
         """Compute total energy expectation value and variance for a QubitHamiltonian.
 
         Args:
             hamiltonians: List of ``QubitHamiltonian`` defining Pauli terms and coefficients.
             bitstring_counts_list: List of bitstring count dictionaries corresponding to each QubitHamiltonian.
-            energy_offset: Optional energy shift to include.
 
         Returns:
             ``EnergyExpectationResult`` containing the energy expectation value and variance.
@@ -308,7 +302,7 @@ class QdkEnergyEstimator(EnergyEstimator):
             total_var += np.dot(variances, np.abs(coeffs) ** 2)
 
         return EnergyExpectationResult(
-            energy_expectation_value=float(np.real_if_close(total_expval + energy_offset)),
+            energy_expectation_value=float(np.real_if_close(total_expval)),
             energy_variance=float(np.real_if_close(total_var)),
             expvals_each_term=expvals_list,
             variances_each_term=vars_list,

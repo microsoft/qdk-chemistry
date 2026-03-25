@@ -17,12 +17,12 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from qdk_chemistry._core.utils import (
+from qdk_chemistry.data.base import DataClass
+from qdk_chemistry.utils.pauli_matrix import (
     pauli_expectation,
     pauli_to_dense_matrix,
     pauli_to_sparse_matrix,
 )
-from qdk_chemistry.data.base import DataClass
 
 if TYPE_CHECKING:
     import h5py

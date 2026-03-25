@@ -291,10 +291,9 @@ def test_estimator_run_4e4o(executor_name, hamiltonian_4e4o, wavefunction_4e4o, 
         filtered_hamiltonian,
         executor,
         total_shots=50000,
-        classical_coeffs=classical_coeffs,
     )
     assert np.isclose(
-        energy_result.energy_expectation_value,
+        energy_result.energy_expectation_value + sum(classical_coeffs),
         ref_energy_4e4o,
         rtol=float_comparison_relative_tolerance,
         atol=estimator_energy_tolerance,

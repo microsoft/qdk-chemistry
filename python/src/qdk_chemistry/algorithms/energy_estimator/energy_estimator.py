@@ -39,7 +39,6 @@ class EnergyEstimator(Algorithm):
         circuit_executor: CircuitExecutor,
         total_shots: int,
         noise_model: QuantumErrorProfile | None = None,
-        classical_coeffs: list[float] | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Estimate the expectation value and variance of Hamiltonians.
 
@@ -49,7 +48,6 @@ class EnergyEstimator(Algorithm):
             circuit_executor: An instance of ``CircuitExecutor`` to run quantum circuits.
             total_shots: Total number of shots to allocate across the observable terms.
             noise_model: Optional noise model to simulate noise in the quantum circuit.
-            classical_coeffs: Optional list of classical coefficients for the Hamiltonians.
 
         Returns:
             tuple[EnergyExpectationResult, MeasurementData]: Tuple containing:

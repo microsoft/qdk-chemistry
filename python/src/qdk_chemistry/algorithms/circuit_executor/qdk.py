@@ -108,29 +108,7 @@ class QdkSparseStateSimulatorSettings(Settings):
         """Initialize QDK Sparse State Simulator settings."""
         Logger.trace_entering()
         super().__init__()
-        self._set_default("qubit_loss", "double", -1.0, "Qubit loss rate for sparse state simulation")
         self._set_default("seed", "int", 42, "Random seed for simulation reproducibility")
-        self._set_default(
-            "noise_type",
-            "string",
-            "none",
-            "Type of noise to apply",
-            ["none", "depolarizing", "pauli", "bitflip", "phaseflip"],
-        )
-        self._set_default(
-            "noise_rate",
-            "vector<double>",
-            [0.0],
-            "Noise rate to apply during simulation (ignored if noise_type is 'none')",
-        )
-
-
-_QSHARP_SPARSE_STATE_NOISE_MAPPING = {
-    "depolarizing": qsharp.DepolarizingNoise,
-    "bitflip": qsharp.BitFlipNoise,
-    "pauli": qsharp.PauliNoise,
-    "phaseflip": qsharp.PhaseFlipNoise,
-}
 
 
 class QdkSparseStateSimulator(CircuitExecutor):
@@ -162,30 +140,12 @@ class QdkSparseStateSimulator(CircuitExecutor):
         Logger.trace_entering()
 
         if noise is not None:
-            raise NotImplementedError(
-                "Gate specific noise is not yet supported for the QDK Sparse State Simulator. "
-                "Please define noise at the settings level using the 'noise_type' and 'noise_rate' parameters."
-            )
-
-        noise_type = self._settings.get("noise_type")
-        noise_rate = self._settings.get("noise_rate")
-        if noise_type != "none":
-            if noise_type in ["depolarizing", "bitflip", "phaseflip"] and len(noise_rate) != 1:
-                raise ValueError(f"Noise rate for {noise_type} noise must be a single value")
-            if noise_type == "pauli" and len(noise_rate) != 3:
-                raise ValueError("Noise rate for pauli noise must be a list of 3 values")
-            noise_model = _QSHARP_SPARSE_STATE_NOISE_MAPPING[noise_type](*noise_rate)
-        else:
-            noise_model = None
-        qubit_loss = self._settings.get("qubit_loss")
-        qubit_loss_rate = qubit_loss if qubit_loss >= 0.0 else None
+            raise NotImplementedError("Gate specific noise is not yet supported for the QDK Sparse State Simulator. ")
         if circuit._qsharp_factory is not None:  # noqa: SLF001
             raw_results = qsharp.run(
                 circuit._qsharp_factory.program,  # noqa: SLF001
                 shots,
                 *circuit._qsharp_factory.parameter.values(),  # noqa: SLF001
-                noise=noise_model,
-                qubit_loss=qubit_loss_rate,
             )
             Logger.debug(f"Measurement results obtained: {raw_results}")
             bitstrings = [
@@ -197,10 +157,8 @@ class QdkSparseStateSimulator(CircuitExecutor):
             raw_results = sparse_state_run_qasm(
                 qasm,
                 shots=shots,
-                noise=noise_model,
                 as_bitstring=True,
                 seed=self._settings.get("seed"),
-                qubit_loss=qubit_loss_rate,
             )
             Logger.debug(f"Measurement results obtained: {raw_results}")
             # Reverse the order of bits in each measurement result to match Little Endian convention

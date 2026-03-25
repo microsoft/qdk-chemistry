@@ -10,7 +10,7 @@ import random as stdlib_random
 import numpy as np
 import pytest
 
-from qdk_chemistry._core.utils import (
+from qdk_chemistry.utils.pauli_matrix import (
     pauli_expectation,
     pauli_string_to_masks,
     pauli_to_dense_matrix,

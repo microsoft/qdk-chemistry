@@ -38,7 +38,6 @@ void bind_davidson_solver(py::module& m);
 void bind_syev_solver(py::module& m);
 void bind_lattice_graph(py::module& m);
 void bind_model_hamiltonians(py::module& m);
-void bind_pauli_matrix(py::module& m);
 
 PYBIND11_MODULE(_core, m) {
   m.doc() = "QDK/Chemistry C++ core bindings";
@@ -86,7 +85,6 @@ PYBIND11_MODULE(_core, m) {
   bind_valence_space(utils);
   bind_orbital_rotation(utils);
   bind_model_hamiltonians(utils);
-  bind_pauli_matrix(utils);
   bind_logger(utils);
 
   // Bind constants and config at the top level
