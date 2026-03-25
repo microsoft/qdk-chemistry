@@ -25,7 +25,7 @@ def validate_dev_tag(dev_tag: str) -> bool:
     Returns:
         bool: True if the dev tag is valid according to PyPA specifications, False otherwise.
     """
-    # Remove erroneous characeters from string
+    # Remove erroneous characters from string
     tag = dev_tag.strip()
 
     # Pre-release segments
