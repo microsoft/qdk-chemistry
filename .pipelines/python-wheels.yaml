@@ -51,7 +51,7 @@ parameters:
   displayName: Publish to PyPI
 - name: devTag
   type: string
-  default: 'None'
+  default: None
   displayName: PyPI Development Tag (e.g. 'dev1', 'rc1', etc.)
 
 variables:
@@ -138,16 +138,6 @@ extends:
               targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
               artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
-          # Check if user provided a development tag for release and validate before building wheels.
-          # If a development tag is provided and is valid, the VERSION file in the top level directory
-          # will be updated to include the dev tag before publishing to PyPI.
-          - script: |
-              python3 $(Agent.BuildDirectory)/qdk-chemistry/.pipelines/pip-scripts/versioning.py \
-              --version-file $(Agent.BuildDirectory)/qdk-chemistry/VERSION \
-              --dev-tag ${{ parameters.devTag }}
-            displayName: Validate/Set Development Version for Wheels
-            condition: ne('${{ parameters.devTag }}', 'None')
-
           # Build - Linux x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
             - template: .pipelines/templates/build-pip-wheels.yml@self
@@ -159,6 +149,7 @@ extends:
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
+                devTag: ${{ parameters.devTag }}
 
           # Test - Linux x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
@@ -180,6 +171,7 @@ extends:
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
+                devTag: ${{ parameters.devTag }}
 
           # Test - Linux ARM64
           - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
@@ -200,6 +192,7 @@ extends:
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 pythonVersion: $(pythonVersion)
                 macBuild: ON
+                devTag: ${{ parameters.devTag }}
 
           # Test - macOS ARM64
           - ${{ if eq(target.os, 'macOS') }}:
