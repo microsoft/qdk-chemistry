@@ -34,12 +34,91 @@ class ResidueArrayHamiltonianGenerator
   using base_type = SortedDoubleLoopHamiltonianGenerator<WfnType>;
   using full_det_t = typename base_type::full_det_t;
   using full_det_iterator = typename base_type::full_det_iterator;
+  using matrix_span_t = matrix_span<double>;
+  using rank4_span_t = rank4_span<double>;
   template <typename index_t>
   using sparse_matrix_type = sparsexx::csr_matrix<double, index_t>;
 
   template <typename... Args>
   ResidueArrayHamiltonianGenerator(Args&&... args)
       : base_type(std::forward<Args>(args)...) {}
+
+  // ---- Pair-based RDM override (spin-dependent only) ----
+
+  void form_rdms_spin_dep(full_det_iterator bra_begin,
+                          full_det_iterator bra_end,
+                          full_det_iterator ket_begin,
+                          full_det_iterator ket_end, double* C,
+                          matrix_span_t ordm_aa, matrix_span_t ordm_bb,
+                          rank4_span_t trdm_aaaa, rank4_span_t trdm_bbbb,
+                          rank4_span_t trdm_aabb) override {
+    const bool is_symm = bra_begin == ket_begin && bra_end == ket_end;
+    if (!is_symm)
+      return base_type::form_rdms_spin_dep(bra_begin, bra_end, ket_begin,
+                                           ket_end, C, ordm_aa, ordm_bb,
+                                           trdm_aaaa, trdm_bbbb, trdm_aabb);
+    using clock_type = std::chrono::high_resolution_clock;
+    auto st = clock_type::now();
+    auto [pairs, cache] = enumerate_connected_pairs_(bra_begin, bra_end);
+    const size_t ndets = std::distance(bra_begin, bra_end);
+    const size_t npairs = pairs.size();
+
+#pragma omp parallel
+    {
+      std::vector<uint32_t> bra_oa, bra_ob;
+      uint32_t last_bra = UINT32_MAX;
+
+#pragma omp for schedule(static)
+      for (size_t k = 0; k < npairs; ++k) {
+        uint32_t i = detail::pair_lo(pairs[k]);
+        uint32_t j = detail::pair_hi(pairs[k]);
+
+        double val = C[i] * C[j];
+        if (std::abs(val) < 1e-16) continue;
+
+        if (i != last_bra) {
+          bra_oa.assign(cache.occ_a(i),
+                        cache.occ_a(i) + cache.n_alpha_elec);
+          bra_ob.assign(cache.occ_b(i),
+                        cache.occ_b(i) + cache.n_beta_elec);
+          last_bra = i;
+        }
+
+        auto ex_a = cache.alpha[i] ^ cache.alpha[j];
+        auto ex_b = cache.beta[i] ^ cache.beta[j];
+
+        rdm_contributions_spin_dep<true>(
+            cache.alpha[i], cache.alpha[j], ex_a, cache.beta[i],
+            cache.beta[j], ex_b, bra_oa, bra_ob, val, ordm_aa, ordm_bb,
+            trdm_aaaa, trdm_bbbb, trdm_aabb);
+      }
+
+#pragma omp for schedule(static)
+      for (size_t i = 0; i < ndets; ++i) {
+        double val = C[i] * C[i];
+        if (std::abs(val) < 1e-16) continue;
+
+        bra_oa.assign(cache.occ_a(i),
+                      cache.occ_a(i) + cache.n_alpha_elec);
+        bra_ob.assign(cache.occ_b(i),
+                      cache.occ_b(i) + cache.n_beta_elec);
+        rdm_contributions_diag_spin_dep(bra_oa, bra_ob, val, ordm_aa,
+                                        ordm_bb, trdm_aaaa, trdm_bbbb,
+                                        trdm_aabb);
+      }
+    }
+
+    auto en = clock_type::now();
+    auto logger = spdlog::get("rdm");
+    if (logger)
+      logger->info("  RDM_SD(RA): {:.2e}s  ndets={} pairs={}",
+                   std::chrono::duration<double>(en - st).count(), ndets,
+                   pairs.size());
+  }
+
+  // form_entropies: NOT overridden — SDL's unique-alpha grouping is faster
+  // for entropies because only excitation ≤ 2 contributes, and SDL naturally
+  // skips high-excitation pairs via alpha-string grouping.
 
  protected:
   template <typename index_t>
@@ -67,26 +146,16 @@ class ResidueArrayHamiltonianGenerator
                                                 ket_end, H_thresh);
   }
 
- private:
-  template <typename index_t>
-  sparse_matrix_type<index_t> residue_array_build_(
-      full_det_iterator dets_begin, full_det_iterator dets_end,
-      double H_thresh) {
+  // ---- Pair enumeration via residue arrays ----
+  std::pair<std::vector<uint64_t>, detail::SpinCache<WfnType>>
+  enumerate_connected_pairs_(full_det_iterator dets_begin,
+                             full_det_iterator dets_end) {
     using wfn_traits = wavefunction_traits<WfnType>;
-    using clock_type = std::chrono::high_resolution_clock;
 
     const size_t ndets = std::distance(dets_begin, dets_end);
-    if (ndets == 0) return sparse_matrix_type<index_t>(0, 0, 0, 0);
-    auto h_logger = spdlog::get("h_build");
-
-    // ---- Pre-compute spin decomposition ----
-    auto decomp_st = clock_type::now();
     detail::SpinCache<WfnType> cache;
     cache.build(&*dets_begin, ndets);
-    auto decomp_en = clock_type::now();
 
-    // ---- Generate residues ----
-    auto gen_st = clock_type::now();
     const size_t n_elec = dets_begin->count();
     const size_t residues_per_det = n_elec * (n_elec - 1) / 2;
     const size_t total_residues = ndets * residues_per_det;
@@ -103,8 +172,7 @@ class ResidueArrayHamiltonianGenerator
 #pragma omp for schedule(static)
       for (size_t d = 0; d < ndets; ++d) {
         const auto& det = *(dets_begin + d);
-        bits_to_indices(det, occ);  // ffs-based, much faster than scanning N bits
-
+        bits_to_indices(det, occ);
         size_t offset = d * residues_per_det;
         size_t k = 0;
         for (size_t i = 0; i < occ.size(); ++i) {
@@ -118,10 +186,7 @@ class ResidueArrayHamiltonianGenerator
         }
       }
     }
-    auto gen_en = clock_type::now();
 
-    // ---- Sort residues ----
-    auto sort_st = clock_type::now();
     using wfn_less = typename wfn_traits::wfn_comparator;
     auto cmp = [](const ResiduePair& a, const ResiduePair& b) {
       return wfn_less{}(a.residue, b.residue);
@@ -131,12 +196,7 @@ class ResidueArrayHamiltonianGenerator
 #else
     std::sort(residue_arr.begin(), residue_arr.end(), cmp);
 #endif
-    auto sort_en = clock_type::now();
 
-    // ---- Find block boundaries + parallel pair enumeration ----
-    auto scan_st = clock_type::now();
-
-    // Identify where residue changes (block boundaries)
     std::vector<size_t> block_starts;
     block_starts.reserve(total_residues / 4);
     block_starts.push_back(0);
@@ -147,7 +207,6 @@ class ResidueArrayHamiltonianGenerator
     block_starts.push_back(total_residues);
     const size_t n_blocks = block_starts.size() - 1;
 
-    // Each thread accumulates pairs into a local buffer
     int nthreads = 1;
 #ifdef _OPENMP
     nthreads = omp_get_max_threads();
@@ -180,13 +239,9 @@ class ResidueArrayHamiltonianGenerator
         }
       }
     }
-    auto scan_en = clock_type::now();
 
-    // Free residue array
     { std::vector<ResiduePair>().swap(residue_arr); }
 
-    // ---- Merge + sort + dedup ----
-    auto dedup_st = clock_type::now();
     size_t total_raw = 0;
     for (auto& tp : thread_pairs) total_raw += tp.size();
     std::vector<uint64_t> all_pairs;
@@ -196,9 +251,25 @@ class ResidueArrayHamiltonianGenerator
       { std::vector<uint64_t>().swap(tp); }
     }
     detail::sort_unique_pairs(all_pairs);
-    auto dedup_en = clock_type::now();
 
-    // ---- Build CSR ----
+    return {std::move(all_pairs), std::move(cache)};
+  }
+
+ private:
+  template <typename index_t>
+  sparse_matrix_type<index_t> residue_array_build_(
+      full_det_iterator dets_begin, full_det_iterator dets_end,
+      double H_thresh) {
+    using clock_type = std::chrono::high_resolution_clock;
+
+    const size_t ndets = std::distance(dets_begin, dets_end);
+    if (ndets == 0) return sparse_matrix_type<index_t>(0, 0, 0, 0);
+    auto h_logger = spdlog::get("h_build");
+
+    auto enum_st = clock_type::now();
+    auto [all_pairs, cache] = enumerate_connected_pairs_(dets_begin, dets_end);
+    auto enum_en = clock_type::now();
+
     auto csr_st = clock_type::now();
     auto result = detail::build_csr_from_pairs<index_t>(
         ndets, all_pairs, cache, *this, H_thresh);
@@ -209,13 +280,10 @@ class ResidueArrayHamiltonianGenerator
         return std::chrono::duration<double>(b - a).count();
       };
       h_logger->info(
-          "  H_BUILD(RA): decomp={:.2e}s gen={:.2e}s sort={:.2e}s "
-          "scan={:.2e}s dedup={:.2e}s csr={:.2e}s "
-          "pairs_raw={} pairs_uniq={} nnz={}",
-          dur(decomp_st, decomp_en), dur(gen_st, gen_en),
-          dur(sort_st, sort_en), dur(scan_st, scan_en),
-          dur(dedup_st, dedup_en), dur(csr_st, csr_en), total_raw,
-          all_pairs.size(), result.nnz());
+          "  H_BUILD(RA): enum={:.2e}s csr={:.2e}s "
+          "pairs_uniq={} nnz={}",
+          dur(enum_st, enum_en), dur(csr_st, csr_en), all_pairs.size(),
+          result.nnz());
     }
     return result;
   }

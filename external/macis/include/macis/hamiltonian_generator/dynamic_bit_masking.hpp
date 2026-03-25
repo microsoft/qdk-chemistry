@@ -51,6 +51,12 @@ class DynamicBitMaskHamiltonianGenerator
   void set_num_masks(int n) { n_masks_ = n; }
   int num_masks() const { return n_masks_; }
 
+  // form_rdms, form_rdms_spin_dep, form_entropies: NOT overridden.
+  // DBM's pair enumeration (C(10,4)=210 combo passes) is too expensive to
+  // be faster than SDL's unique-alpha grouping for RDMs.  Benchmarks showed
+  // DBM RDM at 35s vs SDL's 29s at 1M dets.  Entropy uses SDL via
+  // inheritance (excitation ≤ 2 only, alpha grouping is ideal).
+
  protected:
   template <typename index_t>
   sparse_matrix_type<index_t> make_csr_hamiltonian_block_(
@@ -75,6 +81,82 @@ class DynamicBitMaskHamiltonianGenerator
       double H_thresh) override {
     return make_csr_hamiltonian_block_<int64_t>(bra_begin, bra_end, ket_begin,
                                                 ket_end, H_thresh);
+  }
+
+  // ---- Pair enumeration via dynamic bit masking ----
+  std::pair<std::vector<uint64_t>, detail::SpinCache<WfnType>>
+  enumerate_connected_pairs_(full_det_iterator dets_begin,
+                             full_det_iterator dets_end) {
+    const size_t ndets = std::distance(dets_begin, dets_end);
+    const WfnType* dets = &*dets_begin;
+
+    detail::SpinCache<WfnType> cache;
+    cache.build(dets, ndets);
+
+    auto variable_orbs = compute_discriminating_orbitals(dets_begin, ndets);
+    std::vector<std::vector<uint32_t>> mask_bits;
+    std::vector<int> bits_per_mask;
+    assign_masks(variable_orbs, n_masks_, mask_bits, bits_per_mask);
+
+    int max_key_bits = 0;
+    {
+      auto combos_tmp = generate_combos(n_masks_, bits_per_mask);
+      for (auto& c : combos_tmp)
+        max_key_bits = std::max(max_key_bits, c.key_bits);
+    }
+    const bool use_u64 = (max_key_bits <= 64);
+
+    std::vector<uint64_t> masked_values(ndets * n_masks_);
+#pragma omp parallel for schedule(static)
+    for (size_t d = 0; d < ndets; ++d) {
+      for (int m = 0; m < n_masks_; ++m) {
+        masked_values[d * n_masks_ + m] = apply_mask(dets[d], mask_bits[m]);
+      }
+    }
+
+    auto combos = generate_combos(n_masks_, bits_per_mask);
+    const size_t n_combos = combos.size();
+
+    int nthreads = 1;
+#ifdef _OPENMP
+    nthreads = omp_get_max_threads();
+#endif
+    std::vector<std::vector<uint64_t>> thread_pairs(nthreads);
+
+#pragma omp parallel
+    {
+      int tid = 0;
+#ifdef _OPENMP
+      tid = omp_get_thread_num();
+#endif
+      auto& my_pairs = thread_pairs[tid];
+
+#pragma omp for schedule(dynamic)
+      for (size_t ci = 0; ci < n_combos; ++ci) {
+        if (use_u64)
+          process_combo_u64_(combos[ci], ndets, masked_values, n_masks_,
+                             bits_per_mask, dets, my_pairs);
+        else
+          process_combo_128_(combos[ci], ndets, masked_values, n_masks_,
+                             bits_per_mask, dets, my_pairs);
+      }
+
+      std::sort(my_pairs.begin(), my_pairs.end());
+      my_pairs.erase(std::unique(my_pairs.begin(), my_pairs.end()),
+                     my_pairs.end());
+    }
+
+    size_t total_raw = 0;
+    for (auto& tp : thread_pairs) total_raw += tp.size();
+    std::vector<uint64_t> all_pairs;
+    all_pairs.reserve(total_raw);
+    for (auto& tp : thread_pairs) {
+      all_pairs.insert(all_pairs.end(), tp.begin(), tp.end());
+      { std::vector<uint64_t>().swap(tp); }
+    }
+    detail::sort_unique_pairs(all_pairs);
+
+    return {std::move(all_pairs), std::move(cache)};
   }
 
  private:
@@ -300,104 +382,16 @@ class DynamicBitMaskHamiltonianGenerator
   sparse_matrix_type<index_t> dynamic_bit_mask_build_(
       full_det_iterator dets_begin, full_det_iterator dets_end,
       double H_thresh) {
-    using wfn_traits = wavefunction_traits<WfnType>;
     using clock_type = std::chrono::high_resolution_clock;
 
     const size_t ndets = std::distance(dets_begin, dets_end);
     if (ndets == 0) return sparse_matrix_type<index_t>(0, 0, 0, 0);
     auto h_logger = spdlog::get("h_build");
-    const WfnType* dets = &*dets_begin;
 
-    // ---- Pre-compute spin decomposition ----
-    auto decomp_st = clock_type::now();
-    detail::SpinCache<WfnType> cache;
-    cache.build(dets, ndets);
-    auto decomp_en = clock_type::now();
+    auto enum_st = clock_type::now();
+    auto [all_pairs, cache] = enumerate_connected_pairs_(dets_begin, dets_end);
+    auto enum_en = clock_type::now();
 
-    // ---- Assign masks (filtering non-discriminating orbitals) ----
-    auto mask_st = clock_type::now();
-
-    auto variable_orbs = compute_discriminating_orbitals(dets_begin, ndets);
-    std::vector<std::vector<uint32_t>> mask_bits;
-    std::vector<int> bits_per_mask;
-    assign_masks(variable_orbs, n_masks_, mask_bits, bits_per_mask);
-
-    // Determine max key bits across combos to choose uint64 vs 128 path
-    int max_key_bits = 0;
-    {
-      auto combos_tmp = generate_combos(n_masks_, bits_per_mask);
-      for (auto& c : combos_tmp) max_key_bits = std::max(max_key_bits, c.key_bits);
-    }
-    const bool use_u64 = (max_key_bits <= 64);
-
-    auto mask_en = clock_type::now();
-
-    // ---- Compute masked values for all dets ----
-    auto mv_st = clock_type::now();
-    std::vector<uint64_t> masked_values(ndets * n_masks_);
-
-#pragma omp parallel for schedule(static)
-    for (size_t d = 0; d < ndets; ++d) {
-      for (int m = 0; m < n_masks_; ++m) {
-        masked_values[d * n_masks_ + m] = apply_mask(dets[d], mask_bits[m]);
-      }
-    }
-    auto mv_en = clock_type::now();
-
-    // ---- Generate combos ----
-    auto combos = generate_combos(n_masks_, bits_per_mask);
-    const size_t n_combos = combos.size();
-
-    // ---- Parallel combo processing ----
-    // Each thread handles a subset of combos with its own key buffer
-    // and pair accumulator.  This is THE key optimization for DBM.
-    auto combo_st = clock_type::now();
-
-    int nthreads = 1;
-#ifdef _OPENMP
-    nthreads = omp_get_max_threads();
-#endif
-    std::vector<std::vector<uint64_t>> thread_pairs(nthreads);
-
-#pragma omp parallel
-    {
-      int tid = 0;
-#ifdef _OPENMP
-      tid = omp_get_thread_num();
-#endif
-      auto& my_pairs = thread_pairs[tid];
-
-#pragma omp for schedule(dynamic)
-      for (size_t ci = 0; ci < n_combos; ++ci) {
-        if (use_u64)
-          process_combo_u64_(combos[ci], ndets, masked_values, n_masks_,
-                             bits_per_mask, dets, my_pairs);
-        else
-          process_combo_128_(combos[ci], ndets, masked_values, n_masks_,
-                             bits_per_mask, dets, my_pairs);
-      }
-
-      // Thread-local dedup to reduce global merge size
-      std::sort(my_pairs.begin(), my_pairs.end());
-      my_pairs.erase(std::unique(my_pairs.begin(), my_pairs.end()),
-                     my_pairs.end());
-    }
-    auto combo_en = clock_type::now();
-
-    // ---- Global merge + dedup ----
-    auto dedup_st = clock_type::now();
-    size_t total_raw = 0;
-    for (auto& tp : thread_pairs) total_raw += tp.size();
-    std::vector<uint64_t> all_pairs;
-    all_pairs.reserve(total_raw);
-    for (auto& tp : thread_pairs) {
-      all_pairs.insert(all_pairs.end(), tp.begin(), tp.end());
-      { std::vector<uint64_t>().swap(tp); }
-    }
-    detail::sort_unique_pairs(all_pairs);
-    auto dedup_en = clock_type::now();
-
-    // ---- Build CSR ----
     auto csr_st = clock_type::now();
     auto result = detail::build_csr_from_pairs<index_t>(
         ndets, all_pairs, cache, *this, H_thresh);
@@ -408,14 +402,10 @@ class DynamicBitMaskHamiltonianGenerator
         return std::chrono::duration<double>(b - a).count();
       };
       h_logger->info(
-          "  H_BUILD(DBM): decomp={:.2e}s masks={:.2e}s mv={:.2e}s "
-          "combos={:.2e}s({} combos,{} masks,{}) dedup={:.2e}s csr={:.2e}s "
-          "var_orbs={} pairs_raw={} pairs_uniq={} nnz={}",
-          dur(decomp_st, decomp_en), dur(mask_st, mask_en),
-          dur(mv_st, mv_en), dur(combo_st, combo_en),
-          n_combos, n_masks_, use_u64 ? "u64" : "u128",
-          dur(dedup_st, dedup_en), dur(csr_st, csr_en),
-          variable_orbs.size(), total_raw, all_pairs.size(), result.nnz());
+          "  H_BUILD(DBM): enum={:.2e}s csr={:.2e}s "
+          "pairs_uniq={} nnz={}",
+          dur(enum_st, enum_en), dur(csr_st, csr_en), all_pairs.size(),
+          result.nnz());
     }
     return result;
   }
