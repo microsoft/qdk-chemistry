@@ -106,7 +106,7 @@ QDK energy estimator
 
 .. rubric:: Factory name: ``"qdk"``
 
-Native QDK/Chemistry implementation of energy estimator. Supports various simualtor backends and noise models for realistic quantum hardware simulation.
+Native QDK/Chemistry implementation of energy estimator. Supports various simulator backends and noise models for realistic quantum hardware simulation.
 
 .. rubric:: Run parameters
 

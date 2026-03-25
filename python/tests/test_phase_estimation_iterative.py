@@ -607,6 +607,7 @@ def test_create_iteration_circuit_invalid_total_iterations_zero() -> None:
         _validate_iteration_inputs(iteration=0, total_iterations=-1)
 
 
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 def test_create_iteration_circuit_power_calculation() -> None:
     """Test that the power calculation is correct for different iterations."""
     hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])

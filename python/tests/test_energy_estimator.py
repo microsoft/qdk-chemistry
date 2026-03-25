@@ -269,13 +269,7 @@ def test_estimator_fewer_shots():
     "executor_name",
     [
         "qdk_full_state_simulator",
-        pytest.param(  # This will be fixed with qsharp factory support in Circuit
-            "qdk_sparse_state_simulator",
-            marks=pytest.mark.skipif(
-                not QDK_CHEMISTRY_HAS_QISKIT,
-                reason="Qiskit not available for QASM-based circuit generation in sparse state simulator",
-            ),
-        ),
+        "qdk_sparse_state_simulator",
         pytest.param(
             "qiskit_aer_simulator",
             marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available"),

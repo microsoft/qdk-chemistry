@@ -48,6 +48,9 @@ namespace QDKChemistry.Utils.MeasurementBasis {
         bases : Pauli[],
         numQubits : Int,
     ) : Result[] {
+        if Length(bases) != numQubits {
+            fail "Length of Pauli bases must match the number of qubits.";
+        }
         use qs = Qubit[numQubits];
         baseCircuit(qs);
         return MeasureInBasis(bases, qs);

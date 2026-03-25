@@ -154,6 +154,8 @@ def _append_measurement_to_circuit(base_circuit: Circuit, m_basis: str) -> Circu
     except ImportError as err:
         raise ImportError("Qiskit is required to use Qiskit circuits with EnergyEstimator.") from err
     base_circuit = base_circuit.get_qiskit_circuit()
+    if len(base_circuit.num_qubits) != len(m_basis):
+        raise ValueError("Measurement basis length must match the number of qubits in the circuit.")
     basis = Pauli(m_basis)
     active = np.arange(basis.num_qubits)[basis.z | basis.x]
     qreg = QuantumRegister(basis.num_qubits, "q")
@@ -187,7 +189,7 @@ class QdkEnergyEstimator(EnergyEstimator):
         circuit_executor: CircuitExecutor,
         total_shots: int,
         noise_model: QuantumErrorProfile | None = None,
-        classical_coeffs: list | None = None,
+        classical_coeffs: list[float] | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Estimate the expectation value and variance of Hamiltonians.
 
