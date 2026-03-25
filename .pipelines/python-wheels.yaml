@@ -143,7 +143,7 @@ extends:
           # will be updated to include the dev tag before publishing to PyPI.
           - script: |
               python3 .pipelines/pip-scripts/versioning.py \
-              --version-file $(System.DefaultWorkingDirectory)/qdk-chemistry/VERSION \
+              --version-file $(System.DefaultWorkingDirectory)/VERSION \
               --dev-tag ${{ parameters.devTag }}
             displayName: Validate/Set Development Version for Wheels
             condition: and(succeeded(), ne('${{ parameters.devTag }}', 'None'))
