@@ -146,7 +146,7 @@ extends:
               --version-file $(System.DefaultWorkingDirectory)/qdk-chemistry/VERSION \
               --dev-tag ${{ parameters.devTag }}
             displayName: Validate/Set Development Version for Wheels
-            condition: and(ne('${{ parameters.devTag }}', 'None'))
+            condition: ne('${{ parameters.devTag }}', 'None')
 
           # Build - Linux x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
