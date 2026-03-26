@@ -76,9 +76,9 @@ def update_version_file(version_file: str, new_version_string: str) -> None:
         LOG.error(f"""
             Invalid version string: {new_version_string}.\n
             Please ensure that the new version string is compliant with PyPA version specifications.
-            The version string should be in the form of X.Y.Z[.devN|rcN|aN|bN|postN], where X, Y, Z, and N are integers. For example: 1.0.0, 2.1.3.dev1, 0.9.0rc2, etc.
+            The version string should be in the form of X.Y.Z[.devN|rcN|aN|bN|.postN], where X, Y, Z, and N are integers. For example: 1.0.0, 2.1.3.dev1, 0.9.0rc2, etc.
         """)
-        exit(1)
+        sys.exit(1)
     else:
         with open(version_file, "w") as f:
             f.write(new_version_string)
