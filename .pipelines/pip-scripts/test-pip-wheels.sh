@@ -90,7 +90,7 @@ python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
 cd "$PYTHON_DIR"
 
 # Install testing/optional dependencies
-python3 -m pip install pytest "pyscf>=2.9.0,<2.12.1" 
+python3 -m pip install pytest "pyscf>=2.9.0,<2.12.1"
 
 # Install built wheel into fresh venv
 pip3 install repaired_wheelhouse/qdk_chemistry*.whl

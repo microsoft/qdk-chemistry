@@ -25,7 +25,8 @@ PYTHON_EXAMPLES_DIR = EXAMPLES_DIR / "python"
 PYSCF_AVAILABLE = importlib.util.find_spec("pyscf") is not None
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
 
-def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool]:
+
+def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool]:
     """Check if an example file requires qiskit or pyscf.
 
     Args:
@@ -159,12 +160,14 @@ def _create_test_methods():
             test_name = f"test_py_{example_file.stem}"
 
             # Check requirements for this example
-            requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature, requires_openfermion = check_example_requirements(
-                example_file
+            requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature, requires_openfermion = (
+                check_example_requirements(example_file)
             )
 
             # Create the test method
-            def make_test(filepath, needs_pyscf, needs_qiskit, needs_qiskit_aer, needs_qiskit_nature, needs_openfermion):
+            def make_test(
+                filepath, needs_pyscf, needs_qiskit, needs_qiskit_aer, needs_qiskit_nature, needs_openfermion
+            ):
                 """Create a test method for the given example file."""
 
                 def test_method(self):
@@ -189,7 +192,14 @@ def _create_test_methods():
             setattr(
                 TestExampleScripts,
                 test_name,
-                make_test(example_file, requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature, requires_openfermion),
+                make_test(
+                    example_file,
+                    requires_pyscf,
+                    requires_qiskit,
+                    requires_qiskit_aer,
+                    requires_qiskit_nature,
+                    requires_openfermion,
+                ),
             )
 
 
