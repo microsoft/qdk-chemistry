@@ -54,7 +54,7 @@ def test_davidson_solver_matrix():
 def test_davidson_solver_model_hamiltonian():
     """Test Davidson solver on a model Hamiltonian."""
     heisenberg_model = QubitHamiltonian(pauli_strings=["XX", "YY", "ZZ"], coefficients=[1.0, 1.0, 1.0])
-    csr_matrix = heisenberg_model.pauli_ops.to_matrix(sparse=True).real.copy()
+    csr_matrix = heisenberg_model.to_matrix(sparse=True).real.copy()
 
     eigval, eigvec = davidson_solver(csr_matrix)
 
@@ -73,7 +73,7 @@ def test_davidson_solver_model_hamiltonian():
 
 def test_davidson_solver_hamiltonian(hamiltonian_10e6o):
     """Test Davidson solver on a larger Hamiltonian (10 electrons in 6 orbitals)."""
-    hamiltonian_csr = hamiltonian_10e6o.pauli_ops.to_matrix(sparse=True).real.copy()
+    hamiltonian_csr = hamiltonian_10e6o.to_matrix(sparse=True).real.copy()
     eigval, eigvec = davidson_solver(hamiltonian_csr)
 
     # Reference values obtained from SCI calculation (test_data/make_f2.py)
