@@ -113,14 +113,14 @@ def main():
     if args.dev_tag is not None:
         dev_tag_is_valid = validate_dev_tag(args.dev_tag)
 
-        if not dev_tag_is_valid and args.dev_tag is not None:
+        if not dev_tag_is_valid:
             LOG.error(f"""
                 Invalid dev tag provided for the wheels: {args.dev_tag}.
                 Please ensure that the dev tag provided in the parameters section of the pipeline is compliant with PyPA version specifications.
                 The dev tag should take the form of devN|rcN|aN|bN|postN, where N is an integer. For example: dev0, rc1, a2, b3, etc.
             """)
             exit(1)
-        elif dev_tag_is_valid and args.dev_tag is not None:
+        elif dev_tag_is_valid:
             LOG.info(f"Dev tag provided for the wheels: {args.dev_tag} is valid.")
             LOG.info(
                 f"New version to be published on PyPI will be suffixed with the dev tag: {args.dev_tag}"
@@ -139,7 +139,7 @@ def main():
         update_version_file(args.version_file, new_version)
     else:  # Not a development release, use the current version as is for the release to PyPI
         new_version = current_version
-        LOG.info(f"Version to be published on PyPI: {new_version}")
+    LOG.info(f"Version to be published on PyPI: {new_version}")
 
 
 if __name__ == "__main__":
