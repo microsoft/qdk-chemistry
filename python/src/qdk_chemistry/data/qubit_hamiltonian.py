@@ -12,20 +12,26 @@ and quantum circuit construction or measurement workflows.
 
 from __future__ import annotations
 
-from functools import cached_property
+import re
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from qiskit.quantum_info import SparsePauliOp
 
 from qdk_chemistry.data.base import DataClass
+from qdk_chemistry.utils.pauli_matrix import (
+    pauli_expectation,
+    pauli_to_dense_matrix,
+    pauli_to_sparse_matrix,
+)
 
 if TYPE_CHECKING:
     import h5py
+    import scipy
 
     from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
 
 __all__ = ["filter_and_group_pauli_ops_from_wavefunction"]
 
@@ -81,10 +87,8 @@ class QubitHamiltonian(DataClass):
             FermionModeOrder(fermion_mode_order) if fermion_mode_order is not None else None
         )
 
-        try:
-            _ = self.pauli_ops  # Trigger cached property to validate Pauli strings
-        except Exception as e:
-            raise ValueError(f"Invalid Pauli strings or coefficients: {e}") from e
+        # Validate Pauli strings
+        _validate_pauli_strings(pauli_strings)
 
         # Make instance immutable after construction (handled by base class)
         super().__init__()
@@ -97,7 +101,7 @@ class QubitHamiltonian(DataClass):
             int: The number of qubits.
 
         """
-        return self.pauli_ops.num_qubits
+        return len(self.pauli_strings[0])
 
     @property
     def schatten_norm(self) -> float:
@@ -113,15 +117,20 @@ class QubitHamiltonian(DataClass):
         """
         return float(np.sum(np.abs(self.coefficients)))
 
-    @cached_property
-    def pauli_ops(self) -> SparsePauliOp:
-        """Get the qubit Hamiltonian as a ``SparsePauliOp``.
+    def to_matrix(self, sparse: bool = False) -> np.ndarray | scipy.sparse.spmatrix:
+        """Convert the qubit Hamiltonian to its full matrix representation.
+
+        Args:
+            sparse: If True, return a csr matrix.
+                Otherwise return a dense matrix. Defaults to False.
 
         Returns:
-            qiskit.quantum_info.SparsePauliOp: The qubit Hamiltonian represented as a ``SparsePauliOp``.
+            The Hamiltonian matrix (dense or sparse).
 
         """
-        return SparsePauliOp(self.pauli_strings, self.coefficients)
+        if sparse:
+            return pauli_to_sparse_matrix(self.pauli_strings, self.coefficients)
+        return np.asarray(pauli_to_dense_matrix(self.pauli_strings, self.coefficients))
 
     def equiv(self, other: QubitHamiltonian, atol: float = 1e-12) -> bool:
         """Check mathematical equivalence with another QubitHamiltonian.
@@ -173,7 +182,7 @@ class QubitHamiltonian(DataClass):
             ``True`` if every coefficient has ``|imag| <= tolerance``.
 
         """
-        return all(abs(complex(c).imag) <= tolerance for c in self.pauli_ops.coeffs)
+        return all(abs(complex(c).imag) <= tolerance for c in self.coefficients)
 
     def get_real_coefficients(
         self, tolerance: float = 1e-12, sort_by_magnitude: bool = False
@@ -196,10 +205,10 @@ class QubitHamiltonian(DataClass):
 
         """
         terms: list[tuple[str, float]] = []
-        for pauli, coeff in zip(self.pauli_ops.paulis, self.pauli_ops.coeffs, strict=True):
+        for pauli_str, coeff in zip(self.pauli_strings, self.coefficients, strict=True):
             real = complex(coeff).real
             if abs(real) > tolerance:
-                terms.append((pauli.to_label(), real))
+                terms.append((pauli_str, real))
         if sort_by_magnitude:
             terms.sort(key=lambda t: abs(t[1]), reverse=True)
         return terms
@@ -272,15 +281,29 @@ class QubitHamiltonian(DataClass):
 
         """
         Logger.trace_entering()
-        sparse_pauli_ops = self.pauli_ops.group_commuting(qubit_wise=qubit_wise)
+        commutes = do_pauli_labels_qw_commute if qubit_wise else do_pauli_labels_commute
+
+        # Each group is a list of (pauli_string, coefficient)
+        groups: list[list[tuple[str, complex]]] = []
+
+        for pauli_str, coeff in zip(self.pauli_strings, self.coefficients, strict=True):
+            placed = False
+            for group in groups:
+                if all(commutes(pauli_str, existing_str) for existing_str, _ in group):
+                    group.append((pauli_str, coeff))
+                    placed = True
+                    break
+            if not placed:
+                groups.append([(pauli_str, coeff)])
+
         return [
             QubitHamiltonian(
-                pauli_strings=group.paulis.to_labels(),
-                coefficients=group.coeffs,
+                pauli_strings=[p for p, _ in group],
+                coefficients=np.array([c for _, c in group]),
                 encoding=self.encoding,
                 fermion_mode_order=self.fermion_mode_order,
             )
-            for group in sparse_pauli_ops
+            for group in groups
         ]
 
     # DataClass interface implementation
@@ -444,11 +467,11 @@ def _filter_and_group_pauli_ops_from_statevector(
     expectations: list[float] = []
     classical: list[float] = []
 
-    for pauli, coeff in zip(hamiltonian.pauli_ops.paulis, hamiltonian.coefficients, strict=True):
-        expval = float(np.vdot(psi, pauli.to_matrix(sparse=True) @ psi).real)
+    for pauli_str, coeff in zip(hamiltonian.pauli_strings, hamiltonian.coefficients, strict=True):
+        expval = pauli_expectation(pauli_str, psi)
 
         if not trimming:
-            retained_paulis.append(pauli.to_label())
+            retained_paulis.append(pauli_str)
             retained_coeffs.append(coeff)
             expectations.append(expval)
             continue
@@ -460,7 +483,7 @@ def _filter_and_group_pauli_ops_from_statevector(
         elif np.isclose(expval, -1.0, atol=trimming_tolerance):
             classical.append(float(-coeff.real))
         else:
-            retained_paulis.append(pauli.to_label())
+            retained_paulis.append(pauli_str)
             retained_coeffs.append(coeff)
             expectations.append(expval)
 
@@ -546,3 +569,27 @@ def filter_and_group_pauli_ops_from_wavefunction(
     return _filter_and_group_pauli_ops_from_statevector(
         hamiltonian, psi, abelian_grouping, trimming, trimming_tolerance
     )
+
+
+def _validate_pauli_strings(pauli_strings: list[str]) -> None:
+    """Validate that all Pauli strings are well-formed.
+
+    Checks that every string uses only the characters {I, X, Y, Z} and
+    that all strings have the same length.
+
+    Raises:
+        ValueError: If any string is empty, has invalid characters, or if strings have inconsistent lengths.
+
+    """
+    if not pauli_strings:
+        raise ValueError("Pauli strings list cannot be empty.")
+    length = len(pauli_strings[0])
+    valid_pauli_pattern = re.compile(r"^[IXYZ]+$")
+    for i, ps in enumerate(pauli_strings):
+        if not ps:
+            raise ValueError(f"Pauli string at index {i} is empty.")
+        if len(ps) != length:
+            raise ValueError(f"Pauli string at index {i} has length {len(ps)}, expected {length}.")
+        if not valid_pauli_pattern.fullmatch(ps):
+            invalid = set(ps) - set("IXYZ")
+            raise ValueError(f"Pauli string at index {i} contains invalid characters: {invalid}.")
