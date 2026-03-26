@@ -190,6 +190,9 @@ TEST_CASE("Bitset Operations") {
     SECTION("128") { mask_test<128>(); }
     SECTION("256") { mask_test<256>(); }
     SECTION("512") { mask_test<512>(); }
+    SECTION("1024") { mask_test<1024>(); }
+    SECTION("2048") { mask_test<2048>(); }
+    SECTION("4096") { mask_test<4096>(); }
   }
 
   SECTION("FFS") {
@@ -219,6 +222,8 @@ TEST_CASE("Bitset Operations") {
     SECTION("256") { lo_word_test<256>(); }
     SECTION("512") { lo_word_test<512>(); }
     SECTION("1024") { lo_word_test<1024>(); }
+    SECTION("2048") { lo_word_test<2048>(); }
+    SECTION("4096") { lo_word_test<4096>(); }
   }
 
   SECTION("HI WORDS") {
@@ -227,6 +232,8 @@ TEST_CASE("Bitset Operations") {
     SECTION("256") { hi_word_test<256>(); }
     SECTION("512") { hi_word_test<512>(); }
     SECTION("1024") { hi_word_test<1024>(); }
+    SECTION("2048") { hi_word_test<2048>(); }
+    SECTION("4096") { hi_word_test<4096>(); }
   }
 
   SECTION("Compare") {

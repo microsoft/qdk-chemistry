@@ -25,6 +25,8 @@ References:
 
 from __future__ import annotations
 
+import itertools
+import math
 from typing import TYPE_CHECKING
 
 from qdk_chemistry.data import PauliTermAccumulator
@@ -36,6 +38,7 @@ if TYPE_CHECKING:
 
 __all__: list[str] = [
     "commutator_bound_first_order",
+    "commutator_bound_higher_order",
     "commutator_bound_second_order",
     "do_pauli_labels_commute",
     "do_pauli_labels_qw_commute",
@@ -329,3 +332,33 @@ def commutator_bound_second_order(
                 total_term2 += 2.0**2 * abs(coefficients[i]) ** 2 * abs(coefficients[j])
 
     return total_term1 + 0.5 * total_term2
+
+
+def commutator_bound_higher_order(
+    hamiltonian: QubitHamiltonian,
+    order: int,
+    weight_threshold: float = 1e-12,
+) -> float:
+    r"""Compute the commutator bound term :math:`\alpha` for arbitrary-order Trotter errors.
+
+    Args:
+        hamiltonian: The qubit Hamiltonian for which to compute the bound.
+        order: The order of the Trotter decomposition.
+        weight_threshold: Absolute threshold for filtering small Hamiltonian coefficients.
+
+    Returns:
+        The commutator bound term :math:`\alpha` multiplying :math:`t^{order+1}` in Theorem 6 of Childs et. al (2021).
+
+    """
+    real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
+    pauli_labels = [label for label, _ in real_terms]
+    coefficients = [coeff for _, coeff in real_terms]
+    abs_coeffs = [abs(c) for c in coefficients]
+
+    n = len(pauli_labels)
+    total = 0.0
+    for idx_tuple in itertools.product(range(n), repeat=order + 1):
+        labels = [pauli_labels[i] for i in idx_tuple]
+        if not does_nested_commutator_vanish(*labels):
+            total += (2.0**order) * math.prod(abs_coeffs[i] for i in idx_tuple)
+    return total
