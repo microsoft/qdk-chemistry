@@ -21,6 +21,18 @@ if QDK_CHEMISTRY_HAS_QISKIT:
         RemoveZBasisOnZeroState,
         SubstituteCliffordRz,
     )
+else:
+    # Define placeholders for type checking when Qiskit is not available
+    QuantumCircuit = object
+    Parameter = object
+    IGate = object
+    SdgGate = object
+    SGate = object
+    ZGate = object
+    PassManager = object
+    MergeZBasisRotations = object
+    RemoveZBasisOnZeroState = object
+    SubstituteCliffordRz = object
 
 pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 

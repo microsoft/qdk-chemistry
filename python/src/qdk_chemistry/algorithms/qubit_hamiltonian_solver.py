@@ -90,7 +90,7 @@ class SparseMatrixSolver(QubitHamiltonianSolver):
             tuple[float, np.ndarray]: The ground state energy and corresponding eigenstate.
 
         """
-        sparse_matrix = qubit_hamiltonian.pauli_ops.to_matrix(sparse=True)
+        sparse_matrix = qubit_hamiltonian.to_matrix(sparse=True)
         sparse_matrix_real = sparse_matrix.real.copy()
         eigenvalue, eigenvector = davidson_solver(
             sparse_matrix_real, tol=self._settings.get("tol"), max_m=self._settings.get("max_m")
@@ -119,7 +119,7 @@ class DenseMatrixSolver(QubitHamiltonianSolver):
             tuple[float, np.ndarray]: The ground state energy and corresponding eigenstate.
 
         """
-        dense_matrix = qubit_hamiltonian.pauli_ops.to_matrix()
+        dense_matrix = qubit_hamiltonian.to_matrix()
         dense_matrix_real = dense_matrix.real.copy()
         eigenvalues, eigenvectors = syev_solver(dense_matrix_real)
         ground_state_energy = eigenvalues[0]

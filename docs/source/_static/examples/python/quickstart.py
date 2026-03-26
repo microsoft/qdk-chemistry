@@ -130,12 +130,15 @@ print(f"Number of classical coefficients: {len(classical_coeffs)}")
 ################################################################################
 # start-cell-energy-estimation
 # Estimate energy using the optimized circuit and filtered Hamiltonian operators
-estimator = create("energy_estimator", algorithm_name="qdk_base_simulator")
+estimator = create("energy_estimator", algorithm_name="qdk")
+circuit_executor = create(
+    "circuit_executor", algorithm_name="qdk_sparse_state_simulator"
+)
 energy_results, simulation_data = estimator.run(
     circuit=sparse_isometry_circuit,
     qubit_hamiltonians=filtered_hamiltonian_ops,
+    circuit_executor=circuit_executor,
     total_shots=250000,
-    classical_coeffs=classical_coeffs,
 )
 
 for i, results in enumerate(simulation_data.bitstring_counts):
@@ -144,7 +147,11 @@ for i, results in enumerate(simulation_data.bitstring_counts):
     )
 
 # Print statistics for the measured energy
-energy_mean = energy_results.energy_expectation_value + hamiltonian.get_core_energy()
+energy_mean = (
+    energy_results.energy_expectation_value
+    + sum(classical_coeffs)
+    + hamiltonian.get_core_energy()
+)
 energy_stddev = np.sqrt(energy_results.energy_variance)
 print(
     f"Estimated energy from quantum circuit: {energy_mean:.3f} ± {energy_stddev:.3f} Hartree"

@@ -37,7 +37,7 @@ def test_qiskit_qubit_mappers(encoding) -> None:
     assert isinstance(hamiltonian, Hamiltonian)
     qubit_hamiltonian = qubit_mapper.run(hamiltonian)
     assert isinstance(qubit_hamiltonian, QubitHamiltonian)
-    assert qubit_hamiltonian.pauli_ops.num_qubits == 4
+    assert qubit_hamiltonian.num_qubits == 4
     assert isinstance(qubit_hamiltonian.pauli_strings, list)
     assert (
         qubit_hamiltonian.pauli_strings

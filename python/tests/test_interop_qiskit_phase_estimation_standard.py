@@ -9,7 +9,6 @@ from dataclasses import dataclass
 
 import numpy as np
 import pytest
-from qiskit import QuantumCircuit, qasm3
 
 from qdk_chemistry.data import Circuit, QpeResult, QubitHamiltonian
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
@@ -21,11 +20,19 @@ from .reference_tolerances import (
 )
 
 if QDK_CHEMISTRY_HAS_QISKIT:
+    from qiskit import QuantumCircuit, qasm3
     from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 
     from qdk_chemistry.algorithms import create
     from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
     from qdk_chemistry.utils.phase import energy_from_phase
+
+else:
+    # Define placeholders for type checking when Qiskit is not available
+    QuantumCircuit = object
+    qasm3 = object
+    QiskitStatePreparation = object
+    QiskitStandardPhaseEstimation = object
 
 
 pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
