@@ -62,7 +62,7 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     if ', "qiskit' in content or ", 'qiskit" in content:
         requires_qiskit = True
 
-    if ' ,"openfermion"' in content or ",'openfermion'" in content:
+    if ', "openfermion"' in content or ", 'openfermion'" in content:
         requires_openfermion = True
 
     # Look for create(..., algorithm_name="pyscf") or create(..., algorithm_name='pyscf') patterns
@@ -71,7 +71,7 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     if 'algorithm_name="qiskit' in content or "algorithm_name='qiskit" in content:
         requires_qiskit = True
     if 'algorithm_name="openfermion' in content or "algorithm_name='openfermion" in content:
-        requires_qiskit = True
+        requires_openfermion = True
 
     if any(
         pattern in content
