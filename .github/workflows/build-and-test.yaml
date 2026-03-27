@@ -105,6 +105,31 @@ jobs:
         echo "PYTHONPATH=${{ github.workspace }}/install/lib/python${{ matrix.python-version }}/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
         echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
+
+    - name: Debug Host Environment
+      run: |
+        set -x
+        sudo apt install -y pciutils lshw
+        echo "RUNNER_NAME=$RUNNER_NAME"
+        echo "RUNNER_OS=$RUNNER_OS"
+        echo "RUNNER_TRACKING_ID=$RUNNER_TRACKING_ID"
+        echo "HOSTNAME: $(hostname)"
+        cat /etc/machine-id || true
+        echo "Boot ID:"; cat /proc/sys/kernel/random/boot_id || true
+        echo "DISKS:"
+        lsblk -o NAME,SIZE,TYPE,FSTYPE,PATH,MOUNTPOINT,MODEL
+        df -hT
+        lspci | grep -i storage || true
+        sudo lshw -class disk -class storage || true
+        echo "/mnt contents:"
+        ls -la /mnt
+        ls -la /mnt/storage
+        DPKG_PIDS="$(sudo fuser /var/lib/dpkg/lock-frontend 2>/dev/null | awk '{print $1}')"
+        [ -n "$DPKG_PIDS" ] && ps -fp "$DPKG_PIDS" || true
+        systemctl list-timers | grep -E 'apt|unattended' || true
+        systemctl status apt-daily.service apt-daily-upgrade.service unattended-upgrades || true
+        ps aux | egrep -i 'Runner.Listener|Runner.Worker|actions.runner|runsvc|Agent.Listener' | grep -v egrep || true
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
