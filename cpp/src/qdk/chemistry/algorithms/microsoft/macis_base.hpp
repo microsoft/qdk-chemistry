@@ -122,6 +122,7 @@ inline data::Wavefunction build_wavefunction(
   using VV = typename Container::VectorVariant;
 
   // General Wavefunction construction
+  // All the new logging in this file should be debug, not info
   QDK_LOGGER().info("Building wavefunction: converting {} determinants to "
                     "configurations...",
                     dets.size());

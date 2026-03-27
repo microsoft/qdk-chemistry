@@ -116,6 +116,7 @@ struct asci_helper {
       QDK_LOGGER().info(
           "Requested number of determinants ({}) exceeds FCI dimension ({}).",
           asci_settings.ntdets_max, fci_dimension);
+      // IS SDL the best idea for FCI?
       E_casci = macis::CASRDMFunctor<sdl_gen_t>::rdms(
           mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
           nbeta, const_cast<double*>(T_a.data()),

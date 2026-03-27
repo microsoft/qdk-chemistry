@@ -51,6 +51,7 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                size_t ndets_max, double E0, std::vector<wfn_t<N>> wfn,
                std::vector<double> X, HamiltonianGenerator<wfn_t<N>>& ham_gen,
                size_t norb,
+               // This should take the cache as the last parameter and not default the communicator
                CachedHamiltonianState<wfn_t<N>, index_t>* h_cache = nullptr
                MACIS_MPI_CODE(, MPI_Comm comm = MPI_COMM_WORLD)) {
   // Sort wfn on coefficient weights
@@ -159,6 +160,7 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 
     // Only use warm-start if overlap is high enough; otherwise the guess
     // is too far from the ground state in the new, much larger space.
+    // This is not the actual overlap fraction - the inner product would need to be computed
     double overlap_fraction = wfn.size() > 0
         ? static_cast<double>(n_matched) / static_cast<double>(wfn.size())
         : 0.0;

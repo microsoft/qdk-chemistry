@@ -136,11 +136,13 @@ class MacisAsciSettings : public MultiConfigurationSettings {
         "grow_ci_residual_tolerance",
         macis_defaults.grow_ci_residual_tolerance,
         "CI residual tolerance during grow phase (0 = use refine tolerance)");
+    // I still don't understand this option very well, can you document is better and explain it to me in the chat?
     set_default<double>(
         "taper_grow_factor", macis_defaults.taper_grow_factor,
         "Growth factor for final expansion near ntdets_max (0 = disabled)");
 
     // Hamiltonian build algorithm selection
+    // This is a bad variable name and should use the "constraint" type to enumerate the allowed options
     set_default<std::string>(
         "h_build_algo", macis_defaults.h_build_algo,
         "Algorithm for diagonal Hamiltonian construction: "

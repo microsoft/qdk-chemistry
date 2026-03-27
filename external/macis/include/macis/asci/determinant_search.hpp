@@ -160,6 +160,7 @@ struct ASCISettings {
   /// @brief Minimum determinant overlap fraction for using incremental
   /// (patched) Hamiltonian build.  Below this threshold the full CSR is
   /// rebuilt from scratch.  Range: (0, 1].
+  // This is misleading as it will still enforce alternation. We should check whether that's actually required or if it just requires tinkering with the grow_factor parameters.
   double min_patch_overlap = 0.3;
 
   /// @brief CI residual tolerance used during the grow phase.
