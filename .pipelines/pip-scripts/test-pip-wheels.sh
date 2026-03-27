@@ -100,7 +100,7 @@ pip3 install repaired_wheelhouse/qdk_chemistry*.whl
 PYTHON_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
 if [ "$PYTHON_MINOR" -lt 14 ]; then
     echo "Installing qiskit-extras..."
-    python3 -m pip install qiskit-aer qiskit-nature "openfermion>=1.0.0" qiskit_qasm3_import
+    python3 -m pip install qiskit-aer qiskit-nature "openfermion>=1.0.0" qiskit_qasm3_import "pylatexenc==2.10"
 else
     echo "Skipping qiskit-extras and openfermion (not supported on Python 3.14+)"
 fi
