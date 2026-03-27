@@ -109,6 +109,7 @@ autodoc_mock_imports = [  # Configure autodoc to handle C++ extension modules an
     "qdk_chemistry.libchemistry",
     "qdk_chemistry.libsparsexx",
     "pybind11_builtins",
+    "qiskit",
     "qiskit_nature",
     "qiskit_aer",
     "openfermion",

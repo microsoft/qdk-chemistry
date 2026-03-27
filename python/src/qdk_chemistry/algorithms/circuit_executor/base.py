@@ -62,5 +62,5 @@ class CircuitExecutorFactory(AlgorithmFactory):
         return "circuit_executor"
 
     def default_algorithm_name(self) -> str:
-        """Return the qdk_full_state_simulator as default algorithm name."""
-        return "qdk_full_state_simulator"
+        """Return the qdk sparse state simulator as default algorithm name."""
+        return "qdk_sparse_state_simulator"
