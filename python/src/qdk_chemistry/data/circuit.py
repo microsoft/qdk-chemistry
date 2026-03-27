@@ -193,10 +193,7 @@ class Circuit(DataClass):
 
         raise RuntimeError("The quantum circuit is not set in a Q# format.")
 
-    def estimate(
-        self,
-        params: dict[str, Any] | list[Any] | qsharp.estimator.EstimatorParams | None = None,
-    ) -> qsharp.estimator.EstimatorResult:
+    def estimate(self, params=None):
         """Estimate resources for the quantum circuit.
 
         Args:
@@ -207,7 +204,7 @@ class Circuit(DataClass):
                 ``qsharp.openqasm.estimate``) are used.
 
         Returns:
-            qsharp.estimator.EstimatorResult: The estimated resources.
+            The estimated resources as an ``EstimatorResult``.
 
         Raises:
             RuntimeError: If no suitable circuit representation is available for estimation.
