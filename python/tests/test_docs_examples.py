@@ -29,7 +29,7 @@ _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1",
 
 
 def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool, bool]:
-    """Check if an example file requires qiskit or pyscf.
+    """Check if an example file requires qiskit, pyscf, openfermion or contains slow tests.
 
     Args:
         example_file: Path to the example file to check
