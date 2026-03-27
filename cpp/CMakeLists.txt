@@ -4,6 +4,18 @@ cmake_minimum_required(VERSION 3.15)
 set(_VERSION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION")
 file(READ "${_VERSION_FILE}" QDK_VERSION)
 string(STRIP "${QDK_VERSION}" QDK_VERSION)
+
+# Strip prerelease/dev suffixes for development PyPI release (e.g. .dev0, .rc1)
+# Keeps only the leading numeric core: X, X.Y, or X.Y.Z
+set(QDK_VERSION_RAW "${QDK_VERSION}")
+string(REGEX MATCH "^[0-9]+(\\.[0-9]+)?(\\.[0-9]+)?" QDK_VERSION "${QDK_VERSION_RAW}")
+
+if(NOT QDK_VERSION)
+    message(FATAL_ERROR "Invalid VERSION file content for CMake project VERSION: '${QDK_VERSION_RAW}'. ")
+else()
+    message(STATUS "Project version: ${QDK_VERSION}")
+endif()
+
 # Re-run CMake configure when the VERSION file changes
 # Only set at the top-level to avoid duplicate output errors when included via add_subdirectory
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
