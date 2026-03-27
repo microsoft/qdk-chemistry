@@ -101,6 +101,11 @@ PYTHON_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
 if [ "$PYTHON_MINOR" -lt 14 ]; then
     echo "Installing qiskit-extras..."
     python3 -m pip install qiskit-aer qiskit-nature "openfermion>=1.0.0"
+
+    if [ "$PYTHON_MINOR" -eq 10 ]; then
+        echo "Installing qiskit_qasm3_import for Python 3.10..."
+        python3 -m pip install qiskit_qasm3_import
+    fi
 else
     echo "Skipping qiskit-extras and openfermion (not supported on Python 3.14+)"
 fi
