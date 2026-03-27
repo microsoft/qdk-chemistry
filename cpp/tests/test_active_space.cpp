@@ -724,6 +724,51 @@ TEST_F(WavefunctionActiveSpaceTest, AutocasEosEntropyThreshold) {
   EXPECT_EQ(indices4_beta, std::vector<size_t>({0, 1, 2, 3, 4, 5}));
 }
 
+TEST_F(WavefunctionActiveSpaceTest, AutocasEosNormalizeEntropies) {
+  Eigen::VectorXd entropies(10);
+  entropies << 0.8, 0.8, 0.4, 0.4, 0.4, 0.02, 0.02, 0.02, 0.02, 0.02;
+  std::vector<size_t> orbital_indices = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+  auto wfn = std::make_shared<MockWavefunction>(
+      MockWavefunction(entropies, orbital_indices));
+
+  auto selector = ActiveSpaceSelectorFactory::create("qdk_autocas_eos");
+  selector->settings().set("normalize_entropies", true);
+  selector->settings().set("entropy_threshold", 0.45);
+  auto result = selector->run(wfn);
+  auto indices = result->get_orbitals()->get_active_space_indices();
+  EXPECT_EQ(indices.first, std::vector<size_t>({0, 1}));
+  EXPECT_EQ(indices.second, std::vector<size_t>({0, 1}));
+
+  // Without normalization: raw entropies [0.8, 0.8, 0.4, ...], threshold=0.45
+  // 0.4 < 0.45, so only 0.8 pass -> also 2 orbitals, but via raw comparison
+  selector = ActiveSpaceSelectorFactory::create("qdk_autocas_eos");
+  selector->settings().set("normalize_entropies", false);
+  selector->settings().set("entropy_threshold", 0.45);
+  result = selector->run(wfn);
+  auto indices2 = result->get_orbitals()->get_active_space_indices();
+  EXPECT_EQ(indices2.first, std::vector<size_t>({0, 1}));
+  EXPECT_EQ(indices2.second, std::vector<size_t>({0, 1}));
+
+  // threshold=0.35 with normalization: 0.35/0.8 = 0.4375
+  // Normalized entropy 0.5 > 0.4375 -> 5 orbitals selected
+  selector = ActiveSpaceSelectorFactory::create("qdk_autocas_eos");
+  selector->settings().set("normalize_entropies", true);
+  selector->settings().set("entropy_threshold", 0.35);
+  result = selector->run(wfn);
+  auto indices3 = result->get_orbitals()->get_active_space_indices();
+  EXPECT_EQ(indices3.first, std::vector<size_t>({0, 1, 2, 3, 4}));
+  EXPECT_EQ(indices3.second, std::vector<size_t>({0, 1, 2, 3, 4}));
+
+  // Without normalization: raw entropy 0.4 > 0.35 -> also 5 orbitals
+  selector = ActiveSpaceSelectorFactory::create("qdk_autocas_eos");
+  selector->settings().set("normalize_entropies", false);
+  selector->settings().set("entropy_threshold", 0.35);
+  result = selector->run(wfn);
+  auto indices4 = result->get_orbitals()->get_active_space_indices();
+  EXPECT_EQ(indices4.first, std::vector<size_t>({0, 1, 2, 3, 4}));
+  EXPECT_EQ(indices4.second, std::vector<size_t>({0, 1, 2, 3, 4}));
+}
+
 TEST_F(WavefunctionActiveSpaceTest, AutocasNonContinuous) {
   auto selector = ActiveSpaceSelectorFactory::create("qdk_autocas");
   Eigen::VectorXd entropies(10);
