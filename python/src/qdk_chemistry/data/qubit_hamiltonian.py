@@ -425,10 +425,9 @@ class QubitHamiltonian(DataClass):
 def _filter_and_group_pauli_ops_from_statevector(
     hamiltonian: QubitHamiltonian,
     statevector: np.ndarray,
-    abelian_grouping: bool = True,
     trimming: bool = True,
     trimming_tolerance: float = 1e-8,
-) -> tuple[list[QubitHamiltonian], list[float]]:
+) -> tuple[QubitHamiltonian | None, list[float]]:
     """Filter and group the Pauli operators respect to a given quantum state.
 
     This function evaluates each Pauli term in the Hamiltonian with respect to the
@@ -440,7 +439,6 @@ def _filter_and_group_pauli_ops_from_statevector(
     * Remaining terms with fractional expectation values are retained and grouped by
         shared expectation value to reduce measurement redundancy
         (e.g., due to symmetry).
-    * The rest of Hamiltonian is grouped into qubit wise commuting terms.
 
     Args:
         hamiltonian (QubitHamiltonian): QubitHamiltonian to be filtered and grouped.
@@ -450,8 +448,8 @@ def _filter_and_group_pauli_ops_from_statevector(
         trimming_tolerance (float): Numerical tolerance for determining zero or ±1 expectation (Default: 1e-8).
 
     Returns:
-        A tuple of ``(list[QubitHamiltonian], list[float])``
-            * A list of grouped QubitHamiltonian.
+        A tuple of ``(QubitHamiltonian, list[float])``
+            * The reduced QubitHamiltonian.
             * A list of classical coefficients for terms that were reduced to classical contributions.
 
     """
@@ -488,7 +486,10 @@ def _filter_and_group_pauli_ops_from_statevector(
             expectations.append(expval)
 
     if not retained_paulis:
-        return [], classical
+        Logger.info(
+            "All terms have zero or ±1 expectation value; returning empty Hamiltonian and classical contributions."
+        )
+        return None, classical
 
     grouped: dict[int, list[tuple[str, complex, float]]] = {}
     key_counter = 0
@@ -522,20 +523,15 @@ def _filter_and_group_pauli_ops_from_statevector(
         fermion_mode_order=hamiltonian.fermion_mode_order,
     )
 
-    grouped_hamiltonians = (
-        reduced_hamiltonian.group_commuting(qubit_wise=abelian_grouping) if abelian_grouping else [reduced_hamiltonian]
-    )
-
-    return grouped_hamiltonians, classical
+    return reduced_hamiltonian, classical
 
 
 def filter_and_group_pauli_ops_from_wavefunction(
     hamiltonian: QubitHamiltonian,
     wavefunction: Wavefunction,
-    abelian_grouping: bool = True,
     trimming: bool = True,
     trimming_tolerance: float = 1e-8,
-) -> tuple[list[QubitHamiltonian], list[float]]:
+) -> tuple[QubitHamiltonian | None, list[float]]:
     """Filter and group the Pauli operators respect to a given quantum state.
 
     This function evaluates each Pauli term in the Hamiltonian with respect to the
@@ -547,18 +543,16 @@ def filter_and_group_pauli_ops_from_wavefunction(
     * Remaining terms with fractional expectation values are retained and grouped by
         shared expectation value to reduce measurement redundancy
         (e.g., due to symmetry).
-    * The rest of Hamiltonian is grouped into qubit wise commuting terms.
 
     Args:
         hamiltonian (QubitHamiltonian): QubitHamiltonian to be filtered and grouped.
         wavefunction (Wavefunction): Wavefunction used to compute expectation values.
-        abelian_grouping (bool): Whether to group into qubit-wise commuting subsets.
         trimming (bool): If True, discard or reduce terms with ±1 or 0 expectation value.
         trimming_tolerance (float): Numerical tolerance for determining zero or ±1 expectation (Default: 1e-8).
 
     Returns:
-        A tuple of ``(list[QubitHamiltonian], list[float])``
-            * A list of grouped QubitHamiltonian.
+        A tuple of ``(QubitHamiltonian | None, list[float])``
+            * The reduced QubitHamiltonian, or None if all terms were reduced to classical contributions.
             * A list of classical coefficients for terms that were reduced to classical contributions.
 
     """
@@ -566,9 +560,7 @@ def filter_and_group_pauli_ops_from_wavefunction(
 
     Logger.trace_entering()
     psi = create_statevector_from_wavefunction(wavefunction, normalize=True)
-    return _filter_and_group_pauli_ops_from_statevector(
-        hamiltonian, psi, abelian_grouping, trimming, trimming_tolerance
-    )
+    return _filter_and_group_pauli_ops_from_statevector(hamiltonian, psi, trimming, trimming_tolerance)
 
 
 def _validate_pauli_strings(pauli_strings: list[str]) -> None:

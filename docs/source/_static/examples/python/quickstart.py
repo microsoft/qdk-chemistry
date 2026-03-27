@@ -119,10 +119,10 @@ filtered_hamiltonian_ops, classical_coeffs = (
     filter_and_group_pauli_ops_from_wavefunction(qubit_hamiltonian, wfn_sparse)
 )
 print(
-    f"Filtered and grouped qubit Hamiltonian contains {len(filtered_hamiltonian_ops)} groups:"
+    f"Filtered qubit Hamiltonian contains {len(filtered_hamiltonian_ops.pauli_strings)} terms:"
 )
-for igroup, group in enumerate(filtered_hamiltonian_ops):
-    print(f"Group {igroup + 1}: {[group.pauli_strings]}")
+for iterm, term in enumerate(filtered_hamiltonian_ops.pauli_strings):
+    print(f"Term {iterm + 1}: {[term]}")
 print(f"Number of classical coefficients: {len(classical_coeffs)}")
 # end-cell-qubit-hamiltonian
 ################################################################################
@@ -136,7 +136,7 @@ circuit_executor = create(
 )
 energy_results, simulation_data = estimator.run(
     circuit=sparse_isometry_circuit,
-    qubit_hamiltonians=filtered_hamiltonian_ops,
+    qubit_hamiltonian=filtered_hamiltonian_ops,
     circuit_executor=circuit_executor,
     total_shots=250000,
 )

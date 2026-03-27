@@ -363,8 +363,8 @@ def test_filter_and_group_returns_empty_if_all_trimmed():
     """If all expectation values are +1 or -1, no grouped Hamiltonians remain."""
     qubit_hamiltonian = QubitHamiltonian(["ZZ"], np.array([5.0]))
     state = np.array([1 / np.sqrt(2), 0, 0, 1 / np.sqrt(2)])
-    grouped, classical = _filter_and_group_pauli_ops_from_statevector(qubit_hamiltonian, state)
-    assert grouped == []
+    filtered_op, classical = _filter_and_group_pauli_ops_from_statevector(qubit_hamiltonian, state)
+    assert filtered_op is None
     assert len(classical) == 1
     assert np.isclose(
         sum(classical), 5.0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
@@ -373,10 +373,10 @@ def test_filter_and_group_returns_empty_if_all_trimmed():
 
 def test_filter_and_group_behavior_on_simple_state(hamiltonian_4e4o, wavefunction_4e4o):
     """Test extraction and simplification of Pauli terms from a Hamiltonian."""
-    grouped_ops, classical_coeffs = filter_and_group_pauli_ops_from_wavefunction(
-        hamiltonian_4e4o, wavefunction_4e4o, abelian_grouping=True, trimming=True
+    filtered_op, classical_coeffs = filter_and_group_pauli_ops_from_wavefunction(
+        hamiltonian_4e4o, wavefunction_4e4o, trimming=True
     )
-    assert len(grouped_ops) == 2
+    assert len(filtered_op.pauli_strings) == 3
     assert np.isclose(
         sum(classical_coeffs).real,
         -4.191428699447072,
@@ -387,63 +387,31 @@ def test_filter_and_group_behavior_on_simple_state(hamiltonian_4e4o, wavefunctio
 
 def test_filter_and_group_no_trimming(hamiltonian_4e4o, wavefunction_4e4o):
     """Test filter_and_group_pauli_ops_from_wavefunction with trimming=False."""
-    grouped_ops, classical_coeffs = filter_and_group_pauli_ops_from_wavefunction(
+    filtered_op, classical_coeffs = filter_and_group_pauli_ops_from_wavefunction(
         hamiltonian_4e4o,
         wavefunction_4e4o,
-        abelian_grouping=True,
         trimming=False,
     )
 
     # With trimming=False, should keep all terms and have no classical coefficients
+    # Only group by expectation value
     assert len(classical_coeffs) == 0
-    assert len(grouped_ops) > 0
+    assert len(filtered_op.pauli_strings) == 6
 
     qubit_hamiltonian = QubitHamiltonian(["X", "Z"], [1.0, 2.0])
 
     # Create |0> state
     statevector = np.array([1.0, 0.0])
 
-    grouped_ops, classical_coeffs = _filter_and_group_pauli_ops_from_statevector(
+    filtered_op, classical_coeffs = _filter_and_group_pauli_ops_from_statevector(
         qubit_hamiltonian,
         statevector,
-        abelian_grouping=True,
         trimming=False,  # This avoids the filtering logic entirely
     )
 
     # With trimming=False, should keep all terms and have no classical coefficients
     assert len(classical_coeffs) == 0
-    assert len(grouped_ops) > 0
-
-
-def test_filter_and_group_no_abelian_grouping(hamiltonian_4e4o, wavefunction_4e4o):
-    """Test filter_and_group_pauli_ops_from_wavefunction abelian_grouping=False."""
-    grouped_ops, _ = filter_and_group_pauli_ops_from_wavefunction(
-        hamiltonian_4e4o,
-        wavefunction_4e4o,
-        abelian_grouping=False,
-        trimming=True,
-    )
-
-    # With abelian_grouping=False, should return a single group
-    assert len(grouped_ops) == 1
-    assert isinstance(grouped_ops[0], QubitHamiltonian)
-
-    # Create a 1-qubit Hamiltonian
-    qubit_hamiltonian = QubitHamiltonian(["X", "Z"], [1.0, 2.0])
-
-    # Create |0> state
-    statevector = np.array([1.0, 0.0])
-
-    grouped_ops, _ = _filter_and_group_pauli_ops_from_statevector(
-        qubit_hamiltonian,
-        statevector,
-        abelian_grouping=False,  # This takes a different path
-        trimming=False,
-    )
-
-    # With abelian_grouping=False, should return a single group
-    assert len(grouped_ops) == 1
-    assert isinstance(grouped_ops[0], QubitHamiltonian)
+    assert len(filtered_op.pauli_strings) == 2
 
 
 def test_filter_and_group_mixed_with_retained_terms():
@@ -456,8 +424,8 @@ def test_filter_and_group_mixed_with_retained_terms():
     # |00> + |11> (Bell state) normalized
     statevector = np.array([1 / np.sqrt(2), 0, 0, 1 / np.sqrt(2)])
 
-    grouped_ops, classical_coeffs = _filter_and_group_pauli_ops_from_statevector(
-        qubit_hamiltonian, statevector, abelian_grouping=True, trimming=True
+    filtered_op, classical_coeffs = _filter_and_group_pauli_ops_from_statevector(
+        qubit_hamiltonian, statevector, trimming=True
     )
 
     # This should have some classical terms and some retained terms
@@ -466,7 +434,7 @@ def test_filter_and_group_mixed_with_retained_terms():
     # IZ: expectation 0 (filtered)
     # ZZ: expectation 1 (classical)
     assert len(classical_coeffs) == 2
-    assert len(grouped_ops) == 0
+    assert filtered_op is None
 
 
 def test_filter_and_group_with_small_fractional_expectations():
@@ -480,15 +448,17 @@ def test_filter_and_group_with_small_fractional_expectations():
     norm = np.sqrt(1 + epsilon**2)
     statevector = np.array([1 / norm, epsilon / norm])
 
-    grouped_ops, classical_coeffs = _filter_and_group_pauli_ops_from_statevector(
-        qubit_hamiltonian, statevector, abelian_grouping=True, trimming=True
+    filtered_op, classical_coeffs = _filter_and_group_pauli_ops_from_statevector(
+        qubit_hamiltonian, statevector, trimming=True
     )
 
-    # I should be classical (expectation ~1)
-    # Z should have fractional expectation (retained)
-    # X should have small expectation (likely retained unless very close to 0)
-    total_ops = len(grouped_ops) + len(classical_coeffs)
-    assert total_ops > 0  # Should have some terms
+    # I has expectation 1.0 → classical with coefficient contribution 1.0
+    assert len(classical_coeffs) == 1
+    assert np.isclose(
+        classical_coeffs[0], 1.0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+    )
+    # Z (exp ≈ 0.98) and X (exp ≈ 0.20) are fractional → retained
+    assert set(filtered_op.pauli_strings) == {"Z", "X"}
 
 
 def test_filter_and_group_both_trimming_modes():
@@ -498,25 +468,26 @@ def test_filter_and_group_both_trimming_modes():
     statevector = np.array([1.0, 0.0])  # |0> state
 
     # Test with trimming=False (safe path)
-    grouped_ops_no_trim, classical_coeffs_no_trim = _filter_and_group_pauli_ops_from_statevector(
-        qubit_hamiltonian, statevector, abelian_grouping=True, trimming=False
+    filtered_op_no_trim, classical_coeffs_no_trim = _filter_and_group_pauli_ops_from_statevector(
+        qubit_hamiltonian, statevector, trimming=False
     )
 
     # Should keep all terms
     assert len(classical_coeffs_no_trim) == 0
-    assert len(grouped_ops_no_trim) > 0
+    assert set(filtered_op_no_trim.pauli_strings) == {"X", "Z"}
 
     # Test with trimming=True and a state that ensures some fractional expectations
     # Use a superposition state
     statevector_super = np.array([0.8, 0.6])
 
-    grouped_ops_trim, classical_coeffs_trim = _filter_and_group_pauli_ops_from_statevector(
-        qubit_hamiltonian, statevector_super, abelian_grouping=True, trimming=True
+    filtered_op_trim, classical_coeffs_trim = _filter_and_group_pauli_ops_from_statevector(
+        qubit_hamiltonian, statevector_super, trimming=True
     )
 
-    # Should have some result
-    total_terms = len(grouped_ops_trim) + len(classical_coeffs_trim)
-    assert total_terms >= 0
+    # <X> = 2 * 0.8 * 0.6 = 0.96 and <Z> = 0.64 - 0.36 = 0.28
+    # Both are fractional → retained, nothing classical
+    assert len(classical_coeffs_trim) == 0
+    assert set(filtered_op_trim.pauli_strings) == {"X", "Z"}
 
 
 class TestQubitHamiltonianSerialization:

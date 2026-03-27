@@ -254,11 +254,7 @@ def test_estimator_fewer_shots():
     cx q[0], q[1];
     """
     circuit = Circuit(qasm=qasm)
-    observable = [
-        QubitHamiltonian(["ZZ"], np.array([2])),
-        QubitHamiltonian(["XX"], np.array([3])),
-        QubitHamiltonian(["YY"], np.array([4])),
-    ]
+    observable = QubitHamiltonian(["ZZ", "XX", "YY"], np.array([2, 3, 4]))
     executor = create("circuit_executor", "qdk_full_state_simulator")
     estimator = QdkEnergyEstimator()
     with pytest.raises(ValueError, match=r"Total shots .* is less than the number of observables .*"):
