@@ -94,10 +94,83 @@ jobs:
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
     steps:
+    - name: Free up disk space (Linux)
+      if: matrix.os-name == 'Linux'
+      run: |
+        echo "=== Disk space before cleanup ==="
+        df -h
+        
+        # Remove unnecessary large packages commonly present on GitHub runners
+        sudo rm -rf /usr/share/dotnet || true
+        sudo rm -rf /usr/local/lib/android || true
+        sudo rm -rf /opt/ghc || true
+        sudo rm -rf /opt/hostedtoolcache/go || true
+        sudo rm -rf /opt/hostedtoolcache/Ruby || true
+        
+        # Clean apt cache
+        sudo apt-get clean || true
+        
+        echo "=== Disk space after cleanup ==="
+        df -h
+
+    - name: Find additional disk and prepare workspace (Linux)
+      if: matrix.os-name == 'Linux'
+      id: find-disk
+      run: |
+        echo "=== Available disks ==="
+        df -h
+        
+        # Find mount point with most available space (excluding virtual filesystems)
+        LARGEST_MOUNT=$(df --output=avail,target -x tmpfs -x devtmpfs -x squashfs -x overlay 2>/dev/null | tail -n +2 | sort -rn | head -1 | awk '{print $2}')
+        LARGEST_AVAIL_KB=$(df --output=avail "$LARGEST_MOUNT" 2>/dev/null | tail -1 | tr -d ' ')
+        
+        echo "Largest mount: $LARGEST_MOUNT (${LARGEST_AVAIL_KB}KB available)"
+        
+        # Use the alternate disk if it's not root/home and has >50GB available
+        if [[ "$LARGEST_MOUNT" != "/" && "$LARGEST_MOUNT" != "/home" && "$LARGEST_AVAIL_KB" -gt 52428800 ]]; then
+          ALT_WORKSPACE="$LARGEST_MOUNT/gh-runner-${{ github.run_id }}"
+          sudo mkdir -p "$ALT_WORKSPACE"
+          sudo chown -R $USER:$USER "$ALT_WORKSPACE"
+          echo "alt_workspace=$ALT_WORKSPACE" >> $GITHUB_OUTPUT
+          echo "use_alt_disk=true" >> $GITHUB_OUTPUT
+          echo "Will use alternate disk at: $ALT_WORKSPACE"
+          
+          # Clean up old workspaces from previous runs (older than 1 day)
+          find "$LARGEST_MOUNT" -maxdepth 1 -type d -name "gh-runner-*" -mtime +1 -exec sudo rm -rf {} \; 2>/dev/null || true
+        else
+          echo "use_alt_disk=false" >> $GITHUB_OUTPUT
+          echo "Using default workspace (alternate disk not available or too small)"
+        fi
+
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         submodules: recursive
+
+    - name: Move build directories to larger disk (Linux)
+      if: matrix.os-name == 'Linux' && steps.find-disk.outputs.use_alt_disk == 'true'
+      run: |
+        ALT_WORKSPACE="${{ steps.find-disk.outputs.alt_workspace }}"
+        
+        # Create directories on larger disk and symlink them
+        mkdir -p "$ALT_WORKSPACE/cpp_build"
+        mkdir -p "$ALT_WORKSPACE/install"
+        mkdir -p "$ALT_WORKSPACE/cpp_deps_install"
+        mkdir -p "$ALT_WORKSPACE/cpp_deps_build"
+        
+        # Create build directory in source tree as symlink
+        mkdir -p cpp
+        ln -sfn "$ALT_WORKSPACE/cpp_build" cpp/build
+        
+        # Create symlink for cpp_deps_build at workspace level
+        ln -sfn "$ALT_WORKSPACE/cpp_deps_build" "${{ github.workspace }}/cpp_deps_build"
+        
+        # Update env vars to point to larger disk
+        echo "CMAKE_INSTALL_PREFIX=$ALT_WORKSPACE/install" >> $GITHUB_ENV
+        echo "CPP_DEPS_PREFIX=$ALT_WORKSPACE/cpp_deps_install" >> $GITHUB_ENV
+        
+        echo "Build artifacts will be stored on larger disk at: $ALT_WORKSPACE"
+        df -h "$ALT_WORKSPACE"
 
     - name: Set up environment paths
       run: |
@@ -114,6 +187,11 @@ jobs:
     - name: Install Linux system packages
       if: matrix.os-name == 'Linux'
       run: |
+        # Wait for any existing apt/dpkg processes to finish (e.g., unattended-upgrades)
+        while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+          echo "Waiting for dpkg lock to be released..."
+          sleep 5
+        done
         sudo apt-get update
         sudo apt-get install -y \
           build-essential \
@@ -501,4 +579,13 @@ jobs:
             fi
           done
           exit $MAKE_EXIT_CODE
+        fi
+
+    - name: Cleanup alternate disk workspace (Linux)
+      if: always() && matrix.os-name == 'Linux' && steps.find-disk.outputs.use_alt_disk == 'true'
+      run: |
+        ALT_WORKSPACE="${{ steps.find-disk.outputs.alt_workspace }}"
+        if [[ -d "$ALT_WORKSPACE" ]]; then
+          echo "Cleaning up alternate workspace: $ALT_WORKSPACE"
+          sudo rm -rf "$ALT_WORKSPACE" || true
         fi

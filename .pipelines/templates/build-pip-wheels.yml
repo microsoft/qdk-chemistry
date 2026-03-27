@@ -49,6 +49,8 @@ steps:
 - checkout: self
   persistCredentials: true
   path: qdk-chemistry
+  fetchDepth: 1
+  retryCountOnCheckout: 3
 
 - task: PipAuthenticate@1
   displayName: Pip Authenticate
