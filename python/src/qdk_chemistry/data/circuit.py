@@ -19,6 +19,7 @@ from typing import Any
 
 import h5py
 import qsharp._native
+import qsharp.estimator
 import qsharp.openqasm
 from qsharp.openqasm import OutputSemantics
 
@@ -192,12 +193,18 @@ class Circuit(DataClass):
 
         raise RuntimeError("The quantum circuit is not set in a Q# format.")
 
-    def estimate(self, params=None):
-        """Estimate logical resources for the quantum circuit.
+    def estimate(
+        self,
+        params: dict[str, Any] | list[Any] | qsharp.estimator.EstimatorParams | None = None,
+    ) -> qsharp.estimator.EstimatorResult:
+        """Estimate resources for the quantum circuit.
 
         Args:
-            params: Optional parameters to configure physical estimation. Can be a dictionary,
-                list, or ``qsharp.estimator.EstimatorParams`` instance. Defaults to None.
+            params: Optional parameters to configure resource estimation (for logical and/or
+                physical resources). Can be a dictionary, list, or
+                ``qsharp.estimator.EstimatorParams`` instance. If None, the default estimator
+                settings of the underlying Q# APIs (``qsharp.estimate`` or
+                ``qsharp.openqasm.estimate``) are used.
 
         Returns:
             qsharp.estimator.EstimatorResult: The estimated resources.

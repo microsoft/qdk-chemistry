@@ -415,9 +415,15 @@ class TestCircuitEstimate:
 
     def test_estimate_from_factory(self):
         """Test that estimate works with Q# factory data."""
-        state_prep_params = {"rowMap": [1, 0], "stateVector": [0.6, 0.0, 0.0, 0.8], "expansionOps": [], "numQubits": 2}
+        state_prep_params = {
+            "rowMap": [1, 0],
+            "stateVector": [0.6, 0.0, 0.0, 0.8],
+            "expansionOps": [],
+            "numQubits": 2,
+        }
         qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=state_prep_params,
         )
         circuit = Circuit(qsharp_factory=qsharp_factory)
         result = circuit.estimate()
