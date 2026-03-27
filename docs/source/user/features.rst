@@ -2,6 +2,7 @@ Features, methods and dependencies
 ==================================
 
 This document provides an overview of QDK/Chemistry's features, supported methods, and software dependencies.
+QDK/Chemistry spans the full quantum applications pipeline — from classical electronic structure through quantum circuit synthesis and execution — providing researchers with the tools to construct end-to-end quantum–classical workflows for molecular simulation.
 
 .. contents:: On This Page
    :local:
@@ -11,13 +12,108 @@ This document provides an overview of QDK/Chemistry's features, supported method
 Supported Methods
 -----------------
 
+Quantum Algorithms
+^^^^^^^^^^^^^^^^^^
+
+QDK/Chemistry provides quantum algorithms for chemistry, designed to work together as composable stages in a quantum applications workflow.
+Each algorithm is available through the :doc:`factory/registry pattern <comprehensive/algorithms/factory_pattern>`, enabling seamless selection between multiple implementations.
+
+Phase Estimation
+""""""""""""""""
+
+Phase estimation algorithms extract energy eigenvalues from a quantum state by measuring the phase accumulated under Hamiltonian time evolution.
+QDK/Chemistry provides several phase estimation approaches, including:
+
+Iterative Quantum Phase Estimation (:term:`IQPE`)
+   Kitaev's algorithm using a single ancilla qubit with sequential MSB-to-LSB bit extraction and adaptive feedback phase correction.
+   Particularly suited to near-term hardware due to its low ancilla requirements and configurable shots-per-bit precision.
+
+Standard QFT-based Quantum Phase Estimation (:term:`QPE`)
+   Parallel phase-register measurement via quantum Fourier transform, providing all precision bits simultaneously.
+
+Phase estimation implementations include post-processing with automatic phase wrapping, energy alias detection and resolution, and full serialization of results.
+
+State Preparation
+"""""""""""""""""
+
+Core to quantum algorithms for chemistry is the ability to efficiently prepare quantum states that approximate the ground or excited states of molecular systems. In QDK/Chemistry, this process is generally viewed as a mapping between a classical representation of the molecular wavefunction (e.g., a Slater determinant or a linear combination thereof, represented by the `Wavefunction` class) and a circuit that prepares the corresponding quantum state on a quantum computer given a particular qubit encoding (e.g. binary, gray code, etc). QDK/Chemistry provides several state preparation techniques to facilitate this mapping, including:
+
+Dense Isometry State Preparation
+   Implementations of general-purpose state preparation algorithms that can prepare arbitrary quantum states, represented in the occupation number formalism, given their amplitudes.
+
+Sparse Isometry State Preparation
+   Optimized algorithms for preparing quantum states with a small number of non-zero amplitudes, such as those arising from selected :term:`CI` methods.
+
+See :doc:`comprehensive/algorithms/state_preparation` for further details about available state preparation methods and implementations.
+
+Implementation Highlights
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+GF2+X Sparse Isometry State Preparation
+   QDK/Chemistry implements an optimized state preparation algorithm for wavefunctions with sparse amplitude structure.
+   The GF2+X method, a modification of the original sparse isometry work in :cite:`Malvetti2021`, applies GF(2) Gaussian elimination to the binary matrix representation of the quantum state to determine a reduced space representation of the sparse state.
+   This reduced state is then densely encoded via regular isometry :cite:`Christandl2016` on a smaller number of qubits, and finally scattered to the full qubit space using X and :term:`CNOT` gates.
+   By focusing only on non-zero amplitudes, this approach substantially reduces circuit depth and gate count compared to dense isometry methods, making it especially suitable for selected :term:`CI` and other sparse wavefunctions.
+
+
+Hamiltonian Encoding
+""""""""""""""""""""
+
+Classical quantum chemistry methods are generally expressed in the language of second quantization, using fermionic creation and annihilation operators to describe interactions between electron configurations. However, quantum computers operate on qubits, necessitating a transformation from fermionic operators to qubit operators. QDK/Chemistry implements several standard mapping techniques, including:
+
+Jordan-Wigner Transformation :cite:`Jordan-Wigner1928`
+   A straightforward mapping that encodes fermionic operators directly onto qubits, preserving the algebraic structure of the operators.
+
+Bravyi-Kitaev Transformation :cite:`Seeley2012`
+   A more efficient mapping that reduces the number of qubits required for certain operations by balancing locality and parity information.
+
+Parity Transformation :cite:`Seeley2012`
+   An alternative mapping that encodes fermionic operators based on the parity of occupation numbers, offering advantages in specific contexts.
+
+QDK/Chemistry provides both a native qubit mapper implementation and integration with external libraries through plugins.
+See :doc:`comprehensive/algorithms/qubit_mapper` for available implementations and usage details.
+QDK/Chemistry also provides :doc:`Pauli operator arithmetic <comprehensive/data/pauli_operator>` for building and manipulating qubit Hamiltonians using natural mathematical notation.
+
+.. _qubit-mapper-highlights:
+
+Implementation Highlights
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Native QDK Qubit Mapper
+   QDK/Chemistry includes a high-performance native implementation of fermion-to-qubit mappings built on the :doc:`PauliOperator <comprehensive/data/pauli_operator>` expression layer.
+   This implementation supports both Jordan-Wigner and Bravyi-Kitaev encodings :cite:`Seeley2012`, using the Seeley-Richard-Love algorithm for the Bravyi-Kitaev mapping, with configurable coefficient thresholds for controlling numerical precision.
+   The native mapper applies thresholds after the complete transformation, ensuring mathematically consistent results across different molecular systems.
+
+
+Observable Sampling and Energy Estimation
+"""""""""""""""""""""""""""""""""""""""""
+
+After preparing a quantum state representing the molecular system, a common next step is to compute physical observables, such as the ground state energy.
+One canonical choice for this task is to estimate the expectation value through statistical sampling of measurements performed on the quantum state relative to the operator of interest.
+This generally involves the following steps:
+
+1. **Operator Decomposition**:
+   The target operator (e.g., the electronic Hamiltonian) is decomposed into a sum of measurable components, often expressed in terms of Pauli operators.
+   This decomposition facilitates efficient measurement on quantum hardware.
+   Starting from a qubit-mapped Hamiltonian, this task generally involves grouping Pauli terms into sets of mutually commuting operators that can be measured simultaneously.
+   QDK/Chemistry provides utilities for Pauli grouping by qubit-wise commutativity via the :class:`~qdk_chemistry.data.QubitHamiltonian.group_commuting` method.
+2. **Circuit Execution and Measurement**:
+   Given the state preparation circuit and the decomposed operator, quantum circuits are executed on quantum hardware or simulators to obtain measurement outcomes.
+3. **Classical Post-Processing**:
+   The measurement results are processed classically to estimate the expectation value of the operator.
+
+See :doc:`comprehensive/algorithms/energy_estimator` for further details about available observable sampling methods and implementations.
+
+
 Classical Quantum Chemistry Methods
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The classical electronic structure methods in QDK/Chemistry produce the molecular orbitals, reference wavefunctions, and compact Hamiltonians that serve as essential inputs to the quantum algorithms above.
 
 Self-Consistent Field (SCF)
 """""""""""""""""""""""""""
 
-QDK/Chemistry provides access to a variety of robust, high-performance implementations mean-field electronic structure methods that produce optimized molecular orbitals and reference energies. In particular, the following :term:`SCF` types are supported:
+QDK/Chemistry provides access to a variety of robust, high-performance implementations of mean-field electronic structure methods that produce optimized molecular orbitals and reference energies. In particular, the following :term:`SCF` types are supported:
 
 Hartree-Fock (:term:`HF`)
    Restricted (:term:`RHF`), Unrestricted (:term:`UHF`), Restricted Open-Shell (:term:`ROHF`)
@@ -137,82 +233,6 @@ Adaptive Sampling Configuration Interaction (:term:`ASCI`)
    QDK/Chemistry integrates :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :cite:`Williams-Young2023`, a high-performance, parallel implementation of the Adaptive Sampling Configuration Interaction (:term:`ASCI`) algorithm :cite:`Tubman2016,Tubman2020`.
    :term:`ASCI` iteratively grows the determinant space by identifying configurations with the largest contributions to the wavefunction, achieving near-:term:`CASCI` accuracy at a fraction of the cost.
    This enables treatment of active spaces that would be intractable for conventional :term:`CASCI`. See the :ref:`ASCI Algorithm <asci-algorithm>` section for details.
-
-
-Quantum Algorithms
-^^^^^^^^^^^^^^^^^^
-
-State Preparation
-"""""""""""""""""
-
-Core to quantum algorithms for chemistry is the ability to efficiently prepare quantum states that approximate the ground or excited states of molecular systems. In QDK/Chemistry, this process is generally viewed as a mapping between a classical representation of the molecular wavefunction (e.g., a Slater determinant or a linear combination thereof, represented by the `Wavefunction` class) and a circuit that prepares the corresponding quantum state on a quantum computer given a particular qubit encoding (e.g. binary, gray code, etc). QDK/Chemistry provides several state preparation techniques to facilitate this mapping, including:
-
-Dense Isometry State Preparation
-   Implementations of general-purpose state preparation algorithms that can prepare arbitrary quantum states, represented in the occupation number formalism, given their amplitudes.
-
-Sparse Isometry State Preparation
-   Optimized algorithms for preparing quantum states with a small number of non-zero amplitudes, such as those arising from selected :term:`CI` methods.
-
-See :doc:`comprehensive/algorithms/state_preparation` for further details about available state preparation methods and implementations.
-
-Implementation Highlights
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-GF2+X Sparse Isometry State Preparation
-   QDK/Chemistry implements an optimized state preparation algorithm for wavefunctions with sparse amplitude structure.
-   The GF2+X method, a modification of the original sparse isometry work in :cite:`Malvetti2021`, applies GF(2) Gaussian elimination to the binary matrix representation of the quantum state to determine a reduced space representation of the sparse state.
-   This reduced state is then densely encoded via regular isometry :cite:`Christandl2016` on a smaller number of qubits, and finally scattered to the full qubit space using X and :term:`CNOT` gates.
-   By focusing only on non-zero amplitudes, this approach substantially reduces circuit depth and gate count compared to dense isometry methods, making it especially suitable for selected :term:`CI` and other sparse wavefunctions.
-
-
-Hamiltonian Encoding
-""""""""""""""""""""
-
-Classical quantum chemistry methods are generally expressed in the language of second quantization, using fermionic creation and annihilation operators to describe interactions between electron configurations. However, quantum computers operate on qubits, necessitating a transformation from fermionic operators to qubit operators. QDK/Chemistry implements several standard mapping techniques to achieve this:
-
-Jordan-Wigner Transformation :cite:`Jordan-Wigner1928`
-   A straightforward mapping that encodes fermionic operators directly onto qubits, preserving the algebraic structure of the operators.
-
-Bravyi-Kitaev Transformation :cite:`Seeley2012`
-   A more efficient mapping that reduces the number of qubits required for certain operations by balancing locality and parity information.
-
-Parity Transformation :cite:`Seeley2012`
-   An alternative mapping that encodes fermionic operators based on the parity of occupation numbers, offering advantages in specific contexts.
-
-QDK/Chemistry provides both a native qubit mapper implementation and integration with external libraries through plugins.
-See :doc:`comprehensive/algorithms/qubit_mapper` for available implementations and usage details.
-QDK/Chemistry also provides :doc:`Pauli operator arithmetic <comprehensive/data/pauli_operator>` for building and manipulating qubit Hamiltonians using natural mathematical notation.
-
-.. _qubit-mapper-highlights:
-
-Implementation Highlights
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Native QDK Qubit Mapper
-   QDK/Chemistry includes a high-performance native implementation of fermion-to-qubit mappings built on the :doc:`PauliOperator <comprehensive/data/pauli_operator>` expression layer.
-   This implementation supports both Jordan-Wigner and Bravyi-Kitaev encodings :cite:`Seeley2012`, using the Seeley-Richard-Love algorithm for the Bravyi-Kitaev mapping, with configurable coefficient thresholds for controlling numerical precision.
-   The native mapper applies thresholds after the complete transformation, ensuring mathematically consistent results across different molecular systems.
-
-
-Observable Sampling
-"""""""""""""""""""
-
-After preparing a quantum state representing the molecular system, a common next step is to compute physical observables, such as the ground state energy.
-One canonical choice for this task is to estimate the expectation value through statistical sampling of measurements performed on the quantum state relative to the operator of interest.
-This generally involves the following steps:
-
-1. **Operator Decomposition**:
-   The target operator (e.g., the electronic Hamiltonian) is decomposed into a sum of measurable components, often expressed in terms of Pauli operators.
-   This decomposition facilitates efficient measurement on quantum hardware.
-   Starting from a qubit-mapped Hamiltonian, this task generally involves grouping Pauli terms into sets of mutually commuting operators that can be measured simultaneously.
-   QDK/Chemistry provides utilities to perform, for example, `Pauli grouping by qubit-wise commutativity <https://qiskit.org/documentation/stubs/qiskit.opflow.grouping.PauliGrouper.html>`_ through its Qiskit plugin.
-2. **Circuit Execution and Measurement**:
-   Given the state preparation circuit and the decomposed operator, quantum circuits are executed on quantum hardware or simulators to obtain measurement outcomes.
-3. **Classical Post-Processing**:
-   The measurement results are processed classically to estimate the expectation value of the operator.
-
-See :doc:`comprehensive/algorithms/energy_estimator` for further details about available observable sampling methods and implementations.
-
 
 
 Community Open Source Software Dependencies
