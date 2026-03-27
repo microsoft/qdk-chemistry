@@ -127,7 +127,7 @@ Native QDK/Chemistry implementation of energy estimator. Supports various simula
      - int
      - Total number of measurement shots
    * - ``noise_model``
-     - NoiseModel
+     - QuantumErrorProfile | None
      - Noise model to apply during circuit execution
 
 Related classes

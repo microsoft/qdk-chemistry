@@ -19,7 +19,6 @@ import numpy as np
 
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils.pauli_matrix import (
-    pauli_expectation,
     pauli_to_dense_matrix,
     pauli_to_sparse_matrix,
 )
@@ -28,12 +27,11 @@ if TYPE_CHECKING:
     import h5py
     import scipy
 
-    from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
 
-__all__ = ["filter_and_group_pauli_ops_from_wavefunction"]
+__all__: list[str] = []
 
 
 class QubitHamiltonian(DataClass):
@@ -420,147 +418,6 @@ class QubitHamiltonian(DataClass):
             encoding=encoding,
             fermion_mode_order=fermion_mode_order,
         )
-
-
-def _filter_and_group_pauli_ops_from_statevector(
-    hamiltonian: QubitHamiltonian,
-    statevector: np.ndarray,
-    trimming: bool = True,
-    trimming_tolerance: float = 1e-8,
-) -> tuple[QubitHamiltonian | None, list[float]]:
-    """Filter and group the Pauli operators respect to a given quantum state.
-
-    This function evaluates each Pauli term in the Hamiltonian with respect to the
-    provided statevector:
-
-    * Terms with zero expectation value are discarded.
-    * Terms with expectation ±1 are treated as classical and their contribution is
-        added to the energy at the end.
-    * Remaining terms with fractional expectation values are retained and grouped by
-        shared expectation value to reduce measurement redundancy
-        (e.g., due to symmetry).
-
-    Args:
-        hamiltonian (QubitHamiltonian): QubitHamiltonian to be filtered and grouped.
-        statevector (numpy.ndarray): Statevector used to compute expectation values.
-        abelian_grouping (bool): Whether to group into qubit-wise commuting subsets.
-        trimming (bool): If True, discard or reduce terms with ±1 or 0 expectation value.
-        trimming_tolerance (float): Numerical tolerance for determining zero or ±1 expectation (Default: 1e-8).
-
-    Returns:
-        A tuple of ``(QubitHamiltonian, list[float])``
-            * The reduced QubitHamiltonian.
-            * A list of classical coefficients for terms that were reduced to classical contributions.
-
-    """
-    Logger.trace_entering()
-    psi = np.asarray(statevector, dtype=complex)
-    norm = np.linalg.norm(psi)
-    if norm < np.finfo(np.float64).eps:
-        raise ValueError("Statevector has zero norm.")
-    psi /= norm
-
-    retained_paulis: list[str] = []
-    retained_coeffs: list[complex] = []
-    expectations: list[float] = []
-    classical: list[float] = []
-
-    for pauli_str, coeff in zip(hamiltonian.pauli_strings, hamiltonian.coefficients, strict=True):
-        expval = pauli_expectation(pauli_str, psi)
-
-        if not trimming:
-            retained_paulis.append(pauli_str)
-            retained_coeffs.append(coeff)
-            expectations.append(expval)
-            continue
-
-        if np.isclose(expval, 0.0, atol=trimming_tolerance):
-            continue
-        if np.isclose(expval, 1.0, atol=trimming_tolerance):
-            classical.append(float(coeff.real))
-        elif np.isclose(expval, -1.0, atol=trimming_tolerance):
-            classical.append(float(-coeff.real))
-        else:
-            retained_paulis.append(pauli_str)
-            retained_coeffs.append(coeff)
-            expectations.append(expval)
-
-    if not retained_paulis:
-        Logger.info(
-            "All terms have zero or ±1 expectation value; returning empty Hamiltonian and classical contributions."
-        )
-        return None, classical
-
-    grouped: dict[int, list[tuple[str, complex, float]]] = {}
-    key_counter = 0
-    # Assign approximate groups based on tolerance
-    for pauli, coeff, expval in zip(retained_paulis, retained_coeffs, expectations, strict=True):
-        matched_key = None
-        for k, terms in grouped.items():
-            if np.isclose(expval, terms[0][2], atol=trimming_tolerance):
-                matched_key = k
-                break
-        if matched_key is None:
-            grouped[key_counter] = [(pauli, coeff, expval)]
-            key_counter += 1
-        else:
-            grouped[matched_key].append((pauli, coeff, expval))
-
-    reduced_pauli: list[str] = []
-    reduced_coeffs: list[complex] = []
-
-    for _, terms in grouped.items():
-        coeff_sum = sum(c for _, c, _ in terms)
-        # Choose Pauli with maximum # of I (most diagonal)
-        best_pauli = sorted([p for p, _, _ in terms], key=lambda p: (-str(p).count("I"), str(p)))[0]
-        reduced_pauli.append(best_pauli)
-        reduced_coeffs.append(coeff_sum)
-
-    reduced_hamiltonian = QubitHamiltonian(
-        reduced_pauli,
-        np.array(reduced_coeffs),
-        encoding=hamiltonian.encoding,
-        fermion_mode_order=hamiltonian.fermion_mode_order,
-    )
-
-    return reduced_hamiltonian, classical
-
-
-def filter_and_group_pauli_ops_from_wavefunction(
-    hamiltonian: QubitHamiltonian,
-    wavefunction: Wavefunction,
-    trimming: bool = True,
-    trimming_tolerance: float = 1e-8,
-) -> tuple[QubitHamiltonian | None, list[float]]:
-    """Filter and group the Pauli operators respect to a given quantum state.
-
-    This function evaluates each Pauli term in the Hamiltonian with respect to the
-    provided wavefunction:
-
-    * Terms with zero expectation value are discarded.
-    * Terms with expectation ±1 are treated as classical and their contribution is
-        added to the energy at the end.
-    * Remaining terms with fractional expectation values are retained and grouped by
-        shared expectation value to reduce measurement redundancy
-        (e.g., due to symmetry).
-
-    Args:
-        hamiltonian (QubitHamiltonian): QubitHamiltonian to be filtered and grouped.
-        wavefunction (Wavefunction): Wavefunction used to compute expectation values.
-        trimming (bool): If True, discard or reduce terms with ±1 or 0 expectation value.
-        trimming_tolerance (float): Numerical tolerance for determining zero or ±1 expectation (Default: 1e-8).
-
-    Returns:
-        A tuple of ``(QubitHamiltonian | None, list[float])``
-            * The reduced QubitHamiltonian, or None if all terms were reduced to classical contributions.
-            * A list of classical coefficients for terms that were reduced to classical contributions.
-
-    """
-    from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction  # noqa: PLC0415
-
-    Logger.trace_entering()
-    psi = create_statevector_from_wavefunction(wavefunction, normalize=True)
-    return _filter_and_group_pauli_ops_from_statevector(hamiltonian, psi, trimming, trimming_tolerance)
 
 
 def _validate_pauli_strings(pauli_strings: list[str]) -> None:

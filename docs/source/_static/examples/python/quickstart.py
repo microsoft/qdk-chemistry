@@ -12,9 +12,6 @@ from pathlib import Path
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
-from qdk_chemistry.data.qubit_hamiltonian import (
-    filter_and_group_pauli_ops_from_wavefunction,
-)
 
 # Load para-benzyne structure from XYZ file
 structure = Structure.from_xyz_file(
@@ -106,24 +103,13 @@ sparse_isometry_circuit = state_prep.run(wfn_sparse)
 ################################################################################
 # start-cell-qubit-hamiltonian
 # Prepare qubit Hamiltonian
-qubit_mapper = create("qubit_mapper", algorithm_name="qiskit", encoding="jordan-wigner")
+qubit_mapper = create("qubit_mapper", algorithm_name="qdk", encoding="jordan-wigner")
 qubit_hamiltonian = qubit_mapper.run(hamiltonian)
 
 # Print the number of Pauli strings in the full Hamiltonian
 print(
     f"Number of Pauli strings in the Hamiltonian: {len(qubit_hamiltonian.pauli_strings)}"
 )
-
-# Filter and group Pauli operators based on the wavefunction
-filtered_hamiltonian_ops, classical_coeffs = (
-    filter_and_group_pauli_ops_from_wavefunction(qubit_hamiltonian, wfn_sparse)
-)
-print(
-    f"Filtered qubit Hamiltonian contains {len(filtered_hamiltonian_ops.pauli_strings)} terms:"
-)
-for iterm, term in enumerate(filtered_hamiltonian_ops.pauli_strings):
-    print(f"Term {iterm + 1}: {[term]}")
-print(f"Number of classical coefficients: {len(classical_coeffs)}")
 # end-cell-qubit-hamiltonian
 ################################################################################
 
@@ -131,14 +117,12 @@ print(f"Number of classical coefficients: {len(classical_coeffs)}")
 # start-cell-energy-estimation
 # Estimate energy using the optimized circuit and filtered Hamiltonian operators
 estimator = create("energy_estimator", algorithm_name="qdk")
-circuit_executor = create(
-    "circuit_executor", algorithm_name="qdk_sparse_state_simulator"
-)
+circuit_executor = create("circuit_executor", algorithm_name="qdk_full_state_simulator")
 energy_results, simulation_data = estimator.run(
     circuit=sparse_isometry_circuit,
-    qubit_hamiltonian=filtered_hamiltonian_ops,
+    qubit_hamiltonian=qubit_hamiltonian,
     circuit_executor=circuit_executor,
-    total_shots=250000,
+    total_shots=500000,  # Increase number of shots to improve accuracy
 )
 
 for i, results in enumerate(simulation_data.bitstring_counts):
@@ -147,11 +131,7 @@ for i, results in enumerate(simulation_data.bitstring_counts):
     )
 
 # Print statistics for the measured energy
-energy_mean = (
-    energy_results.energy_expectation_value
-    + sum(classical_coeffs)
-    + hamiltonian.get_core_energy()
-)
+energy_mean = energy_results.energy_expectation_value + hamiltonian.get_core_energy()
 energy_stddev = np.sqrt(energy_results.energy_variance)
 print(
     f"Estimated energy from quantum circuit: {energy_mean:.3f} ± {energy_stddev:.3f} Hartree"
