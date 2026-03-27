@@ -53,11 +53,11 @@ Acronym definitions
    ERI
       Electron Repulsion Integral.
 
-   FCIDUMP
-      Text format for storing one- and two-electron integrals (FCIDUMP standard).
-
    FCI
       Full Configuration Interaction.
+
+   FCIDUMP
+      Text format for storing one- and two-electron integrals (FCIDUMP standard).
 
    GDM
       Geometric Direct Minimization.
@@ -70,6 +70,10 @@ Acronym definitions
 
    HOMO
       Highest Occupied Molecular Orbital.
+
+   IQPE
+      Iterative Quantum Phase Estimation.
+      A variant of QPE using a single ancilla qubit with sequential bit extraction and adaptive feedback.
 
    LDA
       Local Density Approximation.
@@ -93,6 +97,10 @@ Acronym definitions
    MP2
       Second-order Møller-Plesset perturbation theory.
 
+   NISQ
+      Noisy Intermediate-Scale Quantum.
+      Refers to the current era of quantum computing with limited qubit counts and imperfect gate operations.
+
    PMC
       Projected Multi-Configuration.
 
@@ -101,6 +109,7 @@ Acronym definitions
 
    QPE
       Quantum Phase Estimation.
+      Algorithm that extracts energy eigenvalues by measuring the phase accumulated under Hamiltonian time evolution.
 
    RDM
       Reduced Density Matrix; one- or two-particle reduced density matrices used for many-body properties.
