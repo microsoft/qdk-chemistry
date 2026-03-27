@@ -192,6 +192,33 @@ class Circuit(DataClass):
 
         raise RuntimeError("The quantum circuit is not set in a Q# format.")
 
+    def estimate(self, params=None):
+        """Estimate logical resources for the quantum circuit.
+
+        Args:
+            params: Optional parameters to configure physical estimation. Can be a dictionary,
+                list, or ``qsharp.estimator.EstimatorParams`` instance. Defaults to None.
+
+        Returns:
+            qsharp.estimator.EstimatorResult: The estimated resources.
+
+        Raises:
+            RuntimeError: If no suitable circuit representation is available for estimation.
+
+        """
+        if self._qsharp_factory is not None:
+            return qsharp.estimate(
+                self._qsharp_factory.program,
+                params,
+                *self._qsharp_factory.parameter.values(),
+            )
+        if self.qasm is not None:
+            return qsharp.openqasm.estimate(self.qasm, params)
+
+        raise RuntimeError(
+            "Cannot estimate resources: no Q# factory data or QASM representation is available."
+        )
+
     def get_qiskit_circuit(self):
         """Convert the Circuit to a Qiskit QuantumCircuit.
 
