@@ -18,10 +18,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from qdk_chemistry.data.base import DataClass
-from qdk_chemistry.utils.pauli_matrix import (
-    pauli_to_dense_matrix,
-    pauli_to_sparse_matrix,
-)
+from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_sparse_matrix
 
 if TYPE_CHECKING:
     import h5py
@@ -30,6 +27,8 @@ if TYPE_CHECKING:
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
+
+__all__: list[str] = []
 
 
 class QubitHamiltonian(DataClass):
