@@ -99,17 +99,17 @@ jobs:
       run: |
         echo "=== Disk space before cleanup ==="
         df -h
-        
+
         # Remove unnecessary large packages commonly present on GitHub runners
         sudo rm -rf /usr/share/dotnet || true
         sudo rm -rf /usr/local/lib/android || true
         sudo rm -rf /opt/ghc || true
         sudo rm -rf /opt/hostedtoolcache/go || true
         sudo rm -rf /opt/hostedtoolcache/Ruby || true
-        
+
         # Clean apt cache
         sudo apt-get clean || true
-        
+
         echo "=== Disk space after cleanup ==="
         df -h
 
@@ -119,13 +119,13 @@ jobs:
       run: |
         echo "=== Available disks ==="
         df -h
-        
+
         # Find mount point with most available space (excluding virtual filesystems)
         LARGEST_MOUNT=$(df --output=avail,target -x tmpfs -x devtmpfs -x squashfs -x overlay 2>/dev/null | tail -n +2 | sort -rn | head -1 | awk '{print $2}')
         LARGEST_AVAIL_KB=$(df --output=avail "$LARGEST_MOUNT" 2>/dev/null | tail -1 | tr -d ' ')
-        
+
         echo "Largest mount: $LARGEST_MOUNT (${LARGEST_AVAIL_KB}KB available)"
-        
+
         # Use the alternate disk if it's not root/home and has >50GB available
         if [[ "$LARGEST_MOUNT" != "/" && "$LARGEST_MOUNT" != "/home" && "$LARGEST_AVAIL_KB" -gt 52428800 ]]; then
           ALT_WORKSPACE="$LARGEST_MOUNT/gh-runner-${{ github.run_id }}"
@@ -134,7 +134,7 @@ jobs:
           echo "alt_workspace=$ALT_WORKSPACE" >> $GITHUB_OUTPUT
           echo "use_alt_disk=true" >> $GITHUB_OUTPUT
           echo "Will use alternate disk at: $ALT_WORKSPACE"
-          
+
           # Clean up old workspaces from previous runs (older than 1 day)
           find "$LARGEST_MOUNT" -maxdepth 1 -type d -name "gh-runner-*" -mtime +1 -exec sudo rm -rf {} \; 2>/dev/null || true
         else
@@ -151,32 +151,34 @@ jobs:
       if: matrix.os-name == 'Linux' && steps.find-disk.outputs.use_alt_disk == 'true'
       run: |
         ALT_WORKSPACE="${{ steps.find-disk.outputs.alt_workspace }}"
-        
+
         # Create directories on larger disk and symlink them
         mkdir -p "$ALT_WORKSPACE/cpp_build"
         mkdir -p "$ALT_WORKSPACE/install"
         mkdir -p "$ALT_WORKSPACE/cpp_deps_install"
         mkdir -p "$ALT_WORKSPACE/cpp_deps_build"
-        
+
         # Create build directory in source tree as symlink
         mkdir -p cpp
         ln -sfn "$ALT_WORKSPACE/cpp_build" cpp/build
-        
+
         # Create symlink for cpp_deps_build at workspace level
         ln -sfn "$ALT_WORKSPACE/cpp_deps_build" "${{ github.workspace }}/cpp_deps_build"
-        
+
         # Update env vars to point to larger disk
         echo "CMAKE_INSTALL_PREFIX=$ALT_WORKSPACE/install" >> $GITHUB_ENV
         echo "CPP_DEPS_PREFIX=$ALT_WORKSPACE/cpp_deps_install" >> $GITHUB_ENV
-        
+
         echo "Build artifacts will be stored on larger disk at: $ALT_WORKSPACE"
         df -h "$ALT_WORKSPACE"
 
     - name: Set up environment paths
       run: |
-        echo "PATH=${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH" >> $GITHUB_ENV
-        echo "PYTHONPATH=${{ github.workspace }}/install/lib/python${{ matrix.python-version }}/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+        # Use CMAKE_INSTALL_PREFIX which may point to alternate disk
+        INSTALL_DIR="${CMAKE_INSTALL_PREFIX:-${{ github.workspace }}/install}"
+        echo "PATH=$INSTALL_DIR/bin:$INSTALL_DIR/lib:$PATH" >> $GITHUB_ENV
+        echo "PYTHONPATH=$INSTALL_DIR/lib/python${{ matrix.python-version }}/site-packages:$INSTALL_DIR/lib:$PYTHONPATH" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=$INSTALL_DIR/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -349,7 +351,7 @@ jobs:
 
     - name: Test C++ installation
       run: |
-        cmake -S examples/language/cpp -B build_example -GNinja -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install
+        cmake -S examples/language/cpp -B build_example -GNinja -DCMAKE_PREFIX_PATH="$CMAKE_INSTALL_PREFIX"
         cmake --build build_example --target all
         echo "C++ Example Compiled with Pre-Installed QDK/Chemistry-C++ Libraries!"
 
@@ -360,25 +362,25 @@ jobs:
         CMAKE_BUILD_TYPE: RelWithDebInfo
       run: |
         # Remove CMake files to build Python package without picking the installed library
-        rm -r ${{ github.workspace }}/install/lib/cmake/qdk
+        rm -rf "$CMAKE_INSTALL_PREFIX/lib/cmake/qdk" || true
         # Use persistent build directory for coverage analysis
         # Note: qiskit-extras is not supported on Python 3.14
         if [ "${{ matrix.skip-qiskit-extras }}" == "true" ]; then
           echo "Skipping qiskit-extras installation (not supported on Python ${{ matrix.python-version }})"
-          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[plugins,dev,docs,coverage]
+          python -m pip install --prefix="$CMAKE_INSTALL_PREFIX" -C build-dir="build/{wheel_tag}" .[plugins,dev,docs,coverage]
         else
-          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[all]
+          python -m pip install --prefix="$CMAKE_INSTALL_PREFIX" -C build-dir="build/{wheel_tag}" .[all]
         fi
         python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
         # Install optional dependencies for tests
-        python -m pip install --prefix=${{ github.workspace }}/install pennylane gast ipykernel
+        python -m pip install --prefix="$CMAKE_INSTALL_PREFIX" pennylane gast ipykernel
         # Register the Jupyter kernel for notebook tests
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install --prefix=${{ github.workspace }}/install coverage pytest pytest-cov
+        python -m pip install --prefix="$CMAKE_INSTALL_PREFIX" coverage pytest pytest-cov
 
     - name: Run Python tests
       env:
