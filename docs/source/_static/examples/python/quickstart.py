@@ -122,7 +122,7 @@ energy_results, simulation_data = estimator.run(
     circuit=sparse_isometry_circuit,
     qubit_hamiltonian=qubit_hamiltonian,
     circuit_executor=circuit_executor,
-    total_shots=500000,  # Increase number of shots to improve accuracy
+    total_shots=500000,
 )
 
 for i, results in enumerate(simulation_data.bitstring_counts):

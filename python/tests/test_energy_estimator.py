@@ -277,7 +277,7 @@ def test_estimator_run_4e4o(executor_name, wavefunction_4e4o, ref_energy_4e4o):
     state_prep_circuit = state_prep.run(wavefunction_4e4o)
     energy_offset = -4.19142869944708
     test_hamiltonian = QubitHamiltonian(
-        ["IIIIIZII", "IXXIIXXI", "IIIIIIZI"], np.array([[0.76388709, 0.1022262, 1.03502496]])
+        ["IIIIIZII", "IXXIIXXI", "IIIIIIZI"], np.array([0.76388709, 0.1022262, 1.03502496])
     )
     executor = create("circuit_executor", executor_name)
     estimator = QdkEnergyEstimator()
