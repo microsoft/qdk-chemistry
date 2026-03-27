@@ -215,9 +215,7 @@ class Circuit(DataClass):
         if self.qasm is not None:
             return qsharp.openqasm.estimate(self.qasm, params)
 
-        raise RuntimeError(
-            "Cannot estimate resources: no Q# factory data or QASM representation is available."
-        )
+        raise RuntimeError("Cannot estimate resources: no Q# factory data or QASM representation is available.")
 
     def get_qiskit_circuit(self):
         """Convert the Circuit to a Qiskit QuantumCircuit.
