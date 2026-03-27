@@ -122,8 +122,20 @@ jobs:
 
         # Find mount point with most available space (excluding virtual filesystems)
         LARGEST_MOUNT=$(df --output=avail,target -x tmpfs -x devtmpfs -x squashfs -x overlay 2>/dev/null | tail -n +2 | sort -rn | head -1 | awk '{print $2}')
+
+        # Fall back to the default GitHub workspace if no suitable mount was found
+        if [[ -z "$LARGEST_MOUNT" ]]; then
+          echo "No suitable mount found; falling back to default workspace: $GITHUB_WORKSPACE"
+          LARGEST_MOUNT="$GITHUB_WORKSPACE"
+        fi
+
         LARGEST_AVAIL_KB=$(df --output=avail "$LARGEST_MOUNT" 2>/dev/null | tail -1 | tr -d ' ')
 
+        # Ensure LARGEST_AVAIL_KB is numeric before using it in a comparison
+        if ! [[ "$LARGEST_AVAIL_KB" =~ ^[0-9]+$ ]]; then
+          echo "Could not determine numeric available space for $LARGEST_MOUNT; treating as 0KB"
+          LARGEST_AVAIL_KB=0
+        fi
         echo "Largest mount: $LARGEST_MOUNT (${LARGEST_AVAIL_KB}KB available)"
 
         # Use the alternate disk if it's not root/home and has >50GB available
