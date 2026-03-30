@@ -272,7 +272,11 @@ def test_estimator_fewer_shots():
     ids=["qdk-full-state", "qiskit-aer"],
 )
 def test_estimator_run_4e4o(executor_name, wavefunction_4e4o, ref_energy_4e4o):
-    """Functional test: energy estimation on the 4e4o ethylene problem with different circuit executors."""
+    """Functional test for energy estimation on the 4e4o ethylene problem using different circuit executors.
+
+    The energy offset and test Hamiltonian are derived from classical wavefunction information,
+    which is used to pre-screen the qubit Hamiltonian and identify terms requiring quantum measurement.
+    """
     state_prep = create("state_prep", "sparse_isometry_gf2x")
     state_prep_circuit = state_prep.run(wavefunction_4e4o)
     energy_offset = -4.19142869944708
