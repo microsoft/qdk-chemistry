@@ -10,7 +10,7 @@ namespace QDKChemistry.Utils.HadamardTest {
     /// # Parameters
     /// - `statePrep`: A function to prepare the initial quantum state.
     /// - `repControlledEvolution`: A function to perform repeated controlled evolution.
-    /// - `testBasis`: Measurement basis for the control qubit. Supported values are `PauliX` and `PauliY`.
+    /// - `testBasis`: Measurement basis for the control qubit. Supported values are `PauliX`, `PauliY`, and `PauliZ`.
     /// - `control`: The index of the control qubit in the allocated register.
     /// - `systems`: An array of indices representing the system qubits.
     /// # Returns
@@ -36,8 +36,10 @@ namespace QDKChemistry.Utils.HadamardTest {
         } elif (testBasis == PauliY) {
             Adjoint S(control_q);
             H(control_q);
+        } elif (testBasis == PauliZ) {
+            // Direct Z-basis measurement: no additional rotation is required.
         } else {
-            fail $"Invalid measurement basis: {testBasis}. Supported values are PauliX and PauliY.";
+            fail $"Invalid measurement basis: {testBasis}. Supported values are PauliX, PauliY, and PauliZ.";
         }
         ResetAll(system_q);
         return [MResetZ(control_q)];

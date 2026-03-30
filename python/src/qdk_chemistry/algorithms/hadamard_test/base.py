@@ -26,9 +26,10 @@ class HadamardTestBasis(Enum):
 
     X = "X"
     Y = "Y"
+    Z = "Z"
 
     def __str__(self) -> str:
-        """Return the string label ("X" or "Y") for this basis."""
+        """Return the string label ("X", "Y", or "Z") for this basis."""
         return str(self.value)
 
 
@@ -76,7 +77,8 @@ class HadamardTest(Algorithm):
             unitary_power: Power :math:`n` used to form the controlled unitary :math:`U^n`.
             simulator_type: Algorithm name for the circuit executor.
             shots: Number of shots to execute the circuit.
-            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X`` or ``HadamardTestBasis.Y``).
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``,
+                or ``HadamardTestBasis.Z``).
 
         Returns:
             CircuitExecutorData returned directly by the given simulator.
@@ -147,7 +149,8 @@ class HadamardTest(Algorithm):
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             num_system_qubits: Number of qubits in the system register.
             ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
-            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X`` or ``HadamardTestBasis.Y``).
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``,
+                or ``HadamardTestBasis.Z``).
 
         Returns:
             Circuit representing the Hadamard test workflow for the selected backend.

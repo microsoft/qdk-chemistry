@@ -36,7 +36,8 @@ class QiskitHadamardTest(HadamardTest):
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             num_system_qubits: Number of qubits in the system register.
             ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
-            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X`` or ``HadamardTestBasis.Y``).
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``,
+                or ``HadamardTestBasis.Z``).
 
         Returns:
             Circuit containing the OpenQASM3 representation of the Qiskit Hadamard test circuit.
@@ -83,6 +84,10 @@ class QiskitHadamardTest(HadamardTest):
         elif test_basis is HadamardTestBasis.Y:
             circuit.sdg(control)
             circuit.h(control)
+        elif test_basis is HadamardTestBasis.Z:
+            pass
+        else:
+            raise ValueError(f"Unsupported test basis: {test_basis}.")
         circuit.measure(control, classical[0])
 
         Logger.debug(f"Completed qiskit circuit for measurement on {test_basis.value} basis.")

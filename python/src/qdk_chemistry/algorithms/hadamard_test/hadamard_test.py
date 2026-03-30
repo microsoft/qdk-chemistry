@@ -43,7 +43,8 @@ class QdkHadamardTest(HadamardTest):
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             num_system_qubits: Number of qubits in the system register.
             ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
-            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X`` or ``HadamardTestBasis.Y``).
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``,
+                or ``HadamardTestBasis.Z``).
 
         Returns:
             Circuit containing compiled and rendered Q# Hadamard test artifacts.
