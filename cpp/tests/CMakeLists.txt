@@ -39,6 +39,7 @@ add_library(test_main qdk_test_main.cpp)
 target_link_libraries(test_main PUBLIC GTest::gtest GTest::gmock chemistry)
 target_compile_definitions(test_main PUBLIC TEST_RESOURCES_DIR="${PROJECT_SOURCE_DIR}/src/qdk/chemistry/algorithms/microsoft/scf/resources")
 target_include_directories(test_main PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/tests>
   $<BUILD_INTERFACE:${QDK_SCF_TEST_DIR}>
 )
