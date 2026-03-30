@@ -125,10 +125,8 @@ class TestTrotter:
         assert container.num_qubits == 3
         assert container.step_reps == 1
         # After merging identical Pauli strings, 2 unique terms remain (XII with
-        # coeff=2 and IXI with coeff=1).  Because optimize_term_ordering groups
-        # them into one commuting set, the Clifford sandwich adds basis-change
-        # rotations (C and C†) around the diagonal terms.
-        assert len(container.step_terms) == 6
+        # coeff=2 and IXI with coeff=1).  Raw Pauli terms are emitted directly.
+        assert len(container.step_terms) == 2
 
     def test_basic_decomposition(self):
         """Test basic decomposition of a qubit Hamiltonian."""
@@ -903,51 +901,10 @@ class TestOptimizeTermOrdering:
 
         term_labels = [term_to_label(t) for t in terms]
 
-        # After Clifford diagonalization, the ZZ layers produce 2 terms each
-        # (image_of transforms the original labels), and the X group
-        # {XIII, IXII, IIXI, IIIX} produces a Clifford sandwich of 12
-        # single-qubit Z terms (C + diagonal + C†).
-        pauli_zz_layer_1 = {"ZZZZ", "IZIZ"}
-        pauli_zz_layer_2 = {"ZIZZ", "IZZZ"}
-        pauli_x_size = 12
+        # Raw Pauli terms are emitted directly (no Clifford sandwich).
+        # ZZ terms stay as their original labels; X terms stay as single-qubit X.
+        pauli_zz_labels = {"ZZII", "IIZZ", "IZZI", "ZIIZ"}
+        pauli_x_labels = {"XIII", "IXII", "IIXI", "IIIX"}
 
-        assert len(terms) == pauli_x_size + len(pauli_zz_layer_1) + len(pauli_zz_layer_2)
-
-        # Identify contiguous blocks: ZZ layers are 2-term blocks of multi-qubit
-        # Z strings; the X group sandwich is a 12-term block of single-qubit Z terms.
-        remaining = list(term_labels)
-        matched_groups = []
-        while remaining:
-            first = remaining[0]
-            if first in pauli_zz_layer_1:
-                block = set(remaining[: len(pauli_zz_layer_1)])
-                assert block == pauli_zz_layer_1, f"Expected {pauli_zz_layer_1}, got {block}"
-                matched_groups.append(("zz", block))
-                remaining = remaining[len(pauli_zz_layer_1) :]
-            elif first in pauli_zz_layer_2:
-                block = set(remaining[: len(pauli_zz_layer_2)])
-                assert block == pauli_zz_layer_2, f"Expected {pauli_zz_layer_2}, got {block}"
-                matched_groups.append(("zz", block))
-                remaining = remaining[len(pauli_zz_layer_2) :]
-            else:
-                # X group Clifford sandwich: 12 contiguous single-qubit Z terms
-                x_block = remaining[:pauli_x_size]
-                assert len(x_block) == pauli_x_size, f"X block too short: {len(x_block)}"
-                assert all(sum(c != "I" for c in lbl) <= 1 for lbl in x_block), (
-                    f"X group sandwich should contain only single-qubit terms, got: {x_block}"
-                )
-                matched_groups.append(("x", set(x_block)))
-                remaining = remaining[pauli_x_size:]
-
-        assert len(matched_groups) == 3
-
-        # Verify all three group types are present
-        tags = [tag for tag, _ in matched_groups]
-        assert tags.count("zz") == 2
-        assert tags.count("x") == 1
-
-        # The two ZZ layers must be adjacent (they come from the same commuting group).
-        zz_indices = [i for i, (tag, _) in enumerate(matched_groups) if tag == "zz"]
-        assert abs(zz_indices[0] - zz_indices[1]) == 1, (
-            "The two ZZ layers must be adjacent, but got group ordering: " + str(tags)
-        )
+        assert len(terms) == len(pauli_zz_labels) + len(pauli_x_labels)
+        assert set(term_labels) == pauli_zz_labels | pauli_x_labels
