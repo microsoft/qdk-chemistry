@@ -22,7 +22,6 @@ from qdk_chemistry.algorithms.energy_estimator.qdk import (
     _paulis_to_nonid_masks,
 )
 from qdk_chemistry.data import Circuit, MeasurementData, QubitHamiltonian
-from qdk_chemistry.data.qubit_hamiltonian import filter_and_group_pauli_ops_from_wavefunction
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 
 from .reference_tolerances import (
@@ -254,11 +253,7 @@ def test_estimator_fewer_shots():
     cx q[0], q[1];
     """
     circuit = Circuit(qasm=qasm)
-    observable = [
-        QubitHamiltonian(["ZZ"], np.array([2])),
-        QubitHamiltonian(["XX"], np.array([3])),
-        QubitHamiltonian(["YY"], np.array([4])),
-    ]
+    observable = QubitHamiltonian(["ZZ", "XX", "YY"], np.array([2, 3, 4]))
     executor = create("circuit_executor", "qdk_full_state_simulator")
     estimator = QdkEnergyEstimator()
     with pytest.raises(ValueError, match=r"Total shots .* is less than the number of observables .*"):
@@ -276,23 +271,28 @@ def test_estimator_fewer_shots():
     ],
     ids=["qdk-full-state", "qiskit-aer"],
 )
-def test_estimator_run_4e4o(executor_name, hamiltonian_4e4o, wavefunction_4e4o, ref_energy_4e4o):
-    """Functional test: energy estimation on the 4e4o ethylene problem with different circuit executors."""
+def test_estimator_run_4e4o(executor_name, wavefunction_4e4o, ref_energy_4e4o):
+    """Functional test for energy estimation on the 4e4o ethylene problem using different circuit executors.
+
+    The energy offset and test Hamiltonian are derived from classical wavefunction information,
+    which is used to pre-screen the qubit Hamiltonian and identify terms requiring quantum measurement.
+    """
     state_prep = create("state_prep", "sparse_isometry_gf2x")
     state_prep_circuit = state_prep.run(wavefunction_4e4o)
-    filtered_hamiltonian, classical_coeffs = filter_and_group_pauli_ops_from_wavefunction(
-        hamiltonian_4e4o, wavefunction_4e4o
+    energy_offset = -4.19142869944708
+    test_hamiltonian = QubitHamiltonian(
+        ["IIIIIZII", "IXXIIXXI", "IIIIIIZI"], np.array([0.76388709, 0.1022262, 1.03502496])
     )
     executor = create("circuit_executor", executor_name)
     estimator = QdkEnergyEstimator()
     energy_result, _ = estimator.run(
         state_prep_circuit,
-        filtered_hamiltonian,
+        test_hamiltonian,
         executor,
         total_shots=50000,
     )
     assert np.isclose(
-        energy_result.energy_expectation_value + sum(classical_coeffs),
+        energy_result.energy_expectation_value + energy_offset,
         ref_energy_4e4o,
         rtol=float_comparison_relative_tolerance,
         atol=estimator_energy_tolerance,

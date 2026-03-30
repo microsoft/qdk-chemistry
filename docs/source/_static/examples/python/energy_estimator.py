@@ -28,12 +28,12 @@ circuit = Circuit(
     cx q[0], q[1];
     """
 )
-qubit_hamiltonians = [QubitHamiltonian(["ZZ"], np.array([1.0]))]
+qubit_hamiltonian = QubitHamiltonian(["ZZ"], np.array([1.0]))
 
 # Run energy estimation using Qsharp simulator without noise
 circuit_executor = create("circuit_executor", "qdk_sparse_state_simulator")
 energy_expectation_results, measurement_data = qdk_estimator.run(
-    circuit, qubit_hamiltonians, circuit_executor, total_shots=1000
+    circuit, qubit_hamiltonian, circuit_executor, total_shots=1000
 )
 print(
     "Energy expectation value from noiseless QDK Simulator: "
@@ -71,7 +71,7 @@ circuit_executor = create("circuit_executor", "qdk_full_state_simulator", type="
 qdk_estimator = create("energy_estimator", "qdk")
 energy_expectation_results, measurement_data = qdk_estimator.run(
     circuit,
-    qubit_hamiltonians,
+    qubit_hamiltonian,
     circuit_executor,
     total_shots=1000,
     noise_model=noise_model,
@@ -88,7 +88,7 @@ print(
 # Run energy estimation using Qiskit Aer simulator without noise
 qiskit_aer_simulator = create("circuit_executor", "qiskit_aer_simulator")
 energy_expectation_results, measurement_data = qdk_estimator.run(
-    circuit, qubit_hamiltonians, qiskit_aer_simulator, total_shots=1000
+    circuit, qubit_hamiltonian, qiskit_aer_simulator, total_shots=1000
 )
 print(
     f"Energy expectation value from Qiskit Aer Simulator: {energy_expectation_results.energy_expectation_value}"
@@ -119,7 +119,7 @@ noise_model = QuantumErrorProfile(
 )
 energy_expectation_results, measurement_data = qdk_estimator.run(
     circuit,
-    qubit_hamiltonians,
+    qubit_hamiltonian,
     qiskit_aer_simulator,
     total_shots=1000,
     noise_model=noise_model,

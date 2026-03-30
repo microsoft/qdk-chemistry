@@ -8,7 +8,7 @@ Overview
 --------
 
 The :class:`~qdk_chemistry.algorithms.EnergyEstimator` evaluates the expectation value of a :class:`~qdk_chemistry.data.QubitHamiltonian` with respect to a given quantum circuit that loads a wavefunction onto qubits.
-It takes a Circuit object with target qubit Hamiltonians and automatically generates the corresponding measurement circuits.
+It takes a Circuit object and a target qubit Hamiltonian and automatically generates the corresponding measurement circuits.
 These circuits are executed on a selected backend simulator with the user-specified number of shots, and the resulting bitstring statistics are used to calculate per-term expectation values and the total energy.
 
 The algorithm supports:
@@ -19,8 +19,6 @@ Noise modeling
   Depolarizing noise, bit flip noise, Pauli noise, phase flip noise, and qubit loss simulation
 Grouped measurements
   Efficient measurement of commuting Pauli terms in a single circuit execution
-Classical coefficient handling
-  Pre-computed classical contributions from Hamiltonian filtering
 
 A typical workflow connects :doc:`StatePreparation <state_preparation>` (which loads the wavefunction onto qubits) with EnergyEstimator (which measures the energy):
 
@@ -48,7 +46,6 @@ Circuit
 
 QubitHamiltonian
    A :class:`~qdk_chemistry.data.QubitHamiltonian` instance containing the Pauli-string representation of the electronic Hamiltonian. This is obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm.
-
 
 Circuit execution
    A backend to execute the measurement circuits. Supported backends include QDK's native Q# simulator and Qiskit's Aer simulator.
@@ -120,15 +117,18 @@ Native QDK/Chemistry implementation of energy estimator. Supports various simula
    * - ``circuit``
      - Circuit
      - Quantum circuit that prepares the target quantum state
-   * - ``qubit_hamiltonians``
-     - list[QubitHamiltonian]
-     - List of qubit Hamiltonians to measure
+   * - ``qubit_hamiltonian``
+     - QubitHamiltonian
+     - Qubit Hamiltonian to measure
    * - ``circuit_executor``
      - CircuitExecutor
      - Backend to execute the measurement circuits
    * - ``total_shots``
      - int
      - Total number of measurement shots
+   * - ``noise_model``
+     - QuantumErrorProfile | None
+     - Noise model to apply during circuit execution
 
 Related classes
 ---------------

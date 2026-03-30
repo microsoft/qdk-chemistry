@@ -19,7 +19,6 @@ import numpy as np
 import scipy.sparse
 
 __all__ = [
-    "pauli_expectation",
     "pauli_string_to_masks",
     "pauli_to_dense_matrix",
     "pauli_to_sparse_matrix",
@@ -54,39 +53,6 @@ def pauli_string_to_masks(pauli_str: str) -> tuple[int, int, complex]:
         if ch == "Y":
             y_count += 1
     return x_mask, z_mask, 1j ** (y_count & 3)
-
-
-def pauli_expectation(pauli_str: str, psi: np.ndarray) -> float:
-    """Compute the expectation value ``<psi|P|psi>`` for a single Pauli string.
-
-    Args:
-        pauli_str: Pauli label of length *n* (characters in {I, X, Y, Z}), using Little-Endian convention.
-        psi: Complex state vector of length ``2**n``.
-
-    Returns:
-        Expectation value.
-
-    """
-    psi = np.asarray(psi, dtype=np.complex128).ravel()
-    expected_dim = 1 << len(pauli_str)
-    if psi.size != expected_dim:
-        raise ValueError(
-            f"State vector length {psi.size} does not match the expected "
-            f"dimension 2**{len(pauli_str)} = {expected_dim} for Pauli string '{pauli_str}'."
-        )
-    x_mask, z_mask, phase = pauli_string_to_masks(pauli_str)
-    dim = psi.shape[0]
-
-    # Build the row-index array and the corresponding column-index array
-    rows = np.arange(dim, dtype=np.int64)
-    cols = rows ^ x_mask  # P maps |r> -> phase * |r ^ x_mask>
-
-    # Parity of (col & z_mask) gives the sign: (-1)^popcount(col & z_mask)
-    parity_bits = cols & z_mask
-    signs = np.where(np.bitwise_count(parity_bits) & 1, -1.0, 1.0)
-
-    val = np.sum(np.conj(psi[rows]) * phase * signs * psi[cols])
-    return float(val.real)
 
 
 def pauli_to_dense_matrix(
