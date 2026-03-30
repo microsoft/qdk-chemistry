@@ -675,37 +675,30 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
         }
 
         // Merge into accumulated results
-        if (ntdets) {
-          accumulated_pairs.insert(
-              accumulated_pairs.end(),
-              std::make_move_iterator(working_pairs.begin()),
-              std::make_move_iterator(working_pairs.end()));
-          working_pairs.clear();
-
-          if (accumulated_pairs.size() > ntdets) {
-            const size_t cutoff_idx = ntdets - 1;
-            std::nth_element(accumulated_pairs.begin(),
-                             accumulated_pairs.begin() + cutoff_idx,
-                             accumulated_pairs.end(), contrib_cmp);
-
-            const double threshold =
-                std::abs(accumulated_pairs[cutoff_idx].rv());
-
-            // Keep all contributions tied at the cutoff so equal-|rv| entries
-            // survive trimming
-            auto new_end = std::partition(
-                accumulated_pairs.begin(), accumulated_pairs.end(),
-                [threshold](const auto& contrib) {
-                  return std::abs(contrib.rv()) >= threshold;
-                });
-            accumulated_pairs.erase(new_end, accumulated_pairs.end());
-          }
-        } else {
-          working_pairs.clear();
+        accumulated_pairs.insert(
+            accumulated_pairs.end(),
+            std::make_move_iterator(working_pairs.begin()),
+            std::make_move_iterator(working_pairs.end()));
+        working_pairs.clear();
+        if (accumulated_pairs.size() > ntdets) {
+          const size_t cutoff_idx = ntdets - 1;
+          std::nth_element(accumulated_pairs.begin(),
+                           accumulated_pairs.begin() + cutoff_idx,
+                           accumulated_pairs.end(), contrib_cmp);
+          const double threshold =
+              std::abs(accumulated_pairs[cutoff_idx].rv());
+          // Keep all contributions tied at the cutoff so equal-|rv| entries
+          // survive trimming
+          auto new_end = std::partition(
+              accumulated_pairs.begin(), accumulated_pairs.end(),
+              [threshold](const auto& contrib) {
+                return std::abs(contrib.rv()) >= threshold;
+              });
+          accumulated_pairs.erase(new_end, accumulated_pairs.end());
         }
 
-        logger->info(
-            "after debug, thread {} accumulated_pairs.size() = {}, ntdets = {} "
+        logger->debug(
+            "after merge, thread {} accumulated_pairs.size() = {}, ntdets = {} "
             "at CON = {}",
             tid, accumulated_pairs.size(), ntdets, ic);
       }  // Loc constraint loop
