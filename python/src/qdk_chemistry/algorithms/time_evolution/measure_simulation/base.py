@@ -209,22 +209,9 @@ class MeasureSimulation(Algorithm):
         noise: QuantumErrorProfile | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Measure a qubit observable on the provided circuit state."""
-        grouped_observables = observable.group_commuting(qubit_wise=True)
-        if not grouped_observables:
-            raise ValueError("Observable has no measurable terms after grouping.")
-
-        if shots < len(grouped_observables):
-            raise ValueError(
-                f"Total shots {shots} is less than the number of grouped observables {len(grouped_observables)}."
-            )
-
-        shots_per_group = shots // len(grouped_observables)
-        if shots_per_group <= 0:
-            raise ValueError("shots per measurement group must be positive.")
-
         energy_result, measurement_data = energy_estimator.run(
             circuit,
-            grouped_observables,
+            observable,
             circuit_executor,
             total_shots=shots,
             noise_model=noise,
