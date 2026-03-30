@@ -18,6 +18,8 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import numpy as np
+
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
     trotter_steps_commutator,
@@ -293,7 +295,7 @@ class Trotter(TimeEvolutionBuilder):
             for group in grouped_hamiltonians:
                 for subgroup in group:
                     terms.extend(
-                        self._exponentiate_commuting(
+                        self._exponentiate_disjoint_commuting(
                             subgroup,
                             time=time,
                             atol=atol,
@@ -308,7 +310,7 @@ class Trotter(TimeEvolutionBuilder):
             for group in grouped_hamiltonians[:-1]:
                 for subgroup in group:
                     terms_without_last_group.extend(
-                        self._exponentiate_commuting(
+                        self._exponentiate_disjoint_commuting(
                             subgroup,
                             time=time / 2,
                             atol=atol,
@@ -319,7 +321,7 @@ class Trotter(TimeEvolutionBuilder):
             # e^{-iH_i t/n} for all terms in the last group
             for subgroup in grouped_hamiltonians[-1]:
                 terms.extend(
-                    self._exponentiate_commuting(
+                    self._exponentiate_disjoint_commuting(
                         subgroup,
                         time=time,
                         atol=atol,
@@ -479,36 +481,57 @@ class Trotter(TimeEvolutionBuilder):
 
         return result
 
-    def _exponentiate_commuting(
+    def _exponentiate_disjoint_commuting(
         self,
         group: QubitHamiltonian,
         time: float,
         *,
         atol: float = 1e-12,
     ) -> list[ExponentiatedPauliTerm]:
-        r"""Exponentiate a group of commuting Pauli terms.
+        r"""Exponentiate commuting Pauli terms via qubit-wise diagonalization.
 
-        Each term :math:`P_j` with coefficient :math:`c_j` is converted to
-        the rotation :math:`e^{-i\,c_j\,t\,P_j}`.  Because all terms in the
-        group commute and :meth:`_group_terms` ensures they have disjoint
-        qubit supports, the rotations can be applied in any order.
+        Each non-diagonal character is rotated into *Z*:
 
-        Args:
-            group: The group of commuting Hamiltonian terms to exponentiate.
-            time: The evolution time used to compute rotation angles
-                (:math:`\theta_j = c_j \cdot t`).
-            atol: Absolute tolerance for filtering small coefficients.
+        * **X** → :math:`e^{-i(\pi/4)Y}` maps :math:`X \to Z`.
+        * **Y** → :math:`e^{-i(\pi/4)X}` maps :math:`Y \to -Z`.
 
-        Returns:
-            A flat list of :class:`ExponentiatedPauliTerm`.
+        The output is ``[basis_change, diag_rotations, basis_change†]``.
 
         """
-        terms: list[ExponentiatedPauliTerm] = []
-        for label, coeff in group.get_real_coefficients(tolerance=atol):
-            mapping = self._pauli_label_to_map(label)
-            angle = coeff * time
-            terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
-        return terms
+        raw = [(lbl, c, self._pauli_label_to_map(lbl)) for lbl, c in group.get_real_coefficients(tolerance=atol)]
+
+        # Single-term group — emit directly (Q# Exp handles X/Y/Z natively).
+        if len(raw) == 1:
+            _, c, m = raw[0]
+            return [ExponentiatedPauliTerm(pauli_term=m, angle=c * time)]
+
+        # Map each non-diagonal qubit to its basis-change axis.
+        basis: dict[int, str] = {}
+        for _, _, m in raw:
+            for q, ch in m.items():
+                if ch in ("X", "Y") and q not in basis:
+                    basis[q] = "Y" if ch == "X" else "X"
+
+        # Already diagonal — emit raw terms.
+        if not basis:
+            return [ExponentiatedPauliTerm(pauli_term=m, angle=c * time) for _, c, m in raw]
+
+        # Basis-change layer (sorted for determinism).
+        bc = [ExponentiatedPauliTerm(pauli_term={q: basis[q]}, angle=np.pi / 4) for q in sorted(basis)]
+
+        # Diagonal rotations: replace X/Y → Z, flip sign per Y.
+        diag: list[ExponentiatedPauliTerm] = []
+        for _, coeff, m in raw:
+            sign = (-1) ** sum(ch == "Y" for ch in m.values())
+            diag.append(
+                ExponentiatedPauliTerm(
+                    pauli_term={q: "Z" if ch in ("X", "Y") else ch for q, ch in m.items()},
+                    angle=coeff * time * sign,
+                )
+            )
+
+        # Sandwich: C · diag · C†
+        return bc + diag + [ExponentiatedPauliTerm(pauli_term=t.pauli_term, angle=-t.angle) for t in reversed(bc)]
 
     def name(self) -> str:
         """Return the name of the time evolution unitary builder."""
