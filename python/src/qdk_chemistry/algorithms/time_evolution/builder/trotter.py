@@ -17,7 +17,6 @@ References:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-import cmath
 
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
@@ -296,7 +295,6 @@ class Trotter(TimeEvolutionBuilder):
                     terms.extend(
                         self._exponentiate_commuting(
                             subgroup,
-                            num_qubits=qubit_hamiltonian.num_qubits,
                             time=time,
                             atol=atol,
                         )
@@ -312,7 +310,6 @@ class Trotter(TimeEvolutionBuilder):
                     terms_without_last_group.extend(
                         self._exponentiate_commuting(
                             subgroup,
-                            num_qubits=qubit_hamiltonian.num_qubits,
                             time=time / 2,
                             atol=atol,
                         )
@@ -324,7 +321,6 @@ class Trotter(TimeEvolutionBuilder):
                 terms.extend(
                     self._exponentiate_commuting(
                         subgroup,
-                        num_qubits=qubit_hamiltonian.num_qubits,
                         time=time,
                         atol=atol,
                     )
@@ -486,135 +482,32 @@ class Trotter(TimeEvolutionBuilder):
     def _exponentiate_commuting(
         self,
         group: QubitHamiltonian,
-        num_qubits: int,
         time: float,
         *,
         atol: float = 1e-12,
     ) -> list[ExponentiatedPauliTerm]:
-        r"""Exponentiate commuting Pauli groups via Clifford diagonalization.
+        r"""Exponentiate a group of commuting Pauli terms.
 
-        For each commuting group produced by :meth:`_group_terms`, computes
-        the encoding Clifford *C* that simultaneously diagonalizes every
-        Pauli string in that group (:math:`C\,P_j\,C^\dagger = D_j`, where
-        :math:`D_j` is a product of *Z* and *I* operators only), then
-        constructs the sandwich decomposition:
-
-        .. math::
-
-            \prod_j e^{-i\,\theta_j\,P_j}
-            \;=\;
-            C^\dagger
-            \!\left(\prod_j e^{-i\,\theta_j\,D_j}\right)
-            C
-
-        Applied to a quantum state :math:`|\psi\rangle`:
-
-        1. Apply *C*  (rotate into the diagonal basis).
-        2. Apply :math:`\prod_j e^{-i\,\theta_j\,D_j}` (diagonal rotations).
-        3. Apply :math:`C^\dagger` (undo the basis change).
-
-        The returned list encodes the full sequence as
-        :class:`ExponentiatedPauliTerm` entries: for every commuting group
-        the Clifford *C* (decomposed into Pauli rotations), then the
-        diagonal :math:`e^{-i\theta_j D_j}` terms, then :math:`C^\dagger`
-        (the reversed rotations with negated angles).
+        Each term :math:`P_j` with coefficient :math:`c_j` is converted to
+        the rotation :math:`e^{-i\,c_j\,t\,P_j}`.  Because all terms in the
+        group commute and :meth:`_group_terms` ensures they have disjoint
+        qubit supports, the rotations can be applied in any order.
 
         Args:
             group: The group of commuting Hamiltonian terms to exponentiate.
-            num_qubits: The number of qubits in the system.
             time: The evolution time used to compute rotation angles
                 (:math:`\theta_j = c_j \cdot t`).
             atol: Absolute tolerance for filtering small coefficients.
 
         Returns:
-            A flat list of :class:`ExponentiatedPauliTerm` representing, for
-            each commuting group, the sequence
-            :math:`C \;\prod_j e^{-i\theta_j D_j}\; C^\dagger`.
+            A flat list of :class:`ExponentiatedPauliTerm`.
 
         """
-        from paulimer import DensePauli, SparsePauli, encoding_clifford_of  # noqa: PLC0415
-
         terms: list[ExponentiatedPauliTerm] = []
-
-        # Single-term groups don't need Clifford diagonalization.
-        if len(group.pauli_strings) == 1:
-            for label, coeff in group.get_real_coefficients(tolerance=atol):
-                mapping = self._pauli_label_to_map(label)
-                angle = coeff * time
-                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
-            return terms
-
-        sparse_paulis = [SparsePauli(ps) for ps in group.pauli_strings]
-        clifford = encoding_clifford_of(sparse_paulis, num_qubits)
-
-        if clifford.is_identity:
-            # All terms are already diagonal (Z/I only); no basis change needed.
-            for label, coeff in group.get_real_coefficients(tolerance=atol):
-                mapping = self._pauli_label_to_map(label)
-                angle = coeff * time
-                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
-            return terms
-
-        # Decompose the Clifford C into Pauli rotations.
-        clifford_terms = self._clifford_to_terms(clifford, num_qubits, atol)
-
-        # C: rotate into the diagonal basis.
-        terms.extend(clifford_terms)
-
-        # Build the diagonal exponentiated terms.
-        # C diagonalizes each P_j: D_j = C P_j C†  (Z/I only).
         for label, coeff in group.get_real_coefficients(tolerance=atol):
-            diag_pauli = clifford.image_of(DensePauli(label))
-            mapping = self._pauli_label_to_map(diag_pauli.characters)
-            angle = coeff * time * diag_pauli.phase.real
+            mapping = self._pauli_label_to_map(label)
+            angle = coeff * time
             terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
-
-        # C†: undo the basis change (reversed order, negated angles).
-        for ct in reversed(clifford_terms):
-            terms.append(ExponentiatedPauliTerm(pauli_term=ct.pauli_term, angle=-ct.angle))
-
-        return terms
-
-    @staticmethod
-    def _clifford_to_terms(clifford, num_qubits, atol) -> list[ExponentiatedPauliTerm]:
-        r"""Convert an encoding Clifford into Pauli strings with phases.
-
-        Extracts the 2n generator images of the Clifford via
-        :meth:`~paulimer.CliffordUnitary.image_z` and
-        :meth:`~paulimer.CliffordUnitary.image_x`, returning each as
-        an :class:`ExponentiatedPauliTerm` with angle derived from the
-        image phase.
-
-        Args:
-            clifford: The encoding Clifford object returned by
-                :func:`~paulimer.encoding_clifford_of`.
-            num_qubits: Number of qubits.
-            atol: Absolute tolerance for filtering small angles (e.g., from numerical imprecision).
-
-        Returns:
-            A list of :class:`ExponentiatedPauliTerm` entries.
-
-        """
-        if clifford.is_identity:
-            return []
-
-        terms: list[ExponentiatedPauliTerm] = []
-        for q in range(num_qubits):
-            for image in (clifford.image_z(q), clifford.image_x(q)):
-                chars = image.characters
-                # Skip pure-identity images.
-                if all(c == "I" for c in chars):
-                    continue
-                # phase is +1, -1, +i, or -i.
-                # Map to an angle: phase = exp(i * phi) => angle = phi / 2
-                phi = cmath.phase(image.phase)  # 0, pi, pi/2, -pi/2
-                angle = phi / 2
-                # Skip no-op rotations (phase == +1 => angle == 0).
-                if abs(angle) < atol:
-                    continue
-                mapping = Trotter._pauli_label_to_map(chars)
-                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
-
         return terms
 
     def name(self) -> str:
