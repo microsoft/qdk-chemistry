@@ -273,6 +273,24 @@ TEST_CASE("make_triplet and make_quad large bitset") {
     for (unsigned b = k; b < norb; ++b) REQUIRE_FALSE(B.test(b));
   }
 
+  SECTION("make_triplet<4096>") {
+    // N=4096 -> spin string is bitset<2048>
+    constexpr unsigned norb = 2048;
+    unsigned i = norb - 1;        // 2047
+    unsigned j = norb / 2 + 123;  // 1147
+    unsigned k = 511;
+    auto constraint = macis::make_triplet<4096>(i, j, k);
+    auto C = constraint.C();
+    auto B = constraint.B();
+    REQUIRE(C.count() == 3);
+    REQUIRE(C.test(i));
+    REQUIRE(C.test(j));
+    REQUIRE(C.test(k));
+    REQUIRE(B.count() == k);
+    for (unsigned b = 0; b < k; ++b) REQUIRE(B.test(b));
+    for (unsigned b = k; b < norb; ++b) REQUIRE_FALSE(B.test(b));
+  }
+
   SECTION("make_quad<256>") {
     constexpr unsigned norb = 128;
     unsigned i = norb - 28;     // 100 — upper quarter
@@ -299,6 +317,25 @@ TEST_CASE("make_triplet and make_quad large bitset") {
     unsigned k = norb / 2 - 28;  // 100
     unsigned l = 50;
     auto constraint = make_quad<512>(i, j, k, l);
+    auto C = constraint.C();
+    auto B = constraint.B();
+    REQUIRE(C.count() == 4);
+    REQUIRE(C.test(i));
+    REQUIRE(C.test(j));
+    REQUIRE(C.test(k));
+    REQUIRE(C.test(l));
+    REQUIRE(B.count() == l);
+    for (unsigned b = 0; b < l; ++b) REQUIRE(B.test(b));
+    for (unsigned b = l; b < norb; ++b) REQUIRE_FALSE(B.test(b));
+  }
+
+  SECTION("make_quad<4096>") {
+    constexpr unsigned norb = 2048;
+    unsigned i = norb - 1;        // 2047
+    unsigned j = norb / 2 + 499;  // 1523
+    unsigned k = norb / 2 - 1;    // 1023
+    unsigned l = 511;
+    auto constraint = make_quad<4096>(i, j, k, l);
     auto C = constraint.C();
     auto B = constraint.B();
     REQUIRE(C.count() == 4);

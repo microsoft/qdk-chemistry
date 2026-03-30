@@ -10,16 +10,28 @@ and quantum circuit construction or measurement workflows.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from functools import cached_property
-from typing import Any
+from __future__ import annotations
 
-import h5py
+import re
+from typing import TYPE_CHECKING, Any
+
 import numpy as np
-from qiskit.quantum_info import SparsePauliOp
 
-from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.base import DataClass
+from qdk_chemistry.utils.pauli_matrix import (
+    pauli_expectation,
+    pauli_to_dense_matrix,
+    pauli_to_sparse_matrix,
+)
+
+if TYPE_CHECKING:
+    import h5py
+    import scipy
+
+    from qdk_chemistry.data import Wavefunction
+from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
 
 __all__ = ["filter_and_group_pauli_ops_from_wavefunction"]
 
@@ -32,6 +44,9 @@ class QubitHamiltonian(DataClass):
         coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
         encoding (str | None): The fermion-to-qubit encoding used to create this Hamiltonian
             (e.g., "jordan-wigner", "bravyi-kitaev", "parity"). If None, encoding is not specified.
+        fermion_mode_order (FermionModeOrder | None): The fermion mode ordering convention used
+            when mapping fermionic modes to qubits (``"blocked"`` or ``"interleaved"``). If None,
+            the ordering is unspecified or not applicable.
 
     """
 
@@ -46,15 +61,15 @@ class QubitHamiltonian(DataClass):
         pauli_strings: list[str],
         coefficients: np.ndarray,
         encoding: str | None = None,
+        fermion_mode_order: FermionModeOrder | str | None = None,
     ) -> None:
         """Initialize a QubitHamiltonian.
 
         Args:
             pauli_strings (list[str]): List of Pauli strings representing the ``QubitHamiltonian``.
             coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
-            encoding (str | None): The fermion-to-qubit encoding used to create this Hamiltonian.
-                Valid values include "jordan-wigner", "bravyi-kitaev", "parity", or None.
-                Defaults to None.
+            encoding (str | None): Fermion-to-qubit encoding (e.g., ``"jordan-wigner"``). Default ``None``.
+            fermion_mode_order (FermionModeOrder | str | None): Mode ordering (``"blocked"``/``"interleaved"``).
 
         Raises:
             ValueError: If the number of Pauli strings and coefficients don't match,
@@ -68,11 +83,12 @@ class QubitHamiltonian(DataClass):
         self.pauli_strings = pauli_strings
         self.coefficients = coefficients
         self.encoding = encoding
+        self.fermion_mode_order: FermionModeOrder | None = (
+            FermionModeOrder(fermion_mode_order) if fermion_mode_order is not None else None
+        )
 
-        try:
-            _ = self.pauli_ops  # Trigger cached property to validate Pauli strings
-        except Exception as e:
-            raise ValueError(f"Invalid Pauli strings or coefficients: {e}") from e
+        # Validate Pauli strings
+        _validate_pauli_strings(pauli_strings)
 
         # Make instance immutable after construction (handled by base class)
         super().__init__()
@@ -85,7 +101,7 @@ class QubitHamiltonian(DataClass):
             int: The number of qubits.
 
         """
-        return self.pauli_ops.num_qubits
+        return len(self.pauli_strings[0])
 
     @property
     def schatten_norm(self) -> float:
@@ -101,15 +117,56 @@ class QubitHamiltonian(DataClass):
         """
         return float(np.sum(np.abs(self.coefficients)))
 
-    @cached_property
-    def pauli_ops(self) -> SparsePauliOp:
-        """Get the qubit Hamiltonian as a ``SparsePauliOp``.
+    def to_matrix(self, sparse: bool = False) -> np.ndarray | scipy.sparse.spmatrix:
+        """Convert the qubit Hamiltonian to its full matrix representation.
+
+        Args:
+            sparse: If True, return a csr matrix.
+                Otherwise return a dense matrix. Defaults to False.
 
         Returns:
-            qiskit.quantum_info.SparsePauliOp: The qubit Hamiltonian represented as a ``SparsePauliOp``.
+            The Hamiltonian matrix (dense or sparse).
 
         """
-        return SparsePauliOp(self.pauli_strings, self.coefficients)
+        if sparse:
+            return pauli_to_sparse_matrix(self.pauli_strings, self.coefficients)
+        return np.asarray(pauli_to_dense_matrix(self.pauli_strings, self.coefficients))
+
+    def equiv(self, other: QubitHamiltonian, atol: float = 1e-12) -> bool:
+        """Check mathematical equivalence with another QubitHamiltonian.
+
+        Two QubitHamiltonians are equivalent if they contain the same Pauli
+        terms with the same coefficients (within tolerance), regardless of
+        term ordering.  Duplicate Pauli strings are summed before comparison.
+
+        Args:
+            other: The QubitHamiltonian to compare against.
+            atol: Absolute tolerance for coefficient comparison. Defaults to 1e-12.
+
+        Returns:
+            ``True`` if the two QubitHamiltonians are mathematically equivalent.
+
+        Examples:
+            >>> qh1 = QubitHamiltonian(["XI", "ZZ"], np.array([0.5, 0.3]))
+            >>> qh2 = QubitHamiltonian(["ZZ", "XI"], np.array([0.3, 0.5]))
+            >>> qh1.equiv(qh2)
+            True
+
+        """
+        if not isinstance(other, QubitHamiltonian):
+            return False
+
+        def _sum_terms(qh: QubitHamiltonian) -> dict[str, complex]:
+            d: dict[str, complex] = {}
+            for ps, c in zip(qh.pauli_strings, qh.coefficients, strict=True):
+                d[ps] = d.get(ps, 0) + c
+            return d
+
+        self_dict = _sum_terms(self)
+        other_dict = _sum_terms(other)
+
+        all_keys = set(self_dict) | set(other_dict)
+        return all(abs(self_dict.get(k, 0) - other_dict.get(k, 0)) <= atol for k in all_keys)
 
     def is_hermitian(self, tolerance: float = 1e-12) -> bool:
         """Check whether all coefficients are real within ``tolerance``.
@@ -125,7 +182,7 @@ class QubitHamiltonian(DataClass):
             ``True`` if every coefficient has ``|imag| <= tolerance``.
 
         """
-        return all(abs(complex(c).imag) <= tolerance for c in self.pauli_ops.coeffs)
+        return all(abs(complex(c).imag) <= tolerance for c in self.coefficients)
 
     def get_real_coefficients(
         self, tolerance: float = 1e-12, sort_by_magnitude: bool = False
@@ -148,64 +205,15 @@ class QubitHamiltonian(DataClass):
 
         """
         terms: list[tuple[str, float]] = []
-        for pauli, coeff in zip(self.pauli_ops.paulis, self.pauli_ops.coeffs, strict=True):
+        for pauli_str, coeff in zip(self.pauli_strings, self.coefficients, strict=True):
             real = complex(coeff).real
             if abs(real) > tolerance:
-                terms.append((pauli.to_label(), real))
+                terms.append((pauli_str, real))
         if sort_by_magnitude:
             terms.sort(key=lambda t: abs(t[1]), reverse=True)
         return terms
 
-    def reorder_qubits(self, permutation: list[int]) -> "QubitHamiltonian":
-        """Reorder qubits in all Pauli strings according to a permutation.
-
-        Applies a qubit index permutation to all Pauli strings. The permutation
-        specifies where each qubit should be mapped: permutation[old_index] = new_index.
-
-        Args:
-            permutation (list[int]): A permutation mapping old qubit indices to new indices.
-                Must be a valid permutation of [0, 1, ..., num_qubits-1].
-
-        Returns:
-            QubitHamiltonian: A new QubitHamiltonian with reordered Pauli strings.
-
-        Raises:
-            ValueError: If the permutation is invalid (wrong length or not a valid permutation).
-
-        Examples:
-            >>> qh = QubitHamiltonian(["XIZI", "IYII"], np.array([0.5, 0.3]))
-            >>> # Swap qubits 0 and 1: permutation[0]=1, permutation[1]=0, ...
-            >>> reordered = qh.reorder_qubits([1, 0, 2, 3])
-            >>> print(reordered.pauli_strings)
-            ['IXZI', 'YIII']
-
-        """
-        Logger.trace_entering()
-        n_qubits = self.num_qubits
-
-        # Validate permutation
-        if len(permutation) != n_qubits:
-            raise ValueError(f"Permutation length ({len(permutation)}) must match number of qubits ({n_qubits}).")
-        if sorted(permutation) != list(range(n_qubits)):
-            raise ValueError(f"Invalid permutation: must be a permutation of [0, 1, ..., {n_qubits - 1}].")
-
-        # Apply permutation to each Pauli string
-        # Pauli strings are in little-endian order: string[i] corresponds to qubit i
-        reordered_strings = []
-        for pauli_str in self.pauli_strings:
-            # Create new string with reordered characters
-            new_chars = ["I"] * n_qubits
-            for old_idx, char in enumerate(pauli_str):
-                new_idx = permutation[old_idx]
-                new_chars[new_idx] = char
-            reordered_strings.append("".join(new_chars))
-
-        return QubitHamiltonian(
-            pauli_strings=reordered_strings,
-            coefficients=self.coefficients.copy(),
-        )
-
-    def to_interleaved(self, n_spatial: int) -> "QubitHamiltonian":
+    def to_interleaved(self, n_spatial: int) -> QubitHamiltonian:
         """Convert from blocked to interleaved spin-orbital ordering.
 
         Converts a qubit Hamiltonian from blocked ordering (alpha orbitals first,
@@ -239,18 +247,30 @@ class QubitHamiltonian(DataClass):
         # Build permutation: blocked -> interleaved
         # Blocked ordering:      a0, a1, ..., a(n-1), b0, b1, ..., b(n-1)
         # Interleaved ordering:  a0, b0, a1, b1, ..., a(n-1), b(n-1)
-        # For blocked index i, alpha spin (i < n_spatial) maps to 2*i,
-        # and beta spin (i >= n_spatial) maps to 2*(i - n_spatial) + 1
-        permutation = []
-        for i in range(n_qubits):
-            if i < n_spatial:
-                permutation.append(2 * i)
-            else:
-                permutation.append(2 * (i - n_spatial) + 1)
+        # Pauli strings are little-endian (rightmost char = qubit 0), so
+        # string position j corresponds to qubit (n_qubits - 1 - j).
+        # Qubit mapping: alpha (q < n_spatial) -> 2*q, beta -> 2*(q - n_spatial) + 1
+        permutation = [0] * n_qubits
+        for pos in range(n_qubits):
+            q_old = n_qubits - 1 - pos
+            q_new = 2 * q_old if q_old < n_spatial else 2 * (q_old - n_spatial) + 1
+            permutation[pos] = n_qubits - 1 - q_new
 
-        return self.reorder_qubits(permutation)
+        reordered_strings = []
+        for pauli_str in self.pauli_strings:
+            new_chars = ["I"] * n_qubits
+            for old_pos, char in enumerate(pauli_str):
+                new_chars[permutation[old_pos]] = char
+            reordered_strings.append("".join(new_chars))
 
-    def group_commuting(self, qubit_wise: bool = True) -> list["QubitHamiltonian"]:
+        return QubitHamiltonian(
+            pauli_strings=reordered_strings,
+            coefficients=self.coefficients.copy(),
+            encoding=self.encoding,
+            fermion_mode_order=FermionModeOrder.INTERLEAVED,
+        )
+
+    def group_commuting(self, qubit_wise: bool = True) -> list[QubitHamiltonian]:
         """Group the qubit Hamiltonian into commuting subsets.
 
         Args:
@@ -261,14 +281,29 @@ class QubitHamiltonian(DataClass):
 
         """
         Logger.trace_entering()
-        sparse_pauli_ops = self.pauli_ops.group_commuting(qubit_wise=qubit_wise)
+        commutes = do_pauli_labels_qw_commute if qubit_wise else do_pauli_labels_commute
+
+        # Each group is a list of (pauli_string, coefficient)
+        groups: list[list[tuple[str, complex]]] = []
+
+        for pauli_str, coeff in zip(self.pauli_strings, self.coefficients, strict=True):
+            placed = False
+            for group in groups:
+                if all(commutes(pauli_str, existing_str) for existing_str, _ in group):
+                    group.append((pauli_str, coeff))
+                    placed = True
+                    break
+            if not placed:
+                groups.append([(pauli_str, coeff)])
+
         return [
             QubitHamiltonian(
-                pauli_strings=group.paulis.to_labels(),
-                coefficients=group.coeffs,
+                pauli_strings=[p for p, _ in group],
+                coefficients=np.array([c for _, c in group]),
                 encoding=self.encoding,
+                fermion_mode_order=self.fermion_mode_order,
             )
-            for group in sparse_pauli_ops
+            for group in groups
         ]
 
     # DataClass interface implementation
@@ -284,6 +319,8 @@ class QubitHamiltonian(DataClass):
         )
         if self.encoding is not None:
             summary += f"  Encoding: {self.encoding}\n"
+        if self.fermion_mode_order is not None:
+            summary += f"  Fermion mode order: {self.fermion_mode_order}\n"
         return summary
 
     def to_json(self) -> dict[str, Any]:
@@ -305,6 +342,8 @@ class QubitHamiltonian(DataClass):
         }
         if self.encoding is not None:
             data["encoding"] = self.encoding
+        if self.fermion_mode_order is not None:
+            data["fermion_mode_order"] = str(self.fermion_mode_order)
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -319,9 +358,11 @@ class QubitHamiltonian(DataClass):
         group.create_dataset("coefficients", data=self.coefficients)
         if self.encoding is not None:
             group.attrs["encoding"] = self.encoding
+        if self.fermion_mode_order is not None:
+            group.attrs["fermion_mode_order"] = str(self.fermion_mode_order)
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> "QubitHamiltonian":
+    def from_json(cls, json_data: dict[str, Any]) -> QubitHamiltonian:
         """Create a QubitHamiltonian from a JSON dictionary.
 
         Args:
@@ -346,10 +387,11 @@ class QubitHamiltonian(DataClass):
             pauli_strings=json_data["pauli_strings"],
             coefficients=coefficients,
             encoding=json_data.get("encoding"),
+            fermion_mode_order=json_data.get("fermion_mode_order"),
         )
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> "QubitHamiltonian":
+    def from_hdf5(cls, group: h5py.Group) -> QubitHamiltonian:
         """Load a QubitHamiltonian from an HDF5 group.
 
         Args:
@@ -369,7 +411,15 @@ class QubitHamiltonian(DataClass):
         # Decode encoding if it's stored as bytes (HDF5 behavior can vary)
         if encoding is not None and isinstance(encoding, bytes):
             encoding = encoding.decode("utf-8")
-        return cls(pauli_strings=pauli_strings, coefficients=coefficients, encoding=encoding)
+        fermion_mode_order = group.attrs.get("fermion_mode_order")
+        if fermion_mode_order is not None and isinstance(fermion_mode_order, bytes):
+            fermion_mode_order = fermion_mode_order.decode("utf-8")
+        return cls(
+            pauli_strings=pauli_strings,
+            coefficients=coefficients,
+            encoding=encoding,
+            fermion_mode_order=fermion_mode_order,
+        )
 
 
 def _filter_and_group_pauli_ops_from_statevector(
@@ -417,11 +467,11 @@ def _filter_and_group_pauli_ops_from_statevector(
     expectations: list[float] = []
     classical: list[float] = []
 
-    for pauli, coeff in zip(hamiltonian.pauli_ops.paulis, hamiltonian.coefficients, strict=True):
-        expval = float(np.vdot(psi, pauli.to_matrix(sparse=True) @ psi).real)
+    for pauli_str, coeff in zip(hamiltonian.pauli_strings, hamiltonian.coefficients, strict=True):
+        expval = pauli_expectation(pauli_str, psi)
 
         if not trimming:
-            retained_paulis.append(pauli.to_label())
+            retained_paulis.append(pauli_str)
             retained_coeffs.append(coeff)
             expectations.append(expval)
             continue
@@ -433,7 +483,7 @@ def _filter_and_group_pauli_ops_from_statevector(
         elif np.isclose(expval, -1.0, atol=trimming_tolerance):
             classical.append(float(-coeff.real))
         else:
-            retained_paulis.append(pauli.to_label())
+            retained_paulis.append(pauli_str)
             retained_coeffs.append(coeff)
             expectations.append(expval)
 
@@ -465,7 +515,12 @@ def _filter_and_group_pauli_ops_from_statevector(
         reduced_pauli.append(best_pauli)
         reduced_coeffs.append(coeff_sum)
 
-    reduced_hamiltonian = QubitHamiltonian(reduced_pauli, np.array(reduced_coeffs), encoding=hamiltonian.encoding)
+    reduced_hamiltonian = QubitHamiltonian(
+        reduced_pauli,
+        np.array(reduced_coeffs),
+        encoding=hamiltonian.encoding,
+        fermion_mode_order=hamiltonian.fermion_mode_order,
+    )
 
     grouped_hamiltonians = (
         reduced_hamiltonian.group_commuting(qubit_wise=abelian_grouping) if abelian_grouping else [reduced_hamiltonian]
@@ -514,3 +569,27 @@ def filter_and_group_pauli_ops_from_wavefunction(
     return _filter_and_group_pauli_ops_from_statevector(
         hamiltonian, psi, abelian_grouping, trimming, trimming_tolerance
     )
+
+
+def _validate_pauli_strings(pauli_strings: list[str]) -> None:
+    """Validate that all Pauli strings are well-formed.
+
+    Checks that every string uses only the characters {I, X, Y, Z} and
+    that all strings have the same length.
+
+    Raises:
+        ValueError: If any string is empty, has invalid characters, or if strings have inconsistent lengths.
+
+    """
+    if not pauli_strings:
+        raise ValueError("Pauli strings list cannot be empty.")
+    length = len(pauli_strings[0])
+    valid_pauli_pattern = re.compile(r"^[IXYZ]+$")
+    for i, ps in enumerate(pauli_strings):
+        if not ps:
+            raise ValueError(f"Pauli string at index {i} is empty.")
+        if len(ps) != length:
+            raise ValueError(f"Pauli string at index {i} has length {len(ps)}, expected {length}.")
+        if not valid_pauli_pattern.fullmatch(ps):
+            invalid = set(ps) - set("IXYZ")
+            raise ValueError(f"Pauli string at index {i} contains invalid characters: {invalid}.")

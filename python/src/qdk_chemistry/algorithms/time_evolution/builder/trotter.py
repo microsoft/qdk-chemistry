@@ -1,4 +1,17 @@
-"""QDK/Chemistry implementation of the Trotter decomposition Builder."""
+r"""QDK/Chemistry implementation of the Trotter decomposition Builder.
+
+References:
+    Childs, A. M., et al. "Theory of Trotter Error with Commutator
+    Scaling." *Physical Review X* 11.1 (2021): 011020.
+
+    Strang, G. "On the construction and comparison of difference
+    schemes." SIAM Journal on Numerical Analysis 5.3 (1968): 506-517.
+
+    Suzuki, M. "General theory of higher-order decomposition of
+    exponential operators and symplectic integrators."
+    Physics Letters A 165.5-6 (1992): 387-395.
+
+"""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -16,6 +29,7 @@ from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
+from qdk_chemistry.utils import Logger
 
 __all__: list[str] = ["Trotter", "TrotterSettings"]
 
@@ -151,10 +165,10 @@ class Trotter(TimeEvolutionBuilder):
         order = self._settings.get("order")
         if order in {1, 2} or (order > 2 and order % 2 == 0):
             return self._trotter(qubit_hamiltonian, time)
-        raise NotImplementedError("Non-positive and higher odd orders are not supported.")
+        raise NotImplementedError("Trotter orders must be positive and even for orders greater than 1")
 
     def _trotter(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
-        r"""Construct the time evolution unitary using first-order Trotter decomposition.
+        r"""Construct the time evolution unitary using the Trotter decomposition.
 
         The First Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`
         by decomposing the Hamiltonian H into a sum of terms and using the product formula:
@@ -162,12 +176,12 @@ class Trotter(TimeEvolutionBuilder):
 
         The Second Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`
         by decomposing the Hamiltonian H into a sum of terms and using the product formula:
-        :math:`e^{-iHt} \approx \left[\prod_i e^{-iH_{i=1}^{L-1} t/2n}e^{-iH_L t/n}\prod_i
-        e^{-iH_{i=L-1}^{1} t/2n}\right]^n`, where n is the number of divisions.
+        :math:`e^{-iHt} \approx \left[\prod_{i=1}^{L-1} e^{-iH_i t/2n}e^{-iH_L t/n}\prod_{i=L-1}^{1}
+        e^{-iH_i t/2n}\right]^n`, where n is the number of divisions (See Strang (1968)).
 
         Higher order Trotter methods are constructed using the recursive Suzuki method, which builds order 2k formulas
         as: :math:`S_{2k}(t) = S_{2k-2}(u_k t)^2 S_{2k-2}((1-4u_k) t) S_{2k-2}(u_k t)^2`,
-        where :math:`u_k = 1/(4-4^{1/(2k-1)})`.
+        where :math:`u_k = 1/(4-4^{1/(2k-1)})` (See Suzuki (1992)).
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
@@ -246,6 +260,9 @@ class Trotter(TimeEvolutionBuilder):
     ) -> list[ExponentiatedPauliTerm]:
         """Decompose a single Trotter step into exponentiated Pauli terms.
 
+        The order of the Trotter decomposition is taken from the settings associated
+        with this builder.
+
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be decomposed.
             time: The evolution time for the single step.
@@ -267,6 +284,7 @@ class Trotter(TimeEvolutionBuilder):
         # If there are no coefficients (e.g., empty Hamiltonian or all filtered by atol),
         # there is nothing to decompose; return the empty list of terms.
         if not coeffs:
+            Logger.warn("No coefficients above the tolerance; returning empty term list.")
             return terms
 
         order = self._settings.get("order")

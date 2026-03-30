@@ -3,7 +3,7 @@ build-backend = "scikit_build_core.build"
 requires = [
   "scikit-build-core>=0.10.0",
   "pybind11>=2.13.6",
-  "numpy>=1.20.0,<2.4.0",
+  "numpy>=2.0.0,<2.4.0",
 ]
 
 
@@ -30,13 +30,10 @@ classifiers = [
   "Topic :: Education",
 ]
 dependencies = [
-  "numpy>=1.20.0,<2.4.0",
+  "numpy>=2.0.0,<2.4.0",
   "scipy>=1.7.0",
   "matplotlib>=3.10.0",
-  "qiskit[qasm3-import]>=2.2.0",
-  "pylatexenc==2.10",
   "ruamel-yaml>=0.18.10",
-  "pydantic-settings>=2.9.1",
   "qdk[jupyter]>=1.26.0",
   "pybind11-stubgen>=2.5.1",
   "h5py>=3.0.0",
@@ -51,7 +48,7 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 all = [
-  "qdk-chemistry[coverage,dev,docs,plugins,qiskit-extras]"
+  "qdk-chemistry[coverage,dev,docs,jupyter,plugins,qiskit-extras,openfermion-extras]"
 ]
 coverage = [
   "coverage",
@@ -88,8 +85,13 @@ plugins = [
   "pyscf>=2.9.0,<2.12.1"
 ]
 qiskit-extras = [
+  "qiskit[qasm3-import]>=2.2.0",
   "qiskit-aer",
-  "qiskit-nature"
+  "qiskit-nature",
+  "pylatexenc==2.10"
+]
+openfermion-extras = [
+  "openfermion>=1.0.0"
 ]
 
 [project.urls]
@@ -164,7 +166,7 @@ markers = [
 ]
 testpaths = ["tests"]
 env = [
-  "QSHARP_PYTHON_TELEMETRY=none"
+  "QSHARP_PYTHON_TELEMETRY=false"
 ]
 
 [tool.ruff]

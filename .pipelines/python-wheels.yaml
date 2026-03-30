@@ -37,16 +37,22 @@ parameters:
     march: armv8-a
     imageName: 1es-pt-azurelinux3-arm
   - name: macos_arm64
-    os: macos
+    os: macOS
     arch: aarch64
     march: armv8-a
     imageName: ACES_VM_SharedPool_Tahoe
 - name: publishInternalFeed
   type: boolean
   default: false
+  displayName: Publish to Internal Feed
 - name: publishEsrp
   type: boolean
   default: false
+  displayName: Publish to PyPI
+- name: devTag
+  type: string
+  default: None
+  displayName: PyPI Development Tag (e.g. 'dev1', 'rc1', etc.)
 
 variables:
 - group: QdkChemistry
@@ -83,7 +89,7 @@ extends:
       jobs:
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
-          ${{ if eq(target.os, 'macos') }}:
+          ${{ if eq(target.os, 'macOS') }}:
             pool:
               name: AcesShared
               demands:
@@ -143,6 +149,7 @@ extends:
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
+                devTag: ${{ parameters.devTag }}
 
           # Test - Linux x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
@@ -164,6 +171,7 @@ extends:
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
+                devTag: ${{ parameters.devTag }}
 
           # Test - Linux ARM64
           - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
@@ -175,7 +183,7 @@ extends:
                 pythonVersion: $(pythonVersion)
 
           # Build - macOS ARM64
-          - ${{ if eq(target.os, 'macos') }}:
+          - ${{ if eq(target.os, 'macOS') }}:
             - template: .pipelines/templates/build-pip-wheels.yml@self
               parameters:
                 march: $(buildMarch)
@@ -184,9 +192,10 @@ extends:
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 pythonVersion: $(pythonVersion)
                 macBuild: ON
+                devTag: ${{ parameters.devTag }}
 
           # Test - macOS ARM64
-          - ${{ if eq(target.os, 'macos') }}:
+          - ${{ if eq(target.os, 'macOS') }}:
             - template: .pipelines/templates/test-pip-wheels.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
@@ -213,6 +222,18 @@ extends:
               python3 -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
             displayName: Upload wheel with twine
             condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
+
+          # Publishing debug symbols is not supported for macOS
+          - ${{ if and( eq(target.os, 'linux'), eq(target.arch, 'x86_64') ) }}:
+            - task: PublishSymbols@2
+              displayName: Publish debug symbols
+              condition: and(succeeded(), ${{ parameters.publishEsrp }})
+              inputs:
+                SymbolsFolder: $(System.DefaultWorkingDirectory)/python/debug_symbols
+                IndexSources: false # Not applicable for non-Windows builds
+                SymbolServerType: TeamServices
+                SearchPattern: '**/*.debug'
+                publishLinuxSymbols: true
 
     - stage: Approval
       displayName: Approval

@@ -83,17 +83,17 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
     qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
 
     # Obtain the ground state energy by diagonalizing the qubit Hamiltonian matrix
-    jordan_wigner_matrix = qubit_hamiltonian.pauli_ops.to_matrix()
+    jordan_wigner_matrix = qubit_hamiltonian.to_matrix()
     eigenvalues = np.linalg.eigvalsh(jordan_wigner_matrix)
     ground_state_energy = eigenvalues[0]
 
     # Verify that the ground state energy matches that obtained from OpenFermion's Jordan-Wigner Hamiltonian
     openfermion_jordan_wigner_energy = _extract_float(
-        r"Ground state energy is\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr
+        r"Ground-state energy:\s+([+\-0-9.]+) Hartree", result.stdout + result.stderr
     )
 
     assert np.isclose(
-        ground_state_energy + active_hamiltonian.get_core_energy(),
+        ground_state_energy,
         openfermion_jordan_wigner_energy,
         atol=float_comparison_absolute_tolerance,
     )

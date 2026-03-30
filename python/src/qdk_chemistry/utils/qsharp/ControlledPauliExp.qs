@@ -33,10 +33,14 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
     /// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
     /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
     /// - `repetitions`: The number of times to repeat the controlled evolution.
+    /// - `control`: The index of the control qubit.
+    /// - `systems`: An array of integers representing the indices of the system qubits.
     struct RepControlledPauliExpParams {
         pauliExponents : Pauli[][],
         pauliCoefficients : Double[],
         repetitions : Int,
+        control : Int,
+        systems : Int[],
     }
 
     /// Performs repeated Controlled Time Evolution for a set of Pauli exponentials.
@@ -58,18 +62,26 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
 
     /// A helper operation to create a circuit for repeated Controlled Time Evolution for a set of Pauli exponentials.
     /// # Parameters
-    /// - `params`: A `RepControlledPauliExpParams` struct containing the parameters for the operation.
+    /// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
+    /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
+    /// - `repetitions`: The number of times to repeat the controlled evolution.
     /// - `control`: The index of the control qubit.
-    /// - `system`: An array of integers representing the indices of the system qubits.
+    /// - `systems`: An array of integers representing the indices of the system qubits.
     /// # Returns
     /// - `Unit`: The operation prepares the repeated controlled time evolution on the allocated qubits.
     operation MakeRepControlledPauliExpCircuit(
-        params : RepControlledPauliExpParams,
+        pauliExponents : Pauli[][],
+        pauliCoefficients : Double[],
+        repetitions : Int,
         control : Int,
-        system : Int[],
+        systems : Int[]
     ) : Unit {
-        use qs = Qubit[Length(system) + 1];
-        RepControlledPauliExp(params, qs[control], Subarray(system, qs));
+        use qs = Qubit[Length(systems) + 1];
+        RepControlledPauliExp(
+            new RepControlledPauliExpParams { pauliExponents = pauliExponents, pauliCoefficients = pauliCoefficients, repetitions = repetitions, control = control, systems = systems },
+            qs[control],
+            Subarray(systems, qs)
+        );
     }
 
     /// A helper function to create a callable for repeated Controlled Time Evolution for a set of Pauli exponentials.

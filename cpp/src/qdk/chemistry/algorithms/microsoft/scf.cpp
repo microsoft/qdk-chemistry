@@ -202,6 +202,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
         convergence_threshold * eri_threshold_multiplier;
   }
   ms_scf_config->eri.use_atomics = _settings->get<bool>("eri_use_atomics");
+  ms_scf_config->eri.shell_pair_threshold =
+      _settings->get<double>("shell_pair_threshold");
   ms_scf_config->k_eri = ms_scf_config->eri;
   ms_scf_config->grad_eri = ms_scf_config->eri;
 
@@ -244,12 +246,6 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
                        nthreads);
   }
 #endif
-
-  // Save the current global level before disabling SCF logging
-  auto saved_level = Logger::get_global_level();
-
-  // Disable SCF logging
-  Logger::set_global_level(LogLevel::off);
 
   // Create SCF solver based on method and basis set type
   std::shared_ptr<qcs::SCF> scf;
@@ -486,9 +482,6 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
   // Return total energy
   double total_energy = context.result.scf_total_energy;
-
-  // Restore the original global logging level
-  Logger::set_global_level(saved_level);
 
   return std::make_pair(total_energy, std::make_shared<data::Wavefunction>(
                                           std::move(wavefunction)));

@@ -1,8 +1,10 @@
 Quickstart
 ==========
 
-These quickstart instructions provide a high-level overview of the typical workflow when using the QDK/Chemistry library.
-More comprehensive documentation can be found in the :doc:`comprehensive/index`. A list of features can be found in the :doc:`features` document.
+This quickstart walks through a complete quantum chemistry workflow, from molecular structure to energy estimate, using QDK/Chemistry's modular architecture.
+Each stage in the pipeline is an interchangeable component, so any step can be swapped for an alternative implementation without changing the rest of the workflow.
+
+More detailed documentation can be found in the :doc:`comprehensive/index`. A complete list of supported methods can be found in the :doc:`features` document.
 
 Installation
 ------------
@@ -12,13 +14,24 @@ To install QDK/Chemistry, please see the `installation instructions <https://git
 End-to-end example
 ------------------
 
-This document is intended to provide a brief introduction to the QDK/Chemistry library by walking through a minimal end-to-end example for ground state energy estimation with state preparation and measurement.
-The emphasis of this example is optimization:  reducing the resources required for the quantum computer to run a simple chemistry application.
-The example starts with a molecular structure and ends with an energy estimation computed by simulating a quantum circuit.
-The focus of this example is on high-level concepts and common coding patterns that can be extended to other applications.
+This example walks through the full quantum applications workflow: from building classical context around a molecular structure, through encoding for a quantum computer, to estimating the ground-state energy via circuit simulation.
+The emphasis is on optimizing the quantum resource requirements at every stage, demonstrating how QDK/Chemistry's modular pipeline makes it easy to select the right method for each step.
 
 You can also view a related code sample in a Jupyter notebook format, along with several other examples, in the `examples folder <https://github.com/microsoft/qdk-chemistry/blob/main/examples/>`_ of the GitHub repository.
 Companion chemistry datasets and supporting assets are also available in `microsoft/qdk-chemistry-data <https://github.com/microsoft/qdk-chemistry-data>`_.
+
+.. note::
+
+   If you installed ``qdk-chemistry`` from PyPI, use the ``stable/major.minor`` branch
+   when cloning the repository for examples.
+   The ``main`` branch is the active development branch and may be incompatible with
+   the released pip package. For example, to clone the repository for the latest stable 1.0 release, use:
+
+   .. code-block:: bash
+
+      git clone --branch stable/1.0 https://github.com/microsoft/qdk-chemistry.git
+
+   See the `examples README <https://github.com/microsoft/qdk-chemistry/blob/main/examples/README.md>`_ for details.
 
 Create a Structure object
 ^^^^^^^^^^^^^^^^^^^^^^^^^

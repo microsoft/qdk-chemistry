@@ -157,7 +157,7 @@ TEST_F(HamiltonianTest, ConstructorWithInactiveFock) {
       std::make_tuple(std::move(active_indices), std::move(inactive_indices)));
 
   // Create a non-empty inactive Fock matrix
-  Eigen::MatrixXd non_empty_inactive_fock = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::MatrixXd non_empty_inactive_fock = Eigen::MatrixXd::Identity(4, 4);
   Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
       one_body, two_body, orbitals_with_inactive, core_energy,
       non_empty_inactive_fock));
@@ -168,6 +168,13 @@ TEST_F(HamiltonianTest, ConstructorWithInactiveFock) {
   EXPECT_TRUE(h.has_inactive_fock_matrix());
   EXPECT_EQ(h.get_orbitals()->get_num_molecular_orbitals(), 4);
   EXPECT_EQ(h.get_core_energy(), 1.5);
+
+  Eigen::MatrixXd wrong_dim_inactive_fock = Eigen::MatrixXd::Identity(2, 2);
+  EXPECT_THROW(
+      Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          one_body, two_body, orbitals_with_inactive, core_energy,
+          wrong_dim_inactive_fock)),
+      std::invalid_argument);
 }
 
 TEST_F(HamiltonianTest, MoveConstructor) {
@@ -617,8 +624,8 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
                      coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
                      std::nullopt, basis_set,
                      std::make_tuple(std::move(alpha_active_indices),
-                                     std::move(alpha_inactive_indices),
                                      std::move(beta_active_indices),
+                                     std::move(alpha_inactive_indices),
                                      std::move(beta_inactive_indices)));
                  hc->run(orbitals);
                }),
@@ -637,8 +644,8 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
                      coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
                      std::nullopt, basis_set,
                      std::make_tuple(std::move(alpha_active_indices),
-                                     std::move(alpha_inactive_indices),
                                      std::move(beta_active_indices),
+                                     std::move(alpha_inactive_indices),
                                      std::move(beta_inactive_indices)));
                  hc->run(orbitals);
                }),
@@ -712,8 +719,8 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
             coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
             basis_set,
             std::make_tuple(std::move(alpha_active_indices),
-                            std::move(alpha_inactive_indices),
                             std::move(beta_active_indices),
+                            std::move(alpha_inactive_indices),
                             std::move(beta_inactive_indices)));
         hc->run(orbitals);
       },
@@ -750,9 +757,10 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
     auto orbitals = std::make_shared<Orbitals>(
         coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
         large_basis_set,
-        std::make_tuple(
-            std::move(alpha_active_indices), std::move(alpha_inactive_indices),
-            std::move(beta_active_indices), std::move(beta_inactive_indices)));
+        std::make_tuple(std::move(alpha_active_indices),
+                        std::move(beta_active_indices),
+                        std::move(alpha_inactive_indices),
+                        std::move(beta_inactive_indices)));
     auto hamiltonian = hc->run(orbitals);
     EXPECT_TRUE(hamiltonian->has_one_body_integrals());
     EXPECT_TRUE(hamiltonian->has_two_body_integrals());
@@ -859,6 +867,13 @@ TEST_F(HamiltonianConstructorTest, CholeskyFactory) {
 
   auto cholesky_hc = HamiltonianConstructorFactory::create("qdk_cholesky");
   EXPECT_EQ(cholesky_hc->name(), "qdk_cholesky");
+
+  // Test default eri_threshold
+  EXPECT_DOUBLE_EQ(cholesky_hc->settings().get<double>("eri_threshold"), 1e-12);
+
+  // Test setting eri_threshold
+  EXPECT_NO_THROW(cholesky_hc->settings().set("eri_threshold", 1e-10));
+  EXPECT_DOUBLE_EQ(cholesky_hc->settings().get<double>("eri_threshold"), 1e-10);
 }
 
 TEST_F(HamiltonianConstructorTest, CholeskyRestrictedO2) {
@@ -1707,13 +1722,14 @@ TEST_F(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {
 
   Eigen::VectorXd two_body_2x2 = 2 * Eigen::VectorXd::Ones(16);  // 2^4 = 16
 
-  // Create appropriate inactive Fock matrix for the inactive space
-  Eigen::MatrixXd inactive_fock_2x2 = Eigen::MatrixXd::Zero(2, 2);
+  // Create appropriate inactive Fock matrix for the inactive space, size must
+  // match total number of orbitals (3x3) (see orbitals_with_active_space).
+  Eigen::MatrixXd inactive_fock_3x3 = Eigen::MatrixXd::Zero(3, 3);
 
   Hamiltonian h_active_space(
       std::make_unique<CanonicalFourCenterHamiltonianContainer>(
           one_body_2x2, two_body_2x2, orbitals_with_active_space, core_energy,
-          inactive_fock_2x2));
+          inactive_fock_3x3));
 
   // Should successfully write FCIDUMP using active space dimensions
   EXPECT_NO_THROW({

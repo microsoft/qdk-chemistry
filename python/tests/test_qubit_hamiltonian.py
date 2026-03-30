@@ -6,11 +6,14 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+import random as stdlib_random
 import re
 
 import numpy as np
 import pytest
+import scipy.sparse
 
+from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.qubit_hamiltonian import (
     QubitHamiltonian,
     _filter_and_group_pauli_ops_from_statevector,
@@ -18,6 +21,23 @@ from qdk_chemistry.data.qubit_hamiltonian import (
 )
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+
+def _pauli_matrix(label):
+    """Return Pauli matrix from a Pauli label."""
+    mat = np.eye(1, dtype=complex)
+    for i in label:
+        if i == "I":
+            mat = np.kron(mat, np.eye(2, dtype=complex))
+        elif i == "X":
+            mat = np.kron(mat, np.array([[0, 1], [1, 0]], dtype=complex))
+        elif i == "Y":
+            mat = np.kron(mat, np.array([[0, -1j], [1j, 0]], dtype=complex))
+        elif i == "Z":
+            mat = np.kron(mat, np.array([[1, 0], [0, -1]], dtype=complex))
+        else:
+            raise ValueError(f"Invalid Pauli character '{i}'")
+    return mat
 
 
 class TestQubitHamiltonian:
@@ -39,12 +59,16 @@ class TestQubitHamiltonian:
 
     def test_initialization_invalid_pauli(self):
         """Test that initialization raises ValueError on invalid Pauli strings."""
-        with pytest.raises(ValueError, match="Invalid Pauli strings or coefficients"):
+        with pytest.raises(ValueError, match="invalid characters"):
             QubitHamiltonian(pauli_strings=["X", "A"], coefficients=np.array([1.0, 0.5]))
-        with pytest.raises(ValueError, match="Invalid Pauli strings or coefficients"):
-            QubitHamiltonian(pauli_strings=["X", "Y"], coefficients=np.array([1.0, "invalid"]))
-        with pytest.raises(ValueError, match="Invalid Pauli strings or coefficients"):
+        with pytest.raises(ValueError, match="has length"):
             QubitHamiltonian(pauli_strings=["X", "ZY"], coefficients=np.array([1.0, 2.0]))
+        with pytest.raises(ValueError, match="invalid characters"):
+            QubitHamiltonian(pauli_strings=["XZ", "A1"], coefficients=np.array([1.0, 0.5]))
+        with pytest.raises(ValueError, match="empty"):
+            QubitHamiltonian(pauli_strings=["X", ""], coefficients=np.array([1.0, 0.5]))
+        with pytest.raises(ValueError, match="empty"):
+            QubitHamiltonian(pauli_strings=[], coefficients=[])
 
     def test_group_commuting(self):
         """Test group_commuting."""
@@ -75,6 +99,65 @@ class TestQubitHamiltonian:
             assert len(group.pauli_strings) == 1  # Each group should contain only one Pauli string
             all_grouped_strings.extend(group.pauli_strings)
         assert set(all_grouped_strings) == {"XX", "YY", "ZZ", "XY"}
+
+    def test_group_commuting_all_commute(self):
+        """Test that fully commuting operators go into one group."""
+        # ZI, IZ, ZZ all commute with each other
+        qh = QubitHamiltonian(["ZI", "IZ", "ZZ"], np.array([1.0, -0.5, 0.3]))
+        grouped = qh.group_commuting(qubit_wise=False)
+        assert len(grouped) == 1
+        assert len(grouped[0].pauli_strings) == 3
+
+    def test_group_commuting_none_commute(self):
+        """Test that non-commuting operators each get their own group."""
+        # X and Z anticommute; Y and X anticommute; Y and Z anticommute
+        qh = QubitHamiltonian(["X", "Z", "Y"], np.array([1.0, -0.5, 0.3]))
+        grouped = qh.group_commuting(qubit_wise=False)
+        assert len(grouped) == 3
+
+    def test_group_commuting_single_term(self):
+        """Test group_commuting with a single term."""
+        qh = QubitHamiltonian(["ZZ"], np.array([1.0]))
+        grouped = qh.group_commuting(qubit_wise=False)
+        assert len(grouped) == 1
+        assert grouped[0].pauli_strings == ["ZZ"]
+
+    def test_group_commuting_reconstruct_matrix(self):
+        """Test group_commuting with matrix verification."""
+        qh = QubitHamiltonian(
+            ["II", "IZ", "ZI", "ZZ", "XX", "YY"],
+            np.array([-0.8, 0.17, -0.17, 0.12, 0.04, 0.04]),
+        )
+        # General commuting: all diagonal terms commute, XX and YY commute with each other and with diag terms
+        grouped = qh.group_commuting(qubit_wise=False)
+        total_terms = sum(len(g.pauli_strings) for g in grouped)
+        assert total_terms == 6
+        # Verify ground state energy via eigenvalues
+        mat = qh.to_matrix()
+        gs_energy = np.min(np.linalg.eigvalsh(mat))
+        # Reconstruct from groups and check same ground state energy
+        full_mat = np.zeros_like(mat)
+        for g in grouped:
+            full_mat += g.to_matrix()
+        gs_energy_grouped = np.min(np.linalg.eigvalsh(full_mat))
+        assert np.isclose(gs_energy, gs_energy_grouped, atol=float_comparison_absolute_tolerance)
+
+    def test_group_commuting_qw_reconstruct_matrix(self):
+        """Test that QW-grouped Hamiltonian reconstructs the original matrix exactly."""
+        labels = ["ZI", "IZ", "ZZ", "XI", "IX", "XX", "YY"]
+        coeffs = np.array([0.5, 0.3, 0.2, -0.1, 0.4, -0.25, 0.15])
+        qh = QubitHamiltonian(labels, coeffs)
+        original_mat = qh.to_matrix()
+        groups = qh.group_commuting(qubit_wise=True)
+        reconstructed = np.zeros_like(original_mat)
+        for g in groups:
+            reconstructed += g.to_matrix()
+        assert np.allclose(
+            reconstructed,
+            original_mat,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
 
     def test_schatten_norm_basic(self):
         """Test Schatten norm with basic Hamiltonian."""
@@ -144,37 +227,6 @@ class TestQubitHamiltonian:
             rtol=float_comparison_relative_tolerance,
         )
 
-    def test_reorder_qubits_identity(self):
-        """Test that identity permutation returns equivalent Hamiltonian."""
-        qh = QubitHamiltonian(["XIZI", "IYII"], np.array([0.5, 0.3], dtype=complex))
-        reordered = qh.reorder_qubits([0, 1, 2, 3])
-        assert reordered.pauli_strings == qh.pauli_strings
-        assert np.allclose(reordered.coefficients, qh.coefficients)
-
-    def test_reorder_qubits_swap(self):
-        """Test swapping two adjacent qubits."""
-        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
-        reordered = qh.reorder_qubits([1, 0, 2, 3])
-        assert reordered.pauli_strings == ["IXZI"]
-
-    def test_reorder_qubits_reverse(self):
-        """Test reversing all qubit indices."""
-        qh = QubitHamiltonian(["XYZI"], np.array([1.0], dtype=complex))
-        reordered = qh.reorder_qubits([3, 2, 1, 0])
-        assert reordered.pauli_strings == ["IZYX"]
-
-    def test_reorder_qubits_invalid_length(self):
-        """Test that invalid permutation length raises error."""
-        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
-        with pytest.raises(ValueError, match="Permutation length"):
-            qh.reorder_qubits([0, 1, 2])
-
-    def test_reorder_qubits_invalid_values(self):
-        """Test that invalid permutation values raise error."""
-        qh = QubitHamiltonian(["XIZI"], np.array([1.0], dtype=complex))
-        with pytest.raises(ValueError, match="Invalid permutation"):
-            qh.reorder_qubits([0, 1, 1, 3])
-
     def test_to_interleaved_4_qubits(self):
         """Test blocked to interleaved conversion for 4 qubits."""
         # Blocked: [α₀, α₁, β₀, β₁] -> Interleaved: [α₀, β₀, α₁, β₁]
@@ -199,6 +251,84 @@ class TestQubitHamiltonian:
         qh = QubitHamiltonian(["XY"], np.array([1.0], dtype=complex))
         interleaved = qh.to_interleaved(n_spatial=1)
         assert interleaved.pauli_strings == ["XY"]
+
+    def test_to_matrix_hermitian(self):
+        """Test that to_matrix produces a Hermitian matrix for real coefficients."""
+        qh = QubitHamiltonian(["IX", "ZI", "ZZ", "YY"], np.array([0.5, -0.3, 0.8, -0.2]))
+        mat = qh.to_matrix()
+        assert np.allclose(
+            mat, mat.conj().T, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+
+    def test_to_matrix(self):
+        """Test to_matrix returns a matrix matching reference."""
+        labels = ["IX", "ZZ", "YY"]
+        coeffs = np.array([0.5, -0.3, 0.1])
+        qh = QubitHamiltonian(labels, coeffs)
+        expected = sum(c * _pauli_matrix(label) for c, label in zip(coeffs, labels, strict=True))
+        dense = qh.to_matrix(sparse=False)
+        sparse = qh.to_matrix(sparse=True)
+        assert scipy.sparse.issparse(sparse)
+        assert np.allclose(
+            dense, expected, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+        assert np.allclose(
+            sparse.toarray(),
+            expected,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+    def test_to_matrix_eigenvalues(self):
+        """Test that sparse and dense matrices give the same eigenvalues."""
+        qh = QubitHamiltonian(["ZI", "IZ", "XX"], np.array([0.7, -0.4, 0.3]))
+        dense = qh.to_matrix(sparse=False)
+        sparse = qh.to_matrix(sparse=True)
+        eigvals_dense = np.sort(np.linalg.eigvalsh(dense))
+        eigvals_sparse = np.sort(np.linalg.eigvalsh(sparse.toarray()))
+        assert np.allclose(
+            eigvals_dense,
+            eigvals_sparse,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+    def test_to_matrix_complex_coefficients(self):
+        """Test to_matrix with complex coefficients."""
+        labels = ["X", "Y"]
+        coeffs = np.array([1.0 + 0.5j, 0.0 - 0.3j])
+        qh = QubitHamiltonian(labels, coeffs)
+        expected = sum(c * _pauli_matrix(label) for c, label in zip(coeffs, labels, strict=True))
+        mat = qh.to_matrix()
+        assert np.allclose(
+            mat, expected, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+
+    def test_to_matrix_large_10qubit_random(self):
+        """Test to_matrix on a 10-qubit, 20-term random Hamiltonian."""
+        stdlib_random.seed(2026)
+        rng = np.random.default_rng(2026)
+        pauli_chars = "IXYZ"
+        n_qubits = 10
+        n_terms = 20
+        labels = ["".join(stdlib_random.choice(pauli_chars) for _ in range(n_qubits)) for _ in range(n_terms)]
+        coeffs = rng.standard_normal(n_terms) + 1j * rng.standard_normal(n_terms)
+        qh = QubitHamiltonian(labels, coeffs)
+        dim = 2**n_qubits
+        expected = np.zeros((dim, dim), dtype=complex)
+        for coeff, label in zip(coeffs, labels, strict=True):
+            expected += coeff * _pauli_matrix(label)
+        dense = qh.to_matrix(sparse=False)
+        sparse = qh.to_matrix(sparse=True)
+        assert np.allclose(
+            dense, expected, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+        assert np.allclose(
+            sparse.toarray(),
+            expected,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
 
 
 def test_filter_and_group_raises_on_zero_norm():
@@ -520,3 +650,111 @@ class TestQubitHamiltonianSerialization:
 
         assert "pauli_strings" in data
         assert "coefficients" in data
+
+
+class TestFermionModeOrder:
+    """Test suite for fermion_mode_order metadata on QubitHamiltonian."""
+
+    def test_default_is_none(self):
+        """fermion_mode_order defaults to None when not specified."""
+        qh = QubitHamiltonian(["IX", "ZZ"], np.array([0.5, 0.3]))
+        assert qh.fermion_mode_order is None
+
+    def test_set_blocked(self):
+        """fermion_mode_order can be set to BLOCKED."""
+        qh = QubitHamiltonian(["IX", "ZZ"], np.array([0.5, 0.3]), fermion_mode_order=FermionModeOrder.BLOCKED)
+        assert qh.fermion_mode_order == FermionModeOrder.BLOCKED
+        assert qh.fermion_mode_order == "blocked"
+
+    def test_set_interleaved(self):
+        """fermion_mode_order can be set to INTERLEAVED."""
+        qh = QubitHamiltonian(["IX", "ZZ"], np.array([0.5, 0.3]), fermion_mode_order=FermionModeOrder.INTERLEAVED)
+        assert qh.fermion_mode_order == FermionModeOrder.INTERLEAVED
+
+    def test_set_from_string(self):
+        """fermion_mode_order accepts a raw string and coerces to the enum."""
+        qh = QubitHamiltonian(["IX", "ZZ"], np.array([0.5, 0.3]), fermion_mode_order="blocked")
+        assert qh.fermion_mode_order is FermionModeOrder.BLOCKED
+
+    def test_json_roundtrip(self):
+        """fermion_mode_order survives JSON serialization."""
+        original = QubitHamiltonian(
+            ["IX", "ZZ"],
+            np.array([0.5, 0.3]),
+            encoding="jordan-wigner",
+            fermion_mode_order=FermionModeOrder.BLOCKED,
+        )
+        json_data = original.to_json()
+        assert json_data["fermion_mode_order"] == "blocked"
+
+        restored = QubitHamiltonian.from_json(json_data)
+        assert restored.fermion_mode_order == FermionModeOrder.BLOCKED
+
+    def test_json_roundtrip_none(self):
+        """fermion_mode_order=None is omitted from JSON and restored as None."""
+        original = QubitHamiltonian(["IX", "ZZ"], np.array([0.5, 0.3]))
+        json_data = original.to_json()
+        assert "fermion_mode_order" not in json_data
+
+        restored = QubitHamiltonian.from_json(json_data)
+        assert restored.fermion_mode_order is None
+
+    def test_hdf5_roundtrip(self, tmp_path):
+        """fermion_mode_order survives HDF5 serialization."""
+        original = QubitHamiltonian(
+            ["IX", "ZZ"],
+            np.array([0.5, 0.3]),
+            encoding="jordan-wigner",
+            fermion_mode_order=FermionModeOrder.INTERLEAVED,
+        )
+        filename = tmp_path / "test.qubit_hamiltonian.h5"
+        original.to_hdf5_file(str(filename))
+
+        restored = QubitHamiltonian.from_hdf5_file(str(filename))
+        assert restored.fermion_mode_order == FermionModeOrder.INTERLEAVED
+
+    def test_hdf5_roundtrip_none(self, tmp_path):
+        """fermion_mode_order=None is omitted from HDF5 and restored as None."""
+        original = QubitHamiltonian(["IX", "ZZ"], np.array([0.5, 0.3]))
+        filename = tmp_path / "test.qubit_hamiltonian.h5"
+        original.to_hdf5_file(str(filename))
+
+        restored = QubitHamiltonian.from_hdf5_file(str(filename))
+        assert restored.fermion_mode_order is None
+
+    def test_group_commuting_preserves(self):
+        """group_commuting preserves fermion_mode_order."""
+        qh = QubitHamiltonian(
+            ["XX", "YY", "ZZ"],
+            np.array([1.0, 0.5, -0.5]),
+            fermion_mode_order=FermionModeOrder.BLOCKED,
+        )
+        for group in qh.group_commuting(qubit_wise=True):
+            assert group.fermion_mode_order == FermionModeOrder.BLOCKED
+
+    def test_to_interleaved_sets_order(self):
+        """to_interleaved sets fermion_mode_order to INTERLEAVED."""
+        qh = QubitHamiltonian(
+            ["IIIX", "ZZII"],
+            np.array([0.5, 0.3]),
+            fermion_mode_order=FermionModeOrder.BLOCKED,
+        )
+        interleaved = qh.to_interleaved(n_spatial=2)
+        assert interleaved.fermion_mode_order == FermionModeOrder.INTERLEAVED
+
+    def test_summary_includes_order(self):
+        """get_summary includes fermion_mode_order when set."""
+        qh = QubitHamiltonian(
+            ["IX", "ZZ"],
+            np.array([0.5, 0.3]),
+            fermion_mode_order=FermionModeOrder.BLOCKED,
+        )
+        summary = qh.get_summary()
+        assert "blocked" in summary
+        assert "Fermion mode order" in summary
+
+    def test_summary_omits_when_none(self):
+        """get_summary omits fermion_mode_order when None."""
+        qh = QubitHamiltonian(["IX", "ZZ"], np.array([0.5, 0.3]))
+        summary = qh.get_summary()
+        assert "Fermion mode order" not in summary

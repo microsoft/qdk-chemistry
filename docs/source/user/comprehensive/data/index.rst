@@ -9,8 +9,25 @@ Comprehensive details on each data class can be found in the :ref:`API documenta
 Here, we provide a quick reference guide to help users understand the purpose and typical sources of commonly encountered data classes.
 Each of the links below leads to a detailed description of the data class, including its attributes, methods, and usage examples.
 
+.. toctree::
+   :maxdepth: 1
+   :caption: Contents
+
+   serialization
+   ansatz
+   basis_set
+   hamiltonian
+   orbitals
+   pauli_operator
+   structure
+   symmetries
+   wavefunction
+
+
 Quick reference
 ---------------
+
+The following table summarizes the available data classes in QDK/Chemistry and their purposes. For detailed documentation, refer to the linked pages.
 
 .. list-table::
    :header-rows: 1
@@ -31,23 +48,15 @@ Quick reference
    * - :doc:`Hamiltonian <hamiltonian>`
      - One- and two-electron integrals
      - :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`
-   * - ``Wavefunction``
+   * - :doc:`Wavefunction <wavefunction>`
      - Electronic state (orbitals + :term:`CI` coefficients)
      - :doc:`MCCalculator <../algorithms/mc_calculator>`
    * - ``QubitHamiltonian``
      - Pauli operator representation
      - :doc:`QubitMapper <../algorithms/qubit_mapper>`
+   * - :doc:`Symmetries <symmetries>`
+     - Physical symmetries
+     - Factory methods, User input
    * - :doc:`PauliOperator <pauli_operator>`
      - Pauli operator expressions with arithmetic
      - User construction
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Contents
-
-   serialization
-   basis_set
-   hamiltonian
-   orbitals
-   pauli_operator
-   structure

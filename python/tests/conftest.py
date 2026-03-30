@@ -5,6 +5,12 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
+
+# Disable telemetry before any qdk_chemistry imports.
+# Uses setdefault so an explicit env override is still respected.
+os.environ.setdefault("QSHARP_PYTHON_TELEMETRY", "false")
+
 import platform as plt
 import sys
 import tempfile

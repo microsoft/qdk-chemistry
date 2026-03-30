@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from qdk import qsharp
 
 from qdk_chemistry.data import Settings
-from qdk_chemistry.data.circuit import Circuit
+from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     PauliProductFormulaContainer,
 )
@@ -140,26 +140,19 @@ class PauliSequenceMapper(ControlledEvolutionCircuitMapper):
         if power < 1:
             raise ValueError("PauliSequenceMapper requires 'power' to be an integer greater than or equal to 1.")
 
-        controlled_evo_params = {
-            "pauliExponents": flattened_pauli_terms,
-            "pauliCoefficients": flattened_angles,
-            "repetitions": power,
-        }
-
-        qsc = qsharp.circuit(
-            QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
-            controlled_evo_params,
-            controlled_evolution.control_indices[0],
-            target_indices,
+        controlled_evo_params = QSHARP_UTILS.ControlledPauliExp.RepControlledPauliExpParams(
+            pauliExponents=flattened_pauli_terms,
+            pauliCoefficients=flattened_angles,
+            repetitions=power,
+            control=controlled_evolution.control_indices[0],
+            systems=target_indices,
         )
 
-        qir = qsharp.compile(
-            QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
-            controlled_evo_params,
-            controlled_evolution.control_indices[0],
-            target_indices,
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
+            parameter=vars(controlled_evo_params),
         )
 
         controlled_evolution_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(controlled_evo_params)
 
-        return Circuit(qsharp=qsc, qir=qir, qsharp_op=controlled_evolution_op)
+        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_evolution_op)
