@@ -105,7 +105,8 @@ def test_evolve_and_measure_eigenvalue_remains_constant() -> None:
     evolution_builder = Trotter(num_divisions=1, order=1, optimize_term_ordering=True)
     algo = EvolveAndMeasure()
     mapper = PauliSequenceMapper()
-    circuit_executor = create("energy_estimator", "qiskit_aer_simulator")
+    energy_estimator = create("energy_estimator", "qdk")
+    circuit_executor = create("circuit_executor", "qdk_full_state_simulator")
 
     measurements = algo.run(
         hamiltonians,
@@ -114,6 +115,7 @@ def test_evolve_and_measure_eigenvalue_remains_constant() -> None:
         evolution_builder=evolution_builder,
         circuit_mapper=mapper,
         circuit_executor=circuit_executor,
+        energy_estimator=energy_estimator,
         shots=1024,
     )
 

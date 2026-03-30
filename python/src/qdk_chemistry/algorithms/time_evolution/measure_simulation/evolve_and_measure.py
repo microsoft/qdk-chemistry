@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
+from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEstimator
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.circuit_mapper.base import EvolutionCircuitMapper
 from qdk_chemistry.data import (
@@ -50,6 +51,7 @@ class EvolveAndMeasure(MeasureSimulation):
         circuit_mapper: EvolutionCircuitMapper,
         shots: int = 1000,
         circuit_executor: CircuitExecutor,
+        energy_estimator: EnergyEstimator,
         noise: QuantumErrorProfile | None = None,
         basis_gates: list[str] | None = None,
     ) -> list[MeasurementData]:
@@ -64,6 +66,7 @@ class EvolveAndMeasure(MeasureSimulation):
             circuit_mapper: Mapper for time-evolution unitary to circuit.
             shots: Number of shots to use for measurement.
             circuit_executor: Circuit executor backend.
+            energy_estimator: Energy estimator algorithm.
             noise: Optional noise profile.
             basis_gates: Optional list of basis gates to transpile the circuit into before execution.
 
@@ -102,6 +105,7 @@ class EvolveAndMeasure(MeasureSimulation):
                     shots=shots,
                     observable=observable,
                     circuit_executor=circuit_executor,
+                    energy_estimator=energy_estimator,
                     noise=noise,
                 )
             )

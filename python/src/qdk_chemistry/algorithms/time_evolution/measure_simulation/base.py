@@ -12,6 +12,7 @@ from qdk import qsharp
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
+from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEstimator
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.circuit_mapper.base import EvolutionCircuitMapper
 from qdk_chemistry.data import (
@@ -63,6 +64,7 @@ class MeasureSimulation(Algorithm):
         circuit_mapper: EvolutionCircuitMapper,
         shots: int = 1000,
         circuit_executor: CircuitExecutor,
+        energy_estimator: EnergyEstimator,
         noise: QuantumErrorProfile | None = None,
         basis_gates: list[str] | None = None,
     ) -> list[MeasurementData]:
@@ -77,6 +79,7 @@ class MeasureSimulation(Algorithm):
             circuit_mapper: Mapper for time-evolution unitary to circuit.
             shots: Number of shots to use for measurement.
             circuit_executor: Circuit executor backend.
+            energy_estimator: Energy estimator algorithm.
             noise: Optional noise profile.
             basis_gates: Optional list of basis gates to transpile the circuit into before execution.
 
@@ -201,6 +204,7 @@ class MeasureSimulation(Algorithm):
         circuit: Circuit,
         observable: QubitHamiltonian,
         circuit_executor: CircuitExecutor,
+        energy_estimator: EnergyEstimator,
         shots: int = 1000,
         noise: QuantumErrorProfile | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
@@ -218,12 +222,10 @@ class MeasureSimulation(Algorithm):
         if shots_per_group <= 0:
             raise ValueError("shots per measurement group must be positive.")
 
-        if getattr(circuit_executor, "type_name", lambda: None)() != "energy_estimator":
-            raise TypeError("Only an EnergyEstimator is supported as circuit_executor.")
-
-        energy_result, measurement_data = circuit_executor.run(
+        energy_result, measurement_data = energy_estimator.run(
             circuit,
             grouped_observables,
+            circuit_executor,
             total_shots=shots,
             noise_model=noise,
         )
