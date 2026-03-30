@@ -576,11 +576,14 @@ def _register_python_algorithms():
     This function is automatically called during module import and should not
     be called by users.
     """
-    from qdk_chemistry.algorithms.circuit_executor.qdk import QdkFullStateSimulator  # noqa: PLC0415
-    from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.hadamard_test_generator.hadamard_test_generator import (  # noqa: PLC0415
         QdkHadamardTest,
     )
+    from qdk_chemistry.algorithms.circuit_executor.qdk import (  # noqa: PLC0415
+        QdkFullStateSimulator,
+        QdkSparseStateSimulator,
+    )
+    from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (  # noqa: PLC0415
         IterativePhaseEstimation,
     )
@@ -600,7 +603,7 @@ def _register_python_algorithms():
         PauliSequenceMapper,
     )
 
-    register(lambda: QDKEnergyEstimator())
+    register(lambda: QdkEnergyEstimator())
     register(lambda: SparseIsometryGF2XStatePreparation())
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
@@ -610,6 +613,7 @@ def _register_python_algorithms():
     register(lambda: PartiallyRandomized())
     register(lambda: PauliSequenceMapper())
     register(lambda: QdkFullStateSimulator())
+    register(lambda: QdkSparseStateSimulator())
     register(lambda: IterativePhaseEstimation())
     register(lambda: QdkHadamardTest())
 

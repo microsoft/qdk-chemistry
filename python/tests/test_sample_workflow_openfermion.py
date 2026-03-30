@@ -83,7 +83,7 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
     qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
 
     # Obtain the ground state energy by diagonalizing the qubit Hamiltonian matrix
-    jordan_wigner_matrix = qubit_hamiltonian.pauli_ops.to_matrix()
+    jordan_wigner_matrix = qubit_hamiltonian.to_matrix()
     eigenvalues = np.linalg.eigvalsh(jordan_wigner_matrix)
     ground_state_energy = eigenvalues[0]
 
