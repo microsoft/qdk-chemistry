@@ -115,9 +115,6 @@ extends:
             LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
           strategy:
             matrix:
-              Python3.14:
-                pythonVersion: '3.14'
-                buildMarch: ${{ target.march }}
               Python3.10:
                 pythonVersion: '3.10'
                 buildMarch: ${{ target.march }}
@@ -130,7 +127,10 @@ extends:
               Python3.13:
                 pythonVersion: '3.13'
                 buildMarch: ${{ target.march }}
-            maxParallel: 5
+              Python3.14:
+                pythonVersion: '3.14'
+                buildMarch: ${{ target.march }}
+            maxParallel: 3
           templateContext:
             outputs:
             - output: pipelineArtifact
