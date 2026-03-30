@@ -456,6 +456,7 @@ class Trotter(TimeEvolutionBuilder):
                 for layer_i, layer_occ in enumerate(layers_occupied):
                     if qubits.isdisjoint(layer_occ):
                         layers_indices[layer_i].append(i)
+                        layer_occ.update(qubits)
                         placed = True
                         break
                 if not placed:
