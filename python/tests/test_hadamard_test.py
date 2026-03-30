@@ -14,8 +14,8 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.hadamard_test_generator.base import HadamardTestBasis
-from qdk_chemistry.algorithms.hadamard_test_generator.hadamard_test_generator import QdkHadamardTest
+from qdk_chemistry.algorithms.hadamard_test.base import HadamardTestBasis
+from qdk_chemistry.algorithms.hadamard_test.hadamard_test import QdkHadamardTest
 from qdk_chemistry.data import Circuit, Structure, TimeEvolutionUnitary
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.plugins.qiskit.hadamard_test import QiskitHadamardTest

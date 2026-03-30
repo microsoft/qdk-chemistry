@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.hadamard_test_generator.base import HadamardTest, HadamardTestBasis
+from qdk_chemistry.algorithms.hadamard_test.base import HadamardTest, HadamardTestBasis
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.utils import Logger
 
