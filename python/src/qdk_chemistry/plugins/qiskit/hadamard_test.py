@@ -21,7 +21,7 @@ class QiskitHadamardTest(HadamardTest):
         Logger.trace_entering()
         super().__init__()
 
-    def _run_impl(
+    def _build_hadamard_test_circuit(
         self,
         state_preparation_circuit: Circuit,
         num_system_qubits: int,
@@ -45,8 +45,6 @@ class QiskitHadamardTest(HadamardTest):
             ModuleNotFoundError: If Qiskit is not installed.
 
         """
-        if not isinstance(test_basis, HadamardTestBasis):
-            raise TypeError("test_basis must be an instance of HadamardTestBasis.")
         try:
             from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3  # noqa: PLC0415
         except ModuleNotFoundError as err:

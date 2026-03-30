@@ -28,7 +28,7 @@ class QdkHadamardTest(HadamardTest):
         Logger.trace_entering()
         super().__init__()
 
-    def _run_impl(
+    def _build_hadamard_test_circuit(
         self,
         state_preparation_circuit: Circuit,
         num_system_qubits: int,
@@ -49,9 +49,6 @@ class QdkHadamardTest(HadamardTest):
             Circuit containing compiled and rendered Q# Hadamard test artifacts.
 
         """
-        if not isinstance(test_basis, HadamardTestBasis):
-            raise TypeError("test_basis must be an instance of HadamardTestBasis.")
-
         Logger.debug(f"Building qsharp circuit for measurement on {test_basis.value} basis.")
 
         qsharp_basis = basis_to_qsharp_pauli(test_basis)
