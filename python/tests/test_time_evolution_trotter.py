@@ -903,11 +903,12 @@ class TestOptimizeTermOrdering:
 
         term_labels = [term_to_label(t) for t in terms]
 
-        # With qubit-wise diagonalization, ZZ terms are already diagonal and
-        # stay as-is.  The X group {XIII, IXII, IIXI, IIIX} gets a sandwich:
-        # 4 basis-change + 4 diagonal + 4 basis-change† = 12 single-qubit terms.
-        pauli_zz_layer_1 = {"ZZII", "IIZZ"}
-        pauli_zz_layer_2 = {"IZZI", "ZIIZ"}
+        # After Clifford diagonalization, the ZZ layers produce 2 terms each
+        # (image_of transforms the original labels), and the X group
+        # {XIII, IXII, IIXI, IIIX} produces a Clifford sandwich of 12
+        # single-qubit Z terms (C + diagonal + C†).
+        pauli_zz_layer_1 = {"ZZZZ", "IZIZ"}
+        pauli_zz_layer_2 = {"ZIZZ", "IZZZ"}
         pauli_x_size = 12
 
         assert len(terms) == pauli_x_size + len(pauli_zz_layer_1) + len(pauli_zz_layer_2)
