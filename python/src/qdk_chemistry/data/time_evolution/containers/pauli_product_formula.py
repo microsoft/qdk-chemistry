@@ -131,7 +131,7 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
         Args:
             self_container: The first ``PauliProductFormulaContainer``.
             other_container: The second ``PauliProductFormulaContainer`` appended
-                after *self_container*.
+            after *self_container*.
             atol: Absolute tolerance for filtering small coefficients.
 
         Returns:
