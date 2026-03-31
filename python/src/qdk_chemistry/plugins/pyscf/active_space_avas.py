@@ -156,12 +156,14 @@ class PyscfAVAS(ActiveSpaceSelector):
                 )
 
         avas_obj = avas.AVAS(mf, ao_labels_clean, canonicalize=canonicalize, openshell_option=openshell_option)
-        norb_act, _, mo_coeff = avas_obj.kernel()
+        norb_act, nelec_act, mo_coeff = avas_obj.kernel()
 
         # Extract active indices
-        inactive_range = int(mol.nelectron / 2) - norb_act
-        active_indices = [inactive_range + i for i in range(norb_act)]
-        inactive_indices = range(inactive_range)
+        # nelec_act is the number of active electrons (int or tuple of alpha/beta)
+        n_active_electrons = sum(nelec_act) if isinstance(nelec_act, tuple | list) else int(nelec_act)
+        n_inactive_occ = (mol.nelectron - n_active_electrons) // 2
+        active_indices = [n_inactive_occ + i for i in range(norb_act)]
+        inactive_indices = list(range(n_inactive_occ))
 
         if open_shell:
             # Create active orbitals
