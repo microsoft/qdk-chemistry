@@ -176,14 +176,21 @@ class MeasureSimulation(Algorithm):
             A new ``Circuit`` restricted to the requested basis gates.
 
         """
-        from qiskit import qasm3, transpile  # noqa: PLC0415
-        from qiskit.transpiler import PassManager  # noqa: PLC0415
+        try:
+            from qiskit import qasm3, transpile  # noqa: PLC0415
+            from qiskit.transpiler import PassManager  # noqa: PLC0415
 
-        from qdk_chemistry.plugins.qiskit._interop.transpiler import (  # noqa: PLC0415
-            MergeZBasisRotations,
-            RemoveZBasisOnZeroState,
-            SubstituteCliffordRz,
-        )
+            from qdk_chemistry.plugins.qiskit._interop.transpiler import (  # noqa: PLC0415
+                MergeZBasisRotations,
+                RemoveZBasisOnZeroState,
+                SubstituteCliffordRz,
+            )
+        except ImportError as exc:  # noqa: PLC0415
+            raise RuntimeError(
+                "Qiskit is required to transpile circuits to the requested basis_gates, "
+                "but it is not installed. Please install the 'qiskit' package to use "
+                "the basis_gates option."
+            ) from exc
 
         qc = circuit.get_qiskit_circuit()
         qc = transpile(qc, basis_gates=basis_gates, optimization_level=3)
