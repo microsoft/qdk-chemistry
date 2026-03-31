@@ -199,14 +199,10 @@ class Circuit(DataClass):
         """Estimate resources for the quantum circuit.
 
         Args:
-            params: Optional parameters to configure resource estimation (for logical and/or
-                physical resources). Can be a dictionary, list, or
-                ``qsharp.estimator.EstimatorParams`` instance. If None, the default estimator
-                settings of the underlying Q# APIs (``qsharp.estimate`` or
-                ``qsharp.openqasm.estimate``) are used.
+            params: Resource estimation parameters. Accepts a dict, list, or ``qsharp._qsharp.EstimatorParams``.
 
         Returns:
-            qsharp.estimator.EstimatorResult: The estimated resources.
+            qsharp._qsharp.EstimatorResult: The estimated resources.
 
         Raises:
             RuntimeError: If no suitable circuit representation is available for estimation.
