@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import importlib.util
+import os
 import subprocess
 import sys
 import unittest
@@ -24,16 +25,18 @@ PYTHON_EXAMPLES_DIR = EXAMPLES_DIR / "python"
 
 PYSCF_AVAILABLE = importlib.util.find_spec("pyscf") is not None
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
+_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
 
-def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool]:
-    """Check if an example file requires qiskit or pyscf.
+def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool, bool]:
+    """Check if an example file requires qiskit, pyscf, openfermion or contains slow tests.
 
     Args:
         example_file: Path to the example file to check
 
     Returns:
-        Tuple of (requires_pyscf, requires_qiskit)
+        Tuple of (requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature,
+                  requires_openfermion, is_slow)
 
     """
     content = example_file.read_text()
@@ -43,6 +46,7 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     requires_qiskit_aer = False
     requires_qiskit_nature = False
     requires_openfermion = False
+    is_slow = False
 
     # Check for explicit imports
     if "import pyscf" in content or "from pyscf" in content:
@@ -112,7 +116,11 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     ):
         requires_qiskit_aer = True
 
-    return requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature, requires_openfermion
+    # Energy estimator examples run circuit simulations and are slow
+    if 'create("energy_estimator"' in content or "create('energy_estimator'" in content:
+        is_slow = True
+
+    return requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature, requires_openfermion, is_slow
 
 
 class TestExampleScripts(unittest.TestCase):
@@ -160,13 +168,18 @@ def _create_test_methods():
             test_name = f"test_py_{example_file.stem}"
 
             # Check requirements for this example
-            requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature, requires_openfermion = (
-                check_example_requirements(example_file)
-            )
+            (
+                requires_pyscf,
+                requires_qiskit,
+                requires_qiskit_aer,
+                requires_qiskit_nature,
+                requires_openfermion,
+                is_slow,
+            ) = check_example_requirements(example_file)
 
             # Create the test method
             def make_test(
-                filepath, needs_pyscf, needs_qiskit, needs_qiskit_aer, needs_qiskit_nature, needs_openfermion
+                filepath, needs_pyscf, needs_qiskit, needs_qiskit_aer, needs_qiskit_nature, needs_openfermion, slow
             ):
                 """Create a test method for the given example file."""
 
@@ -183,6 +196,8 @@ def _create_test_methods():
                         self.skipTest("Qiskit Nature not available")
                     if needs_openfermion and not OPENFERMION_AVAILABLE:
                         self.skipTest("OpenFermion not available")
+                    if slow and not _RUN_SLOW_TESTS:
+                        self.skipTest("Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
 
                     self._run_python_example(filepath)
 
@@ -199,6 +214,7 @@ def _create_test_methods():
                     requires_qiskit_aer,
                     requires_qiskit_nature,
                     requires_openfermion,
+                    is_slow,
                 ),
             )
 
