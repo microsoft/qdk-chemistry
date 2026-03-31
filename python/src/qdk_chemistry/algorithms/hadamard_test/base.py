@@ -59,7 +59,6 @@ class HadamardTest(Algorithm):
     def _run_impl(
         self,
         state_preparation_circuit: Circuit,
-        num_system_qubits: int,
         time_evolution_unitary: TimeEvolutionUnitary,
         mapper_type: str = "pauli_sequence",
         unitary_power: int = 1,
@@ -71,7 +70,6 @@ class HadamardTest(Algorithm):
 
         Args:
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
-            num_system_qubits: Number of qubits in the system register.
             time_evolution_unitary: Time evolution unitary :math:`\exp(-i H \Delta t)`.
             mapper_type: Algorithm name for controlled evolution circuit mapper.
             unitary_power: Power :math:`n` used to form the controlled unitary :math:`U^n`.
@@ -88,6 +86,7 @@ class HadamardTest(Algorithm):
             raise TypeError("test_basis must be an instance of HadamardTestBasis.")
         if not isinstance(time_evolution_unitary, TimeEvolutionUnitary):
             raise TypeError("time_evolution_unitary must be an instance of TimeEvolutionUnitary.")
+        num_system_qubits = time_evolution_unitary.get_num_qubits()
         if not isinstance(mapper_type, str) or not mapper_type:
             raise TypeError("mapper_type must be a non-empty string.")
         if not isinstance(unitary_power, int):

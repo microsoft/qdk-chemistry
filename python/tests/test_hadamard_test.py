@@ -14,16 +14,17 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.hadamard_test.base import HadamardTestBasis
+from qdk_chemistry.algorithms.hadamard_test.base import HadamardTest, HadamardTestBasis
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import QdkHadamardTest
 from qdk_chemistry.data import Circuit, Structure, TimeEvolutionUnitary
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.plugins.qiskit.hadamard_test import QiskitHadamardTest
 
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import QuantumCircuit, qasm3
+
+    from qdk_chemistry.plugins.qiskit.hadamard_test import QiskitHadamardTest
 
 _SEED = 42
 _SHOTS = 100
@@ -35,7 +36,6 @@ _OBSERVABLE_POWER = 10
 class HadamardWaterBenchmark:
     """Container for the water benchmark used by Hadamard generator tests."""
 
-    num_system_qubits: int
     state_preparation: Circuit
     time_evolution_unitary: TimeEvolutionUnitary
 
@@ -43,9 +43,8 @@ class HadamardWaterBenchmark:
 def _measure_observable(
     *,
     state_preparation: Circuit,
-    num_system_qubits: int,
     time_evolution_unitary: TimeEvolutionUnitary,
-    generator: QiskitHadamardTest | QdkHadamardTest,
+    generator: HadamardTest,
     test_basis: HadamardTestBasis = HadamardTestBasis.X,
     shots: int = _SHOTS,
     mapper_type: str = "pauli_sequence",
@@ -59,7 +58,6 @@ def _measure_observable(
     """
     result = generator.run(
         state_preparation,
-        num_system_qubits,
         time_evolution_unitary,
         mapper_type,
         unitary_power,
@@ -116,7 +114,6 @@ def water_hadamard_benchmark() -> HadamardWaterBenchmark:
     time_evolution = evolution_builder.run(qubit_hamiltonian, _EVOLUTION_TIME)
 
     return HadamardWaterBenchmark(
-        num_system_qubits=qubit_hamiltonian.num_qubits,
         state_preparation=state_preparation,
         time_evolution_unitary=time_evolution,
     )
@@ -129,7 +126,6 @@ def test_qiskit_hadamard_generator_measures_water_observable(
     """Qiskit Hadamard generator reproduces the reference observable for water."""
     observable_value = _measure_observable(
         state_preparation=water_hadamard_benchmark.state_preparation,
-        num_system_qubits=water_hadamard_benchmark.num_system_qubits,
         time_evolution_unitary=water_hadamard_benchmark.time_evolution_unitary,
         generator=QiskitHadamardTest(),
     )
@@ -144,7 +140,6 @@ def test_qdk_hadamard_test_measures_water_observable(
     """Q# Hadamard generator reproduces the reference observable for water."""
     observable_value = _measure_observable(
         state_preparation=water_hadamard_benchmark.state_preparation,
-        num_system_qubits=water_hadamard_benchmark.num_system_qubits,
         time_evolution_unitary=water_hadamard_benchmark.time_evolution_unitary,
         generator=QdkHadamardTest(),
     )
@@ -159,7 +154,6 @@ def test_qiskit_hadamard_generator_measures_water_observable_in_y_basis(
     """Qiskit Hadamard generator reproduces the Y-basis reference observable for water."""
     observable_value = _measure_observable(
         state_preparation=water_hadamard_benchmark.state_preparation,
-        num_system_qubits=water_hadamard_benchmark.num_system_qubits,
         time_evolution_unitary=water_hadamard_benchmark.time_evolution_unitary,
         generator=QiskitHadamardTest(),
         test_basis=HadamardTestBasis.Y,
@@ -175,7 +169,6 @@ def test_qdk_hadamard_test_measures_water_observable_in_y_basis(
     """Q# Hadamard generator reproduces the Y-basis reference observable for water."""
     observable_value = _measure_observable(
         state_preparation=water_hadamard_benchmark.state_preparation,
-        num_system_qubits=water_hadamard_benchmark.num_system_qubits,
         time_evolution_unitary=water_hadamard_benchmark.time_evolution_unitary,
         generator=QdkHadamardTest(),
         test_basis=HadamardTestBasis.Y,
@@ -192,7 +185,6 @@ def test_qiskit_hadamard_generator_rejects_invalid_test_basis() -> None:
     with pytest.raises(TypeError, match="HadamardTestBasis"):
         QiskitHadamardTest().run(
             Circuit(qasm=qasm3.dumps(state_prep_qc)),
-            1,
             object(),
             "pauli_sequence",
             _OBSERVABLE_POWER,
@@ -208,7 +200,6 @@ def test_qdk_hadamard_test_rejects_invalid_test_basis() -> None:
     with pytest.raises(TypeError, match="HadamardTestBasis"):
         QdkHadamardTest().run(  # type: ignore[arg-type]
             object(),
-            1,
             object(),
             "pauli_sequence",
             _OBSERVABLE_POWER,
@@ -228,7 +219,6 @@ def test_qiskit_hadamard_generator_rejects_incompatible_input_circuits(
     with pytest.raises(ValueError, match="state_preparation"):
         generator.run(  # type: ignore[arg-type]
             object(),
-            water_hadamard_benchmark.num_system_qubits,
             water_hadamard_benchmark.time_evolution_unitary,
             "pauli_sequence",
             _OBSERVABLE_POWER,
@@ -240,7 +230,6 @@ def test_qiskit_hadamard_generator_rejects_incompatible_input_circuits(
     with pytest.raises(TypeError, match="TimeEvolutionUnitary"):
         generator.run(  # type: ignore[arg-type]
             Circuit(qasm=qasm3.dumps(QuantumCircuit(1))),
-            1,
             object(),
             "pauli_sequence",
             _OBSERVABLE_POWER,
@@ -261,7 +250,6 @@ def test_qdk_hadamard_test_rejects_incompatible_input_circuits(
     with pytest.raises(ValueError, match="state_preparation"):
         generator.run(
             bad_state_preparation_circuit,
-            water_hadamard_benchmark.num_system_qubits,
             water_hadamard_benchmark.time_evolution_unitary,
             "pauli_sequence",
             _OBSERVABLE_POWER,
@@ -273,7 +261,6 @@ def test_qdk_hadamard_test_rejects_incompatible_input_circuits(
     with pytest.raises(TypeError, match="TimeEvolutionUnitary"):
         generator.run(
             water_hadamard_benchmark.state_preparation,
-            water_hadamard_benchmark.num_system_qubits,
             object(),
             "pauli_sequence",
             _OBSERVABLE_POWER,
