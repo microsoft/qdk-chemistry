@@ -90,16 +90,10 @@ class PauliSequenceMapper(EvolutionCircuitMapper):
             pauli_terms.append(base_terms.copy())
             angles.append(term.angle)
 
-        flattened_pauli_terms: list[list[qsharp.Pauli]] = []
-        flattened_angles: list[float] = []
-        for _ in range(unitary_container.step_reps):
-            flattened_pauli_terms.extend(pauli_terms)
-            flattened_angles.extend(angles)
-
         evo_params = {
-            "pauliExponents": flattened_pauli_terms,
-            "pauliCoefficients": flattened_angles,
-            "repetitions": 1,
+            "pauliExponents": pauli_terms,
+            "pauliCoefficients": angles,
+            "repetitions": unitary_container.step_reps,
         }
 
         target_indices = list(range(unitary_container.num_qubits))

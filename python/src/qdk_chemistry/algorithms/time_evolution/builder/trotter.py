@@ -417,7 +417,7 @@ class Trotter(TimeEvolutionBuilder):
                         encoding=qubit_hamiltonian.encoding,
                     )
                 ]
-                for label, coeff in zip(qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients, strict=False)
+                for label, coeff in zip(qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients, strict=True)
             ]
 
         # Sort terms so that Pauli strings acting on more qubits appear first.
