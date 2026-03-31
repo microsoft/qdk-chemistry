@@ -80,7 +80,6 @@ class TestPauliSequenceMapperNonControlled:
         x_0 = np.kron(identity, pauli_x)
         z_1 = np.kron(pauli_z, identity)
 
-        # U = [exp(-i*angle_z*Z1) @ exp(-i*angle_x*X0)]^step_reps
         u_step = scipy.linalg.expm(-1j * angle_z * z_1) @ scipy.linalg.expm(-1j * angle_x * x_0)
         expected_matrix = np.linalg.matrix_power(u_step, container.step_reps)
 
