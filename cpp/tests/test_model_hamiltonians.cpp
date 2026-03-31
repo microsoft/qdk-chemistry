@@ -206,15 +206,13 @@ TEST_F(ModelHamiltonianTest, OhnoPotentialTest) {
   double epsilon_r = 0.9;
   double U = 0.4;
   double R = 1.2;
-  double constant = model_hamiltonians::detail::COULOMB_CONSTANT;
 
   auto potential = model_hamiltonians::ohno_potential(lattice, U, R, epsilon_r);
   Eigen::MatrixXd V_expected = Eigen::MatrixXd::Zero(n, n);
   for (int i = 0; i < n; i++)
     for (int j = 0; j < n; j++)
       if (i != j)
-        V_expected(i, j) =
-            U / std::sqrt(1.0 + std::pow(R * U * epsilon_r / constant, 2));
+        V_expected(i, j) = U / std::sqrt(1.0 + std::pow(R * U * epsilon_r, 2));
   EXPECT_TRUE(
       potential.isApprox(V_expected, testing::numerical_zero_tolerance));
 }
@@ -225,14 +223,13 @@ TEST_F(ModelHamiltonianTest, MatagaNishimotoPotentialTest) {
   double epsilon_r = 0.9;
   double U = 0.4;
   double R = 1.2;
-  double constant = model_hamiltonians::detail::COULOMB_CONSTANT;
 
   auto potential =
       model_hamiltonians::mataga_nishimoto_potential(lattice, U, R, epsilon_r);
   Eigen::MatrixXd V_expected = Eigen::MatrixXd::Zero(n, n);
   for (int i = 0; i < n; i++)
     for (int j = 0; j < n; j++)
-      if (i != j) V_expected(i, j) = U / (1.0 + R * U * epsilon_r / constant);
+      if (i != j) V_expected(i, j) = U / (1.0 + R * U * epsilon_r);
   EXPECT_TRUE(
       potential.isApprox(V_expected, testing::numerical_zero_tolerance));
 }
