@@ -441,8 +441,8 @@ class Trotter(TimeEvolutionBuilder):
             coeffs = list(merged.values())
 
             # Split into parallelizable layers (disjoint qubit supports).
-            # Each layer becomes its own sub-group so that every sub-group
-            # passed to encoding_clifford_of contains only independent generators.
+            # Each layer becomes its own sub-group consisting of terms whose
+            # supports are mutually disjoint, allowing them to be applied in parallel.
             pauli_maps = [self._pauli_label_to_map(label) for label in labels]
             layers_indices: list[list[int]] = []
             layers_occupied: list[set[int]] = []

@@ -109,8 +109,8 @@ class TestTrotter:
         pauli_strings = ["XII", "IXI", "XII"]
         coefficients = [1.0, 1.0, 1.0]
 
-        # Scramble the order of the terms to ensure grouping works
-        perm = np.random.default_rng().permutation(len(pauli_strings))
+        # Scramble the order of the terms to ensure grouping works, using a fixed seed
+        perm = np.random.default_rng(seed=0).permutation(len(pauli_strings))
         pauli_strings = [pauli_strings[i] for i in perm]
         coefficients = [coefficients[i] for i in perm]
 

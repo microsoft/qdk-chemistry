@@ -36,8 +36,7 @@ dependencies = [
   "ruamel-yaml>=0.18.10",
   "qdk[jupyter]>=1.26.0",
   "pybind11-stubgen>=2.5.1",
-  "h5py>=3.0.0",
-  "paulimer>=0.1.0"
+  "h5py>=3.0.0"
 ]
 description = "Quantum Development Kit - Chemistry Library"
 license = { file = "LICENSE.txt" }

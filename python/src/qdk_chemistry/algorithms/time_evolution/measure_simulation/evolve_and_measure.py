@@ -84,6 +84,12 @@ class EvolveAndMeasure(MeasureSimulation):
             raise ValueError("times must not be empty.")
         if len(qubit_hamiltonians) != len(times):
             raise ValueError("qubit_hamiltonians and times must have the same length.")
+        if times != sorted(times):
+            raise ValueError("times must be monotonically increasing.")
+        for hamiltonian_1 in qubit_hamiltonians + observables:
+            for hamiltonian_2 in qubit_hamiltonians + observables:
+                if hamiltonian_1.num_qubits != hamiltonian_2.num_qubits:
+                    raise ValueError("All Hamiltonians and observables must have the same number of qubits.")
 
         evolution = self._create_time_evolution(qubit_hamiltonians[0], times[0], evolution_builder)
 

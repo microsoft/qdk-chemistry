@@ -176,8 +176,8 @@ class TestPauliProductFormulaContainer:
         )
         result = a.combine(b)
 
-        # a expanded: [Y(1.5), X(0.5), Y(1.5)], b expanded: [X(0.7), Z(1.5)]
-        # All three are adjacent identical → merged into one term with angle 1.7
+        # a expanded: [Y(1.5), X(0.5), Y(1.5), X(0.5)], b expanded: [X(0.7), Z(1.5)]
+        # Only the two adjacent X terms at the boundary are merged into X(1.2)
         assert result.step_reps == 1
         assert len(result.step_terms) == 5
 
