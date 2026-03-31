@@ -511,11 +511,17 @@ def _register_python_factories():
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.time_evolution.builder import TimeEvolutionBuilderFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.time_evolution.circuit_mapper import (  # noqa: PLC0415
+        EvolutionCircuitMapperFactory,
+    )
     from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledEvolutionCircuitMapperFactory,
     )
+    from qdk_chemistry.algorithms.time_evolution.measure_simulation import MeasureSimulationFactory  # noqa: PLC0415
 
     register_factory(EnergyEstimatorFactory())
+    register_factory(EvolutionCircuitMapperFactory())
+    register_factory(MeasureSimulationFactory())
     register_factory(StatePreparationFactory())
     register_factory(QubitMapperFactory())
     register_factory(QubitHamiltonianSolverFactory())

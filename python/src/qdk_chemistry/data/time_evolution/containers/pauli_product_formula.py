@@ -146,7 +146,12 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
             evolution with adjacent identical terms fused.
 
         """
-        num_qubits = max(self.num_qubits, other_container.num_qubits)
+        if self.num_qubits != other_container.num_qubits:
+            raise ValueError(
+                f"Cannot combine PauliProductFormulaContainer instances with different "
+                f"num_qubits (self.num_qubits={self.num_qubits}, "
+                f"other_container.num_qubits={other_container.num_qubits})."
+            )
 
         merged: list[ExponentiatedPauliTerm] = []
         for step_terms, step_reps in (
@@ -163,7 +168,7 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
                             merged.pop()
                     else:
                         merged.append(term)
-        return PauliProductFormulaContainer(step_terms=merged, step_reps=1, num_qubits=num_qubits)
+        return PauliProductFormulaContainer(step_terms=merged, step_reps=1, num_qubits=self.num_qubits)
 
     def to_json(self) -> dict[str, Any]:
         """Convert the PauliProductFormulaContainer to a dictionary for JSON serialization.

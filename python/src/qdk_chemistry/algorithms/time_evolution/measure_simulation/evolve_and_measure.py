@@ -101,7 +101,6 @@ class EvolveAndMeasure(MeasureSimulation):
             evolution = TimeEvolutionUnitary(
                 evolution.get_container().combine(
                     self._create_time_evolution(qubit_hamiltonian, delta_t, evolution_builder).get_container(),
-                    evolution_builder.settings().get("weight_threshold"),
                 )
             )
 

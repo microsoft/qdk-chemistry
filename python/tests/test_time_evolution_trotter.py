@@ -875,9 +875,9 @@ class TestOptimizeTermOrdering:
         t = 1.0
         terms = builder.run(hamiltonian, time=t).get_container().step_terms
 
-        for term in terms:
-            assert term.pauli_term == builder._pauli_label_to_map(pauli_strings[terms.index(term)])
-            assert term.angle == coefficients[terms.index(term)] * t
+        for idx, term in enumerate(terms):
+            assert term.pauli_term == builder._pauli_label_to_map(pauli_strings[idx])
+            assert term.angle == coefficients[idx] * t
 
     def test_optimize_term_ordering_groups_when_true(self):
         """Test that optimize_term_ordering groups commuting terms into parallelizable layers."""

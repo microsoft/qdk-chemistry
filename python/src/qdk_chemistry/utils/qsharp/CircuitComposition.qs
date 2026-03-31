@@ -4,6 +4,8 @@
 
 namespace QDKChemistry.Utils.CircuitComposition {
 
+    import Std.Arrays.Subarray;
+
     /// Applies two operations sequentially on the same system register.
     operation ApplySequential(
         first : Qubit[] => Unit,
@@ -26,6 +28,6 @@ namespace QDKChemistry.Utils.CircuitComposition {
         targets : Int[]
     ) : Unit {
         use qs = Qubit[Length(targets)];
-        ApplySequential(first, second, qs);
+        ApplySequential(first, second, Subarray(targets, qs));
     }
 }
