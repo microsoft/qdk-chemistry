@@ -185,7 +185,7 @@ class MeasureSimulation(Algorithm):
                 RemoveZBasisOnZeroState,
                 SubstituteCliffordRz,
             )
-        except ImportError as exc:  # noqa: PLC0415
+        except ImportError as exc:
             raise RuntimeError(
                 "Qiskit is required to transpile circuits to the requested basis_gates, "
                 "but it is not installed. Please install the 'qiskit' package to use "
