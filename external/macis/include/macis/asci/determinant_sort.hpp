@@ -136,6 +136,110 @@ PairIterator accumulate_asci_pairs(PairIterator pairs_begin,
 }
 
 /**
+ * @brief Parallel accumulate + compact for sorted ASCI contributions
+ *
+ * Given a sorted range with duplicate bitstrings, accumulates the
+ * c_times_matel values for each unique state and compacts the result.
+ * Uses OpenMP for parallelism by segmenting the sorted input into
+ * per-thread chunks — each chunk accumulates independently, then
+ * cross-boundary groups are fixed up in a serial pass.
+ *
+ * Falls back to serial accumulate_asci_pairs when OpenMP is unavailable
+ * or the input is small.
+ *
+ * @tparam PairIterator Iterator type for ASCI contribution container
+ * @param[in,out] pairs_begin Iterator to the beginning of the sorted range
+ * @param[in,out] pairs_end Iterator to the end of the sorted range
+ * @return Iterator pointing to the new logical end after accumulation
+ */
+template <typename PairIterator>
+PairIterator parallel_accumulate_asci_pairs(PairIterator pairs_begin,
+                                            PairIterator pairs_end) {
+  const size_t n = static_cast<size_t>(std::distance(pairs_begin, pairs_end));
+  if (n <= 1) return pairs_end;
+
+#ifdef _OPENMP
+  const int nthreads = omp_get_max_threads();
+  if (nthreads <= 1 || n < 10000)
+    return accumulate_asci_pairs(pairs_begin, pairs_end);
+
+  // Phase 1: Each thread accumulates duplicates in its chunk.
+  // For groups that straddle a chunk boundary, the first chunk's
+  // representative accumulates only its portion; we fix cross-boundary
+  // groups in phase 2.
+  const size_t chunk = (n + nthreads - 1) / nthreads;
+
+  // segment_starts[t] = index of first unique state in chunk t
+  // segment_ends[t]   = one-past-last written position in chunk t
+  // We compact in-place within each chunk.
+  std::vector<size_t> compact_begin(nthreads);
+  std::vector<size_t> compact_end(nthreads);
+
+#pragma omp parallel
+  {
+    const int tid = omp_get_thread_num();
+    const size_t lo = std::min(static_cast<size_t>(tid) * chunk, n);
+    const size_t hi = std::min(lo + chunk, n);
+    compact_begin[tid] = lo;
+    compact_end[tid] = lo;
+
+    if (lo < hi) {
+      // Compact duplicates within [lo, hi) by accumulating into the
+      // first occurrence and moving unique states forward.
+      size_t write = lo;
+      for (size_t r = lo + 1; r < hi; ++r) {
+        if (pairs_begin[r].state == pairs_begin[write].state) {
+          pairs_begin[write].c_times_matel += pairs_begin[r].c_times_matel;
+        } else {
+          ++write;
+          if (write != r) pairs_begin[write] = pairs_begin[r];
+        }
+      }
+      compact_begin[tid] = lo;
+      compact_end[tid] = write + 1;
+    }
+  }
+
+  // Phase 2: Fix cross-boundary groups.
+  // If chunk[t]'s first state == the last accumulated state from the
+  // previous non-empty chunk, merge into that accumulator.
+  // We track the accumulator position explicitly to handle groups
+  // spanning 3+ chunks correctly.
+  size_t accum_pos = compact_end[0] - 1;  // last written position in chunk 0
+  for (int t = 1; t < nthreads; ++t) {
+    if (compact_end[t] <= compact_begin[t]) continue;
+    size_t cur_first = compact_begin[t];
+    if (pairs_begin[accum_pos].state == pairs_begin[cur_first].state) {
+      pairs_begin[accum_pos].c_times_matel +=
+          pairs_begin[cur_first].c_times_matel;
+      compact_begin[t]++;  // skip the merged element
+    }
+    // Update accum_pos to the last element of this chunk (if non-empty)
+    if (compact_end[t] > compact_begin[t]) {
+      accum_pos = compact_end[t] - 1;
+    }
+  }
+
+  // Phase 3: Compact all chunks into contiguous output.
+  size_t write = compact_end[0];
+  for (int t = 1; t < nthreads; ++t) {
+    size_t cb = compact_begin[t];
+    size_t ce = compact_end[t];
+    if (cb >= ce) continue;
+    size_t seg_len = ce - cb;
+    if (write != cb) {
+      std::move(pairs_begin + cb, pairs_begin + ce, pairs_begin + write);
+    }
+    write += seg_len;
+  }
+  return pairs_begin + write;
+
+#else
+  return accumulate_asci_pairs(pairs_begin, pairs_end);
+#endif
+}
+
+/**
  * @brief Sort ASCI pairs by bitstring and accumulate duplicate contributions
  *
  * This function sorts ASCI contributions by their quantum state bitstrings
@@ -192,7 +296,7 @@ PairIterator parallel_sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
     return bitset_less(x.state, y.state);
   };
   ips4o::parallel::sort(pairs_begin, pairs_end, comparator);
-  return accumulate_asci_pairs(pairs_begin, pairs_end);
+  return parallel_accumulate_asci_pairs(pairs_begin, pairs_end);
 #else
   return sort_and_accumulate_asci_pairs(pairs_begin, pairs_end);
 #endif

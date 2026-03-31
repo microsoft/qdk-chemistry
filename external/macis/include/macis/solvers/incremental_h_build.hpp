@@ -25,71 +25,6 @@
 
 namespace macis {
 
-// -----------------------------------------------------------------------
-// Internal helpers for iterating over the three CSR blocks that compose
-// the patched Hamiltonian (old-old, added-added, kept-added + transpose).
-// Used by both operator_action (SpMV) and consolidate (CSR assembly).
-// -----------------------------------------------------------------------
-namespace detail {
-
-/// Visit every (row_new, col_new, value) entry in the old-old CSR block.
-template <typename index_t, typename Fn>
-void for_each_old_old(const sparsexx::csr_matrix<double, index_t>& old_H,
-                      const std::vector<size_t>& old_to_new, Fn&& fn) {
-  const auto& rp = old_H.rowptr();
-  const auto& ci = old_H.colind();
-  const auto& nz = old_H.nzval();
-  const size_t n_old = old_H.m();
-  for (size_t i_old = 0; i_old < n_old; ++i_old) {
-    size_t i_new = old_to_new[i_old];
-    if (i_new == SIZE_MAX) continue;
-    for (index_t jj = rp[i_old]; jj < rp[i_old + 1]; ++jj) {
-      size_t j_new = old_to_new[static_cast<size_t>(ci[jj])];
-      if (j_new == SIZE_MAX) continue;
-      fn(i_new, j_new, nz[jj]);
-    }
-  }
-}
-
-/// Visit every (row_global, col_global, value) in the added-added CSR block.
-template <typename index_t, typename Fn>
-void for_each_added_added(const sparsexx::csr_matrix<double, index_t>& H_nn,
-                          const std::vector<size_t>& added_new, Fn&& fn) {
-  if (H_nn.m() == 0) return;
-  const auto& rp = H_nn.rowptr();
-  const auto& ci = H_nn.colind();
-  const auto& nz = H_nn.nzval();
-  for (size_t i = 0; i < added_new.size(); ++i) {
-    size_t i_global = added_new[i];
-    for (index_t jj = rp[i]; jj < rp[i + 1]; ++jj) {
-      size_t j_global = added_new[static_cast<size_t>(ci[jj])];
-      fn(i_global, j_global, nz[jj]);
-    }
-  }
-}
-
-/// Visit every (row_global, col_global, value) in the kept-added block,
-/// including both forward (kept×added) and transpose (added×kept).
-template <typename index_t, typename Fn>
-void for_each_kept_added(const sparsexx::csr_matrix<double, index_t>& H_on,
-                         const std::vector<size_t>& kept_new,
-                         const std::vector<size_t>& added_new, Fn&& fn) {
-  if (H_on.m() == 0) return;
-  const auto& rp = H_on.rowptr();
-  const auto& ci = H_on.colind();
-  const auto& nz = H_on.nzval();
-  for (size_t i = 0; i < kept_new.size(); ++i) {
-    size_t i_global = kept_new[i];
-    for (index_t jj = rp[i]; jj < rp[i + 1]; ++jj) {
-      size_t j_global = added_new[static_cast<size_t>(ci[jj])];
-      fn(i_global, j_global, nz[jj]);
-      fn(j_global, i_global, nz[jj]);  // symmetric transpose
-    }
-  }
-}
-
-}  // namespace detail
-
 /**
  * @brief Davidson operator backed by a masked old CSR + delta blocks.
  *
@@ -197,11 +132,19 @@ class PatchedSparseOperator {
 #ifdef _OPENMP
       if (n_added > 256) {
         const int nthreads = omp_get_max_threads();
-        std::vector<std::vector<double>> scratch(
-            nthreads, std::vector<double>(n_added, 0.0));
+        // Lazily allocate / resize cached scratch vectors
+        if (transpose_scratch_.size() != static_cast<size_t>(nthreads) ||
+            transpose_scratch_n_added_ != n_added) {
+          transpose_scratch_.assign(
+              nthreads, std::vector<double>(n_added, 0.0));
+          transpose_scratch_n_added_ = n_added;
+        } else {
+          for (auto& v : transpose_scratch_)
+            std::memset(v.data(), 0, n_added * sizeof(double));
+        }
 #pragma omp parallel
         {
-          auto& local = scratch[omp_get_thread_num()];
+          auto& local = transpose_scratch_[omp_get_thread_num()];
 #pragma omp for schedule(static)
           for (size_t i_local = 0; i_local < n_kept; ++i_local) {
             double v_kept = alpha * V[kept_new_[i_local]];
@@ -212,7 +155,7 @@ class PatchedSparseOperator {
         }
         for (int t = 0; t < nthreads; ++t)
           for (size_t j = 0; j < n_added; ++j)
-            AV[added_new_[j]] += scratch[t][j];
+            AV[added_new_[j]] += transpose_scratch_[t][j];
       } else
 #endif
       {
@@ -226,64 +169,6 @@ class PatchedSparseOperator {
     }
   }
 
-  /**
-   * @brief Build the full consolidated CSR for caching in the next iteration.
-   *
-   * Assembles a new square CSR in the new determinant ordering by remapping
-   * the three blocks.  Cost is O(nnz) — no matrix element recomputation.
-   */
-  csr_type consolidate() const {
-    // Pass 1: count NNZ per row
-    std::vector<size_t> row_nnz(n_new_, 0);
-    auto count = [&](size_t i, size_t, double) { ++row_nnz[i]; };
-    detail::for_each_old_old(old_H_, old_to_new_, count);
-    detail::for_each_added_added(H_nn_, added_new_, count);
-    detail::for_each_kept_added(H_on_, kept_new_, added_new_, count);
-
-    // Build rowptr
-    std::vector<index_t> rowptr(n_new_ + 1, 0);
-    for (size_t i = 0; i < n_new_; ++i)
-      rowptr[i + 1] = rowptr[i] + static_cast<index_t>(row_nnz[i]);
-    const size_t total_nnz = static_cast<size_t>(rowptr[n_new_]);
-
-    std::vector<index_t> colind(total_nnz);
-    std::vector<double> nzval(total_nnz);
-    std::vector<index_t> offset(rowptr.begin(), rowptr.end() - 1);
-
-    // Pass 2: fill entries
-    auto fill = [&](size_t i, size_t j, double v) {
-      auto pos = offset[i]++;
-      colind[pos] = static_cast<index_t>(j);
-      nzval[pos] = v;
-    };
-    detail::for_each_old_old(old_H_, old_to_new_, fill);
-    detail::for_each_added_added(H_nn_, added_new_, fill);
-    detail::for_each_kept_added(H_on_, kept_new_, added_new_, fill);
-
-    // Sort columns within each row
-    for (size_t i = 0; i < n_new_; ++i) {
-      index_t begin = rowptr[i];
-      index_t end = rowptr[i + 1];
-      if (end - begin <= 1) continue;
-      std::vector<index_t> perm(end - begin);
-      std::iota(perm.begin(), perm.end(), index_t(0));
-      std::sort(perm.begin(), perm.end(), [&](index_t a, index_t b) {
-        return colind[begin + a] < colind[begin + b];
-      });
-      std::vector<index_t> tmp_ci(perm.size());
-      std::vector<double> tmp_nz(perm.size());
-      for (size_t k = 0; k < perm.size(); ++k) {
-        tmp_ci[k] = colind[begin + perm[k]];
-        tmp_nz[k] = nzval[begin + perm[k]];
-      }
-      std::copy(tmp_ci.begin(), tmp_ci.end(), colind.begin() + begin);
-      std::copy(tmp_nz.begin(), tmp_nz.end(), nzval.begin() + begin);
-    }
-
-    return csr_type(n_new_, n_new_,
-                    std::move(rowptr), std::move(colind), std::move(nzval));
-  }
-
  private:
   const csr_type& old_H_;
   size_t n_new_, n_old_;
@@ -291,6 +176,11 @@ class PatchedSparseOperator {
   csr_type H_nn_, H_on_;
   std::vector<size_t> kept_new_, added_new_;
   std::vector<double> diag_;
+
+  // Cached scratch for the transpose SpMV in operator_action.
+  // Resized lazily on first use or when n_added changes.
+  mutable std::vector<std::vector<double>> transpose_scratch_;
+  mutable size_t transpose_scratch_n_added_ = 0;
 };
 
 /**

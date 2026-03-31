@@ -293,7 +293,7 @@ inline data::Wavefunction build_wavefunction(
  * The calculation automatically adapts to the size of the active space and
  * selects the appropriate internal representation for the wavefunction.
  *
- * @note Currently supports up to 128 orbitals in the active space.
+ * @note Currently supports up to 2048 orbitals in the active space.
  *
  * @see qdk::chemistry::algorithms::MultiConfigurationCalculator
  * @see qdk::chemistry::data::Hamiltonian

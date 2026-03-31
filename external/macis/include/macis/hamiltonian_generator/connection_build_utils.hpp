@@ -32,7 +32,7 @@ namespace macis {
 namespace detail {
 
 // -----------------------------------------------------------------------
-// SpinCache: pre-computed alpha/beta strings and occupation arrays for
+// SpinCache: pre-computed alpha/beta spin strings and occupation arrays for
 // all determinants.  Eliminates redundant decomposition in the matrix
 // element computation inner loop.
 // -----------------------------------------------------------------------
@@ -247,6 +247,24 @@ sparsexx::csr_matrix<double, index_t> build_csr_from_pairs(
 
   return csr_type(ndets, ndets, std::move(rowptr), std::move(colind),
                   std::move(nzval));
+}
+
+// -----------------------------------------------------------------------
+// pair_based_build_impl_: shared CSR construction from pre-enumerated pairs.
+// The caller is responsible for calling enumerate_connected_pairs_ (which
+// is protected) and for any logging.
+// -----------------------------------------------------------------------
+template <typename index_t, typename WfnType>
+auto pair_based_build_impl_(
+    size_t ndets,
+    std::vector<uint64_t>& all_pairs,
+    SpinCache<WfnType>& cache,
+    HamiltonianGenerator<WfnType>& gen,
+    double H_thresh)
+    -> sparsexx::csr_matrix<double, index_t> {
+  if (ndets == 0)
+    return sparsexx::csr_matrix<double, index_t>(0, 0, 0, 0);
+  return build_csr_from_pairs<index_t>(ndets, all_pairs, cache, gen, H_thresh);
 }
 
 }  // namespace detail

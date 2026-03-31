@@ -99,8 +99,8 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
   // Settings objects, so silently fall back to the default (empty string).
   try {
     asci_settings.h_build_algo = settings_.get<std::string>("h_build_algo");
-  } catch (...) {
-    // leave empty — default sorted_double_loop
+  } catch (const qdk::chemistry::data::SettingNotFound&) {
+    // not present in settings — leave empty (default sorted_double_loop)
   }
 
   // Validate grow_factor and related parameters
