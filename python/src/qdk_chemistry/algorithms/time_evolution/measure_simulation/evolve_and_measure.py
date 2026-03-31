@@ -11,6 +11,7 @@ from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBu
 from qdk_chemistry.algorithms.time_evolution.circuit_mapper.base import EvolutionCircuitMapper
 from qdk_chemistry.data import (
     Circuit,
+    EnergyExpectationResult,
     MeasurementData,
     QuantumErrorProfile,
     QubitHamiltonian,
@@ -54,12 +55,12 @@ class EvolveAndMeasure(MeasureSimulation):
         energy_estimator: EnergyEstimator,
         noise: QuantumErrorProfile | None = None,
         basis_gates: list[str] | None = None,
-    ) -> list[MeasurementData]:
+    ) -> list[tuple[EnergyExpectationResult, MeasurementData]]:
         """Run evolve-and-measure simulation.
 
         Args:
             qubit_hamiltonians: List of Hamiltonians used to build time evolution.
-            times: List of times to evolve under the Hamiltonians.
+            times: Monotonically-increasing list of times to evolve under the Hamiltonians.
             observables: List of observable Hamiltonians to measure after evolution.
             state_prep: Optional circuit that prepares the initial state before time evolution.
             evolution_builder: Time-evolution builder.
@@ -71,7 +72,7 @@ class EvolveAndMeasure(MeasureSimulation):
             basis_gates: Optional list of basis gates to transpile the circuit into before execution.
 
         Returns:
-            A list of ``MeasurementData`` objects.
+            A list of tuples containing ``EnergyExpectationResult`` and ``MeasurementData`` objects.
 
         Raises:
             ValueError: If ``qubit_hamiltonians`` is empty.
@@ -79,6 +80,10 @@ class EvolveAndMeasure(MeasureSimulation):
         """
         if not qubit_hamiltonians:
             raise ValueError("qubit_hamiltonians must not be empty.")
+        if not times:
+            raise ValueError("times must not be empty.")
+        if len(qubit_hamiltonians) != len(times):
+            raise ValueError("qubit_hamiltonians and times must have the same length.")
 
         evolution = self._create_time_evolution(qubit_hamiltonians[0], times[0], evolution_builder)
 

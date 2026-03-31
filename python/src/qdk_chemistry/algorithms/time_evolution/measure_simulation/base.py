@@ -67,7 +67,7 @@ class MeasureSimulation(Algorithm):
         energy_estimator: EnergyEstimator,
         noise: QuantumErrorProfile | None = None,
         basis_gates: list[str] | None = None,
-    ) -> list[MeasurementData]:
+    ) -> list[tuple[EnergyExpectationResult, MeasurementData]]:
         """Run evolve-and-measure simulation.
 
         Args:
@@ -84,7 +84,7 @@ class MeasureSimulation(Algorithm):
             basis_gates: Optional list of basis gates to transpile the circuit into before execution.
 
         Returns:
-            A list of ``MeasurementData`` objects.
+            A list of tuples containing ``EnergyExpectationResult`` and ``MeasurementData`` objects.
 
         """
 

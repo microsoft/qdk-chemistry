@@ -146,21 +146,23 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
             evolution with adjacent identical terms fused.
 
         """
-        self_terms = list(self.step_terms) * self.step_reps
-        other_terms = list(other_container.step_terms) * other_container.step_reps
         num_qubits = max(self.num_qubits, other_container.num_qubits)
 
-        combined = self_terms + other_terms
         merged: list[ExponentiatedPauliTerm] = []
-        for term in combined:
-            if merged and merged[-1].pauli_term == term.pauli_term:
-                new_angle = merged[-1].angle + term.angle
-                if abs(new_angle) > atol:
-                    merged[-1] = ExponentiatedPauliTerm(pauli_term=term.pauli_term, angle=new_angle)
-                else:
-                    merged.pop()
-            else:
-                merged.append(term)
+        for step_terms, step_reps in (
+            (self.step_terms, self.step_reps),
+            (other_container.step_terms, other_container.step_reps),
+        ):
+            for _ in range(step_reps):
+                for term in step_terms:
+                    if merged and merged[-1].pauli_term == term.pauli_term:
+                        new_angle = merged[-1].angle + term.angle
+                        if abs(new_angle) > atol:
+                            merged[-1] = ExponentiatedPauliTerm(pauli_term=term.pauli_term, angle=new_angle)
+                        else:
+                            merged.pop()
+                    else:
+                        merged.append(term)
         return PauliProductFormulaContainer(step_terms=merged, step_reps=1, num_qubits=num_qubits)
 
     def to_json(self) -> dict[str, Any]:

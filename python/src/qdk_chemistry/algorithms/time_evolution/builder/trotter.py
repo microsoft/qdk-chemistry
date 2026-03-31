@@ -435,7 +435,7 @@ class Trotter(TimeEvolutionBuilder):
         for sub_h in sub_hamiltonians:
             # Merge terms with identical Pauli strings.
             merged: dict[str, complex] = {}
-            for label, coeff in zip(sub_h.pauli_strings, sub_h.coefficients, strict=False):
+            for label, coeff in zip(sub_h.pauli_strings, sub_h.coefficients, strict=True):
                 merged[label] = merged.get(label, 0.0) + coeff
             labels = list(merged.keys())
             coeffs = list(merged.values())
