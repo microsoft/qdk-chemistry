@@ -73,7 +73,13 @@ class EvolveAndMeasure(MeasureSimulation):
         Returns:
             A list of ``MeasurementData`` objects.
 
+        Raises:
+            ValueError: If ``qubit_hamiltonians`` is empty.
+
         """
+        if not qubit_hamiltonians:
+            raise ValueError("qubit_hamiltonians must not be empty.")
+
         evolution = self._create_time_evolution(qubit_hamiltonians[0], times[0], evolution_builder)
 
         for i in range(1, len(qubit_hamiltonians)):
