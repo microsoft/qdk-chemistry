@@ -132,5 +132,5 @@ class EvolveAndMeasure(MeasureSimulation):
         return measurements
 
     def name(self) -> str:
-        """Return ``classical_sampling`` as the algorithm type name."""
+        """Return ``classical_sampling`` as the algorithm name."""
         return "classical_sampling"
