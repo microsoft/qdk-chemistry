@@ -62,7 +62,22 @@ namespace QDKChemistry.Utils.PauliExp {
         params : RepPauliExpParams,
         system : Int[],
     ) : Unit {
-        use qs = Qubit[Length(system)];
+        // If no system indices are provided, there is nothing to do.
+        if Length(system) == 0 {
+            return ();
+        }
+
+        // Determine the maximum index in the system array to size the qubit register safely.
+        mutable maxIndex = system[0];
+        for idx in 1..Length(system) - 1 {
+            let current = system[idx];
+            if current > maxIndex {
+                set maxIndex = current;
+            }
+        }
+
+        // Allocate enough qubits so that all indices in `system` are valid.
+        use qs = Qubit[maxIndex + 1];
         RepPauliExp(params, Subarray(system, qs));
     }
 
