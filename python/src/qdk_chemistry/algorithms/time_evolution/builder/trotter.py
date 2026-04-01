@@ -18,6 +18,8 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import numpy as np
+
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
     trotter_steps_commutator,
@@ -424,8 +426,8 @@ class Trotter(TimeEvolutionBuilder):
         num_non_identity = [sum(c != "I" for c in ps) for ps in qubit_hamiltonian.pauli_strings]
         sorted_indices = sorted(range(len(num_non_identity)), key=lambda i: num_non_identity[i], reverse=True)
         qubit_hamiltonian = QubitHamiltonian(
-            pauli_strings=[qubit_hamiltonian.pauli_strings[i] for i in sorted_indices],
-            coefficients=[qubit_hamiltonian.coefficients[i] for i in sorted_indices],
+            pauli_strings=np.asarray([qubit_hamiltonian.pauli_strings[i] for i in sorted_indices]),
+            coefficients=np.asarray([qubit_hamiltonian.coefficients[i] for i in sorted_indices]),
             encoding=qubit_hamiltonian.encoding,
         )
 
@@ -463,8 +465,8 @@ class Trotter(TimeEvolutionBuilder):
             for layer in layers_indices:
                 outer_group.append(
                     QubitHamiltonian(
-                        pauli_strings=[labels[i] for i in layer],
-                        coefficients=[coeffs[i] for i in layer],
+                        pauli_strings=np.asarray([labels[i] for i in layer]),
+                        coefficients=np.asarray([coeffs[i] for i in layer]),
                         encoding=sub_h.encoding,
                     )
                 )
