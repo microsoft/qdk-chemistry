@@ -47,6 +47,7 @@ class TrotterSettings(Settings):
             num_divisions: Explicit number of divisions within a Trotter step (0 means automatic).
             error_bound: Strategy for computing the Trotter error bound ("commutator" or "naive").
             weight_threshold: The absolute threshold for filtering small coefficients.
+            optimize_term_ordering: Whether to group commuting terms and execute them in parallel.
 
         """
         super().__init__()
