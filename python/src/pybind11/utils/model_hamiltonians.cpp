@@ -212,14 +212,16 @@ Returns:
       R"(
 Compute the Ohno intersite potential matrix.
 
-``V_ij = U_ij / sqrt(1 + (U_ij * epsilon_r * R_ij / C)^2)``
+``V_ij = U_ij / sqrt(1 + (U_ij * epsilon_r * R_ij)^2)``
 
-where ``U_ij = sqrt(U_i * U_j)`` and ``C = e^2 / (4 pi epsilon_0)``.
+where ``U_ij = sqrt(U_i * U_j)`` is the geometric mean of on-site parameters.
+
+All parameters should be in atomic units (Hartree for U, Bohr for R).
 
 Args:
     lattice (LatticeGraph): Lattice graph (used for the number of sites).
-    U (float or numpy.ndarray): On-site Coulomb parameter(s).
-    R (float or numpy.ndarray): Intersite distance(s).
+    U (float or numpy.ndarray): On-site Coulomb parameter(s) in Hartree.
+    R (float or numpy.ndarray): Intersite distance(s) in Bohr.
     epsilon_r (float, optional): Relative permittivity. Defaults to 1.0.
     nearest_neighbor_only (bool, optional): If True, restrict to lattice-connected
         pairs. Defaults to False.
@@ -242,14 +244,16 @@ Returns:
       R"(
 Compute the Mataga-Nishimoto intersite potential matrix.
 
-``V_ij = U_ij / (1 + U_ij * epsilon_r * R_ij / C)``
+``V_ij = U_ij / (1 + U_ij * epsilon_r * R_ij)``
 
-where ``U_ij = sqrt(U_i * U_j)`` and ``C = e^2 / (4 pi epsilon_0)``.
+where ``U_ij = sqrt(U_i * U_j)`` is the geometric mean of on-site parameters.
+
+All parameters should be in atomic units (Hartree for U, Bohr for R).
 
 Args:
     lattice (LatticeGraph): Lattice graph (used for the number of sites).
-    U (float or numpy.ndarray): On-site Coulomb parameter(s).
-    R (float or numpy.ndarray): Intersite distance(s).
+    U (float or numpy.ndarray): On-site Coulomb parameter(s) in Hartree.
+    R (float or numpy.ndarray): Intersite distance(s) in Bohr.
     epsilon_r (float, optional): Relative permittivity. Defaults to 1.0.
     nearest_neighbor_only (bool, optional): If True, restrict to lattice-connected
         pairs. Defaults to False.

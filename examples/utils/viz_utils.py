@@ -57,6 +57,12 @@ def generate_cube_data_with_info(
         Dictionary suitable for passing as ``cube_data`` to ``MoleculeViewer``.
 
     """
+    if orbitals.is_unrestricted():
+        raise ValueError(
+            "generate_cube_data_with_info only supports restricted orbitals. "
+            "Unrestricted orbitals have separate alpha/beta channels that require different handling."
+        )
+
     energies = orbitals.get_energies_alpha()
 
     cube_data_raw = generate_cubefiles_from_orbitals(
