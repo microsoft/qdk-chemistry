@@ -391,9 +391,11 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_json(
   std::string container_type = j["container_type"];
   if (container_type == "canonical_four_center") {
     return CanonicalFourCenterHamiltonianContainer::from_json(j);
-  } else if (container_type == "density_fitted") {
+  }
+  if (container_type == "density_fitted") {
     return DensityFittedHamiltonianContainer::from_json(j);
-  } else if (container_type == "cholesky") {
+  }
+  if (container_type == "cholesky") {
     return CholeskyHamiltonianContainer::from_json(j);
   }
   if (container_type == "sparse") {
@@ -516,22 +518,26 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
     file << "\n";
   };
 
-  // Write permutationally unique MO ERIs
-  for (size_t i = 0, ij = 0; i < num_molecular_orbitals; ++i)
-    for (size_t j = i; j < num_molecular_orbitals; ++j, ij++) {
-      for (size_t k = 0, kl = 0; k < num_molecular_orbitals; ++k)
-        for (size_t l = k; l < num_molecular_orbitals; ++l, kl++) {
-          if (ij <= kl) {
-            write_eri(i, j, k, l);
-          }
-        }  // kl loop
-    }  // ij loop
+  if (has_two_body_integrals()) {
+    // Write permutationally unique MO ERIs
+    for (size_t i = 0, ij = 0; i < num_molecular_orbitals; ++i)
+      for (size_t j = i; j < num_molecular_orbitals; ++j, ij++) {
+        for (size_t k = 0, kl = 0; k < num_molecular_orbitals; ++k)
+          for (size_t l = k; l < num_molecular_orbitals; ++l, kl++) {
+            if (ij <= kl) {
+              write_eri(i, j, k, l);
+            }
+          }  // kl loop
+      }  // ij loop
+  }
 
-  // Write permutationally unique MO 1-body integrals
-  for (size_t i = 0; i < num_molecular_orbitals; ++i)
-    for (size_t j = 0; j <= i; ++j) {
-      write_1body(i, j);
-    }
+  if (has_one_body_integrals()) {
+    // Write permutationally unique MO 1-body integrals
+    for (size_t i = 0; i < num_molecular_orbitals; ++i)
+      for (size_t j = 0; j <= i; ++j) {
+        write_1body(i, j);
+      }
+  }
 
   // Write core energy
   formatted_line(0, 0, 0, 0, _core_energy);

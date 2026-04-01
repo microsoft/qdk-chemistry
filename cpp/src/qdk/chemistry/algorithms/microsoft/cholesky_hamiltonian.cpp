@@ -44,7 +44,7 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
 
-namespace detail_cholesky {
+namespace detail {
 /**
  * @brief Compute Cholesky decomposition of the two-electron integral tensor
  *
@@ -427,7 +427,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   return {std::move(L_data), current_col};
 }
 
-}  // namespace detail_cholesky
+}  // namespace detail
 
 std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
     std::shared_ptr<data::Orbitals> orbitals,
@@ -588,9 +588,8 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   double eri_tol = _settings->get<double>("eri_threshold");
 
   // get cholesky vectors
-  auto [output, num_cholesky_vectors] =
-      detail_cholesky::compute_cholesky_vectors(*internal_basis_set,
-                                                cholesky_tol, eri_tol);
+  auto [output, num_cholesky_vectors] = detail::compute_cholesky_vectors(
+      *internal_basis_set, cholesky_tol, eri_tol);
   // map output to Eigen matrix
   Eigen::Map<const Eigen::MatrixXd> L_ao(
       output.data(), num_atomic_orbitals * num_atomic_orbitals,
