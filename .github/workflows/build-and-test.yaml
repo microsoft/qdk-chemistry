@@ -49,28 +49,28 @@ jobs:
         echo "Branch is up to date, starting Build and Test workflow."
 
   coverage:
-    name: ${{ matrix.os-name }} Build, Test, and Coverage Analysis
+    name: ${{ matrix.os-name }}-py${{ matrix.python-version }} Build, Test, and Coverage Analysis
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
         - os-name: Linux
-          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
+          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool, 'JobId=qdk-chemistry-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.10'
           cpp-test-threads: 2
           python-test-threads: 2
         - os-name: Linux
-          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
+          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool, 'JobId=qdk-chemistry-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.13'
           cpp-test-threads: 2
           python-test-threads: 2
         - os-name: Linux
-          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
+          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool, 'JobId=qdk-chemistry-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.14'
