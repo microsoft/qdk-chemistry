@@ -238,5 +238,5 @@ class MeasureSimulationFactory(AlgorithmFactory):
         return "measure_simulation"
 
     def default_algorithm_name(self) -> str:
-        """Return evolve_and_measure as the default algorithm name."""
-        return "evolve_and_measure"
+        """Return classical sampling as the default algorithm name."""
+        return "classical_sampling"
