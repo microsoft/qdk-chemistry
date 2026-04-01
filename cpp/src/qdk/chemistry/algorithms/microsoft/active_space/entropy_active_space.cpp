@@ -17,17 +17,26 @@ std::shared_ptr<data::Wavefunction> AutocasEosActiveSpaceSelector::_run_impl(
   QDK_LOGGER().info("autoCAS-EOS::Starting active space selection.");
 
   // get settings
-  const double entropy_threshold = _settings->get<double>("entropy_threshold");
+  double entropy_threshold = _settings->get<double>("entropy_threshold");
   const double plateau_threshold = _settings->get<double>("diff_threshold");
   const bool normalize_entropies = _settings->get<bool>("normalize_entropies");
+
+  // get max entropy, sorted entropies and corresponding orbital indices
+  auto [max_entropy, selected_active_space_indices, sorted_entropies] =
+      detail::_sort_entropies_and_indices(wavefunction, normalize_entropies);
+
   QDK_LOGGER().debug("Settings:");
   QDK_LOGGER().debug("  entropy_threshold: {}", entropy_threshold);
   QDK_LOGGER().debug("  diff_threshold: {}", plateau_threshold);
   QDK_LOGGER().debug("  normalize_entropies: {}", normalize_entropies);
 
-  // get max entropy, sorted entropies and corresponding orbital indices
-  auto [max_entropy, selected_active_space_indices, sorted_entropies] =
-      detail::_sort_entropies_and_indices(wavefunction, normalize_entropies);
+  // normalize entropy threshold
+  if (normalize_entropies) {
+    entropy_threshold /= max_entropy;
+    QDK_LOGGER().debug("  Normalized entropy threshold: {:.6f}",
+                       entropy_threshold);
+  }
+  QDK_LOGGER().debug("Max entropy: {:.6f}", max_entropy);
 
   // Determine cutoff based on entropy differences
   Eigen::VectorXd diff = sorted_entropies.head(sorted_entropies.size() - 1) -

@@ -44,9 +44,15 @@ parameters:
 - name: publishInternalFeed
   type: boolean
   default: false
+  displayName: Publish to Internal Feed
 - name: publishEsrp
   type: boolean
   default: false
+  displayName: Publish to PyPI
+- name: devTag
+  type: string
+  default: None
+  displayName: PyPI Development Tag (e.g. 'dev1', 'rc1', etc.)
 
 variables:
 - group: QdkChemistry
@@ -143,6 +149,7 @@ extends:
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
+                devTag: ${{ parameters.devTag }}
 
           # Test - Linux x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
@@ -164,6 +171,7 @@ extends:
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
+                devTag: ${{ parameters.devTag }}
 
           # Test - Linux ARM64
           - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
@@ -184,6 +192,7 @@ extends:
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 pythonVersion: $(pythonVersion)
                 macBuild: ON
+                devTag: ${{ parameters.devTag }}
 
           # Test - macOS ARM64
           - ${{ if eq(target.os, 'macOS') }}:
