@@ -139,7 +139,7 @@ TEST_F(ModelHamiltonianTest, PPPChainPotentialAndChargeOnly) {
   auto lattice = LatticeGraph::chain(n);
   Eigen::MatrixXd h1_expected = Eigen::MatrixXd::Zero(n, n);
   h1_expected(0, 0) = h1_expected(1, 1) = h1_expected(2, 2) =
-      h1_expected(3, 3) = -6.0;
+      h1_expected(3, 3) = -3.0;
   Eigen::VectorXd h2_expected = Eigen::VectorXd::Zero(n * n * n * n);
   for (int i = 0; i < n; i++) {
     for (int j = 0; j < n; j++) {
@@ -148,7 +148,7 @@ TEST_F(ModelHamiltonianTest, PPPChainPotentialAndChargeOnly) {
     }
   }
 
-  double energy_offset_expected = 12.0;
+  double energy_offset_expected = 6.0;
 
   // test scalar form — returns tuple of (SparseMatrix, TwoBodyMap, double)
   auto [h1, h2, offset] = model_hamiltonians::detail::_build_ppp_integrals(
@@ -185,13 +185,13 @@ TEST_F(ModelHamiltonianTest, PPPChainPotentialAndChargeOnly) {
       h1_mod_dense.isApprox(h1_expected, testing::numerical_zero_tolerance));
   EXPECT_FALSE(
       h2_mod_dense.isApprox(h2_expected, testing::numerical_zero_tolerance));
-  h1_expected(0, 0) = -8.0;
-  h1_expected(1, 1) = -12.0;
-  h1_expected(2, 2) = -8.0;
-  h1_expected(3, 3) = -8.0;
+  h1_expected(0, 0) = -4.0;
+  h1_expected(1, 1) = -6.0;
+  h1_expected(2, 2) = -4.0;
+  h1_expected(3, 3) = -4.0;
   h2_expected[0 * n * n * n + 0 * n * n + 1 * n + 1] = 2.0;
   h2_expected[1 * n * n * n + 1 * n * n + 0 * n + 0] = 2.0;
-  energy_offset_expected = 22.0;
+  energy_offset_expected = 11.0;
   EXPECT_TRUE(
       h1_mod_dense.isApprox(h1_expected, testing::numerical_zero_tolerance));
   EXPECT_TRUE(
@@ -287,7 +287,7 @@ TEST_F(ModelHamiltonianTest, CreatePPPHamiltonian) {
   EXPECT_TRUE(ham.has_container_type<SparseHamiltonianContainer>());
   EXPECT_TRUE(ham.is_restricted());
   EXPECT_TRUE(ham.has_two_body_integrals());
-  EXPECT_NEAR(ham.get_core_energy(), 12.0, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(ham.get_core_energy(), 6.0, testing::numerical_zero_tolerance);
 }
 
 TEST_F(ModelHamiltonianTest, PairwisePotentialCustomFunction) {

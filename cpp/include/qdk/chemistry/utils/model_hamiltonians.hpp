@@ -294,12 +294,12 @@ _build_ppp_integrals(const qdk::chemistry::data::LatticeGraph& lattice,
       // two-body: (ii|jj) = V_ij for both orderings
       h2[{i, i, j, j}] += V_ij;
 
-      // one-body correction: -sum_{j!=i} V_ij z_j applied to h_ii
-      h1_dense(i, i) -= V_ij * z(j);
-      h1_dense(j, j) -= V_ij * z(i);
+      // one-body correction: -1/2 sum_{j!=i} V_ij z_j applied to h_ii
+      h1_dense(i, i) -= 0.5 * V_ij * z(j);
+      h1_dense(j, j) -= 0.5 * V_ij * z(i);
 
       // scalar offset: 1/2 sum_{i!=j} V_ij z_i z_j = sum_{i<j} V_ij z_i z_j
-      energy_offset += V_ij * z(i) * z(j);
+      energy_offset += 0.5 * V_ij * z(i) * z(j);
     }
   }
   Eigen::SparseMatrix<double> h1 = h1_dense.sparseView();
