@@ -23,7 +23,7 @@ from .reference_tolerances import float_comparison_absolute_tolerance
 
 def _get_terms_dict(qh: QubitHamiltonian) -> dict[str, float]:
     """Return a {pauli_string: coefficient} dict for easy assertions."""
-    return {ps: float(c) for ps, c in zip(qh.pauli_strings, qh.coefficients, strict=False)}
+    return dict(qh.get_real_coefficients())
 
 
 class TestModelHamiltonians:

@@ -113,6 +113,8 @@ basis_set = BasisSet.from_json(j)
 basis_set.to_hdf5_file("molecule.basis_set.h5")
 basis_set = BasisSet.from_hdf5_file("molecule.basis_set.h5")
 # end-cell-serialization
+Path("molecule.basis_set.json").unlink()
+Path("molecule.basis_set.h5").unlink()
 ################################################################################
 
 ################################################################################

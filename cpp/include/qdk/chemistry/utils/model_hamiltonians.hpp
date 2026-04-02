@@ -243,6 +243,10 @@ _build_hubbard_integrals(const qdk::chemistry::data::LatticeGraph& lattice,
  * @param U_in  On-site Coulomb repulsion. Scalar or VectorXd of size n.
  * @param V_in  Intersite Coulomb interaction matrix. Scalar or n x n MatrixXd.
  * @param z_in  Effective core charges. Scalar or VectorXd of size n.
+ *
+ * @note The 1/2 prefactor from the PPP formula is **not** included in the
+ * stored two-body integrals.
+ *
  * @return Tuple of (sparse one-body matrix, two-body map, energy offset).
  * @throws std::invalid_argument if V or z dimensions mismatch.
  */
@@ -284,18 +288,18 @@ _build_ppp_integrals(const qdk::chemistry::data::LatticeGraph& lattice,
   for (int i = 0; i < n; i++) {
     for (int j = 0; j < n; j++) {
       if (i == j) continue;
-      double V_ij = 0.5 * V(i, j);
+      double V_ij = V(i, j);
       if (V_ij == 0.0) continue;
 
       // two-body: (ii|jj) = V_ij for both orderings
       h2[{i, i, j, j}] += V_ij;
 
-      // one-body correction: -sum_{j!=i} V_ij z_j applied to h_ii
-      h1_dense(i, i) -= V_ij * z(j);
-      h1_dense(j, j) -= V_ij * z(i);
+      // one-body correction: -1/2 sum_{j!=i} V_ij z_j applied to h_ii
+      h1_dense(i, i) -= 0.5 * V_ij * z(j);
+      h1_dense(j, j) -= 0.5 * V_ij * z(i);
 
       // scalar offset: 1/2 sum_{i!=j} V_ij z_i z_j = sum_{i<j} V_ij z_i z_j
-      energy_offset += V_ij * z(i) * z(j);
+      energy_offset += 0.5 * V_ij * z(i) * z(j);
     }
   }
   Eigen::SparseMatrix<double> h1 = h1_dense.sparseView();

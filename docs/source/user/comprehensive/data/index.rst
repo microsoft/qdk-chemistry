@@ -18,6 +18,7 @@ Each of the links below leads to a detailed description of the data class, inclu
    basis_set
    hamiltonian
    orbitals
+   lattice_graph
    pauli_operator
    structure
    symmetries
@@ -58,6 +59,9 @@ The following table summarizes the available data classes in QDK/Chemistry and t
      - :doc:`QubitMapper <../algorithms/qubit_mapper>`
    * - :doc:`Symmetries <symmetries>`
      - Physical symmetries
+     - Factory methods, User input
+   * - :doc:`LatticeGraph <lattice_graph>`
+     - Lattice topology for model Hamiltonians
      - Factory methods, User input
    * - :doc:`PauliOperator <pauli_operator>`
      - Pauli operator expressions with arithmetic
