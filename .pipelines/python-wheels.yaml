@@ -110,7 +110,7 @@ extends:
               os: ${{ target.os }}
 
           timeoutInMinutes: 480
-          displayName: Build ${{ target.march }} wheels
+          displayName: Build ${{ target.march }} ${{ target.os }} wheels
           variables:
             LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
           strategy:
