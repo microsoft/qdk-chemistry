@@ -41,6 +41,10 @@ parameters:
 - name: macBuild
   type: string
   default: OFF
+- name: devTag
+  type: string
+  default: 'None'
+
 steps:
 - checkout: self
   persistCredentials: true
@@ -50,6 +54,18 @@ steps:
   displayName: Pip Authenticate
   inputs:
     artifactFeeds: ""
+
+# Check if user provided a development tag for release and validate before building wheels.
+# If a development tag is provided and is valid, the VERSION file in the top level directory
+# will be updated to include the dev tag before publishing to PyPI.
+- script: |
+    set -e
+    python3 $(Agent.BuildDirectory)/qdk-chemistry/.pipelines/pip-scripts/versioning.py \
+    --version-file $(Agent.BuildDirectory)/qdk-chemistry/VERSION \
+    --dev-tag ${{ parameters.devTag }}
+    cat $(Agent.BuildDirectory)/qdk-chemistry/VERSION
+  displayName: Validate/Set Development Version for Wheels
+  condition: ne('${{ parameters.devTag }}', 'None')
 
 - ${{ if eq(parameters.macBuild, 'OFF') }}:
   - script: |

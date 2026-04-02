@@ -6,19 +6,34 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+import random as stdlib_random
 import re
 
 import numpy as np
 import pytest
+import scipy.sparse
 
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
-from qdk_chemistry.data.qubit_hamiltonian import (
-    QubitHamiltonian,
-    _filter_and_group_pauli_ops_from_statevector,
-    filter_and_group_pauli_ops_from_wavefunction,
-)
+from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+
+def _pauli_matrix(label):
+    """Return Pauli matrix from a Pauli label."""
+    mat = np.eye(1, dtype=complex)
+    for i in label:
+        if i == "I":
+            mat = np.kron(mat, np.eye(2, dtype=complex))
+        elif i == "X":
+            mat = np.kron(mat, np.array([[0, 1], [1, 0]], dtype=complex))
+        elif i == "Y":
+            mat = np.kron(mat, np.array([[0, -1j], [1j, 0]], dtype=complex))
+        elif i == "Z":
+            mat = np.kron(mat, np.array([[1, 0], [0, -1]], dtype=complex))
+        else:
+            raise ValueError(f"Invalid Pauli character '{i}'")
+    return mat
 
 
 class TestQubitHamiltonian:
@@ -40,12 +55,16 @@ class TestQubitHamiltonian:
 
     def test_initialization_invalid_pauli(self):
         """Test that initialization raises ValueError on invalid Pauli strings."""
-        with pytest.raises(ValueError, match="Invalid Pauli strings or coefficients"):
+        with pytest.raises(ValueError, match="invalid characters"):
             QubitHamiltonian(pauli_strings=["X", "A"], coefficients=np.array([1.0, 0.5]))
-        with pytest.raises(ValueError, match="Invalid Pauli strings or coefficients"):
-            QubitHamiltonian(pauli_strings=["X", "Y"], coefficients=np.array([1.0, "invalid"]))
-        with pytest.raises(ValueError, match="Invalid Pauli strings or coefficients"):
+        with pytest.raises(ValueError, match="has length"):
             QubitHamiltonian(pauli_strings=["X", "ZY"], coefficients=np.array([1.0, 2.0]))
+        with pytest.raises(ValueError, match="invalid characters"):
+            QubitHamiltonian(pauli_strings=["XZ", "A1"], coefficients=np.array([1.0, 0.5]))
+        with pytest.raises(ValueError, match="empty"):
+            QubitHamiltonian(pauli_strings=["X", ""], coefficients=np.array([1.0, 0.5]))
+        with pytest.raises(ValueError, match="empty"):
+            QubitHamiltonian(pauli_strings=[], coefficients=[])
 
     def test_group_commuting(self):
         """Test group_commuting."""
@@ -76,6 +95,65 @@ class TestQubitHamiltonian:
             assert len(group.pauli_strings) == 1  # Each group should contain only one Pauli string
             all_grouped_strings.extend(group.pauli_strings)
         assert set(all_grouped_strings) == {"XX", "YY", "ZZ", "XY"}
+
+    def test_group_commuting_all_commute(self):
+        """Test that fully commuting operators go into one group."""
+        # ZI, IZ, ZZ all commute with each other
+        qh = QubitHamiltonian(["ZI", "IZ", "ZZ"], np.array([1.0, -0.5, 0.3]))
+        grouped = qh.group_commuting(qubit_wise=False)
+        assert len(grouped) == 1
+        assert len(grouped[0].pauli_strings) == 3
+
+    def test_group_commuting_none_commute(self):
+        """Test that non-commuting operators each get their own group."""
+        # X and Z anticommute; Y and X anticommute; Y and Z anticommute
+        qh = QubitHamiltonian(["X", "Z", "Y"], np.array([1.0, -0.5, 0.3]))
+        grouped = qh.group_commuting(qubit_wise=False)
+        assert len(grouped) == 3
+
+    def test_group_commuting_single_term(self):
+        """Test group_commuting with a single term."""
+        qh = QubitHamiltonian(["ZZ"], np.array([1.0]))
+        grouped = qh.group_commuting(qubit_wise=False)
+        assert len(grouped) == 1
+        assert grouped[0].pauli_strings == ["ZZ"]
+
+    def test_group_commuting_reconstruct_matrix(self):
+        """Test group_commuting with matrix verification."""
+        qh = QubitHamiltonian(
+            ["II", "IZ", "ZI", "ZZ", "XX", "YY"],
+            np.array([-0.8, 0.17, -0.17, 0.12, 0.04, 0.04]),
+        )
+        # General commuting: all diagonal terms commute, XX and YY commute with each other and with diag terms
+        grouped = qh.group_commuting(qubit_wise=False)
+        total_terms = sum(len(g.pauli_strings) for g in grouped)
+        assert total_terms == 6
+        # Verify ground state energy via eigenvalues
+        mat = qh.to_matrix()
+        gs_energy = np.min(np.linalg.eigvalsh(mat))
+        # Reconstruct from groups and check same ground state energy
+        full_mat = np.zeros_like(mat)
+        for g in grouped:
+            full_mat += g.to_matrix()
+        gs_energy_grouped = np.min(np.linalg.eigvalsh(full_mat))
+        assert np.isclose(gs_energy, gs_energy_grouped, atol=float_comparison_absolute_tolerance)
+
+    def test_group_commuting_qw_reconstruct_matrix(self):
+        """Test that QW-grouped Hamiltonian reconstructs the original matrix exactly."""
+        labels = ["ZI", "IZ", "ZZ", "XI", "IX", "XX", "YY"]
+        coeffs = np.array([0.5, 0.3, 0.2, -0.1, 0.4, -0.25, 0.15])
+        qh = QubitHamiltonian(labels, coeffs)
+        original_mat = qh.to_matrix()
+        groups = qh.group_commuting(qubit_wise=True)
+        reconstructed = np.zeros_like(original_mat)
+        for g in groups:
+            reconstructed += g.to_matrix()
+        assert np.allclose(
+            reconstructed,
+            original_mat,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
 
     def test_schatten_norm_basic(self):
         """Test Schatten norm with basic Hamiltonian."""
@@ -170,193 +248,83 @@ class TestQubitHamiltonian:
         interleaved = qh.to_interleaved(n_spatial=1)
         assert interleaved.pauli_strings == ["XY"]
 
+    def test_to_matrix_hermitian(self):
+        """Test that to_matrix produces a Hermitian matrix for real coefficients."""
+        qh = QubitHamiltonian(["IX", "ZI", "ZZ", "YY"], np.array([0.5, -0.3, 0.8, -0.2]))
+        mat = qh.to_matrix()
+        assert np.allclose(
+            mat, mat.conj().T, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
 
-def test_filter_and_group_raises_on_zero_norm():
-    """Statevector with zero norm should raise ValueError."""
-    psi = np.zeros(4)
-    h = QubitHamiltonian(["ZZ"], np.array([1.0]))
-    with pytest.raises(ValueError, match="zero norm"):
-        _filter_and_group_pauli_ops_from_statevector(h, psi)
+    def test_to_matrix(self):
+        """Test to_matrix returns a matrix matching reference."""
+        labels = ["IX", "ZZ", "YY"]
+        coeffs = np.array([0.5, -0.3, 0.1])
+        qh = QubitHamiltonian(labels, coeffs)
+        expected = sum(c * _pauli_matrix(label) for c, label in zip(coeffs, labels, strict=True))
+        dense = qh.to_matrix(sparse=False)
+        sparse = qh.to_matrix(sparse=True)
+        assert scipy.sparse.issparse(sparse)
+        assert np.allclose(
+            dense, expected, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+        assert np.allclose(
+            sparse.toarray(),
+            expected,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
 
+    def test_to_matrix_eigenvalues(self):
+        """Test that sparse and dense matrices give the same eigenvalues."""
+        qh = QubitHamiltonian(["ZI", "IZ", "XX"], np.array([0.7, -0.4, 0.3]))
+        dense = qh.to_matrix(sparse=False)
+        sparse = qh.to_matrix(sparse=True)
+        eigvals_dense = np.sort(np.linalg.eigvalsh(dense))
+        eigvals_sparse = np.sort(np.linalg.eigvalsh(sparse.toarray()))
+        assert np.allclose(
+            eigvals_dense,
+            eigvals_sparse,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
 
-def test_filter_and_group_trimming_handles_plus_minus_one_expectations():
-    """Check correct sign handling for +1 and -1 expectation values."""
-    qubit_hamiltonian = QubitHamiltonian(["ZZ", "YY"], np.array([1.0, 2.0]))
-    state = np.array([1 / np.sqrt(2), 0, 0, 1 / np.sqrt(2)])
-    _, classical = _filter_and_group_pauli_ops_from_statevector(qubit_hamiltonian, state)
-    # ZZ exp = +1, +1 * 1 added; YY exp = -1, -1 * 2 added
-    assert len(classical) == 2
-    assert any(
-        np.isclose(c, 1.0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance)
-        for c in classical
-    )
-    assert any(
-        np.isclose(c, -2.0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance)
-        for c in classical
-    )
-    assert np.isclose(
-        sum(classical), -1.0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
-    )
+    def test_to_matrix_complex_coefficients(self):
+        """Test to_matrix with complex coefficients."""
+        labels = ["X", "Y"]
+        coeffs = np.array([1.0 + 0.5j, 0.0 - 0.3j])
+        qh = QubitHamiltonian(labels, coeffs)
+        expected = sum(c * _pauli_matrix(label) for c, label in zip(coeffs, labels, strict=True))
+        mat = qh.to_matrix()
+        assert np.allclose(
+            mat, expected, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
 
-
-def test_filter_and_group_returns_empty_if_all_trimmed():
-    """If all expectation values are +1 or -1, no grouped Hamiltonians remain."""
-    qubit_hamiltonian = QubitHamiltonian(["ZZ"], np.array([5.0]))
-    state = np.array([1 / np.sqrt(2), 0, 0, 1 / np.sqrt(2)])
-    grouped, classical = _filter_and_group_pauli_ops_from_statevector(qubit_hamiltonian, state)
-    assert grouped == []
-    assert len(classical) == 1
-    assert np.isclose(
-        sum(classical), 5.0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
-    )
-
-
-def test_filter_and_group_behavior_on_simple_state(hamiltonian_4e4o, wavefunction_4e4o):
-    """Test extraction and simplification of Pauli terms from a Hamiltonian."""
-    grouped_ops, classical_coeffs = filter_and_group_pauli_ops_from_wavefunction(
-        hamiltonian_4e4o, wavefunction_4e4o, abelian_grouping=True, trimming=True
-    )
-    assert len(grouped_ops) == 2
-    assert np.isclose(
-        sum(classical_coeffs).real,
-        -4.191428699447072,
-        rtol=float_comparison_relative_tolerance,
-        atol=float_comparison_absolute_tolerance,
-    )
-
-
-def test_filter_and_group_no_trimming(hamiltonian_4e4o, wavefunction_4e4o):
-    """Test filter_and_group_pauli_ops_from_wavefunction with trimming=False."""
-    grouped_ops, classical_coeffs = filter_and_group_pauli_ops_from_wavefunction(
-        hamiltonian_4e4o,
-        wavefunction_4e4o,
-        abelian_grouping=True,
-        trimming=False,
-    )
-
-    # With trimming=False, should keep all terms and have no classical coefficients
-    assert len(classical_coeffs) == 0
-    assert len(grouped_ops) > 0
-
-    qubit_hamiltonian = QubitHamiltonian(["X", "Z"], [1.0, 2.0])
-
-    # Create |0> state
-    statevector = np.array([1.0, 0.0])
-
-    grouped_ops, classical_coeffs = _filter_and_group_pauli_ops_from_statevector(
-        qubit_hamiltonian,
-        statevector,
-        abelian_grouping=True,
-        trimming=False,  # This avoids the filtering logic entirely
-    )
-
-    # With trimming=False, should keep all terms and have no classical coefficients
-    assert len(classical_coeffs) == 0
-    assert len(grouped_ops) > 0
-
-
-def test_filter_and_group_no_abelian_grouping(hamiltonian_4e4o, wavefunction_4e4o):
-    """Test filter_and_group_pauli_ops_from_wavefunction abelian_grouping=False."""
-    grouped_ops, _ = filter_and_group_pauli_ops_from_wavefunction(
-        hamiltonian_4e4o,
-        wavefunction_4e4o,
-        abelian_grouping=False,
-        trimming=True,
-    )
-
-    # With abelian_grouping=False, should return a single group
-    assert len(grouped_ops) == 1
-    assert isinstance(grouped_ops[0], QubitHamiltonian)
-
-    # Create a 1-qubit Hamiltonian
-    qubit_hamiltonian = QubitHamiltonian(["X", "Z"], [1.0, 2.0])
-
-    # Create |0> state
-    statevector = np.array([1.0, 0.0])
-
-    grouped_ops, _ = _filter_and_group_pauli_ops_from_statevector(
-        qubit_hamiltonian,
-        statevector,
-        abelian_grouping=False,  # This takes a different path
-        trimming=False,
-    )
-
-    # With abelian_grouping=False, should return a single group
-    assert len(grouped_ops) == 1
-    assert isinstance(grouped_ops[0], QubitHamiltonian)
-
-
-def test_filter_and_group_mixed_with_retained_terms():
-    """Test filter_and_group ensuring some terms are always retained."""
-    # Create a state that will ensure some terms have fractional expectations
-    # Use a 2-qubit system with careful state preparation
-    qubit_hamiltonian = QubitHamiltonian(["II", "ZI", "IZ", "ZZ"], [1.0, 0.5, 0.3, 0.2])
-
-    # Create a state that gives mixed expectations
-    # |00> + |11> (Bell state) normalized
-    statevector = np.array([1 / np.sqrt(2), 0, 0, 1 / np.sqrt(2)])
-
-    grouped_ops, classical_coeffs = _filter_and_group_pauli_ops_from_statevector(
-        qubit_hamiltonian, statevector, abelian_grouping=True, trimming=True
-    )
-
-    # This should have some classical terms and some retained terms
-    # II: expectation 1 (classical)
-    # ZI: expectation 0 (filtered)
-    # IZ: expectation 0 (filtered)
-    # ZZ: expectation 1 (classical)
-    assert len(classical_coeffs) == 2
-    assert len(grouped_ops) == 0
-
-
-def test_filter_and_group_with_small_fractional_expectations():
-    """Test with a state that guarantees fractional expectations."""
-    # Create a 1-qubit Hamiltonian with multiple terms
-    qubit_hamiltonian = QubitHamiltonian(["I", "Z", "X"], [1.0, 2.0, 3.0])
-
-    # Create a state with fractional Z expectation but keep other terms
-    # Use a state that's close to |0> but with small |1> component
-    epsilon = 0.1
-    norm = np.sqrt(1 + epsilon**2)
-    statevector = np.array([1 / norm, epsilon / norm])
-
-    grouped_ops, classical_coeffs = _filter_and_group_pauli_ops_from_statevector(
-        qubit_hamiltonian, statevector, abelian_grouping=True, trimming=True
-    )
-
-    # I should be classical (expectation ~1)
-    # Z should have fractional expectation (retained)
-    # X should have small expectation (likely retained unless very close to 0)
-    total_ops = len(grouped_ops) + len(classical_coeffs)
-    assert total_ops > 0  # Should have some terms
-
-
-def test_filter_and_group_both_trimming_modes():
-    """Test both trimming=True and trimming=False for consistency."""
-    # Use the same Hamiltonian and state for both tests
-    qubit_hamiltonian = QubitHamiltonian(["X", "Z"], [1.0, 2.0])
-    statevector = np.array([1.0, 0.0])  # |0> state
-
-    # Test with trimming=False (safe path)
-    grouped_ops_no_trim, classical_coeffs_no_trim = _filter_and_group_pauli_ops_from_statevector(
-        qubit_hamiltonian, statevector, abelian_grouping=True, trimming=False
-    )
-
-    # Should keep all terms
-    assert len(classical_coeffs_no_trim) == 0
-    assert len(grouped_ops_no_trim) > 0
-
-    # Test with trimming=True and a state that ensures some fractional expectations
-    # Use a superposition state
-    statevector_super = np.array([0.8, 0.6])
-
-    grouped_ops_trim, classical_coeffs_trim = _filter_and_group_pauli_ops_from_statevector(
-        qubit_hamiltonian, statevector_super, abelian_grouping=True, trimming=True
-    )
-
-    # Should have some result
-    total_terms = len(grouped_ops_trim) + len(classical_coeffs_trim)
-    assert total_terms >= 0
+    def test_to_matrix_large_10qubit_random(self):
+        """Test to_matrix on a 10-qubit, 20-term random Hamiltonian."""
+        stdlib_random.seed(2026)
+        rng = np.random.default_rng(2026)
+        pauli_chars = "IXYZ"
+        n_qubits = 10
+        n_terms = 20
+        labels = ["".join(stdlib_random.choice(pauli_chars) for _ in range(n_qubits)) for _ in range(n_terms)]
+        coeffs = rng.standard_normal(n_terms) + 1j * rng.standard_normal(n_terms)
+        qh = QubitHamiltonian(labels, coeffs)
+        dim = 2**n_qubits
+        expected = np.zeros((dim, dim), dtype=complex)
+        for coeff, label in zip(coeffs, labels, strict=True):
+            expected += coeff * _pauli_matrix(label)
+        dense = qh.to_matrix(sparse=False)
+        sparse = qh.to_matrix(sparse=True)
+        assert np.allclose(
+            dense, expected, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+        assert np.allclose(
+            sparse.toarray(),
+            expected,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
 
 
 class TestQubitHamiltonianSerialization:
