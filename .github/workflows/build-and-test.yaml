@@ -136,6 +136,12 @@ jobs:
         python-version: ${{ matrix.python-version }}
         cache: pip
 
+    - name: Die if Python == 3.13
+      if: matrix.python-version == '3.13'
+      run: |
+        echo "Dying early to test runners independence... sorry! ;-)"
+        exit 1
+
     - name: Install Linux system packages
       if: matrix.os-name == 'Linux'
       run: |
