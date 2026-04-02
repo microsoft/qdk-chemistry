@@ -15,7 +15,9 @@ import pytest
 import qsharp
 
 from qdk_chemistry.data import Circuit
+from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 
 def strip_ws(s: str) -> str:
@@ -105,6 +107,40 @@ class TestGetQsharpCircuit:
         assert len(qdk_circuit_info["qubits"]) == 3
         qir = circuit.get_qir()
         assert isinstance(qir, qsharp._qsharp.QirInputData)
+
+    def test_get_circuit_from_factory(self):
+        """Test that get_qir and get_qsharp_circuit can generate and cache QIR and Q# circuit from Q# factory data."""
+        state_prep_params = {"rowMap": [1, 0], "stateVector": [0.6, 0.0, 0.0, 0.8], "expansionOps": [], "numQubits": 2}
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
+        )
+        circuit = Circuit(qsharp_factory=qsharp_factory)
+        assert circuit.qir is None
+        assert circuit.qsharp is None
+        qir = circuit.get_qir()
+        qsc = circuit.get_qsharp_circuit()
+        assert isinstance(qir, qsharp._qsharp.QirInputData)
+        assert isinstance(circuit.qir, qsharp._qsharp.QirInputData)
+        assert isinstance(qsc, qsharp._native.Circuit)
+
+    def test_get_qsharp_circuit_prune_classical_qubits(self):
+        """Test that get_qsharp_circuit can prune classical qubits when requested."""
+        state_prep_params = {
+            "rowMap": [1, 0],
+            "stateVector": [0.6, 0.0, 0.0, 0.8],
+            "expansionOps": [[2]],
+            "numQubits": 4,
+        }
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
+        )
+        circuit = Circuit(qsharp_factory=qsharp_factory)
+        qsc_pruned = circuit.get_qsharp_circuit(prune_classical_qubits=True)
+        qsc = circuit.get_qsharp_circuit(prune_classical_qubits=False)
+        qsc_pruned_info = json.loads(qsc_pruned.json())
+        qsc_info = json.loads(qsc.json())
+        assert len(qsc_info["qubits"]) == 4
+        assert len(qsc_pruned_info["qubits"]) == 2
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
@@ -372,3 +408,58 @@ class TestCircuitImmutability:
         # Attempting to add a new attribute should raise an error
         with pytest.raises(AttributeError):
             circuit.new_attr = "value"
+
+
+class TestCircuitEstimate:
+    """Test cases for Circuit.estimate method."""
+
+    def test_estimate_from_factory(self):
+        """Test that estimate works with Q# factory data."""
+        state_prep_params = {
+            "rowMap": [1, 0],
+            "stateVector": [0.6, 0.0, 0.0, 0.8],
+            "expansionOps": [],
+            "numQubits": 2,
+        }
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=state_prep_params,
+        )
+        circuit = Circuit(qsharp_factory=qsharp_factory)
+        result = circuit.estimate()
+        assert result is not None
+        assert hasattr(result, "logical_counts")
+
+    def test_estimate_from_qasm(self):
+        """Test that estimate works with QASM representation."""
+        qasm_with_t = """
+            OPENQASM 3.0;
+            include "stdgates.inc";
+            qubit[2] q;
+            bit[2] c;
+            h q[0];
+            t q[0];
+            cx q[0], q[1];
+            c[0] = measure q[0];
+            c[1] = measure q[1];
+        """
+        circuit = Circuit(qasm=qasm_with_t)
+        result = circuit.estimate()
+        assert result is not None
+        assert hasattr(result, "logical_counts")
+
+    def test_estimate_raises_with_qir_only(self):
+        """Test that estimate raises when only QIR representation is available."""
+        qir = qsharp.openqasm.compile("""
+            OPENQASM 3.0;
+            include "stdgates.inc";
+            qubit[2] q;
+            bit[2] c;
+            h q[0];
+            cx q[0], q[1];
+            c[0] = measure q[0];
+            c[1] = measure q[1];
+        """)
+        circuit = Circuit(qir=qir)
+        with pytest.raises(RuntimeError, match="Cannot estimate resources"):
+            circuit.estimate()

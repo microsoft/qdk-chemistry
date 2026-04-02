@@ -24,6 +24,7 @@ steps:
       echo "Running wheel tests (Docker)..."
       docker run --rm \
         --platform ${{ parameters.imageTag }} \
+        -e QSHARP_PYTHON_TELEMETRY=false \
         -v ${{ parameters.agentBuildDirectory }}:/workspace \
         -w /workspace/qdk-chemistry/python \
         ${{ parameters.dockerImage }} \
