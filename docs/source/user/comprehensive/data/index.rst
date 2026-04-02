@@ -18,6 +18,7 @@ Each of the links below leads to a detailed description of the data class, inclu
    basis_set
    hamiltonian
    orbitals
+   lattice_graph
    pauli_operator
    structure
    symmetries
