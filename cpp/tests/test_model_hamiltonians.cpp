@@ -134,21 +134,21 @@ TEST_F(ModelHamiltonianTest, HubbardChain) {
 
 TEST_F(ModelHamiltonianTest, PPPChainPotentialAndChargeOnly) {
   const int n = 4;
-  double V = 2.0;
+  double V = 1.0;
   double z = 1.0;
   auto lattice = LatticeGraph::chain(n);
   Eigen::MatrixXd h1_expected = Eigen::MatrixXd::Zero(n, n);
   h1_expected(0, 0) = h1_expected(1, 1) = h1_expected(2, 2) =
-      h1_expected(3, 3) = -6.0;
+      h1_expected(3, 3) = -3.0;
   Eigen::VectorXd h2_expected = Eigen::VectorXd::Zero(n * n * n * n);
   for (int i = 0; i < n; i++) {
     for (int j = 0; j < n; j++) {
       if (i == j) continue;
-      h2_expected[i * n * n * n + i * n * n + j * n + j] = 0.5 * V;
+      h2_expected[i * n * n * n + i * n * n + j * n + j] = V;
     }
   }
 
-  double energy_offset_expected = 12.0;
+  double energy_offset_expected = 6.0;
 
   // test scalar form — returns tuple of (SparseMatrix, TwoBodyMap, double)
   auto [h1, h2, offset] = model_hamiltonians::detail::_build_ppp_integrals(
@@ -174,7 +174,7 @@ TEST_F(ModelHamiltonianTest, PPPChainPotentialAndChargeOnly) {
               testing::numerical_zero_tolerance);
 
   // change V and z and verify different integrals
-  V_mat(0, 1) = V_mat(1, 0) = 4.0;
+  V_mat(0, 1) = V_mat(1, 0) = 2.0;
   z_vec(0) = 2.0;
   auto [h1_mod, h2_mod, offset_mod] =
       model_hamiltonians::detail::_build_ppp_integrals(lattice, 0.0, 0.0, 0.0,
@@ -185,13 +185,13 @@ TEST_F(ModelHamiltonianTest, PPPChainPotentialAndChargeOnly) {
       h1_mod_dense.isApprox(h1_expected, testing::numerical_zero_tolerance));
   EXPECT_FALSE(
       h2_mod_dense.isApprox(h2_expected, testing::numerical_zero_tolerance));
-  h1_expected(0, 0) = -8.0;
-  h1_expected(1, 1) = -12.0;
-  h1_expected(2, 2) = -8.0;
-  h1_expected(3, 3) = -8.0;
+  h1_expected(0, 0) = -4.0;
+  h1_expected(1, 1) = -6.0;
+  h1_expected(2, 2) = -4.0;
+  h1_expected(3, 3) = -4.0;
   h2_expected[0 * n * n * n + 0 * n * n + 1 * n + 1] = 2.0;
   h2_expected[1 * n * n * n + 1 * n * n + 0 * n + 0] = 2.0;
-  energy_offset_expected = 22.0;
+  energy_offset_expected = 11.0;
   EXPECT_TRUE(
       h1_mod_dense.isApprox(h1_expected, testing::numerical_zero_tolerance));
   EXPECT_TRUE(
@@ -206,15 +206,13 @@ TEST_F(ModelHamiltonianTest, OhnoPotentialTest) {
   double epsilon_r = 0.9;
   double U = 0.4;
   double R = 1.2;
-  double constant = model_hamiltonians::detail::COULOMB_CONSTANT;
 
   auto potential = model_hamiltonians::ohno_potential(lattice, U, R, epsilon_r);
   Eigen::MatrixXd V_expected = Eigen::MatrixXd::Zero(n, n);
   for (int i = 0; i < n; i++)
     for (int j = 0; j < n; j++)
       if (i != j)
-        V_expected(i, j) =
-            U / std::sqrt(1.0 + std::pow(R * U * epsilon_r / constant, 2));
+        V_expected(i, j) = U / std::sqrt(1.0 + std::pow(R * U * epsilon_r, 2));
   EXPECT_TRUE(
       potential.isApprox(V_expected, testing::numerical_zero_tolerance));
 }
@@ -225,14 +223,13 @@ TEST_F(ModelHamiltonianTest, MatagaNishimotoPotentialTest) {
   double epsilon_r = 0.9;
   double U = 0.4;
   double R = 1.2;
-  double constant = model_hamiltonians::detail::COULOMB_CONSTANT;
 
   auto potential =
       model_hamiltonians::mataga_nishimoto_potential(lattice, U, R, epsilon_r);
   Eigen::MatrixXd V_expected = Eigen::MatrixXd::Zero(n, n);
   for (int i = 0; i < n; i++)
     for (int j = 0; j < n; j++)
-      if (i != j) V_expected(i, j) = U / (1.0 + R * U * epsilon_r / constant);
+      if (i != j) V_expected(i, j) = U / (1.0 + R * U * epsilon_r);
   EXPECT_TRUE(
       potential.isApprox(V_expected, testing::numerical_zero_tolerance));
 }
@@ -283,14 +280,14 @@ TEST_F(ModelHamiltonianTest, CreateHubbardHamiltonian) {
 TEST_F(ModelHamiltonianTest, CreatePPPHamiltonian) {
   const int n = 4;
   auto lattice = LatticeGraph::chain(n);
-  double V = 2.0, z = 1.0;
+  double V = 1.0, z = 1.0;
 
   auto ham =
       model_hamiltonians::create_ppp_hamiltonian(lattice, 0.0, 0.0, 0.0, V, z);
   EXPECT_TRUE(ham.has_container_type<SparseHamiltonianContainer>());
   EXPECT_TRUE(ham.is_restricted());
   EXPECT_TRUE(ham.has_two_body_integrals());
-  EXPECT_NEAR(ham.get_core_energy(), 12.0, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(ham.get_core_energy(), 6.0, testing::numerical_zero_tolerance);
 }
 
 TEST_F(ModelHamiltonianTest, PairwisePotentialCustomFunction) {

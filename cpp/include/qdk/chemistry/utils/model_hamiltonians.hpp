@@ -100,12 +100,6 @@ inline Eigen::MatrixXd to_pair_param(
 }
 
 /**
- * @brief e^2 / (4 pi epsilon_0), used in Ohno and Mataga-Nishimoto potentials.
- */
-constexpr double COULOMB_CONSTANT = qdk::chemistry::constants::hartree_to_ev *
-                                    qdk::chemistry::constants::bohr_to_angstrom;
-
-/**
  * @brief Construct a Hückel Hamiltonian on a lattice.
  *
  * Builds the one-body Hamiltonian:
@@ -249,6 +243,10 @@ _build_hubbard_integrals(const qdk::chemistry::data::LatticeGraph& lattice,
  * @param U_in  On-site Coulomb repulsion. Scalar or VectorXd of size n.
  * @param V_in  Intersite Coulomb interaction matrix. Scalar or n x n MatrixXd.
  * @param z_in  Effective core charges. Scalar or VectorXd of size n.
+ *
+ * @note The 1/2 prefactor from the PPP formula is **not** included in the
+ * stored two-body integrals.
+ *
  * @return Tuple of (sparse one-body matrix, two-body map, energy offset).
  * @throws std::invalid_argument if V or z dimensions mismatch.
  */
@@ -290,18 +288,18 @@ _build_ppp_integrals(const qdk::chemistry::data::LatticeGraph& lattice,
   for (int i = 0; i < n; i++) {
     for (int j = 0; j < n; j++) {
       if (i == j) continue;
-      double V_ij = 0.5 * V(i, j);
+      double V_ij = V(i, j);
       if (V_ij == 0.0) continue;
 
       // two-body: (ii|jj) = V_ij for both orderings
       h2[{i, i, j, j}] += V_ij;
 
-      // one-body correction: -sum_{j!=i} V_ij z_j applied to h_ii
-      h1_dense(i, i) -= V_ij * z(j);
-      h1_dense(j, j) -= V_ij * z(i);
+      // one-body correction: -1/2 sum_{j!=i} V_ij z_j applied to h_ii
+      h1_dense(i, i) -= 0.5 * V_ij * z(j);
+      h1_dense(j, j) -= 0.5 * V_ij * z(i);
 
       // scalar offset: 1/2 sum_{i!=j} V_ij z_i z_j = sum_{i<j} V_ij z_i z_j
-      energy_offset += V_ij * z(i) * z(j);
+      energy_offset += 0.5 * V_ij * z(i) * z(j);
     }
   }
   Eigen::SparseMatrix<double> h1 = h1_dense.sparseView();
@@ -447,20 +445,21 @@ inline Eigen::MatrixXd pairwise_potential(
 /**
  * @brief Compute the Ohno intersite potential matrix.
  *
- * V_ij = U_ij / sqrt(1 + (U_ij * epsilon_r * R_ij / constant)^2)
+ * V_ij = U_ij / sqrt(1 + (U_ij * epsilon_r * R_ij)^2)
  *
  * where U_ij = sqrt(U_i * U_j) is the geometric mean of on-site parameters.
- * The constant is e^2 / (4 pi epsilon_0).
+ *
+ * All parameters should be in atomic units (Hartree for U, Bohr for R).
  *
  * @tparam UT  double or Eigen::VectorXd
  * @tparam RT  double or Eigen::MatrixXd
  * @param lattice  Lattice graph (used for the number of sites).
- * @param U  On-site Coulomb parameter(s). Scalar or VectorXd of size n.
- * @param R  Intersite distances. Scalar or n x n MatrixXd.
+ * @param U  On-site Coulomb parameter(s) in Hartree. Scalar or VectorXd.
+ * @param R  Intersite distances in Bohr. Scalar or n x n MatrixXd.
  * @param epsilon_r  Relative permittivity (dimensionless, default 1.0).
  * @param nearest_neighbor_only  If true, restrict to lattice-connected pairs
  * (default false).
- * @return n x n symmetric MatrixXd of Ohno potential values.
+ * @return n x n symmetric MatrixXd of Ohno potential values in Hartree.
  */
 template <typename UT, typename RT>
 inline Eigen::MatrixXd ohno_potential(
@@ -477,7 +476,7 @@ inline Eigen::MatrixXd ohno_potential(
   return pairwise_potential(
       lattice, std::forward<UT>(U), std::forward<RT>(R),
       [epsilon_r](int, int, double Uij, double Rij) {
-        double x = Uij * epsilon_r * Rij / detail::COULOMB_CONSTANT;
+        double x = Uij * epsilon_r * Rij;
         return Uij / std::sqrt(1.0 + x * x);
       },
       nearest_neighbor_only);
@@ -486,20 +485,22 @@ inline Eigen::MatrixXd ohno_potential(
 /**
  * @brief Compute the Mataga-Nishimoto intersite potential matrix.
  *
- * V_ij = U_ij / (1 + U_ij * epsilon_r * R_ij / constant)
+ * V_ij = U_ij / (1 + U_ij * epsilon_r * R_ij)
  *
  * where U_ij = sqrt(U_i * U_j) is the geometric mean of on-site parameters.
- * The constant e^2 / (4 pi epsilon_0).
+ *
+ * All parameters should be in atomic units (Hartree for U, Bohr for R).
  *
  * @tparam UT  double or Eigen::VectorXd
  * @tparam RT  double or Eigen::MatrixXd
  * @param lattice  Lattice graph (used for the number of sites).
- * @param U  On-site Coulomb parameter(s). Scalar or VectorXd of size n.
- * @param R  Intersite distances. Scalar or n x n MatrixXd.
+ * @param U  On-site Coulomb parameter(s) in Hartree. Scalar or VectorXd.
+ * @param R  Intersite distances in Bohr. Scalar or n x n MatrixXd.
  * @param epsilon_r  Relative permittivity (dimensionless, default 1.0).
  * @param nearest_neighbor_only  If true, restrict to lattice-connected pairs
  * (default false).
- * @return n x n symmetric MatrixXd of Mataga-Nishimoto potential values.
+ * @return n x n symmetric MatrixXd of Mataga-Nishimoto potential values in
+ * Hartree.
  */
 template <typename UT, typename RT>
 inline Eigen::MatrixXd mataga_nishimoto_potential(
@@ -515,7 +516,7 @@ inline Eigen::MatrixXd mataga_nishimoto_potential(
   return pairwise_potential(
       lattice, std::forward<UT>(U), std::forward<RT>(R),
       [epsilon_r](int, int, double Uij, double Rij) {
-        return Uij / (1.0 + Uij * epsilon_r * Rij / detail::COULOMB_CONSTANT);
+        return Uij / (1.0 + Uij * epsilon_r * Rij);
       },
       nearest_neighbor_only);
 }

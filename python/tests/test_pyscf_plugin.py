@@ -1420,7 +1420,7 @@ class TestPyscfPlugin:
 
         act_a, act_b = active_wfn.get_orbitals().get_active_space_indices()
         assert act_a == act_b
-        assert act_a == [0, 1, 2, 3, 4]
+        assert act_a == [2, 3, 4, 5, 6]
 
         occ_a, occ_b = wavefunction.get_total_orbital_occupations()
         assert np.isclose(
@@ -1445,7 +1445,7 @@ class TestPyscfPlugin:
 
         act_a, act_b = active_wfn.get_orbitals().get_active_space_indices()
         assert act_a == act_b
-        assert act_a == [0, 1, 2, 3, 4, 5, 6, 7]
+        assert act_a == [2, 3, 4, 5, 6, 7, 8, 9]
 
     def test_pyscf_ccsd_water_def2svp(self):
         """Test PySCF CCSD on water with def2-svp basis."""
