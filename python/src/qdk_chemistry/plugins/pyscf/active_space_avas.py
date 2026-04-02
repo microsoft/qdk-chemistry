@@ -160,7 +160,7 @@ class PyscfAVAS(ActiveSpaceSelector):
 
         # Extract active indices
         # nelec_act is the number of active electrons (int or tuple of alpha/beta)
-        n_active_electrons = sum(nelec_act) if isinstance(nelec_act, (tuple, list)) else int(nelec_act)
+        n_active_electrons = sum(nelec_act) if isinstance(nelec_act, (tuple, list)) else int(nelec_act)  # noqa: UP038
         n_inactive_occ = (mol.nelectron - n_active_electrons) // 2
         active_indices = [n_inactive_occ + i for i in range(norb_act)]
         inactive_indices = list(range(n_inactive_occ))
