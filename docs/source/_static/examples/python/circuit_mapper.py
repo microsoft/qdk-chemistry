@@ -35,7 +35,9 @@ structure = Structure(coords, symbols=symbols)
 
 # 2. SCF
 scf_solver = create("scf_solver")
-E_scf, wfn_scf = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+E_scf, wfn_scf = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
 
 # 3. Hamiltonian and qubit mapping
 hamiltonian_constructor = create("hamiltonian_constructor")

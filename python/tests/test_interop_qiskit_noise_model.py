@@ -6,12 +6,14 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
+
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER
 
 if QDK_CHEMISTRY_HAS_QISKIT_AER:
+    from qiskit_aer.noise import NoiseModel
+
     from qdk_chemistry.data.noise_models import QuantumErrorProfile
     from qdk_chemistry.plugins.qiskit._interop.noise_model import get_noise_model_from_profile
-    from qiskit_aer.noise import NoiseModel
 
 
 pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available")

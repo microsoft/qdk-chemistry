@@ -104,6 +104,8 @@ from qdk_chemistry.algorithms import registry
 
 # List all registered circuit executor implementations
 implementations = registry.available("circuit_executor")
-print(implementations)  # e.g. ['qdk_sparse_state_simulator', 'qdk_full_state_simulator', 'qiskit_aer_simulator']
+print(
+    implementations
+)  # e.g. ['qdk_sparse_state_simulator', 'qdk_full_state_simulator', 'qiskit_aer_simulator']
 # end-cell-list-implementations
 ################################################################################

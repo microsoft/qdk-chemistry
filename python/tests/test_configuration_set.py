@@ -9,6 +9,7 @@ import json
 import pickle
 
 import pytest
+
 from qdk_chemistry.data import (
     Configuration,
     ConfigurationSet,

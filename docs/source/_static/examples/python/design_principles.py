@@ -30,7 +30,9 @@ structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structur
 
 # Configure and run SCF calculation
 scf_solver = create("scf_solver")
-scf_energy, scf_wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz")
+scf_energy, scf_wavefunction = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
+)
 
 # Select active space orbitals
 active_space_selector = create(
@@ -48,6 +50,8 @@ hamiltonian = ham_constructor.run(active_orbitals)
 
 mc = create("multi_configuration_calculator")
 mc.settings().set("max_solver_iterations", 300)
-E_cas, wfn_cas = mc.run(hamiltonian, n_active_alpha_electrons=1, n_active_beta_electrons=1)
+E_cas, wfn_cas = mc.run(
+    hamiltonian, n_active_alpha_electrons=1, n_active_beta_electrons=1
+)
 # end-cell-data-flow
 ################################################################################

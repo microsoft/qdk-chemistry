@@ -6,12 +6,14 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
-from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qsharp.openqasm import compile as compile_qasm_to_qir
 
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+
 if QDK_CHEMISTRY_HAS_QISKIT:
-    from qdk_chemistry.plugins.qiskit._interop.qir import qir_ir_to_qiskit
     from qiskit import QuantumCircuit
+
+    from qdk_chemistry.plugins.qiskit._interop.qir import qir_ir_to_qiskit
 
 
 pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")

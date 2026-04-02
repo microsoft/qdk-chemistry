@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Check that required .pyi stub files exist in the repository.
+"""
+Check that required .pyi stub files exist in the repository.
 
 This script ensures that essential type stub files are not accidentally
 deleted (e.g., via `git commit -a`).
@@ -60,13 +61,18 @@ def main() -> int:
             print("\nModified files (should be placeholder stubs):")
             for f in modified_files:
                 print(f"  - {f}")
-        print("\nThese files may have been accidentally deleted or changed (e.g., via `git commit -a`).")
+        print(
+            "\nThese files may have been accidentally deleted or changed "
+            "(e.g., via `git commit -a`)."
+        )
         print("Please restore them before committing.")
         print("To restore deleted files, you can use:")
         print("  git checkout HEAD -- <file>")
         return 1
 
-    print(f"All {len(REQUIRED_PYI_FILES)} required .pyi stub files are present and valid.")
+    print(
+        f"All {len(REQUIRED_PYI_FILES)} required .pyi stub files are present and valid."
+    )
     return 0
 
 

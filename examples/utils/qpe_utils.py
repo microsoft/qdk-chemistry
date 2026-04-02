@@ -27,7 +27,9 @@ def prepare_top_dets_trial_state(
     """
     dets = wf.get_top_determinants(max_determinants=num_dets)
     if not dets:
-        raise ValueError("Cannot prepare trial state: No determinants found in the wavefunction.")
+        raise ValueError(
+            "Cannot prepare trial state: No determinants found in the wavefunction."
+        )
 
     pmc_calculator = create("projected_multi_configuration_calculator", "macis_pmc")
     _, wf_trial = pmc_calculator.run(hamiltonian, list(dets.keys()))
@@ -68,7 +70,11 @@ def compute_evolution_time(
     """
     # Compute base evolution time from Hamiltonian norm or use provided guess
     bound_time = np.pi / qubit_hamiltonian.schatten_norm
-    base_time = min(initial_time_guess, bound_time) if initial_time_guess is not None else bound_time
+    base_time = (
+        min(initial_time_guess, bound_time)
+        if initial_time_guess is not None
+        else bound_time
+    )
 
     if not solve_hamiltonian:
         return base_time
@@ -85,7 +91,9 @@ def compute_evolution_time(
 
     # Compute the energy error from phase discretization
     if abs(base_time) < np.finfo(np.float64).eps:
-        raise ValueError(f"Cannot compute discretization energy error: base_time {base_time} is too close to zero.")
+        raise ValueError(
+            f"Cannot compute discretization energy error: base_time {base_time} is too close to zero."
+        )
     discretization_energy_error = (2 * np.pi * (bit_phase - expected_phase)) / base_time
 
     # Shift the energy error to achieve the target precision

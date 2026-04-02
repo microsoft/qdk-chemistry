@@ -78,7 +78,6 @@ class CustomScfSolver(ScfSolver):
 
         Returns:
             Tuple of (energy, wavefunction)
-
         """
         # Convert to external format
 
@@ -134,8 +133,12 @@ class GeometryOptimizerSettings(Settings):
 
     def __init__(self):
         super().__init__()
-        self._set_default("max_steps", "int", 100, "Maximum optimization steps", (1, 10000))
-        self._set_default("convergence_threshold", "double", 1e-5, "Gradient convergence threshold")
+        self._set_default(
+            "max_steps", "int", 100, "Maximum optimization steps", (1, 10000)
+        )
+        self._set_default(
+            "convergence_threshold", "double", 1e-5, "Gradient convergence threshold"
+        )
         self._set_default("step_size", "double", 0.1, "Initial optimization step size")
 
 
@@ -228,7 +231,7 @@ class SteepestDescentOptimizer(GeometryOptimizer):
 
 ################################################################################
 # start-cell-geometry-registration
-from qdk_chemistry import algorithms
+import qdk_chemistry.algorithms as algorithms
 
 # Register the factory
 algorithms.registry.register_factory(GeometryOptimizerFactory())

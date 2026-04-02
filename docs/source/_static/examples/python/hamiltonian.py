@@ -8,16 +8,19 @@
 ################################################################################
 # start-cell-hamiltonian-creation
 from pathlib import Path
-
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import SpinChannel, Structure
+from qdk_chemistry.data import Structure, SpinChannel
 
 # Load a structure from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/water.structure.xyz")
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/water.structure.xyz"
+)
 
 # Run initial SCF to get orbitals
 scf_solver = create("scf_solver")
-E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+E_scf, wfn = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
 orbitals = wfn.get_orbitals()
 
 # Create a Hamiltonian constructor
@@ -43,7 +46,9 @@ h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
 one_body_element = hamiltonian.get_one_body_element(i_int, j_int, SpinChannel.aa)
 
 # Access a specific two-electron integral <ij|kl> (for aaaa spin channel)
-two_body_element = hamiltonian.get_two_body_element(i_int, j_int, k_int, l_int, SpinChannel.aaaa)
+two_body_element = hamiltonian.get_two_body_element(
+    i_int, j_int, k_int, l_int, SpinChannel.aaaa
+)
 
 # Get core energy (nuclear repulsion + inactive orbital energy)
 core_energy = hamiltonian.get_core_energy()

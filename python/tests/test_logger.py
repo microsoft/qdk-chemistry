@@ -18,6 +18,7 @@ Tests the functionality of the logger module including:
 import re
 
 import pytest
+
 from qdk_chemistry.utils import Logger
 
 

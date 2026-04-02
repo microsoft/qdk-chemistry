@@ -27,16 +27,19 @@ active_space_selector.settings().set("num_active_orbitals", 4)
 ################################################################################
 # start-cell-run
 from pathlib import Path
-
 from qdk_chemistry.data import Structure
 
 # Load a molecular structure (water molecule) from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/water.structure.xyz")
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/water.structure.xyz"
+)
 charge = 0
 
 # First, run SCF to get molecular orbitals
 scf_solver = create("scf_solver")
-scf_energy, scf_wavefunction = scf_solver.run(structure, charge=charge, spin_multiplicity=1, basis_or_guess="6-31g")
+scf_energy, scf_wavefunction = scf_solver.run(
+    structure, charge=charge, spin_multiplicity=1, basis_or_guess="6-31g"
+)
 
 # Run active space selection
 active_wavefunction = active_space_selector.run(scf_wavefunction)
@@ -77,7 +80,9 @@ mc_calculator = create("multi_configuration_calculator", "macis_asci")
 mc_calculator.settings().set("ntdets_max", 50000)
 mc_calculator.settings().set("calculate_one_rdm", True)
 mc_calculator.settings().set("calculate_two_rdm", True)
-mc_energy, mc_wavefunction = mc_calculator.run(active_hamiltonian, num_electrons // 2, num_electrons // 2)
+mc_energy, mc_wavefunction = mc_calculator.run(
+    active_hamiltonian, num_electrons // 2, num_electrons // 2
+)
 
 # Print single orbital entropies which are used by autoCAS to determine the active space
 entropies = mc_wavefunction.get_single_orbital_entropies()

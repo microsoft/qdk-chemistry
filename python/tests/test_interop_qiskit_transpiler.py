@@ -7,18 +7,20 @@
 
 import numpy as np
 import pytest
+
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
 if QDK_CHEMISTRY_HAS_QISKIT:
+    from qiskit import QuantumCircuit
+    from qiskit.circuit import Parameter
+    from qiskit.circuit.library import IGate, SdgGate, SGate, ZGate
+    from qiskit.transpiler import PassManager
+
     from qdk_chemistry.plugins.qiskit._interop.transpiler import (
         MergeZBasisRotations,
         RemoveZBasisOnZeroState,
         SubstituteCliffordRz,
     )
-    from qiskit import QuantumCircuit
-    from qiskit.circuit import Parameter
-    from qiskit.circuit.library import IGate, SdgGate, SGate, ZGate
-    from qiskit.transpiler import PassManager
 else:
     # Define placeholders for type checking when Qiskit is not available
     QuantumCircuit = object

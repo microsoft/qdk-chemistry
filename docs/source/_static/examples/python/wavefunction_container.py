@@ -7,27 +7,27 @@
 
 import numpy as np
 from qdk_chemistry.data import (
-    BasisSet,
-    CanonicalFourCenterHamiltonianContainer,
-    CasWavefunctionContainer,
-    Configuration,
-    CoupledClusterContainer,
-    Hamiltonian,
-    MP2Container,
     Orbitals,
-    OrbitalType,
-    SciWavefunctionContainer,
-    Shell,
     SlaterDeterminantContainer,
+    CasWavefunctionContainer,
+    SciWavefunctionContainer,
+    CoupledClusterContainer,
+    MP2Container,
+    Configuration,
     Wavefunction,
+    Hamiltonian,
+    CanonicalFourCenterHamiltonianContainer,
+    BasisSet,
+    Shell,
+    OrbitalType,
 )
 
 
 def make_minimal_orbitals():
     """Helper function to create orbitals.
 
-    These are used in the different constructors for wfn containers.
-    """
+    These are used in the different constructors for wfn containers."""
+
     # Create STO-1G basis set for H2
     shells = [
         Shell(0, OrbitalType.S, exponents=[1.0], coefficients=[1.0]),
@@ -48,8 +48,8 @@ def make_minimal_orbitals():
 def make_minimal_hamiltonian(orbitals):
     """Helper function to create a minimal Hamiltonian.
 
-    This is needed for MP2 container examples.
-    """
+    This is needed for MP2 container examples."""
+
     # Create minimal one- and two-electron integrals for H2
     h_core = np.array([[-1.5, -0.8], [-0.8, 0.5]])  # Core Hamiltonian
 
@@ -78,7 +78,9 @@ def make_minimal_hamiltonian(orbitals):
 
     # Create Hamiltonian
     hamiltonian = Hamiltonian(
-        CanonicalFourCenterHamiltonianContainer(h_core, eri, orbitals, core_energy, inactive_fock)
+        CanonicalFourCenterHamiltonianContainer(
+            h_core, eri, orbitals, core_energy, inactive_fock
+        )
     )
     return hamiltonian
 
@@ -179,7 +181,9 @@ t1_amplitudes = np.array([0.05])
 t2_amplitudes = np.array([0.15])
 
 # Create CC container: requires reference wavefunction, orbitals, and amplitudes
-cc_container = CoupledClusterContainer(orbitals, ref_wavefunction, t1_amplitudes, t2_amplitudes)
+cc_container = CoupledClusterContainer(
+    orbitals, ref_wavefunction, t1_amplitudes, t2_amplitudes
+)
 cc_wavefunction = Wavefunction(cc_container)
 # end-cell-create-cc
 ################################################################################
@@ -212,7 +216,9 @@ entropies = sd_wavefunction.get_single_orbital_entropies()
 # Access T1 and T2 amplitudes from MP2 and CC containers
 
 # For MP2 - amplitudes computed on demand
-t2_abab_mp2, t2_aaaa_mp2, t2_bbbb_mp2 = mp2_wavefunction.get_container().get_t2_amplitudes()
+t2_abab_mp2, t2_aaaa_mp2, t2_bbbb_mp2 = (
+    mp2_wavefunction.get_container().get_t2_amplitudes()
+)
 
 # For CC - amplitudes stored during construction
 t1_aa, t1_bb = cc_wavefunction.get_container().get_t1_amplitudes()

@@ -35,7 +35,10 @@ circuit_executor = create("circuit_executor", "qdk_sparse_state_simulator")
 energy_expectation_results, measurement_data = qdk_estimator.run(
     circuit, qubit_hamiltonian, circuit_executor, total_shots=1000
 )
-print(f"Energy expectation value from noiseless QDK Simulator: {energy_expectation_results.energy_expectation_value}")
+print(
+    "Energy expectation value from noiseless QDK Simulator: "
+    f"{energy_expectation_results.energy_expectation_value}"
+)
 
 # Create energy estimator using Qsharp simulator with depolarizing noise
 noise_model = QuantumErrorProfile(
@@ -87,7 +90,9 @@ qiskit_aer_simulator = create("circuit_executor", "qiskit_aer_simulator")
 energy_expectation_results, measurement_data = qdk_estimator.run(
     circuit, qubit_hamiltonian, qiskit_aer_simulator, total_shots=1000
 )
-print(f"Energy expectation value from Qiskit Aer Simulator: {energy_expectation_results.energy_expectation_value}")
+print(
+    f"Energy expectation value from Qiskit Aer Simulator: {energy_expectation_results.energy_expectation_value}"
+)
 
 # Create energy estimator using Qiskit Aer simulator with noise model
 

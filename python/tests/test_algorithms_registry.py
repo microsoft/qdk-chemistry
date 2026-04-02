@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
+
 from qdk_chemistry._core._algorithms import ScfSolverFactory
 from qdk_chemistry.algorithms import ScfSolver, registry
 from qdk_chemistry.plugins.qiskit import (

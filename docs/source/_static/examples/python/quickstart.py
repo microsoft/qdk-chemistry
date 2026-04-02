@@ -14,7 +14,9 @@ from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
 # Load para-benzyne structure from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/para_benzyne.structure.xyz")
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/para_benzyne.structure.xyz"
+)
 
 print(f"Created structure with {structure.get_num_atoms()} atoms")
 print(f"Elements: {structure.get_elements()}")
@@ -25,7 +27,9 @@ print(f"Elements: {structure.get_elements()}")
 # start-cell-scf
 # Perform an SCF calculation, returning the energy and wavefunction
 scf_solver = create("scf_solver")
-E_hf, wfn_hf = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz")
+E_hf, wfn_hf = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
+)
 print(f"SCF energy is {E_hf:.3f} Hartree")
 
 # Display a summary of the molecular orbitals obtained from the SCF calculation
@@ -64,8 +68,12 @@ print("Active Space Hamiltonian:\n", hamiltonian.get_summary())
 # start-cell-mc-compute
 # Perform CASCI calculation to get the wavefunction and exact energy for the active space
 mc = create("multi_configuration_calculator")
-E_cas, wfn_cas = mc.run(hamiltonian, n_active_alpha_electrons=3, n_active_beta_electrons=3)
-print(f"CASCI energy is {E_cas:.3f} Hartree, and the electron correlation energy is {E_cas - E_hf:.3f} Hartree")
+E_cas, wfn_cas = mc.run(
+    hamiltonian, n_active_alpha_electrons=3, n_active_beta_electrons=3
+)
+print(
+    f"CASCI energy is {E_cas:.3f} Hartree, and the electron correlation energy is {E_cas - E_hf:.3f} Hartree"
+)
 # end-cell-mc-compute
 ################################################################################
 
@@ -99,7 +107,9 @@ qubit_mapper = create("qubit_mapper", algorithm_name="qdk", encoding="jordan-wig
 qubit_hamiltonian = qubit_mapper.run(hamiltonian)
 
 # Print the number of Pauli strings in the full Hamiltonian
-print(f"Number of Pauli strings in the Hamiltonian: {len(qubit_hamiltonian.pauli_strings)}")
+print(
+    f"Number of Pauli strings in the Hamiltonian: {len(qubit_hamiltonian.pauli_strings)}"
+)
 # end-cell-qubit-hamiltonian
 ################################################################################
 
@@ -116,12 +126,16 @@ energy_results, simulation_data = estimator.run(
 )
 
 for i, results in enumerate(simulation_data.bitstring_counts):
-    print(f"Measurement Results for Hamiltonian Group {i + 1}: {simulation_data.hamiltonians[i].pauli_strings}")
+    print(
+        f"Measurement Results for Hamiltonian Group {i + 1}: {simulation_data.hamiltonians[i].pauli_strings}"
+    )
 
 # Print statistics for the measured energy
 energy_mean = energy_results.energy_expectation_value + hamiltonian.get_core_energy()
 energy_stddev = np.sqrt(energy_results.energy_variance)
-print(f"Estimated energy from quantum circuit: {energy_mean:.3f} ± {energy_stddev:.3f} Hartree")
+print(
+    f"Estimated energy from quantum circuit: {energy_mean:.3f} ± {energy_stddev:.3f} Hartree"
+)
 
 # Print comparison with reference energy
 print(f"Difference from reference energy: {energy_mean - E_sparse} Hartree")

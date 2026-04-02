@@ -38,17 +38,20 @@ mcscf.settings().set("max_cycle_macro", 50)
 ################################################################################
 # start-cell-run
 from pathlib import Path
-
 from qdk_chemistry.data import Structure
 from qdk_chemistry.utils import compute_valence_space_parameters
 
 # Load nitrogen molecule structure
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/n2_stretched.structure.xyz")
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/n2_stretched.structure.xyz"
+)
 charge = 0
 
 # First, run SCF to get molecular orbitals
 scf_solver = create("scf_solver")
-E_scf, scf_wavefunction = scf_solver.run(structure, charge=charge, spin_multiplicity=1, basis_or_guess="cc-pvdz")
+E_scf, scf_wavefunction = scf_solver.run(
+    structure, charge=charge, spin_multiplicity=1, basis_or_guess="cc-pvdz"
+)
 
 # Select active space based on valence orbitals
 valence_selector = create("active_space_selector", "qdk_valence")
@@ -59,7 +62,9 @@ active_wavefunction = valence_selector.run(scf_wavefunction)
 
 # Run MCSCF calculation
 nalpha, nbeta = active_wavefunction.get_active_num_electrons()
-E_mcscf, mcscf_wfn = mcscf.run(active_wavefunction.get_orbitals(), ham_constructor, mc_calculator, nalpha, nbeta)
+E_mcscf, mcscf_wfn = mcscf.run(
+    active_wavefunction.get_orbitals(), ham_constructor, mc_calculator, nalpha, nbeta
+)
 
 print(f"SCF Energy: {E_scf:.10f} Hartree")
 print(f"MCSCF Energy: {E_mcscf:.10f} Hartree")

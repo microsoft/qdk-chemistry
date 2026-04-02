@@ -28,7 +28,9 @@ from rdkit.Chem import AllChem, Mol
 def create_structure_from_rdkit(molecule: Mol) -> Structure:
     """Create a Structure object from an RDKit molecule."""
     symbols = []
-    coords = molecule.GetConformer().GetPositions() * ANGSTROM_TO_BOHR  # qdk_chemistry uses Bohr units
+    coords = (
+        molecule.GetConformer().GetPositions() * ANGSTROM_TO_BOHR
+    )  # qdk_chemistry uses Bohr units
 
     for atom in molecule.GetAtoms():
         symbols.append(f"{atom.GetSymbol()}")
@@ -38,14 +40,18 @@ def create_structure_from_rdkit(molecule: Mol) -> Structure:
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse CLI options in the same order as the workflow steps."""
-    parser = argparse.ArgumentParser(description="Build QDK Chemistry structure from RDKit SMILES and run SCF")
+    parser = argparse.ArgumentParser(
+        description="Build QDK Chemistry structure from RDKit SMILES and run SCF"
+    )
 
     parser.add_argument(
         "--basis",
         default="cc-pvdz",
         help="Basis set applied to the SCF solver (default: cc-pvdz).",
     )
-    parser.add_argument("--charge", type=int, default=0, help="Total molecular charge (default: 0).")
+    parser.add_argument(
+        "--charge", type=int, default=0, help="Total molecular charge (default: 0)."
+    )
     parser.add_argument(
         "--spin",
         type=int,
@@ -57,6 +63,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Example of constructing water from RDKit."""
+
     Logger.set_global_level("info")
     args = parse_args(argv)
 

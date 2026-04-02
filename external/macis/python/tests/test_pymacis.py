@@ -1,11 +1,13 @@
-"""Tests for PyMACIS Python bindings"""
+"""
+Tests for PyMACIS Python bindings
+"""
 
 import os
 import sys
-from pathlib import Path
 
 import numpy as np
 import pytest
+from pathlib import Path
 
 # Add the directory containing pymacis to Python's path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,14 +18,22 @@ except ImportError:
     pytest.skip("pymacis not found, skipping tests", allow_module_level=True)
 
 # Paths to FCIDUMP files for different molecules and active spaces
-FCIDUMP_2E2O_PATH = Path(__file__).parent / "data" / "h2_valence_2e2o.hamiltonian.fcidump"
-FCIDUMP_6E6O_PATH = Path(__file__).parent / "data" / "n2_selected_6e6o.hamiltonian.fcidump"
-FCIDUMP_14E18O_PATH = Path(__file__).parent / "data" / "n2_full_14e18o.hamiltonian.fcidump"
+FCIDUMP_2E2O_PATH = (
+    Path(__file__).parent / "data" / "h2_valence_2e2o.hamiltonian.fcidump"
+)
+FCIDUMP_6E6O_PATH = (
+    Path(__file__).parent / "data" / "n2_selected_6e6o.hamiltonian.fcidump"
+)
+FCIDUMP_14E18O_PATH = (
+    Path(__file__).parent / "data" / "n2_full_14e18o.hamiltonian.fcidump"
+)
 TEST_WFN = Path(__file__).parent.parent.parent / "tests" / "ref_data" / "ch4.wfn.dat"
 
 
 def test_read_fcidump():
-    """Test reading an FCIDUMP file and verifying the Hamiltonian structure"""
+    """
+    Test reading an FCIDUMP file and verifying the Hamiltonian structure
+    """
     fcidump_path = str(FCIDUMP_2E2O_PATH)
     H = pymacis.read_fcidump(fcidump_path)
     assert H is not None, "Failed to read FCIDUMP file"
@@ -56,7 +66,9 @@ def test_read_fcidump():
 
 
 def test_active_hamiltonian_noop():
-    """Test that compute_active_hamiltonian returns the same Hamiltonian when full active space is specified"""
+    """
+    Test that compute_active_hamiltonian returns the same Hamiltonian when full active space is specified
+    """
     fcidump_path = str(FCIDUMP_2E2O_PATH)
     H = pymacis.read_fcidump(fcidump_path)
 
@@ -64,27 +76,45 @@ def test_active_hamiltonian_noop():
     H_active = pymacis.compute_active_hamiltonian(2, 0, H)
 
     assert H_active is not None, "Failed to compute active Hamiltonian"
-    assert np.allclose(H_active.T, H.T), "1-body integrals do not match in active Hamiltonian"
-    assert np.allclose(H_active.V, H.V), "2-body integrals do not match in active Hamiltonian"
-    assert np.allclose(H_active.F_inactive, H.F_inactive), "Inactive Fock matrix does not match"
-    assert np.isclose(H_active.core_energy, H.core_energy), "Core energy mismatch in active Hamiltonian"
+    assert np.allclose(H_active.T, H.T), (
+        "1-body integrals do not match in active Hamiltonian"
+    )
+    assert np.allclose(H_active.V, H.V), (
+        "2-body integrals do not match in active Hamiltonian"
+    )
+    assert np.allclose(H_active.F_inactive, H.F_inactive), (
+        "Inactive Fock matrix does not match"
+    )
+    assert np.isclose(H_active.core_energy, H.core_energy), (
+        "Core energy mismatch in active Hamiltonian"
+    )
 
 
 def test_active_hamiltonian_2e2o_nitrogen():
-    """Test the 2e2o active Hamiltonian for nitrogen (from 6e6o)"""
+    """
+    Test the 2e2o active Hamiltonian for nitrogen (from 6e6o)
+    """
     fcidump_path = str(FCIDUMP_6E6O_PATH)
     H = pymacis.read_fcidump(fcidump_path)
 
     H_active = pymacis.compute_active_hamiltonian(2, 2, H)
 
     assert H_active is not None, "Failed to compute active Hamiltonian"
-    assert H_active.T.shape == (2, 2), "Active Hamiltonian 1-body integrals shape mismatch"
-    assert H_active.V.shape == (2, 2, 2, 2), "Active Hamiltonian 2-body integrals shape mismatch"
-    assert np.isclose(H_active.core_energy, -107.05494530230706), "Core energy mismatch in active Hamiltonian"
+    assert H_active.T.shape == (2, 2), (
+        "Active Hamiltonian 1-body integrals shape mismatch"
+    )
+    assert H_active.V.shape == (2, 2, 2, 2), (
+        "Active Hamiltonian 2-body integrals shape mismatch"
+    )
+    assert np.isclose(H_active.core_energy, -107.05494530230706), (
+        "Core energy mismatch in active Hamiltonian"
+    )
 
 
 def test_casci_default():
-    """Test CASCI calculation with default parameters (no determinants)"""
+    """
+    Test CASCI calculation with default parameters (no determinants)
+    """
     fcidump_path = str(FCIDUMP_6E6O_PATH)
     H = pymacis.read_fcidump(fcidump_path)
 
@@ -97,7 +127,9 @@ def test_casci_default():
 
 
 def test_casci_with_determinants():
-    """Test CASCI calculation with determinants in output"""
+    """
+    Test CASCI calculation with determinants in output
+    """
     fcidump_path = str(FCIDUMP_6E6O_PATH)
     H = pymacis.read_fcidump(fcidump_path)
 
@@ -124,7 +156,9 @@ def test_canonical_hf_determinant():
 
 
 def test_asci():
-    """Test the ASCI calculation with a specific problem"""
+    """
+    Test the ASCI calculation with a specific problem
+    """
     fcidump_path = str(FCIDUMP_14E18O_PATH)
     H = pymacis.read_fcidump(fcidump_path)
 
@@ -148,7 +182,9 @@ def test_asci():
 
     assert np.isclose(res["energy"], -1.205187165264e02), "ASCI energy mismatch"
     assert len(res["determinants"]) == 2000, "No determinants found in ASCI result"
-    assert np.isclose(np.linalg.norm(res["coefficients"]), 1.0), "ASCI coefficients do not normalize to 1"
+    assert np.isclose(np.linalg.norm(res["coefficients"]), 1.0), (
+        "ASCI coefficients do not normalize to 1"
+    )
 
 
 def test_read_write_wavefunction(tmp_path):
@@ -300,9 +336,9 @@ def test_write_fcidump_with_threshold(tmp_path):
     pymacis.write_fcidump(str(output_path2), header, T, V, core_energy, 1e-13)
 
     # Read file contents
-    with open(output_path1) as f:
+    with open(output_path1, "r") as f:
         content_tight = f.read()
-    with open(output_path2) as f:
+    with open(output_path2, "r") as f:
         content_loose = f.read()
 
     # With tight threshold, small integrals should be present
@@ -369,29 +405,41 @@ def test_write_fcidump_input_validation():
 
     # Test invalid T matrix dimensions
     with pytest.raises(RuntimeError, match="T matrix must be 2-dimensional"):
-        pymacis.write_fcidump("test.fcidump", header, np.random.random((2,)), V_valid, core_energy)
+        pymacis.write_fcidump(
+            "test.fcidump", header, np.random.random((2,)), V_valid, core_energy
+        )
 
     # Test non-square T matrix
     with pytest.raises(RuntimeError, match="T matrix must be square"):
-        pymacis.write_fcidump("test.fcidump", header, np.random.random((2, 3)), V_valid, core_energy)
+        pymacis.write_fcidump(
+            "test.fcidump", header, np.random.random((2, 3)), V_valid, core_energy
+        )
 
     # Test invalid V tensor dimensions
     with pytest.raises(RuntimeError, match="V tensor must be 4-dimensional"):
-        pymacis.write_fcidump("test.fcidump", header, T_valid, np.random.random((2, 2, 2)), core_energy)
+        pymacis.write_fcidump(
+            "test.fcidump", header, T_valid, np.random.random((2, 2, 2)), core_energy
+        )
 
     # Test non-uniform V tensor dimensions
     with pytest.raises(RuntimeError, match="V tensor must have equal dimensions"):
-        pymacis.write_fcidump("test.fcidump", header, T_valid, np.random.random((2, 2, 2, 3)), core_energy)
+        pymacis.write_fcidump(
+            "test.fcidump", header, T_valid, np.random.random((2, 2, 2, 3)), core_energy
+        )
 
     # Test dimension mismatch between T and V
     with pytest.raises(RuntimeError, match="T and V must have compatible dimensions"):
-        pymacis.write_fcidump("test.fcidump", header, T_valid, np.random.random((3, 3, 3, 3)), core_energy)
+        pymacis.write_fcidump(
+            "test.fcidump", header, T_valid, np.random.random((3, 3, 3, 3)), core_energy
+        )
 
     # Test dimension mismatch with header.norb
     header_wrong = pymacis.FCIDumpHeader()
     header_wrong.norb = 3
     with pytest.raises(RuntimeError, match="Matrix dimensions must match header.norb"):
-        pymacis.write_fcidump("test.fcidump", header_wrong, T_valid, V_valid, core_energy)
+        pymacis.write_fcidump(
+            "test.fcidump", header_wrong, T_valid, V_valid, core_energy
+        )
 
 
 def test_write_fcidump_file_format(tmp_path):
@@ -417,7 +465,7 @@ def test_write_fcidump_file_format(tmp_path):
     pymacis.write_fcidump(str(output_path), header, T, V, core_energy)
 
     # Read file content and verify format
-    with open(output_path) as f:
+    with open(output_path, "r") as f:
         content = f.read()
 
     # Check header format
@@ -427,11 +475,21 @@ def test_write_fcidump_file_format(tmp_path):
     assert "&END" in content
 
     # Check that integrals are present
-    assert "5.00000000000000e-01        1        1        1        1" in content  # V[0,0,0,0]
-    assert "3.00000000000000e-01        2        2        2        2" in content  # V[1,1,1,1]
-    assert "1.00000000000000e+00        1        1        0        0" in content  # T[0,0]
-    assert "2.00000000000000e+00        2        2        0        0" in content  # T[1,1]
-    assert "-1.50000000000000e+00        0        0        0        0" in content  # core energy
+    assert (
+        "5.00000000000000e-01        1        1        1        1" in content
+    )  # V[0,0,0,0]
+    assert (
+        "3.00000000000000e-01        2        2        2        2" in content
+    )  # V[1,1,1,1]
+    assert (
+        "1.00000000000000e+00        1        1        0        0" in content
+    )  # T[0,0]
+    assert (
+        "2.00000000000000e+00        2        2        0        0" in content
+    )  # T[1,1]
+    assert (
+        "-1.50000000000000e+00        0        0        0        0" in content
+    )  # core energy
 
 
 def test_fcidump_format_compatibility(tmp_path):
@@ -500,9 +558,9 @@ def test_fcidump_format_compatibility(tmp_path):
         "Two-body integrals differ between integral-first and indices-first formats"
     )
 
-    assert np.isclose(H_integral_first.core_energy, H_indices_first.core_energy, atol=1e-14), (
-        "Core energies differ between integral-first and indices-first formats"
-    )
+    assert np.isclose(
+        H_integral_first.core_energy, H_indices_first.core_energy, atol=1e-14
+    ), "Core energies differ between integral-first and indices-first formats"
 
     # Verify against expected values
     expected_T = T

@@ -7,6 +7,7 @@
 
 import numpy as np
 import pytest
+
 from qdk_chemistry import algorithms as alg
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
@@ -16,6 +17,7 @@ from .reference_tolerances import float_comparison_relative_tolerance, mcscf_ene
 # Check if PySCF is available and import the plugin
 try:
     import pyscf  # noqa: F401
+
     import qdk_chemistry.plugins.pyscf as pyscf_plugin
 
     pyscf_plugin.load()

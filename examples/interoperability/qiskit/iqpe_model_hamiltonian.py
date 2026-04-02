@@ -93,7 +93,9 @@ phase_angle_1 = result_1.phase_angle
 phase_angle_canonical_1 = result_1.canonical_phase_angle
 raw_energy_1 = result_1.raw_energy
 candidate_energies_1 = result_1.branching
-estimated_energy_1 = result_1.resolved_energy if result_1.resolved_energy is not None else raw_energy_1
+estimated_energy_1 = (
+    result_1.resolved_energy if result_1.resolved_energy is not None else raw_energy_1
+)
 
 Logger.info("=== Iterative QPE: Non-commuting Hamiltonian Example ===")
 Logger.info("Hamiltonian: H = 0.519 * XI + ZZ")
@@ -164,9 +166,13 @@ phase_angle_2 = result_2.phase_angle
 phase_angle_canonical_2 = result_2.canonical_phase_angle
 raw_energy_2 = result_2.raw_energy
 candidate_energies_2 = result_2.branching
-estimated_energy_2 = result_2.resolved_energy if result_2.resolved_energy is not None else raw_energy_2
+estimated_energy_2 = (
+    result_2.resolved_energy if result_2.resolved_energy is not None else raw_energy_2
+)
 Logger.info("\n=== Iterative QPE: Second Non-commuting Hamiltonian Example ===")
-Logger.info("Hamiltonian: H = -0.0289(X1 + X2) + 0.0541(Z1 + Z2) + 0.0150 X1X2 + 0.0590 Z1Z2")
+Logger.info(
+    "Hamiltonian: H = -0.0289(X1 + X2) + 0.0541(Z1 + Z2) + 0.0150 X1X2 + 0.0590 Z1Z2"
+)
 Logger.info(f"Time step t = pi / 4 ({TIME_STEP_2:.6f}) and {PHASE_BITS_2} phase bits\n")
 Logger.info(f"Measured bits (MSB → LSB): {list(result_2.bits_msb_first or [])}")
 Logger.info(f"Phase fraction φ (measured): {result_2.phase_fraction:.6f}")

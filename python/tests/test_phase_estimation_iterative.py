@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import pytest
+
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (
     IterativePhaseEstimation,
@@ -39,8 +40,9 @@ from .reference_tolerances import (
 )
 
 if QDK_CHEMISTRY_HAS_QISKIT:
-    from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
     from qiskit import QuantumCircuit, qasm3
+
+    from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
 
 _SEED = 42
 

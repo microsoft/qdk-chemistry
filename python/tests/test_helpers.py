@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
+
 from qdk_chemistry.data import (
     Ansatz,
     BasisSet,

@@ -36,7 +36,9 @@ structure = Structure(coords, symbols=symbols)
 
 # Run scf
 scf_solver = create("scf_solver")
-E_scf, wfn_scf = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+E_scf, wfn_scf = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
 
 # Compute the Hamiltonian
 hamiltonian_constructor = create("hamiltonian_constructor")

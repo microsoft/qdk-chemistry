@@ -51,7 +51,9 @@ structure = Structure(coords, symbols=symbols)
 
 # 2. SCF
 scf_solver = create("scf_solver")
-E_scf, wfn_scf = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+E_scf, wfn_scf = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
 
 # 3. Hamiltonian construction
 hamiltonian_constructor = create("hamiltonian_constructor")
@@ -75,7 +77,9 @@ circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
 circuit_executor = create("circuit_executor", "qiskit_aer_simulator", seed=42)
 
 # 8. Create and run IQPE
-iqpe = create("phase_estimation", "iterative", num_bits=10, evolution_time=0.1, shots_per_bit=10)
+iqpe = create(
+    "phase_estimation", "iterative", num_bits=10, evolution_time=0.1, shots_per_bit=10
+)
 result = iqpe.run(
     state_preparation=circuit,
     qubit_hamiltonian=qubit_ham,

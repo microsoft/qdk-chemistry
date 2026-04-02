@@ -21,9 +21,13 @@ from qdk_chemistry.data import Structure
 # Shared pipeline: H2 molecule → SCF → active-space → Hamiltonian → QubitHam
 # (used by cells below that need a fermionic or qubit Hamiltonian)
 # ---------------------------------------------------------------------------
-_h2_structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+_h2_structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/h2.structure.xyz"
+)
 _scf = create("scf_solver")
-_E_scf, _wfn_scf = _scf.run(_h2_structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+_E_scf, _wfn_scf = _scf.run(
+    _h2_structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
 _orbitals = _wfn_scf.get_orbitals()
 
 _ham_constructor = create("hamiltonian_constructor")
@@ -123,7 +127,9 @@ from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
     trotter_steps_commutator,
 )
 
-n_steps = trotter_steps_commutator(qubit_hamiltonian, time=1.0, target_accuracy=1e-3, order=2)
+n_steps = trotter_steps_commutator(
+    qubit_hamiltonian, time=1.0, target_accuracy=1e-3, order=2
+)
 # end-cell-trotter-error
 ################################################################################
 
@@ -140,7 +146,9 @@ scf_solver = create("scf_solver")
 scf_solver.settings().set("method", "hf")
 scf_solver.settings().set("scf_type", "restricted")
 scf_solver.settings().set("enable_gdm", False)
-energy, wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=2, basis_or_guess="sto-3g")
+energy, wavefunction = scf_solver.run(
+    structure, charge=0, spin_multiplicity=2, basis_or_guess="sto-3g"
+)
 # end-cell-rohf
 ################################################################################
 
@@ -162,7 +170,9 @@ cholesky_hamiltonian = constructor.run(orbitals)
 # end-cell-cholesky
 ################################################################################
 
-print(f"Cholesky Hamiltonian core energy: {cholesky_hamiltonian.get_core_energy():.10f}")
+print(
+    f"Cholesky Hamiltonian core energy: {cholesky_hamiltonian.get_core_energy():.10f}"
+)
 
 # ===========================================================================
 # MACIS — single-orbital entropies and mutual information

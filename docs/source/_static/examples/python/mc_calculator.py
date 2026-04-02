@@ -24,7 +24,6 @@ mc_calculator.settings().set("ci_residual_tolerance", 1.0e-6)
 ################################################################################
 # start-cell-run
 from pathlib import Path
-
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
@@ -33,7 +32,9 @@ structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structur
 
 # Run SCF to get orbitals
 scf_solver = create("scf_solver")
-E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+E_scf, wfn = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
 
 # Build Hamiltonian from orbitals
 ham_constructor = create("hamiltonian_constructor")

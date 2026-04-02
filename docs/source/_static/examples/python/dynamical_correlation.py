@@ -32,7 +32,9 @@ structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structur
 
 # Run initial SCF to get reference wavefunction
 scf_solver = create("scf_solver")
-E_hf, wfn_hf = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="def2-svp")
+E_hf, wfn_hf = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="def2-svp"
+)
 
 # Create Hamiltonian from orbitals
 hamiltonian_constructor = create("hamiltonian_constructor")

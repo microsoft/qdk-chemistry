@@ -22,6 +22,7 @@ OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
 
 if OPENFERMION_AVAILABLE:
     import openfermion as of
+
     from qdk_chemistry.algorithms import QubitMapper, available, create
     from qdk_chemistry.data import Symmetries
     from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder

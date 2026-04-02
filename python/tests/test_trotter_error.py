@@ -8,6 +8,7 @@
 import math
 
 import pytest
+
 from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
     trotter_steps_commutator,
     trotter_steps_naive,

@@ -7,13 +7,14 @@
 
 ################################################################################
 # start-cell-loading
-from pathlib import Path
-
 import numpy as np
+from pathlib import Path
 from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell, Structure
 
 # Load a water molecule structure from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/water.structure.xyz")
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/water.structure.xyz"
+)
 
 # Create basis sets from the library using basis set name
 basis_from_name = BasisSet.from_basis_name("sto-3g", structure)
@@ -74,7 +75,9 @@ atomic_orbital_indices = basis_set.get_atomic_orbital_indices_for_atom(1)
 # Returns list[int]
 shell_indices = basis_set.get_shell_indices_for_orbital_type(OrbitalType.P)
 # Returns list[int]
-shell_indices_specific = basis_set.get_shell_indices_for_atom_and_orbital_type(0, OrbitalType.D)
+shell_indices_specific = basis_set.get_shell_indices_for_atom_and_orbital_type(
+    0, OrbitalType.D
+)
 # end-cell-access
 ################################################################################
 
@@ -132,7 +135,9 @@ num_orbitals = BasisSet.get_num_orbitals_for_l(2, AOType.Spherical)  # 5
 # Convert basis type to string (returns str)
 basis_str = BasisSet.atomic_orbital_type_to_string(AOType.Cartesian)  # "cartesian"
 # Convert string to basis type (returns AOType)
-atomic_orbital_type = BasisSet.string_to_atomic_orbital_type("spherical")  # AOType.Spherical
+atomic_orbital_type = BasisSet.string_to_atomic_orbital_type(
+    "spherical"
+)  # AOType.Spherical
 # end-cell-utility-functions
 ################################################################################
 

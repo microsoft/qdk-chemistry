@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
-from qdk_chemistry import algorithms
+import qdk_chemistry.algorithms as algorithms
 from qdk_chemistry.data import LatticeGraph
 from qdk_chemistry.utils.model_hamiltonians import (
     create_heisenberg_hamiltonian,
@@ -156,7 +156,7 @@ V_custom = pairwise_potential(
     lattice,
     U=0.414,
     R=2.65,
-    func=lambda _i, _j, uij, rij: uij / (1.0 + rij),
+    func=lambda i, j, Uij, Rij: Uij / (1.0 + Rij),
 )
 
 print(f"Ohno V(0,1) = {V_ohno[0, 1]:.4f}")

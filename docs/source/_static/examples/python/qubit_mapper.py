@@ -32,7 +32,9 @@ structure = Structure.from_xyz_file(Path(".") / "../data/water.structure.xyz")
 
 # Perform an SCF calculation to generate initial orbitals
 scf_solver = create("scf_solver")
-_, wfn_hf = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz")
+_, wfn_hf = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
+)
 
 # Select an active space
 active_space_selector = create(
@@ -88,7 +90,9 @@ print(f"QDK mapper produced {len(qdk_qubit_hamiltonian.pauli_strings)} Pauli ter
 from qdk_chemistry.data import Symmetries
 
 # Create an OpenFermion mapper with SCBK encoding
-scbk_mapper = create_algorithm("qubit_mapper", "openfermion", encoding="symmetry-conserving-bravyi-kitaev")
+scbk_mapper = create_algorithm(
+    "qubit_mapper", "openfermion", encoding="symmetry-conserving-bravyi-kitaev"
+)
 
 # Provide symmetries: the SCBK encoding needs active electron counts
 # Option 1: construct directly
@@ -100,6 +104,9 @@ symmetries = Symmetries.from_wavefunction(active_wfn)
 scbk_hamiltonian = scbk_mapper.run(hamiltonian, symmetries)
 
 # SCBK reduces the qubit count by 2 compared to JW or BK
-print(f"SCBK mapper: {scbk_hamiltonian.num_qubits} qubits (vs {qdk_qubit_hamiltonian.num_qubits} for JW)")
+print(
+    f"SCBK mapper: {scbk_hamiltonian.num_qubits} qubits "
+    f"(vs {qdk_qubit_hamiltonian.num_qubits} for JW)"
+)
 # end-cell-scbk-mapper
 ################################################################################

@@ -17,7 +17,9 @@ for algo_type, implementations in available().items():
 print_settings("scf_solver", "qdk")
 
 # Inspect settings programmatically
-for name, type_name, default, description, limits in inspect_settings("scf_solver", "qdk"):
+for name, type_name, default, description, limits in inspect_settings(
+    "scf_solver", "qdk"
+):
     print(f"{name} ({type_name}): {default}")
 
 # Create an instance and iterate over its settings
@@ -155,7 +157,9 @@ energy, wfn = scf.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="
 # Create a new instance for different settings
 scf2 = create("scf_solver")
 scf2.settings().set("method", "b3lyp")
-energy2, wfn2 = scf2.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz")  # type: ignore[name-defined]
+energy2, wfn2 = scf2.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
+)  # type: ignore[name-defined]
 # end-cell-settings-locked
 ################################################################################
 

@@ -11,6 +11,7 @@ import math
 
 import numpy as np
 import pytest
+
 from qdk_chemistry.utils.phase import (
     accumulated_phase_from_bits,
     energy_alias_candidates,

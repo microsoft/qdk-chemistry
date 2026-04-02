@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
+
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Ansatz, Structure
 

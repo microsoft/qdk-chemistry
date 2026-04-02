@@ -50,7 +50,9 @@ structure = Structure(
 )
 
 scf_solver = create("scf_solver")
-scf_energy, scf_wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+scf_energy, scf_wavefunction = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
 
 ########################################################################################
 # 2. Active-space Hamiltonian
@@ -91,4 +93,6 @@ qdk_qubit_ham_rt = qubit_operator_to_qubit_hamiltonian(qop, encoding="jordan-wig
 
 Logger.info("=== OpenFermion → QDK (round-trip check) ===")
 assert qdk_qubit_ham_rt.equiv(qdk_qubit_ham), "Round-trip mismatch!"
-Logger.info(f"  Round-trip check passed ({len(qdk_qubit_ham_rt.pauli_strings)} Pauli terms)")
+Logger.info(
+    f"  Round-trip check passed ({len(qdk_qubit_ham_rt.pauli_strings)} Pauli terms)"
+)
