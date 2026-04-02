@@ -33,6 +33,8 @@ Standard QFT-based Quantum Phase Estimation (:term:`QPE`)
 
 Phase estimation implementations include post-processing with automatic phase wrapping, energy alias detection and resolution, and full serialization of results.
 
+See :doc:`comprehensive/algorithms/phase_estimation` for detailed documentation on available implementations and usage, and :doc:`comprehensive/algorithms/time_evolution_builder` for the Hamiltonian simulation methods that underpin phase estimation.
+
 State Preparation
 """""""""""""""""
 
@@ -45,6 +47,7 @@ Sparse Isometry State Preparation
    Optimized algorithms for preparing quantum states with a small number of non-zero amplitudes, such as those arising from selected :term:`CI` methods.
 
 See :doc:`comprehensive/algorithms/state_preparation` for further details about available state preparation methods and implementations.
+The output circuits from state preparation are used as inputs to :doc:`phase estimation <comprehensive/algorithms/phase_estimation>` and :doc:`energy estimation <comprehensive/algorithms/energy_estimator>` algorithms.
 
 Implementation Highlights
 ~~~~~~~~~~~~~~~~~~~~~~~~~
