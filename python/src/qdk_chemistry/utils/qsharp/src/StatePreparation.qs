@@ -5,17 +5,23 @@
 namespace QDKChemistry.Utils.StatePreparation {
 
     import Std.Arrays.Subarray;
+    import Std.Canon.ApplyControlledOnBitString;
+    import Std.Measurement.MResetZ;
     import Std.StatePreparation.PreparePureStateD;
+    import Std.TableLookup.Select;
+    import QDKChemistry.Utils.BinaryEncoding.MatrixCompressionOp;
+    import QDKChemistry.Utils.BinaryEncoding.ApplyMatrixCompressionOp;
+
 
     /// A struct to hold parameters for state preparation.
     /// - `rowMap`: An array of integers representing the mapping of qubits to rows in the state vector.
     /// - `stateVector`: An array of doubles representing the amplitudes of the quantum state.
-    /// - `expansionOps`: An array of arrays of integers representing the operations to expand the state preparation (e.g., CNOTs, X gates).
+    /// - `expansionOps`: An array of MatrixCompressionOp representing the operations to expand the state preparation (e.g., CX, X gates).
     /// - `numQubits`: The number of qubits to allocate for the state preparation.
     struct StatePreparationParams {
         rowMap : Int[],
         stateVector : Double[],
-        expansionOps : Int[][],
+        expansionOps : MatrixCompressionOp[],
         numQubits : Int,
     }
 
@@ -31,14 +37,8 @@ namespace QDKChemistry.Utils.StatePreparation {
         qs : Qubit[],
     ) : Unit {
         PreparePureStateD(params.stateVector, Subarray(params.rowMap, qs));
-        for op in params.expansionOps {
-            if Length(op) == 2 {
-                CNOT(qs[op[0]], qs[op[1]]);
-            } elif Length(op) == 1 {
-                X(qs[op[0]]);
-            } else {
-                fail "Unsupported operation length in expansionOps.";
-            }
+        for gate in params.expansionOps {
+            ApplyMatrixCompressionOp(gate, qs);
         }
     }
 
@@ -56,14 +56,14 @@ namespace QDKChemistry.Utils.StatePreparation {
     /// # Parameters
     /// - `rowMap`: An array of integers representing the mapping of qubits to rows in the state vector.
     /// - `stateVector`: An array of doubles representing the amplitudes of the quantum state.
-    /// - `expansionOps`: An array of arrays of integers representing the operations to expand the state preparation (e.g., CNOTs, X gates).
+    /// - `expansionOps`: An array of MatrixCompressionOp representing the operations to expand the state preparation.
     /// - `numQubits`: The number of qubits to allocate for the state preparation.
     /// # Returns
     /// - `Unit`: The operation prepares the quantum state on the allocated qubits.
     operation MakeStatePreparationCircuit(
         rowMap : Int[],
         stateVector : Double[],
-        expansionOps : Int[][],
+        expansionOps : MatrixCompressionOp[],
         numQubits : Int,
     ) : Unit {
         use qs = Qubit[numQubits];

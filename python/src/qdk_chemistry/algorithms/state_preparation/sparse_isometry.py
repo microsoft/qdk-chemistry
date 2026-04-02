@@ -24,7 +24,7 @@ Algorithm Details:
 
 * SparseIsometryGF2X: Applies enhanced GF2+X elimination (preprocessing + GF2
   + postprocessing), performs dense state preparation on the reduced space,
-  then applies recorded operations (CNOT and X) in reverse to expand back to
+  then applies recorded operations (CX and X) in reverse to expand back to
   the full space.
 """
 
@@ -33,7 +33,8 @@ Algorithm Details:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 
@@ -65,14 +66,14 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
     the ``gf2x_with_tracking`` function which performs smart preprocessing
     before GF2 Gaussian elimination. The preprocessing includes:
 
-        1. Removing duplicate rows using CNOT operations
+        1. Removing duplicate rows using CX operations
         2. Removing all-ones rows using X operations
         3. Then performing standard GF2 Gaussian elimination
         4. Apply the additional rank reduction if the reduced row-echelon matrix is diagonal
 
     This enhanced approach can be more efficient than standard GF2 Gaussian elimination,
     particularly for matrices with duplicate rows or all-ones rows. The algorithm
-    tracks both CNOT and X operations for proper circuit reconstruction.
+    tracks both CX and X operations for proper circuit reconstruction.
 
     The algorithm:
 
@@ -80,7 +81,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         2. Converts bitstrings to a binary matrix
         3. Applies enhanced GF2+X elimination (duplicate removal + all-ones removal + GF2)
         4. Performs dense state preparation on the reduced space
-        5. Applies recorded operations (both CNOT and X) in reverse order to expand back to full space
+        5. Applies recorded operations (both CX and X) in reverse order to expand back to full space
 
     Key References:
 
@@ -149,23 +150,20 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             return self._qiskit_dense_preparation(gf2x_operation_results, statevector_data, n_qubits)
 
         # Use QDK dense state preparation
-        expansion_ops: list[list[int]] = []
+        expansion_ops: list[MatrixCompressionOp] = []
         for operation in reversed(gf2x_operation_results.operations):
-            if operation[0] == "cnot":
-                # operation[1] should be a tuple for CNOT operations
+            if operation[0] == "cx":
                 if isinstance(operation[1], tuple):
                     target, control = operation[1]
-                    expansion_ops.append([control, target])
+                    expansion_ops.append(MatrixCompressionOp("CX", [control, target]))
             elif operation[0] == "x" and isinstance(operation[1], int):
-                # operation[1] should be an int for X operations
-                qubit = operation[1]
-                expansion_ops.append([qubit])
+                expansion_ops.append(MatrixCompressionOp("X", [operation[1]]))
 
         # State vector indexing is in little-endian order, the row map is reversed for Q# convention
         state_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
             rowMap=gf2x_operation_results.row_map[::-1],
             stateVector=statevector_data.tolist(),
-            expansionOps=expansion_ops,
+            expansionOps=[op.to_dict() for op in expansion_ops],
             numQubits=n_qubits,
         )
 
@@ -210,8 +208,8 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         statevector = Statevector(statevector_data)
         qc.append(QiskitStatePreparation(statevector, normalize=False), gf2x_operation_results.row_map)
         for operation in reversed(gf2x_operation_results.operations):
-            if operation[0] == "cnot":
-                # operation[1] should be a tuple for CNOT operations
+            if operation[0] == "cx":
+                # operation[1] should be a tuple for CX operations
                 if isinstance(operation[1], tuple):
                     target, control = operation[1]
                     qc.cx(control, target)
@@ -260,7 +258,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         Logger.debug(f"Total operations: {len(gf2x_operation_results.operations)}")
 
         # Log operations by type
-        Logger.debug(f"CNOT operations: {[op for op in gf2x_operation_results.operations if op[0] == 'cnot']}")
+        Logger.debug(f"CX operations: {[op for op in gf2x_operation_results.operations if op[0] == 'cx']}")
         Logger.debug(f"X operations: {[op for op in gf2x_operation_results.operations if op[0] == 'x']}")
 
         # Step 3: Create statevector for the reduced matrix
@@ -442,7 +440,7 @@ class GF2XEliminationResult:
     operations: list[tuple[str, int | tuple[int, int]]]
     """List of operations in the form:
 
-        * ('cnot', (target_row, control_row)) for CNOT operations
+        * ('cx', (target_row, control_row)) for CX operations
         * ('x', row_index) for X operations on entire rows
 
     All indices refer to original matrix positions.
@@ -452,12 +450,50 @@ class GF2XEliminationResult:
     """Rank of the reduced matrix (number of non-zero rows)."""
 
 
-def gf2x_with_tracking(matrix: np.ndarray) -> GF2XEliminationResult:
+@dataclass
+class MatrixCompressionOp:
+    """A single gate in the compressed matrix-encoding circuit.
+
+    Mirrors the Q# ``MatrixCompressionOp`` struct.  Use :meth:`to_dict` to
+    produce a camelCase dict consumable by the Q# bridge.
+
+    Attributes:
+        name: Gate name (e.g. ``"CX"``, ``"CCX"``, ``"SELECT"``).
+        qubits: Qubit indices involved in the operation.
+        control_state: Integer encoding of the control state for multi-
+            controlled gates.  For ``SELECT``/``SELECT_AND``, this stores
+            the number of address qubits.
+        lookup_data: Boolean lookup table for ``SELECT`` operations;
+            empty list for all other gate types.
+
+    """
+
+    name: str
+    qubits: list[int]
+    control_state: int = 0
+    lookup_data: list[list[bool]] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to a camelCase dict matching the Q# ``MatrixCompressionOp`` struct."""
+        return {
+            "name": self.name,
+            "qubits": self.qubits,
+            "controlState": self.control_state,
+            "lookupData": self.lookup_data,
+        }
+
+
+def gf2x_with_tracking(
+    matrix: np.ndarray,
+    *,
+    skip_diagonal_reduction: bool = False,
+    staircase_mode: bool = False,
+) -> GF2XEliminationResult:
     """Perform enhanced GF2+X Gaussian elimination with smart preprocessing and X operations.
 
     This function implements a smarter approach to GF2 Gaussian elimination by:
 
-        1. First removing duplicate rows using CNOT operations
+        1. First removing duplicate rows using CX operations
         2. Removing all-ones rows using X operations
         3. Then performing standard Gaussian elimination
         4. Performing further reduction if the resulting matrix is diagonal
@@ -467,6 +503,17 @@ def gf2x_with_tracking(matrix: np.ndarray) -> GF2XEliminationResult:
 
     Args:
         matrix: shape (m, n), binary (0/1) matrix
+        skip_diagonal_reduction: If True, skip the optional diagonal-to-upper-
+            staircase rank reduction (step 4).  Binary encoding handles the
+            identity pivot block natively, so the extra CX + X expansion ops
+            produced by the diagonal reduction are redundant Cliffords.
+        staircase_mode: If True, perform forward-only GF2 elimination (REF)
+            then convert the pivot block directly to upper-staircase form
+            with minimal CX ops — skipping back-substitution entirely.
+            This produces a matrix that binary encoding's diagonal path
+            recognises as ``is_diagonal_reduced``, saving ``r-1`` CX gates
+            vs. the full RREF + staircase cascade.  Implies
+            ``skip_diagonal_reduction=True``.
 
     Returns:
         A dataclass containing GF2+X elimination results.
@@ -498,7 +545,7 @@ def gf2x_with_tracking(matrix: np.ndarray) -> GF2XEliminationResult:
     # Work on a copy to avoid modifying the input
     matrix_work = matrix.copy()
 
-    # Step 1: Remove duplicate rows using CNOT operations
+    # Step 1: Remove duplicate rows using CX operations
     matrix_work, row_map, operations = _remove_duplicate_rows_with_cnot(matrix_work, row_map, operations)
 
     # Step 2: Remove all-ones rows using X operations
@@ -506,33 +553,52 @@ def gf2x_with_tracking(matrix: np.ndarray) -> GF2XEliminationResult:
 
     # Step 3: Perform standard Gaussian elimination on the remaining matrix
     if matrix_work.shape[0] > 0:  # Only if there are rows left
-        # Convert CNOT operations to the format expected by Gaussian elimination
-        cnot_ops = []
-        for op in operations:
-            if op[0] == "cnot" and isinstance(op[1], tuple):
-                cnot_ops.append((op[1][0], op[1][1]))
+        if staircase_mode:
+            # Forward-only elimination → REF → direct staircase fill
+            matrix_processed, updated_row_map, new_cnot_ops = _perform_gaussian_elimination_forward_only(
+                matrix_work, row_map, []
+            )
 
-        # Perform Gaussian elimination
-        m_current, n_current = matrix_work.shape
-        matrix_processed, updated_row_map, updated_cnot_ops = _perform_gaussian_elimination(
-            matrix_work, m_current, n_current, row_map, cnot_ops
-        )
+            for target, control in new_cnot_ops:
+                operations.append(("cx", (target, control)))
 
-        # Update operations list with new CNOT operations from Gaussian elimination
-        for target, control in updated_cnot_ops[len(cnot_ops) :]:  # Only add new operations
-            operations.append(("cnot", (target, control)))
+            # Remove zero rows
+            matrix_reduced, reduced_row_map, rank = _remove_zero_rows(matrix_processed, updated_row_map)
 
-        # Remove zero rows and update row_map accordingly
-        matrix_reduced, reduced_row_map, rank = _remove_zero_rows(matrix_processed, updated_row_map)
+            if rank > 1:
+                # Convert REF pivot block directly to staircase form
+                matrix_reduced, reduced_row_map, operations = _ref_to_staircase(
+                    matrix_reduced, reduced_row_map, operations
+                )
 
-        gf2x_results = GF2XEliminationResult(
-            reduced_matrix=matrix_reduced, row_map=reduced_row_map, col_map=col_map, operations=operations, rank=rank
-        )
+            gf2x_results = GF2XEliminationResult(
+                reduced_matrix=matrix_reduced,
+                row_map=reduced_row_map,
+                col_map=col_map,
+                operations=operations,
+                rank=rank,
+            )
+        else:
+            matrix_processed, updated_row_map, new_cnot_ops = _perform_gaussian_elimination(matrix_work, row_map, [])
 
-        # Step 4: Check for diagonal matrix and apply further reduction if possible
-        if rank > 1 and _is_diagonal_matrix(matrix_reduced):
-            Logger.info(f"Detected diagonal matrix with rank {rank}, applying further reduction")
-            gf2x_results = _reduce_diagonal_matrix(matrix_reduced, reduced_row_map, col_map, operations)
+            for target, control in new_cnot_ops:
+                operations.append(("cx", (target, control)))
+
+            # Remove zero rows and update row_map accordingly
+            matrix_reduced, reduced_row_map, rank = _remove_zero_rows(matrix_processed, updated_row_map)
+
+            gf2x_results = GF2XEliminationResult(
+                reduced_matrix=matrix_reduced,
+                row_map=reduced_row_map,
+                col_map=col_map,
+                operations=operations,
+                rank=rank,
+            )
+
+            # Step 4: Check for diagonal matrix and apply further reduction if possible
+            if not skip_diagonal_reduction and rank > 1 and _is_diagonal_matrix(matrix_reduced):
+                Logger.info(f"Detected diagonal matrix with rank {rank}, applying further reduction")
+                gf2x_results = _reduce_diagonal_matrix(matrix_reduced, reduced_row_map, col_map, operations)
 
         # Log the final reduced matrix rank
         Logger.info(f"Final reduced matrix rank: {gf2x_results.rank}")
@@ -574,56 +640,34 @@ def _remove_duplicate_rows_with_cnot(
     operations_work = operations.copy()
 
     n_rows, _ = matrix_work.shape
-    rows_to_eliminate = []
+    rows_to_eliminate: set[int] = set()
 
-    # Find duplicate rows
+    # Find duplicate rows and XOR them to zero immediately
     for i in range(n_rows):
-        # Skip rows that are already marked for elimination
         if i in rows_to_eliminate:
             continue
 
-        row_i = matrix_work[i]
-
-        # Skip all-zero rows as they don't need CNOT operations
-        if np.all(row_i == 0):
+        if not np.any(matrix_work[i]):
             continue
 
-        # Look for duplicates of this row
         for j in range(i + 1, n_rows):
             if j in rows_to_eliminate:
                 continue
 
-            row_j = matrix_work[j]
-
-            # If rows are identical, eliminate the later one
-            if np.array_equal(row_i, row_j):
-                # CNOT(control=i, target=j) will make row j become all zeros
-                operations_work.append(("cnot", (row_map_work[j], row_map_work[i])))
-                rows_to_eliminate.append(j)
+            if np.array_equal(matrix_work[i], matrix_work[j]):
+                operations_work.append(("cx", (row_map_work[j], row_map_work[i])))
+                matrix_work[j] ^= matrix_work[i]
+                rows_to_eliminate.add(j)
 
                 Logger.info(
-                    f"Found duplicate row {j} identical to row {i}, adding CNOT({row_map_work[i]}, {row_map_work[j]})"
+                    f"Found duplicate row {j} identical to row {i}, adding CX({row_map_work[i]}, {row_map_work[j]})"
                 )
 
-    # Apply CNOT operations to eliminate duplicate rows
-    for op in operations_work:
-        if op[0] == "cnot" and isinstance(op[1], tuple):
-            # Find the current positions of the target and control rows
-            target_orig, control_orig = op[1]
-            target_current = row_map_work.index(target_orig)
-            control_current = row_map_work.index(control_orig)
-
-            # Apply CNOT: target row = target row XOR control row
-            matrix_work[target_current] = matrix_work[target_current] ^ matrix_work[control_current]
-
-    # Remove eliminated rows (which should now be all zeros)
+    # Remove eliminated rows (now all zeros)
     if rows_to_eliminate:
-        Logger.info(f"Eliminating {len(rows_to_eliminate)} duplicate rows: {rows_to_eliminate}")
+        Logger.info(f"Eliminating {len(rows_to_eliminate)} duplicate rows: {sorted(rows_to_eliminate)}")
 
-        # Create mask for rows to keep
         rows_to_keep = [i for i in range(n_rows) if i not in rows_to_eliminate]
-
-        # Update matrix and row mapping
         matrix_work = matrix_work[rows_to_keep]
         row_map_work = [row_map_work[i] for i in rows_to_keep]
 
@@ -684,193 +728,181 @@ def _remove_all_ones_rows_with_x(
 
 def _perform_gaussian_elimination(
     matrix: np.ndarray,
-    num_rows: int,
-    num_cols: int,
     row_map: list[int],
     cnot_ops: list[tuple[int, int]],
 ) -> tuple[np.ndarray, list[int], list[tuple[int, int]]]:
-    """Perform the main GF2 Gaussian elimination steps on a binary matrix.
-
-    This function implements the core algorithm of GF2 Gaussian elimination by iterating through columns,
-    finding pivot rows, swapping rows when necessary, and eliminating other entries in each column using XOR operations.
+    """Perform full GF2 Gaussian elimination (forward + back-substitution).
 
     Args:
-        matrix: Binary matrix to reduce (copied, not modified in-place)
-        num_rows: Number of rows in the matrix
-        num_cols: Number of columns in the matrix
-        row_map: Mapping from current to original row indices (copied, not modified)
-        cnot_ops: List to record CNOT operations (copied, not modified)
+        matrix: Binary matrix to reduce (copied internally).
+        row_map: Current-to-original row index mapping (copied internally).
+        cnot_ops: Existing CNOT operation list (copied internally).
 
     Returns:
-        A tuple containing ``(updated_matrix, updated_row_map, updated_operations)``
+        ``(reduced_matrix, updated_row_map, updated_cnot_ops)``
 
     """
     matrix_work = matrix.copy()
     row_map_work = row_map.copy()
     cnot_ops_work = cnot_ops.copy()
+    num_rows, num_cols = matrix_work.shape
 
-    row = 0  # current row
+    pivot_row = 0
     for col in range(num_cols):
-        # Find the first row (row >= current) with a 1 in this column
-        sel = _find_pivot_row(matrix_work, row, num_rows, col)
+        sel = _find_pivot_row(matrix_work, pivot_row, col)
         if sel is None:
             continue
 
-        # Swap current row and selected row if needed
-        if sel != row:
-            matrix_work[[row, sel], :] = matrix_work[[sel, row], :]
-            row_map_work[row], row_map_work[sel] = row_map_work[sel], row_map_work[row]
+        if sel != pivot_row:
+            matrix_work[[pivot_row, sel]] = matrix_work[[sel, pivot_row]]
+            row_map_work[pivot_row], row_map_work[sel] = row_map_work[sel], row_map_work[pivot_row]
 
-        # Eliminate all other rows (except the pivot row) in this column
-        matrix_work, cnot_ops_work = _eliminate_column(matrix_work, num_rows, row, col, row_map_work, cnot_ops_work)
+        _eliminate_column(matrix_work, pivot_row, col, row_map_work, cnot_ops_work)
 
-        # Move to next row
-        row += 1
-        if row == num_rows:
+        pivot_row += 1
+        if pivot_row == num_rows:
             break
 
     return matrix_work, row_map_work, cnot_ops_work
 
 
-def _find_pivot_row(matrix: np.ndarray, row: int, num_rows: int, col: int) -> int | None:
-    """Find the first row with a 1 in the given column for pivot selection.
-
-    This function searches for a suitable pivot row starting from the current row position downward.
-    It looks for the first row that has a 1 in the specified column,
-    which can be used as a pivot for Gaussian elimination.
+def _find_pivot_row(matrix: np.ndarray, start_row: int, col: int) -> int | None:
+    """Find the first row at or below ``start_row`` with a 1 in ``col``.
 
     Args:
-        matrix: Binary matrix to search (read-only, not modified)
-        row: Starting row index to search from (inclusive)
-        num_rows: Total number of rows in the matrix
-        col: Column index to check for pivot candidates
+        matrix: Binary matrix (read-only).
+        start_row: First row index to consider (inclusive).
+        col: Column to search.
 
     Returns:
-        Index of the first row with a 1 in the column, or None if no suitable pivot is found in the remaining rows.
-
-    Note:
-        This function only reads the matrix and does not modify any arguments.
-        It returns None when no pivot can be found, indicating the column should be skipped.
+        Row index of the first 1-entry, or ``None`` if the column is
+        all-zero from ``start_row`` downward.
 
     """
-    for r in range(row, num_rows):
-        if matrix[r, col]:
-            return r
-    return None
+    candidates = np.flatnonzero(matrix[start_row:, col])
+    return start_row + int(candidates[0]) if candidates.size > 0 else None
 
 
 def _eliminate_column(
     matrix: np.ndarray,
-    num_rows: int,
     pivot_row: int,
     col: int,
     row_map: list[int],
     cnot_ops: list[tuple[int, int]],
-) -> tuple[np.ndarray, list[tuple[int, int]]]:
-    """Eliminate all other rows in the given column using XOR operations.
+) -> None:
+    """Eliminate all other rows in ``col`` using XOR with the pivot row.
 
-    This function performs the elimination step of GF2 Gaussian elimination
-    by XORing the pivot row with all other rows that have a 1 in the current column.
+    Modifies ``matrix`` and ``cnot_ops`` **in place**.
 
     Args:
-        matrix: Binary matrix to modify (copied, not modified in-place)
-        num_rows: Number of rows in the matrix
-        pivot_row: Index of the pivot row (remains unchanged)
-        col: Column index to eliminate
-        row_map: Mapping from current to original row indices (read-only)
-        cnot_ops: List to record CNOT operations (copied, not modified)
-
-    Returns:
-        tuple[np.ndarray, list[tuple[int, int]]]: Tuple containing:
-
-            * ``updated_matrix``: Matrix after column elimination.
-            * ``updated_cnot_ops``: Updated list of CNOT operations.
+        matrix: Binary matrix (modified in place).
+        pivot_row: Index of the pivot row (unchanged).
+        col: Column to eliminate.
+        row_map: Current-to-original row index mapping (read-only).
+        cnot_ops: Destination list for recorded CNOT operations.
 
     """
-    matrix_work = matrix.copy()
-    cnot_ops_work = cnot_ops.copy()
-
-    for r in range(num_rows):
-        if r != pivot_row and matrix_work[r, col]:
-            matrix_work[r, :] ^= matrix_work[pivot_row, :]
-            # Record CNOT operation using original matrix indices
-            cnot_ops_work.append((row_map[r], row_map[pivot_row]))
-
-    return matrix_work, cnot_ops_work
+    targets = np.flatnonzero(matrix[:, col])
+    targets = targets[targets != pivot_row]
+    for r in targets:
+        matrix[r] ^= matrix[pivot_row]
+        cnot_ops.append((row_map[r], row_map[pivot_row]))
 
 
 def _remove_zero_rows(matrix: np.ndarray, row_map: list[int]) -> tuple[np.ndarray, list[int], int]:
-    """Remove zero rows from the matrix and update row mapping.
-
-    This function creates a new matrix containing only the non-zero rows from the input matrix,
-    along with an updated row mapping that tracks which original rows correspond to the rows in the reduced matrix.
+    """Remove all-zero rows from the matrix and update the row mapping.
 
     Args:
-        matrix: Binary matrix to process (read-only, not modified)
-        row_map: Current mapping from matrix rows to original indices (read-only)
+        matrix: Binary matrix (read-only).
+        row_map: Current-to-original row index mapping (read-only).
 
     Returns:
-        tuple[np.ndarray, list[int], int]: Tuple containing:
-
-            * ``matrix_reduced``: New matrix with only non-zero rows.
-            * ``reduced_row_map``: Updated mapping from reduced matrix rows to original indices.
-            * ``rank``: Number of non-zero rows (matrix rank).
-
-    Note:
-        This function does not modify its input arguments. It creates and returns
-        new objects containing only the non-zero rows and their corresponding mappings.
+        ``(matrix_reduced, reduced_row_map, rank)`` where ``rank`` is the
+        number of retained (non-zero) rows.
 
     """
-    n_rows, _ = matrix.shape
-    non_zero_rows = []
-    reduced_row_map = []
-
-    for i in range(n_rows):
-        if not np.all(matrix[i, :] == 0):  # Keep non-zero rows
-            non_zero_rows.append(i)
-            reduced_row_map.append(row_map[i])
-
-    # Extract only non-zero rows
-    matrix_reduced = matrix[non_zero_rows, :]
-    rank = len(non_zero_rows)
-
-    return matrix_reduced, reduced_row_map, rank
+    non_zero_indices = np.flatnonzero(np.any(matrix, axis=1))
+    return (
+        matrix[non_zero_indices],
+        [row_map[i] for i in non_zero_indices],
+        int(non_zero_indices.size),
+    )
 
 
-def _reduce_diagonal_matrix(
+def _perform_gaussian_elimination_forward_only(
     matrix: np.ndarray,
     row_map: list[int],
-    col_map: list[int],
-    operations: list[tuple[str, int | tuple[int, int]]],
-) -> GF2XEliminationResult:
-    """Further reduce a diagonal matrix using CNOT and X operations.
+    cnot_ops: list[tuple[int, int]],
+) -> tuple[np.ndarray, list[int], list[tuple[int, int]]]:
+    """Perform forward-only GF2 Gaussian elimination (no back-substitution).
 
-    This function handles the special case where the matrix is diagonal
-    (square matrix with 1s on diagonal and 0s elsewhere). It applies
-    sequential CNOT operations to create an all-ones row, then uses
-    an X operation to eliminate it, reducing the rank by 1.
-
-    Procedure:
-
-        1. Apply CNOT(i, i+1) sequentially for i = 0 to rank-2
-        2. This makes the last row (rank-1) become all 1s
-        3. Apply X on the last row to make it all 0s
-        4. Remove the zero row to reduce rank by 1
+    Produces an upper-triangular (row echelon form) matrix rather than RREF.
+    Back-substitution is skipped so that binary encoding's staircase
+    conversion can be applied directly to the REF pivot block.
 
     Args:
-        matrix: Diagonal binary matrix to reduce
-        row_map: Current row mapping to original indices
-        col_map: Column mapping to original indices (unchanged)
-        operations: List of operations performed so far
+        matrix: Binary matrix to reduce (copied internally).
+        row_map: Current-to-original row index mapping (copied internally).
+        cnot_ops: Existing CNOT operation list (copied internally).
 
     Returns:
-        A tuple containing:
+        ``(reduced_matrix, updated_row_map, updated_cnot_ops)``
 
-            * matrix_reduced: Further reduced matrix with rank decreased by 1
-            * reduced_row_map: Updated row mapping (last row removed)
-            * col_map: Unchanged column mapping
-            * updated_operations: Operations list with new CNOT and X operations
-            * new_rank: Original rank - 1
+    """
+    matrix_work = matrix.copy()
+    row_map_work = row_map.copy()
+    cnot_ops_work = cnot_ops.copy()
+    num_rows, num_cols = matrix_work.shape
+
+    pivot_row = 0
+    for col in range(num_cols):
+        sel = _find_pivot_row(matrix_work, pivot_row, col)
+        if sel is None:
+            continue
+
+        if sel != pivot_row:
+            matrix_work[[pivot_row, sel]] = matrix_work[[sel, pivot_row]]
+            row_map_work[pivot_row], row_map_work[sel] = row_map_work[sel], row_map_work[pivot_row]
+
+        # Eliminate only rows BELOW the pivot (forward elimination only)
+        below = np.flatnonzero(matrix_work[pivot_row + 1 :, col]) + pivot_row + 1
+        for r in below:
+            matrix_work[r] ^= matrix_work[pivot_row]
+            cnot_ops_work.append((row_map_work[r], row_map_work[pivot_row]))
+
+        pivot_row += 1
+        if pivot_row == num_rows:
+            break
+
+    return matrix_work, row_map_work, cnot_ops_work
+
+
+def _ref_to_staircase(
+    matrix: np.ndarray,
+    row_map: list[int],
+    operations: list[tuple[str, int | tuple[int, int]]],
+) -> tuple[np.ndarray, list[int], list[tuple[str, int | tuple[int, int]]]]:
+    """Convert a REF (upper-triangular) pivot block to upper-staircase form.
+
+    For each above-diagonal entry ``(i, pivot_col_j)`` where ``j > i``:
+
+    * If the entry is already 1, it's correct — do nothing.
+    * If the entry is 0, apply CX(control=row_j, target=row_i) to set it to 1.
+
+    Processing columns left-to-right guarantees that side effects on later
+    columns are absorbed when we reach them.
+
+    After this transform the pivot sub-matrix equals ``np.triu(ones(r, r))``
+    which binary encoding's ``_is_diagonal_reduction_shape`` recognises,
+    allowing it to skip its own CX cascade.
+
+    Args:
+        matrix: REF binary matrix (rank x n_cols).
+        row_map: Current row-to-original-qubit mapping.
+        operations: Existing operations list to extend.
+
+    Returns:
+        ``(matrix, row_map, operations)`` — updated in place.
 
     """
     matrix_work = matrix.copy()
@@ -879,121 +911,103 @@ def _reduce_diagonal_matrix(
 
     rank = matrix_work.shape[0]
 
-    # Verify this is actually a diagonal matrix
-    if not _is_diagonal_matrix(matrix_work):
-        Logger.warn("Matrix is not diagonal, skipping diagonal reduction")
-        return GF2XEliminationResult(
-            reduced_matrix=matrix_work, row_map=row_map_work, col_map=col_map, operations=operations_work, rank=rank
-        )
+    # Identify pivot columns
+    pivot_cols: list[int] = []
+    for r in range(rank):
+        nz = np.flatnonzero(matrix_work[r])
+        if nz.size > 0:
+            pivot_cols.append(int(nz[0]))
 
-    Logger.info(f"Applying diagonal matrix reduction on {rank}x{rank} matrix")
+    # Fill above-diagonal entries in pivot columns to reach staircase form
+    for j_idx in range(1, len(pivot_cols)):
+        pc = pivot_cols[j_idx]
+        for i_idx in range(j_idx):
+            if not matrix_work[i_idx, pc]:
+                # Need to set this entry to 1: CX(control=row_j, target=row_i)
+                matrix_work[i_idx] ^= matrix_work[j_idx]
+                operations_work.append(("cx", (row_map_work[i_idx], row_map_work[j_idx])))
 
-    # Step 1: Apply sequential CNOT operations CNOT(i, i+1) for i = 0 to rank-2
+    return matrix_work, row_map_work, operations_work
+
+
+def _reduce_diagonal_matrix(
+    matrix: np.ndarray,
+    row_map: list[int],
+    col_map: list[int],
+    operations: list[tuple[str, int | tuple[int, int]]],
+) -> GF2XEliminationResult:
+    """Reduce a diagonal (identity) matrix by one rank via CX cascade + X.
+
+    Applies CX(i, i+1) for i = 0…rank-2, making the last row all-ones,
+    then X on the last row to zero it, and finally removes that row.
+
+    The caller is responsible for verifying ``_is_diagonal_matrix`` first.
+
+    Args:
+        matrix: Diagonal binary matrix to reduce.
+        row_map: Current row mapping to original indices.
+        col_map: Column mapping (passed through unchanged).
+        operations: Operations list to extend.
+
+    Returns:
+        :class:`GF2XEliminationResult` with rank decremented by 1.
+
+    """
+    matrix_work = matrix.copy()
+    row_map_work = row_map.copy()
+    operations_work = operations.copy()
+    rank = matrix_work.shape[0]
+
+    Logger.info(f"Applying diagonal matrix reduction on {rank}x{matrix_work.shape[1]} matrix")
+
+    # Sequential CX(i, i+1) accumulates all 1s into the last row
     for i in range(rank - 1):
-        control_idx = i
-        target_idx = i + 1
+        operations_work.append(("cx", (row_map_work[i + 1], row_map_work[i])))
+        matrix_work[i + 1] ^= matrix_work[i]
 
-        # Record CNOT operation using original row indices
-        operations_work.append(
-            (
-                "cnot",
-                (row_map_work[target_idx], row_map_work[control_idx]),
-            )
-        )
+    # X on the all-ones last row zeroes it
+    operations_work.append(("x", row_map_work[rank - 1]))
 
-        # Apply CNOT: target row = target row XOR control row
-        matrix_work[target_idx] = matrix_work[target_idx] ^ matrix_work[control_idx]
-
-        Logger.info(f"Applied CNOT({row_map_work[control_idx]}, {row_map_work[target_idx]})")
-
-    # After all CNOTs, the last row should be all 1s
-    last_row = rank - 1
-    Logger.info(f"Last row after CNOTs: {matrix_work[last_row]}")
-
-    # Step 2: Apply X operation on the last row to make it all 0s
-    operations_work.append(("x", row_map_work[last_row]))
-    matrix_work[last_row] = np.zeros(matrix_work.shape[1], dtype=matrix_work.dtype)
-
-    Logger.info(f"Applied X operation on row {row_map_work[last_row]}")
-
-    # Step 3: Remove the last row (which is now all zeros)
-    matrix_reduced = matrix_work[:-1, :]  # Remove last row
-    reduced_row_map = row_map_work[:-1]  # Remove last row mapping
-    new_rank = rank - 1
-
-    Logger.info(f"Diagonal reduction complete: rank reduced from {rank} to {new_rank}")
+    Logger.info(f"Diagonal reduction complete: rank reduced from {rank} to {rank - 1}")
 
     return GF2XEliminationResult(
-        reduced_matrix=matrix_reduced,
-        row_map=reduced_row_map,
+        reduced_matrix=matrix_work[:-1],
+        row_map=row_map_work[:-1],
         col_map=col_map,
         operations=operations_work,
-        rank=new_rank,
+        rank=rank - 1,
     )
 
 
 def _is_diagonal_matrix(matrix: np.ndarray) -> bool:
-    """Check if a binary matrix is diagonal and safe for a further rank reduction.
+    """Check if a binary matrix is diagonal and safe for rank reduction.
 
-    The diagonal reduction optimization is mathematically valid in two scenarios:
+    Two accepted shapes:
 
-        1. True diagonal matrix: Square matrix with 1s on diagonal, 0s elsewhere
-        2. Pseudo-diagonal: Rectangular matrix where:
-            * The square part (min(rows,cols) x min(rows,cols)) is diagonal
-            * ALL remaining columns are all 1s
-            * We have an odd number of rows
-
-    The rank reduction works by applying sequential CNOTs and an X operation,
-    which is only valid when these specific structural conditions are met.
-    We also require rank > 1 since rank 1 matrices are already minimal.
+    1. **Square identity**: ``matrix == np.eye(r)``.
+    2. **Pseudo-diagonal** (more columns than rows, odd row count):
+       the leading ``r x r`` block is identity and every extra column
+       is all-ones.
 
     Args:
-        matrix: Binary matrix to check
+        matrix: Binary matrix to check.
 
     Returns:
-        True if matrix is diagonal and safe for rank reduction, False otherwise
+        ``True`` if the matrix matches one of the accepted shapes.
 
     """
-    # Check basic requirements
-    if matrix.ndim != 2 or matrix.shape[0] <= 1 or not np.array_equal(matrix & 1, matrix):
+    if matrix.ndim != 2 or matrix.shape[0] <= 1:
         return False
 
     num_rows, num_cols = matrix.shape
+    identity = np.eye(num_rows, dtype=matrix.dtype)
 
-    # Scenario 1: True diagonal matrix (square)
     if num_rows == num_cols:
-        is_diagonal = True
-        for row_idx in range(num_rows):
-            for col_idx in range(num_rows):
-                expected_value = 1 if row_idx == col_idx else 0
-                if matrix[row_idx, col_idx] != expected_value:
-                    is_diagonal = False
-                    break
-            if not is_diagonal:
-                break
-        if is_diagonal:
-            return True
+        return bool(np.array_equal(matrix, identity))
 
-    # Scenario 2: Pseudo-diagonal (rectangular with more columns than rows)
-    # ONLY valid when: remaining columns are ALL 1s AND odd number of rows
-    elif num_cols > num_rows and num_rows % 2 == 1:
-        # Check the square part is diagonal
-        square_part = matrix[:num_rows, :num_rows]
-        is_square_diagonal = True
-        for row_idx in range(num_rows):
-            for col_idx in range(num_rows):
-                expected_value = 1 if row_idx == col_idx else 0
-                if square_part[row_idx, col_idx] != expected_value:
-                    is_square_diagonal = False
-                    break
-            if not is_square_diagonal:
-                break
-
-        # If square part is diagonal, check remaining columns are all 1s
-        if is_square_diagonal:
-            remaining_columns = matrix[:, num_rows:]
-            if np.all(remaining_columns == 1):
-                return True
-
-    # All other cases: not safe for diagonal reduction
-    return False
+    return (
+        num_cols > num_rows
+        and num_rows % 2 == 1
+        and bool(np.array_equal(matrix[:, :num_rows], identity))
+        and bool(np.all(matrix[:, num_rows:] == 1))
+    )

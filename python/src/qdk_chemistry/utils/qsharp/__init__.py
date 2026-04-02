@@ -7,40 +7,25 @@
 from pathlib import Path
 
 import qdk
-from qdk import qsharp
+import qsharp
+from qdk import init as qdk_init
+from qsharp._qsharp import get_config as get_qdk_profile_config
+
+from qdk_chemistry.utils import Logger
 
 __all__ = ["QSHARP_UTILS"]
 
-_QS_FILES = [
-    Path(__file__).parent / "StatePreparation.qs",
-    Path(__file__).parent / "IterativePhaseEstimation.qs",
-    Path(__file__).parent / "ControlledPauliExp.qs",
-    Path(__file__).parent / "MeasurementBasis.qs",
-]
+# Initialize Q# interpreter
+qdk_config = get_qdk_profile_config()
+_QDK_INTERPRETER_PROFILE = qdk_config.get_target_profile()
+if _QDK_INTERPRETER_PROFILE == "unrestricted":  # Default by Q# if not set
+    _QDK_INTERPRETER_PROFILE = qsharp.TargetProfile.Adaptive_RIF
+    Logger.debug(
+        f"QDK interpreter profile initialized to '{_QDK_INTERPRETER_PROFILE}'. "
+        "If you imported Q# code before this module was loaded, please re-import it, "
+        "or set your target profile before importing qdk_chemistry."
+    )
 
-
-def get_qsharp_utils():
-    """Returns the Q# namespace for chemistry operations (lazy-loaded)."""
-    try:
-        return qdk.code.QDKChemistry.Utils
-    except AttributeError:
-        code = "\n".join(f.read_text() for f in _QS_FILES)
-        qsharp.eval(code)
-        return qdk.code.QDKChemistry.Utils
-
-
-class _QSharpUtilsProxy:
-    """Lightweight proxy that lazily resolves the Q# utilities namespace."""
-
-    def __getattr__(self, name: str):
-        """Load Q# code (if necessary) and resolve *name* on the utilities namespace.
-
-        Args:
-            name: The name of the attribute being accessed on the Q# utilities namespace.
-
-        """
-        utils = get_qsharp_utils()
-        return getattr(utils, name)
-
-
-QSHARP_UTILS = _QSharpUtilsProxy()
+_QS_DIR = Path(__file__).parent
+qdk_init(project_root=_QS_DIR, target_profile=_QDK_INTERPRETER_PROFILE)
+QSHARP_UTILS = qdk.code.QDKChemistry.Utils

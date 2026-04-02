@@ -11,6 +11,9 @@ quantum states from classical wavefunctions.
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     SparseIsometryGF2XStatePreparation,
 )
+from qdk_chemistry.algorithms.state_preparation.sparse_isometry_binary_encoding import (
+    SparseIsometryBinaryEncodingStatePreparation,
+)
 from qdk_chemistry.algorithms.state_preparation.state_preparation import (
     StatePreparation,
     StatePreparationFactory,
@@ -18,6 +21,7 @@ from qdk_chemistry.algorithms.state_preparation.state_preparation import (
 )
 
 __all__ = [
+    "SparseIsometryBinaryEncodingStatePreparation",
     "SparseIsometryGF2XStatePreparation",
     "StatePreparationFactory",
     "StatePreparationSettings",

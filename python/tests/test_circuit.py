@@ -128,7 +128,7 @@ class TestGetQsharpCircuit:
         state_prep_params = {
             "rowMap": [1, 0],
             "stateVector": [0.6, 0.0, 0.0, 0.8],
-            "expansionOps": [[2]],
+            "expansionOps": [{"name": "X", "qubits": [2], "controlState": 0, "lookupData": []}],
             "numQubits": 4,
         }
         qsharp_factory = QsharpFactoryData(
