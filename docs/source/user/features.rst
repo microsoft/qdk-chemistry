@@ -47,7 +47,6 @@ Sparse Isometry State Preparation
    Optimized algorithms for preparing quantum states with a small number of non-zero amplitudes, such as those arising from selected :term:`CI` methods.
 
 See :doc:`comprehensive/algorithms/state_preparation` for further details about available state preparation methods and implementations.
-The output circuits from state preparation are used as inputs to :doc:`phase estimation <comprehensive/algorithms/phase_estimation>` and :doc:`energy estimation <comprehensive/algorithms/energy_estimator>` algorithms.
 
 Implementation Highlights
 ~~~~~~~~~~~~~~~~~~~~~~~~~
