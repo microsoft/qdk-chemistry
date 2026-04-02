@@ -18,8 +18,13 @@ This directory contains example scripts demonstrating how to use QDK/Chemistry f
 
 ## Prerequisites
 
-The base `pip install qdk-chemistry` is sufficient for importing the library, but running the examples requires additional dependencies.
-The table below summarizes which [optional extras](https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md#optional-extras) or packages are needed for each example:
+If you installed with `pip install 'qdk-chemistry[all]'` (recommended), you already have the dependencies for most examples. The only extras not included in `[all]` are PennyLane and RDKit:
+
+```bash
+python -m pip install pennylane rdkit
+```
+
+If you used a minimal install instead, the table below shows which [optional extras](https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md#optional-extras) each example needs:
 
 | Example | Install command |
 |---------|----------------|

@@ -44,8 +44,8 @@ _qubit_hamiltonian = _qdk_mapper.run(_hamiltonian)
 # start-cell-model-fermionic
 from qdk_chemistry.data import LatticeGraph  # noqa: E402
 from qdk_chemistry.utils.model_hamiltonians import (  # noqa: E402
-    create_huckel_hamiltonian,
     create_hubbard_hamiltonian,
+    create_huckel_hamiltonian,
     create_ppp_hamiltonian,
     ohno_potential,
 )
@@ -71,8 +71,8 @@ ham = create_ppp_hamiltonian(ring, epsilon=0.0, t=2.4, U=11.26, V=V, z=1.0)
 ################################################################################
 # start-cell-model-spin
 from qdk_chemistry.utils.model_hamiltonians import (  # noqa: E402
-    create_ising_hamiltonian,
     create_heisenberg_hamiltonian,
+    create_ising_hamiltonian,
 )
 
 # Transverse-field Ising model (ZZ coupling + transverse X field)
@@ -108,7 +108,9 @@ qubit_hamiltonian = _qubit_hamiltonian  # alias for display
 
 ################################################################################
 # start-cell-trotter
-from qdk_chemistry.algorithms.time_evolution.builder.trotter import Trotter  # noqa: E402
+from qdk_chemistry.algorithms.time_evolution.builder.trotter import (
+    Trotter,  # noqa: E402
+)
 
 builder = Trotter(order=2, target_accuracy=1e-3, error_bound="commutator")
 unitary = builder.run(qubit_hamiltonian, time=1.0)
