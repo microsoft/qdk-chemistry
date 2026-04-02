@@ -170,70 +170,136 @@ env = [
 
 [tool.ruff]
 line-length = 120
+# Vendored and infrastructure directories — not part of the Python package.
+# These are excluded because --config in pre-commit applies this config to all
+# files (not just python/), and these dirs were never under the full rule set.
+exclude = ["external", ".github", ".pipelines"]
 
 [tool.ruff.format]
-indent-style = 'space'
-quote-style = 'double'
+indent-style = "space"
+quote-style = "double"
 
 [tool.ruff.lint]
 ignore = [
-  'D203',  # Incompatible with D211 `no-blank-line-before-class`
-  'D213',  # Incompatible with D212 `multi-line-summary-second-line`
-  'D401',  # non-imperative-mood
-  'PLR0912',  # too-many-branches
-  'PLR0913',  # too-many-arguments
-  'PLR0915',  # too-many-statements
-  'PLR2004',  # magic-value-comparison
-  'INP001'  # Allow __init__.py files without PEP 420 compliance
+  "D203",     # Incompatible with D211 `no-blank-line-before-class`
+  "D213",     # Incompatible with D212 `multi-line-summary-second-line`
+  "D401",     # non-imperative-mood
+  "PLR0912",  # too-many-branches
+  "PLR0913",  # too-many-arguments
+  "PLR0915",  # too-many-statements
+  "PLR2004",  # magic-value-comparison
+  "INP001",   # Allow __init__.py files without PEP 420 compliance
 ]
 select = [
-  'ARG',  # flake8-unused-argument
-  'TC',  # flake8-type-checking
-  'SIM',  # flake8-simplify
-  'SLF',  # flake8-self
-  'RET',  # flake8-return
-  'RSE',  # flake8-raise
-  'INP',  # flake8-no-pep420
-  'A',  # flake8-builtins
-  'B',  # flake8-bugbear
-  'BLE',  # flake8-blind-except
-  'I',  # isort
-  'NPY',  # numpy-rules
-  'N',  # pep8-naming
-  'E',  # pycodecstyle-error
-  'W',  # pycodecstyle-warning
-  'D',  # pydocstyle
-  'F',  # pyflakes
-  'PL',  # pylint
-  'RUF',  # ruff
-  'UP',
-  'C4',
-  'DTZ',
-  'T10',
-  'PIE',
-  'PT',
-  'ERA'
+  "ARG",  # flake8-unused-argument
+  "TC",   # flake8-type-checking
+  "SIM",  # flake8-simplify
+  "SLF",  # flake8-self
+  "RET",  # flake8-return
+  "RSE",  # flake8-raise
+  "INP",  # flake8-no-pep420
+  "A",    # flake8-builtins
+  "B",    # flake8-bugbear
+  "BLE",  # flake8-blind-except
+  "I",    # isort
+  "NPY",  # numpy-rules
+  "N",    # pep8-naming
+  "E",    # pycodecstyle-error
+  "W",    # pycodecstyle-warning
+  "D",    # pydocstyle
+  "F",    # pyflakes
+  "PL",   # pylint
+  "RUF",  # ruff
+  "UP",
+  "C4",
+  "DTZ",
+  "T10",
+  "PIE",
+  "PT",
+  "ERA",
 ]
 
 [tool.ruff.lint.per-file-ignores]
+# Sphinx conf.py and doc helper scripts
 "**/docs/*" = [
-  "INP001",  # Ignore __init__.py in docs directory
-  "A001",  # Variable `copyright` is shadowing a Python builtin
+  "A001",    # Variable `copyright` shadows a builtin
   "ARG001",  # Unused function argument
-  "D103"  # Missing docstring in public function
+  "D100",    # Missing module docstring
+  "D103",    # Missing function docstring
+  "E501",    # Line too long (Sphinx config has long URLs)
+  "INP001",  # Not a package
+  "PLC0415", # import not at top level (lazy imports in Sphinx hooks)
+  "RET504",  # Unnecessary assignment before return
+]
+# Documentation examples are literate scripts: imports are interleaved with
+# explanatory code, names may be re-defined across sections, and the code is
+# meant to be read, not maintained as production source.
+"**/docs/source/_static/examples/**/*.py" = [
+  "ARG002",  # Unused method argument (stub implementations)
+  "B007",    # Loop control variable not used (demo loops)
+  "B018",    # Useless expression (demonstrating attribute access)
+  "B904",    # raise … from (pedagogical, not production)
+  "D101",    # Missing class docstring
+  "D102",    # Missing method docstring
+  "D103",    # Missing function docstring
+  "D107",    # Missing __init__ docstring
+  "E402",    # Module-level import not at top of file
+  "ERA001",  # Commented-out code (showing alternatives)
+  "F811",    # Redefinition of unused name from line N
+  "F821",    # Undefined name (cross-section references)
+  "RET504",  # Unnecessary assignment before return (clearer pedagogically)
+  "RUF003",  # Ambiguous unicode in comment
+  "SIM118",  # Use `key in dict` (verbose form is clearer in examples)
+  "TC002",   # Move import into type-checking block
+]
+"**/examples/*.py" = [
+  "ARG002",
+  "B007",
+  "B018",
+  "B904",
+  "D101",
+  "D102",
+  "D103",
+  "D107",
+  "E402",
+  "ERA001",
+  "F811",
+  "F821",
+  "RET504",
+  "RUF003",
+  "SIM118",
+  "TC002",
+]
+"**/examples/**/*.py" = [
+  "ARG002",
+  "B007",
+  "B018",
+  "B904",
+  "D101",
+  "D102",
+  "D103",
+  "D107",
+  "E402",
+  "ERA001",
+  "F811",
+  "F821",
+  "RET504",
+  "RUF003",
+  "SIM118",
+  "TC002",
 ]
 "**/tests/*" = [
-  "D101",  # undocumented-public-class
-  "D102",  # Missing docstring in public method
-  "D103",  # Missing docstring in public function
-  "D107",  # Missing docstring in `__init__`
-  "SLF001"  # Private member accessed
+  "D101",    # undocumented-public-class
+  "D102",    # Missing docstring in public method
+  "D103",    # Missing docstring in public function
+  "D107",    # Missing docstring in `__init__`
+  "SLF001",  # Private member accessed
 ]
 "**/tests/test_data/*.py" = [
-  "INP001"  # Standalone scripts to create test data, not part of a package
+  "INP001",  # Standalone scripts to create test data, not part of a package
 ]
 "__init__.py" = [
-  "F401"  # imported but unused; consider removing
+  "F401",  # imported but unused; consider removing
 ]
 
 # Scikit-build-core configuration

@@ -26,8 +26,8 @@ sparse_prep.settings().set("transpile_optimization_level", 3)
 
 ################################################################################
 # start-cell-run
-import numpy as np  # noqa: E402
-from qdk_chemistry.data import Structure  # noqa: E402
+import numpy as np
+from qdk_chemistry.data import Structure
 
 # Specify a structure
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
@@ -36,9 +36,7 @@ structure = Structure(coords, symbols=symbols)
 
 # Run scf
 scf_solver = create("scf_solver")
-E_scf, wfn_scf = scf_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
-)
+E_scf, wfn_scf = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
 
 # Compute the Hamiltonian
 hamiltonian_constructor = create("hamiltonian_constructor")
@@ -58,7 +56,7 @@ print(f"Sparse isometry circuit:\n{sparse_circuit.get_qsharp_circuit()}")
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 print(registry.available("state_prep"))
 # ['sparse_isometry_gf2x', 'qiskit_regular_isometry']

@@ -175,14 +175,10 @@ def run_iterative_exact_qpe(
 ########################################################################################
 # 1. QDK/Chemistry calculation for H₂ (0.76 Å, STO-3G)
 ########################################################################################
-structure = Structure(
-    np.array([[0.0, 0.0, -0.72], [0.0, 0.0, 0.72]], dtype=float), ["H", "H"]
-)  # Geometry in bohr
+structure = Structure(np.array([[0.0, 0.0, -0.72], [0.0, 0.0, 0.72]], dtype=float), ["H", "H"])  # Geometry in bohr
 
 scf_solver = create("scf_solver")
-scf_energy, scf_wavefunction = scf_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
-)
+scf_energy, scf_wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
 
 
 ########################################################################################
@@ -201,9 +197,7 @@ active_hamiltonian = constructor.run(selected_wavefunction.get_orbitals())
 
 n_alpha = n_beta = ACTIVE_ELECTRONS // 2
 mc_calculator = create("multi_configuration_calculator")
-casci_energy, casci_wavefunction = mc_calculator.run(
-    active_hamiltonian, n_alpha, n_beta
-)
+casci_energy, casci_wavefunction = mc_calculator.run(active_hamiltonian, n_alpha, n_beta)
 
 core_energy = active_hamiltonian.get_core_energy()
 
@@ -217,16 +211,12 @@ Logger.info(f"  CASCI total energy: {casci_energy: .8f} Hartree")
 ########################################################################################
 qubit_mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
 qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
-qubit_pauli_op = SparsePauliOp(
-    qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients
-)
+qubit_pauli_op = SparsePauliOp(qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients)
 num_spin_orbitals = qubit_hamiltonian.num_qubits
 
 top_configurations = casci_wavefunction.get_top_determinants(max_determinants=2)
 pmc = create("projected_multi_configuration_calculator")
-E_sparse, sparse_wavefunction = pmc.run(
-    active_hamiltonian, list(top_configurations.keys())
-)
+E_sparse, sparse_wavefunction = pmc.run(active_hamiltonian, list(top_configurations.keys()))
 
 sparse_state_prep = create("state_prep", algorithm_name="sparse_isometry_gf2x")
 state_prep = sparse_state_prep.run(sparse_wavefunction).get_qiskit_circuit()
@@ -238,10 +228,7 @@ state_prep = transpile(
 )
 state_prep.name = "casci_sparse_isometry"
 
-Logger.info(
-    "\nSparse-isometry state preparation circuit:\n"
-    + str(state_prep.draw(output="text"))
-)
+Logger.info("\nSparse-isometry state preparation circuit:\n" + str(state_prep.draw(output="text")))
 
 ########################################################################################
 # 4. Build and run the Qiskit iterative QPE circuit
@@ -277,15 +264,11 @@ phase_angle_measured = result.phase_angle
 phase_angle_canonical = result.canonical_phase_angle
 raw_energy = result.raw_energy
 candidate_energies = result.branching
-estimated_electronic_energy = (
-    result.resolved_energy if result.resolved_energy is not None else raw_energy
-)
+estimated_electronic_energy = result.resolved_energy if result.resolved_energy is not None else raw_energy
 estimated_total_energy = estimated_electronic_energy + core_energy
 
 Logger.info(f"Measured bits (MSB → LSB): {list(result.bits_msb_first or [])}")
-Logger.info(
-    f"Phase fraction φ (measured): {result.phase_fraction:.6f} (angle = {phase_angle_measured:.6f} rad)"
-)
+Logger.info(f"Phase fraction φ (measured): {result.phase_fraction:.6f} (angle = {phase_angle_measured:.6f} rad)")
 if not np.isclose(result.phase_fraction, result.canonical_phase_fraction):
     Logger.info(
         f"Canonical phase fraction φ: {result.canonical_phase_fraction:.6f} (angle = {phase_angle_canonical:.6f} rad)",

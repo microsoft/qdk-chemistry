@@ -9,7 +9,6 @@ import json
 import tempfile
 
 import numpy as np
-
 from qdk_chemistry.data import QubitHamiltonian
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 

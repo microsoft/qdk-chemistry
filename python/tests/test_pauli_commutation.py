@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
-
 from qdk_chemistry.data import QubitHamiltonian
 from qdk_chemistry.utils.pauli_commutation import (
     commutator_bound_first_order,

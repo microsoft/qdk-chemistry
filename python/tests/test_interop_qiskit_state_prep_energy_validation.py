@@ -9,7 +9,6 @@ from itertools import combinations
 
 import numpy as np
 import pytest
-
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import SparseIsometryGF2XStatePreparation
 from qdk_chemistry.data import Circuit

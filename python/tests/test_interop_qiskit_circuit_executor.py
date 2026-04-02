@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
-
 from qdk_chemistry.data import Circuit, QuantumErrorProfile
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER
 

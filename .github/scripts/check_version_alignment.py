@@ -32,6 +32,7 @@ def check_versions() -> int:
 
     Returns:
         0 if all versions match, 1 if there are mismatches
+
     """
     # Define the root directory (repository root)
     repo_root = Path(__file__).parent.parent.parent
@@ -85,17 +86,10 @@ def check_versions() -> int:
     pyproject = repo_root / "python/pyproject.toml"
     if pyproject.exists():
         content = pyproject.read_text()
-        if (
-            'metadata.version.provider = "scikit_build_core.metadata.regex"'
-            not in content
-        ):
-            errors.append(
-                "pyproject.toml: missing scikit-build-core metadata.version.provider"
-            )
+        if 'metadata.version.provider = "scikit_build_core.metadata.regex"' not in content:
+            errors.append("pyproject.toml: missing scikit-build-core metadata.version.provider")
         if 'metadata.version.input = "../VERSION"' not in content:
-            errors.append(
-                "pyproject.toml: missing metadata.version.input pointing to VERSION"
-            )
+            errors.append("pyproject.toml: missing metadata.version.input pointing to VERSION")
         if 'dynamic = ["version"]' not in content:
             errors.append('pyproject.toml: missing dynamic = ["version"]')
     else:
@@ -105,13 +99,8 @@ def check_versions() -> int:
     init_py = repo_root / "python/src/qdk_chemistry/__init__.py"
     if init_py.exists():
         content = init_py.read_text()
-        if (
-            "from importlib.metadata import" not in content
-            or "PackageNotFoundError" not in content
-        ):
-            errors.append(
-                "__init__.py: missing importlib.metadata with PackageNotFoundError fallback"
-            )
+        if "from importlib.metadata import" not in content or "PackageNotFoundError" not in content:
+            errors.append("__init__.py: missing importlib.metadata with PackageNotFoundError fallback")
         if '/ "VERSION"' not in content:
             errors.append("__init__.py: fallback does not read from VERSION file")
     else:
@@ -121,13 +110,8 @@ def check_versions() -> int:
     telemetry_py = repo_root / "python/src/qdk_chemistry/utils/telemetry.py"
     if telemetry_py.exists():
         content = telemetry_py.read_text()
-        if (
-            "from importlib.metadata import" not in content
-            or "PackageNotFoundError" not in content
-        ):
-            errors.append(
-                "telemetry.py: missing importlib.metadata with PackageNotFoundError fallback"
-            )
+        if "from importlib.metadata import" not in content or "PackageNotFoundError" not in content:
+            errors.append("telemetry.py: missing importlib.metadata with PackageNotFoundError fallback")
     else:
         errors.append("telemetry.py: file not found")
 
@@ -147,9 +131,7 @@ def check_versions() -> int:
         # Look for "Version X.Y.Z" header in rst format
         version_header = f"Version {canonical_version}"
         if version_header not in content:
-            errors.append(
-                f"docs/source/changelog.rst: missing entry for '{version_header}'"
-            )
+            errors.append(f"docs/source/changelog.rst: missing entry for '{version_header}'")
     else:
         errors.append("docs/source/changelog.rst: file not found")
 

@@ -8,6 +8,7 @@
 ################################################################################
 # start-cell-scf
 from pathlib import Path
+
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.data import Structure
 
@@ -21,9 +22,7 @@ scf_solver = create("scf_solver", "pyscf")
 scf_solver.settings().set("method", "hf")
 
 # Run calculation - returns (energy, wavefunction)
-energy, wavefunction = scf_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
-)
+energy, wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz")
 orbitals = wavefunction.get_orbitals()
 
 print(f"SCF Energy: {energy:.10f} Hartree")
@@ -46,7 +45,7 @@ for algorithm_name in available():
 
 ################################################################################
 # start-cell-discover-implementations
-from qdk_chemistry.algorithms import available, create  # noqa: E402
+from qdk_chemistry.algorithms import available, create
 
 # List all registered SCF solver implementations
 print(available("scf_solver"))  # ['qdk', 'pyscf']

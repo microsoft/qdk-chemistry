@@ -17,7 +17,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure

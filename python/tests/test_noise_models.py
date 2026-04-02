@@ -13,7 +13,6 @@ import h5py
 import numpy as np
 import pytest
 from qdk.simulation import NoiseConfig
-
 from qdk_chemistry.data.noise_models import (
     GateErrorDef,
     QuantumErrorProfile,

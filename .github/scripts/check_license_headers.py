@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Check that all source files have the correct Microsoft license header.
+"""Check that all source files have the correct Microsoft license header.
 
 This script verifies that C++, C, and Python source files contain the
 appropriate copyright and license information.
@@ -14,7 +13,6 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 # Expected license headers for different file types
 CPP_LICENSE_PATTERNS = [
@@ -71,15 +69,15 @@ CPP_EXTENSIONS = {".cpp", ".hpp", ".h", ".cc", ".cxx", ".c"}
 PYTHON_EXTENSIONS = {".py"}
 
 
-def check_file_header(filepath: Path) -> Tuple[bool, str]:
-    """
-    Check if a file has the correct license header.
+def check_file_header(filepath: Path) -> tuple[bool, str]:
+    """Check if a file has the correct license header.
 
     Args:
         filepath: Path to the file to check
 
     Returns:
         Tuple of (success: bool, message: str)
+
     """
     try:
         content = filepath.read_text(encoding="utf-8")
@@ -112,19 +110,17 @@ def check_file_header(filepath: Path) -> Tuple[bool, str]:
     return False, f"Missing or incorrect {file_type} license header"
 
 
-def main(argv: Optional[List[str]] = None) -> int:
-    """
-    Main entry point for the license header checker.
+def main(argv: list[str] | None = None) -> int:
+    """Main entry point for the license header checker.
 
     Args:
         argv: Command line arguments
 
     Returns:
         Exit code (0 for success, 1 for failure)
+
     """
-    parser = argparse.ArgumentParser(
-        description="Check source files for correct license headers"
-    )
+    parser = argparse.ArgumentParser(description="Check source files for correct license headers")
     parser.add_argument(
         "files",
         nargs="*",
@@ -181,16 +177,12 @@ def main(argv: Optional[List[str]] = None) -> int:
             print("\nExpected header format (any of these):")
             print("  /*")
             print("   * Copyright (c) Microsoft Corporation. All rights reserved.")
-            print(
-                "   * Licensed under the MIT License. See LICENSE.txt in the project root for"
-            )
+            print("   * Licensed under the MIT License. See LICENSE.txt in the project root for")
             print("   * license information.")
             print("   */")
             print("\n  Or:")
             print("  // Copyright (c) Microsoft Corporation. All rights reserved.")
-            print(
-                "  // Licensed under the MIT License. See LICENSE.txt in the project root for"
-            )
+            print("  // Licensed under the MIT License. See LICENSE.txt in the project root for")
             print("  // license information.\n")
 
         if failed_python_files:
@@ -199,19 +191,11 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(f"  - {filepath}")
             print("\nExpected header format:")
             print('  """Module description."""')
-            print(
-                "  # --------------------------------------------------------------------------------------------"
-            )
+            print("  # --------------------------------------------------------------------------------------------")
             print("  # Copyright (c) Microsoft Corporation. All rights reserved.")
-            print(
-                "  # Licensed under the MIT License. See LICENSE.txt in the project root for license information."
-            )
-            print(
-                "  # --------------------------------------------------------------------------------------------"
-            )
-            print(
-                "\nNote: License header must come directly after the module docstring (or at top if no docstring)."
-            )
+            print("  # Licensed under the MIT License. See LICENSE.txt in the project root for license information.")
+            print("  # --------------------------------------------------------------------------------------------")
+            print("\nNote: License header must come directly after the module docstring (or at top if no docstring).")
 
         return 1
 

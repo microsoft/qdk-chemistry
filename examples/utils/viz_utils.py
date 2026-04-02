@@ -25,12 +25,11 @@ def orbital_label(idx: int, n_occupied: int) -> str:
     offset = idx - (n_occupied - 1)
     if offset == 0:
         return "HOMO"
-    elif offset < 0:
+    if offset < 0:
         return f"HOMO{offset}"
-    elif offset == 1:
+    if offset == 1:
         return "LUMO"
-    else:
-        return f"LUMO+{offset - 1}"
+    return f"LUMO+{offset - 1}"
 
 
 def generate_cube_data_with_info(

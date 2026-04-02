@@ -7,7 +7,6 @@
 
 import numpy as np
 import pytest
-
 from qdk_chemistry.data import Hamiltonian, LatticeGraph, QubitHamiltonian
 from qdk_chemistry.utils.model_hamiltonians import (
     create_heisenberg_hamiltonian,

@@ -24,9 +24,9 @@ pmc_calculator.settings().set("davidson_res_tol", 1.0e-8)
 
 ################################################################################
 # start-cell-run
-import numpy as np  # noqa: E402
-from qdk_chemistry.algorithms import create  # noqa: E402
-from qdk_chemistry.data import Configuration, Structure  # noqa: E402
+import numpy as np
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import Configuration, Structure
 
 # Create a structure (H2 molecule)
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
@@ -35,9 +35,7 @@ structure = Structure(coords, symbols)
 
 # Run SCF to get orbitals
 scf_solver = create("scf_solver")
-E_scf, wfn = scf_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
-)
+E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
 
 # Build Hamiltonian from orbitals
 ham_constructor = create("hamiltonian_constructor")
@@ -59,7 +57,7 @@ print(f"PMC Energy: {E_pmc:.10f} Hartree")
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 available = registry.available("projected_multi_configuration_calculator")
 print(available)

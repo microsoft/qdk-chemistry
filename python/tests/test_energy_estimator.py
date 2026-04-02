@@ -11,7 +11,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.energy_estimator.qdk import (
     QdkEnergyEstimator,

@@ -11,7 +11,6 @@ import numpy as np
 import pytest
 import qsharp
 import scipy
-
 from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.pauli_sequence_mapper import (
     PauliSequenceMapper,
 )

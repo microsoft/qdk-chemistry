@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
-
 from qdk_chemistry.data import PauliOperator
 
 

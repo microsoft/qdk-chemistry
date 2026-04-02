@@ -7,7 +7,6 @@
 
 import numpy as np
 import pytest
-
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.time_evolution.builder.partially_randomized import PartiallyRandomized
 from qdk_chemistry.data import QubitHamiltonian, TimeEvolutionUnitary

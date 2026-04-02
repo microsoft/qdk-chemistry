@@ -7,7 +7,6 @@
 
 import numpy as np
 import scipy.sparse as sp
-
 from qdk_chemistry._core._algorithms import davidson_solver
 from qdk_chemistry.data import QubitHamiltonian
 

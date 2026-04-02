@@ -7,7 +7,6 @@
 
 import numpy as np
 import pytest
-
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_NATURE
 
 from .reference_tolerances import (

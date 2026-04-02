@@ -7,7 +7,6 @@
 
 import numpy as np
 import pytest
-
 from qdk_chemistry import algorithms, data
 
 

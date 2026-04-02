@@ -8,6 +8,7 @@
 ################################################################################
 # start-cell-create
 from pathlib import Path
+
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
@@ -30,15 +31,11 @@ print(f"Localizer settings: {localizer.settings().keys()}")
 ################################################################################
 # start-cell-localize
 # Load H2O molecule from XYZ file
-structure = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/water.structure.xyz"
-)
+structure = Structure.from_xyz_file(Path(__file__).parent / "../data/water.structure.xyz")
 
 # Obtain orbitals from SCF
 scf_solver = create("scf_solver")
-E_scf, wfn = scf_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
-)
+E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
 
 # Create indices for orbitals to localize
 loc_indices = [0, 1, 2, 3]
@@ -53,7 +50,7 @@ print(localized_orbitals.get_summary())
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 print(registry.available("orbital_localizer"))
 # ['pyscf_multi', 'qdk_vvhv', 'qdk_mp2_natural_orbitals', 'qdk_pipek_mezey']

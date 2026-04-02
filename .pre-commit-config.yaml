@@ -74,12 +74,13 @@ repos:
   rev: v0.12.2
   hooks:
   - id: ruff-format
+    args: [--config=python/pyproject.toml]
     files: &all_py >
       (?x)^(
         .*\.py$|
       )$
   - id: ruff
-    args: [--fix, --output-format=concise]
+    args: [--fix, --output-format=concise, --config=python/pyproject.toml]
     files: *all_py
 
 - repo: https://github.com/igorshubovych/markdownlint-cli

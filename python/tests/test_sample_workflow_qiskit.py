@@ -16,7 +16,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-
 from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT,
     QDK_CHEMISTRY_HAS_QISKIT_AER,

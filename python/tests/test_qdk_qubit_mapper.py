@@ -9,7 +9,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-
 from qdk_chemistry.algorithms import QubitMapper, available, create
 from qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper import (
     _bk_compute_ancestor_indices,

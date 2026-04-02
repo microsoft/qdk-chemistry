@@ -7,7 +7,8 @@
 
 This example demonstrates the use of PennyLane to implement traditional QFT-based Quantum Phase Estimation (QPE)
 using QDK/Chemistry tools for preparing the electronic structure problem.
-This example does not use Trotterization; instead, it leverages PennyLane's ability to implement the time-evolution operator `exp(−i*coeff*H)` exactly for a given qubit Hamiltonian.
+This example does not use Trotterization; instead, it leverages PennyLane's ability to implement the
+time-evolution operator `exp(-i*coeff*H)` exactly for a given qubit Hamiltonian.
 """
 
 import numpy as np
@@ -33,9 +34,7 @@ T_TIME = 0.1  # evolution time; lower if you see 2π wrap
 ########################################################################################
 # 1. QDK/Chemistry calculation for H₂ (1.44 Bohr bond length in STO-3G)
 ########################################################################################
-structure = Structure(
-    np.array([[0.0, 0.0, -0.72], [0.0, 0.0, 0.72]], dtype=float), ["H", "H"]
-)  # Geometry in bohr
+structure = Structure(np.array([[0.0, 0.0, -0.72], [0.0, 0.0, 0.72]], dtype=float), ["H", "H"])  # Geometry in bohr
 
 scf_solver = create("scf_solver")  # STO-3G basis for H2
 scf_energy, scf_wavefunction = scf_solver.run(
@@ -53,20 +52,14 @@ selector = create(
     num_active_electrons=ACTIVE_ELECTRONS,
     num_active_orbitals=ACTIVE_ORBITALS,
 )  # Use valence space heuristic
-active_orbitals = selector.run(
-    scf_wavefunction
-).get_orbitals()  # Extract active orbitals
+active_orbitals = selector.run(scf_wavefunction).get_orbitals()  # Extract active orbitals
 
 constructor = create("hamiltonian_constructor")
 active_hamiltonian = constructor.run(active_orbitals)  # Build active-space Hamiltonian
 
 n_alpha = n_beta = ACTIVE_ELECTRONS // 2
-multi_configuration_calculator = create(
-    "multi_configuration_calculator"
-)  # CASCI solver
-casci_energy, _ = multi_configuration_calculator.run(
-    active_hamiltonian, n_alpha, n_beta
-)  # Solve CASCI
+multi_configuration_calculator = create("multi_configuration_calculator")  # CASCI solver
+casci_energy, _ = multi_configuration_calculator.run(active_hamiltonian, n_alpha, n_beta)  # Solve CASCI
 
 Logger.info("=== Generating QDK/Chemistry artifacts for H2 (0.76 Å, STO-3G) ===")
 Logger.info(f"  SCF total energy:   {scf_energy: .4f} Hartree")
@@ -77,24 +70,16 @@ Logger.info(f"  CASCI total energy: {casci_energy: .4f} Hartree")
 # 3. Preparing the qubit Hamiltonian for PennyLane QPE
 ########################################################################################
 
-one_body = np.array(
-    active_hamiltonian.get_one_body_integrals(), dtype=float
-)  # One-electron integrals
+one_body = np.array(active_hamiltonian.get_one_body_integrals(), dtype=float)  # One-electron integrals
 norb = one_body.shape[0]  # Number of spatial orbitals
 (two_body_integrals, _, _) = active_hamiltonian.get_two_body_integrals()
 two_body_flat = np.array(two_body_integrals, dtype=float)  # Two-electron integrals
-two_body = two_body_flat.reshape(
-    (norb,) * 4
-)  # Make a rank-4 tensor in chemists' notation (pq|rs)
-two_body_phys = np.transpose(
-    two_body, (0, 2, 1, 3)
-)  # Transpose as Pennylane expects physicists' notation <pq|rs>
+two_body = two_body_flat.reshape((norb,) * 4)  # Make a rank-4 tensor in chemists' notation (pq|rs)
+two_body_phys = np.transpose(two_body, (0, 2, 1, 3))  # Transpose as Pennylane expects physicists' notation <pq|rs>
 
 core_energy = active_hamiltonian.get_core_energy()  # Core energy constant
 constant = np.array([core_energy], dtype=float)
-fermionic_sentence = qml.qchem.fermionic_observable(
-    constant, one_body, two_body_phys
-)  # Fermionic Hamiltonian
+fermionic_sentence = qml.qchem.fermionic_observable(constant, one_body, two_body_phys)  # Fermionic Hamiltonian
 
 # Map to qubit Hamiltonian via Jordan-Wigner transformation
 H_qubit_raw = qml.jordan_wigner(fermionic_sentence)
@@ -175,9 +160,7 @@ result = QpeResult.from_phase_fraction(
 )
 raw_energy = result.raw_energy
 candidate_energies = result.branching
-estimated_total_energy = (
-    result.resolved_energy if result.resolved_energy is not None else raw_energy
-)
+estimated_total_energy = result.resolved_energy if result.resolved_energy is not None else raw_energy
 
 Logger.info(f"\nMost likely phase bitstring: {dominant_bits}")
 Logger.info(f"Phase fraction φ (measured): {result.phase_fraction:.4f} rad")
@@ -187,9 +170,7 @@ Logger.info("Candidate energies (alias checks):")
 for energy in candidate_energies:
     Logger.info(f"  E = {energy:.4f} Hartree")
 
-Logger.info(
-    f"Total energy difference (QPE - CASCI): {estimated_total_energy - casci_energy:.4e} Hartree"
-)
+Logger.info(f"Total energy difference (QPE - CASCI): {estimated_total_energy - casci_energy:.4e} Hartree")
 Logger.info(
     "Diagnostic: PennyLane's controlled evolve applies exp(-i H t) exactly, so this residual "
     "difference is dominated by finite phase-register resolution rather than Trotterization."

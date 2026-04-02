@@ -12,10 +12,10 @@ from pathlib import Path
 
 import numpy as np
 from qdk_chemistry.data import (
-    Structure,
-    Hamiltonian,
     CanonicalFourCenterHamiltonianContainer,
+    Hamiltonian,
     ModelOrbitals,
+    Structure,
 )
 
 # Load structure from XYZ file (the file uses Angstrom, which is converted to Bohr internally)
@@ -27,9 +27,7 @@ coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])  # Bohr
 symbols = ["H", "H"]
 custom_masses = [1.001, 0.999]
 custom_charges = [0.9, 1.1]
-structure_custom = Structure(
-    coords, symbols=symbols, masses=custom_masses, nuclear_charges=custom_charges
-)
+structure_custom = Structure(coords, symbols=symbols, masses=custom_masses, nuclear_charges=custom_charges)
 
 # Serialize to JSON object
 structure_data = structure_custom.to_json()
@@ -60,9 +58,7 @@ core_energy = 1.5
 inactive_fock = np.zeros((0, 0))
 
 h2_example = Hamiltonian(
-    CanonicalFourCenterHamiltonianContainer(
-        one_body, two_body, orbitals, core_energy, inactive_fock
-    )
+    CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, core_energy, inactive_fock)
 )
 
 h2_example.to_hdf5_file("h2_example.hamiltonian.h5")

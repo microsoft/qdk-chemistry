@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
-
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Configuration, Orbitals, SlaterDeterminantContainer, Structure, Wavefunction
 from qdk_chemistry.utils import compute_valence_space_parameters

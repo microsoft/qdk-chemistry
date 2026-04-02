@@ -8,7 +8,6 @@
 import numpy as np
 import pytest
 import scipy
-
 from qdk_chemistry.algorithms.time_evolution.builder.trotter import Trotter
 from qdk_chemistry.data import QubitHamiltonian, TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (

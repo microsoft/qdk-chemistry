@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
-
 from qdk_chemistry.algorithms.circuit_executor.qdk import (
     QdkFullStateSimulator,
     QdkSparseStateSimulator,

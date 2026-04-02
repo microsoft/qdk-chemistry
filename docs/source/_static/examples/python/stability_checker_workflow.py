@@ -9,9 +9,9 @@
 # start-cell-create
 import numpy as np
 from qdk_chemistry.algorithms import create
+from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
 from qdk_chemistry.utils import rotate_orbitals
-from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 
 # Create the default StabilityChecker instance
 stability_checker = create("stability_checker", "qdk")
@@ -48,9 +48,7 @@ scf_solver.settings().set("method", "hf")
 
 # Run initial SCF calculation
 spin_multiplicity = 1
-energy, wavefunction = scf_solver.run(
-    n2, charge=0, spin_multiplicity=1, basis_or_guess="def2-svp"
-)
+energy, wavefunction = scf_solver.run(n2, charge=0, spin_multiplicity=1, basis_or_guess="def2-svp")
 print(f"Initial SCF Energy: {energy:.10f} Hartree")
 
 # Determine if calculation is restricted and configure stability checker accordingly
@@ -77,9 +75,9 @@ while iteration < max_iterations:
     except RuntimeError as e:
         if "Davidson Did Not Converge!" in str(e):
             print("Try increasing max_subspace or adjusting davidson_tolerance")
-            raise RuntimeError(f"Davidson solver did not converge: {str(e)}")
+            raise RuntimeError(f"Davidson solver did not converge: {e!s}")
         else:
-            raise RuntimeError(f"Stability check failed: {str(e)}")
+            raise RuntimeError(f"Stability check failed: {e!s}")
 
     if is_stable:
         print("\nConverged to stable wavefunction!")
@@ -88,19 +86,11 @@ while iteration < max_iterations:
     # Determine rotation type based on which instability is present
     do_external = False
     if not result.is_internal_stable():
-        smallest_eigenvalue, rotation_vector = (
-            result.get_smallest_internal_eigenvalue_and_vector()
-        )
-        print(
-            f"Internal instability detected. Smallest eigenvalue: {smallest_eigenvalue:.6f}"
-        )
+        smallest_eigenvalue, rotation_vector = result.get_smallest_internal_eigenvalue_and_vector()
+        print(f"Internal instability detected. Smallest eigenvalue: {smallest_eigenvalue:.6f}")
     elif not result.is_external_stable() and result.has_external_result():
-        smallest_eigenvalue, rotation_vector = (
-            result.get_smallest_external_eigenvalue_and_vector()
-        )
-        print(
-            f"External instability detected. Smallest eigenvalue: {smallest_eigenvalue:.6f}"
-        )
+        smallest_eigenvalue, rotation_vector = result.get_smallest_external_eigenvalue_and_vector()
+        print(f"External instability detected. Smallest eigenvalue: {smallest_eigenvalue:.6f}")
         do_external = True
     else:
         print("Unexpected state: neither internal nor external instability detected")
@@ -109,9 +99,7 @@ while iteration < max_iterations:
     # Rotate orbitals along the instability direction
     num_alpha, num_beta = wavefunction.get_total_num_electrons()
     orbitals = wavefunction.get_orbitals()
-    rotated_orbitals = rotate_orbitals(
-        orbitals, rotation_vector, num_alpha, num_beta, do_external
-    )
+    rotated_orbitals = rotate_orbitals(orbitals, rotation_vector, num_alpha, num_beta, do_external)
 
     # If external instability detected, switch to unrestricted calculation
     if do_external:
@@ -135,9 +123,7 @@ while iteration < max_iterations:
         stability_checker = new_stability_checker
 
     # Re-run SCF with rotated orbitals as initial guess
-    energy, wavefunction = scf_solver.run(
-        n2, charge=0, spin_multiplicity=1, basis_or_guess=rotated_orbitals
-    )
+    energy, wavefunction = scf_solver.run(n2, charge=0, spin_multiplicity=1, basis_or_guess=rotated_orbitals)
     print(f"New Energy after rotation: {energy:.10f} Hartree")
     print()
 
@@ -148,7 +134,7 @@ print(f"Final stability status: {is_stable}")
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 print("available backend choices for scf_solver and stability_checker:")
 print(registry.available("stability_checker"))

@@ -23,18 +23,17 @@ mc_calculator.settings().set("ci_residual_tolerance", 1.0e-6)
 
 ################################################################################
 # start-cell-run
-from pathlib import Path  # noqa: E402
-from qdk_chemistry.algorithms import create  # noqa: E402
-from qdk_chemistry.data import Structure  # noqa: E402
+from pathlib import Path
+
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import Structure
 
 # Load H2 structure from XYZ file
 structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
 
 # Run SCF to get orbitals
 scf_solver = create("scf_solver")
-E_scf, wfn = scf_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
-)
+E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
 
 # Build Hamiltonian from orbitals
 ham_constructor = create("hamiltonian_constructor")
@@ -53,7 +52,7 @@ print(f"CI Energy:  {E_ci:.10f} Hartree")
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 print(registry.available("multi_configuration_calculator"))
 # end-cell-list-implementations

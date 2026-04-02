@@ -8,6 +8,7 @@
 ################################################################################
 # start-cell-scf-localizer
 from pathlib import Path
+
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
@@ -21,15 +22,13 @@ scf_solver = create("scf_solver")
 localizer = create("orbital_localizer", "qdk_pipek_mezey")
 
 # Configure the SCF solver and run
-E_scf, wfn = scf_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
-)
+E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz")
 # end-cell-scf-localizer
 ################################################################################
 
 ################################################################################
 # start-cell-list-algorithms
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 # List all algorithm types and their implementations
 all_algorithms = registry.available()
@@ -54,7 +53,7 @@ print("Defaults:", defaults)
 
 ################################################################################
 # start-cell-inspect-settings
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 # Create a SCF solver and inspect its settings
 scf = registry.create("scf_solver", "qdk")

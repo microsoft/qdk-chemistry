@@ -26,8 +26,7 @@ _repo_root = Path(__file__).resolve().parent.parent.parent
 _version_file = _repo_root / "VERSION"
 if not _version_file.exists():
     raise FileNotFoundError(
-        f"VERSION file not found at {_version_file}. "
-        "Ensure you have a complete checkout of the repository."
+        f"VERSION file not found at {_version_file}. Ensure you have a complete checkout of the repository."
     )
 release = _version_file.read_text().strip()
 
@@ -90,17 +89,11 @@ autodoc_default_options = {
     "imported-members": False,  # Don't include imported members in documentation
     "private-members": False,  # Exclude private members (those starting with underscore)
 }
-autodoc_typehints = (
-    "description"  # Put type hints in description text instead of signatures
-)
-autodoc_typehints_format = (
-    "short"  # Use shorter type names (e.g., List instead of typing.List)
-)
+autodoc_typehints = "description"  # Put type hints in description text instead of signatures
+autodoc_typehints_format = "short"  # Use shorter type names (e.g., List instead of typing.List)
 autodoc_member_order = "bysource"  # Document members in the order they appear in source
 autoclass_content = "class"  # "class", "both", or "init"
-autodoc_docstring_signature = (
-    True  # Extract signatures from docstrings; setting to True helps with C++ bindings
-)
+autodoc_docstring_signature = True  # Extract signatures from docstrings; setting to True helps with C++ bindings
 autodoc_preserve_defaults = True  # Preserve default values in function signatures
 autodoc_mock_imports = [  # Configure autodoc to handle C++ extension modules and internal modules
     "qdk_chemistry.libblaspp",  # These are still mocked since they're only used for implementation
@@ -274,7 +267,6 @@ _MODULE_ALIAS_RULES: tuple[tuple[str, str], ...] = (
 
 def _rewrite_internal_module_path(text: str) -> str:
     """Map internal module paths to their public equivalents."""
-
     rewritten = text
     for old, new in _MODULE_ALIAS_RULES:
         if old in rewritten:
@@ -282,11 +274,8 @@ def _rewrite_internal_module_path(text: str) -> str:
     return rewritten
 
 
-def normalize_autodoc_signature(
-    app, what, name, obj, options, signature, return_annotation
-):
+def normalize_autodoc_signature(app, what, name, obj, options, signature, return_annotation):
     """Rewrite signatures/annotations pointing to internal modules."""
-
     new_signature = signature
     new_return = return_annotation
 
@@ -307,7 +296,6 @@ def normalize_autodoc_signature(
 
 def normalize_autodoc_docstring(app, what, name, obj, options, lines):
     """Rewrite internal module references that appear inside docstrings."""
-
     for idx, line in enumerate(lines):
         rewritten = _rewrite_internal_module_path(line)
         if rewritten != line:
@@ -438,11 +426,7 @@ def transform_doctree_citations(app, doctree):
             child = node.children[i]
             next_child = node.children[i + 1] if i + 1 < len(node.children) else None
 
-            if (
-                isinstance(child, nodes.Text)
-                and next_child is not None
-                and isinstance(next_child, nodes.literal)
-            ):
+            if isinstance(child, nodes.Text) and next_child is not None and isinstance(next_child, nodes.literal):
                 text = str(child)
                 if text.rstrip().endswith(_CITE_PREFIX):
                     # Found the pattern - extract citation key from literal
@@ -523,7 +507,6 @@ def process_breathe_docstring(app, what, name, obj, options, lines):
     additional processing needs.
     """
     # The :cite:`key` syntax works as-is for autodoc docstrings
-    pass
 
 
 def setup(app):

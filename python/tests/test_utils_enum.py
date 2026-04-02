@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
-
 from qdk_chemistry.data.noise_models import SupportedErrorTypes, SupportedGate
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 

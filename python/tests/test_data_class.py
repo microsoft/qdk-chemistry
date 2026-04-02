@@ -10,7 +10,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-
 from qdk_chemistry._core.data import DataClass as DataClassCore
 from qdk_chemistry.data import (
     Ansatz,

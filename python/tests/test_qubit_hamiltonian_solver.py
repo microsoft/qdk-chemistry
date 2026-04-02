@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
-
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver
 from qdk_chemistry.data import QubitHamiltonian

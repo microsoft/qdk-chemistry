@@ -21,13 +21,9 @@ from qdk_chemistry.data import Structure
 # Shared pipeline: H2 molecule → SCF → active-space → Hamiltonian → QubitHam
 # (used by cells below that need a fermionic or qubit Hamiltonian)
 # ---------------------------------------------------------------------------
-_h2_structure = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/h2.structure.xyz"
-)
+_h2_structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
 _scf = create("scf_solver")
-_E_scf, _wfn_scf = _scf.run(
-    _h2_structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
-)
+_E_scf, _wfn_scf = _scf.run(_h2_structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
 _orbitals = _wfn_scf.get_orbitals()
 
 _ham_constructor = create("hamiltonian_constructor")
@@ -42,8 +38,8 @@ _qubit_hamiltonian = _qdk_mapper.run(_hamiltonian)
 
 ################################################################################
 # start-cell-model-fermionic
-from qdk_chemistry.data import LatticeGraph  # noqa: E402
-from qdk_chemistry.utils.model_hamiltonians import (  # noqa: E402
+from qdk_chemistry.data import LatticeGraph
+from qdk_chemistry.utils.model_hamiltonians import (
     create_hubbard_hamiltonian,
     create_huckel_hamiltonian,
     create_ppp_hamiltonian,
@@ -70,7 +66,7 @@ ham = create_ppp_hamiltonian(ring, epsilon=0.0, t=2.4, U=11.26, V=V, z=1.0)
 
 ################################################################################
 # start-cell-model-spin
-from qdk_chemistry.utils.model_hamiltonians import (  # noqa: E402
+from qdk_chemistry.utils.model_hamiltonians import (
     create_heisenberg_hamiltonian,
     create_ising_hamiltonian,
 )
@@ -109,7 +105,7 @@ qubit_hamiltonian = _qubit_hamiltonian  # alias for display
 ################################################################################
 # start-cell-trotter
 from qdk_chemistry.algorithms.time_evolution.builder.trotter import (
-    Trotter,  # noqa: E402
+    Trotter,
 )
 
 builder = Trotter(order=2, target_accuracy=1e-3, error_bound="commutator")
@@ -123,13 +119,11 @@ unitary = builder.run(qubit_hamiltonian, time=1.0)
 
 ################################################################################
 # start-cell-trotter-error
-from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (  # noqa: E402
+from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
     trotter_steps_commutator,
 )
 
-n_steps = trotter_steps_commutator(
-    qubit_hamiltonian, time=1.0, target_accuracy=1e-3, order=2
-)
+n_steps = trotter_steps_commutator(qubit_hamiltonian, time=1.0, target_accuracy=1e-3, order=2)
 # end-cell-trotter-error
 ################################################################################
 
@@ -146,9 +140,7 @@ scf_solver = create("scf_solver")
 scf_solver.settings().set("method", "hf")
 scf_solver.settings().set("scf_type", "restricted")
 scf_solver.settings().set("enable_gdm", False)
-energy, wavefunction = scf_solver.run(
-    structure, charge=0, spin_multiplicity=2, basis_or_guess="sto-3g"
-)
+energy, wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=2, basis_or_guess="sto-3g")
 # end-cell-rohf
 ################################################################################
 
@@ -170,9 +162,7 @@ cholesky_hamiltonian = constructor.run(orbitals)
 # end-cell-cholesky
 ################################################################################
 
-print(
-    f"Cholesky Hamiltonian core energy: {cholesky_hamiltonian.get_core_energy():.10f}"
-)
+print(f"Cholesky Hamiltonian core energy: {cholesky_hamiltonian.get_core_energy():.10f}")
 
 # ===========================================================================
 # MACIS — single-orbital entropies and mutual information
@@ -225,7 +215,7 @@ print(f"Estimated energy: {energy_result.energy_expectation_value:.6f}")
 
 ################################################################################
 # start-cell-symmetries
-from qdk_chemistry.data import Symmetries  # noqa: E402
+from qdk_chemistry.data import Symmetries
 
 sym = Symmetries(n_alpha=3, n_beta=2)
 sym.n_particles  # 5
@@ -247,7 +237,7 @@ _HAS_OPENFERMION = importlib.util.find_spec("openfermion") is not None
 if _HAS_OPENFERMION:
     ############################################################################
     # start-cell-openfermion
-    from qdk_chemistry.data import Symmetries  # noqa: E402, F811
+    from qdk_chemistry.data import Symmetries
 
     mapper = create("qubit_mapper", "openfermion", encoding="jordan-wigner")
     qh = mapper.run(hamiltonian)
