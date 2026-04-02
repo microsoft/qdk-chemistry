@@ -107,6 +107,24 @@ This generally involves the following steps:
 See :doc:`comprehensive/algorithms/energy_estimator` for further details about available observable sampling methods and implementations.
 
 
+Model Hamiltonians
+^^^^^^^^^^^^^^^^^^
+
+For systems where the essential physics can be captured by a lattice model, QDK/Chemistry provides native construction of model Hamiltonians without requiring molecular structures, basis sets, or external electronic-structure codes.
+The resulting Hamiltonians integrate directly with the quantum and classical algorithms described on this page.
+
+Fermionic Models
+   Hückel (tight-binding), Hubbard, and Pariser-Parr-Pople (:term:`PPP`) models return :class:`~qdk_chemistry.data.Hamiltonian` objects compatible with all QDK/Chemistry algorithms, including :doc:`qubit mapping <comprehensive/algorithms/qubit_mapper>` and :doc:`multi-configuration methods <comprehensive/algorithms/mc_calculator>`.
+
+Spin Models
+   Ising and Heisenberg models return :class:`~qdk_chemistry.data.QubitHamiltonian` objects directly, bypassing the fermion-to-qubit mapping step.
+
+All builders operate on a :doc:`LatticeGraph <comprehensive/data/lattice_graph>` that defines site connectivity, with built-in support for common lattice topologies (chain, square, triangular, honeycomb, kagome) and custom geometries.
+Parameters accept either scalars (uniform) or per-site/per-bond arrays for inhomogeneous systems.
+
+See :doc:`comprehensive/model_hamiltonians` for detailed documentation and usage examples.
+
+
 Classical Quantum Chemistry Methods
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
