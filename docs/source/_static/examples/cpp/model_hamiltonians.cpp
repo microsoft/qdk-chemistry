@@ -54,13 +54,13 @@ int main() {
   auto ring = LatticeGraph::chain(6, /*periodic=*/true);
 
   // Compute interpair Coulomb repulsion with the Ohno potential
-  auto V = ohno_potential(ring, /*U=*/11.26, /*R=*/1.4);
+  auto V = ohno_potential(ring, /*U=*/0.414, /*R=*/2.65);
 
   // Create the PPP Hamiltonian
   auto ppp_hamiltonian = create_ppp_hamiltonian(ring,
                                                 /*epsilon=*/0.0,
-                                                /*t=*/2.4,
-                                                /*U=*/11.26,
+                                                /*t=*/0.088,
+                                                /*U=*/0.414,
                                                 /*V=*/V,
                                                 /*z=*/1.0);
 
@@ -83,19 +83,19 @@ int main() {
   // start-cell-potentials
   auto pot_lattice = LatticeGraph::chain(4);
 
-  // Ohno potential: V_ij = U_ij / sqrt(1 + (U_ij * epsilon_r * R_ij / C)^2)
+  // Ohno potential: V_ij = U_ij / sqrt(1 + (U_ij * epsilon_r * R_ij)^2)
   auto V_ohno =
-      ohno_potential(pot_lattice, /*U=*/11.26, /*R=*/1.4, /*epsilon_r=*/1.0);
+      ohno_potential(pot_lattice, /*U=*/0.414, /*R=*/2.65, /*epsilon_r=*/1.0);
 
-  // Mataga-Nishimoto potential: V_ij = U_ij / (1 + U_ij * epsilon_r * R_ij / C)
-  auto V_mn = mataga_nishimoto_potential(pot_lattice, /*U=*/11.26, /*R=*/1.4,
+  // Mataga-Nishimoto potential: V_ij = U_ij / (1 + U_ij * epsilon_r * R_ij)
+  auto V_mn = mataga_nishimoto_potential(pot_lattice, /*U=*/0.414, /*R=*/2.65,
                                          /*epsilon_r=*/1.0);
 
   // Custom pairwise potential using a user-defined function
   auto V_custom = pairwise_potential(
       pot_lattice,
-      /*U=*/11.26,
-      /*R=*/1.4,
+      /*U=*/0.414,
+      /*R=*/2.65,
       [](int, int, double Uij, double Rij) { return Uij / (1.0 + Rij); });
   // end-cell-potentials
 

@@ -64,14 +64,14 @@ print(f"Has two-body integrals: {hamiltonian.has_two_body_integrals()}")
 lattice = LatticeGraph.chain(6, periodic=True)
 
 # Compute interpair Coulomb repulsion with the Ohno potential
-V = ohno_potential(lattice, U=11.26, R=1.4)
+V = ohno_potential(lattice, U=0.414, R=2.65)
 
 # Create the PPP Hamiltonian
 hamiltonian = create_ppp_hamiltonian(
     lattice,
     epsilon=0.0,
-    t=2.4,
-    U=11.26,
+    t=0.088,
+    U=0.414,
     V=V,
     z=1.0,
 )
@@ -145,17 +145,17 @@ print(f"Ground state energy: {energy:.6f} a.u.")
 # start-cell-potentials
 lattice = LatticeGraph.chain(4)
 
-# Ohno potential: V_ij = U_ij / sqrt(1 + (U_ij * epsilon_r * R_ij / C)^2)
-V_ohno = ohno_potential(lattice, U=11.26, R=1.4, epsilon_r=1.0)
+# Ohno potential: V_ij = U_ij / sqrt(1 + (U_ij * epsilon_r * R_ij)^2)
+V_ohno = ohno_potential(lattice, U=0.414, R=2.65, epsilon_r=1.0)
 
-# Mataga-Nishimoto potential: V_ij = U_ij / (1 + U_ij * epsilon_r * R_ij / C)
-V_mn = mataga_nishimoto_potential(lattice, U=11.26, R=1.4, epsilon_r=1.0)
+# Mataga-Nishimoto potential: V_ij = U_ij / (1 + U_ij * epsilon_r * R_ij)
+V_mn = mataga_nishimoto_potential(lattice, U=0.414, R=2.65, epsilon_r=1.0)
 
 # Custom pairwise potential using a user-defined function
 V_custom = pairwise_potential(
     lattice,
-    U=11.26,
-    R=1.4,
+    U=0.414,
+    R=2.65,
     func=lambda i, j, Uij, Rij: Uij / (1.0 + Rij),
 )
 

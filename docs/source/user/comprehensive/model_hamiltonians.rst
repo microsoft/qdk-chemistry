@@ -183,16 +183,16 @@ Ohno potential
 
 .. math::
 
-   V_{ij} = \frac{U_{ij}}{\sqrt{1 + \left(\frac{U_{ij}\,\varepsilon_r\,R_{ij}}{C}\right)^2}}
+   V_{ij} = \frac{U_{ij}}{\sqrt{1 + \left(U_{ij}\,\varepsilon_r\,R_{ij}\right)^2}}
 
-where :math:`U_{ij} = \sqrt{U_i U_j}` is the geometric mean of on-site parameters, :math:`R_{ij}` is the intersite distance, :math:`\varepsilon_r` is the relative permittivity, and :math:`C = e^2 / (4\pi\varepsilon_0)`.
+where :math:`U_{ij} = \sqrt{U_i U_j}` is the geometric mean of on-site parameters, :math:`R_{ij}` is the intersite distance, and :math:`\varepsilon_r` is the relative permittivity.
 
 Mataga-Nishimoto potential
 """"""""""""""""""""""""""
 
 .. math::
 
-   V_{ij} = \frac{U_{ij}}{1 + \frac{U_{ij}\,\varepsilon_r\,R_{ij}}{C}}
+   V_{ij} = \frac{U_{ij}}{1 + U_{ij}\,\varepsilon_r\,R_{ij}}
 
 Custom pairwise potential
 """""""""""""""""""""""""
