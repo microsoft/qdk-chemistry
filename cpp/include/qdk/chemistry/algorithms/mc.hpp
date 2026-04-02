@@ -43,6 +43,10 @@ class MultiConfigurationSettings : public data::Settings {
     set_default<bool>("calculate_two_orbital_entropies", false);
     // evaluate mutual information
     set_default<bool>("calculate_mutual_information", false);
+    // evaluate one-orbital RDMs (norb x 4)
+    set_default<bool>("calculate_one_orbital_rdm", false);
+    // evaluate two-orbital RDMs (norb x norb x 16 x 16)
+    set_default<bool>("calculate_two_orbital_rdm", false);
     // energy convergence threshold
     set_default<double>("ci_residual_tolerance", 1.0e-6);
     // maximum number of iterations any Davidson

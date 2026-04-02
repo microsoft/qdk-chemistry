@@ -178,6 +178,24 @@ struct OrbitalEntropies {
 };
 
 /**
+ * @brief Container for orbital reduced density matrix data
+ *
+ * Groups single-orbital RDMs (norb x 4) and
+ * two-orbital RDMs (norb x norb x 16 x 16) into a single struct. These are the
+ * orbital reduced density matrices used for entropy calculations and orbital
+ * analysis.
+ */
+struct OrbitalRDMs {
+  /// Single-orbital RDMs: norb x 4 matrix
+  std::optional<Eigen::MatrixXd> one_ordm;
+  /// Two-orbital RDMs: flat vector of size norb*norb*16*16
+  std::optional<Eigen::VectorXd> two_ordm;
+
+  /** @brief Check if any orbital RDM data is present */
+  bool has_any() const { return one_ordm || two_ordm; }
+};
+
+/**
  * @brief Abstract base class for wavefunction containers
  *
  * This class provides the interface for different types of wavefunction
@@ -212,6 +230,7 @@ class WavefunctionContainer {
   WavefunctionContainer(const std::optional<MatrixVariant>& one_rdm_spin_traced,
                         const std::optional<VectorVariant>& two_rdm_spin_traced,
                         const OrbitalEntropies& entropies = OrbitalEntropies{},
+                        const OrbitalRDMs& orbital_rdms = OrbitalRDMs{},
                         WavefunctionType type = WavefunctionType::SelfDual);
 
   /**
@@ -239,6 +258,7 @@ class WavefunctionContainer {
                         const std::optional<VectorVariant>& two_rdm_aaaa,
                         const std::optional<VectorVariant>& two_rdm_bbbb,
                         const OrbitalEntropies& entropies = OrbitalEntropies{},
+                        const OrbitalRDMs& orbital_rdms = OrbitalRDMs{},
                         WavefunctionType type = WavefunctionType::SelfDual);
 
   virtual ~WavefunctionContainer() = default;
@@ -367,6 +387,40 @@ class WavefunctionContainer {
    * @throws std::runtime_error if mutual information is not available
    */
   virtual Eigen::MatrixXd get_mutual_information() const;
+
+  /**
+   * @brief Checks if single-orbital RDMs are available
+   * @return True if one-orbital RDM data is available, false otherwise
+   */
+  virtual bool has_one_orbital_rdm() const;
+
+  /**
+   * @brief Get the single-orbital RDM matrix
+   *
+   * Returns a norb x 4 matrix where each row contains the four diagonal
+   * elements of the single-orbital reduced density matrix for that orbital.
+   *
+   * @return Matrix of shape (norb, 4)
+   * @throws std::runtime_error if one-orbital RDMs are not available
+   */
+  virtual Eigen::MatrixXd get_one_orbital_rdm() const;
+
+  /**
+   * @brief Checks if two-orbital RDMs are available
+   * @return True if two-orbital RDM data is available, false otherwise
+   */
+  virtual bool has_two_orbital_rdm() const;
+
+  /**
+   * @brief Get the two-orbital RDM tensor as a flat vector
+   *
+   * Returns a flat vector of size norb*norb*16*16 representing the rank-4
+   * tensor of two-orbital reduced density matrices.
+   *
+   * @return Flat vector of the two-orbital RDM tensor
+   * @throws std::runtime_error if two-orbital RDMs are not available
+   */
+  virtual Eigen::VectorXd get_two_orbital_rdm() const;
 
   /**
    * @brief Get total number of alpha and beta electrons (active + inactive)
@@ -539,6 +593,9 @@ class WavefunctionContainer {
 
   // Orbital entropies
   mutable OrbitalEntropies _entropies;
+
+  // Orbital reduced density matrices
+  mutable OrbitalRDMs _orbital_rdms;
 
   /** @brief Clear cached RDMs */
   void _clear_rdms() const;
@@ -882,6 +939,32 @@ class Wavefunction : public DataClass,
    * @throws std::runtime_error if mutual information is not available
    */
   virtual Eigen::MatrixXd get_mutual_information() const;
+
+  /**
+   * @brief Checks if single-orbital RDMs are available
+   * @return True if one-orbital RDM data is available, false otherwise
+   */
+  bool has_one_orbital_rdm() const;
+
+  /**
+   * @brief Get the single-orbital RDM matrix
+   * @return Matrix of shape (norb, 4)
+   * @throws std::runtime_error if one-orbital RDMs are not available
+   */
+  Eigen::MatrixXd get_one_orbital_rdm() const;
+
+  /**
+   * @brief Checks if two-orbital RDMs are available
+   * @return True if two-orbital RDM data is available, false otherwise
+   */
+  bool has_two_orbital_rdm() const;
+
+  /**
+   * @brief Get the two-orbital RDM tensor as a flat vector
+   * @return Flat vector of the two-orbital RDM tensor
+   * @throws std::runtime_error if two-orbital RDMs are not available
+   */
+  Eigen::VectorXd get_two_orbital_rdm() const;
 
   /**
    * @brief Check if spin-dependent one-particle RDMs are available

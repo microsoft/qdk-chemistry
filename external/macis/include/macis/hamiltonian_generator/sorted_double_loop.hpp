@@ -731,34 +731,28 @@ class SortedDoubleLoopHamiltonianGenerator
     }
   }
 
-  void form_entropies(full_det_iterator bra_begin, full_det_iterator bra_end,
-                      full_det_iterator ket_begin, full_det_iterator ket_end,
-                      double* C, std::vector<double>& single_orbital_entropies,
-                      matrix_span_t s2_entropy,
-                      matrix_span_t mutual_information) override {
+  void form_orbital_rdms(full_det_iterator bra_begin, full_det_iterator bra_end,
+                         full_det_iterator ket_begin, full_det_iterator ket_end,
+                         double* C,
+                         OrbitalRDMIntermediates& intermediates) override {
     using wfn_traits = wavefunction_traits<WfnType>;
     using spin_wfn_type = typename wfn_traits::spin_wfn_type;
     using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
     const size_t nbra_dets = std::distance(bra_begin, bra_end);
     const size_t nket_dets = std::distance(ket_begin, ket_end);
 
-    const bool need_s2 =
-        s2_entropy.data_handle() || mutual_information.data_handle();
-
-    OrbitalRDMIntermediates entropy_intermediates(
-        single_orbital_entropies.size(), need_s2);
+    const bool need_s2 = intermediates.need_s2;
 
     const bool is_symm = bra_begin == ket_begin and bra_end == ket_end;
 #ifdef MACIS_ENABLE_MPI
     if (comm_size(MPI_COMM_WORLD) > 1) {
       throw std::runtime_error(
-          "SortedDoubleLoopHamiltonianGenerator::form_entropies "
+          "SortedDoubleLoopHamiltonianGenerator::form_orbital_rdms "
           "does not support MPI with more than one rank");
     }
 #endif /* MACIS_ENABLE_MPI */
 
     // Get unique alpha strings
-    auto setup_st = std::chrono::high_resolution_clock::now();
     auto unique_alpha_bra = get_unique_alpha(bra_begin, bra_end);
     auto unique_alpha_ket =
         is_symm ? unique_alpha_bra : get_unique_alpha(ket_begin, ket_end);
@@ -784,8 +778,6 @@ class SortedDoubleLoopHamiltonianGenerator
 
     unique_alpha_bra_idx.back() = nbra_dets;
     unique_alpha_ket_idx.back() = nket_dets;
-
-    auto count_st = std::chrono::high_resolution_clock::now();
 
 #pragma omp parallel
     {
@@ -844,13 +836,32 @@ class SortedDoubleLoopHamiltonianGenerator
               if (std::abs(val) > 1e-16) {
                 eval_ordm_intermediates(
                     bra_alpha, ket_alpha, ex_alpha, bra_beta, ket_beta, ex_beta,
-                    bra_occ_alpha, bra_occ_beta, val, entropy_intermediates);
+                    bra_occ_alpha, bra_occ_beta, val, intermediates);
               }
             }
           }
         }
       }
     }
+
+    // Transfer diagonal vectors into matrix positions
+    intermediates.update_diagonal();
+  }
+
+  void form_entropies(full_det_iterator bra_begin, full_det_iterator bra_end,
+                      full_det_iterator ket_begin, full_det_iterator ket_end,
+                      double* C, std::vector<double>& single_orbital_entropies,
+                      matrix_span_t s2_entropy,
+                      matrix_span_t mutual_information) override {
+    const bool need_s2 =
+        s2_entropy.data_handle() || mutual_information.data_handle();
+
+    OrbitalRDMIntermediates entropy_intermediates(
+        single_orbital_entropies.size(), need_s2);
+
+    form_orbital_rdms(bra_begin, bra_end, ket_begin, ket_end, C,
+                      entropy_intermediates);
+
     // Finalize entropy calculations
     build_s1_entropy(entropy_intermediates, single_orbital_entropies);
 

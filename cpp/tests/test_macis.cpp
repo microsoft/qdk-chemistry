@@ -12,6 +12,7 @@
 #include <qdk/chemistry/data/configuration.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/orbital_entropies.hpp>
 
 #include "ut_common.hpp"
 
@@ -1463,4 +1464,176 @@ TEST_F(MacisAsciBackoffTest, MinimalRecoveryKeepsBackoff) {
   auto [energy, wavefunction] = calculator->run(hamiltonian, 5, 5);
   ASSERT_LT(energy, hf_energy_);
   EXPECT_GT(wavefunction->size(), static_cast<size_t>(1));
+}
+
+// ========== Tests for orbital RDM -> entropy / mutual information ==========
+
+// Verify that entropies and mutual information rebuilt from orbital RDMs
+// match the values computed directly by the MACIS Hamiltonian generator.
+TEST_F(MacisAsciTest, OrbitalRDMEntropiesAndMutualInformation) {
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_cas");
+  if (!calculator) {
+    GTEST_SKIP() << "MACIS CAS not available";
+  }
+
+  auto& settings = calculator->settings();
+  settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
+  settings.set("max_solver_iterations", macis_params::max_solver_iterations);
+  // Enable direct computation of entropies and mutual information
+  settings.set("calculate_single_orbital_entropies", true);
+  settings.set("calculate_two_orbital_entropies", true);
+  settings.set("calculate_mutual_information", true);
+  // Enable orbital RDM computation
+  settings.set("calculate_one_orbital_rdm", true);
+  settings.set("calculate_two_orbital_rdm", true);
+
+  auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
+  auto hamiltonian = hamiltonian_constructor->run(orbitals_);
+  const size_t norb = orbitals_->get_active_space_indices().first.size();
+
+  auto result = calculator->run(hamiltonian, 3, 3);
+  ASSERT_TRUE(std::isfinite(result.first));
+
+  const auto& wfn = result.second;
+
+  // Retrieve directly computed entropies / mutual information
+  ASSERT_TRUE(wfn->has_single_orbital_entropies());
+  ASSERT_TRUE(wfn->has_two_orbital_entropies());
+  ASSERT_TRUE(wfn->has_mutual_information());
+  auto s1_direct = wfn->get_single_orbital_entropies();
+  auto s2_direct = wfn->get_two_orbital_entropies();
+  auto mi_direct = wfn->get_mutual_information();
+
+  // Rebuild entropies from orbital RDMs using the Wavefunction API
+  ASSERT_TRUE(wfn->has_one_orbital_rdm());
+  ASSERT_TRUE(wfn->has_two_orbital_rdm());
+  namespace oe = qdk::chemistry::utils::orbital_entropies;
+  auto s1_from_rdm = oe::build_single_orbital_entropies(*wfn);
+  auto s2_from_rdm = oe::build_two_orbital_entropies(*wfn);
+  auto mi_from_rdm = oe::build_mutual_information(s1_from_rdm, s2_from_rdm);
+
+  // Compare single-orbital entropies
+  ASSERT_EQ(s1_direct.size(), s1_from_rdm.size());
+  for (Eigen::Index i = 0; i < s1_direct.size(); ++i) {
+    EXPECT_NEAR(s1_direct(i), s1_from_rdm(i), 1e-10)
+        << "Single-orbital entropy mismatch at orbital " << i;
+  }
+
+  // Compare two-orbital entropies
+  ASSERT_EQ(s2_direct.rows(), s2_from_rdm.rows());
+  ASSERT_EQ(s2_direct.cols(), s2_from_rdm.cols());
+  for (Eigen::Index i = 0; i < s2_direct.rows(); ++i) {
+    for (Eigen::Index j = 0; j < s2_direct.cols(); ++j) {
+      EXPECT_NEAR(s2_direct(i, j), s2_from_rdm(i, j), 1e-10)
+          << "Two-orbital entropy mismatch at (" << i << ", " << j << ")";
+    }
+  }
+
+  // Compare mutual information
+  ASSERT_EQ(mi_direct.rows(), mi_from_rdm.rows());
+  ASSERT_EQ(mi_direct.cols(), mi_from_rdm.cols());
+  for (Eigen::Index i = 0; i < mi_direct.rows(); ++i) {
+    for (Eigen::Index j = 0; j < mi_direct.cols(); ++j) {
+      EXPECT_NEAR(mi_direct(i, j), mi_from_rdm(i, j), 1e-10)
+          << "Mutual information mismatch at (" << i << ", " << j << ")";
+    }
+  }
+
+  // Basic sanity checks on the entropy values themselves
+  for (Eigen::Index i = 0; i < s1_from_rdm.size(); ++i) {
+    EXPECT_GE(s1_from_rdm(i), 0.0)
+        << "Single-orbital entropy must be non-negative at orbital " << i;
+  }
+  for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(norb); ++i) {
+    for (Eigen::Index j = i + 1; j < static_cast<Eigen::Index>(norb); ++j) {
+      EXPECT_GE(s2_from_rdm(i, j), 0.0)
+          << "Two-orbital entropy must be non-negative at (" << i << ", " << j
+          << ")";
+      EXPECT_GE(mi_from_rdm(i, j), -1e-10)
+          << "Mutual information should be non-negative at (" << i << ", "
+          << j << ")";
+    }
+  }
+
+  // Verify symmetry of two-orbital entropies and mutual information
+  for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(norb); ++i) {
+    for (Eigen::Index j = i + 1; j < static_cast<Eigen::Index>(norb); ++j) {
+      EXPECT_DOUBLE_EQ(s2_from_rdm(i, j), s2_from_rdm(j, i))
+          << "Two-orbital entropy not symmetric at (" << i << ", " << j
+          << ")";
+      EXPECT_DOUBLE_EQ(mi_from_rdm(i, j), mi_from_rdm(j, i))
+          << "Mutual information not symmetric at (" << i << ", " << j
+          << ")";
+    }
+  }
+}
+
+// Same test with ASCI solver to verify consistency across solvers
+TEST_F(MacisAsciTest, ASCIOrbitalRDMEntropiesAndMutualInformation) {
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+  ASSERT_NE(calculator, nullptr);
+
+  auto& settings = calculator->settings();
+  settings.set("ntdets_max", macis_params::ntdets_max_large);
+  settings.set("ntdets_min", macis_params::ntdets_min);
+  settings.set("max_refine_iter", macis_params::refine_off);
+  settings.set("core_selection_strategy", "fixed");
+  // Enable direct computation of entropies and mutual information
+  settings.set("calculate_single_orbital_entropies", true);
+  settings.set("calculate_two_orbital_entropies", true);
+  settings.set("calculate_mutual_information", true);
+  // Enable orbital RDM computation
+  settings.set("calculate_one_orbital_rdm", true);
+  settings.set("calculate_two_orbital_rdm", true);
+
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+  const size_t norb = orbitals_->get_active_space_indices().first.size();
+
+  auto result = calculator->run(hamiltonian, 3, 3);
+  ASSERT_TRUE(std::isfinite(result.first));
+
+  const auto& wfn = result.second;
+
+  // Retrieve directly computed values
+  ASSERT_TRUE(wfn->has_single_orbital_entropies());
+  ASSERT_TRUE(wfn->has_two_orbital_entropies());
+  ASSERT_TRUE(wfn->has_mutual_information());
+  auto s1_direct = wfn->get_single_orbital_entropies();
+  auto s2_direct = wfn->get_two_orbital_entropies();
+  auto mi_direct = wfn->get_mutual_information();
+
+  // Rebuild entropies from orbital RDMs using the Wavefunction API
+  ASSERT_TRUE(wfn->has_one_orbital_rdm());
+  ASSERT_TRUE(wfn->has_two_orbital_rdm());
+  namespace oe = qdk::chemistry::utils::orbital_entropies;
+  auto s1_from_rdm = oe::build_single_orbital_entropies(*wfn);
+  auto s2_from_rdm = oe::build_two_orbital_entropies(*wfn);
+  auto mi_from_rdm = oe::build_mutual_information(s1_from_rdm, s2_from_rdm);
+
+  // Compare single-orbital entropies
+  ASSERT_EQ(s1_direct.size(), s1_from_rdm.size());
+  for (Eigen::Index i = 0; i < s1_direct.size(); ++i) {
+    EXPECT_NEAR(s1_direct(i), s1_from_rdm(i), 1e-10)
+        << "Single-orbital entropy mismatch at orbital " << i;
+  }
+
+  // Compare two-orbital entropies
+  ASSERT_EQ(s2_direct.rows(), s2_from_rdm.rows());
+  ASSERT_EQ(s2_direct.cols(), s2_from_rdm.cols());
+  for (Eigen::Index i = 0; i < s2_direct.rows(); ++i) {
+    for (Eigen::Index j = 0; j < s2_direct.cols(); ++j) {
+      EXPECT_NEAR(s2_direct(i, j), s2_from_rdm(i, j), 1e-10)
+          << "Two-orbital entropy mismatch at (" << i << ", " << j << ")";
+    }
+  }
+
+  // Compare mutual information
+  ASSERT_EQ(mi_direct.rows(), mi_from_rdm.rows());
+  ASSERT_EQ(mi_direct.cols(), mi_from_rdm.cols());
+  for (Eigen::Index i = 0; i < mi_direct.rows(); ++i) {
+    for (Eigen::Index j = 0; j < mi_direct.cols(); ++j) {
+      EXPECT_NEAR(mi_direct(i, j), mi_from_rdm(i, j), 1e-10)
+          << "Mutual information mismatch at (" << i << ", " << j << ")";
+    }
+  }
 }

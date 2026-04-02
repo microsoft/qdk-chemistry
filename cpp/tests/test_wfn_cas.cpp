@@ -543,9 +543,27 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMs) {
   two_rdm_aaaa.setOnes();
   two_rdm_aaaa *= 0.25;
 
+  // Create orbital RDMs
+  size_t norb = 4;
+  Eigen::MatrixXd one_ordm(norb, 4);
+  one_ordm.setZero();
+  for (size_t i = 0; i < norb; ++i) {
+    one_ordm(i, 0) = 0.1 * (i + 1);
+    one_ordm(i, 1) = 0.2 * (i + 1);
+    one_ordm(i, 2) = 0.3 * (i + 1);
+    one_ordm(i, 3) = 1.0 - one_ordm(i, 0) - one_ordm(i, 1) - one_ordm(i, 2);
+  }
+  Eigen::VectorXd two_ordm(norb * norb * 16 * 16);
+  two_ordm.setRandom();
+
+  OrbitalRDMs orbital_rdms;
+  orbital_rdms.one_ordm = one_ordm;
+  orbital_rdms.two_ordm = two_ordm;
+
   CasWavefunctionContainer original(coeffs, dets, orbitals, std::nullopt,
                                     one_rdm_aa, one_rdm_aa, std::nullopt,
-                                    two_rdm_aabb, two_rdm_aaaa, two_rdm_aaaa);
+                                    two_rdm_aabb, two_rdm_aaaa, two_rdm_aaaa,
+                                    OrbitalEntropies{}, orbital_rdms);
 
   // Serialize to JSON
   nlohmann::json j = original.to_json();
@@ -586,6 +604,14 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMs) {
   EXPECT_TRUE(std::get<Eigen::VectorXd>(orig_two_aaaa)
                   .isApprox(std::get<Eigen::VectorXd>(rest_two_aaaa),
                             testing::wf_tolerance));
+
+  // Verify orbital RDMs survived JSON roundtrip
+  EXPECT_TRUE(restored->has_one_orbital_rdm());
+  EXPECT_TRUE(restored->has_two_orbital_rdm());
+  EXPECT_TRUE(
+      one_ordm.isApprox(restored->get_one_orbital_rdm(), testing::wf_tolerance));
+  EXPECT_TRUE(
+      two_ordm.isApprox(restored->get_two_orbital_rdm(), testing::wf_tolerance));
 }
 
 // Test JSON serialization with RDMs for open shell system
@@ -744,6 +770,8 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationRDMs) {
   auto mc = MultiConfigurationCalculatorFactory::create();
   mc->settings().set("calculate_one_rdm", true);
   mc->settings().set("calculate_two_rdm", true);
+  mc->settings().set("calculate_one_orbital_rdm", true);
+  mc->settings().set("calculate_two_orbital_rdm", true);
   auto [E_cas, wfn_cas] = mc->run(H, 2, 2);
 
   const auto& original = wfn_cas->get_container<CasWavefunctionContainer>();
@@ -752,6 +780,8 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationRDMs) {
   EXPECT_TRUE(original.has_one_rdm_spin_traced());
   EXPECT_TRUE(original.has_two_rdm_spin_dependent());
   EXPECT_TRUE(original.has_two_rdm_spin_traced());
+  EXPECT_TRUE(original.has_one_orbital_rdm());
+  EXPECT_TRUE(original.has_two_orbital_rdm());
 
   // save to hdf5
   std::string filename = "test_cas_rdm_serialization.h5";
@@ -832,6 +862,14 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationRDMs) {
         std::get<Eigen::VectorXd>(original_two_rdm);
     EXPECT_TRUE(restored_two_rdm_r.isApprox(original_two_rdm_r,
                                             testing::rdm_tolerance));
+
+    // Verify orbital RDMs survived HDF5 roundtrip
+    EXPECT_TRUE(restored->has_one_orbital_rdm());
+    EXPECT_TRUE(restored->has_two_orbital_rdm());
+    EXPECT_TRUE(original.get_one_orbital_rdm().isApprox(
+        restored->get_one_orbital_rdm(), testing::rdm_tolerance));
+    EXPECT_TRUE(original.get_two_orbital_rdm().isApprox(
+        restored->get_two_orbital_rdm(), testing::rdm_tolerance));
 
     file.close();
   }

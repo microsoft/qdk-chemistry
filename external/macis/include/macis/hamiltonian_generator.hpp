@@ -10,6 +10,7 @@
 #pragma once
 #include <macis/hamiltonian_generator/base.hpp>
 #include <macis/sd_operations.hpp>
+#include <macis/util/entropies.hpp>
 
 namespace macis {
 
@@ -291,6 +292,27 @@ class HamiltonianGenerator : public HamiltonianGeneratorBase<double> {
                               std::vector<double>& single_orbital_entropies,
                               matrix_span_t s2_entropy,
                               matrix_span_t mutual_information) = 0;
+
+  /**
+   *  @brief Form orbital reduced density matrix intermediates
+   *
+   *  Pure virtual function to compute the orbital RDM intermediates needed
+   *  for single-orbital and two-orbital density matrices. These intermediates
+   *  can then be used to build the 1-ORDM and 2-ORDM via build_1ordm /
+   *  build_2ordm, or to compute entropies and mutual information.
+   *
+   *  @param[in] bra_begin Iterator to beginning of bra determinants
+   *  @param[in] bra_end Iterator to end of bra determinants
+   *  @param[in] ket_begin Iterator to beginning of ket determinants
+   *  @param[in] ket_end Iterator to end of ket determinants
+   *  @param[in] C CI coefficient array
+   *  @param[in,out] intermediates Orbital RDM intermediates to populate
+   */
+  virtual void form_orbital_rdms(full_det_iterator bra_begin,
+                                 full_det_iterator bra_end,
+                                 full_det_iterator ket_begin,
+                                 full_det_iterator ket_end, double* C,
+                                 OrbitalRDMIntermediates& intermediates) = 0;
 };
 
 }  // namespace macis

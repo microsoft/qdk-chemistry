@@ -7,6 +7,7 @@
 #include <Eigen/Core>
 #include <macis/asci/determinant_search.hpp>
 #include <macis/mcscf/mcscf.hpp>
+#include <macis/util/entropies.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
@@ -123,6 +124,8 @@ inline data::Wavefunction build_wavefunction(
   const bool eval_mutual_info =
       settings.get<bool>("calculate_mutual_information");
   const bool eval_s2 = settings.get<bool>("calculate_two_orbital_entropies");
+  const bool eval_one_ordm = settings.get<bool>("calculate_one_orbital_rdm");
+  const bool eval_two_ordm = settings.get<bool>("calculate_two_orbital_rdm");
 
   std::optional<Eigen::MatrixXd> one_aa, one_bb;
   std::optional<Eigen::VectorXd> two_aabb, two_aaaa, two_bbbb;
@@ -201,6 +204,34 @@ inline data::Wavefunction build_wavefunction(
     }
   }
 
+  // evaluate orbital RDMs
+  data::OrbitalRDMs computed_orbital_rdms;
+  if (eval_one_ordm || eval_two_ordm) {
+    const bool need_s2 = eval_two_ordm;
+    macis::OrbitalRDMIntermediates intermediates(nmo, need_s2);
+
+    ham_gen.form_orbital_rdms(dets.begin(), dets.end(), dets.begin(),
+                              dets.end(), coeffs.data(), intermediates);
+
+    if (eval_one_ordm) {
+      std::vector<double> ordm_data(nmo * 4, 0.0);
+      macis::matrix_span<double> ordm_span(ordm_data.data(), nmo, 4);
+      macis::build_1ordm(intermediates, ordm_span);
+      // Store as norb x 4 matrix
+      computed_orbital_rdms.one_ordm =
+          Eigen::Map<Eigen::MatrixXd>(ordm_data.data(), nmo, 4);
+    }
+    if (eval_two_ordm) {
+      const size_t tensor_size = nmo * nmo * 16 * 16;
+      std::vector<double> tordm_data(tensor_size, 0.0);
+      macis::rank4_span<double> tordm_span(tordm_data.data(), nmo, nmo, 16,
+                                            16);
+      macis::build_2ordm(intermediates, tordm_span);
+      computed_orbital_rdms.two_ordm =
+          Eigen::Map<Eigen::VectorXd>(tordm_data.data(), tensor_size);
+    }
+  }
+
   // helper function to convert optional Eigen types to MatrixVariant
   auto to_mv =
       [](const std::optional<Eigen::MatrixXd>& m) -> std::optional<MV> {
@@ -218,17 +249,18 @@ inline data::Wavefunction build_wavefunction(
   // build container with appropriate RDMs
   std::unique_ptr<data::WavefunctionContainer> container;
   if (one_aa || one_bb || two_aabb || two_aaaa || two_bbbb ||
-      computed_entropies.has_any()) {
+      computed_entropies.has_any() || computed_orbital_rdms.has_any()) {
     container = std::make_unique<Container>(
         C_vector, dets_configs, hamiltonian.get_orbitals(), std::nullopt,
         to_mv(one_aa), to_mv(one_bb), std::nullopt, to_vv(two_aabb),
         to_vv(two_aaaa), to_vv(two_bbbb), computed_entropies,
-        data::WavefunctionType::SelfDual);
+        computed_orbital_rdms, data::WavefunctionType::SelfDual);
   } else {
     container = std::make_unique<Container>(C_vector, dets_configs,
                                             hamiltonian.get_orbitals(),
                                             data::WavefunctionType::SelfDual);
   }
+
   return data::Wavefunction(std::move(container));
 }
 

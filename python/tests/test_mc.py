@@ -222,3 +222,61 @@ class TestMCCalculator:
         np.testing.assert_allclose(s1, s1_expected, atol=entropy_tol)
         np.testing.assert_allclose(s2, s2_expected, atol=entropy_tol)
         np.testing.assert_allclose(mi, mi_expected, atol=entropy_tol)
+
+    def test_mc_cas_orbital_rdms(self):
+        """Test MACIS CAS orbital RDM evaluation on H2O singlet."""
+        h2o = create_water_structure()
+
+        scf_solver = algorithms.create("scf_solver")
+        mc_calculator = algorithms.create("multi_configuration_calculator", "macis_cas")
+        ham_constructor = algorithms.create("hamiltonian_constructor")
+
+        _, wfn_hf = scf_solver.run(h2o, 0, 1, "sto-3g")
+
+        settings = mc_calculator.settings()
+        settings.set("ci_residual_tolerance", ci_energy_tolerance)
+        settings.set("calculate_one_orbital_rdm", True)
+        settings.set("calculate_two_orbital_rdm", True)
+
+        ham = ham_constructor.run(wfn_hf.get_orbitals())
+        norb = wfn_hf.get_orbitals().get_num_molecular_orbitals()
+
+        _, wfn = mc_calculator.run(ham, 5, 5)
+
+        assert wfn.has_one_orbital_rdm()
+        assert wfn.has_two_orbital_rdm()
+
+        one_ordm = wfn.get_one_orbital_rdm()
+        assert one_ordm.shape == (norb, 4)
+
+        two_ordm = wfn.get_two_orbital_rdm()
+        assert two_ordm.shape == (norb * norb * 16 * 16,)
+
+    def test_mc_asci_orbital_rdms(self):
+        """Test MACIS ASCI orbital RDM evaluation on H2O singlet."""
+        h2o = create_water_structure()
+
+        scf_solver = algorithms.create("scf_solver")
+        mc_calculator = algorithms.create("multi_configuration_calculator", "macis_asci")
+        ham_constructor = algorithms.create("hamiltonian_constructor")
+
+        _, wfn_hf = scf_solver.run(h2o, 0, 1, "sto-3g")
+
+        settings = mc_calculator.settings()
+        settings.set("ci_residual_tolerance", ci_energy_tolerance)
+        settings.set("calculate_one_orbital_rdm", True)
+        settings.set("calculate_two_orbital_rdm", True)
+
+        ham = ham_constructor.run(wfn_hf.get_orbitals())
+        norb = wfn_hf.get_orbitals().get_num_molecular_orbitals()
+
+        _, wfn = mc_calculator.run(ham, 5, 5)
+
+        assert wfn.has_one_orbital_rdm()
+        assert wfn.has_two_orbital_rdm()
+
+        one_ordm = wfn.get_one_orbital_rdm()
+        assert one_ordm.shape == (norb, 4)
+
+        two_ordm = wfn.get_two_orbital_rdm()
+        assert two_ordm.shape == (norb * norb * 16 * 16,)
