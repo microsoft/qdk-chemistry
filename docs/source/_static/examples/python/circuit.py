@@ -76,9 +76,18 @@ qsharp.eval(
     """
 )
 
-# 2. Get a Q# circuit object and wrap it
+# 2. Get a Q# circuit object and wrap it — keep QASM too for estimate()
 qsharp_circuit = qsharp.circuit("BellPair()")
-circuit = Circuit(qsharp=qsharp_circuit)
+bell_qasm = """
+include "stdgates.inc";
+qubit[2] q;
+bit[2] c;
+h q[0];
+cx q[0], q[1];
+c[0] = measure q[0];
+c[1] = measure q[1];
+"""
+circuit = Circuit(qsharp=qsharp_circuit, qasm=bell_qasm)
 
 # 3. Inspect the circuit — prints an ASCII diagram
 #    q_0  ── H ──── ● ──── M ──── |0〉 ──
@@ -102,49 +111,22 @@ print(f"Runtime: {formatted['runtime']}")
 ################################################################################
 
 ################################################################################
-# start-cell-qsharp-native
-import numpy as np
-from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Structure
-
-# When algorithms produce circuits, they carry native Q# operations internally.
-# This enables end-to-end Q# composition without format conversions.
-coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
-structure = Structure(coords, symbols=["H", "H"])
-
-scf = create("scf_solver")
-_, wfn = scf.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
-ham = create("hamiltonian_constructor").run(wfn.get_orbitals())
-_, wfn_cas = create("multi_configuration_calculator").run(ham, 1, 1)
-
-# StatePreparation produces a Circuit with a native Q# factory
-state_prep = create("state_prep", "sparse_isometry_gf2x")
-circuit = state_prep.run(wfn_cas)
-
-# Inspect the Q# circuit (prune unused qubits for clarity)
-print(circuit.get_qsharp_circuit(prune_classical_qubits=True))
-
-# Resource estimation — deferred QIR compilation happens here automatically
-print(circuit.estimate())
-
-# Export to OpenQASM or Qiskit when needed
-qasm_str = circuit.get_qasm()
-# qiskit_circuit = circuit.get_qiskit_circuit()  # requires qiskit installed
-# end-cell-qsharp-native
-################################################################################
-
-################################################################################
 # start-cell-serialization
+import os
+import tempfile
+
+tmpdir = tempfile.mkdtemp()
+
 # Save to JSON
-circuit.to_json_file("circuit.json")
+circuit.to_json_file(os.path.join(tmpdir, "my.circuit.json"))
 
 # Load from JSON
-loaded = Circuit.from_json_file("circuit.json")
+loaded = Circuit.from_json_file(os.path.join(tmpdir, "my.circuit.json"))
 
 # Save to HDF5
-circuit.to_hdf5_file("circuit.h5")
+circuit.to_hdf5_file(os.path.join(tmpdir, "my.circuit.h5"))
 
 # Load from HDF5
-loaded_h5 = Circuit.from_hdf5_file("circuit.h5")
+loaded_h5 = Circuit.from_hdf5_file(os.path.join(tmpdir, "my.circuit.h5"))
 # end-cell-serialization
 ################################################################################

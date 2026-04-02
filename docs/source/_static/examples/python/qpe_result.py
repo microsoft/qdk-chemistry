@@ -64,16 +64,21 @@ print(f"Resolved energy: {resolved:.8f} Ha")
 
 ################################################################################
 # start-cell-serialization
+import os
+import tempfile
+
+tmpdir = tempfile.mkdtemp()
+
 # Save to JSON
-result.to_json_file("qpe_result.json")
+result.to_json_file(os.path.join(tmpdir, "result.qpe_result.json"))
 
 # Load from JSON
-loaded = QpeResult.from_json_file("qpe_result.json")
+loaded = QpeResult.from_json_file(os.path.join(tmpdir, "result.qpe_result.json"))
 
 # Save to HDF5
-result.to_hdf5_file("qpe_result.h5")
+result.to_hdf5_file(os.path.join(tmpdir, "result.qpe_result.h5"))
 
 # Load from HDF5
-loaded_h5 = QpeResult.from_hdf5_file("qpe_result.h5")
+loaded_h5 = QpeResult.from_hdf5_file(os.path.join(tmpdir, "result.qpe_result.h5"))
 # end-cell-serialization
 ################################################################################

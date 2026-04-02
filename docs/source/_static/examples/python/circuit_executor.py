@@ -48,12 +48,15 @@ circuit = Circuit(
     qasm="""
     include "stdgates.inc";
     qubit[2] q;
+    bit[2] c;
     x q[0];
     cx q[0], q[1];
+    c[0] = measure q[0];
+    c[1] = measure q[1];
     """
 )
 
-# Execute with the sparse-state simulator
+# Execute with the QDK sparse-state simulator
 executor = create("circuit_executor", "qdk_sparse_state_simulator")
 result = executor.run(circuit, shots=1000)
 print(f"Bitstring counts: {result.bitstring_counts}")
@@ -70,8 +73,11 @@ circuit = Circuit(
     qasm="""
     include "stdgates.inc";
     qubit[2] q;
+    bit[2] c;
     x q[0];
     cx q[0], q[1];
+    c[0] = measure q[0];
+    c[1] = measure q[1];
     """
 )
 
