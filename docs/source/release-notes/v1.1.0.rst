@@ -1,0 +1,237 @@
+.. _release-v1.1.0:
+
+==========================
+What's New in Version 1.1
+==========================
+
+Version 1.1 introduces Q#-native circuits, model Hamiltonians, higher-order Trotter-Suzuki formulas,
+native :term:`ROHF`, Cholesky-based integral transformations, and an OpenFermion plugin.
+
+
+Highlights
+==========
+
+- **Q#-native circuit architecture** — circuits are now built and composed as native Q# operations, eliminating intermediate format conversions for faster circuit construction and lower memory overhead, and enabling a streamlined end-to-end :term:`QPE` code path with lazy :term:`QIR` compilation.
+- **Model Hamiltonians** — native construction of fermionic and spin lattice Hamiltonians (Hückel, Fermi-Hubbard, :term:`PPP`, Ising, Heisenberg) on arbitrary lattice geometries.
+- **Arbitrary-order Trotter-Suzuki** — product formulas of any even order with accuracy-aware step sizing and commutator-based error bounds.
+- **Native ROHF** — :term:`DIIS`-accelerated restricted open-shell Hartree-Fock in the :term:`QDK` :term:`SCF` solver.
+- **Cholesky AO→MO transformation** — pivoted Cholesky decomposition for two-electron integrals, reducing memory from :math:`O(N^4)` to :math:`O(N^2 N_\text{chol})` and enabling treatment of larger molecular systems with significant speedup over full four-center :term:`ERI` evaluation.
+- **OpenFermion plugin** — Jordan-Wigner, Bravyi-Kitaev, and symmetry-conserving Bravyi-Kitaev mappings via OpenFermion.
+
+
+Model Hamiltonians
+==================
+
+Running quantum phase estimation on a full *ab initio* molecular Hamiltonian is general and accurate, but the number of qubits and gates grows with the orbital basis set, making even modest molecules expensive to simulate.
+An alternative is to **map the essential physics onto a simpler model Hamiltonian** that captures the key interactions with far fewer degrees of freedom.
+New model-Hamiltonian constructors make it possible to build these Hamiltonians directly, without quantum-chemistry input files or external electronic-structure codes.
+
+**Fermionic models** — Hückel, Hubbard, and Pariser-Parr-Pople (:term:`PPP`) — return a second-quantized ``Hamiltonian``:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v1_1.py
+   :language: python
+   :start-after: # start-cell-model-fermionic
+   :end-before: # end-cell-model-fermionic
+
+All parameters (``epsilon``, ``t``, ``U``, ``V``, ``z``) accept either a scalar or per-site/per-bond arrays for inhomogeneous lattices.
+
+**Spin models** — Ising and Heisenberg — return a ``QubitHamiltonian`` directly:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v1_1.py
+   :language: python
+   :start-after: # start-cell-model-spin
+   :end-before: # end-cell-model-spin
+
+**Lattice geometries.** All constructors take a ``LatticeGraph`` that defines the site connectivity. Common topologies are built in:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v1_1.py
+   :language: python
+   :start-after: # start-cell-lattice
+   :end-before: # end-cell-lattice
+
+See `examples/extended_hubbard.ipynb <https://github.com/microsoft/qdk-chemistry/blob/v1.1.0/examples/extended_hubbard.ipynb>`_ for a complete walkthrough that models cyclobutadiene with the extended Hubbard (:term:`PPP`) model and runs :term:`QPE` on it.
+The interoperability examples under ``examples/interoperability/`` also demonstrate constructing model Hamiltonians directly without relying on the built-in infrastructure.
+
+
+Q#-Native Circuit Architecture
+===============================
+
+The ``Circuit`` class now composes quantum operations as native Q# callables (exposed in `qdk>=1.27.0`). By removing intermediate format conversions (e.g., QASM-to-QIR round-trips), circuit construction is faster and uses less memory, especially for large active spaces. This enables:
+
+- End-to-end :term:`QPE` without intermediate format conversions — faster pipeline execution
+- Lazy compilation to :term:`QIR` only at execution time — construction cost is deferred until the circuit is actually run
+- Direct access to Q#'s resource estimator on any ``Circuit``
+- A leaner default install with framework-specific dependencies as optional extras
+
+``Circuit`` can hold any combination of:
+
+- ``qsharp_op`` — a callable Q# operation
+- ``qsharp_factory`` — a lazy ``QsharpFactoryData(program, parameter)`` that compiles on demand
+- ``qasm`` / ``qir`` — for interoperability with external tools
+
+The :term:`QPE` pipeline composes Q# callables end-to-end — state preparation, controlled time evolution, and phase estimation are all native Q# operations:
+
+.. code-block:: python
+
+   from qdk_chemistry.algorithms import create
+
+   state_prep = create("state_prep", "sparse_isometry_gf2x")
+   circuit = state_prep.run(wavefunction)
+
+   # Inspect the Q# circuit
+   circuit.get_qsharp_circuit(prune_classical_qubits=True)
+
+   # Compile to QIR for external use
+   qir = circuit.get_qir()
+
+   # Use Q#'s resource estimator directly
+   import qsharp
+   qsharp.estimate(
+       circuit._qsharp_factory.program, None,
+       *circuit._qsharp_factory.parameter.values(),
+   )
+
+**Lightweight core dependencies.** Framework-specific dependencies are now isolated as optional extras, keeping the core install lean:
+
+.. code-block:: bash
+
+   pip install qdk-chemistry                        # core (Q#-native)
+   pip install 'qdk-chemistry[qiskit-extras]'       # + Qiskit interop
+   pip install 'qdk-chemistry[openfermion-extras]'   # + OpenFermion interop
+
+See `examples/qpe_stretched_n2.ipynb <https://github.com/microsoft/qdk-chemistry/blob/v1.1.0/examples/qpe_stretched_n2.ipynb>`_ and `examples/state_prep_energy.ipynb <https://github.com/microsoft/qdk-chemistry/blob/v1.1.0/examples/state_prep_energy.ipynb>`_ for worked end-to-end :term:`QPE` notebooks.
+
+
+Arbitrary-Order Trotter-Suzuki
+==============================
+
+Time-evolution builders now support product formulas of any even order via recursive Suzuki composition :cite:`Suzuki1992`.
+
+.. literalinclude:: ../_static/examples/python/release_notes_v1_1.py
+   :language: python
+   :start-after: # start-cell-trotter
+   :end-before: # end-cell-trotter
+
+When both ``num_divisions`` and ``target_accuracy`` are specified, the builder uses whichever requires more Trotter steps. The ``error_bound`` parameter selects between two bounds:
+
+- ``"naive"`` — triangle-inequality bound: :math:`N = \lceil (\sum_j |\alpha_j|)^2 t^2 / \epsilon \rceil`
+- ``"commutator"`` — tighter commutator-scaling bound from :cite:`Childs2021`: :math:`N = \lceil \frac{t^2}{2\epsilon} \sum_{j<k} \lVert [\alpha_j P_j, \alpha_k P_k] \rVert \rceil`
+
+**Error-bound utilities** are available for manual step-count analysis:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v1_1.py
+   :language: python
+   :start-after: # start-cell-trotter-error
+   :end-before: # end-cell-trotter-error
+
+
+Native ROHF in QDK SCF
+=======================
+
+The :term:`QDK` :term:`SCF` solver now supports restricted open-shell Hartree-Fock (:term:`ROHF`) with :term:`DIIS` acceleration for systems with unpaired electrons. Previously, open-shell calculations required an unrestricted formulation through the :term:`QDK` :term:`SCF` code path.
+
+:term:`ROHF` is automatically selected when specifying ``scf_type="restricted"`` on a system with multiplicity > 1. The :term:`DIIS` extrapolation works with the :term:`ROHF`-effective Fock matrix and total density matrix.
+
+.. literalinclude:: ../_static/examples/python/release_notes_v1_1.py
+   :language: python
+   :start-after: # start-cell-rohf
+   :end-before: # end-cell-rohf
+
+
+Cholesky-Based AO-to-MO Transformation
+=======================================
+
+A new Hamiltonian constructor uses pivoted Cholesky decomposition of the :term:`AO` electron-repulsion integrals (:term:`ERI`), reducing memory from :math:`O(N^4)` to :math:`O(N^2 N_\text{chol})` and significantly accelerating the :term:`AO`-to-:term:`MO` integral transformation compared to full four-center :term:`ERI` evaluation. This enables treatment of active-space methods for larger molecular systems that would be impractical with the conventional approach.
+
+.. literalinclude:: ../_static/examples/python/release_notes_v1_1.py
+   :language: python
+   :start-after: # start-cell-cholesky
+   :end-before: # end-cell-cholesky
+
+The implementation includes Schwarz-based shell-quartet screening, stability guards for near-singular decompositions, and diagnostic logging for convergence monitoring.
+
+
+OpenFermion Plugin
+==================
+
+A new plugin provides qubit mappings backed by `OpenFermion <https://quantumai.google/openfermion>`_:
+
+.. code-block:: bash
+
+   pip install 'qdk-chemistry[openfermion-extras]'
+
+.. literalinclude:: ../_static/examples/python/release_notes_v1_1.py
+   :language: python
+   :start-after: # start-cell-openfermion
+   :end-before: # end-cell-openfermion
+
+Available encodings: ``jordan-wigner``, ``bravyi-kitaev``, ``bravyi-kitaev-tree``, ``symmetry-conserving-bravyi-kitaev``.
+Please see the OpenFermion documentation for more information.
+
+See `examples/interoperability/openFermion/molecular_hamiltonian_jordan_wigner.py <https://github.com/microsoft/qdk-chemistry/blob/v1.1.0/examples/interoperability/openFermion/molecular_hamiltonian_jordan_wigner.py>`_ for a worked example.
+
+
+MACIS Improvements
+==================
+
+- **Expanded orbital limits.** The selected-:term:`CI` dispatch now supports active spaces up to **2048 orbitals** (up from 127 in v1.0). The internal :term:`SCI` bit-string representation was widened to 255 orbitals.
+- **Single-orbital entropies and mutual information.** :term:`MACIS` calculators can now compute S1 entropies and two-orbital mutual information for active-space analysis:
+
+  .. literalinclude:: ../_static/examples/python/release_notes_v1_1.py
+     :language: python
+     :start-after: # start-cell-macis-entropies
+     :end-before: # end-cell-macis-entropies
+
+- **ASCI refinement stability.** The :term:`ASCI` refinement loop now detects sign-flipping energy oscillations and terminates gracefully instead of looping indefinitely.
+- **Unrestricted-orbital guard.** :term:`MACIS` calculators (:term:`CAS`, :term:`ASCI`, :term:`PMC`) now raise a clear error if passed an unrestricted Hamiltonian, which is not supported by the :term:`MACIS` backend.
+
+
+Orbital Localization
+====================
+
+- **One-shot VVHV localization.** The valence-virtual hard-virtual (:term:`VVHV`) localizer was rewritten to use a proper one-shot localization for proto hard-virtuals, replacing the previous canonicalization-based approach. This improves numerical stability with better weighted orthogonalization and singular-value diagnostics.
+- **Bug fix** in the proto-HV construction that could produce incorrect localized orbitals in certain basis sets.
+
+
+Other Improvements
+==================
+
+- **Refactored energy estimator.** ``QdkEnergyEstimator`` now takes a single ``QubitHamiltonian``, groups commuting terms internally via ``group_commuting(qubit_wise=True)``, and delegates execution to a ``CircuitExecutor``:
+
+  .. literalinclude:: ../_static/examples/python/release_notes_v1_1.py
+     :language: python
+     :start-after: # start-cell-energy-estimator
+     :end-before: # end-cell-energy-estimator
+
+- **CI coefficients for CC and MP2.** Coupled-cluster and :term:`MP2` wavefunctions now expose a CI-like expansion with ``get_coefficients()``, ``get_coefficient(...)``, and ``get_active_determinants()`` methods, enabling determinant-level analysis of post-:term:`HF` wavefunctions.
+- **Configurable ERI threshold.** The ``eri_threshold`` setting (default ``1e-12``) controls shell-quartet screening in Hamiltonian construction. A separate ``shell_pair_threshold`` is available for :term:`SCF` pre-screening.
+- **Wavefunction file I/O with** ``pathlib.Path``. Python bindings for ``to_file`` / ``from_file``, ``to_json_file`` / ``from_json_file``, and ``to_hdf5_file`` / ``from_hdf5_file`` now accept ``pathlib.Path`` objects in addition to strings.
+- **Dedicated** ``[jupyter]`` **install extra.** Notebook dependencies are now isolated from the core install: ``pip install 'qdk-chemistry[jupyter]'``.
+- **``Symmetries`` data class.** A new immutable container for active-space quantum numbers, used by qubit mappers that exploit particle-number or spin symmetries (e.g., symmetry-conserving Bravyi-Kitaev):
+
+  .. literalinclude:: ../_static/examples/python/release_notes_v1_1.py
+     :language: python
+     :start-after: # start-cell-symmetries
+     :end-before: # end-cell-symmetries
+
+
+Bug Fixes
+=========
+
+- Fixed inactive Fock matrix dimension validation — matrices are now checked for full NMO × NMO shape before Hamiltonian construction, preventing silent size mismatches.
+- Fixed active-space :term:`MP2` orbital energies — denominators now use active-space orbital energies rather than full-system indices for both restricted and unrestricted :term:`MP2`.
+- Fixed JSON serialization of ``TimeEvolutionContainer`` — Pauli-term keys are now correctly serialized as strings and deserialized back to integer qubit indices.
+- Fixed :term:`SCF` logging suppression — the solver no longer silences the global logger during execution, which was hiding unrelated log messages.
+- Aligned logger flush policy with the configured log level.
+
+
+Infrastructure and Packaging
+=============================
+
+- **macOS ARM64 wheels.** Pre-built wheels are now published for macOS Apple Silicon alongside Linux x86_64 and Linux aarch64.
+- **Modular install extras.** Framework-specific dependencies are now optional extras (``qiskit-extras``, ``openfermion-extras``, ``jupyter``), keeping the default install lightweight.
+- **Telemetry sanitization.** Tests and CI builds now force telemetry off (``QSHARP_PYTHON_TELEMETRY=false``) to prevent accidental data collection during development.
+- **Centralized** ``VERSION`` **file.** A single ``VERSION`` file at the repo root is the source of truth for CMake, Python packaging, and CI. Format: ``X.Y.Z`` or ``X.Y.Z.T``.
+- Broadened CI/CD coverage and release pipeline hardening.
+- Documentation restructured with clearer navigation and a layered quick-reference style.
+- Added `qdk-chemistry-data <https://github.com/microsoft/qdk-chemistry-data>`_ companion repo references for curated datasets and benchmark materials.

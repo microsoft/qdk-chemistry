@@ -21,6 +21,10 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    scf_solver
    stability_checker
    state_preparation
+   phase_estimation
+   time_evolution_builder
+   circuit_mapper
+   circuit_executor
 
 
 Quick reference
@@ -68,6 +72,18 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`StabilityChecker <stability_checker>`
      - :term:`SCF` stability analysis
      - Orbitals → Stability
+   * - :doc:`PhaseEstimation <phase_estimation>`
+     - Quantum phase estimation
+     - Circuit + QubitHamiltonian → QpeResult
+   * - :doc:`TimeEvolutionBuilder <time_evolution_builder>`
+     - Hamiltonian simulation unitaries
+     - QubitHamiltonian → TimeEvolutionUnitary
+   * - :doc:`ControlledEvolutionCircuitMapper <circuit_mapper>`
+     - Controlled-unitary circuit synthesis
+     - TimeEvolutionUnitary → Circuit
+   * - :doc:`CircuitExecutor <circuit_executor>`
+     - Quantum circuit execution
+     - Circuit → CircuitExecutorData
 
 
 Discovering implementations

@@ -37,9 +37,9 @@ mcscf.settings().set("max_cycle_macro", 50)
 
 ################################################################################
 # start-cell-run
-from pathlib import Path  # noqa: E402
-from qdk_chemistry.data import Structure  # noqa: E402
-from qdk_chemistry.utils import compute_valence_space_parameters  # noqa: E402
+from pathlib import Path
+from qdk_chemistry.data import Structure
+from qdk_chemistry.utils import compute_valence_space_parameters
 
 # Load nitrogen molecule structure
 structure = Structure.from_xyz_file(
@@ -74,7 +74,7 @@ print(f"Correlation energy: {E_mcscf - E_scf:.10f} Hartree")
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 print(registry.available("multi_configuration_scf"))
 # ['pyscf']

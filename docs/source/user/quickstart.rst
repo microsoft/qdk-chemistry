@@ -9,7 +9,15 @@ More detailed documentation can be found in the :doc:`comprehensive/index`. A co
 Installation
 ------------
 
-To install QDK/Chemistry, please see the `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_.
+Install from PyPI with all optional dependencies:
+
+.. code-block:: bash
+
+   python3 -m venv venv && source venv/bin/activate
+   python3 -m pip install 'qdk-chemistry[all]'
+
+``[all]`` pulls in all optional dependencies so that examples and tests work without extra steps.
+For a minimal install, other methods (Dev Container, building from source), and platform-specific notes, see the `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_.
 
 End-to-end example
 ------------------

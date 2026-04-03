@@ -133,7 +133,7 @@ print(
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 print(registry.available("energy_estimator"))
 # ['qdk']

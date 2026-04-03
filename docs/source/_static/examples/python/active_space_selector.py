@@ -26,8 +26,8 @@ active_space_selector.settings().set("num_active_orbitals", 4)
 
 ################################################################################
 # start-cell-run
-from pathlib import Path  # noqa: E402
-from qdk_chemistry.data import Structure  # noqa: E402
+from pathlib import Path
+from qdk_chemistry.data import Structure
 
 # Load a molecular structure (water molecule) from XYZ file
 structure = Structure.from_xyz_file(
@@ -52,7 +52,7 @@ print(f"Active orbitals summary:\n{active_orbitals.get_summary()}")
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 print(registry.available("active_space_selector"))
 # ['pyscf_avas', 'qdk_occupation', 'qdk_autocas_eos', 'qdk_autocas', 'qdk_valence']
@@ -61,7 +61,7 @@ print(registry.available("active_space_selector"))
 
 ################################################################################
 # start-cell-autocas
-from qdk_chemistry.utils import compute_valence_space_parameters  # noqa: E402
+from qdk_chemistry.utils import compute_valence_space_parameters
 
 # Create a valence space active space selector
 valence_selector = create("active_space_selector", "qdk_valence")

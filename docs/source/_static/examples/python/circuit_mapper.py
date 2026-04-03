@@ -1,4 +1,4 @@
-"""Projected Multi-Configuration Calculator usage examples."""
+"""Controlled evolution circuit mapper usage examples."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -9,16 +9,16 @@
 # start-cell-create
 from qdk_chemistry.algorithms import create
 
-# Create a MACIS PMC calculator instance
-pmc_calculator = create("projected_multi_configuration_calculator", "macis_pmc")
+# Create the default mapper (pauli_sequence)
+mapper = create("controlled_evolution_circuit_mapper")
 # end-cell-create
 ################################################################################
 
 ################################################################################
 # start-cell-configure
-# Configure the PMC calculator using the settings interface
-pmc_calculator.settings().set("ci_residual_tolerance", 1.0e-6)
-pmc_calculator.settings().set("davidson_res_tol", 1.0e-8)
+# Configure the power of the controlled unitary
+mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+mapper.settings().set("power", 4)
 # end-cell-configure
 ################################################################################
 
@@ -26,34 +26,36 @@ pmc_calculator.settings().set("davidson_res_tol", 1.0e-8)
 # start-cell-run
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Configuration, Structure
+from qdk_chemistry.data import Structure
 
-# Create a structure (H2 molecule)
+# 1. Setup molecule
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 symbols = ["H", "H"]
-structure = Structure(coords, symbols)
+structure = Structure(coords, symbols=symbols)
 
-# Run SCF to get orbitals
+# 2. SCF
 scf_solver = create("scf_solver")
-E_scf, wfn = scf_solver.run(
+E_scf, wfn_scf = scf_solver.run(
     structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
 )
 
-# Build Hamiltonian from orbitals
-ham_constructor = create("hamiltonian_constructor")
-hamiltonian = ham_constructor.run(wfn.get_orbitals())
+# 3. Hamiltonian and qubit mapping
+hamiltonian_constructor = create("hamiltonian_constructor")
+hamiltonian = hamiltonian_constructor.run(wfn_scf.get_orbitals())
+qubit_mapper = create("qubit_mapper", encoding="jordan-wigner")
+qubit_ham = qubit_mapper.run(hamiltonian)
 
-# Define configurations
-configurations = [
-    Configuration("20"),  # Ground state (both electrons in lowest orbital)
-    Configuration("02"),  # Excited state (both electrons in higher orbital)
-]
+# 4. Build time evolution unitary
+trotter = create("time_evolution_builder", "trotter", order=2)
+evolution = trotter.run(qubit_ham, time=0.1)
 
-# Run the PMC calculation
-E_pmc, pmc_wavefunction = pmc_calculator.run(hamiltonian, configurations)
+# 5. Create a controlled version and map to a circuit
+from qdk_chemistry.data import ControlledTimeEvolutionUnitary
 
-print(f"SCF Energy: {E_scf:.10f} Hartree")
-print(f"PMC Energy: {E_pmc:.10f} Hartree")
+controlled = ControlledTimeEvolutionUnitary(evolution, control_indices=[0])
+mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+circuit = mapper.run(controlled)
+print("Controlled evolution circuit generated")
 # end-cell-run
 ################################################################################
 
@@ -61,7 +63,8 @@ print(f"PMC Energy: {E_pmc:.10f} Hartree")
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import registry
 
-available = registry.available("projected_multi_configuration_calculator")
-print(available)
+# List all registered controlled evolution circuit mapper implementations
+implementations = registry.available("controlled_evolution_circuit_mapper")
+print(implementations)  # e.g. ['pauli_sequence']
 # end-cell-list-implementations
 ################################################################################
